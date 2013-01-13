@@ -1,0 +1,479 @@
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+#include <cmath>
+#include <cstdio>
+
+#include <o2scl/interp.h>
+
+#include "arrays.h"
+#include "complex.h"
+#include "integrate.h"
+#include "twoel.h"
+
+MultipoleIntegral::MultipoleIntegral(
+	int lambda,
+	DistortingPotential u,
+	RadialFunction<double> const * f1,
+	RadialFunction<double> const * f2
+){
+	Lambda = lambda;
+	F1 = f1;
+	F2 = f2;
+	U = u;
+	
+	Evaluations = 0;
+	
+	init();
+}
+
+// int MultipoleIntegral::I0_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+// {
+// 	dydx[0] = F1->getValue(x) * pow(x,Lambda) * F2->getValue(x);
+// 	return 0;
+// }
+
+int MultipoleIntegral::II0_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+{
+	if (x == 0)
+		dydx[0] = 0.;
+	else
+		dydx[0] = (F1->getValue(x) * F2->getValue(x) - (Lambda + 1) * y[0]) / x;
+	return 0;
+}
+
+// int MultipoleIntegral::Iinf_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+// {
+// 	dydx[0] = F1->getValue(x) * pow(x,-Lambda-1) * F2->getValue(x);
+// 	return 0;
+// }
+
+int MultipoleIntegral::IIinf_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+{
+	if (x == 0)
+		dydx[0] = 0.;
+	else
+		dydx[0] = (F1->getValue(x) * F2->getValue(x) + Lambda * y[0]) / x;
+	return 0;
+}
+
+double MultipoleIntegral::eval(double x) const
+{
+	// evaluate distorting potential
+	double u = 0;
+	if (Lambda == 0)
+		u = U.getValue(x);
+	
+	// evaluate integrand for r < x
+	auto integrand1 = [ & ](double r) -> double {
+		
+		double multi;
+		if (Lambda == 0)
+			multi = -u;
+		else
+			multi = pow(r/x,Lambda)/x;
+		
+		return F1->getValue(r) * multi * F2->getValue(r);
+		
+	};
+	
+	// evaluate integrand for r > x
+	auto integrand2 = [ & ](double r) -> double {
+		
+		double multi;
+		if (Lambda == 0)
+			multi = 1./r - 1./x - u;
+		else
+			multi = pow(x/r,Lambda)/r;
+		
+		return F1->getValue(r) * multi * F2->getValue(r);
+		
+	};
+	
+	Integrator<decltype(integrand1)> Q1(integrand1);
+	Q1.integrate(0., x);
+	
+	Integrator<decltype(integrand2)> Q2(integrand2);
+	Q2.integrate(x, std::numeric_limits<double>::infinity());
+	
+	return Q1.result() + Q2.result();
+}
+
+
+void MultipoleIntegral::init()
+{
+	// precompute integrals
+	
+// 	// FIXME set grid parameters
+// 	double Rmax = 200;
+// 	size_t IIinf_N, II0_N;
+// 	IIinf_N = II0_N = 20001;
+// 	
+// 	// prepare derivative callback MFPTR-wrapper
+// 	o2scl::ode_funct_mfptr<MultipoleIntegral> IIinf_der(this, &MultipoleIntegral::IIinf_derivs);
+// 	o2scl::ode_funct_mfptr<MultipoleIntegral> II0_der(this, &MultipoleIntegral::II0_derivs);
+// 	
+// 	// prepare faster adaptive Cash-Karp Runge-Kutta stepper
+// 	o2scl::gsl_astep<decltype(IIinf_der)> IIinf_adapt_stepper;
+// 	o2scl::gsl_astep<decltype(II0_der)> II0_adapt_stepper;
+// 	o2scl::gsl_rkck_fast<2,decltype(IIinf_der)> stepper;
+// 	IIinf_adapt_stepper.set_step(stepper);
+// 	II0_adapt_stepper.set_step(stepper);
+// 		
+// 	// data arrays
+// 	o2scl::ovector IIinf_xg(IIinf_N), II0_xg(II0_N);
+// 	o2scl::omatrix IIinf_yg(IIinf_N,1), IIinf_ypg(IIinf_N,1), IIinf_yerrg(IIinf_N,1);
+// 	o2scl::omatrix II0_yg(II0_N,1), II0_ypg(II0_N,1), II0_yerrg(II0_N,1);
+// 		
+// 	// create grid
+// 	for (int i = 0; i < (int)IIinf_N; i++)
+// 	{
+// 		IIinf_xg[(int)IIinf_N - 1 - i] = Rmax * i / (IIinf_N - 1);
+// 		II0_xg[i] = Rmax * i / (II0_N - 1);
+// 	}
+// 	
+// 	// set boundary conditions
+// 	II0_yg[0][0] = 0.;
+// 	IIinf_yg[0][0] = 0.;
+// 	
+// 	// solve
+// 	o2scl::ode_iv_solve<> solver;
+// 	solver.ntrial = 1000000;
+// 	solver.solve_grid<o2scl::omatrix, o2scl::omatrix_row>(
+// 		-1e-3, 1, IIinf_N, IIinf_xg, IIinf_yg, IIinf_yerrg, IIinf_ypg, IIinf_der
+// 	);
+// 	solver.solve_grid<o2scl::omatrix, o2scl::omatrix_row>(
+// 		1e-3, 1, II0_N, II0_xg, II0_yg, II0_yerrg, II0_ypg, II0_der
+// 	);
+// 	
+// 	// copy results to private storage
+// 	IIinf_grid = rArray(IIinf_N);
+// 	II0_grid = rArray(II0_N);
+// 	IIinf_array = rArray(IIinf_N);
+// 	II0_array = rArray(II0_N);
+// 	for (int i = 0; i < (int)IIinf_N; i++)
+// 	{
+// 		IIinf_grid[i] = IIinf_xg[(int)IIinf_N - 1 - i];
+// 		IIinf_array[i] = -IIinf_yg[(int)IIinf_N - 1 - i][0];
+// 	}
+// 	for (int i = 0; i < (int)II0_N; i++)
+// 	{
+// 		II0_grid[i] = II0_xg[i];
+// 		II0_array[i] = II0_yg[i][0];
+// 	}
+// 	
+// 	IIinf_interpolator.set(IIinf_grid, IIinf_array, IIinf_array.size());
+// 	II0_interpolator.set(II0_grid, II0_array, II0_array.size());
+// 	
+// 	// compute overlap integral
+// 	auto integrand = [ & ](double x) -> double {
+// 		return F1->getValue(x) * F2->getValue(x);
+// 	};
+// 	Integrator<decltype(integrand)> Q(integrand);
+// 	Q.integrate(0., std::numeric_limits<double>::infinity());
+// 	S = Q.result();
+	
+	// create grid
+	int N = 20001;
+	double Rmax = 200;
+	grid = linspace(0., Rmax, N);
+	
+	// evaluate the function
+	array = rArray(N);
+	for (int i = 1; i < N; i++)
+		array[i] = eval(grid[i]);
+	array[0] = array[1];
+	
+	// prepare interpolator
+	interpolator.set(grid, array, array.size());
+}
+
+double MultipoleIntegral::getValue(double r) const
+{
+	Evaluations++;
+	
+	if (r > grid.back())
+		
+		// extrapolate
+		return 0.;
+	
+	else
+		
+		// interpolate
+		return interpolator.interp(r);
+	
+	
+	
+// 	if (r == 0.)
+// 	{
+// 		if (Lambda == 0)
+// 			return IIinf_array[0] - U.getConstant() * S;
+// 		
+// 		else
+// 			return IIinf_array[0];
+// 	}
+// 	else if (r > IIinf_grid.back() or r > II0_grid.back())
+// 	{
+// 		// extrapolate: omit IIinf_interpolator.interp(r), which ought to be zero
+// 		
+// 		if (Lambda == 0)
+// 			return II0_array.back() - (1/r + U.getValue(r)) * S;
+// 		
+// 		else // Lambda > 0
+// 			return II0_array.back();
+// 	}
+// 	else
+// 	{
+// 		// interpolate
+// 		
+// 		if (Lambda == 0)
+// 			return II0_interpolator.interp(r) + IIinf_interpolator.interp(r) - (1/r + U.getValue(r)) * S;
+// 		
+// 		else // Lambda > 0
+// 			return II0_interpolator.interp(r) + IIinf_interpolator.interp(r);
+// 	}
+}
+
+void MultipoleIntegral::toFile(const char* filenamebase) const
+{
+	char filename[50];
+	
+// 	sprintf(filename, "%s-I0.dat", filenamebase);
+// 	write_array(II0_grid, II0_array, filename);
+	
+// 	sprintf(filename, "%s-Iinf.dat", filenamebase);
+// 	write_array(IIinf_grid, IIinf_array, filename);
+	
+	sprintf(filename, "%s-all.dat", filenamebase);
+	write_array(grid, array, filename);
+}
+
+
+// -------------------------------------------------------------------------- //
+//                                                                            //
+//  MultipoleIntegralExc class members                                        //
+//                                                                            //
+// -------------------------------------------------------------------------- //
+
+
+MultipoleIntegralExc::MultipoleIntegralExc(
+	int lambda,
+	DistortingPotential u,
+	RadialFunction<double> const * f1,
+	RadialFunction<double> const * f2
+) {
+	Lambda = lambda;
+	F1 = f1;
+	F2 = f2;
+	U = u;
+	
+	Evaluations = 0;
+	
+	init();
+}
+
+void MultipoleIntegralExc::init()
+{
+	// precompute integrals
+	
+// 	// FIXME set grid parameters
+// 	double Rmax = 200;
+// 	size_t JJinf_N, JJ0_N;
+// 	JJinf_N = JJ0_N = 20001;
+// 	
+// 	// prepare derivative callback MFPTR-wrapper
+// 	o2scl::ode_funct_mfptr<MultipoleIntegralExc> JJinf_der(this, &MultipoleIntegralExc::JJinf_derivs);
+// 	o2scl::ode_funct_mfptr<MultipoleIntegralExc> JJ0_der(this, &MultipoleIntegralExc::JJ0_derivs);
+// 	
+// 	// prepare faster adaptive Cash-Karp Runge-Kutta stepper
+// 	o2scl::gsl_astep<decltype(JJinf_der)> JJinf_adapt_stepper;
+// 	o2scl::gsl_astep<decltype(JJ0_der)> JJ0_adapt_stepper;
+// 	o2scl::gsl_rkck_fast<2,decltype(JJinf_der)> stepper;
+// 	JJinf_adapt_stepper.set_step(stepper);
+// 	JJ0_adapt_stepper.set_step(stepper);
+// 		
+// 	// data arrays
+// 	o2scl::ovector JJinf_xg(JJinf_N), JJ0_xg(JJ0_N);
+// 	o2scl::omatrix JJinf_yg(JJinf_N,1), JJinf_ypg(JJinf_N,1), JJinf_yerrg(JJinf_N,1);
+// 	o2scl::omatrix JJ0_yg(JJ0_N,1), JJ0_ypg(JJ0_N,1), JJ0_yerrg(JJ0_N,1);
+// 		
+// 	// create grid
+// 	for (int i = 0; i < (int)JJ0_N; i++)
+// 		JJ0_xg[i] = Rmax * i / (JJ0_N - 1);
+// 	for (int i = 0; i < (int)JJinf_N; i++)
+// 		JJinf_xg[(int)JJinf_N - 1 - i] = Rmax * i / (JJinf_N - 1);
+// 	
+// 	// set initial conditions
+// 	JJ0_yg[0][0] = 0.;
+// 	JJinf_yg[0][0] = 0.;
+// 	
+// 	// solve
+// 	o2scl::ode_iv_solve<> solver;
+// 	solver.ntrial = 1000000;
+// 	solver.solve_grid<o2scl::omatrix, o2scl::omatrix_row>(
+// 		-1e-3, 1, JJinf_N, JJinf_xg, JJinf_yg, JJinf_yerrg, JJinf_ypg, JJinf_der
+// 	);
+// 	solver.solve_grid<o2scl::omatrix, o2scl::omatrix_row>(
+// 		1e-3, 1, JJ0_N, JJ0_xg, JJ0_yg, JJ0_yerrg, JJ0_ypg, JJ0_der
+// 	);
+// 	
+// 	// copy results to private storage
+// 	JJinf_grid = rArray(JJinf_N);
+// 	JJ0_grid = rArray(JJ0_N);
+// 	JJinf_array = rArray(JJinf_N);
+// 	JJ0_array = rArray(JJ0_N);
+// 	for (int i = 0; i < (int)JJ0_N; i++)
+// 	{
+// 		JJ0_grid[i] = JJ0_xg[i];
+// 		JJ0_array[i] = JJ0_yg[i][0];
+// 	}
+// 	for (int i = 0; i < (int)JJinf_N; i++)
+// 	{
+// 		JJinf_grid[i] = JJinf_xg[(int)JJinf_N - 1 - i];
+// 		JJinf_array[i] = -JJinf_yg[(int)JJinf_N - 1 - i][0];
+// 	}
+// 	
+// 	JJinf_interpolator.set(JJinf_grid, JJinf_array, JJinf_array.size());
+// 	JJ0_interpolator.set(JJ0_grid, JJ0_array, JJ0_array.size());
+/*	
+	// compute the integral of U·F1·F2
+	auto integrand = [ & ] (double x) -> double {
+		return U.getValue(x) * F1->getValue(x) * F2->getValue(x);
+	};
+	Integrator<decltype(integrand)> Q(integrand);
+	Q.integrate(0, std::numeric_limits<double>::infinity());
+	Z = Q.result();*/
+	
+	// create grid
+	int N = 20001;
+	double Rmax = 200;
+	grid = linspace(0., Rmax, N);
+	
+	// evaluate the function
+	array = rArray(N);
+	for (int i = 1; i < N; i++)
+		array[i] = eval(grid[i]);
+	array[0] = array[1];
+	
+	// prepare interpolator
+	interpolator.set(grid, array, array.size());
+}
+
+int MultipoleIntegralExc::JJ0_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+{
+	if (x == 0)
+		dydx[0] = 0.;
+	else
+		dydx[0] = (F1->getValue(x) * F2->getValue(x) - (Lambda + 1) * y[0]) / x;
+	return 0;
+}
+
+int MultipoleIntegralExc::JJinf_derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+{
+	if (x == 0)
+		dydx[0] = 0.;
+	else
+		dydx[0] = (F1->getValue(x) * F2->getValue(x) + Lambda * y[0]) / x;
+	return 0;
+}
+
+double MultipoleIntegralExc::eval(double x) const
+{
+	// evaluate integrand for r < x
+	auto integrand1 = [ & ](double r) -> double {
+		
+		// evaluate distorting potential
+		double u = 0;
+		if (Lambda == 0)
+			u = U.getValue(r);
+		
+		double multi;
+		if (Lambda == 0)
+			multi = 1./x - 1./r - u;
+		else
+			multi = pow(r/x,Lambda)/x;
+		
+		return F1->getValue(r) * multi * F2->getValue(r);
+		
+	};
+	
+	// evaluate integrand for r > x
+	auto integrand2 = [ & ](double r) -> double {
+		
+		// evaluate distorting potential
+		double u = 0;
+		if (Lambda == 0)
+			u = U.getValue(r);
+		
+		double multi;
+		if (Lambda == 0)
+			multi = -u;
+		else
+			multi = pow(x/r,Lambda)/r;
+		
+		return F1->getValue(r) * multi * F2->getValue(r);
+		
+	};
+	
+	Integrator<decltype(integrand1)> Q1(integrand1);
+	Q1.integrate(0., x);
+	
+	Integrator<decltype(integrand2)> Q2(integrand2);
+	Q2.integrate(x, std::numeric_limits<double>::infinity());
+	
+	return Q1.result() + Q2.result();
+}
+
+double MultipoleIntegralExc::getValue(double r) const
+{
+	Evaluations++;
+	
+	if (r > grid.back())
+		return 0.;
+	
+	else
+		return interpolator.interp(r);
+	
+// 	// get precomputed data
+// 	if (r > JJinf_grid.back() or r > JJ0_grid.back())
+// 	{
+// 		// extrapolate: omit JJinf_array, which ought to be zero
+// 		if (Lambda == 0)
+// 			return JJ0_array.back() - Z;
+// 		
+// 		else // Lambda > 0
+// 			return JJ0_array.back();
+// 	}
+// 	else
+// 	{
+// 		// interpolate
+// 		if (Lambda == 0)
+// 			return JJ0_interpolator.interp(r) + JJinf_interpolator.interp(r) - Z;
+// 		
+// 		else // Lambda > 0
+// 			return JJ0_interpolator.interp(r) + JJinf_interpolator.interp(r);
+// 	}
+}
+
+void MultipoleIntegralExc::toFile(const char* filenamebase) const
+{
+	char filename[50];
+	
+// 	sprintf(filename, "%s-J0.dat", filenamebase);
+// 	write_array(JJ0_grid, JJ0_array, filename);
+	
+// 	sprintf(filename, "%s-Jinf.dat", filenamebase);
+// 	write_array(JJinf_grid, JJinf_array, filename);
+	
+	sprintf(filename, "%s-all.dat", filenamebase);
+	write_array(grid, array, filename);
+}

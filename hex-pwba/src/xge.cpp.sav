@@ -1,0 +1,398 @@
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+#include <cmath>
+#include <complex>
+#include <cstdlib>
+#include <cstdio>
+#include <vector>
+
+#include <gsl/gsl_sf.h>
+#define fac(n) gsl_sf_fact(n)
+
+#include "xge.h"
+
+/*
+ * Generalized combination number
+ */
+double Combination(double alpha, int k)
+{
+	double res = 1;
+	for (int w = 0; w < k; w++)
+		res *= (alpha - w) / (k - w);
+	return res;
+}
+
+typedef std::complex<double> Complex;
+
+const char* gfname(unsigned i)
+{
+	static const char* const names[] = {"none", "sin", "cos"};
+	return names[i];
+}
+
+// operators on XGE polynomials
+xge_poly operator * (const xge_poly& P, const xge_poly& Q)
+{
+	xge_poly product_poly;
+	
+	for (xge_term p : P) for (xge_term q : Q)
+	{
+		xge_term product_term;
+		product_term.k = p.k * q.k;
+		product_term.a = p.a + q.a;
+		product_term.c = p.c + q.c;
+		
+		if (p.gf == GF_NONE and q.gf == GF_NONE)
+		{
+			product_term.gf = GF_NONE;
+			product_term.b = 0;
+			
+			product_poly.push_back(product_term);
+		}
+		else if (p.gf != GF_NONE and q.gf == GF_NONE)
+		{
+			product_term.gf = p.gf;
+			product_term.b = p.b;
+			
+			product_poly.push_back(product_term);
+		}
+		else if (p.gf == GF_NONE and q.gf != GF_NONE)
+		{
+			product_term.gf = q.gf;
+			product_term.b = q.b;
+			
+			product_poly.push_back(product_term);
+		}
+		else if (p.gf == GF_SIN and q.gf == GF_SIN)
+		{
+			product_term.k /= 2;
+			product_term.gf = GF_COS;
+			
+			product_term.b = p.b - q.b;
+			product_poly.push_back(product_term);
+			if (product_poly.back().b == 0)
+				product_poly.back().gf = GF_NONE;
+			
+			product_term.k += -1;
+			product_term.b = p.b + q.b;
+			product_poly.push_back(product_term);
+			if (product_poly.back().b == 0)
+				product_poly.back().gf = GF_NONE;
+		}
+		else if (p.gf == GF_SIN and q.gf == GF_COS)
+		{
+			product_term.k /= 2;
+			product_term.gf = GF_SIN;
+			
+			product_term.b = p.b + q.b;
+			product_poly.push_back(product_term);
+			
+			product_term.b = p.b - q.b;
+			product_poly.push_back(product_term);
+		}
+		else if (p.gf == GF_COS and q.gf == GF_SIN)
+		{
+			product_term.k /= 2;
+			product_term.gf = GF_SIN;
+			
+			product_term.b = p.b + q.b;
+			product_poly.push_back(product_term);
+			
+			product_term.k += -1;
+			product_term.b = p.b - q.b;
+			product_poly.push_back(product_term);
+		}
+		else if (p.gf == GF_COS and q.gf == GF_COS)
+		{
+			product_term.k /= 2;
+			product_term.gf = GF_COS;
+			
+			product_term.b = p.b + q.b;
+			product_poly.push_back(product_term);
+			if (product_poly.back().b == 0)
+				product_poly.back().gf = GF_NONE;
+			
+			product_term.b = p.b - q.b;
+			product_poly.push_back(product_term);
+			if (product_poly.back().b == 0)
+				product_poly.back().gf = GF_NONE;
+		}
+		else
+		{
+			printf("[operator *] Unknown goniometric function combination.\n");
+			abort();
+		}
+	}
+	
+	return product_poly;
+}
+
+xge_poly operator * (const xge_poly& P, const xge_term& Q)
+{
+	xge_poly poly(1);
+	poly[0] = Q;
+	
+	return P * poly;
+}
+
+xge_poly operator - (const xge_poly& P, const xge_poly& Q)
+{
+	// copy P
+	xge_poly difference = P;
+	
+	// copy Q
+	difference.insert(difference.end(), Q.begin(), Q.end());
+	
+	// invert signs in the copy of Q
+	for (unsigned i = P.size(); i < difference.size(); i++)
+		difference[i].k *= -1;
+	
+	return difference;
+}
+
+/*
+ * Laguerre polynomial
+ * Laguerre(k,s,x) := sum((-1)^j * (k!)^2 * x^(j-s) / ( (k-j)! * j! * (j-s)! ), j, s, k);
+ */
+xge_poly Laguerre(unsigned k, unsigned s)
+{
+	xge_poly laguerre;
+	
+	for (unsigned j = s; j <= k; j++)
+	{
+		xge_term term;
+		term.k = pow(-1,j) * fac(k) * fac(k) / (fac(k-j) * fac(j) * fac(j-s));
+		term.a = j-s;
+		term.gf = GF_NONE;
+		term.b = 0;
+		term.c = 0.;
+		laguerre.push_back(term);
+	}
+	
+	return laguerre;
+}
+
+/*
+ * Hydrogen radial function normalization factor
+ * sqrt((2/n)^3 * (n-l-1)! / (2*n*((n+l)!)^3));
+ */
+double HydrogenN(unsigned n, unsigned l)
+{
+	return sqrt(pow(2./n,3) * fac(n-l-1) / (2*n*pow(fac(n+l),3)));
+}
+
+/*
+ * Hydrogen radial function.
+ * HydrogenP(n,l,r) := r * HydrogenN(n,l) * (2*r/n)^l * Laguerre(n+l,2*l+1,2*r/n) * exp(-r/n);
+ */
+xge_poly HydrogenP(unsigned n, unsigned l)
+{
+	xge_poly laguerre = Laguerre(n+l, 2*l+1);
+	for (xge_term& term : laguerre)
+		term.k *= pow(2./n, term.a);
+	
+	xge_term rest;
+	rest.k = HydrogenN(n,l) * pow(2./n,l);
+	rest.a = l+1;
+	rest.gf = GF_NONE;
+	rest.b = 0;
+	rest.c = 1./n;
+	
+	return laguerre * rest;
+}
+
+/*
+ * Riccati-Bessel function
+ * BesselF(l,x) := sum(
+ *                       sin(x) * (2/x)^(l-2*i) * (l-i)!/i! * combination(-1/2-i,l-2*i) 
+ *                     - cos(x) * (2/x)^(l-2*i) * (l-i)!/i! * i * combination(-1/2-i,l-2*i+1),
+ *                   i, 0, floor((l+1)/2)
+ *                 );
+ */
+xge_poly RiccatiBessel(int l, double k)
+{
+	xge_poly ricj;
+	
+	for (int i = 0; i <= (l+1)/2; i++)
+	{
+		xge_term term;
+		
+		term.k = pow(2/k, 1-2*i) * fac(l-i) / fac(i) * Combination(-0.5-i,l-2*i);
+		term.a = 2*i - l;
+		term.gf = GF_SIN;
+		term.b = k;
+		term.c = 0;
+		ricj.push_back(term);
+	}
+	
+	for (int i = 1; i <= (l+1)/2; i++)
+	{
+		xge_term term;
+		
+		term.k = -pow(2/k, 1-2*i) * fac(l-i) / fac(i) * i *  Combination(-0.5-i,l-2*i+1);
+		term.a = 2*i - l;
+		term.gf = GF_COS;
+		term.b = k;
+		term.c = 0;
+		ricj.push_back(term);
+	}
+	
+	return ricj;
+}
+
+/*
+ * Integrals
+ */
+double Integral_xge_full(const xge_poly& P)
+{
+	double result = 0;
+	
+	for (auto p : P)
+	{
+		if (p.a < -1 or (p.a == -1 and p.gf != GF_SIN))
+		{
+			fprintf(stderr, "[Integral_xge_full] Divergent integral!\n");
+			abort();
+		}
+		
+		if (p.a == -1 and p.gf == GF_SIN)
+			return p.k * (M_PI/2 - atan(p.c/p.b));
+		
+		if (p.gf == GF_NONE)
+			result += p.k * fac(p.a) * pow(p.c, -p.a-1);
+		else if (p.gf == GF_SIN)
+			result += p.k * fac(p.a) * pow(std::complex<double>(p.c,-p.b), -p.a-1).imag();
+		else if (p.gf == GF_COS)
+			result += p.k * fac(p.a) * pow(std::complex<double>(p.c,-p.b), -p.a-1).real();
+		else
+		{
+			fprintf(stderr, "[Integral_xge_full] Unknown goniom. function.\n");
+			abort();
+		}
+	}
+	
+	return result;
+}
+
+xge_poly Integral_xge_inf(const xge_poly& P)
+{
+	xge_poly result;
+	
+	for (auto p : P)
+	{
+		for (int j = 0; j <= p.a; j++)
+		{
+			if (p.gf == GF_NONE)
+			{
+				xge_term term;
+				term.k = p.k * fac(p.a) * pow(p.c, j - p.a - 1) / fac(j);
+				term.a = j;
+				term.gf = GF_NONE;
+				term.b = 0.;
+				term.c = p.c;
+				result.push_back(term);
+			}
+			else if (p.gf == GF_COS)
+			{
+				xge_term term1, term2;
+				term1.a = term2.a = j;
+				term1.b = term2.b = p.b;
+				term1.c = term2.c = p.c;
+				term1.gf = GF_COS;
+				term1.k = (p.k * fac(p.a) * pow(Complex(p.c,-p.b), j-p.a-1) / fac(j)).real();
+				term2.gf = GF_SIN;
+				term2.k = -(p.k * fac(p.a) * pow(Complex(p.c,-p.b), j-p.a-1) / fac(j)).imag();
+				result.push_back(term1);
+				result.push_back(term2);
+			}
+			else if (p.gf == GF_SIN)
+			{
+				xge_term term1, term2;
+				term1.a = term2.a = j;
+				term1.b = term2.b = p.b;
+				term1.c = term2.c = p.c;
+				term1.gf = GF_COS;
+				term1.k = (p.k * fac(p.a) * pow(Complex(p.c,-p.b), j-p.a-1) / fac(j)).imag();
+				term2.gf = GF_SIN;
+				term2.k = (p.k * fac(p.a) * pow(Complex(p.c,-p.b), j-p.a-1) / fac(j)).real();
+				result.push_back(term1);
+				result.push_back(term2);
+			}
+			else
+			{
+				printf("[Integral_xge_full] Unknown goniom. function.\n");
+				abort();
+			}
+		}
+	}
+	
+	return result;
+}
+
+xge_poly Integral_xge_low(const xge_poly& P)
+{
+	double i_full = Integral_xge_full(P);
+	xge_poly x_full(1);
+	x_full[0].k = i_full;
+	x_full[0].a = 0;
+	x_full[0].gf = GF_NONE;
+	x_full[0].b = 0;
+	x_full[0].c = 0;
+	
+	return x_full - Integral_xge_inf(P);
+}
+
+double xge_eval(const xge_poly& P, double r)
+{
+	double result = 0;
+	
+	for (auto p : P)
+	{
+		if (p.gf == GF_NONE)
+			result += p.k * pow(r, p.a) * exp(-p.c*r);
+		else if (p.gf == GF_COS)
+			result += p.k * pow(r, p.a) * cos(p.b*r) * exp(-p.c*r);
+		else if (p.gf == GF_SIN)
+			result += p.k * pow(r, p.a) * sin(p.b*r) * exp(-p.c*r);
+		else
+		{
+			printf("[xge_eval] Unknown goniom. function.\n");
+			abort();
+		}
+	}
+	
+	return result;
+}
+
+void write_xge(const xge_poly &p)
+{
+	for (unsigned i = 0; i < p.size(); i++)
+	{
+		if (p[i].k == 0)
+			continue;
+		if (p[i].k != 1)
+			printf("%g", p[i].k);
+		if (p[i].a != 0)
+			printf(" r^%d", p[i].a);
+		if (p[i].gf != GF_NONE)
+			printf(" %s(%gr)", gfname(p[i].gf), p[i].b);
+		if (p[i].c == 1)
+			printf(" exp(-r)");
+		else if (p[i].c != 0)
+			printf(" exp(-%gr)", p[i].c);
+		
+		if (i < p.size() - 1)
+			printf(" + ");
+	}
+	printf("\n");
+}
