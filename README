@@ -1,0 +1,12 @@
+The following configuration successfully builds the package:
+
+Compiler:
+    GCC 4.7.1
+
+Libraries:
+    GSL 1.15
+    O2scl 0.911
+    OpenBLAS 0.2.5
+    SuiteSparse 4.0.2
+    png++ 0.2.5
+    sqlitepp 0.2

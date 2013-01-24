@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+ "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+ 
+<head>
+	<title>Hex scattering database</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	
+	<style>
+		<!-- @import "style.css"; -->
+	</style>
+</head>
+ 
+<body>
+
+	<div class = "ramec">
+
+	<!-- header -->
+
+	<table border = "0">
+		<tr><td>
+			<a href = "index.html"><img src = "hexe.gif"/></a>
+		</td><td>
+			<div class = "nadpis">Hex</div>
+			
+			<div class = "podnadpis">scattering database</div>
+		</td></tr>
+	</table>
+
+	<!-- explanation -->
+
+	<div class = "text">
+		“<b>Hex</b>” stands for “<b>h</b>ydrogen <b>e</b>xterior <b>c</b>omplex <b>s</b>caling”;
+		nevertheless, this acronym actually covers several distinct things:
+	</div>
+
+	<ul>
+		<li>
+			low-energy scattering code implementing direct solution of Schrödinger equation
+			using exterior complex scaling workaround for boundary condition, a.k.a.
+			<a class = "module" href = "hex-main.html">hex-main</a>,
+		</li>
+		<li>
+			high-energy scattering code implementing first and second order of
+			distorted wave Born approximation, a.k.a. <a class = "module" href = "hex-dwba.html">hex-dwba</a>,
+		</li>
+		<li>
+			the <a class = "module" href = "database.html">database</a> of T-matrices,
+			as computed by these two modules, and
+		</li>
+		<li>
+			the user interface (both CLI and Web), a.k.a. <a class = "module" href = "hex-db.html">hex-db</a>,
+			which uses these data to compute derived scattering quantities.
+		</li>
+	</ul>
+	
+	<img src = "logo.png" style = "float: right; width: 100px; margin: 10px;"/>
+	
+	<div class = "text">
+		The package is maintained by the Institute of Theoretical Physics at the
+		Charles University in Prague, Czech Republic, in the collaboration with
+		the Astronomical Institute of the Czech Academy of Sciences.
+	</div>
+
+	<form name = "goto" action = "db.php" method = "post" style = "margin: 10px;">
+		<center>
+			<input type = "submit" value = "Go to web interface"/>
+		</center>
+	</forn>
+
+	</div> <!-- rám -->
+
+	<div class = "pata">Jakub Benda ⓒ 2012</div>
+
+</body>
+
+</html>
