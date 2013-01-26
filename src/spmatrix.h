@@ -1139,7 +1139,7 @@ unsigned cg_callbacks(
 		r -= alpha * q;
 		
 		// once in a while check convergence but do at least "min_iterations" iterations
-		if (k >= min_iterations and k % 4 == 0 and r.norm() / b.norm() < eps)
+		if (k >= min_iterations and r.norm() / b.norm() < eps)
 			break;
 		
 		// check iteration limit (stop at "max_iterations" iterations)
