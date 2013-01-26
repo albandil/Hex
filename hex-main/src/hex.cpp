@@ -14,6 +14,7 @@
 #include <complex>
 #include <cstdio>
 #include <cmath>
+#include <chrono>
 #include <cstring>
 #include <vector>
 #include <iostream>
@@ -498,10 +499,18 @@ int main(int argc, char* argv[])
 			// get diagonal block index
 			int iblock = l1 * (maxell + 1) + l2;
 			
+			// timer info
+			std::chrono::steady_clock::time_point start;
+			std::chrono::duration<int> sec;
+			
 			// factorize
-			fprintf(stdout, "\tLU factorization %d of (%d,%d) block started\n", iblock, l1, l2); fflush(stdout);
+			std::fprintf(stdout, "\tLU factorization %d of (%d,%d) block started\n", iblock, l1, l2);
+			std::fflush(stdout);
+			start = std::chrono::steady_clock::now();
 			lufts[iblock] = blocks[iblock].factorize();
-			fprintf(stdout, "\tLU factorization %d of (%d,%d) block done\n", iblock, l1, l2); fflush(stdout);
+			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+			std::printf("\tLU factorization %d of (%d,%d) block done after %d s\n", iblock, l1, l2, sec.count()); 
+			std::fflush(stdout);
 		}
 		
 		// For all initial states ------------------------------------------- //
