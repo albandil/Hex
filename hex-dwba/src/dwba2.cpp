@@ -72,8 +72,8 @@ double DWBA2::computeI (
 
 double DWBA2::XiIntegral(HydrogenFunction const & psi, SturmianFunction const & S)
 {
-	RadialFunction<double> const * psi_r = (RadialFunction<double> const *)&psi;
-	RadialFunction<double> const * S_r   = (RadialFunction<double> const *)&S;
+	RadialFunction<double> const *psi_r = (RadialFunction<double> const *) &psi;
+	RadialFunction<double> const *S_r   = (RadialFunction<double> const *) &S;
 	
 	auto integrand = [&](double r) -> double {
 		return r * (*psi_r)(r) * (*S_r)(r);

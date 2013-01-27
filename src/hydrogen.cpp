@@ -173,8 +173,16 @@ double Hydrogen::evalFreeState(double k, int l, double r)
 
 double Hydrogen::evalSturmian(int n, int l, double r, double lambda)
 {
-	return n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
-		* exp(-lambda*r) * pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
+	double S;
+	
+	try {
+		S = n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
+			* exp(-lambda*r) * pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
+	} catch (o2scl::exc_range_error e) {
+		return 0.;
+	}
+	
+	return S;
 }
 
 double Hydrogen::evalFreeState_asy(double k, int l, double r)

@@ -149,7 +149,7 @@ public:
 	}
 	
 	/**
-	 * Return Chebyshev aproximation of the prinimitve function to the
+	 * Return Chebyshev aproximation of the function primitive to the
 	 * stored Chebyshev approximation.
 	 */
 	Chebyshev integrate () const
@@ -157,13 +157,14 @@ public:
 		Chebyshev ret;
 		ret.xt = xt;
 		ret.m  = m;
-		ret.N  = N - 1;
+		ret.N  = N;
 		
 		ret.C.resize(ret.N);
 		ret.C[0] = 0;
+		ret.C[N-1] = ret.m * C[N-2] / (2*(N-2));
 		
 		for (int i = 1; i < N - 1; i++)
-			ret.C[i] = (C[i-1] - C[i+1]) / (2*i);
+			ret.C[i] = ret.m * (C[i-1] - C[i+1]) / (2*i);
 		
 		return ret;
 	}
