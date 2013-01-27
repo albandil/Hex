@@ -14,12 +14,9 @@
 #define HEX_HYDROGEN
 
 #include <vector>
-#include <cln/cln.h>
-#include <o2scl/interp.h>
 
 #include "arrays.h"
 #include "specf.h"
-#include "symbolic.h"
 
 #define DEFAULT_LAMBDA		1
 #define DEFAULT_MAXSTEPS	1000
@@ -72,15 +69,32 @@ public:
 /**
  * Hydrogen radial function.
  */
-class HydrogenFunction : public RadialFunction<double>, public SymbolicPoly
+class HydrogenFunction : public RadialFunction<double>
 {
 public:
 	
-	HydrogenFunction() : SymbolicPoly(), n(0), l(0) {}
-	HydrogenFunction(int n, int l) : SymbolicPoly(HydrogenP(n,l)), n(n), l(l) {}
+	HydrogenFunction() : n(0), l(0) {}
+	HydrogenFunction(int n, int l) : n(n), l(l) {}
 	
+	/**
+	 * Compute far radius \f$ R \f$. For \f$ r > R \f$ the hydrogen radial function
+	 * will always be less than 'eps'.
+	 */
+	inline double far (double eps, int max_steps = 1000) const { return Hydrogen::getFarRadius(n,l,eps,max_steps); };
+	
+	/**
+	 * Get principal quantum number.
+	 */
 	inline int getN () const { return n; }
+	
+	/**
+	 * Get orbital quantum number.
+	 */
 	inline int getL () const { return l; }
+	
+	/**
+	 * Evaluate the function.
+	 */
 	inline double operator() (double r) const { return Hydrogen::evalBoundState(n,l,r); }
 
 private:
@@ -91,26 +105,44 @@ private:
 /**
  * Hydrogen radial function.
  */
-class SturmianFunction : public RadialFunction<double>, public SymbolicPoly
+class SturmianFunction : public RadialFunction<double>
 {
 public:
 	
-	SturmianFunction() : SymbolicPoly(), n(0), l(0), lambda(0) {}
-	SturmianFunction(int n, int l, cln::cl_RA lambda = DEFAULT_LAMBDA)
-	    : SymbolicPoly(HydrogenS(n,l,lambda)), n(n), l(l), lambda(lambda) {}
+	SturmianFunction() : n(0), l(0), lambda(0) {}
+	SturmianFunction(int n, int l, double lambda = DEFAULT_LAMBDA)
+	    : n(n), l(l), lambda(lambda) {}
 	
+	/**
+	 * Compute far radius \f$ R \f$. For \f$ r > R \f$ the hydrogen Sturmian function
+	 * will always be less than 'eps'.
+	 */
+	inline double far (double eps, int max_steps = 1000) const { return Hydrogen::getFarRadiusS(n,l,lambda,eps,max_steps); };
+	
+	/**
+	 * Get principal quantum number.
+	 */
 	inline int getN () const { return n; }
+	
+	/**
+	 * Get orbital quantum number.
+	 */
 	inline int getL () const { return l; }
-	inline double getLambda () const { return cln::double_approx(lambda); }
-	inline double operator() (double r) const
-	{
-		return Hydrogen::evalSturmian(n, l, r, cln::double_approx(lambda));
-	}
+	
+	/**
+	 * Get shielding constant.
+	 */
+	inline double getLambda () const { return lambda; }
+	
+	/**
+	 * Evaluate the function.
+	 */
+	inline double operator() (double r) const { return Hydrogen::evalSturmian(n, l, r, lambda); }
 	
 private:
 	
 	int n, l;
-	cln::cl_RA lambda;
+	double lambda;
 };
 
 #endif

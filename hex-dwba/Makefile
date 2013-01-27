@@ -5,7 +5,7 @@ LFLAGS = -g -fPIC -O3 $(SUITESPARSELIBS) -lrt -lopenblas -lo2scl -lgsl -lgslcbla
 
 all: bin/dwba
 
-bin/dwba: obj/main.o obj/potential.o obj/wave_distort.o obj/symbolic.o \
+bin/dwba: obj/main.o obj/potential.o obj/wave_distort.o \
           obj/dwba1.o obj/dwba2.o obj/hydrogen.o obj/arrays.o \
           obj/angs.o obj/specf.o obj/spmatrix.o
 	@mkdir -p $(@D)
@@ -44,15 +44,11 @@ obj/wave_distort.o: src/wave_distort.cpp src/wave_distort.h src/arrays.h src/com
 # obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrays.h src/complex.h
 # 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/symbolic.o: src/symbolic.cpp src/symbolic.h
-	@mkdir -p $(@D)
-	g++ -c $(CXXFLAGS) $< -o $@
-
 obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h src/potential.h src/hydrogen.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/spmatrix.h src/hydrogen.h src/symbolic.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/spmatrix.h src/hydrogen.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

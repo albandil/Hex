@@ -16,16 +16,19 @@
 #include <cmath>
 #include <vector>
 
-template <class Functor> class Chebyshev
+class Chebyshev
 {
 public:
+	
+	Chebyshev () {}
 	
 	/**
 	 * Construct Chebyshev 'n'-term approximation of the function 'f'
 	 * on the interval (a,b).
 	 */
-	Chebyshev (Functor f, int n, double a = -1, double b = 1) : F(f), N(n)
+	template <class Functor> Chebyshev (Functor f, int n, double a = -1, double b = 1)
 	{
+		N  = n;
 		xt = 0.5 * (b + a);
 		m  = 0.5 * (b - a);
 		
@@ -38,7 +41,7 @@ public:
 			{
 				double xk = cos(M_PI * (k + 0.5) / N);
 				double Tj_xk = cos(M_PI * j * (k + 0.5) / N);
-				double f_xk = F(unscale(xk));
+				double f_xk = f(unscale(xk));
 				
 				C[j] += f_xk * Tj_xk;
 			}
@@ -145,19 +148,33 @@ public:
 		return ret;
 	}
 	
-private:
+	/**
+	 * Return Chebyshev aproximation of the prinimitve function to the
+	 * stored Chebyshev approximation.
+	 */
+	Chebyshev integrate () const
+	{
+		Chebyshev ret;
+		ret.xt = xt;
+		ret.m  = m;
+		ret.N  = N - 1;
+		
+		ret.C.resize(ret.N);
+		ret.C[0] = 0;
+		
+		for (int i = 1; i < N - 1; i++)
+			ret.C[i] = (C[i-1] - C[i+1]) / (2*i);
+		
+		return ret;
+	}
 	
-	/// initialize
-	void init(double a, double b);
+private:
 	
 	/// map interval (xt-m,xt+m) to (-1,1)
 	inline double scale(double x) const { return (x - xt) / m; }
 	
 	/// map interval (-1,1) to (xt-m,xt+m)
 	inline double unscale(double x) const { return (xt + m*x); }
-	
-	/// approximated function
-	Functor F;
 	
 	/// Chebyshev coefficients
 	std::vector<double> C;

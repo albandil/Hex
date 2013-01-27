@@ -35,7 +35,8 @@ double DWBA2::computeI (
 	if (lam_a == 0)
 	{
 		// setup inner integrals
-		PhiFunction phi1(integrate_inf, 0, psi_a, sturm1), phi2(integrate_inf, 1, psi_a, sturm1);
+		PhiFunction phi1 (&PhiFunction::integrate_inf, 0, psi_a, sturm1);
+		PhiFunction phi2 (&PhiFunction::integrate_low, 1, psi_a, sturm1);
 		RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
 		double xi = XiIntegral(psi_a, sturm1);
 		
@@ -47,42 +48,14 @@ double DWBA2::computeI (
 		// integrate
 		Integrator<decltype(integrand)> Q(integrand);
 		Q.integrate(0., std::numeric_limits<double>::infinity());
-		
-		/// DEBUG
-		/*write_1D_data (
-			1000,
-			"integrand.out",
-			[ & ] (size_t i) -> double { return integrand(i * 0.01); }
-		);
-		write_1D_data (
-			1000,
-			"sturm2.out",
-			[ & ] (size_t i) -> double { return sturm2(i * 0.01); }
-		);
-		SymbolicPoly phi1_s = (*(SymbolicPoly const *)(&phi1));
-		SymbolicPoly phi2_s = (*(SymbolicPoly const *)(&phi2));
-		SymbolicPoly phi12  = phi1_s - phi2_s;
-		SymbolicPoly sturm1_s = (*(SymbolicPoly const *)(&sturm1));
-		SymbolicPoly sturm2_s = (*(SymbolicPoly const *)(&sturm2));
-		SymbolicPoly psia_s = (*(SymbolicPoly const *)(&psi_a));
-		printf("phi1: "); write(phi1_s);
-		printf("phi2: "); write(phi2_s);
-		printf("phi1-phi2: "); write(phi12);
-		printf("psi_a: "); write(psia_s);
-		printf("sturm1: "); write(sturm1_s);
-		printf("sturm2: "); write(sturm2_s);
-		printf("psi_a*sturm1: "); write(psi_a*sturm1_s);
-		chi_a.toFile("chii.out");
-		printf("xi = %g\n", xi);
-		printf("res = %g\n", Q.result());
-		abort();*/
-		
+
 		return Q.result();
 	}
 	else
 	{
 		// setup inner integrals
-		PhiFunction phi1(integrate_inf, -lam_a, psi_a, sturm1), phi2(integrate_low, lam_a+1, psi_a, sturm1);
+		PhiFunction phi1 (&PhiFunction::integrate_inf,  -lam_a, psi_a, sturm1);
+		PhiFunction phi2 (&PhiFunction::integrate_low, lam_a+1, psi_a, sturm1);
 		RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
 		
 		// setup outer integrand
@@ -99,14 +72,17 @@ double DWBA2::computeI (
 
 double DWBA2::XiIntegral(HydrogenFunction const & psi, SturmianFunction const & S)
 {
-	SymbolicPoly psi_r = (*(SymbolicPoly const *)(&psi));
-	SymbolicPoly S_r   = (*(SymbolicPoly const *)(&S));
-	SymbolicTerm r;
-	r.ki = 1;
-	r.kr = 1;
-	r.a = 1;
+	RadialFunction<double> const * psi_r = (RadialFunction<double> const *)&psi;
+	RadialFunction<double> const * S_r   = (RadialFunction<double> const *)&S;
 	
-	return eval(integrate_full(r * psi_r * S_r), 0.);
+	auto integrand = [&](double r) -> double {
+		return r * (*psi_r)(r) * (*S_r)(r);
+	};
+	
+	Integrator<decltype(integrand)> Q(integrand);
+	Q.integrate(0., std::numeric_limits<double>::infinity());
+	
+	return Q.result();
 }
 
 double DWBA2::computeA (double E, int Nf1, int Nf2, int Ni1, int Ni2, int L1, int L2)
@@ -244,8 +220,8 @@ void DWBA2::DWBA2_Ln (
 			If.resize(N,N);
 			
 			/// DEBUG
-			PhiFunction phi1(integrate_inf, 0, psii, SturmianFunction(N,L1));
-			PhiFunction phi2(integrate_inf, 1, psii, SturmianFunction(N,L1));
+			PhiFunction phi1 (&PhiFunction::integrate_inf, 0, psii, SturmianFunction(N,L1));
+			PhiFunction phi2 (&PhiFunction::integrate_inf, 1, psii, SturmianFunction(N,L1));
 			RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
 			char phi1name[20], phi2name[20];
 			sprintf(phi1name, "phi1-%.2d.dat", N);
@@ -318,31 +294,6 @@ void DWBA2::DWBA2_Ln (
 			// factorize the Green function inverse matrix A
 			CsrMatrix A_csr = A.tocsr();	// necessary anchor for LUft !!!
 			CsrMatrix::LUft A_LU = A_csr.factorize();
-			
-// 			char A_dat_name[20], A_mat_name[20], A_png_name[20];
-// 			sprintf(A_dat_name, "A-%.2d.dat", N);
-// 			sprintf(A_mat_name, "A-%.2d.mat", N);
-// 			sprintf(A_png_name, "A-%.2d.png", N);
-// 			A.write(A_dat_name);
-// 			A_csr.plot(A_png_name);
-// 			write_2D_data (
-// 				A.rows(), A.cols(),
-// 				A_mat_name,
-// 				[&](size_t i, size_t j) -> double {
-// 					return A(i,j).real();
-// 				}
-//  			);
-// 			char I_dat_name[20], I_mat_name[20];
-// 			sprintf(I_dat_name, "I-%.2d.dat", N);
-// 			sprintf(I_mat_name, "I-%.2d.mat", N);
-// 			Ii.write(I_dat_name);
-// 			write_2D_data (
-// 				Ii.rows(), Ii.cols(),
-// 				I_mat_name,
-// 				[&](size_t i, size_t j) -> double {
-// 					return Ii(i,j).real();
-// 				}
-// 			);
 			
 			// convergence indicator
 			bool converged = true;

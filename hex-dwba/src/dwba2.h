@@ -13,13 +13,15 @@
 #ifndef HEX_DWBA_DWBA2
 #define HEX_DWBA_DWBA2
 
+#include <cassert>
 #include <map>
 #include <tuple>
 
 #include "complex.h"
 #include "potential.h"
+#include "chebyshev.h"
 #include "specf.h"
-#include "symbolic.h"
+#include "integrate.h"
 
 /**
  * Class members compute contributions to the second order of the distorted
@@ -55,29 +57,104 @@ public:
 	/**
 	 * Class holding an intermediate result from inner integration.
 	 */
-	class PhiFunction : public RadialFunction<double>, public SymbolicPoly
+	class PhiFunction : public RadialFunction<double>
 	{
 	public:
 		
 		PhiFunction() {}
 		
-		template <class Integrator> PhiFunction (
-			Integrator integrate, int lambda,
-			HydrogenFunction const & chi_a,
+		PhiFunction (
+			double (PhiFunction::* integrator) (double) const,
+			int lambda,
+			HydrogenFunction const & psi_a,
 			SturmianFunction const & S_u
 		) {
-			SymbolicTerm r_lambda;
-			r_lambda.ki = 1;
-			r_lambda.kr = 1;
-			r_lambda.a = lambda;
+			// make sure we won't get stuck in cyclical function call
+			assert(integrator != &PhiFunction::operator());
 			
-			SymbolicPoly const * chi_a_r = &chi_a;
-			SymbolicPoly const * S_u_r = &S_u;
+			// store pointer-to-member to use wen evaluating
+			Eval = integrator;
 			
-			(*(SymbolicPoly*)this) = integrate(r_lambda * (*chi_a_r) * (*S_u_r));
+			// the integrand we want to approximate by Chebyshev polynomials
+			auto integrand = [&](double x) -> double {
+				return pow(x,lambda) * psi_a(x) * S_u(x);
+			};
+			
+			// Chebyshev base count
+			// FIXME some intelligent way of computing Ncb
+			int psi_nodes = psi_a.getN() - psi_a.getL() - 1;
+			int sturm_nodes = S_u.getN() - S_u.getL() - 1;
+			int Ncb = 20 * (psi_nodes + sturm_nodes + 1);
+			
+			// get far radius
+			Far = std::max(psi_a.far(1e-8), S_u.far(1e-8));
+			
+			// create the approximation
+			Chebyshev cb (
+				integrand,	// function to approximate
+				Ncb,		// number of terms total
+				0,			// left bound of interval
+				Far			// right bound of interval
+			);
+			
+			// integrate the Chebyshev approximation
+			Cb = cb.integrate();
+			
+			// evaluate integration boundaries
+			Cb_0   = Cb.approx(0,   1e-8);
+			Cb_inf = Cb.approx(Far, 1e-8);
 		}
 		
-		inline double operator() (double x) const { return eval(*((SymbolicPoly const *)this), x); }
+		/**
+		 * Evaluate the Phi function:
+		 *     Return either 'integrate_low(x)' or 'integrate_inf(x)'
+		 *     depending on the user's choice during object creation.
+		 */
+		double operator() (double x) const
+		{
+			return (this->*Eval)(x);
+		}
+		
+		/**
+		 * Evaluate proper Phi integral.
+		 */
+		double integrate_low (double x) const
+		{
+			// FIXME use Clenshaw recurrence Cb.clenshaw(...)
+			
+			if (x < 0)
+				return 0;
+			
+			if (x > Far)
+				return Cb_inf;
+			
+			return Cb.approx(x, 1e-8) - Cb_0;
+		}
+		
+		/**
+		 * Evaluate improper Phi integral.
+		 */
+		double integrate_inf (double x) const
+		{
+			// FIXME use Clenshaw recurrence Cb.clenshaw(...)
+			
+			if (x < 0)
+				return Cb_inf;
+			
+			if (x > Far)
+				return 0;
+			
+			return Cb_inf - Cb.approx(x, 1e-8);
+		}
+		
+	private:
+		
+		double Far;
+		Chebyshev Cb;
+		double Cb_0;
+		double Cb_inf;
+		
+		double (PhiFunction::* Eval) (double) const;
 	};
 	
 	/**
