@@ -45,8 +45,6 @@ public:
 			
 			C[j] *= 2;
 			C[j] /= N;
-			
-			std::cout << "C[" << j << "] = " << C[j] << std::endl;
 		}
 	}
 	
