@@ -14,7 +14,7 @@
 #define HEX_HYDROGEN
 
 #include <vector>
-
+#include <cln/cln.h>
 #include <o2scl/interp.h>
 
 #include "arrays.h"
@@ -79,6 +79,8 @@ public:
 	HydrogenFunction() : SymbolicPoly(), n(0), l(0) {}
 	HydrogenFunction(int n, int l) : SymbolicPoly(HydrogenP(n,l)), n(n), l(l) {}
 	
+	inline int getN () const { return n; }
+	inline int getL () const { return l; }
 	inline double operator() (double r) const { return Hydrogen::evalBoundState(n,l,r); }
 
 private:
@@ -97,6 +99,9 @@ public:
 	SturmianFunction(int n, int l, cln::cl_RA lambda = DEFAULT_LAMBDA)
 	    : SymbolicPoly(HydrogenS(n,l,lambda)), n(n), l(l), lambda(lambda) {}
 	
+	inline int getN () const { return n; }
+	inline int getL () const { return l; }
+	inline double getLambda () const { return cln::double_approx(lambda); }
 	inline double operator() (double r) const
 	{
 		return Hydrogen::evalSturmian(n, l, r, cln::double_approx(lambda));
