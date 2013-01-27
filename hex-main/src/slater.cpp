@@ -26,18 +26,18 @@
  * \param r Radius.
  * \param R Truncation radius.
  */
-inline double damp(Complex y, Complex x, Complex R)
-{
-	// compute hyperradius
-	double r = hypot(x.real(), y.real());
-	
-	// if sufficiently far, return clean zero
-	if (r > R.real())
-		return 0.;
-	
-	// else damp using tanh(x) distribution
-	return tanh(0.125 * (R.real() - r));
-}
+// inline double damp(Complex y, Complex x, Complex R)
+// {
+// 	// compute hyperradius
+// 	double r = hypot(x.real(), y.real());
+// 	
+// 	// if sufficiently far, return clean zero
+// 	if (r > R.real())
+// 		return 0.;
+// 	
+// 	// else damp using tanh(x) distribution
+// 	return tanh(0.125 * (R.real() - r));
+// }
 
 void R_inner_integrand(int n, Complex* in, Complex* out, void* data)
 {
@@ -58,7 +58,7 @@ void R_inner_integrand(int n, Complex* in, Complex* out, void* data)
 	
 	// fill output array
 	for (int k = 0; k < n; k++)
-		out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) * damp(in[k], x, R);
+		out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) /* * damp(in[k], x, R)*/;
 }
 
 
