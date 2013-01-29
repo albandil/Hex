@@ -18,7 +18,7 @@
 
 #include "arrays.h"
 
-void parse_command_line(int argc, char* argv[], FILE*& inputfile);
+void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile, int& zipcount);
 
 void parse_input_file(
 	FILE* inputfile,

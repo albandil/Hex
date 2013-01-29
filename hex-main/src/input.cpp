@@ -24,7 +24,7 @@
  * can be specified using the --input/-i option.
  */
 
-void parse_command_line(int argc, char* argv[], FILE*& inputfile)
+void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile, int& zipcount)
 {
 	// set short options
 	const char* const short_options  = "eih";
@@ -34,6 +34,8 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile)
 		{"example",           0,   0, 'e'},
 		{"input",             1,   0, 'i'},
 		{"help",              0,   0, 'h'},
+		{"zipfile",           1,   0, 'z'},
+		{"zipcount",          1,   0, 'n'},
 		{0,                   0,   0,   0}
 	};
 	
@@ -46,13 +48,13 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile)
 			case 'e':
 				// produce sample input file
 				FILE *h;
-				h = fopen("example.inp", "w");
+				h = std::fopen("example.inp", "w");
 				if (h == 0)
 				{
-					printf("Error: Cannot write to \"example.inp\"\n");
+					std::printf("Error: Cannot write to \"example.inp\"\n");
 					abort();
 				}
-				fprintf(h,
+				std::fprintf (h,
 					"# B-spline parameters \n"
 					"# order     R0    Rmax       θ\n"
 					"      4   60.0    100.0    0.63\n"
@@ -83,26 +85,26 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile)
 					"# magnetic field\n"
 					"0\n"
 				);
-				fclose(h);
+				std::fclose(h);
 				exit(0);
 				break;
 				
 			case 'i':
 				// set custom input file
 				FILE *g;
-				g = fopen(optarg, "r");
+				g = std::fopen(optarg, "r");
 				if (g)
 					inputfile = g;
 				else
 				{
-					printf("Error: Input file \"%s\" not found.\n", optarg);
+					std::printf("Error: Input file \"%s\" not found.\n", optarg);
 					abort();
 				}
 				break;
 				
 			case 'h':
 				// print usage information
-				printf(
+				std::printf (
 					"                                                       \n"
 					"         __  __                                        \n"
 					"        / /_/ /  ___   __  __                          \n"
@@ -115,12 +117,25 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile)
 					"Available switches (short forms in parentheses):       \n"
 					"------------------------------------------------       \n"
 					"\nGeneral:                                             \n"
-					"\t--example           (-e)   create sample input file  \n"
-					"\t--help              (-h)   display this help         \n"
-					"\t--input <filename>  (-i)   use custom input file     \n"
+					"\t--example            (-e)  create sample input file  \n"
+					"\t--help               (-h)  display this help         \n"
+					"\t--input <filename>   (-i)  use custom input file     \n"
+					"\t--zipfile <filename> (-z)  solution file to zip      \n"
+					"\t--zipcount <number>  (-n)  zip samples               \n"
 					"                                                       \n"
 				);
 				exit(0);
+				
+			case 'z':
+				// zip B-spline expansion file
+				zipfile = strdup(basename(optarg));
+				printf(zipfile);
+				break;
+				
+			case 'n':
+				// zip samples
+				zipcount = atol(optarg);
+				break;
 				
 			case -1:
 				// end of command line option list
@@ -128,7 +143,7 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile)
 				
 			default:
 				// unknown option
-				printf("Unknown option.\n");
+				std::printf("Unknown option.\n");
 				abort();
 		};
 	} while (next_option != -1);
@@ -142,7 +157,7 @@ long read_int(FILE *f) throw (int)
 	for/*ever*/(;;)
 	{
 		// read string
-		if (fscanf(f, "%s", buff) == EOF)
+		if (std::fscanf(f, "%s", buff) == EOF)
 			throw 0;
 		
 		if (strlen(buff) == 0)
@@ -152,7 +167,7 @@ long read_int(FILE *f) throw (int)
 		if (buff[0] == '#')
 		{
 			// get the rest of the line
-			fgets(buff, 1024, f);
+			std::fgets(buff, 1024, f);
 			continue;
 		}
 		
@@ -176,7 +191,7 @@ double read_dbl(FILE *f) throw (int)
 	for/*ever*/(;;)
 	{
 		// read string
-		if (fscanf(f, "%s", buff) == EOF)
+		if (std::fscanf(f, "%s", buff) == EOF)
 			throw 0;
 		
 		if (strlen(buff) == 0)
@@ -186,7 +201,7 @@ double read_dbl(FILE *f) throw (int)
 		if (buff[0] == '#')
 		{
 			// get the rest of the line
-			fgets(buff, 1024, f);
+			std::fgets(buff, 1024, f);
 			continue;
 		}
 		
@@ -220,15 +235,15 @@ void parse_input_file(
 		Rmax = read_dbl(inputfile);
 		ecstheta = read_dbl(inputfile);
 	} catch (...) {
-		fprintf(stderr, "Input error: Check B-spline parameters.\n");
+		std::fprintf(stderr, "Input error: Check B-spline parameters.\n");
 		abort();
 	}
 	
-	fprintf(stdout, "\n-----   B-spline environment  -------\n");
-	fprintf(stdout, "order = %d\n", order);
-	fprintf(stdout, "R0 = %g\n", R0);
-	fprintf(stdout, "Rmax = %g\n", Rmax);
-	fprintf(stdout, "ecsθ = %g\n", ecstheta);
+	std::fprintf(stdout, "\n-----   B-spline environment  -------\n");
+	std::fprintf(stdout, "order = %d\n", order);
+	std::fprintf(stdout, "R0 = %g\n", R0);
+	std::fprintf(stdout, "Rmax = %g\n", Rmax);
+	std::fprintf(stdout, "ecsθ = %g\n", ecstheta);
 	
 	// load real knot data
 	std::vector<double> rknots_begin, rknots_end, rknots_samples;
@@ -240,7 +255,7 @@ void parse_input_file(
 		for (size_t i = 0; i < rknots_begin.size(); i++)
 			rknots_samples.push_back(read_dbl(inputfile));
 	} catch (...) {
-		fprintf(stderr, "Input error: Check real knot data.\n");
+		std::fprintf(stderr, "Input error: Check real knot data.\n");
 		abort();
 	}
 	
@@ -251,10 +266,10 @@ void parse_input_file(
 		rknots = concatenate(rknots, new_knots);
 	}
 	
-	fprintf(stdout, "\n----------   Real knots  ------------\n");
+	std::fprintf(stdout, "\n----------   Real knots  ------------\n");
 	for (auto knot = rknots.begin(); knot != rknots.end(); knot++)
-		fprintf(stdout, "%g  ", *knot);
-	fprintf(stdout, "\n");
+		std::fprintf(stdout, "%g  ", *knot);
+	std::fprintf(stdout, "\n");
 	
 	// load complex knot data
 	std::vector<double> cknots_begin, cknots_end, cknots_samples;
@@ -266,7 +281,7 @@ void parse_input_file(
 		for (size_t i = 0; i < cknots_begin.size(); i++)
 			cknots_samples.push_back(read_int(inputfile));
 	} catch (...) {
-		fprintf(stderr, "Input error: Check complex knot data.\n");
+		std::fprintf(stderr, "Input error: Check complex knot data.\n");
 		abort();
 	}
 	
@@ -281,10 +296,10 @@ void parse_input_file(
 			)
 		);
 
-	fprintf(stdout, "\n---------  Complex knots  ------------\n");
+	std::fprintf(stdout, "\n---------  Complex knots  ------------\n");
 	for (auto knot = cknots.begin(); knot != cknots.end(); knot++)
-		fprintf(stdout, "%g  ", *knot);
-	fprintf(stdout, "\n");
+		std::fprintf(stdout, "%g  ", *knot);
+	std::fprintf(stdout, "\n");
 	
 	// load atomic states
 	try {
@@ -294,7 +309,7 @@ void parse_input_file(
 		maxnf = read_int(inputfile);
 		maxlf = read_int(inputfile);
 	} catch (...) {
-		fprintf(stderr, "Input error: Check atomic state data.\n");
+		std::fprintf(stderr, "Input error: Check atomic state data.\n");
 		abort();
 	}
 	
@@ -303,23 +318,23 @@ void parse_input_file(
 		L = read_int(inputfile);
 		maxell = read_int(inputfile);
 	} catch (...) {
-		fprintf(stderr, "Input error: Check angular momentum data.\n");
+		std::fprintf(stderr, "Input error: Check angular momentum data.\n");
 		abort();
 	}
 	
-	fprintf(stdout, "\n----------  Angular momentum limits  -------------\n");
-	fprintf(stdout, "L = %d, ℓ = %d\n", L, maxell);
+	std::fprintf(stdout, "\n----------  Angular momentum limits  -------------\n");
+	std::fprintf(stdout, "L = %d, ℓ = %d\n", L, maxell);
 	
-	fprintf(stdout, "\n----------  Initial atomic states  -------------\n");
+	std::fprintf(stdout, "\n----------  Initial atomic states  -------------\n");
 	for (int li = (minli < 0) ? 0 : minli; li <= maxell and li < ni and (maxli < 0 or li <= maxli); li++)
 		fprintf(stdout, "[%d %d] ", ni, li);
-	fprintf(stdout, "\n");
+	std::fprintf(stdout, "\n");
 	
-	fprintf(stdout, "\n----------  Final atomic states  -------------\n");
+	std::fprintf(stdout, "\n----------  Final atomic states  -------------\n");
 	for (int nf = 0; nf <= maxnf; nf++)
 		for (int lf = 0; lf <= maxell and lf < nf and (maxlf < 0 or lf <= maxlf); lf++)
-			fprintf(stdout, "[%d %d] ", nf, lf);
-	fprintf(stdout, "\n");
+			std::fprintf(stdout, "[%d %d] ", nf, lf);
+	std::fprintf(stdout, "\n");
 	
 	// load initial energies
 	std::vector<double> Ei_begin, Ei_end, Ei_samples;
@@ -331,7 +346,7 @@ void parse_input_file(
 		for (size_t i = 0; i < Ei_begin.size(); i++)
 			Ei_samples.push_back(read_int(inputfile));
 	} catch (...) {
-		fprintf(stderr, "Input error: Check energy data.\n");
+		std::fprintf(stderr, "Input error: Check energy data.\n");
 		abort();
 	}
 	
@@ -339,19 +354,19 @@ void parse_input_file(
 	for (unsigned i = 0; i < Ei_begin.size(); i++)
 		Ei = concatenate(Ei, linspace(Ei_begin[i], Ei_end[i], Ei_samples[i]));
 	
-	fprintf(stdout, "\n---  Initial projectile energies  ----\n");
-	fprintf(stdout, "lowest energy: %g\n", Ei.front());
-	fprintf(stdout, "highest energy: %g\n", Ei.back());
-	fprintf(stdout, "total enegies: %ld\n", Ei.size());
+	std::fprintf(stdout, "\n---  Initial projectile energies  ----\n");
+	std::fprintf(stdout, "lowest energy: %g\n", Ei.front());
+	std::fprintf(stdout, "highest energy: %g\n", Ei.back());
+	std::fprintf(stdout, "total enegies: %ld\n", Ei.size());
 	
 	try {
 		B = read_dbl(inputfile);
-		fprintf(stdout, "\n---------- Other parameters -----------\n");
-		fprintf(stdout, "magnetic field: %g a.u.\n", B);
+		std::fprintf(stdout, "\n---------- Other parameters -----------\n");
+		std::fprintf(stdout, "magnetic field: %g a.u.\n", B);
 	} catch (...) {
-		fprintf(stderr, "Input error: Check magnetic field data.\n");
+		std::fprintf(stderr, "Input error: Check magnetic field data.\n");
 		abort();
 	}
 	
-	fprintf(stdout, "\n");
+	std::fprintf(stdout, "\n");
 }

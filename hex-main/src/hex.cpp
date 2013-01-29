@@ -11,7 +11,6 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <algorithm>
-#include <complex>
 #include <cstdio>
 #include <cmath>
 #include <chrono>
@@ -50,9 +49,11 @@ int main(int argc, char* argv[])
 	
 	// variables that can be set by the user from the command line
 	FILE* inputfile = 0;					// input file
+	char* zipfile = 0;						// HDF solution expansion file to zip
+	int   zipcount = 0;						// zip sample count
 	
 	// get input from command line
-	parse_command_line(argc, argv, inputfile);
+	parse_command_line(argc, argv, inputfile, zipfile, zipcount);
 	
 	// check input file
 	if (inputfile == 0 and (inputfile = fopen("hex.inp", "r")) == 0)
@@ -106,6 +107,42 @@ int main(int argc, char* argv[])
 	//
 	// --------------------------------------------------------------------- //
 	
+	
+	if (zipfile != 0)
+	{
+		cArray sol;			// stored solution expansion
+		cArray ev;			// evaluated solution
+		rArray grid;		// real evaluation grid
+		
+		sol.hdfload(zipfile);
+		grid = linspace(0., Rmax, zipcount + 1);
+		ev = zip (sol, grid, grid);
+		
+		// setup output filename
+		char outf1[3 + strlen(zipfile)], outf2[3 + strlen(zipfile)];
+		sprintf(outf1, "%s.re", zipfile);
+		sprintf(outf2, "%s.im", zipfile);
+		
+		write_2D_data (
+			zipcount + 1,
+			zipcount + 1,
+			outf1,
+			[&](size_t i, size_t j) -> double {
+				return ev[i * (zipcount + 1) + j].real();
+			}
+		);
+		
+		write_2D_data (
+			zipcount + 1,
+			zipcount + 1,
+			outf2,
+			[&](size_t i, size_t j) -> double {
+				return ev[i * (zipcount + 1) + j].imag();
+			}
+		);
+		
+		exit(0);
+	}
 	
 	fprintf(stdout, "Loading/precomputing derivative overlaps... ");
 	fflush(stdout);
@@ -398,9 +435,9 @@ int main(int argc, char* argv[])
 	// Kronecker producs
 	fprintf(stdout, "Creating Kronecker products... "); fflush(stdout);
 	CsrMatrix S_kron_S   = kron(S, S).tocsr();
-	CooMatrix S_kron_Mm1 = kron(S, Mm1_tr);
+	CooMatrix S_kron_Mm1_tr = kron(S, Mm1_tr);
 	CsrMatrix S_kron_Mm2 = kron(S, Mm2).tocsr().sparse_like(S_kron_S);
-	CooMatrix Mm1_kron_S = kron(Mm1_tr, S);
+	CooMatrix Mm1_tr_kron_S = kron(Mm1_tr, S);
 	CsrMatrix Mm2_kron_S = kron(Mm2, S).tocsr().sparse_like(S_kron_S);
 	CsrMatrix half_D_minus_Mm1_tr_kron_S = kron(0.5 * D - Mm1_tr, S).tocsr().sparse_like(S_kron_S);
 	CsrMatrix S_kron_half_D_minus_Mm1_tr = kron(S, 0.5 * D - Mm1_tr).tocsr().sparse_like(S_kron_S);
@@ -504,13 +541,13 @@ int main(int argc, char* argv[])
 			std::chrono::duration<int> sec;
 			
 			// factorize
-			std::fprintf(stdout, "\tLU factorization %d of (%d,%d) block started\n", iblock, l1, l2);
-			std::fflush(stdout);
+			fprintf(stdout, "\tLU factorization %d of (%d,%d) block started\n", iblock, l1, l2);
+			fflush(stdout);
 			start = std::chrono::steady_clock::now();
 			lufts[iblock] = blocks[iblock].factorize();
 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-			std::printf("\tLU factorization %d of (%d,%d) block done after %d s\n", iblock, l1, l2, sec.count()); 
-			std::fflush(stdout);
+			printf("\tLU factorization %d of (%d,%d) block done after %d s\n", iblock, l1, l2, sec.count()); 
+			fflush(stdout);
 		}
 		
 		// For all initial states ------------------------------------------- //
@@ -577,10 +614,10 @@ int main(int argc, char* argv[])
 						}
 						
 						if (li == l1 and l == l2)
-							chi_block -= prefactor * S_kron_Mm1.dot(Pj1).todense();
+							chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1).todense();
 						
 						if (li == l2 and l == l1)					
-							chi_block -= prefactor * Mm1_kron_S.dot(Pj2).todense() * Sign;
+							chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2).todense() * Sign;
 					}
 					
 					// copy the block into the whole array
@@ -726,6 +763,18 @@ int main(int argc, char* argv[])
 				
 				// save solution to disk
 				current_solution.hdfsave(cur_oss.str().c_str());
+				
+				if (ie == 0)
+				{
+					size_t N = 1001;
+					cArray psi = zip(current_solution, linspace(0., Rmax, N), linspace(0., Rmax, N));
+					std::ostringstream oss0;
+					oss0 << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".arr";
+					write_2D_data (
+						N, N, oss0.str().c_str(),
+						[ = ](size_t i, size_t j) -> double { return psi[i * N + j].real(); }
+					);
+				}
 				
 			} // end of For mi, Spin
 		} // end of For li

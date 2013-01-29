@@ -26,18 +26,18 @@
  * \param r Radius.
  * \param R Truncation radius.
  */
-// inline double damp(Complex y, Complex x, Complex R)
-// {
-// 	// compute hyperradius
-// 	double r = hypot(x.real(), y.real());
-// 	
-// 	// if sufficiently far, return clean zero
-// 	if (r > R.real())
-// 		return 0.;
-// 	
-// 	// else damp using tanh(x) distribution
-// 	return tanh(0.125 * (R.real() - r));
-// }
+inline double damp(Complex y, Complex x, Complex R)
+{
+	// compute hyperradius
+	double r = hypot(x.real(), y.real());
+	
+	// if sufficiently far, return clean zero
+	if (r > R.real())
+		return 0.;
+	
+	// else damp using tanh(x) distribution
+	return tanh(0.125 * (R.real() - r));
+}
 
 void R_inner_integrand(int n, Complex* in, Complex* out, void* data)
 {
@@ -58,7 +58,7 @@ void R_inner_integrand(int n, Complex* in, Complex* out, void* data)
 	
 	// fill output array
 	for (int k = 0; k < n; k++)
-		out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) /* * damp(in[k], x, R)*/;
+		out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) * damp(in[k], 0, R);
 }
 
 
@@ -79,13 +79,13 @@ void R_outer_integrand(int n, Complex* in, Complex* out, void* data)
 	B(i, iknot, n, in, values_i);
 	B(j, iknot, n, in, values_j);
 	
-	int points2 = 20;//order + L + 1;
+	int points2 = order + L + 1;
 	
 	// evaluate inner integral, fill output array
 	for (int u = 0; u < n; u++)
 	{
 		auto data2 = std::make_tuple(k,l,L,iknot,iknotmax,in[u]);
-		out[u] = values_i[u] * values_j[u] / in[u] //* damp(0, in[u], R)
+		out[u] = values_i[u] * values_j[u] / in[u] * damp(0, in[u], R)
  					* quad(&R_inner_integrand, &data2, points2, iknot, t[iknot], in[u]);
 	}
 }
