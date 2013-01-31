@@ -49,24 +49,24 @@
 					if (isset($_POST["qty"]) and $_POST["qty"] == "dcs")
 						echo "selected = \"selected\"";
 					?> >differential cross section</option>
-				<option value = "sumintegcs" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "sumintegcs")
+				<option value = "ccs" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "ccs")
 						echo "selected = \"selected\"";
 					?> >summed integral cross section</option>
-				<option value = "integcs" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "integcs")
+				<option value = "ics" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "ics")
 						echo "selected = \"selected\"";
 					?> >integral cross section</option>
-				<option value = "extrapolat" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "extrapolat")
+				<option value = "xcs" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "xcs")
 						echo "selected = \"selected\"";
-					?> >extrapolated integral cross section</option>
-				<option value = "momtransf" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "momtransf")
+					?> >xcsed integral cross section</option>
+				<option value = "momtf" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "momtf")
 						echo "selected = \"selected\"";
 					?> >momentum transfer</option>
-				<option value = "collstr" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "collstr")
+				<option value = "colls" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "colls")
 						echo "selected = \"selected\"";
 					?> >collision strength</option>
 				<option value = "tcs" <?php
@@ -104,7 +104,7 @@
 				printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
-			else if ($_POST["qty"] == "sumintegcs" or $_POST["qty"] == "extrapolat" or $_POST["qty"] == "tcs")
+			else if ($_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
 			{
 				// do nothing
 			}
@@ -119,9 +119,9 @@
 						printf("\t\t\tE = <input type = \"number\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
-					case "integcs":
-					case "momtransf":
-					case "collstr":
+					case "ics":
+					case "momtf":
+					case "colls":
 						printf("\t\t\tL = <input type = \"number\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
@@ -143,8 +143,8 @@
 		?>
 
 		<?php
-			if ($_POST["qty"] == "integcs" or $_POST["qty"] == "sumintegcs" or $_POST["qty"] == "extrapolat" or $_POST["qty"] == "collstr"
-				or $_POST["qty"] == "momtransf" or $_POST["qty"] == "tcs")
+			if ($_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
+				or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 			{
 				printf("\t\t<div class = \"text\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
@@ -175,8 +175,8 @@
 				// compute standard input for Hex-db (energies or angles)
 				if ($_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
 					$nums = range($_POST["thmin"], $_POST["thmax"], $_POST["dth"]);
-				if ($_POST["qty"] == "integcs" or $_POST["qty"] == "sumintegcs" or $_POST["qty"] == "extrapolat" or $_POST["qty"] == "collstr"
-					or $_POST["qty"] == "momtransf" or $_POST["qty"] == "tcs")
+				if ($_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
+					or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 					$nums = range($_POST["Emin"], $_POST["Emax"], $_POST["dE"]);
 				
 				// set PATH to include hex-db executable

@@ -129,7 +129,6 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile
 			case 'z':
 				// zip B-spline expansion file
 				zipfile = strdup(basename(optarg));
-				printf(zipfile);
 				break;
 				
 			case 'n':

@@ -872,7 +872,7 @@ int main(int argc, char* argv[])
 				if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
 				if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
 				{
-					fprintf(fsql, "INSERT OR REPLACE INTO \"hex\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e,%e);\n",
+					fprintf(fsql, "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e,%e);\n",
 						ni, li, mi, nf, lf, mf, L, Spin, Ei[ie], ell, T_ell[i].real(), T_ell[i].imag()
 					);
 				}

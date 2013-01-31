@@ -1,212 +1,239 @@
-#include <cstdlib>
-#include <cstdio>
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+#include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <getopt.h>
 
 #include "hex-db.h"
+#include "variables.h"
 
-/*
+std::string HelpText = 
+	"Usage: hex-db [options]\n"
+	"Options:\n"
+	"  --help            Display this information.\n"
+	"  --new             Create new database.\n"
+	"  --database <name> Use database <name> instead of default \"hex.db\".\n"
+	"  --import <file>   Import SQL batch file.\n"
+	"  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
+	"  --<var>           Compute/retrieve scattering variable <var>.\n"
+	"  --vars            Display all available scattering variables.\n"
+	"  --<param> <val>   Set scattering parameter <param> to the value <val>.\n"
+	"  --params <var>    Display all available scattering parameters for variable <var>.\n"
+	"\n"
+	"Usage examples:\n"
+	"\n"
+	"   # retrieve scattering amplitude\n"
+	"   > seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
+	"\n"
+	"   # retrieve differential cross section:\n"
+	"   > seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
+	"\n"
+	"   # retrieve momentum transfer:\n"
+	"   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+	"\n"
+	"   # retrieve integral cross section:\n"
+	"   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+	"\n"
+	"   # retrieve sum integral cross section:\n"
+	"   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n"
+	"\n"
+	"   # retrieve collision strength:\n"
+	"   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+	"\n"
+	"   #retrieve total cross section:\n"
+	"   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --tcs        --ni=1 --li=0 --mi=0\n"
+	"\n"
+	"\nOn some locales a decimal comma is used instead of decimal point (e.g. on native Czech systems).\n"
+	"This is not compatible with raw C/C++, one has to turn off the locale by executing\n"
+	"> setenv LC_NUMERIC en_GB.utf8\n"
+	"or\n"
+	"> export LC_NUMERIC=en_GB.utf8\n"
+	"depending on version of your shell.\n"
+	"\n";
 
-# scattering amplitude
-seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
-
-# differential cross section
-seq 0.01 0.01 3.14    | hex-db --database="hex.db" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
-
-# momentum transfer
-seq 0.650 0.001 0.850 | hex-db --database="hex.db" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-
-# integral cross section
-seq 0.650 0.001 0.850 | hex-db --database="hex.db" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-
-# sum integral cross section
-seq 0.650 0.001 0.850 | hex-db --database="hex.db" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0
-
-# collision strength
-seq 0.650 0.001 0.850 | hex-db --database="hex.db" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-
-# total cross section
-seq 0.650 0.001 0.850 | hex-db --database="hex.db" --tcs        --ni=1 --li=0 --mi=0
-
-*/
-
-struct Integer
+bool SwitchInput (std::string argnam, std::string argpar)
 {
-	Integer() : val(0), set(false) {}
-	int val;
-	bool set;
-};
-
-struct Real
+	// we can get here only if there is no default callback
+	std::cerr << "ERROR: Uknown option " << argnam << std::endl;
+	return false;
+}
+	
+template <typename DefaultCallback>
+bool SwitchInput (std::string argnam, std::string argpar, DefaultCallback defaultcallback)
 {
-	Real() : val(0), set(false) {}
-	double val;
-	bool set;
-};
+	return defaultcallback(argnam, argpar);
+}
+
+template <typename Callback, typename ...Params>
+bool SwitchInput (std::string argnam, std::string argpar, std::string optname, int npar, Callback callback, Params ...p)
+{
+	// check optname
+	if (argnam != optname)
+		return SwitchInput(argnam, argpar, p...); // parse the rest
+	
+	// check parameter
+	if (npar > 0 and argpar.empty())
+	{
+		std::cerr << "ERROR: The option --" << argnam << " requires a parameter!" << std::endl;
+		return false;
+	}
+	if (npar == 0 and not argpar.empty())
+	{
+		std::cerr << "ERROR: The option --" << argnam << " uses no parameter!" << std::endl;
+		return false;
+	}
+	
+	// run the callback
+	callback(argpar);
+	
+	// successfully done
+	return true;
+}
 
 int main(int argc, char* argv[])
 {
-	// program parameters
-	char dbname[1024] = "hex.db";
-	Integer ni, li, mi, nf, lf, mf, L, S;
-	Real E;
-	bool scatamp = false, dcs = false, momtransf = false, integcs = false,
-		sumintegcs = false, collstr = false, tcs = false, extrapolat = false,
-		create_new = false;
-	
-	// available command line arguments
-	const char* const short_options = "h1234567abcdefLS";
-	const struct option long_options[] = {
-		{ "help",       0, 0, 'h' },
-		{ "new",        0, 0, 'n' },
-		{ "database",   1, 0, 'D' },
-		{ "scatamp",    0, 0, '1' },
-		{ "dcs",        0, 0, '2' },
-		{ "momtransf",  0, 0, '3' },
-		{ "integcs",    0, 0, '4' },
-		{ "sumintegcs", 0, 0, '5' },
-		{ "collstr",    0, 0, '6' },
-		{ "tcs",        0, 0, '7' },
-		{ "extrapolat", 0, 0, '8' },
-		{ "ni",         1, 0, 'a' },
-		{ "li",         1, 0, 'b' },
-		{ "mi",         1, 0, 'c' },
-		{ "nf",         1, 0, 'd' },
-		{ "lf",         1, 0, 'e' },
-		{ "mf",         1, 0, 'f' },
-		{ "L",          1, 0, 'L' },
-		{ "S",          1, 0, 'S' },
-		{ "E",          1, 0, 'E' },
-		{   0,          0, 0,  0  }
-	};
-	
-	// loop over command line arguments
-	int next_option;
-	char * tail;
-	while ((next_option = getopt_long(argc, argv, short_options, long_options, 0)) != -1)
-	switch (next_option) {
-		default:
-			// unknown switch
-			printf("Unknown switch %s\n", argv[optind]);
-			/*break;*/
-		case 'h':
-			// print usage information
-			printf("\nUsage examples:\n");
-			printf("Retrieving scattering amplitude:\n");
-			printf("# seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n\n");
-			printf("Retrieving differential cross section:\n");
-			printf("# seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n\n");
-			printf("Retrieving momentum transfer:\n");
-			printf("# seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n\n");
-			printf("Retrieving integral cross section:\n");
-			printf("# seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n\n");
-			printf("Retrieving sum integral cross section:\n");
-			printf("# seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n\n");
-			printf("Retrieving collision strength:\n");
-			printf("# seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n\n");
-			printf("Retrieving total cross section:\n");
-			printf("# seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --tcs        --ni=1 --li=0 --mi=0\n\n");
-			printf("\nOn some locales a decimal comma is used instead of decimal point (e.g. on native Czech systems).\n");
-			printf("This is not compatible with raw C/C++, one has to turn off the locale by executing\n");
-			printf("# setenv LC_NUMERIC en_GB.utf8\n");
-			printf("or\n");
-			printf("# export LC_NUMERIC=en_GB.utf8\n");
-			printf("depending on version of your shell.\n\n");
-			exit(0);
-		case 'D':
-			// save database name (default "hex.db")
-			strcpy(dbname, optarg);
-			break;
-		case 'n':
-			// create new database
-			create_new = true;
-			break;
-		case '1':
-			// queue scattering amplitude for computation
-			scatamp = true;
-			break;
-		case '2':
-			// queue dcs for computation
-			dcs = true;
-			break;
-		case '3':
-			// queue momtransf for computation
-			momtransf = true;
-			break;
-		case '4':
-			// queue integcs for computation
-			integcs = true;
-			break;
-		case '5':
-			// queue sumintegcs for computation
-			sumintegcs = true;
-			break;
-		case '6':
-			// queue collstr for computation
-			collstr = true;
-			break;
-		case '7':
-			// queue tcs for computation
-			tcs = true;
-			break;
-		case '8':
-			// queue extrapolat for computation
-			extrapolat = true;
-			break;
-		case 'a':
-			// save ni
-			ni.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) ni.set = true;
-			break;
-		case 'b':
-			// save li
-			li.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) li.set = true;
-			break;
-		case 'c':
-			// save mi
-			mi.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) mi.set = true;
-			break;
-		case 'd':
-			// save nf
-			nf.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) nf.set = true;
-			break;
-		case 'e':
-			// save lf
-			lf.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) lf.set = true;
-			break;
-		case 'f':
-			// save mf
-			mf.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) mf.set = true;
-			break;
-		case 'L':
-			// save L
-			L.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) L.set = true;
-			break;
-		case 'S':
-			// save S
-			S.val = strtol(optarg, &tail, 10);
-			if (*tail == 0) S.set = true;
-			break;
-		case 'E':
-			// save E
-			E.val = strtod(optarg, &tail);
-			if (*tail == 0) E.set = true;
-			break;
+	// if no parameters are given, print usage and return
+	if (argc == 1)
+	{
+		std::cout << HelpText;
+		return EXIT_SUCCESS;
 	}
+	
+	// program parameters
+	std::string dbname = "hex.db", sqlfile;
+	bool create_new = false, doupdate = false, doimport = false;
+	
+	// scattering variables to compute
+	std::vector<std::string> vars;
+	
+	// used scattering event data
+	std::map<std::string,std::string> sdata;
+	
+	// for all argv-s
+	for (int i = 1; i < argc; i++)
+	{
+		std::string arg = argv[i];
+		
+		// remove leading dashes
+		while (arg.front() == '-')
+			arg.erase(0,1);
+		
+		// split at equation sign (if present)
+		std::string::iterator eq = std::find(arg.begin(), arg.end(), '=');
+		std::string argnam = arg.substr(0, eq - arg.begin());
+		std::string argpar;
+		if (eq != arg.end()) argpar = arg.substr(eq + 1 - arg.begin(), arg.end() - eq - 1);
+		
+		// switch option name
+		bool OK = SwitchInput ( argnam, argpar,
+			"help",     0, [ & ](std::string opt) -> void { std::cout << HelpText; },
+			"new",      0, [ & ](std::string opt) -> void { create_new = true; },
+			"database", 1, [ & ](std::string opt) -> void { dbname = opt; },
+			"import",   1, [ & ](std::string opt) -> void { doimport = true; sqlfile = opt; },
+			"update",   0, [ & ](std::string opt) -> void { doupdate = true; },
+			"vars",     0, [ & ](std::string opt) -> void {
+				std::cout << "(name)\t\t(description)" << std::endl;
+				for (Variable const * var : vlist)
+					std::cout << var->id() << "\t\t" << var->description() << std::endl;
+				},
+			"params",   1, [ & ](std::string opt) -> void {
+				VariableList::const_iterator it = std::find_if (
+					vlist.begin(),
+					vlist.end(),
+					[ & ](Variable* const & it) -> bool { return it->id() == opt; }
+				);
+				
+				if (it == vlist.end())
+				{
+					std::cout << "No such variable \"" << opt << "\"\n";
+				}
+				else
+				{
+					std::cout << "Variable \"" << opt << "\" uses the following parameters:\n\t";
+					bool theta_present = false;
+					bool Ei_present = false;
+					for (std::string param : (*it)->dependencies())
+					{
+						std::cout << param << " ";
+						if (param == std::string("theta")) theta_present = true;
+						if (param == std::string("Ei")) Ei_present = true;
+					}
+					if (theta_present)
+						std::cout << "\n\"theta\" is to be specified using STDIN.\n";
+					else if (Ei_present)
+						std::cout << "\n\"Ei\" is to be specified using STDIN.\n";
+				}
+			},
+			/* default*/ [ & ](std::string arg, std::string par) -> bool {
+				// try to find it in the variable ids
+				for (const Variable* var : vlist)
+				{
+					if (var->id() == arg)
+					{
+						// insert this id into ToDo list
+						vars.push_back(arg);
+						return true;
+					}
+				}
+				
+				// try to find it in the variable dependencies
+				for (const Variable* var : vlist)
+				{
+					std::vector<std::string> const & deps = var->dependencies();
+					if (std::find(deps.begin(), deps.end(), arg) != deps.end())
+					{
+						// check parameter
+						if (par.empty())
+						{
+							std::cerr << "ERROR: The option --" << arg << " requires a parameter!" << std::endl;
+							return false;
+						}
+						
+						// insert into scattering data list
+						sdata[arg] = std::string(par);
+						return true;
+					}
+				}
+				
+				// unable to match the option
+				return false;
+			}
+		);
+		
+		// chech result
+		if (not OK)
+			return EXIT_FAILURE;
+	}
+	
+	// open the database
+	initialize(dbname.c_str());
 	
 	// create new database if asked to
 	if (create_new)
-		create_new_database(dbname);
+		create_new_database();
 	
-	if (not scatamp and not dcs and not momtransf and not integcs and
-		not sumintegcs and not collstr and not tcs and not extrapolat)
-		return 0;	// nothing to do
+	// import SQL data
+	if (doimport)
+		import(sqlfile.c_str());
+	
+	// update
+	if (doimport or doupdate)
+		update();
+	
+	// is there anything more to do?
+	if (vars.empty())
+		return 0;
 	
 	// read all standard input
 	char str[100];
@@ -217,261 +244,14 @@ int main(int argc, char* argv[])
 		for (char& c : str) if (c == ',') c = '.';
 		
 		// convert to number
+		char* tail;
 		double num = strtod(str, &tail);
 		if (*tail == 0)
-		{
 			nums.push_back(num);
-		}
 		else
-		{
 			fprintf(stderr, "The input \"%s\" is not a valid number.", str);
-// 			if (strchr(str, ',') != 0)
-// 				fprintf(stderr, " It contains \',\' symbol... Did you switch your locale?");
-// 			fprintf(stderr, "\n");
-		}
 	}
-	
-	// open the database
-	initialize(dbname);
 	
 	// retrieve all requested data
-	if (scatamp)
-	{
-		// get scattering amplitude
-		if (ni.set and li.set and mi.set and nf.set and lf.set and mf.set and S.set and E.set)
-		{
-			cArray fs = scattering_amplitude(ni.val, li.val, mi.val, nf.val, lf.val, mf.val, S.val, E.val, nums);
-			printf("# theta\tRe f\tIm f\n");
-			for (size_t i = 0; i < fs.size(); i++)
-				printf("%g\t%.15g\t%.15g\n", nums[i], fs[i].real(), fs[i].imag());
-		}
-		else
-		{
-			printf("Some quantum numbers are missing. Run the program with --help switch to find out.\n");
-			exit(0);
-		}
-	}
-	if (dcs)
-	{
-		// check compulsory parameters
-		if (not ni.set)
-		{
-			printf("'ni' is missing.\n");
-			exit(0);
-		}
-		if (not nf.set)
-		{
-			printf("'nf' is missing.\n");
-			exit(0);
-		}
-		if (not E.set)
-		{
-			printf("'E' is missing.\n");
-			exit(0);
-		}
-		
-		// summed differential cross section
-		rArray sigsum(nums.size());
-		
-		// for all optional parameters
-		for (int __S__ = 0; __S__ <= 1; __S__ ++)
-		{
-			if (S.set and S.val != __S__) continue;
-			for (int __li__ = 0; __li__ < ni.val; __li__++)
-			{
-				if (li.set and li.val != __li__) continue;
-				for (int __lf__ = 0; __lf__ < nf.val; __lf__++)
-				{
-					if (lf.set and lf.val != __lf__) continue;
-					for (int __mi__ = -__li__; __mi__ <= __li__; __mi__++)
-					{
-						if (mi.set and mi.val != __mi__) continue;
-						for (int __mf__ = -__lf__; __mf__ <= __lf__; __mf__++)
-						{
-							if (mf.set and mf.val != __mf__) continue;
-							
-							// get partial cross section for this seto of qnumbers
-							rArray sig = differential_cross_section(
-								ni.val, __li__, __mi__,
-								nf.val, __lf__, __mf__,
-								__S__, E.val, nums
-							);
-							
-							// add to the sum
-							for (size_t i = 0; i < sigsum.size(); i++)
-								sigsum[i] += sig[i];
-						}
-					}
-				}
-			}
-		}
-		
-		printf("# theta\tdσ/dΩ\n");
-		for (size_t i = 0; i < sigsum.size(); i++)
-			printf("%g\t%.15g\n", nums[i], sigsum[i]);
-	}
-	if (momtransf)
-	{
-		// get momentum transfer
-		if (ni.set and li.set and mi.set and nf.set and lf.set and mf.set and L.set and S.set)
-		{
-			rArray eta = momentum_transfer(ni.val, li.val, mi.val, nf.val, lf.val, mf.val, L.val, S.val, nums);
-			printf("# theta\tη\n");
-			for (size_t i = 0; i < eta.size(); i++)
-				printf("%g\t%.15g\n", nums[i], eta[i]);
-		}
-		else
-		{
-			printf("Some quantum numbers are missing. Run the program with --help switch to find out.\n");
-			exit(0);
-		}
-	}
-	if (integcs)
-	{
-		// get integral cross section
-		if (ni.set and li.set and mi.set and nf.set and lf.set and mf.set and L.set and S.set)
-		{
-			rArray sig = integral_cross_section(ni.val, li.val, mi.val, nf.val, lf.val, mf.val, L.val, S.val, nums);
-			printf("# theta\tσ_LS\n");
-			for (size_t i = 0; i < sig.size(); i++)
-				printf("%g\t%.15g\n", nums[i], sig[i]);
-		}
-		else
-		{
-			printf("Some quantum numbers are missing. Run the program with --help switch to find out.\n");
-			exit(0);
-		}
-	}
-	if (sumintegcs)
-	{
-		// check compulsory parameters
-		if (not ni.set)
-		{
-			printf("'ni' is missing.\n");
-			exit(0);
-		}
-		if (not nf.set)
-		{
-			printf("'nf' is missing.\n");
-			exit(0);
-		}
-		
-		// summed differential cross section
-		rArray sigsum(nums.size());
-		
-		// for all optional parameters
-		for (int __li__ = 0; __li__ < ni.val; __li__++)
-		{
-			if (li.set and li.val != __li__) continue;
-			for (int __lf__ = 0; __lf__ < nf.val; __lf__++)
-			{
-				if (lf.set and lf.val != __lf__) continue;
-				for (int __mi__ = -__li__; __mi__ <= __li__; __mi__++)
-				{
-					if (mi.set and mi.val != __mi__) continue;
-					for (int __mf__ = -__lf__; __mf__ <= __lf__; __mf__++)
-					{
-						if (mf.set and mf.val != __mf__) continue;
-						
-						rArray sig = complete_cross_section(
-							ni.val, __li__, __mi__,
-							nf.val, __lf__, __mf__,
-							nums
-						);
-						
-						// add to the sum
-						for (size_t i = 0; i < sigsum.size(); i++)
-							sigsum[i] += sig[i];
-					}
-				}
-			}
-		}
-		
-		printf("# theta\tσ\n");
-		for (size_t i = 0; i < sigsum.size(); i++)
-			printf("%g\t%.15g\n", nums[i], sigsum[i]);
-	}
-	if (collstr)
-	{
-		// get collision strength
-		if (ni.set and li.set and mi.set and nf.set and lf.set and mf.set and L.set and S.set)
-		{
-			rArray omega = collision_strength(ni.val, li.val, mi.val, nf.val, lf.val, mf.val, L.val, S.val, nums);
-			printf("# theta\tΩ\n");
-			for (size_t i = 0; i < omega.size(); i++)
-				printf("%g\t%.15g\n", nums[i], omega[i]);
-		}
-		else
-		{
-			printf("Some quantum numbers are missing. Run the program with --help switch to find out.\n");
-			exit(0);
-		}
-	}
-	if (tcs)
-	{
-		// get total cross section
-		if (ni.set and li.set and mi.set)
-		{
-			rArray sig = total_cross_section(ni.val, li.val, mi.val, nums);
-			printf("# theta\tσ*\n");
-			for (size_t i = 0; i < sig.size(); i++)
-				printf("%g\t%.15g\n", nums[i], sig[i]);
-		}
-		else
-		{
-			printf("Some quantum numbers are missing. Run the program with --help switch to find out.\n");
-			exit(0);
-		}
-	}
-	if (extrapolat)
-	{
-		// check compulsory parameters
-		if (not ni.set)
-		{
-			printf("'ni' is missing.\n");
-			exit(0);
-		}
-		if (not nf.set)
-		{
-			printf("'nf' is missing.\n");
-			exit(0);
-		}
-		
-		// summed differential cross section
-		rArray sigsum(nums.size());
-		
-		// for all optional parameters
-		for (int __li__ = 0; __li__ < ni.val; __li__++)
-		{
-			if (li.set and li.val != __li__) continue;
-			for (int __lf__ = 0; __lf__ < nf.val; __lf__++)
-			{
-				if (lf.set and lf.val != __lf__) continue;
-				for (int __mi__ = -__li__; __mi__ <= __li__; __mi__++)
-				{
-					if (mi.set and mi.val != __mi__) continue;
-					for (int __mf__ = -__lf__; __mf__ <= __lf__; __mf__++)
-					{
-						if (mf.set and mf.val != __mf__) continue;
-						
-						rArray sig = aitkenD2_cross_section(
-							ni.val, __li__, __mi__,
-							nf.val, __lf__, __mf__,
-							nums
-						);
-						
-						// add to the sum
-						for (size_t i = 0; i < sigsum.size(); i++)
-							sigsum[i] += sig[i];
-					}
-				}
-			}
-		}
-		
-		printf("# theta\tσ\n");
-		for (size_t i = 0; i < sigsum.size(); i++)
-			printf("%g\t%.15f\n", nums[i], sigsum[i]);
-	}
-	
-	return EXIT_SUCCESS;
+	return run (vars, sdata, nums);
 }

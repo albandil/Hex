@@ -375,14 +375,14 @@ int main(int argc, char* argv[])
 		if (abs(T_singlet) != 0.)
 		{
 			fprintf(f,
-				"INSERT INTO \"hex\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
+				"INSERT INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
 				Ni, Li, Mi, Nf, Lf, Mf, 0, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
 			);
 		}
 		if (abs(T_triplet) != 0.)
 		{
 			fprintf(f,
-				"INSERT INTO \"hex\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
+				"INSERT INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
 				Ni, Li, Mi, Nf, Lf, Mf, 0, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
 			);
 		}

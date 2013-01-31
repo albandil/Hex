@@ -932,4 +932,55 @@ void eval(TFunctor f, TArray grid, TArray& vals)
 		vals[i] = f(grid[i]);
 }
 
+/**
+ * Sum two indexed arrays if their (sorted) indices perfectly match.
+ * Generally, create output array with elements that are sum of corresponding
+ * elements of both arrays or equal to a single element in one array, if
+ * that its index doesn't have a counterpart.
+ * \param idx1 Sorted (!) indices of the first array.
+ * \param arr1 Merge TO array.
+ * \param idx2 Sorted (!) indices of the second array.
+ * \param arr2 Merge FROM array.
+ */
+template <typename Tidx, typename Tval> void merge (
+	Array<Tidx>       & idx1, Array<Tval>       & arr1,
+	Array<Tidx> const & idx2, Array<Tval> const & arr2
+){
+	// positions in arrays
+	size_t i1 = 0;
+	size_t i2 = 0;
+	
+	// output arrays
+	Array<Tidx> idx;
+	Array<Tval> arr;
+	
+	// while there is anything to merge
+	while (i1 < arr1.size() and i2 < arr2.size())
+	{
+		if (idx1[i1] == idx2[i2])
+		{
+			idx.push_back(idx1[i1]);
+			arr.push_back(arr1[i1] + arr2[i2]);
+			i1++;
+			i2++;
+		}
+		else if (idx1[i1] < idx2[i2])
+		{
+			idx.push_back(idx1[i1]);
+			arr.push_back(arr1[i1]);
+			i1++;
+		}
+		else /* idx1[i2] > idx2[i2] */
+		{
+			idx.push_back(idx2[i2]);
+			arr.push_back(arr2[i2]);
+			i2++;
+		}
+	}
+	
+	// copy to the first pair
+	idx1 = idx;
+	arr1 = arr;
+}
+
 #endif

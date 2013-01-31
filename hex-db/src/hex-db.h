@@ -1,6 +1,20 @@
-#ifndef _HEX_DB_H_
-#define _HEX_DB_H_
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#ifndef HEX_HEX_DB
+#define HEX_HEX_DB
+
+#include <map>
+#include <string>
 #include <vector>
 
 #include "arrays.h"
@@ -194,12 +208,36 @@
 /**
  * Create new database
  */
-void create_new_database(const char* dbname);
+void create_new_database();
 
 /**
  * Initialize
  */
 void initialize(const char* dbname);
+
+/**
+ * Import SQL batch file.
+ * Equivalent to
+ * \code
+ *     sqlite3 "hex.db" < "batchfile.sql"
+ * \endcode
+ */
+void import(const char* sqlname);
+
+/**
+ * Update integral cross section.
+ * Used after import of T-matrices.
+ */
+void update();
+
+/**
+ * Run the computations.
+ */
+int run (
+	std::vector<std::string> const & vars,
+	std::map<std::string,std::string> const & sdata,
+	rArray const & nums
+);
 
 /**
  * Return the scattering amplitude.

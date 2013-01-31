@@ -1,60 +1,68 @@
 CPP = g++
 
-CFLAGS = -Wall -std=c++0x -I ./include
-LFLAGS = -L ./lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lhdf5 -lhdf5_cpp
+CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include
+LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lhdf5 -lhdf5_cpp
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -O2
 CXXDEBUG = $(CFLAGS) -g -O2
 
-all: bin/hex-db bin/hex-db_debug
+SQLITEPP = lib/libsqlitepp.a
+SQLITEPPNAMES = binders exception query session statement string transaction
+SQLITEPPSRC = $(patsubst %,lib/sqlitepp/%.cpp,$(SQLITEPPNAMES))
+SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
+
+all: bin/hex-db
 
 clean:
 	rm -f obj/*.o bin/hex-db*
 
+VARS = ccs colls dcs ecs ics momtf scatamp tcs tmat
+VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
+VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
+
 # -----------------------------------------------------------------------------
 # Main targets
 
-bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o
-	@mkdir -p $(@D)
-	$(CPP) $^ $(LFLAGS) -o $@
-bin/hex-db_debug: obj/ui_debug.o obj/hex-db_debug.o obj/specf_debug.o obj/angs_debug.o obj/arrays_debug.o
+bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
 # -----------------------------------------------------------------------------
 # Release
 
+$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h
+	@mkdir -p $(@D)
+	$(CPP) $(CXXRILIS) -c $< -o $@
+
 obj/ui.o: src/ui.cpp src/hex-db.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
-obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/angs.h src/specf.h src/complex.h src/arrays.h src/interpolate.h
+	
+obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/angs.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
+	
 obj/specf.o: src/specf.cpp src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
+	
 obj/angs.o: src/angs.cpp
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
+	
 obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
+	@mkdir -p $(@D)
+	$(CPP) $(CXXRILIS) -c $< -o $@
+	
+obj/variables.o: src/variables.cpp src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 
 # -----------------------------------------------------------------------------
-# Debug
+# SQLite++ library
 
-obj/ui_debug.o: src/ui.cpp src/hex-db.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXDEBUG) -c $< -o $@
-obj/hex-db_debug.o: src/hex-db.cpp src/hex-db.h src/angs.h src/specf.h src/complex.h src/arrays.h src/interpolate.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXDEBUG) -c $< -o $@
-obj/specf_debug.o: src/specf.cpp src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXDEBUG) -c $< -o $@
-obj/angs_debug.o: src/angs.cpp
-	@mkdir -p $(@D)
-	$(CPP) $(CXXDEBUG) -c $< -o $@
-obj/arrays_debug.o: src/arrays.cpp src/arrays.h src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXDEBUG) -c $< -o $@
+$(SQLITEPPOBJ) : obj/%.o : lib/sqlitepp/%.cpp
+	g++ -O2 -c $^ -o $@
+
+$(SQLITEPP) : $(SQLITEPPOBJ)
+	ar cr $@ $^
