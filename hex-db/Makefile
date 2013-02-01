@@ -16,7 +16,7 @@ all: bin/hex-db
 clean:
 	rm -f obj/*.o bin/hex-db*
 
-VARS = ccs colls dcs ecs ics momtf scatamp tcs tmat
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 
@@ -30,11 +30,11 @@ bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variab
 # -----------------------------------------------------------------------------
 # Release
 
-$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h
+$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 
-obj/ui.o: src/ui.cpp src/hex-db.h
+obj/ui.o: src/ui.cpp src/hex-db.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 	
@@ -54,7 +54,7 @@ obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 	
-obj/variables.o: src/variables.cpp src/variables.h
+obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 

@@ -33,7 +33,7 @@ template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & 
 		
 		if (right == x0.end() or right == x0.begin())
 		{
-			y[i] = T(std::numeric_limits<double>::quiet_NaN());
+			y[i] = T(0);
 			continue;
 		}
 		

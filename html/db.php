@@ -1,4 +1,17 @@
 <?php
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 	if (isset($_POST["download"]))
 	{
 		header("Content-Type: text/plain");
@@ -52,7 +65,7 @@
 				<option value = "ccs" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "ccs")
 						echo "selected = \"selected\"";
-					?> >summed integral cross section</option>
+					?> >complete cross section</option>
 				<option value = "ics" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "ics")
 						echo "selected = \"selected\"";
@@ -60,7 +73,7 @@
 				<option value = "xcs" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "xcs")
 						echo "selected = \"selected\"";
-					?> >xcsed integral cross section</option>
+					?> >extrapolated cross section</option>
 				<option value = "momtf" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "momtf")
 						echo "selected = \"selected\"";
@@ -121,6 +134,8 @@
 						break;
 					case "ics":
 					case "momtf":
+						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						break;
 					case "colls":
 						printf("\t\t\tL = <input type = \"number\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
@@ -168,7 +183,7 @@
 				if (isset($_POST["nf"])) $hexcmdline = $hexcmdline . " --nf=" . $_POST["nf"];
 				if (isset($_POST["lf"])) $hexcmdline = $hexcmdline . " --lf=" . $_POST["lf"];
 				if (isset($_POST["mf"])) $hexcmdline = $hexcmdline . " --mf=" . $_POST["mf"];
-				if (isset($_POST["E"])) $hexcmdline = $hexcmdline . " --E=" . $_POST["E"];
+				if (isset($_POST["E"])) $hexcmdline = $hexcmdline . " --Ei=" . $_POST["E"];
 				if (isset($_POST["L"])) $hexcmdline = $hexcmdline . " --L=" . $_POST["L"];
 				if (isset($_POST["S"])) $hexcmdline = $hexcmdline . " --S=" . $_POST["S"];
 				
@@ -183,7 +198,7 @@
 				putenv("PATH=" . "/home/jacob/Dokumenty/prog/Hex/hex-db/bin:" . $_ENV["PATH"]);
 				
 				// launch hex-db process
-				$prochex = proc_open(
+				$prochex = proc_open (
 					$hexcmdline,
 					array(array("pipe","r"), array("pipe","w"), array("pipe","a")),
 					$pipes
@@ -275,7 +290,7 @@
 
 	</div> <!-- rám -->
 
-	<div class = "pata">Jakub Benda ⓒ 2012</div>
+	<div class = "pata">Jakub Benda ⓒ 2013</div>
 
 </body>
 

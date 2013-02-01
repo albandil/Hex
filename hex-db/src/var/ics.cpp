@@ -79,7 +79,7 @@ bool IntegralCrossSection::run (
 	
 	// compose query
 	sqlitepp::statement st(db);
-	st << "SELECT Ei, sigma FROM " + Id + " "
+	st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
 			"WHERE ni = :ni "
 			"  AND li = :li "
 			"  AND mi = :mi "
@@ -88,7 +88,7 @@ bool IntegralCrossSection::run (
 			"  AND mf = :mf "
 			"  AND  L = :L  "
 			"  AND  S = :S  "
-			"ORDER BY Ei ASC;",
+			"ORDER BY Ei ASC",
 		sqlitepp::into(E), sqlitepp::into(sigma),
 		sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
 		sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
@@ -105,11 +105,13 @@ bool IntegralCrossSection::run (
 	rArray ics = interpolate(E_arr, sigma_arr, energies);
 	
 	// write out
-	std::cout << "# Integral cross section for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << ", " <<
-	    "L = " << L << ", S = " << S << " " <<
-	    " ordered by energy in Rydbergs\n" <<
+	std::cout << this->logo() <<
+		"# Integral cross section for\n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "#     L = " << L << ", S = " << S << "\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+		"#\n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
 		std::cout << energies[i] << "\t" << ics[i] << "\n";

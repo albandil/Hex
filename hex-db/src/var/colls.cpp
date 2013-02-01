@@ -89,11 +89,13 @@ bool CollisionStrength::run (
 	rArray omegas = energies * (2*L+1) * (2*S+1) * interpolate(E_arr, sigma_arr, energies);
 	
 	// write out
-	std::cout << "# Collision strength for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << ", " <<
-	    "L = " << L << ", S = " << S << " " <<
-	    " ordered by energy in Rydbergs\n" <<
+	std::cout << this->logo() <<
+		"# Collision strength for\n"
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "#     L = " << L << ", S = " << S << "\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+	    "# \n" <<
 	    "# E\t Ω\n";
 	for (size_t i = 0; i < energies.size(); i++)
 		std::cout << energies[i] << "\t" << omegas[i] << "\n";

@@ -59,6 +59,7 @@ bool TotalCrossSection::run (
 			"WHERE ni = :ni "
 			"  AND li = :li "
 			"  AND mi = :mi "
+			"GROUP BY Ei "
 			"ORDER BY Ei ASC",
 		sqlitepp::into(E),   sqlitepp::into(sigma),
 		sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi);
@@ -74,9 +75,11 @@ bool TotalCrossSection::run (
 	rArray tcs = interpolate(E_arr, sigma_arr, energies);
 	
 	// write out
-	std::cout << "# Total cross section for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << " " <<
-	    " ordered by energy in Rydbergs\n" <<
+	std::cout << this->logo() <<
+		"# Total cross section for\n"
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << "\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+	    "#\n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
 		std::cout << energies[i] << "\t" << tcs[i] << "\n";

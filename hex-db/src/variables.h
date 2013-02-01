@@ -63,6 +63,7 @@ public:
 		rArray const & data2
 	) const = 0;
 	
+	std::string logo() const;
 };
 
 class VariableList

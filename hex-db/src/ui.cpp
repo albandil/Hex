@@ -65,14 +65,14 @@ std::string HelpText =
 bool SwitchInput (std::string argnam, std::string argpar)
 {
 	// we can get here only if there is no default callback
-	std::cerr << "ERROR: Uknown option " << argnam << std::endl;
+	std::cerr << "ERROR: Uknown option --" << argnam << std::endl;
 	return false;
 }
 	
 template <typename DefaultCallback>
 bool SwitchInput (std::string argnam, std::string argpar, DefaultCallback defaultcallback)
 {
-	return defaultcallback(argnam, argpar);
+	return defaultcallback(argnam, argpar) or SwitchInput(argnam, argpar);
 }
 
 template <typename Callback, typename ...Params>

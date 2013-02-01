@@ -51,3 +51,19 @@ Variable const * const VariableList::get (std::string const & id) const
 	else
 		return nullptr;
 }
+
+std::string Variable::logo() const
+{
+	return std::string (
+		
+		"#\n"
+		"#       / /   / /    __    \\ \\  / /\n"
+		"#      / /__ / /   / _ \\    \\ \\/ /\n"
+		"#     /  ___  /   | |/_/    / /\\ \\\n"
+		"#    / /   / /    \\_\\      / /  \\ \\\n"
+		"#\n"
+		"#             UK MFF (c) 2013\n"
+		"#\n"
+		
+	);
+}

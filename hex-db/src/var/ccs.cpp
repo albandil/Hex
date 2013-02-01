@@ -96,10 +96,12 @@ bool CompleteCrossSection::run (
 	rArray ccs = interpolate(E_arr, sigma_arr, energies);
 	
 	// write out
-	std::cout << "# Complete cross section for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << " " <<
-	    " ordered by energy in Rydbergs\n" <<
+	std::cout << this->logo() <<
+		"# Complete cross section for\n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+	    "# \n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
 		std::cout << energies[i] << "\t" << (finite(ccs[i]) ? ccs[i] : 0.) << "\n";

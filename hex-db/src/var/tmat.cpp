@@ -105,11 +105,13 @@ bool TMatrix::run (
 	cArray T_out = interpolate(E_arr, T_arr, energies);
 	
 	// write out
-	std::cout << "# T-matrices for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << ", " <<
-	    "L = " << L << ", S = " << S << ", ℓ = " << ell << " " <<
-	    " ordered by energy in Rydbergs\n" <<
+	std::cout << this->logo() <<
+		"# T-matrices for\n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "#     L = " << L << ", S = " << S << ", ℓ = " << ell << "\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+	    "# \n" <<
 	    "# E\t Re T\t Im T\n";
 	for (size_t i = 0; i < energies.size(); i++)
 	{

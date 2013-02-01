@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "../angs.h"
 #include "../interpolate.h"
 #include "../variables.h"
 
@@ -27,19 +28,7 @@ const std::vector<std::string> MomentumTransfer::Dependencies = {
 
 std::string const & MomentumTransfer::SQL_CreateTable() const
 {
-	static const std::string cmd = "CREATE TABLE '" + Id + "' ("
-		"ni INTEGER, "
-		"li INTEGER, "
-		"mi INTEGER, "
-		"nf INTEGER, "
-		"lf INTEGER, "
-		"mf INTEGER, "
-		"L  INTEGER, "
-		"S  INTEGER, "
-		"Ei DOUBLE PRECISION, "
-		"sigma DOUBLE PRECISION, "
-		"PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
-	")";
+	static const std::string cmd = "";
 	
 	return cmd;
 }
@@ -53,94 +42,120 @@ std::string const & MomentumTransfer::SQL_Update() const
 
 bool MomentumTransfer::run (
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & data1,
-	rArray const & data2
+	std::map<std::string,std::string> const & sdata,
+	rArray const & energies
 ) const {
 	
-	// TODO
-	return false;
-}
-
-/*
-rArray MomentumTransfer::compute(int ni, int li, int mi, int nf, int lf, int mf, int L, int S, rArray Ei)
-{
-	rArray eta(Ei.size());
+	// atomic and projectile data
+	int ni = As<int>(sdata, "ni", Id);
+	int li = As<int>(sdata, "li", Id);
+	int mi = As<int>(sdata, "mi", Id);
+	int nf = As<int>(sdata, "nf", Id);
+	int lf = As<int>(sdata, "lf", Id);
+	int mf = As<int>(sdata, "mf", Id);
+	int  S = As<int>(sdata,  "S", Id);
 	
-	// get maximal partial wave angular momentum
-	int max_ell;
-	sqlitepp::statement st1(db);
+	// SQL interface variables
+	double E, Re_T_ell, Im_T_ell;
+	int L, ell;
 	
-	st1 << "SELECT MAX(ell) FROM hex WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND L = :L AND S = :S",
-		sqlitepp::into(max_ell),
+	// compose the statement
+	sqlitepp::statement st(db);
+	st << "SELECT Ei, L, ell, Re_T_ell, Im_T_ell FROM " + TMatrix::Id + " "
+	      "WHERE ni = :ni "
+		  "  AND li = :li "
+		  "  AND mi = :mi "
+		  "  AND nf = :nf "
+		  "  AND lf = :lf "
+		  "  AND mf = :mf "
+		  "  AND  S = :S  "
+		  "ORDER BY L, ell, Ei ASC",
+		sqlitepp::into(E), sqlitepp::into(L), sqlitepp::into(ell), 
+		sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
 		sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
 		sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-		sqlitepp::use(L), sqlitepp::use(S);
+		sqlitepp::use(S);
 	
-	if (not st1.exec())
-	{
-		printf ("no data for these quantum numbers\n");
-		return eta;
-	}
-	
-	// load all partial wave T-matrices
-	cArray Tmatrices(Ei.size() * (max_ell + 1));
-	for (int ell = 0; ell <= max_ell; ell++)
-	{
+	// auxiliary variables
+	rArray *pE = nullptr;	// pointer to current energy array
+	cArray *pT = nullptr;	// pointer to current T-matrix array
+	std::pair<int,int> key(-1,-1);	// current (L,ell) pair
+	int maxL = -1;	// maximal L
+	int maxl = -1;	// maximal ell
 		
-		// get all relevant lines from database
-		double __Ei, __Re_T_ell, __Im_T_ell;
-		rArray db_Ei;
-		cArray db_T_ell;
-		sqlitepp::statement st2(db);
-		st2 << "SELECT Ei, Re_T_ell, Im_T_ell FROM hex "
-		      "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND ell = :ell AND L = :L AND S = :S "
-			  "ORDER BY Ei ASC",
-			sqlitepp::into(__Ei), sqlitepp::into(__Re_T_ell), sqlitepp::into(__Im_T_ell),
-			sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-			sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-			sqlitepp::use(ell), sqlitepp::use(L), sqlitepp::use(S);
-		
-		while ( st2.exec() )
+	// load T-matrices
+	std::map<std::pair<int,int>, std::pair<rArray*, cArray*>> Tmatrices;
+	while (st.exec())
+	{
+		// create new arrays if necessary
+		if (key.first != L or key.second != ell)
 		{
-			db_Ei.push_back(__Ei);
-			db_T_ell.push_back(Complex(__Re_T_ell, __Im_T_ell));
+			pE = new rArray;
+			pT = new cArray;
+			key = std::make_pair(L,ell);
+			Tmatrices[key] = std::make_pair(pE,pT);
+			maxL = (L > maxL) ? L : maxL;
+			maxl = (ell > maxl) ? ell : maxl;
 		}
 		
-		// update value of "sigma"
-		for (size_t ei = 0; ei < Ei.size(); ei++)
-			Tmatrices[ei*(max_ell+1) + ell] = interpolate(db_Ei, db_T_ell, Ei[ei]);
+		// insert new data
+		pE->push_back(E);
+		pT->push_back(Complex(Re_T_ell,Im_T_ell));
 	}
 	
-	// compute the momentum transfer
-	for (size_t ei = 0; ei < Ei.size(); ei++)
+	// compute momentum transfer
+	rArray eta_energies;
+	rArray eta;
+	for (int L = 0; L <= maxL; L++)
+	for (int Lp = 0; Lp <= maxL; Lp++)
+	for (int l = 0; l <= maxl; l++)
+	for (int lp = 0; lp <= maxl; lp++)
 	{
-		// check conservation of energy
-		if (Ei[ei] <= 0. or Ei[ei] - 1./(ni*ni) + 1./(nf*nf) <= 0.)
-		{
-			printf("energy not conserved for ni = %d, nf = %d, Ei = %g\n", ni, nf, Ei[ei]);
+		std::pair<int,int> key(L,l), keyp(Lp,lp);
+		
+		// if no data, skip
+		if (Tmatrices.find(key) == Tmatrices.end() or Tmatrices.find(keyp) == Tmatrices.end())
 			continue;
-		}
 		
-		// for all angular momenta
-		for (int ell = 0; ell <= max_ell; ell++)
-		{
-			// cross section contribution
-			Complex T = Tmatrices[ei * (max_ell + 1) + ell];
-			eta[ei] += (T.real() * T.real() + T.imag() * T.imag());
-			
-			// shift contribution
-			for (int elp = abs(ell - 1); elp <= ell + 1; elp++)
-			{
-				Complex Tpc = conj(Tmatrices[elp]);
-				eta[ei] += sqrt(4 * M_PI / 3) * (T*Tpc).real() * Gaunt(ell,mi-mf,1,0,elp,mi-mf);
-			}
-		}
+		// get energies and T-matrices pointers
+		rArray *pE = Tmatrices[key].first;
+		cArray *pT = Tmatrices[key].second;
+		rArray *pEp = Tmatrices[keyp].first;
+		cArray *pTp = Tmatrices[keyp].second;
+		
+		// normalize
+		cArray emptyp(pEp->size());	// zero-filled ghost
+		merge (*pE, *pT, *pEp, emptyp);	// inflate *pE and *pT to accomodate *pEp and emptyp
+		cArray empty(pE->size()); // zero-filled ghost
+		merge (*pEp, *pTp, *pE, empty);
+		
+		// compute factor
+		double factor = 0;
+		for (int m = -l; m <= l; m++)
+			factor += ClebschGordan(l,m,1,0,lp,m);
+		factor *= -sqrt((2.*l+1.)/(2.*lp+1.)) * ClebschGordan(l,0,1,0,lp,0);
+		if (l == lp)
+			factor += 1.;
+		
+		// update momentum transfer
+		merge (eta_energies, eta, *pE, factor * abs((*pT) * (*pTp).conj()));
 	}
+	eta *= 1. / (4. * M_PI * M_PI);
 	
-	// apply prefactor
-	for (size_t ei = 0; ei < Ei.size(); ei++)
-		eta[ei] /= 2.*M_PI*2.*M_PI;
+	// interpolate
+	eta = interpolate(eta_energies, eta, energies);
 	
-	return eta;
+	// write out
+	std::cout << this->logo() <<
+		"# Momentum transfer for\n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "#     S = " << S << "\n" <<
+	    "# ordered by energy in Rydbergs\n" <<
+		"#\n" <<
+	    "# E\t η\n";
+	for (size_t i = 0; i < energies.size(); i++)
+		std::cout << energies[i] << "\t" << eta[i] << "\n";
+	
+	return true;
 }
-*/

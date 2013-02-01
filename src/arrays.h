@@ -58,15 +58,15 @@ template <typename NumberType> class Array
 		// default constructor, creates an empty array
 		Array() : N(0), array(0) {}
 		
-		// constructor, creates a length-n zero-filled array
-		Array(size_t n) : N(n)
+		// constructor, creates a length-n "x"-filled array
+		Array(size_t n, NumberType x = 0) : N(n)
 		{
 			// reserve space
 			array = new NumberType [N];
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
-				array[i] = 0.;
+				array[i] = x;
 		}
 		
 		// copy constructor from Array const reference
@@ -201,6 +201,19 @@ template <typename NumberType> class Array
 				new_array[i] = array[i];
 			new_array[N] = a;
 			N++;
+			delete [] array;
+			array = new_array;
+		}
+		
+		template <class InputIterator> void append (
+			InputIterator first, InputIterator last
+		) {
+			NumberType* new_array = new NumberType [N + last - first];
+			for (size_t i = 0; i < N; i++)
+				new_array[i] = array[i];
+			for (InputIterator it = first; it != last; it++)
+				new_array[N + it - first] = *it;
+			N += last - first;
 			delete [] array;
 			array = new_array;
 		}
@@ -567,8 +580,19 @@ template <typename NumberType> Array<NumberType> sqrt (Array<NumberType> const &
 	size_t N = A.size();
 	Array<NumberType> B (N);
 
-	for (size_t i = 0; i < A.size(); i++)
+	for (size_t i = 0; i < N; i++)
 		B[i] = sqrt(A[i]);
+
+	return B;
+}
+
+inline Array<double> sqrabs (Array<Complex> const & A)
+{
+	size_t N = A.size();
+	Array<double> B (N);
+
+	for (size_t i = 0; i < N; i++)
+		B[i] = sqrabs(A[i]);
 
 	return B;
 }
@@ -934,9 +958,9 @@ void eval(TFunctor f, TArray grid, TArray& vals)
 
 /**
  * Sum two indexed arrays if their (sorted) indices perfectly match.
- * Generally, create output array with elements that are sum of corresponding
+ * Or, generally, create output array with elements that are sum of corresponding
  * elements of both arrays or equal to a single element in one array, if
- * that its index doesn't have a counterpart.
+ * that its index doesn't have a counterpart in the other array.
  * \param idx1 Sorted (!) indices of the first array.
  * \param arr1 Merge TO array.
  * \param idx2 Sorted (!) indices of the second array.
@@ -976,6 +1000,13 @@ template <typename Tidx, typename Tval> void merge (
 			arr.push_back(arr2[i2]);
 			i2++;
 		}
+	}
+	
+	// the rest will be done by a single copy
+	if (i1 == arr1.size() and i2 < arr2.size())
+	{
+		idx.append(idx2.begin() + i2, idx2.end());
+		arr.append(arr2.begin() + i2, arr2.end());
 	}
 	
 	// copy to the first pair

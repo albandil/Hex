@@ -54,7 +54,7 @@ bool DifferentialCrossSection::run (
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "E", Id);
+	double E = As<double>(sdata, "Ei", Id);
 	double ki = sqrt(E);
 	double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
 	
@@ -66,103 +66,76 @@ bool DifferentialCrossSection::run (
 	rArrays energies(angles.size());
 	cArrays amplitudes(angles.size());
 	
-	// total angular momentum projection (given by axis orientation)
-	int M = mi;
+	int ell;
+	double Ei, sum_Re_T_ell, sum_Im_T_ell;
+	rArrays E_ell;
+	cArrays TE_ell;
+	rArray dcs(angles.size());
 	
-	// get maximal partial wave angular momentum
-	int max_L;
-	sqlitepp::statement st3(db);
-	st3 << "SELECT MAX(L) FROM " + TMatrix::Id + " "
-	       "WHERE ni = :ni "
-		   "  AND li = :li "
-		   "  AND mi = :mi "
-		   "  AND nf = :nf "
-		   "  AND lf = :lf "
-		   "  AND mf = :mf "
-		   "  AND  S = :S  ",
-		sqlitepp::into(max_L),
+	// sum over L
+	sqlitepp::statement st(db);
+	st << "SELECT ell, Ei, SUM(Re_T_ell), SUM(Im_T_ell) "
+	      "FROM " + TMatrix::Id + " "
+		  "WHERE ni = :ni "
+		  "  AND li = :li "
+		  "  AND mi = :mi "
+		  "  AND nf = :nf "
+		  "  AND lf = :lf "
+		  "  AND mf = :mf "
+		  "  AND  S = :S  "
+		  "GROUP BY ell, Ei "
+		  "ORDER BY ell ASC, Ei ASC",
+		sqlitepp::into(ell), sqlitepp::into(Ei),
+		sqlitepp::into(sum_Re_T_ell), sqlitepp::into(sum_Im_T_ell),
 		sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
 		sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
 		sqlitepp::use(S);
-	st3.exec();
 	
-	// for all total angular momenta
-	for (int L = M; L <= max_L; L++)
+	// load data using the statement
+	while (st.exec())
 	{
-		// get maximal projectile partial wave angular momentum
-		int max_ell;
-		sqlitepp::statement st1(db);
-		st1 << "SELECT MAX(ell) FROM " + TMatrix::Id + " "
-		       "WHERE ni = :ni "
-			   "  AND li = :li "
-			   "  AND mi = :mi "
-			   "  AND nf = :nf "
-			   "  AND lf = :lf "
-			   "  AND mf = :mf "
-			   "  AND  L = :L  "
-			   "  AND  S = :S  ",
-			sqlitepp::into(max_ell),
-			sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-			sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-			sqlitepp::use(L), sqlitepp::use(S);
-		st1.exec();
-		
-		// for all outgoing partial waves
-		for (int ell = abs(M - mf); ell <= max_ell; ell++)
+		while ((int)E_ell.size() <= ell)
 		{
-			// get all relevant lines from database
-			double __Ei, __Re_T_ell, __Im_T_ell;
-			rArray db_Ei;
-			cArray db_T_ell;
-			sqlitepp::statement st2(db);
-			st2 << "SELECT Ei, Re_T_ell, Im_T_ell FROM " + TMatrix::Id + " "
-				   "WHERE ni = :ni "
-				   "  AND li = :li "
-				   "  AND mi = :mi "
-				   "  AND nf = :nf "
-				   "  AND lf = :lf "
-				   "  AND mf = :mf "
-				   "  AND ell=:ell "
-				   "  AND  L = :L  "
-				   "  AND  S = :S  "
-				   "ORDER BY Ei ASC",
-				sqlitepp::into(__Ei), sqlitepp::into(__Re_T_ell), sqlitepp::into(__Im_T_ell),
-				sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-				sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-				sqlitepp::use(ell), sqlitepp::use(L), sqlitepp::use(S);
-			while ( st2.exec() )
-			{
-				db_Ei.push_back(__Ei);
-				db_T_ell.push_back(Complex(__Re_T_ell, __Im_T_ell));
-			}
-			
-			if (db_Ei.size() == 0)
-				continue;
-			
-			// update value of "f"
-			for (size_t i = 0; i < angles.size(); i++)
-			{
-				merge (
-					energies[i],
-					amplitudes[i],
-					db_Ei,
-					-1./(2.*M_PI) * db_T_ell * sphY(ell, abs(M-mf), angles[i], 0.)
-				);
-			}
+			E_ell.push_back(rArray());
+			TE_ell.push_back(cArray());
 		}
+		
+		E_ell[ell].push_back(Ei);
+		TE_ell[ell].push_back(Complex(sum_Re_T_ell, sum_Im_T_ell));
 	}
 	
-	// differential cross sections
-	rArray dcs(amplitudes.size());
-	for (size_t i = 0; i < dcs.size(); i++)
-		dcs[i] = sqrabs(interpolate(energies[i], amplitudes[i], {E}));
+	// for all angles
+	for (int i = 0; i < (int)angles.size(); i++)
+	{
+		rArray e;	// energies
+		cArray f;	// scattering amplitudes
+		
+		// for all projectile angular momenta
+		for (int l = 0; l < (int)E_ell.size(); l++)
+		{
+			Complex sumY = 0.;
+			
+			// accumulate spherical functions
+			for (int m = -l; m <= l; m++)
+				sumY += sphY(l,m,angles[i],0);
+			
+			// sum arrays
+			merge (e, f, E_ell[l], TE_ell[l] * sumY);
+		}
+		
+		// intepolate energies for unnormalized differential cross section
+		dcs[i] = interpolate(e, sqrabs(f), {E});
+	}
+	
+	// normalize
+	dcs *= kf * (2.*S + 1.) / (16 * M_PI * M_PI * ki);
 	
 	// write out
-	std::cout << "# Differential cross section for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << ", " <<
-	    "S = " << S << ", E = " << E << " " <<
-	    " ordered by angle in radians\n" <<
+	std::cout << this->logo() <<
+		"# Differential cross section for \n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "#     S = " << S << ", E = " << E << " ordered by angle in radians\n" <<
 	    "# θ\t dσ\n";
 	for (size_t i = 0; i < angles.size(); i++)
 		std::cout << angles[i] << "\t" << dcs[i] << "\n";

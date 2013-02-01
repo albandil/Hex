@@ -52,7 +52,7 @@ bool ScatteringAmplitude::run (
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "E", Id);
+	double E = As<double>(sdata, "Ei", Id);
 	
 	// the scattering amplitudes
 	cArray amplitudes(angles.size());
@@ -132,17 +132,20 @@ bool ScatteringAmplitude::run (
 			
 			// update value of "f"
 			Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E});
+			
 			for (size_t i = 0; i < angles.size(); i++)
 				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i], 0.);
 		}
 	}
 	
 	// write out
-	std::cout << "# Scattering amplitudes for "
-		"ni = " << ni << ", li = " << li << ", mi = " << mi << ", " <<
-	    "nf = " << nf << ", lf = " << lf << ", mf = " << mf << ", " <<
-	    "S = " << S << ", E = " << E << " " <<
-	    " ordered by angle in radians\n" <<
+	std::cout << this->logo() <<
+		"# Scattering amplitudes for\n"
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
+	    "#     S = " << S << ", E = " << E << "\n"
+	    "# ordered by angle in radians\n"
+		"# \n"
 	    "# θ\t Re f\t Im f\n";
 	for (size_t i = 0; i < angles.size(); i++)
 	{
