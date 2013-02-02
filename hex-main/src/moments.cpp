@@ -138,29 +138,14 @@ Complex computeD_iknot(int i, int j, int iknot)
 		return 0;
 	
 	// get Gauss-Legendre nodes and weights for the interval [-1, 1]
-	const double *vx = 0, *vw = 0;
-	int points = p_roots(20/*order*/, vx, vw);
-	
-	// actual stored data count (only non-negative values)
-	int Ndata = (points + 1) / 2;
-	
-	// mirror evaluation nodes and weights
-	Complex xs[points], ws[points];
-	for (int dat = 0; dat < Ndata; dat++)
-	{
-		// stretch nodes
-		xs[dat]          = x1 + 0.5 * (1.0 - vx[Ndata-1-dat]) * (x2 - x1);
-		xs[points-1-dat] = x1 + 0.5 * (1.0 + vx[Ndata-1-dat]) * (x2 - x1);
-		
-		// scale weights
-		ws[dat]          = 0.5 * vw[Ndata-1-dat] * (x2 - x1);
-		ws[points-1-dat] = 0.5 * vw[Ndata-1-dat] * (x2 - x1);
-	}
+	int points = /*order*/20;
+	cArray xs = p_points(points, x1, x2);
+	cArray ws = p_weights(points, x1, x2);
 	
 	// evaluate B-splines at Gauss-Legendre nodes
 	Complex values_i[points], values_j[points];
-	dB(i, iknot, points, xs, values_i);
-	dB(j, iknot, points, xs, values_j);
+	dB(i, iknot, points, xs.data(), values_i);
+	dB(j, iknot, points, xs.data(), values_j);
 	
 	// result
 	Complex res = 0;
@@ -203,29 +188,14 @@ Complex computeM_iknot(int a, int i, int j, int iknot, Complex R)
 		return 0;
 	
 	// get Gauss-Legendre nodes and weights for the interval [-1, 1]
-	const double *vx = 0, *vw = 0;
-	int points = p_roots(20/*order + 10*/, vx, vw);
-	
-	// actual stored data count (only non-negative values)
-	int Ndata = (points + 1) / 2;
-	
-	// mirror evaluation nodes and weights
-	Complex xs[points], ws[points];
-	for (int dat = 0; dat < Ndata; dat++)
-	{
-		// stretch nodes
-		xs[dat]          = x1 + 0.5 * (1.0 - vx[Ndata-1-dat]) * (x2 - x1);
-		xs[points-1-dat] = x1 + 0.5 * (1.0 + vx[Ndata-1-dat]) * (x2 - x1);
-		
-		// scale weights
-		ws[dat]          = 0.5 * vw[Ndata-1-dat] * (x2 - x1);
-		ws[points-1-dat] = 0.5 * vw[Ndata-1-dat] * (x2 - x1);
-	}
+	int points = /*order + 5*/20;
+	cArray xs = p_points(points, x1, x2);
+	cArray ws = p_weights(points, x1, x2);
 	
 	// evaluate B-splines at Gauss-Legendre nodes
 	Complex values_i[points], values_j[points];
-	B(i, iknot, points, xs, values_i);
-	B(j, iknot, points, xs, values_j);
+	B(i, iknot, points, xs.data(), values_i);
+	B(j, iknot, points, xs.data(), values_j);
 	
 	// result
 	Complex res = 0;

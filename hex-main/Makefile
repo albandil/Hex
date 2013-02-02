@@ -17,7 +17,7 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o
+bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o obj/gauss_weights.o obj/gauss_roots.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
@@ -66,6 +66,14 @@ obj/bspline-mpi.o: src/bspline.cpp src/arrays.h src/bspline.h
 	$(MPICPP) $(CFLAGS) -c $< -o $@
 
 obj/gauss.o: src/gauss.cpp src/arrays.h src/bspline.h
+	@mkdir -p $(@D)
+	$(CPP) $(CFLAGS) -c $< -o $@
+	
+obj/gauss_weights.o: src/gauss_weights.cpp src/arrays.h
+	@mkdir -p $(@D)
+	$(CPP) $(CFLAGS) -c $< -o $@
+	
+obj/gauss_roots.o: src/gauss_roots.cpp src/arrays.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
