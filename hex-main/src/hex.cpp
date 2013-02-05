@@ -114,6 +114,8 @@ int main(int argc, char* argv[])
 		cArray ev;			// evaluated solution
 		rArray grid;		// real evaluation grid
 		
+		std::cout << "Zipping B-spline expansion of the solution: \"" << zipfile << "\"" << std::endl;
+		
 		sol.hdfload(zipfile);
 		grid = linspace(0., Rmax, zipcount + 1);
 		ev = zip (sol, grid, grid);
