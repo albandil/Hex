@@ -19,6 +19,10 @@
 #include <numeric>
 #include <vector>
 
+#include <gsl/gsl_sf.h>
+
+#define sqr(x) gsl_sf_pow_int((x),2)
+
 template <typename Tin, typename Tout> class Chebyshev
 {
 public:
@@ -120,9 +124,6 @@ public:
 				return k + 1;
 		}
 		
-// 		std::cout << "sum = " << sum << std::endl;
-// 		std::cout << "abs_Ck = " << abs_Ck << std::endl;
-		
 		return N;
 	}
 	
@@ -209,21 +210,70 @@ private:
 	Tin m;
 };
 
-
 /**
- * Chebyshev expansion based integration routine.
- * \param F Function to integrate of the signature FType(*)(CType x).
- * \param x1 Left bound (allowed complex).
- * \param x2 Right bound (allowed complex).
- * \param eps Tolerance.
- * \param n On output, order of the last Chebyshev expansion used.
+ * Limit
+ * \f[
+ *     \lim_{t \rightarrow x} F(t)
+ * \f]
  */
-template <class Functor, typename T> 
-auto ClenshawCurtis (Functor F, T x1, T x2, double eps = 1e-8, int * n = nullptr) -> decltype(F(0.)*1.)
+template <class Functor>
+auto lim (Functor F, double x, int * n = nullptr) -> decltype(F(0.))
 {
 	// shorthands for number types
 	typedef decltype(F(0.)) FType;
-	typedef decltype(F(0.)*1.) CType;
+	
+	// initial position
+	double x0 = (x != 1.) ? 1. : 0.5;
+	
+	// function value
+	FType f0 = F(x0), f;
+	
+	// main loop
+	int i;
+	for (i = 0; n == nullptr or i <= *n; i++)
+	{
+		// advance x0
+		if (x == std::numeric_limits<double>::infinity())
+			x0 *= 2.;
+		else if (x == -std::numeric_limits<double>::infinity())
+			x0 *= 2.;
+		else
+			x0 = 0.5 * (x + x0);
+		
+		// evaluate function
+		f = F(x0);
+		
+		// check convergence
+		if (f == f0)
+			break;
+		else
+			f0 = f;
+	}
+	
+	// return
+	if (n != nullptr) *n = i;
+	return f;
+}
+
+/**
+ * Clenshaw-Curtis quadrature for finite interval (a,b).
+ * \param F Function to integrate of the signature FType(*)(double x).
+ * \param x1 Left bound (allowed infinite).
+ * \param x2 Right bound (allowed infinite).
+ * \param eps Tolerance.
+ * \param n On output, order of the last Chebyshev expansion used.
+ */
+template <class Functor> 
+auto ClenshawCurtis_ff (Functor F, double x1, double x2, double eps = 1e-8, int * n = nullptr) -> decltype(F(0.))
+{
+	// shorthands for number types
+	typedef decltype(F(0.)) FType;
+	
+	// check interval bounds
+	if (x1 == x2)
+		return FType(0);
+	if (x1 > x2)
+		return -ClenshawCurtis_ff(F, x2, x1, eps, n);
 	
 	// scaled F
 	auto f = [&](double x) -> FType {
@@ -250,14 +300,29 @@ auto ClenshawCurtis (Functor F, T x1, T x2, double eps = 1e-8, int * n = nullptr
 		if (coefs.empty())
 		{
 			// evaluate f everywhere
-			for (int k = 0; k <= N; k++)
+			for (int k = 0; k < N; k++)
+			{
 				fvals[k] = f(cos(k * pi_over_N));
+				
+				if (not finite(fvals[k]))
+					fvals[k] = 0;
+			}
+			fvals[N] = f(-1);
+			
+			if (not finite(fvals[N]))
+				fvals[N] = 0;
 		}
 		else
 		{
 			// evaluate just the new half, recycle older evaluations
-			for (int k = 0; k <= N; k++)
+			for (int k = 0; k < N; k++)
+			{
 				fvals[k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
+				
+				if (not finite(fvals[k]))
+					fvals[k] = 0;
+			}
+			fvals[N] = fvals_prev[N/2];
 		}
 		
 		coefs.resize(N + 1);
@@ -295,59 +360,147 @@ auto ClenshawCurtis (Functor F, T x1, T x2, double eps = 1e-8, int * n = nullptr
 	}
 }
 
-template <class Functor, typename T>
-auto ClenshawCurtis0 (Functor F, T x1, T x2, double eps = 1e-8, int * n = nullptr) -> decltype(F(0.))
+/**
+ * Clenshaw-Curtis quadrature, main interface.
+ * \param F Function to integrate of the signature FType(*)(double x).
+ * \param x1 Left bound (allowed infinite).
+ * \param x2 Right bound (allowed infinite).
+ * \param L Range parameter.
+ * \param eps Tolerance.
+ * \param n On output, order of the last Chebyshev expansion used.
+ */
+template <class Functor> 
+auto ClenshawCurtis (Functor F, double x1, double x2, double L = 1., double eps = 1e-8, int * n = nullptr) -> decltype(F(0.))
 {
-	// TODO Implement using regular Clenshaw-Curtis quadrature.
-	
+	// shorthands for number types
 	typedef decltype(F(0.)) FType;
 	
-	if (x1 == x2)
-		return 0;
+	// if both bounds are infinite, call a specialized function
+	if (not finite(x1) and not finite(x2))
+		return ClenshawCurtis_ii(F, L, eps, n);
 	
-	if (x1 > x2)
-		return -ClenshawCurtis(F, x2, x1, eps, n);
-	
-	if (finite(x1) and finite(x2))
+	// lower bound is infinite
+	if (not finite(x1))
 	{
-		for (int N = 2; ; N *= 2)
-		{
-			Chebyshev<T,FType> cb(F,N,x1,x2);
-			Chebyshev<T,FType> cbi = cb.integrate();
+		// transform the function
+		auto Gwrap = [&](double x) -> FType {
 			
-			int i = cbi.tail(eps);
-			if (i < N)
+			// the functor
+			auto G = [&](double t) -> FType {
+				double z = L * (1. + t) / (1. - t);
+				double w = 2. * L / sqr(1. - t);
+				return w * F(x2 - z);
+			};
+			
+			// evaluate
+			return (x == 1.) ? lim(G,x) : G(x);
+		};
+		
+		// integrate
+		return -ClenshawCurtis_ff(Gwrap, -1., 1., eps, n);	// (-∞,x2)->(1,-1)
+	}
+	
+	// upper bound is infinite
+	if (not finite(x2))
+	{
+		// transform the function
+		auto Gwrap = [&](double x) -> FType {
+			
+			// the functor
+			auto G = [&](double t) -> FType {
+				double z = L * (1. + t) / (1. - t);
+				double w = 2. * L / sqr(1. - t);
+				return w * F(x1 + z);
+			};
+			
+			// evaluate
+			return (x == 1.) ? lim(G,x) : G(x);
+		};
+		
+		// integrate
+		return ClenshawCurtis_ff(Gwrap, -1., 1., eps, n);	// (x1,+∞)->(-1,1)
+	}
+	
+	// both bounds are finite
+	return ClenshawCurtis_ff(F, x1, x2, eps, n);
+}
+
+/**
+ * Clenshaw-Curtis quadrature for infinite-infinite interval (-∞,+∞).
+ * \param F Function to integrate of the signature FType(*)(double x).
+ * \param L Range parameter.
+ * \param eps Tolerance.
+ * \param n On output, order of the last Chebyshev expansion used.
+ */
+template <class Functor> 
+auto ClenshawCurtis_ii (Functor F, double L = 1., double eps = 1e-8, int * n = nullptr) -> decltype(F(0.))
+{
+	// shorthand for function output type
+	typedef decltype(F(0.)) FType;
+	
+	// function values, new and previous
+	std::vector<FType> fvals, fvals_prev;
+	
+	// weights, new and previous
+	std::vector<double> weights, weights_prev;
+	
+	// previous integral
+	FType sum_prev = std::numeric_limits<double>::quiet_NaN();
+	
+	// main loop
+	for (int N = 2; ; N *= 2)
+	{
+		fvals.resize(N);
+		weights.resize(N);
+		
+		// precompute values
+		if (fvals_prev.empty())
+		{
+			// compute all values
+			for (int i = 1; i <= N - 1; i++)
 			{
-				if (n != nullptr)
-					*n = N;
-					
-				return cbi.clenshaw(x2,i) - cbi.clenshaw(x1,i);
+				double x = i * M_PI / N;
+				fvals[i] = F(L / tan(x));
+				if (not finite(fvals[i]))
+					fvals[i] = 0;
+				weights[i] = 1. / sqr(sin(x));
 			}
 		}
-	}
-	else if (finite(x1) and not finite(x2))	// (a,inf)
-	{
-		// transform (a,inf) -> (0,1)
-		auto G = [&](double x) -> FType {
-			// TODO transform
-			return Jac(x) * f(transform(x));
-		};
+		else
+		{
+			// compute new values only
+			for (int i = 1; i < N - 1; i++)
+			{
+				if (i % 2 == 0)
+				{
+					fvals[i] = fvals_prev[i/2];
+					weights[i] = weights_prev[i/2];
+				}
+				else
+				{
+					double x = i * M_PI / N;
+					fvals[i] = F(L / tan(x));
+					if (not finite(fvals[i]))
+						fvals[i] = 0;
+					weights[i] = 1. / sqr(sin(x));
+				}
+			}
+		}
 		
-		return ClenshawCurtis(G, 0., 1., eps, n);
-	}
-	else if (not finite(x1) and finite(x2))	// (-inf,a)
-	{
-		// transform (-inf,a) -> (-1,0)
-		auto G = [&](double x) -> FType {
-			// TODO transform
-			return Jac(x) * f(transform(x));
-		};
+		// evaluate the integral
+		FType sum = 0.;
+		for (int i = 1; i <= N - 1; i++)
+			sum += weights[i] * fvals[i];
+		if (std::abs(sum - FType(2.) * sum_prev) < eps * std::abs(sum))
+		{
+			if (n != nullptr) *n = N;
+			return FType(L * M_PI / N) * sum;
+		}
 		
-		return ClenshawCurtis(G, -1., 0., eps, n);
-	}
-	else /* not finite(x1) and not finite(x2) */ // (-inf,inf)
-	{
-		return ClenshawCurtis(F, x1, T(0), eps, n) + ClenshawCurtis(F, T(0), x2, eps, n);
+		// save precomputed values
+		sum_prev = sum;
+		fvals_prev = fvals;
+		weights_prev = weights;
 	}
 }
 
