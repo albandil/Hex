@@ -36,10 +36,11 @@
  
 <body>
 
-	<div class = "ramec">
+	<div class = "grid">
 
 	<!-- header -->
 
+	<center>
 	<table border = "0">
 		<tr><td>
 			<a href = "index.html"><img src = "hexe.gif"/></a>
@@ -49,8 +50,13 @@
 			<div class = "podnadpis">scattering database</div>
 		</td></tr>
 	</table>
+	</center>
 
-	<form name = "data" action = "db.php" method = "post">
+	<table width = "100%"><tr><td valign = "top" width = "50%">
+
+	<div class = "sekce">Input:</div>
+
+	<form name = "data" action = "db.php" method = "post" style = "margin: 10px">
 		<div class = "text">Choose what to compute:</div>
 		<center>
 			<select name = "qty" onchange="this.form.submit()">
@@ -132,10 +138,10 @@
 						printf("\t\t\tE = <input type = \"number\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
-					case "ics":
 					case "momtf":
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
+					case "ics":
 					case "colls":
 						printf("\t\t\tL = <input type = \"number\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
 						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
@@ -235,7 +241,9 @@
 
 	</form>
 
-	<br/>
+	</td><td valign = "top" width = "50%">
+
+	<div class = sekce>Output:</div>
 
 	<?php
 		if (isset($_POST["qty"]) and (isset($_POST["view"]) or isset($_POST["download"])))
@@ -252,7 +260,7 @@
 			fwrite($pipes2[0], "unset key\n");
 			if ($_POST["qty"] == "scatamp")
 			{
-				fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
+				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
 				fwrite($pipes2[0], $hexoutput);
 				fwrite($pipes2[0], "e\n");
 				fwrite($pipes2[0], $hexoutput);
@@ -260,7 +268,7 @@
 			}
 			else
 			{
-				fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
+				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
 				fwrite($pipes2[0], $hexoutput);
 				fwrite($pipes2[0], "e\n");
 			}
@@ -277,16 +285,15 @@
 			// close the process
 			$gnuplot_return_value = proc_close($procgnuplot);
 			
-			// show header
-			echo "\t<div class = \"sekce\">Output:</div>\n";
-			
 			// display the plot
 			echo "\t<div class = \"output\"><img src=\"data:image/png;base64," . base64_encode($gnuplot_out) . "\"/></div>\n";
 			
 			// write text data
-			echo "\t<div class = \"output\"><pre>$hexoutput</pre></div>\n";
+// 			echo "\t<div class = \"output\"><pre>$hexoutput</pre></div>\n";
 		}
 	?>
+
+	</td></tr></table>
 
 	</div> <!-- rám -->
 

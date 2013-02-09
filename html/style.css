@@ -11,6 +11,23 @@ div {
 	color: black;
 	font-family: "Verdana", sans-serif;
 }
+div.grid {
+	margin-left: auto;
+	margin-right: auto;
+	width: 1140px;
+/* 	position: absolute; */
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+}
+div.ramec {
+	margin-left: auto;
+	margin-right: auto;
+	width: 550px;
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+}
 div.nadpis {
 	font-size: 60px;
 }
@@ -20,14 +37,6 @@ div.podnadpis {
 div.sekce {
 	font-size: 20px;
 	margin: 10px;
-}
-div.ramec {
-	margin-left: auto;
-	margin-right: auto;
-	width: 550px;
-	border-style: solid;
-	border-width: 1px;
-	border-color: black;
 }
 div.output {
 	margin: 10px;
@@ -42,6 +51,9 @@ div.text {
 	text-indent: 15px;
 }
 div.pata {
+	position: absolute;
+	width: 100%;
+	clear: both;
 	margin: 5px;
 	font-size: 10px;
 	text-align: center;
