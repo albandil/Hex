@@ -53,11 +53,11 @@
 /**
  * \brief Ricatti-Hankel function of the first kind, \f$ \hat{h}_n^{(+)}(x) \f$.
  */
-#define ric_h_plus(n,x) 	Complex( ric_j(n,x), ric_n(n,x))
+#define ric_h_plus(n,x) 	Complex( ric_n(n,x), ric_j(n,x))
 /**
  * \brief Derivative of Ricatti-Hankel function of the first kind, \f$ {\hat{h}_n^{(+)}}'(x) \f$.
  */
-#define dric_h_plus(n,x)	Complex(dric_j(n,x),dric_n(n,x))
+#define dric_h_plus(n,x)	Complex(dric_n(n,x),dric_j(n,x))
 
 /**
  * \brief Spherical harmonic function.

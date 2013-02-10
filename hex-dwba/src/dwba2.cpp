@@ -10,6 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <algorithm>
 #include <cstdio>
 #include <cmath>
 
@@ -20,102 +21,16 @@
 #include "integrate.h"
 #include "potential.h"
 #include "wave_distort.h"
+#include "wave_irreg.h"
+#include "wave_forbid.h"
+#include "wave_hyperb.h"
 #include "spmatrix.h"
 
 #define EPS_CONTRIB 1e-8
 
-double DWBA2::computeI (
-	int lam_a,
-	HydrogenFunction const & psi_a,
-	DistortedWave const & chi_a,
-	DistortingPotential const & U_a,
-	SturmianFunction const & sturm1,
-	SturmianFunction const & sturm2
-) {
-	if (lam_a == 0)
-	{
-		// setup inner integrals
-		PhiFunction phi1 (&PhiFunction::integrate_inf, 0, psi_a, sturm1);
-		PhiFunction phi2 (&PhiFunction::integrate_low, 1, psi_a, sturm1);
-		RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
-		double xi = XiIntegral(psi_a, sturm1);
-		
-		// setup outer integrand
-		auto integrand = [ & ] (double x) -> double {
-			return chi_a(x) * ((*phi1r)(x) - (*phi2r)(x) - xi * U_a(x)) * sturm2(x);
-		};
-		
-		// integrate
-		Integrator<decltype(integrand)> Q(integrand);
-		Q.integrate(0., std::numeric_limits<double>::infinity());
-
-		return Q.result();
-	}
-	else
-	{
-		// setup inner integrals
-		PhiFunction phi1 (&PhiFunction::integrate_inf,  -lam_a, psi_a, sturm1);
-		PhiFunction phi2 (&PhiFunction::integrate_low, lam_a+1, psi_a, sturm1);
-		RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
-		
-		// setup outer integrand
-		auto integrand = [ & ] (double x) -> double {
-			return chi_a(x) * ((*phi1r)(x) + (*phi2r)(x)) * sturm2(x);
-		};
-		
-		// integrate
-		Integrator<decltype(integrand)> Q(integrand);
-		Q.integrate(0., std::numeric_limits<double>::infinity());
-		return Q.result();
-	}
-}
-
-double DWBA2::XiIntegral(HydrogenFunction const & psi, SturmianFunction const & S)
-{
-	RadialFunction<double> const *psi_r = (RadialFunction<double> const *) &psi;
-	RadialFunction<double> const *S_r   = (RadialFunction<double> const *) &S;
-	
-	auto integrand = [&](double r) -> double {
-		return r * (*psi_r)(r) * (*S_r)(r);
-	};
-	
-	Integrator<decltype(integrand)> Q(integrand);
-	Q.integrate(0., std::numeric_limits<double>::infinity());
-	
-	return Q.result();
-}
-
-double DWBA2::computeA (double E, int Nf1, int Nf2, int Ni1, int Ni2, int L1, int L2)
-{
-	// overlap integral of r1-dependent states
-	double Sigma1 = 0;
-	if (Nf1 == Ni1)
-		Sigma1 = Nf1;
-	if (Nf1 == Ni1 + 1)
-		Sigma1 = -0.5 * ALPHA_PLUS(Ni1,L1);
-	if (Nf1 == Ni1 - 1)
-		Sigma1 = -0.5 * ALPHA_MINUS(Ni1,L1);
-	
-	// overlap integral of r2-dependent states
-	double Sigma2 = 0;
-	if (Nf2 == Ni2)
-		Sigma2 = Nf2;
-	if (Nf2 == Ni2 + 1)
-		Sigma2 = -0.5 * ALPHA_PLUS(Ni2,L2);
-	if (Nf2 == Ni2 - 1)
-		Sigma2 = -0.5 * ALPHA_MINUS(Ni2,L2);
-	
-	// atomic hamiltonian matrix element
-	double Hat1 = (Ni1 - 1) * DELTA(Nf1,Ni1) - 0.5 * Sigma1;
-	double Hfree2 = Ni2 * DELTA(Nf2,Ni2) - 0.5 * Sigma2;	// FIXME rozdělení na U2 a U12
-	
-	// return the result
-	return 0.5 * E * Sigma1 * Sigma2 - Hat1 * Sigma2 - Sigma1 * Hfree2 /* -U12 */;
-}
-
 void DWBA2::DWBA2_Ln (
 	double Ei, int li, int lf, double ki, double kf, 
-	int Ni, int Nf, int Li, int Lf, int L1, int L2,
+	int Ni, int Nf, int Li, int Lf, int Ln,
 	DistortingPotential const & Ui,
 	DistortingPotential const & Uf,
 	HydrogenFunction    const & psii,
@@ -140,215 +55,33 @@ void DWBA2::DWBA2_Ln (
 	int lamf_min = INT_MAX;
 	int lamf_max = INT_MIN;
 	
-	int lami_min_D = std::max(abs(L2-li),abs(L1-Li));
-	int lami_max_D = std::min(    L2+li ,    L1+Li );
+	int lami_min_D = std::max(abs(Ln-li),abs(Ln-Li));
+	int lami_max_D = std::min(    Ln+li ,    Ln+Li );
 	
-	int lamf_min_D = std::max(abs(L2-lf),abs(L1-Lf));
-	int lamf_max_D = std::min(    L2+lf ,    L1+Lf );
+	int lamf_min_D = std::max(abs(Ln-lf),abs(Ln-Lf));
+	int lamf_max_D = std::min(    Ln+lf ,    Ln+Lf );
 	
-	int lami_min_E = std::max(abs(L2-Li),abs(L1-li));
-	int lami_max_E = std::min(    L2+Li ,    L1+li );
-	
-	int lamf_min_E = std::max(abs(L2-Lf),abs(L1-lf));
-	int lamf_max_E = std::min(    L2+Lf ,    L1+lf );
-	
-	if (compute_DD)
-	{
-		lami_min = std::min(lami_min, lami_min_D);
-		lami_max = std::max(lami_max, lami_max_D);
-		lamf_min = std::min(lamf_min, lamf_min_D);
-		lamf_max = std::max(lamf_max, lamf_max_D);
-	}
-	
-	if (compute_DE)
-	{
-		lami_min = std::min(lami_min, lami_min_E);
-		lami_max = std::max(lami_max, lami_max_E);
-		lamf_min = std::min(lamf_min, lamf_min_D);
-		lamf_max = std::max(lamf_max, lamf_max_D);
-	}
-	
-	if (compute_ED)
-	{
-		lami_min = std::min(lami_min, lami_min_D);
-		lami_max = std::max(lami_max, lami_max_D);
-		lamf_min = std::min(lamf_min, lamf_min_E);
-		lamf_max = std::max(lamf_max, lamf_max_E);
-	}
-	
-	if (compute_EE)
-	{
-		lami_min = std::min(lami_min, lami_min_E);
-		lami_max = std::max(lami_max, lami_max_E);
-		lamf_min = std::min(lamf_min, lamf_min_E);
-		lamf_max = std::max(lamf_max, lamf_max_E);
-	}
+	lami_min = std::min(lami_min, lami_min_D);
+	lami_max = std::max(lami_max, lami_max_D);
+	lamf_min = std::min(lamf_min, lamf_min_D);
+	lamf_max = std::max(lamf_max, lamf_max_D);
 	
 	// multipole loop
 	for (int lami = lami_min; lami <= lami_max; lami++)
 	for (int lamf = lamf_min; lamf <= lamf_max; lamf++)
 	{
-		// radial integral matrices
-		CooMatrix Ii, If;
-		
 		// contributions to the scattering amplitude
 		// FIXME: "double" would suffice, but it means to rewrite sparse matrices
 		//        to templates
-		Complex DD_N_prev = 0, DE_N_prev = 0, ED_N_prev = 0, EE_N_prev = 0;
+		Complex DD_N_prev = 0;
 		
-		// Sturmian basis convergence loop
-		for (int N = 1; ; N++)
-		{
-			// N1i = L1+1, ..., L1+N
-			// N2i = L2+1, ..., L2+N
-			
-			/// DEBUG
-			char sturm_file[20];
-			sprintf(sturm_file, "sturm-%.2d.dat", N);
-			SturmianFunction s1(N,0);
-			write_1D_data (
-				1000,
-				sturm_file,
-				[&](size_t i) -> double {
-					return s1(i*0.05);
-				}
-			);
-			
-			// resize matrices
-			CooMatrix A(N*N,N*N);
-			Ii.resize(N,N);
-			If.resize(N,N);
-			
-			/// DEBUG
-			PhiFunction phi1 (&PhiFunction::integrate_inf, 0, psii, SturmianFunction(N,L1));
-			PhiFunction phi2 (&PhiFunction::integrate_inf, 1, psii, SturmianFunction(N,L1));
-			RadialFunction<double> const *phi1r = &phi1, *phi2r = &phi2;
-			char phi1name[20], phi2name[20];
-			sprintf(phi1name, "phi1-%.2d.dat", N);
-			sprintf(phi2name, "phi2-%.2d.dat", N);
-			write_1D_data (
-				10000,
-				phi1name,
-				[&](size_t i) -> double { return (*phi1r)(0.01 * i); }
-			);
-			write_1D_data (
-				10000,
-				phi2name,
-				[&](size_t i) -> double { return (*phi2r)(0.01 * i); }
-			);
-			
-			// update initial radial integral matrix
-			# pragma omp parallel for collapse(2) schedule(dynamic,1)
-			for (int Ni1 = L1 + 1; Ni1 <= L1 + N; Ni1++)
-			for (int Ni2 = L2 + 1; Ni2 <= L2 + N; Ni2++)
-			{
-				// if already done, skip
-				if ( Ii(Ni1-L1-1,Ni2-L2-1) != 0. )
-					continue;
-				
-				// otherwise compute the value
-				double I = computeI (lami, psii, chii, Ui, SturmianFunction(Ni1,L1), SturmianFunction(Ni2,L2));
-				
-				# pragma omp critical
-				Ii.add(Ni1-L1-1, Ni2-L2-1, I);
-			}
-			
-			// update final radial integral matrix
-			# pragma omp parallel for collapse(2) schedule(dynamic,1)
-			for (int Nf1 = L1 + 1; Nf1 <= L1 + N; Nf1++)
-			for (int Nf2 = L2 + 1; Nf2 <= L2 + N; Nf2++)
-			{
-				// if already done, skip
-				if ( If(Nf1-L1-1,Nf2-L2-1) != 0. )
-					continue;
-				
-				// otherwise compute the value
-				double I = computeI (lamf, psif, chif, Uf, SturmianFunction(Nf1,L1), SturmianFunction(Nf2,L2));
-				
-				# pragma omp critical
-				If.add(Nf1-L1-1, Nf2-L2-1, I);
-			}
-			
-			// update matrix of the inverse Green operator
-			# pragma omp parallel for collapse(4) schedule(dynamic,1)
-			for (int Ni1 = L1 + 1; Ni1 <= L1 + N; Ni1++)
-			for (int Nf1 = L1 + 1; Nf1 <= L1 + N; Nf1++)
-			for (int Ni2 = L2 + 1; Ni2 <= L2 + N; Ni2++)
-			for (int Nf2 = L2 + 1; Nf2 <= L2 + N; Nf2++)
-			{
-				// otherwise compute the value
-				double A_val = computeA(ki*ki - 1./(Ni*Ni), Nf1, Nf2, Ni1, Ni2, L1, L2);
-				
-				// store, if nonzero
-				# pragma omp critical
-				if (A_val != 0.)
-					A.add ((Nf1-L1-1) * N + (Nf2-L2-1), (Ni1-L1-1) * N + (Ni2-L2-1), A_val);
-			}
-			
-			// prepare integral matrices as 1D arrays
-			cArray Ii_dense  = Ii.todense();
-			cArray Iit_dense = Ii.transpose().todense();
-			cArray If_dense  = If.todense();
-			cArray Ift_dense = If.transpose().todense();
-			
-			// factorize the Green function inverse matrix A
-			CsrMatrix A_csr = A.tocsr();	// necessary anchor for LUft !!!
-			CsrMatrix::LUft A_LU = A_csr.factorize();
-			
-			// convergence indicator
-			bool converged = true;
-			
-			// solve, project and test convergence
-			printf("%d\t", N); fflush(stdout);
-			if (compute_DD)
-			{
-				cArray sol = A_LU.solve(Ii_dense);
-				Complex DD_N = (If_dense  | sol);
-				
-				if (DD_N == 0. or abs((DD_N - DD_N_prev) / DD_N ) > EPS_CONTRIB)
-				{
-					converged = false;
-					printf("%g\t", abs(DD_N)); fflush(stdout);
-				}
-				DD_N_prev = DD_N;
-			}
-			if (compute_DE)
-			{
-				Complex DE_N = (If_dense  | A_LU.solve(Iit_dense));
-				if (DE_N == 0. or abs((DE_N - DE_N_prev) / DE_N) > EPS_CONTRIB)
-				{
-					converged = false;
-					printf("%g\t", abs(DE_N)); fflush(stdout);
-				}
-				DE_N_prev = DE_N;
-			}
-			if (compute_ED)
-			{
-				Complex ED_N = (Ift_dense | A_LU.solve(Ii_dense));
-				if (ED_N == 0. or abs((ED_N - ED_N_prev) / ED_N) > EPS_CONTRIB)
-				{
-					converged = false;
-					printf("%g\t", abs(ED_N)); fflush(stdout);
-				}
-				ED_N_prev = ED_N;
-			}
-			if (compute_EE)
-			{
-				Complex EE_N = (Ift_dense | A_LU.solve(Iit_dense));
-				if (EE_N == 0. or abs((EE_N - EE_N_prev) / EE_N) > EPS_CONTRIB)
-				{
-					converged = false;
-					printf("%g\t", abs(EE_N)); fflush(stdout);
-				}
-				EE_N_prev = EE_N;
-			}
-			printf("\n"); fflush(stdout);
-			
-			// if converged, exit the Sturmian convergence loop
-			if (converged)
-				break;
-			
-		} // end For N
+		// compute energy sum/integral
+		DWBA2::DWBA2_energy_driver (
+			Ei, li, lf, ki, kf, 
+			Ni, Nf, Li, Lf, Ln,
+			lami, lamf, 
+			psii, psif, Ui, Uf, chii, chif, DD_N_prev
+		);
 		
 		// add all lambda- and M- dependent angular factors
 		for (int Mi = -Li; Mi <= Li; Mi++)
@@ -364,58 +97,227 @@ void DWBA2::DWBA2_Ln (
 				int M2 = mui + mi;
 				int mf = M2 - muf;
 				DD_lf_li_Ln[mindex] += 
-					Gaunt(lami,mui,li,mi,L2,M2) * Gaunt(L1,M1,lami,mui,Li,Mi) * // d
-					Gaunt(lamf,muf,lf,mf,L2,M2) * Gaunt(L1,M1,lamf,muf,Lf,Mf) * // d
+					Gaunt(lami,mui,li,mi,Ln,M2) * Gaunt(Ln,M1,lami,mui,Li,Mi) * // d
+					Gaunt(lamf,muf,lf,mf,Ln,M2) * Gaunt(Ln,M1,lamf,muf,Lf,Mf) * // d
 					DD_N_prev;
-			}
-			
-			{
-				int mi = 0;
-				int M1 = mi - mui;
-				int M2 = mui + Mi;
-				int mf = M2 - mui;
-				DE_lf_li_Ln[mindex] += 
-					Gaunt(lami,mui,Li,Mi,L2,M2) * Gaunt(L1,M1,lami,mui,li,mi) * // e
-					Gaunt(lamf,muf,lf,mf,L2,M2) * Gaunt(L1,M1,lamf,muf,Lf,Mf) * // d
-					DE_N_prev;
-			}
-			
-			{
-				int mi = 0;
-				int M1 = Mi - mui;
-				int M2 = mui + mi;
-				int mf = M1 + muf;
-				ED_lf_li_Ln[mindex] += 
-					Gaunt(lami,mui,li,mi,L2,M2) * Gaunt(L1,M1,lami,mui,Li,Mi) * // d
-					Gaunt(lamf,muf,Lf,Mf,L2,M2) * Gaunt(L1,M1,lamf,muf,lf,mf) * // e
-					ED_N_prev;
-			}
-			
-			{
-				int mi = 0;
-				int M1 = mi - mui;
-				int M2 = mui + Mi;
-				int mf = M1 + muf;
-				EE_lf_li_Ln[mindex] += 
-					Gaunt(lami,mui,Li,Mi,L2,M2) * Gaunt(L1,M1,lami,mui,li,mi) * // e
-					Gaunt(lamf,muf,Lf,Mf,L2,M2) * Gaunt(L1,M1,lamf,muf,lf,mf) * // e
-					EE_N_prev;
 			}
 		}
 		
 		// slash by lambdas
 		double lam_factor = (2*lami + 1) * (2*lamf + 1);
 		DD_lf_li_Ln /= lam_factor;
-		DE_lf_li_Ln /= lam_factor;
-		ED_lf_li_Ln /= lam_factor;
-		EE_lf_li_Ln /= lam_factor;
 		
 	} // end For lambdas
 	
 	// add the remaining constant complex factors
 	Complex factor = pow(4*M_PI, 4) * pow(Complex(0.,1.), li-lf) / (ki * kf);
 	DD_lf_li_Ln *= factor;
-	DE_lf_li_Ln *= factor;
-	ED_lf_li_Ln *= factor;
-	EE_lf_li_Ln *= factor;
+}
+
+void DWBA2::DWBA2_energy_driver (
+	double Ei, int li, int lf, double ki, double kf, 
+	int Ni, int Nf, int Li, int Lf, int Ln,
+	int lami, int lamf, 
+	HydrogenFunction const & psii, 
+	HydrogenFunction const & psif, 
+	DistortingPotential const & Ui,
+	DistortingPotential const & Uf,
+	DistortedWave const & chii,
+	DistortedWave const & chif, Complex & cDD
+) {
+	
+	static const double EPS = 1e-8;
+	
+	// set Green's function distorting potential
+	DistortingPotential Ug(1);	// = U(1s)
+	
+	// sum over discrete intermadiate states
+	for (int Nn = 1; ; Nn++)
+	{
+		// info
+		std::cout << "[DWBA2_energy_part] Nn = " << Nn << std::endl;
+		
+		// get intermediate state
+		HydrogenFunction psin(Nn,Ln);
+		
+		// compute contribution from this discrete intermediate state
+		Complex cDD_Nn;
+		DWBA2::DWBA2_En (
+			Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf,
+			psii, psif, psin,
+			Ui, Uf, Ug,
+			chii, chif,
+			cDD_Nn
+		);
+		
+		std::cout << "[DWBA2_energy_part] Back from DWBA2_En, cDD_Nn = " << cDD_Nn << std::endl;
+		
+		// update sums
+		cDD += cDD_Nn;
+		
+		// check convergence
+		if (abs(cDD_Nn) < EPS * abs(cDD))
+			break;
+	}
+	
+	// integrate over intermediate continuum using Clenshaw-Curtis quadrature
+	//  - only integrate over allowed energies
+	//
+	
+	double min_Kn = 0;						// just after ionization
+	double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
+	
+	rArray eKn;					// evaluation energies
+	cArray eDD;	// evaluated values
+	Complex pDD = 0;	// previous values
+	
+	for (int points = 4; ; points *= 2)
+	{
+		std::cout << "points = " << points << std::endl;
+		
+		// evaluate T-matrices at Chebyshev roots
+		for (int point = 0; point < points; point++)
+		{
+			// get evaluation point
+			double Kn = Chebyshev<double,Complex>::root(points,point,min_Kn,max_Kn);
+			
+			// did we already evaluate the T-matrices for this point?
+			if (std::find(eKn.begin(),eKn.end(),Kn) == eKn.end())
+			{
+				// no, add element to the arrays
+				eKn.push_back(Kn);
+				eDD.push_back(Complex(0));
+				
+				// get intermediate state
+				HydrogenFunction psin(Kn,Ln);
+				
+				// and evaluate the T-matrices
+				DWBA2::DWBA2_En (
+					Ei, Ni, Kn*Kn, Ln, lami, lamf,
+					psii, psif, psin,
+					Ui, Uf, Ug,
+					chii, chif,
+					eDD.back()
+				);
+			}
+		}
+		
+		// construct Chebyshev approximation and integral of the DD integrand
+		auto DDre = [&](double x) -> double { return std::find(eDD.begin(),eDD.end(),x)->real(); };
+		auto DDim = [&](double x) -> double { return std::find(eDD.begin(),eDD.end(),x)->imag(); };
+		Chebyshev<double,double> cb_DDre(DDre, points, min_Kn, max_Kn);
+		Chebyshev<double,double> cb_DDim(DDim, points, min_Kn, max_Kn);
+		Chebyshev<double,double> cb_DDre_int = cb_DDre.integrate();
+		Chebyshev<double,double> cb_DDim_int = cb_DDim.integrate();
+		Complex DD_val (
+			cb_DDre_int.clenshaw(max_Kn,1e-8) - cb_DDre_int.clenshaw(min_Kn,1e-8),
+			cb_DDim_int.clenshaw(max_Kn,1e-8) - cb_DDim_int.clenshaw(min_Kn,1e-8)
+		);
+		
+		// check convergence
+		if (abs(DD_val - pDD) < EPS * abs(DD_val))
+		{
+			// we converged! update sums and return
+			cDD += DD_val;
+			return;
+		}
+		else
+		{
+			// move current values to "previous" values and loop
+			pDD = DD_val;
+		}
+	}
+}
+
+void DWBA2::DWBA2_En (
+	double Ei, int Ni,
+	double Eatn, int Ln,
+	int lami, int lamf,
+	HydrogenFunction const & psii,
+	HydrogenFunction const & psif,
+	HydrogenFunction const & psin,
+	DistortingPotential const & Ui,
+	DistortingPotential const & Uf,
+	DistortingPotential const & Ug,
+	DistortedWave const & chii,
+	DistortedWave const & chif,
+	Complex & DD
+) {
+	static const double inf = std::numeric_limits<double>::infinity();
+	
+	std::cout << "[DWBA2_En] " << std::endl;
+	
+	// get projectile energy
+	double Kn = sqrt(Ei - 1./(Ni*Ni) - Eatn);
+	
+	std::cout << "[DWBA2_En] Kn = " << Kn << std::endl;
+	
+	// construct Green's function parts
+	DistortedWave gphi = Ug.getDistortedWave(Kn,Ln);
+	IrregularWave geta = Ug.getIrregularWave(Kn,Ln);
+	
+	std::cout << "[DWBA2_En] preparing Phi-functions..." << std::endl;
+	
+	// construct direct inner integrals
+	PhiFunctionDir phii(psin, lami, Ui, psii);
+	PhiFunctionDir phif(psin, lamf, Uf, psif);
+	
+	/// DEBUG
+	std::ofstream ofs1;;
+	ofs1.open("phi1.out");
+	for (int i = 0; i < 10000; i++)
+	{
+		double x = i * 0.01;
+		ofs1 << x << " " << phii(x) << std::endl;
+	}
+	ofs1.close();
+	
+	std::cout << "[DWBA2_En] Green's integration..." << std::endl;
+	
+	// Green's function integrand
+	auto integrand = [&](double r1) -> Complex {
+		
+		std::cout << "\n[integrand] r1 = " << r1 << "\n\n";
+		
+		auto integrand1 = [&](double r2) -> Complex {
+			return gphi(r2) * phii(r2) * chii(r2);
+		};
+		auto integrand2 = [&](double r2) -> Complex {
+			if (not finite(r2))
+				return 0.;
+// 			std::cout << r2 << std::endl;
+			return geta(r2) * phii(r2) * chii(r2);
+		};
+		
+		Complex Q1 = ClenshawCurtis<decltype(integrand1),Complex>(integrand1, 0., r1, false, 1.0, 1e-5);
+		
+		std::cout << "\n[integrand] Q1 = " << Q1 << "\n";
+		
+		/// DEBUG
+// 		std::ostringstream oss;
+// 		oss << "r1-" << r1 << ".out";
+// 		std::ofstream ofs;
+// 		ofs.open(oss.str().c_str());
+// 		CompactIntegrand<decltype(integrand2),Complex> R(integrand2, r1, inf, false, 1.0);
+// 		for (int i = -1000; i <= 1000; i++)
+// 		{
+// 			double t = 0.001 * i;
+// 			ofs << t << "\t" << R(t) << std::endl;
+// 		}
+// 		ofs.close();
+		///
+		
+		int n = -1;	// disable bisection
+		Complex Q2 = ClenshawCurtis<decltype(integrand2),Complex>(integrand2, r1, inf, false, 1.0, 1e-5, &n);
+		
+		std::cout << "\n[integrand] Q2 = " << Q2 << "\n";
+		std::cout << "\n[integrand] done\n";
+		
+		return phif(r1) * (geta(r1) * Q1 + gphi(r1) * Q2);
+	};
+	
+	// integrate
+	DD = ClenshawCurtis<decltype(integrand), Complex>(integrand, 0., inf);
+	
+	std::cout << "[DWBA2_En] DD = " << DD << std::endl;
 }

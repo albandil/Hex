@@ -149,34 +149,20 @@ int main(int argc, char *argv[])
 				cArray DD_lf_li_Ln(MM), DE_lf_li_Ln(MM), ED_lf_li_Ln(MM), EE_lf_li_Ln(MM);
 				printf("\t\tLn = %d\n", Ln);
 				
-				// L₁ and L₂ loop
-				//
-				// (L₁,L₂) = (0,Ln), (1,Ln), ..., (Ln-1,Ln),
-				//           (Ln,0), (Ln,1), ..., (Ln,Ln-1),
-				//           (Ln,Ln)
-				//
-				// altogether 2*Ln + 1 terms
-				for (int iLn = 0; iLn < 2 * Ln + 1; iLn++)
-				{
-					int L1 = (iLn < Ln) ? iLn : Ln;
-					int L2 = (iLn < Ln) ? Ln : iLn - Ln;
-					
-					try{
+				try{
 						
-					DWBA2::DWBA2_Ln(
+					DWBA2::DWBA2_Ln (
 						Ei, li, lf, ki, kf, Ni, Nf, Li, Lf,
-						L1, L2,
+						Ln,
 						Ui, Uf, psii, psif, chii, chif,
 						DD_lf_li_Ln, DE_lf_li_Ln, ED_lf_li_Ln, EE_lf_li_Ln,
 						compute_DD, compute_DE, compute_ED, compute_EE
 					);
 					
-					} catch (const char* e) {
+				} catch (const char* e) {
 						printf("\nDWBA-2 failed\n%s\n\n", e);
 						abort();
-					}
-					
-				} // end of For (L₁,L₂)
+				}
 				
 				// update T-matrices
 				DD_lf_li = DD_lf_li + DD_lf_li_Ln;

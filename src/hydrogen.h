@@ -74,32 +74,52 @@ class HydrogenFunction : public RadialFunction<double>
 public:
 	
 	HydrogenFunction() : n(0), l(0) {}
-	HydrogenFunction(int n, int l) : n(n), l(l) {}
+	HydrogenFunction(int n, int l) : n(n), k(0.), l(l) {}
+	HydrogenFunction(double k, int l) : n(0), k(k), l(l) {}
 	
 	/**
+	 * \brief Get far radius.
+	 * 
 	 * Compute far radius \f$ R \f$. For \f$ r > R \f$ the hydrogen radial function
 	 * will always be less than 'eps'.
 	 */
-	inline double far (double eps, int max_steps = 1000) const { return Hydrogen::getFarRadius(n,l,eps,max_steps); };
+	inline double far (double eps, int max_steps = 1000) const
+	{
+		if (n != 0)
+			return Hydrogen::getFarRadius(n,l,eps,max_steps);
+		else
+			throw "Coulomb function has no \"far\"!";
+	};
 	
-	/**
-	 * Get principal quantum number.
-	 */
+	/// Get principal quantum number.
 	inline int getN () const { return n; }
 	
-	/**
-	 * Get orbital quantum number.
-	 */
+	/// Get orbital quantum number.
 	inline int getL () const { return l; }
 	
-	/**
-	 * Evaluate the function.
-	 */
-	inline double operator() (double r) const { return Hydrogen::evalBoundState(n,l,r); }
+	/// Get Coulomb wave momentum.
+	inline double getK () const { return k; }
+	
+	/// Evaluate the function.
+	inline double operator() (double r) const
+	{
+		if (n != 0)
+			return Hydrogen::evalBoundState(n,l,r);
+		else
+			return Hydrogen::evalFreeState(k,l,r);
+	}
+	
+	/// Comparison
+	inline bool operator== (HydrogenFunction const & psi) const
+	{
+		return n == psi.n and k == psi.k and l == psi.l;
+	}
 
 private:
 	
-	int n, l;
+	int n;
+	double k;
+	int l;
 };
 
 /**

@@ -53,7 +53,7 @@ int DistortedWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2s
 	return 0;
 }
 
-DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential _U)
+DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U)
 {
 	this->kn = _kn;
 	this->ln = _ln;

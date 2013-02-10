@@ -27,6 +27,11 @@ DistortingPotential DistortingPotential::operator= (DistortingPotential const& V
 	return *this;
 }
 
+bool DistortingPotential::operator== (DistortingPotential const & V) const
+{
+	return n == V.n and k == V.k;
+}
+
 double DistortingPotential::operator() (double x) const
 {
 	if (n == 1)
@@ -36,10 +41,18 @@ double DistortingPotential::operator() (double x) const
 	abort();
 }
 
+double DistortingPotential::plusMonopole(double x) const
+{
+	if (x == 0.)
+		return getConstant();
+	
+	return 1./x + (*this)(x);
+}
+
 double DistortingPotential::getConstant() const
 {
 	if (n == 1)
-		return 1.;
+		return -1.;
 	
 	printf("U not implemented for n = %d\n", n);	// FIXME
 	abort();
@@ -87,17 +100,17 @@ DistortedWave DistortingPotential::getDistortedWave(double kn, int ln) const
 	return DistortedWave(kn, ln, *this);
 }
 
-// IrregularWave DistortingPotential::getIrregularWave(double kn, int ln) const
-// {
-// 	return IrregularWave(kn, ln, *this);
-// }
-// 
-// ForbiddenWave DistortingPotential::getForbiddenWave(double kn, int ln) const
-// {
-// 	return ForbiddenWave(kn, ln, *this);
-// }
-// 
-// HyperbolicWave DistortingPotential::getHyperbolicWave(double kn, int ln) const
-// {
-// 	return HyperbolicWave(kn, ln, *this);
-// }
+IrregularWave DistortingPotential::getIrregularWave(double kn, int ln) const
+{
+	return IrregularWave(kn, ln, *this);
+}
+
+ForbiddenWave DistortingPotential::getForbiddenWave(double kn, int ln) const
+{
+	return ForbiddenWave(kn, ln, *this);
+}
+
+HyperbolicWave DistortingPotential::getHyperbolicWave(double kn, int ln) const
+{
+	return HyperbolicWave(kn, ln, *this);
+}

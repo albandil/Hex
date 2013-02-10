@@ -13,8 +13,6 @@
 #ifndef HEX_DISTORTING_POTENTIAL
 #define HEX_DISTORTING_POTENTIAL
 
-#include <memory>
-
 #include <o2scl/interp.h>
 #include <o2scl/ode_funct.h>
 
@@ -65,19 +63,25 @@ public:
 	DistortingPotential() : n(0), k(0.) {}
 	DistortingPotential(int _n) : n(_n), k(0.) {}
 	DistortingPotential(double _k) : n(0), k(_k) {}
+	DistortingPotential(HydrogenFunction const& psi) : n(psi.getN()), k(psi.getK()) {}
 	DistortingPotential(DistortingPotential const& U) : n(U.n), k(U.k) {}
 	// @}
 	
 	// socialize
 	friend class DistortedWave;
-// 	friend class IrregularWave;
-// 	friend class ForbiddenWave;
-// 	friend class HyperbolicWave;
+	friend class IrregularWave;
+	friend class ForbiddenWave;
+	friend class HyperbolicWave;
 	
 	/**
 	 * \brief Assignment
 	 */
 	DistortingPotential operator= (DistortingPotential const& V);
+	
+	/**
+	 * \brief Comparison
+	 */
+	bool operator== (DistortingPotential const & V) const;
 	
 	/**
 	 * \brief Evaluate the distorting potential.
@@ -94,11 +98,22 @@ public:
 	double operator() (double x) const;
 	
 	/**
+	 * \brief Add multipole field potential to the distorting potential.
+	 * 
+	 * Returns
+	 * \f[
+	 *     U'(r) = U(r) + \frac{1}{r} \ .
+	 * \f]
+	 * The function handles correctly the input \f$ r = 0 \f$.
+	 */
+	double plusMonopole(double x) const;
+	
+	/**
 	 * \brief Return the zero limit.
 	 * 
 	 * Return the asymptotic constant around zero,
 	 * \f[
-	 *     a = \lim_{r \rightarrow 0+} \left( -\frac{1}{r} - U(r) \right)
+	 *     a = \lim_{r \rightarrow 0+} \left( \frac{1}{r} + U(r) \right)
 	 * \f]
 	 * At the moment, it is hard-coded, and only for \f$ n = 1 \f$ state
 	 * (for which \f$ a = 1 \f$.
@@ -147,7 +162,7 @@ public:
 	 * \param kn Wave number of the wave.
 	 * \param ln Angular momentum (partial wave).
 	 */
-// 	IrregularWave getIrregularWave(double kn, int ln) const;
+	IrregularWave getIrregularWave(double kn, int ln) const;
 	
 	/**
 	 * \brief Compute \f$ \theta_{l_n}(k_n, r) \f$.
@@ -163,7 +178,7 @@ public:
 	 * \param kn Absolute value of the imaginary wave number of the wave.
 	 * \param ln Angular momentum (partial wave).
 	 */
-// 	ForbiddenWave getForbiddenWave(double kn, int ln) const;
+	ForbiddenWave getForbiddenWave(double kn, int ln) const;
 	
 	/**
 	 * \brief Compute \f$ \zeta_{l_n}(k_n, r) \f$.
@@ -176,7 +191,7 @@ public:
 	 * \param kn Absolute value of the imaginary wave number of the wave.
 	 * \param ln Angular momentum (partial wave).
 	 */
-// 	HyperbolicWave getHyperbolicWave(double kn, int ln) const;
+	HyperbolicWave getHyperbolicWave(double kn, int ln) const;
 	
 	void toFile(const char * filename) const;
 	
@@ -186,8 +201,8 @@ private:
 };
 
 #include "wave_distort.h"
-// #include "wave_irreg.h"
-// #include "wave_forbid.h"
-// #include "wave_hyperb.h"
+#include "wave_irreg.h"
+#include "wave_forbid.h"
+#include "wave_hyperb.h"
 
 #endif

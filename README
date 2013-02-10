@@ -11,3 +11,6 @@ Libraries:
     png++ 0.2.5
     sqlitepp 0.2
     cln 1.3.2
+    fftw-3.3.2
+    
+    

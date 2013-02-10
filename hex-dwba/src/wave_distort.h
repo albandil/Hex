@@ -55,7 +55,7 @@ public:
 	
 	// constructors
 	// @{
-	DistortedWave(double _kn, int _ln, DistortingPotential _U);
+	DistortedWave(double _kn, int _ln, DistortingPotential const & _U);
 	DistortedWave(DistortedWave const& W) { *this = W; }
 	// @}
 	
