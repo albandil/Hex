@@ -13,16 +13,10 @@
 #ifndef HEX_DWBA_DWBA2
 #define HEX_DWBA_DWBA2
 
-#include <cassert>
-#include <limits>
-#include <map>
-#include <tuple>
-
-#include "complex.h"
+#include "arrays.h"
 #include "potential.h"
 #include "chebyshev.h"
 #include "specf.h"
-#include "integrate.h"
 
 /**
  * Class members compute contributions to the second order of the distorted
@@ -103,34 +97,10 @@ public:
 			int lam, 
 			DistortingPotential const & U, 
 			HydrogenFunction const & psi
-		) : Lam(lam), U(U), Psi(psi), Psin(psin) {}
+		);
 		
-		// evaluated integral
-		double operator() (double x2) const
-		{
-			if (not finite(x2))
-				return 0.;
-			
-			// finite integrand:
-			auto integrand1 = [&](double x1) -> double {
-				if (x2 == 0.)
-					return 0.;
-				return Psin(x1) * pow(x1/x2, Lam) * Psi(x1);
-			};
-			CompactIntegrand<decltype(integrand1),double> R1(integrand1, 0., Inf, 1.0);
-			double i1 = (x2 == 0) ? 0. : ClenshawCurtis<decltype(R1),double>(R1, R1.scale(0.), R1.scale(x2), 1.0, 1e-10) / x2;
-			
-			// infinite integrand:
-			auto integrand2 = [&](double x1) -> double {
-				if (x1 == 0.)
-					return 0.;
-				return Psin(x1) * pow(x2/x1, Lam) * Psi(x1) / x1;
-			};
-			CompactIntegrand<decltype(integrand2),double> R2(integrand2, 0., Inf, 1.0);
-			double i2 = ClenshawCurtis<decltype(R2),double>(R2, R2.scale(x2), R2.scale(Inf), 1.0, 1e-10);
-			
-			return i1 + i2;
-		};
+		/// evaluated integral
+		double operator() (double x2) const;
 		
 	private:
 		
@@ -168,63 +138,10 @@ public:
 			int lam, 
 			DistortingPotential const & U, 
 			HydrogenFunction const & psi
-		) : Cb_inf(0.), Lam(lam), U(U), Diag(psin == psi), 
-			Zero(Diag and (DistortingPotential(psi) == U)),
-			Integrand(psin,lam,U,psi),
-			CompactIntegral(Integrand,0.,false,1.0)
-		{
-			// shorthand for infinity
-			static const double inf = std::numeric_limits<double>::infinity();
-			
-			// the case λ = 0 is easy:
-			if (lam == 0)
-			{
-				if (Zero)
-					return;
-				
-				if (Diag)
-				{
-					auto integrand = [&](double x1) -> double {
-						return (x1 == 0.) ? 0. : gsl_sf_pow_int(psi(x1), 2) / x1;
-					};
-					
-					Cb_inf = ClenshawCurtis<decltype(integrand),double>(integrand, 0., inf, 1.0, 1e-8);
-					
-					return;
-				}
-				
-				/* otherwise continue */
-			}
-			
-			// convergence loop
-			for (int N = 16; ; N *= 2)
-			{
-				// construct a Chebyshev approximation of the compactified function
-				CompactIntegralCb = Chebyshev<double,double> (CompactIntegral, N, -1., 1.);
-
-				// check convergence
-				if (CompactIntegralCb.tail(1e-10) != N)
-					break;
-			}
-			
-			// get optimal truncation index
-			Tail = CompactIntegralCb.tail(1e-10);
-			
-			// evaluate Phi at positive infinity
-			Cb_inf = CompactIntegralCb.clenshaw(1., Tail);
-		}
+		);
 		
 		/// Evaluate the function.
-		double operator() (double x) const
-		{
-			if (Lam == 0)
-			{
-				if (Zero) return 0.;
-				if (Diag) return Cb_inf - U.plusMonopole(x);
-			}
-			
-			return Cb_inf - CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
-		}
+		double operator() (double x) const;
 		
 	private:
 		

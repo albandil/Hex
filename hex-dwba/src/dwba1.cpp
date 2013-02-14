@@ -10,7 +10,11 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <limits>
+#ifndef Inf
+	#include <limits>
+	#define Inf (std::numeric_limits<double>::infinity())
+	#define Nan (std::numeric_limits<double>::quiet_NaN())
+#endif
 
 #include "complex.h"
 #include "potential.h"
@@ -35,8 +39,8 @@ Complex DWBA1::computeDirect1e(DistortingPotential const& U, int l, double k)
 	// integrate
 	Integrator<decltype(integrand1)> Q1(integrand1);
 	Integrator<decltype(integrand2)> Q2(integrand2);
-	Q1.integrate(0., std::numeric_limits<double>::infinity());
-	Q2.integrate(0., std::numeric_limits<double>::infinity());
+	Q1.integrate(0., Inf);
+	Q2.integrate(0., Inf);
 	
 	// return the result
 	return pow(4*M_PI,2) * sqrt((2*l+1)/(4*M_PI)) / (k*k) * 
@@ -64,8 +68,8 @@ Complex DWBA1::computeExchange1e(
 	// integrate
 	Integrator<decltype(integrand1)> Q1(integrand1);
 	Integrator<decltype(integrand2)> Q2(integrand2);
-	Q1.integrate(0., std::numeric_limits<double>::infinity());
-	Q2.integrate(0., std::numeric_limits<double>::infinity());
+	Q1.integrate(0., Inf);
+	Q2.integrate(0., Inf);
 	
 	// compute phase factor
 	double phase = chif.getPhase() + chii.getPhase();
@@ -113,7 +117,7 @@ Complex DWBA1::computeDirect2e(
 		// integrate
 		Integrator<decltype(inner_integrand_1)> Q1(inner_integrand_1);
 		Integrator<decltype(inner_integrand_2)> Q2(inner_integrand_2);
-		Q1.integrate(r2, std::numeric_limits<double>::infinity());
+		Q1.integrate(r2, Inf);
 		Q2.integrate(0, r2);
 		
 		// evaluate distorted waves
@@ -126,13 +130,11 @@ Complex DWBA1::computeDirect2e(
 	
 	// integrate
 	Integrator<decltype(outer_integrand)> Q(outer_integrand);
-	Q.integrate(0., std::numeric_limits<double>::infinity());
+	Q.integrate(0., Inf);
 	
 	// compute phase factor
 	double phase = chii.getPhase() + chif.getPhase();
 	Complex phasef(cos(phase),sin(phase));
-	
-// 	printf("\tD2 (λ = %d): %g\n", lambda, Q.result());
 	
 	// return the result
 	return pow(4*M_PI,3) * phasef * pow(Complex(0.,1.),li-lf) * 
@@ -176,7 +178,7 @@ Complex DWBA1::computeExchange2e(
 		// integrate
 		Integrator<decltype(inner_integrand_1)> Q1(inner_integrand_1);
 		Integrator<decltype(inner_integrand_2)> Q2(inner_integrand_2);
-		Q1.integrate(r2, std::numeric_limits<double>::infinity());
+		Q1.integrate(r2, Inf);
 		Q2.integrate(0, r2);
 		
 		// evaluate distorted waves
@@ -189,13 +191,11 @@ Complex DWBA1::computeExchange2e(
 	
 	// integrate
 	Integrator<decltype(outer_integrand)> Q(outer_integrand);
-	Q.integrate(0., std::numeric_limits<double>::infinity());
+	Q.integrate(0., Inf);
 	
 	// compute phase factor
 	double phase = chii.getPhase() + chif.getPhase();
 	Complex phasef(cos(phase),sin(phase));
-	
-// 	printf("\tE2 (λ = %d): %g\n", lambda, Q.result());
 	
 	// return the result
 	return pow(4*M_PI,3) * phasef * pow(Complex(0.,1.),li-lf) * 

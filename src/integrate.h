@@ -23,6 +23,8 @@
 #include <o2scl/gsl_inte_qagil.h>
 #include <o2scl/gsl_inte_qagiu.h>
 
+#include "misc.h"
+
 /** \brief Numerical integrator
  *
  * The class is initialized by a lambda-function (= the integrand) and
@@ -45,7 +47,7 @@ template <typename Functor> class Integrator
 		double eval(double x) { return F(x); }
 
 	public:
-		Integrator(Functor f) : F(f) { Result = AbsErr = std::numeric_limits<double>::quiet_NaN(); Ok = false; }
+		Integrator(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
 		~Integrator() {}
 		
 		/** \brief Compute the integral.
@@ -75,7 +77,7 @@ template <typename Functor> class Integrator
 		bool integrate(double a, double b)
 		{
 			// reset
-			Result = AbsErr = std::numeric_limits<double>::quiet_NaN();
+			Result = AbsErr = Nan;
 			Ok = true;
 			Status.clear();
 			
@@ -84,7 +86,7 @@ template <typename Functor> class Integrator
 			if (isnan(a) || isnan(b))
 			{
 				Ok = false;
-				Status = std::string("CHYBA: Některá z integračních mezí není definovaná!");
+				Status = std::string("ERROR: Some of the integration bounds is not defined!");
 				return false;
 			}
 			
@@ -140,106 +142,5 @@ template <typename Functor> class Integrator
 		double result() const { return Result; }		// výsledek poslední integrace
 		double abserr() const { return AbsErr; }		// a její absolutní chyba
 };
-
-// /** \brief Dvojrozměný numerický integrátor
-//  *
-//  * Třída se inicializuje požadovaným integrandem (ukazatelem na funkci, funktorem nebo Λ-funkcí)
-//  * a pak se zavolá členská funkce \ref integrate. Integrand je dvojdílný - první část je závislá
-//  * jen na proměnné ('x'), podle které probíhá vnější integrál, a jde tedy vytknout (což ušetří nějaký čas).
-//  * Druhá část závisí na obou proměnných ('x,y'). Výsledky jsou přístupné přes gettry \ref result
-//  * a \ref abserr.
-//  * \param Funktor1 Datový typ integrandu závislém jen na 'x'.
-//  * \param Funktor2 Datový typ integrandu závislém na 'x' i na 'y'.
-// **/
-// template <typename Funktor1, typename Funktor2> class Integrator2D
-// {
-// 	private:
-// 		Funktor1 F1;	// část integrandu závislá jen na 'x'
-// 		Funktor2 F2;	// část integrandu závislá na 'x' i 'y'
-// 		
-// 		double Result, AbsErr;
-// 		bool Ok;
-// 		std::string Status;
-// 
-// 	public:
-// 		/** \brief Konstruktor
-// 		 *
-// 		 * Konstruktor
-// 		 * \param f1 Vytknutá x-závislá část integrandu jako objekt s rozhraním 'double operator()(double)'.
-// 		 * \param f2 Vnitřní xy-závislá část integrandu jako objekt s rozhraním 'double operator()(double, double)'.
-// 		**/
-// 		Integrator2D(Funktor1 f1, Funktor2 f2) : F1(f1), F2(f2) { Result = AbsErr = nan; Ok = false; }
-// 		~Integrator2D() {}
-// 
-// 		/** \brief Spočítá dvojrozměrný integrál
-// 		 *
-// 		 * Funkce provede požadovanou integraci na oblasti vymezené křivkami x = a, x = b, y = y1(x), y = y2(x).
-// 		 * Meze y1, y2 musí jít implicitně konvertovat na funkci typu double(*)(double), tedy pokud chce
-// 		 * uživatel použít Λ-funkce, tak musí mít obě prázdnou klozuru.
-// 		 * \param a Dolní mez pro vnější integrál (přes první proměnnou 'x').
-// 		 * \param b Horní mez pro vnější integrál (přes první proměnnou 'x').
-// 		 * \param y1 Dolní (x-závislá) mez pro vnitřní integrál (přes druhou proměnnou 'y').
-// 		 * \param y2 Horní (x-závislá) mez pro vnitřní integrál (přes druhou proměnnou 'y').
-// 		 * \return Vrací hodnotu proměnné Ok (tedy zpravidla zda poslední integrace proběhla bez komentářů ze strany knihovny o2scl).
-// 		**/
-// 		bool integrate(double a, double b, double (*y1)(double), double (*y2)(double))
-// 		{
-// 			// reset
-// 			Result = AbsErr = nan;
-// 			Ok = true;
-// 			Status.clear();
-// 			
-// 			if (a == b) { return 0; }
-// 			
-// 			if (isnan(a) || isnan(b))
-// 			{
-// 				Ok = false;
-// 				Status = std::string("CHYBA: Některá z integračních mezí není definovaná!");
-// 				return false;
-// 			}
-// 			
-// 			// otočíme znaménko
-// 			if (a > b)
-// 			{
-// 				integrate(b, a, y1, y2);
-// 				Result = -Result;
-// 				return Ok;
-// 			}
-// 			
-// 			// ReducedIntegrand je integrand zintegrovaný podle 'y' od y1(x) do y2(x)
-// 			// (je to funkce proměnné 'x')
-// 			auto ReducedIntegrand = [this, y1, y2](double x)->double{
-// 				// BoundInnerIntegrand je vnitřní část integrandu (ta, co závisí na 'x' i 'y')
-// 				// vyčíslená v bodě daném PARAMETREM 'x' a PROMĚNNOU 'ÿ́' (je to tedy funkce
-// 				// proměnné 'y')
-// 				auto BoundInnerIntegrand = [this, x](double y)->double{ return this->F2(x,y); };
-// 				// zintegruje BoundInnerIntegrand od y1(x) do y2(x)
-// 				Integrator<decltype(BoundInnerIntegrand)> R(BoundInnerIntegrand);
-// 				R.integrate(y1(x), y2(x));
-// 				if (!R.ok())
-// 					throw o2scl::exc_runtime_error(R.status());
-// 				return this->F1(x) * R.result();
-// 			};
-// 			
-// 			// vnější jednorozměrný integrál
-// 			Integrator<decltype(ReducedIntegrand)> R(ReducedIntegrand);
-// 			R.integrate(a, b);
-// 			if (!R.ok())
-// 			{
-// 				Status = R.status();
-// 				Ok = false;
-// 			}
-// 			
-// 			Result = R.result();
-// 			AbsErr = R.abserr();
-// 			
-// 			return Ok;
-// 		}
-// 		
-// 		const std::string & status() const { return Status; }	// text chybového hlášení
-// 		bool ok() const { return Ok; }				// proběhla poslední integrace v pořádku?
-// 		double result() const { return Result; }		// výsledek poslední integrace
-// 		double abserr() const { return AbsErr; }		// a její absolutní chyba
-// };
 
 #endif

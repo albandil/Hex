@@ -28,6 +28,126 @@
 
 #define EPS_CONTRIB 1e-8
 
+DWBA2::PhiFunctionDirIntegral::PhiFunctionDirIntegral (
+	HydrogenFunction const & psin, 
+	int lam, 
+	DistortingPotential const & U, 
+	HydrogenFunction const & psi
+) : Lam(lam), U(U), Psi(psi), Psin(psin) {}
+
+double DWBA2::PhiFunctionDirIntegral::operator()(double x2) const
+{
+	if (not finite(x2))
+		return 0.;
+	
+	//
+	// finite integrand
+	//
+		
+	auto integrand1 = [&](double x1) -> double {
+		if (x2 == 0.)
+			return 0.;
+		return Psin(x1) * pow(x1/x2, Lam) * Psi(x1);
+	};
+	
+	// compactification
+	CompactIntegrand<decltype(integrand1),double> R1(integrand1, 0., Inf, 1.0);
+	
+	// integration system
+	ClenshawCurtis<decltype(R1),double> Q1(R1);
+	Q1.setEps(1e-10);	// be precise
+	
+	// integrate
+	double i1 = (x2 == 0) ? 0. : Q1.integrate(R1.scale(0.), R1.scale(x2)) / x2;
+	
+	//
+	// infinite integrand:
+	//
+	
+	auto integrand2 = [&](double x1) -> double {
+		if (x1 == 0.)
+			return 0.;
+		return Psin(x1) * pow(x2/x1, Lam) * Psi(x1) / x1;
+	};
+	
+	// compactification
+	CompactIntegrand<decltype(integrand2),double> R2(integrand2, 0., Inf, 1.0);
+	
+	// integration system
+	ClenshawCurtis<decltype(R2),double> Q2(R2);
+	Q2.setEps(1e-10);
+	
+	// integrate
+	double i2 = Q2.integrate(R2.scale(x2), R2.scale(Inf));
+	
+	// sum the two integrals
+	return i1 + i2;
+};
+
+DWBA2::PhiFunctionDir::PhiFunctionDir (
+	HydrogenFunction const & psin, 
+	int lam, 
+	DistortingPotential const & U, 
+	HydrogenFunction const & psi
+) : Cb_inf(0.), Lam(lam), U(U), Diag(psin == psi), 
+	Zero(Diag and (DistortingPotential(psi) == U)),
+	Integrand(psin,lam,U,psi),
+	CompactIntegral(Integrand,0.,false,1.0)
+{
+	// the case λ = 0 is easy:
+	if (lam == 0)
+	{
+		if (Zero)
+			return;
+		
+		if (Diag)
+		{
+			// integrand
+			auto integrand = [&](double x1) -> double {
+				return (x1 == 0.) ? 0. : gsl_sf_pow_int(psi(x1), 2) / x1;
+			};
+			
+			// integration system
+			ClenshawCurtis<decltype(integrand),double> Q(integrand);
+			
+			// integrate
+			Cb_inf = Q.integrate(0., Inf);
+			
+			return;
+		}
+		
+		/* otherwise continue */
+	}
+	
+	// convergence loop
+	for (int N = 16; ; N *= 2)
+	{
+		// construct a Chebyshev approximation of the compactified function
+		CompactIntegralCb = Chebyshev<double,double> (CompactIntegral, N, -1., 1.);
+
+		// check convergence
+		if (CompactIntegralCb.tail(1e-10) != N)
+			break;
+	}
+	
+	// get optimal truncation index
+	Tail = CompactIntegralCb.tail(1e-10);
+	
+	// evaluate Phi at positive infinity
+	Cb_inf = CompactIntegralCb.clenshaw(1., Tail);
+}
+
+double DWBA2::PhiFunctionDir::operator() (double x) const
+{
+	if (Lam == 0)
+	{
+		if (Zero) return 0.;
+		if (Diag) return Cb_inf - U.plusMonopole(x);
+	}
+	
+	return Cb_inf - CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
+}
+
 void DWBA2::DWBA2_Ln (
 	double Ei, int li, int lf, double ki, double kf, 
 	int Ni, int Nf, int Li, int Lf, int Ln,
@@ -162,73 +282,37 @@ void DWBA2::DWBA2_energy_driver (
 	
 	// integrate over intermediate continuum using Clenshaw-Curtis quadrature
 	//  - only integrate over allowed energies
-	//
+	//  - disable recurrence for maximal reuse of evaluations
 	
 	double min_Kn = 0;						// just after ionization
 	double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
 	
-	rArray eKn;				// evaluation energies
-	cArray eDD;				// evaluated values
-	Complex pDD = 0;		// previous values
-	
-	for (int points = 4; ; points *= 2)
-	{
-		std::cout << "points = " << points << std::endl;
+	// integrand
+	auto DD_integrand = [&](double Kn) -> Complex {
 		
-		// evaluate T-matrices at Chebyshev roots
-		for (int point = 0; point < points; point++)
-		{
-			// get evaluation point
-			double Kn = Chebyshev<double,Complex>::root(points,point,min_Kn,max_Kn);
-			
-			// did we already evaluate the T-matrices for this point?
-			if (std::find(eKn.begin(),eKn.end(),Kn) == eKn.end())
-			{
-				// no, add element to the arrays
-				eKn.push_back(Kn);
-				eDD.push_back(Complex(0));
-				
-				// get intermediate state
-				HydrogenFunction psin(Kn,Ln);
-				
-				// and evaluate the T-matrices
-				DWBA2::DWBA2_En (
-					Ei, Ni, Kn*Kn, Ln, lami, lamf,
-					psii, psif, psin,
-					Ui, Uf, Ug,
-					chii, chif,
-					eDD.back()
-				);
-			}
-		}
+		// get intermediate state
+		HydrogenFunction psin(Kn,Ln);
 		
-		// construct Chebyshev approximation and integral of the DD integrand
-		auto DDre = [&](double x) -> double { return std::find(eDD.begin(),eDD.end(),x)->real(); };
-		auto DDim = [&](double x) -> double { return std::find(eDD.begin(),eDD.end(),x)->imag(); };
-		Chebyshev<double,double> cb_DDre(DDre, points, min_Kn, max_Kn);
-		Chebyshev<double,double> cb_DDim(DDim, points, min_Kn, max_Kn);
-		Chebyshev<double,double> cb_DDre_int = cb_DDre.integrate();
-		Chebyshev<double,double> cb_DDim_int = cb_DDim.integrate();
-		Complex DD_val (
-			cb_DDre_int.clenshaw(max_Kn,1e-8) - cb_DDre_int.clenshaw(min_Kn,1e-8),
-			cb_DDim_int.clenshaw(max_Kn,1e-8) - cb_DDim_int.clenshaw(min_Kn,1e-8)
+		// compute amplitude
+		Complex dd;
+		DWBA2::DWBA2_En (
+			Ei, Ni, Kn*Kn, Ln, lami, lamf,
+			psii, psif, psin,
+			Ui, Uf, Ug,
+			chii, chif,
+			dd
 		);
 		
-		std::cout << "DD_val = " << DD_val << "\n";
+		return dd;
 		
-		// check convergence
-		if (abs(DD_val - pDD) < EPS * abs(DD_val))
-		{
-			// we converged! update sums and return
-			cDD += DD_val;
-			return;
-		}
-		else
-		{
-			// move current values to "previous" values and loop
-			pDD = DD_val;
-		}
-	}
+	};
+	
+	// integration system
+	ClenshawCurtis<decltype(DD_integrand),Complex> QDD(DD_integrand);
+	QDD.setLim(false);
+	QDD.setRec(false);
+	QDD.setEps(1e-5);
+	cDD += QDD.integrate(min_Kn, max_Kn);
 }
 
 void DWBA2::DWBA2_En (
@@ -252,7 +336,10 @@ void DWBA2::DWBA2_En (
 	
 	// construct Green's function parts
 	DistortedWave gphi = Ug.getDistortedWave(Kn,Ln);
+	std::cout << "gphi OK\n";
 	IrregularWave geta = Ug.getIrregularWave(Kn,Ln);
+	std::cout << "geta OK\n";
+	
 	
 	// construct direct inner integrals
 	PhiFunctionDir phii(psin, lami, Ui, psii);
@@ -266,6 +353,7 @@ void DWBA2::DWBA2_En (
 	auto integrand = [&](double r1) -> Complex {
 		
 		// inner integrand variations
+		
 		auto integrand1 = [&](double r2) -> Complex {
 			return gphi(r2) * phii(r2) * chii(r2);
 		};
@@ -275,16 +363,36 @@ void DWBA2::DWBA2_En (
 			return geta(r2) * phii(r2) * chii(r2);
 		};
 		
-		int n1 = -1;	// disable bisection
-		Complex Q1 = ClenshawCurtis<decltype(integrand1),Complex>(integrand1, 0., std::min(r1,fari), false, 1.0, 1e-7, &n1);
+		// integration systems
 		
-		int n2 = -1;	// disable bisection
-		Complex Q2 = ClenshawCurtis<decltype(integrand2),Complex>(integrand2, std::min(r1,fari), fari, false, 1.0, 1e-7, &n2);
+		ClenshawCurtis<decltype(integrand1),Complex> Q1(integrand1);
+		Q1.setLim(false);
+		Q1.setRec(false);
+		Q1.setEps(1e-7);
 		
-		return phif(r1) * (geta(r1) * Q1 + gphi(r1) * Q2);
+		ClenshawCurtis<decltype(integrand2),Complex> Q2(integrand2);
+		Q2.setLim(false);
+		Q2.setRec(false);
+		Q2.setEps(1e-7);
+		
+		// integrate
+		
+		Complex q1 = Q1.integrate(0., std::min(r1,fari));
+		Complex q2 = Q2.integrate(std::min(r1,fari), fari);
+		
+		// evaulate outer integrand
+		
+		return phif(r1) * (geta(r1) * q1 + gphi(r1) * q2);
 	};
 	
+	// outer integration system
+	ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
+	Q.setLim(false);
+	Q.setRec(false);
+	Q.setEps(1e-5);
+	
+	std::cout << "[DWBA2_En] Green's integral\n";
+	
 	// integrate
-	int n = -1;	// disable bisection
-	DD = ClenshawCurtis<decltype(integrand), Complex>(integrand, 0., farf, false, 1.0, 1e-5, &n);
+	DD = Q.integrate(0., farf);
 }

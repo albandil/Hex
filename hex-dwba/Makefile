@@ -49,15 +49,9 @@ obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/spmatrix.h src/hydrogen.h src/chebyshev.h src/compact.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/spmatrix.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
-
-# obj/dwba2_cache.o: src/dwba2_cache.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/spmatrix.h src/hydrogen.h
-# 	g++ -c $(CXXFLAGS) $< -o $@
-
-# obj/twoel.o: src/twoel.cpp src/twoel.h src/arrays.h src/complex.h src/integrate.h
-# 	g++ -c $(CXXFLAGS) $< -o $@
 
 obj/hydrogen.o: src/hydrogen.cpp src/hydrogen.h
 	@mkdir -p $(@D)
