@@ -45,7 +45,7 @@ public:
 	
 	/**
 	 * Return radial distance in the exponential decreasing regions,
-	 * for which the radial function is equal to \ref eps.
+	 * for which the radial function is equal to "eps".
 	 * 
 	 * \warning A naive hunt & bisection algorithm is used, which will collapse
 	 * if any of the roots lies in the vicinity of \f$ r_k = 2^k \f$.
@@ -57,8 +57,9 @@ public:
 	
 	/**
 	 * Evaluate free state (Coulomb wave function) \f$ F_{kl}(r) \f$.
+	 * Use precomputed value of the Coulomb phase shift "sigma" if available.
 	 */
-	static double evalFreeState(double k, int l, double r);
+	static double evalFreeState(double k, int l, double r, double sigma = std::numeric_limits<double>::quiet_NaN());
 	
 	/**
 	 * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
@@ -73,9 +74,9 @@ class HydrogenFunction : public RadialFunction<double>
 {
 public:
 	
-	HydrogenFunction() : n(0), l(0) {}
-	HydrogenFunction(int n, int l) : n(n), k(0.), l(l) {}
-	HydrogenFunction(double k, int l) : n(0), k(k), l(l) {}
+	HydrogenFunction() : n(0), k(0), l(0), Sigma(0) {}
+	HydrogenFunction(int n, int l) : n(n), k(0), l(l), Sigma(0) {}
+	HydrogenFunction(double k, int l) : n(0), k(k), l(l), Sigma(F_sigma(l,k)) {}
 	
 	/**
 	 * \brief Get far radius.
@@ -86,9 +87,13 @@ public:
 	inline double far (double eps, int max_steps = 1000) const
 	{
 		if (n != 0)
+		{
 			return Hydrogen::getFarRadius(n,l,eps,max_steps);
+		}
 		else
+		{
 			throw "Coulomb function has no \"far\"!";
+		}
 	};
 	
 	/// Get principal quantum number.
@@ -104,9 +109,9 @@ public:
 	inline double operator() (double r) const
 	{
 		if (n != 0)
-			return Hydrogen::evalBoundState(n,l,r);
+			return Hydrogen::evalBoundState(n, l, r);
 		else
-			return Hydrogen::evalFreeState(k,l,r);
+			return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? std::numeric_limits<double>::quiet_NaN() : Sigma);
 	}
 	
 	/// Comparison
@@ -117,9 +122,17 @@ public:
 
 private:
 	
+	/// Principal quantum number of bound state.
 	int n;
+	
+	/// Wavenumber of free state.
 	double k;
+	
+	/// Angular momentum.
 	int l;
+	
+	/// Coulomb phase shift.
+	double Sigma;
 };
 
 /**
@@ -161,7 +174,13 @@ public:
 	
 private:
 	
-	int n, l;
+	/// \f$ T_3 \f$ operator eigenvalue.
+	int n;
+	
+	/// Angular momentum.
+	int l;
+	
+	/// Scaling (shielding) factor.
 	double lambda;
 };
 

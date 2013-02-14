@@ -126,7 +126,7 @@ void DWBA2::DWBA2_energy_driver (
 	DistortedWave const & chif, Complex & cDD
 ) {
 	
-	static const double EPS = 1e-8;
+	static const double EPS = 1e-3;
 	
 	// set Green's function distorting potential
 	DistortingPotential Ug(1);	// = U(1s)
@@ -150,13 +150,13 @@ void DWBA2::DWBA2_energy_driver (
 			cDD_Nn
 		);
 		
-		std::cout << "[DWBA2_energy_part] Back from DWBA2_En, cDD_Nn = " << cDD_Nn << std::endl;
-		
 		// update sums
 		cDD += cDD_Nn;
 		
+		std::cout << "[DWBA2_energy_part] cDD_Nn = " << cDD_Nn << ", cDD = " << cDD << " [" << std::abs(cDD_Nn)/std::abs(cDD) << "]" << std::endl;
+		
 		// check convergence
-		if (abs(cDD_Nn) < EPS * abs(cDD))
+		if (std::abs(cDD_Nn) < EPS * std::abs(cDD))
 			break;
 	}
 	
@@ -167,9 +167,9 @@ void DWBA2::DWBA2_energy_driver (
 	double min_Kn = 0;						// just after ionization
 	double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
 	
-	rArray eKn;					// evaluation energies
-	cArray eDD;	// evaluated values
-	Complex pDD = 0;	// previous values
+	rArray eKn;				// evaluation energies
+	cArray eDD;				// evaluated values
+	Complex pDD = 0;		// previous values
 	
 	for (int points = 4; ; points *= 2)
 	{
@@ -214,6 +214,8 @@ void DWBA2::DWBA2_energy_driver (
 			cb_DDim_int.clenshaw(max_Kn,1e-8) - cb_DDim_int.clenshaw(min_Kn,1e-8)
 		);
 		
+		std::cout << "DD_val = " << DD_val << "\n";
+		
 		// check convergence
 		if (abs(DD_val - pDD) < EPS * abs(DD_val))
 		{
@@ -243,10 +245,6 @@ void DWBA2::DWBA2_En (
 	DistortedWave const & chif,
 	Complex & DD
 ) {
-	static const double inf = std::numeric_limits<double>::infinity();
-	
-	std::cout << "[DWBA2_En] " << std::endl;
-	
 	// get projectile energy
 	double Kn = sqrt(Ei - 1./(Ni*Ni) - Eatn);
 	
@@ -256,68 +254,37 @@ void DWBA2::DWBA2_En (
 	DistortedWave gphi = Ug.getDistortedWave(Kn,Ln);
 	IrregularWave geta = Ug.getIrregularWave(Kn,Ln);
 	
-	std::cout << "[DWBA2_En] preparing Phi-functions..." << std::endl;
-	
 	// construct direct inner integrals
 	PhiFunctionDir phii(psin, lami, Ui, psii);
 	PhiFunctionDir phif(psin, lamf, Uf, psif);
 	
-	/// DEBUG
-	std::ofstream ofs1;;
-	ofs1.open("phi1.out");
-	for (int i = 0; i < 10000; i++)
-	{
-		double x = i * 0.01;
-		ofs1 << x << " " << phii(x) << std::endl;
-	}
-	ofs1.close();
-	
-	std::cout << "[DWBA2_En] Green's integration..." << std::endl;
+	// get integration upper bound
+	double fari = 5. * psii.far(1e-8);
+	double farf = 5. * psif.far(1e-8);
 	
 	// Green's function integrand
 	auto integrand = [&](double r1) -> Complex {
 		
-		std::cout << "\n[integrand] r1 = " << r1 << "\n\n";
-		
+		// inner integrand variations
 		auto integrand1 = [&](double r2) -> Complex {
 			return gphi(r2) * phii(r2) * chii(r2);
 		};
 		auto integrand2 = [&](double r2) -> Complex {
 			if (not finite(r2))
 				return 0.;
-// 			std::cout << r2 << std::endl;
 			return geta(r2) * phii(r2) * chii(r2);
 		};
 		
-		Complex Q1 = ClenshawCurtis<decltype(integrand1),Complex>(integrand1, 0., r1, false, 1.0, 1e-5);
+		int n1 = -1;	// disable bisection
+		Complex Q1 = ClenshawCurtis<decltype(integrand1),Complex>(integrand1, 0., std::min(r1,fari), false, 1.0, 1e-7, &n1);
 		
-		std::cout << "\n[integrand] Q1 = " << Q1 << "\n";
-		
-		/// DEBUG
-// 		std::ostringstream oss;
-// 		oss << "r1-" << r1 << ".out";
-// 		std::ofstream ofs;
-// 		ofs.open(oss.str().c_str());
-// 		CompactIntegrand<decltype(integrand2),Complex> R(integrand2, r1, inf, false, 1.0);
-// 		for (int i = -1000; i <= 1000; i++)
-// 		{
-// 			double t = 0.001 * i;
-// 			ofs << t << "\t" << R(t) << std::endl;
-// 		}
-// 		ofs.close();
-		///
-		
-		int n = -1;	// disable bisection
-		Complex Q2 = ClenshawCurtis<decltype(integrand2),Complex>(integrand2, r1, inf, false, 1.0, 1e-5, &n);
-		
-		std::cout << "\n[integrand] Q2 = " << Q2 << "\n";
-		std::cout << "\n[integrand] done\n";
+		int n2 = -1;	// disable bisection
+		Complex Q2 = ClenshawCurtis<decltype(integrand2),Complex>(integrand2, std::min(r1,fari), fari, false, 1.0, 1e-7, &n2);
 		
 		return phif(r1) * (geta(r1) * Q1 + gphi(r1) * Q2);
 	};
 	
 	// integrate
-	DD = ClenshawCurtis<decltype(integrand), Complex>(integrand, 0., inf);
-	
-	std::cout << "[DWBA2_En] DD = " << DD << std::endl;
+	int n = -1;	// disable bisection
+	DD = ClenshawCurtis<decltype(integrand), Complex>(integrand, 0., farf, false, 1.0, 1e-5, &n);
 }

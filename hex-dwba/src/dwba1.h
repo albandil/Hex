@@ -78,8 +78,12 @@ public:
 	 *         \chi_{L_f}(k_i,r) \mathrm{d}r
 	 * \f]
 	 * \param U DistortingPotential class containing information of the distorting potential.
-	 * \param l Partial wave (outgoing angular momentum).
-	 * \param k Initial (= final) wavenumber.
+	 * \param Ni Initial atomic principal quantum number.
+	 * \param Li Initial atomic orbital quantum number.
+	 * \param ki Initial projectile wavenumber.
+	 * \param Nf Final atomic principal quantum number.
+	 * \param Lf Final atomic orbital quantum number.
+	 * \param kf Final projectile wavenumber.
 	 */
 	static Complex computeExchange1e(
 		DistortingPotential const& U,

@@ -134,16 +134,16 @@ public:
 		
 	private:
 		
-		/// λ (a constructor parameter)
+		/// λ
 		int Lam;
 		
-		/// U (a constructor parameter)
+		/// U
 		DistortingPotential U;
 		
-		/// psi (a constructor parameter)
+		/// psi
 		HydrogenFunction Psi;
 		
-		/// psin (a constructor parameter)
+		/// psin
 		HydrogenFunction Psin;
 	};
 	
@@ -196,41 +196,12 @@ public:
 				/* otherwise continue */
 			}
 			
-			/// DEBUG
-// 			std::ofstream phi;
-// 			phi.open("compactphi.dat");
-// 			for (int i = -100; i <= 100; i++)
-// 			{
-// 				double x = 0.01 * i;
-// 				double ci = CompactIntegral(x);
-// 				phi << x << "\t" << ci << "\n";
-// 			}
-// 			phi.close();
-			///
-			
 			// convergence loop
 			for (int N = 16; ; N *= 2)
 			{
-// 				std::cout << "[PhiFunctionDir] N = " << N << std::endl;
-				
 				// construct a Chebyshev approximation of the compactified function
 				CompactIntegralCb = Chebyshev<double,double> (CompactIntegral, N, -1., 1.);
-				
-				/// DEBUG
-// 				std::cout << CompactIntegralCb.str() << std::endl;
-// 				std::ostringstream oss;
-// 				oss << "CbN" << N << ".dat";
-// 				std::ofstream ofs;
-// 				ofs.open(oss.str().c_str());
-// 				double cbinf = CompactIntegralCb.clenshaw(1., N-1);
-// 				for (int i = -100; i <= 100; i++)
-// 				{
-// 					double x = 0.01 * i;
-// 					ofs << x << "\t" << CompactIntegralCb.clenshaw(x,N-1) - cbinf << "\n";
-// 				}
-// 				ofs.close();
-				///
-				
+
 				// check convergence
 				if (CompactIntegralCb.tail(1e-10) != N)
 					break;
@@ -243,6 +214,7 @@ public:
 			Cb_inf = CompactIntegralCb.clenshaw(1., Tail);
 		}
 		
+		/// Evaluate the function.
 		double operator() (double x) const
 		{
 			if (Lam == 0)

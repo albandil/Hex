@@ -133,7 +133,7 @@ double Hydrogen::evalBoundState(int n, int l, double r)
 	return psi;
 }
 
-double Hydrogen::evalFreeState(double k, int l, double r)
+double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
 {
 	// Coulomb wave is a regular solution
 	if (r == 0.)
@@ -148,25 +148,25 @@ double Hydrogen::evalFreeState(double k, int l, double r)
 	// evaluate the function
 	try {
 		
-		int err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
-		
-		if (err != GSL_SUCCESS)
-		{
-			fprintf(stderr, "Error (%s) while evaluating free hydrogen function.\n", gsl_strerror(err));
-			abort();
-		}
-		
+  		gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
 		return norm * F;
 		
-	} catch (o2scl::exc_runtime_error e) {
+	} catch (std::exception & e) {
 		
-		fprintf(stderr, "Error (%s) while evaluating F[%d](%g,%g).\n", e.what(), l, k, r);
-		abort();
+		// evaluation failed
 		
-	} catch (o2scl::exc_range_error e) {
-		
-		fprintf(stderr, "Error (%s) while evaluating F[%d](%g,%g).\n", e.what(), l, k, r);
-		abort();
+		if (k * r > 1)
+		{
+			// probably due to "iteration process out of control" for large radii
+			return F_asy(l, k, r, sigma);
+		}
+		else
+		{
+			// some other problem
+			std::cerr << "Evaluation of hydrogen free state failed.\n";
+			std::cerr << e.what() << std::endl;
+			abort();
+		}
 		
 	}
 }

@@ -639,9 +639,9 @@ template <typename T> Array<T> linspace(T start, T end, unsigned samples)
 
 /**
  * Generate logarithmic grid
- * \param start Left boundary and first sample for "samples" > 0.
- * \param end Right boundary and last sample for "samples" > 1.
- * \param samples Sample count.
+ * \param x0 Left boundary and first sample for "samples" > 0.
+ * \param x1 Right boundary and last sample for "samples" > 1.
+ * \param N Sample count.
  */
 template <typename T> Array<T> logspace(T x0, T x1, size_t N)
 {

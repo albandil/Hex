@@ -13,6 +13,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <gsl/gsl_sf.h>
+
 #include "angs.h"
 #include "arrays.h"
 #include "dwba1.h"
@@ -22,6 +24,8 @@
 
 int main(int argc, char *argv[])
 {
+// 	gsl_set_error_handler_off();
+	
 	if (argc != 8)
 	{
 		printf("\nusage:\n");

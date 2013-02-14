@@ -10,6 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <cmath>
+
 #include <gsl/gsl_sf.h>
 
 #include "specf.h"
@@ -36,19 +38,19 @@ static const double p[g+2] = {
         1.5056327351493116e-7
 };
 
-std::complex<double> gamma(std::complex<double> z)
+Complex gamma(Complex z)
 {
         if (real(z) < 0.5)
         {
                  return pi / (sin(pi*z) * gamma(1. - z));
         }
          z -= 1.;
-        std::complex<double> x = p[0];
+        Complex x = p[0];
         for (int i = 1; i < g + 2; i++)
         {
-                x += p[i] / (z + std::complex<double>(i,0));
+                x += p[i] / (z + Complex(i,0));
         }
-        std::complex<double> t = z + (g + 0.5);
+        Complex t = z + (g + 0.5);
         return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
 }
 

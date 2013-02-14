@@ -70,12 +70,7 @@ Complex sphY(int l, int m, double theta, double phi);
  * This class serves as a heritage base for
  * \ref DistortingPotential,
  * \ref DistortedWave,
- * \ref IrregularWave,
- * \ref ForbiddenWave,
- * \ref HyperbolicWave,
- * \ref HydrogenFunction,
- * \ref MultipoleIntegral
- * \ref MultipoleIntegralExc
+ * \ref HydrogenFunction
  * and others.
  */
 template <typename T> class RadialFunction
@@ -163,12 +158,17 @@ inline double dric_k(int n, double x)
 
 /**
  * \brief Asymptotic form of the regular Coulomb wave.
+ * \param l Angular momentum.
+ * \param k Wavenumber.
+ * \param r Radial coordinate.
  * \param sigma Optionally, the precomputed Coulomb phase shift.
  */
 double F_asy(int l, double k, double r, double sigma = std::numeric_limits<double>::quiet_NaN());
 
 /**
  * \brief Coulomb phase shift.
+ * \param l Angular momentum.
+ * \param k Wavenumber.
  */
 double F_sigma(int l, double k);
 

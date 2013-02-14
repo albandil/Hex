@@ -261,6 +261,8 @@ FType ClenshawCurtis_ff (Functor const & F, double x1, double x2, double eps = 1
     if (x1 > x2)
         return -ClenshawCurtis_ff<decltype(F),FType>(F, x2, x1, eps, n);
 
+// 	std::cout << "[ClenshawCurtis_ff] x1 = " << x1 << ", x2 = " << x2 << "\n";
+	
     // scaled F
     auto f = [&](double x) -> FType {
         return F(x1 + 0.5 * (1.0 + x) * (x2 - x1));
@@ -276,7 +278,7 @@ FType ClenshawCurtis_ff (Functor const & F, double x1, double x2, double eps = 1
     FType sum_prev = std::numeric_limits<double>::quiet_NaN();
 
 	// subdivision limit
-	int MaxN = (n == nullptr) ? 16 : *n;
+	int MaxN = (n == nullptr) ? 32 : *n;
 	
     // convergence loop
     for (int N = 4; MaxN < 0 or N <= MaxN; N *= 2)
@@ -390,18 +392,23 @@ FType ClenshawCurtis_ff (Functor const & F, double x1, double x2, double eps = 1
 // 			std::cout << "[ClenshawCurtis_ff] OK, sum = " << sum << std::endl;
             if (n != nullptr)
                 *n = N;
+			
+// 			std::cout << "[ClenshawCurtis_ff] " << N << " " << sum << " " << 2.*sum_prev << " -> " << FType(2. * (x2 - x1) / N) * sum << " \n";
+			
             return FType(2. * (x2 - x1) / N) * sum;
         }
         else if (finite(std::abs(sum)) and finite(std::abs(sum_prev)) and std::max(std::abs(sum), std::abs(sum_prev)) <= 1e-15)
 		{
 			// numerical niose only, return clean zero
 // 			std::cout << "[ClenshawCurtis_ff] Return zero.\n";
+
+// 			std::cout << "[ClenshawCurtis_ff] " << N << " " << sum << " " << 2.*sum_prev << " -> 0 \n";
+
 			return FType(0.);
 		}
 		else
         {
-// 			std::cout << "[ClenshawCurtis_ff] sum = " << sum << std::endl;
-// 			std::cout << "[ClenshawCurtis_ff] 2*sum_prev = " << 2.*sum_prev << std::endl;
+// 			std::cout << "[ClenshawCurtis_ff] " << N << " " << sum << " " << 2.*sum_prev << " -> recycle \n";
         }
 
         // save function evaluations and sum
@@ -410,11 +417,13 @@ FType ClenshawCurtis_ff (Functor const & F, double x1, double x2, double eps = 1
     }
     
     // no convergence? -> bisect
+//     std::cout << "[ClenshawCurtis_ff] x1 = " << x1 << ", x2 = " << x2 << " -> bisect \n";
     int n1, n2;
 	n1 = n2 = (n == nullptr) ? 16 : *n;
     FType i1 = ClenshawCurtis_ff<Functor,FType>(F, x1, (x2+x1)/2, eps, &n1);
 	FType i2 = ClenshawCurtis_ff<Functor,FType>(F, (x2+x1)/2, x2, eps, &n2);
 	if (n != nullptr) *n = n1 + n2;
+// 	std::cout << "[ClenshawCurtis_ff] x1 = " << x1 << ", x2 = " << x2 << " -> recurrent result: " << i1 + i2 << "\n";
 	return i1 + i2;
 }
 
