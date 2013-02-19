@@ -19,134 +19,14 @@
 #include "dwba2.h"
 #include "hydrogen.h"
 #include "integrate.h"
+#include "multi.h"
 #include "potential.h"
 #include "wave_distort.h"
 #include "wave_irreg.h"
 #include "wave_forbid.h"
 #include "wave_hyperb.h"
-#include "spmatrix.h"
 
 #define EPS_CONTRIB 1e-8
-
-DWBA2::PhiFunctionDirIntegral::PhiFunctionDirIntegral (
-	HydrogenFunction const & psin, 
-	int lam, 
-	DistortingPotential const & U, 
-	HydrogenFunction const & psi
-) : Lam(lam), U(U), Psi(psi), Psin(psin) {}
-
-double DWBA2::PhiFunctionDirIntegral::operator()(double x2) const
-{
-	if (not finite(x2))
-		return 0.;
-	
-	//
-	// finite integrand
-	//
-		
-	auto integrand1 = [&](double x1) -> double {
-		if (x2 == 0.)
-			return 0.;
-		return Psin(x1) * pow(x1/x2, Lam) * Psi(x1);
-	};
-	
-	// compactification
-	CompactIntegrand<decltype(integrand1),double> R1(integrand1, 0., Inf, 1.0);
-	
-	// integration system
-	ClenshawCurtis<decltype(R1),double> Q1(R1);
-	Q1.setEps(1e-10);	// be precise
-	
-	// integrate
-	double i1 = (x2 == 0) ? 0. : Q1.integrate(R1.scale(0.), R1.scale(x2)) / x2;
-	
-	//
-	// infinite integrand:
-	//
-	
-	auto integrand2 = [&](double x1) -> double {
-		if (x1 == 0.)
-			return 0.;
-		return Psin(x1) * pow(x2/x1, Lam) * Psi(x1) / x1;
-	};
-	
-	// compactification
-	CompactIntegrand<decltype(integrand2),double> R2(integrand2, 0., Inf, 1.0);
-	
-	// integration system
-	ClenshawCurtis<decltype(R2),double> Q2(R2);
-	Q2.setEps(1e-10);
-	
-	// integrate
-	double i2 = Q2.integrate(R2.scale(x2), R2.scale(Inf));
-	
-	// sum the two integrals
-	return i1 + i2;
-};
-
-DWBA2::PhiFunctionDir::PhiFunctionDir (
-	HydrogenFunction const & psin, 
-	int lam, 
-	DistortingPotential const & U, 
-	HydrogenFunction const & psi
-) : Cb_inf(0.), Lam(lam), U(U), Diag(psin == psi), 
-	Zero(Diag and (DistortingPotential(psi) == U)),
-	Integrand(psin,lam,U,psi),
-	CompactIntegral(Integrand,0.,false,1.0)
-{
-	// the case λ = 0 is easy:
-	if (lam == 0)
-	{
-		if (Zero)
-			return;
-		
-		if (Diag)
-		{
-			// integrand
-			auto integrand = [&](double x1) -> double {
-				return (x1 == 0.) ? 0. : gsl_sf_pow_int(psi(x1), 2) / x1;
-			};
-			
-			// integration system
-			ClenshawCurtis<decltype(integrand),double> Q(integrand);
-			
-			// integrate
-			Cb_inf = Q.integrate(0., Inf);
-			
-			return;
-		}
-		
-		/* otherwise continue */
-	}
-	
-	// convergence loop
-	for (int N = 16; ; N *= 2)
-	{
-		// construct a Chebyshev approximation of the compactified function
-		CompactIntegralCb = Chebyshev<double,double> (CompactIntegral, N, -1., 1.);
-
-		// check convergence
-		if (CompactIntegralCb.tail(1e-10) != N)
-			break;
-	}
-	
-	// get optimal truncation index
-	Tail = CompactIntegralCb.tail(1e-10);
-	
-	// evaluate Phi at positive infinity
-	Cb_inf = CompactIntegralCb.clenshaw(1., Tail);
-}
-
-double DWBA2::PhiFunctionDir::operator() (double x) const
-{
-	if (Lam == 0)
-	{
-		if (Zero) return 0.;
-		if (Diag) return Cb_inf - U.plusMonopole(x);
-	}
-	
-	return Cb_inf - CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
-}
 
 void DWBA2::DWBA2_Ln (
 	double Ei, int li, int lf, double ki, double kf, 
@@ -191,8 +71,6 @@ void DWBA2::DWBA2_Ln (
 	for (int lamf = lamf_min; lamf <= lamf_max; lamf++)
 	{
 		// contributions to the scattering amplitude
-		// FIXME: "double" would suffice, but it means to rewrite sparse matrices
-		//        to templates
 		Complex DD_N_prev = 0;
 		
 		// compute energy sum/integral
@@ -255,7 +133,8 @@ void DWBA2::DWBA2_energy_driver (
 	for (int Nn = 1; ; Nn++)
 	{
 		// info
-		std::cout << "[DWBA2_energy_part] Nn = " << Nn << std::endl;
+		std::cout << "---------------------------------------\n";
+		std::cout << "(discrete loop) Nn = " << Nn << "\n";
 		
 		// get intermediate state
 		HydrogenFunction psin(Nn,Ln);
@@ -273,7 +152,7 @@ void DWBA2::DWBA2_energy_driver (
 		// update sums
 		cDD += cDD_Nn;
 		
-		std::cout << "[DWBA2_energy_part] cDD_Nn = " << cDD_Nn << ", cDD = " << cDD << " [" << std::abs(cDD_Nn)/std::abs(cDD) << "]" << std::endl;
+		std::cout << "cDD_Nn = " << cDD_Nn << ", cDD = " << cDD << " [" << std::abs(cDD_Nn)/std::abs(cDD) << "]" << std::endl;
 		
 		// check convergence
 		if (std::abs(cDD_Nn) < EPS * std::abs(cDD))
@@ -290,6 +169,12 @@ void DWBA2::DWBA2_energy_driver (
 	// integrand
 	auto DD_integrand = [&](double Kn) -> Complex {
 		
+		std::cout << "---------------------------------------\n";
+		std::cout << "(continuum loop) Kn = " << Kn << "\n";
+		
+		if (Kn == 0.)
+			return Complex(0.);
+		
 		// get intermediate state
 		HydrogenFunction psin(Kn,Ln);
 		
@@ -303,6 +188,8 @@ void DWBA2::DWBA2_energy_driver (
 			dd
 		);
 		
+		std::cout << "(continuum loop) Kn = " << Kn << ", dd = " << dd << "\n";
+		
 		return dd;
 		
 	};
@@ -312,12 +199,13 @@ void DWBA2::DWBA2_energy_driver (
 	QDD.setLim(false);
 	QDD.setRec(false);
 	QDD.setEps(1e-5);
+	QDD.setVerbose(true);
 	cDD += QDD.integrate(min_Kn, max_Kn);
 }
 
 void DWBA2::DWBA2_En (
 	double Ei, int Ni,
-	double Eatn, int Ln,
+	double Eatn, int ln,
 	int lami, int lamf,
 	HydrogenFunction const & psii,
 	HydrogenFunction const & psif,
@@ -329,21 +217,16 @@ void DWBA2::DWBA2_En (
 	DistortedWave const & chif,
 	Complex & DD
 ) {
-	// get projectile energy
-	double Kn = sqrt(Ei - 1./(Ni*Ni) - Eatn);
-	
-	std::cout << "[DWBA2_En] Kn = " << Kn << std::endl;
+	// get projectile wave number
+	double kn = sqrt(Ei - 1./(Ni*Ni) - Eatn);	std::cout << "kn = " << kn << std::endl;
 	
 	// construct Green's function parts
-	DistortedWave gphi = Ug.getDistortedWave(Kn,Ln);
-	std::cout << "gphi OK\n";
-	IrregularWave geta = Ug.getIrregularWave(Kn,Ln);
-	std::cout << "geta OK\n";
-	
+	DistortedWave gphi = Ug.getDistortedWave(kn,ln);	std::cout << "gphi OK\n";
+	IrregularWave geta = Ug.getIrregularWave(kn,ln);	std::cout << "geta OK\n";
 	
 	// construct direct inner integrals
-	PhiFunctionDir phii(psin, lami, Ui, psii);
-	PhiFunctionDir phif(psin, lamf, Uf, psif);
+	PhiFunctionDir phii(psin, lami, Ui, psii);	std::cout << "phii OK\n";
+	PhiFunctionDir phif(psin, lamf, Uf, psif);	std::cout << "phif OK\n";
 	
 	// get integration upper bound
 	double fari = 5. * psii.far(1e-8);

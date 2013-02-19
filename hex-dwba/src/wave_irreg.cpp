@@ -46,19 +46,17 @@ IrregularWave IrregularWave::operator=(const IrregularWave& W)
 }
 
 IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U)
+	: Evaluations(0), U(_U), kn(_kn), ln(_ln)
 {
-	this->kn = _kn;
-	this->ln = _ln;
-	this->U = _U;
-	
-	Evaluations = 0;
-	
 	// get far coordinate
 	double r = U.getFarRadius();
 	
 	// determine discretization
 	int N = 1000;				// N samples per wave length
-	this->h = 2*M_PI/(N*kn);	// grid step
+	this->h = std::min (		// grid step
+		2*M_PI/(N*kn),			//  -> N samples per wave length and
+		r/1000					//  -> at least 1000 samples total
+	);
 	this->samples = r/h + 1;	// with both boundaries
 	
 	cArray array(samples);
@@ -69,7 +67,7 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		grid[i] = h * i;
 	
 	char etaname[50];
-	sprintf(etaname, "dwi-%d-%g-%d-%g.arr", U.n, U.k, ln, kn);
+	sprintf(etaname, "dwi-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
 	if (not load_array(array, etaname))
 	{
 		// data arrays

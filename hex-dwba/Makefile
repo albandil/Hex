@@ -7,7 +7,7 @@ all: bin/dwba
 
 bin/dwba: obj/main.o obj/potential.o obj/wave_distort.o \
           obj/dwba1.o obj/dwba2.o obj/hydrogen.o obj/arrays.o \
-          obj/angs.o obj/specf.o obj/spmatrix.o \
+          obj/angs.o obj/specf.o obj/multi.o \
           obj/wave_forbid.o obj/wave_hyperb.o obj/wave_irreg.o
 	@mkdir -p $(@D)
 	g++ $^ $(LFLAGS) -o $@
@@ -49,7 +49,11 @@ obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h
+	@mkdir -p $(@D)
+	g++ -c $(CXXFLAGS) $< -o $@
+
+obj/multi.o: src/multi.cpp src/multi.h src/chebyshev.h src/compact.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

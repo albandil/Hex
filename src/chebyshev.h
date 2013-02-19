@@ -20,9 +20,6 @@
 
 #include <fftw3.h>
 
-#include <gsl/gsl_sf.h>
-#define sqr(x) gsl_sf_pow_int((x),2)
-
 #include "compact.h"
 #include "misc.h"
 
@@ -48,7 +45,7 @@ public:
 	 * \param a Left boundary of the approximation interval.
 	 * \param b Right boundary of the approximation interval.
 	 */
-    template <class Functor> Chebyshev (Functor f, int n, Tin a = -1, Tin b = 1)
+    template <class Functor> Chebyshev (Functor const & f, int n, Tin a = -1, Tin b = 1)
     {
         N  = n;
         xt = 0.5 * (b + a);
@@ -79,6 +76,23 @@ public:
             C[j] /= N;
         }
     }
+	
+	/**
+	 * \brief Constructor.
+	 * 
+	 * \param array Array of precomputed Chebyshev coefficients.
+	 * \param a Left boundary of the approximation interval.
+	 * \param b Right boundary of the approximation interval.
+	 */
+    Chebyshev (Array<Tout> const & array, Tin a = -1, Tin b = 1)
+	{
+		N  = array.size();
+        xt = 0.5 * (b + a);
+        m  = 0.5 * (b - a);
+		
+		// copy coefficients
+		C = array;
+	}
 	
     /**
      * Return full approximation value.
@@ -230,6 +244,11 @@ public:
         return out.str();
     }
 
+    Array<Tout> const & coeffs() const
+    {
+		return C;
+	}
+    
 private:
 
     /// map interval (xt-m,xt+m) to (-1,1)
@@ -243,7 +262,7 @@ private:
     }
 
     /// Chebyshev coefficients
-    std::vector<Tout> C;
+    Array<Tout> C;
 
     /// coefficient number
     int N;
@@ -263,7 +282,8 @@ public:
 	 * Constructor.
 	 * \param  f Function to integrate of the signature FType(*)(double x).
 	 */ 
-	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), Limit(true), Recurrence(true), NLevel(32), L(1.0) {}
+	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
+		Limit(true), Recurrence(true), NLevel(32), L(1.0), Verbose(false) {}
 	
 	/// Get relative tolerance.
 	inline double eps() const { return EpsRel; }
@@ -300,6 +320,12 @@ public:
 	
 	/// Set limit flag.
 	inline void setRec(bool recurrence) { Recurrence = recurrence; }
+	
+	/// Get verbose flag.
+	inline bool verbose() const { return Verbose; }
+	
+	/// Set verbose flag.
+	inline void setVerbose(bool verbose) { Verbose = verbose; }
 	
 	/**
 	 * Clenshaw-Curtis quadrature, main interface.
@@ -472,8 +498,7 @@ public:
 				}
 				else
 				{
-					std::cerr << "[ClenshawCurtis_ff] Can't handle datatype.\n";
-					throw;
+					throw exception("[ClenshawCurtis_ff] Can't handle datatype.");
 				}
 			}
 #endif
@@ -482,7 +507,9 @@ public:
 			FType sum = 0.5 * (coefs[0] - coefs[N] / (N*N - 1.));
 			for (int twok = 2; twok < N; twok += 2)
 				sum -= coefs[twok] / (twok*twok - 1.);
-
+			
+			if (Verbose) std::cout << "[ClenshawCurtis_ff] Sum = " << sum << "\n";
+			
 			// check convergence
 			if (std::abs(sum - FType(2.) * sum_prev) <= EpsRel * std::abs(sum))
 			{
@@ -505,6 +532,8 @@ public:
 			fvals_prev = fvals;
 			sum_prev = sum;
 		}
+		
+		if (Verbose) std::cout << "[ClenshawCurtis_ff] Bisecting.\n";
 		
 		// no convergence? -> bisect
 		int n1, n2;
@@ -622,6 +651,9 @@ private:
 	
 	/// Compactification parameter
 	double L;
+	
+	/// Display debugging information.
+	bool Verbose;
 };
 
 #endif

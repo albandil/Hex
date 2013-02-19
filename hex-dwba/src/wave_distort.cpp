@@ -54,19 +54,17 @@ int DistortedWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2s
 }
 
 DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U)
+	: Evaluations(0), U(_U), kn(_kn), ln(_ln)
 {
-	this->kn = _kn;
-	this->ln = _ln;
-	this->U = _U;
-	
-	Evaluations = 0;
-	
 	// get far coordinate
 	double r = U.getFarRadius();
 	
-	// determine discretization
+	// determine discretization, use at least 1000 samples
 	int N = 1000;				// N samples per wave length
-	this->h = 2*M_PI/(N*kn);	// grid step
+	this->h = std::min (		// grid step
+		2*M_PI/(N*kn),			//  -> N samples per wave length and
+		r/1000					//  -> at least 1000 samples totally
+	);
 	this->samples = r/h + 1;	// with both boundaries
 	
 	// create grid

@@ -14,9 +14,6 @@
 #define HEX_MISC
 
 #include <exception>
-#include <limits>
-	#define Inf (std::numeric_limits<double>::infinity())
-	#define Nan (std::numeric_limits<double>::quiet_NaN())
 #include <cstdio>
 
 /**

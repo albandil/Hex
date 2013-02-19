@@ -17,15 +17,9 @@
 #include <cmath>
 #include <iostream>
 
-#ifndef Inf
-	#include <limits>
-	#define Inf (std::numeric_limits<double>::infinity())
-	#define Nan (std::numeric_limits<double>::quiet_NaN())
-#endif
-
-#include <gsl/gsl_sf.h>
+#include "misc.h"
 #include "specf.h"
-#define sqr(x) gsl_sf_pow_int((x),2)
+
 
 /**
  * Limit
@@ -109,10 +103,7 @@ public:
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
         if (not finite(a) or not finite(b))
-        {
-            std::cerr << "[CompactificationF] Interval has to be finite!" << std::endl;
-            throw;
-        }
+			throw exception("[CompactificationF] Interval has to be finite!");
     }
     
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
@@ -326,10 +317,7 @@ public:
 		else if (not finite(a) and finite(b))
 			Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
 		else
-		{
-			std::cerr << "[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted." << std::endl;
-			throw;
-		}
+			throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");
 	}
 
     ~CompactIntegrand ()
@@ -340,20 +328,35 @@ public:
     /**
      * Get the function multiplied by the Jacobian of the transform for the
      * purpose of integrating the original function.
+	 * 
+	 * \note Whenever the function value is zero, the Jacobian is not evaluated
+	 *       and a clean zero is returned.
      */
-    FType operator() (double t) const
+    inline FType operator() (double t) const
     {
-        return Compactification->operator()(t) * Compactification->Jacobian(t);
+		// evaluate function
+		FType ft = Compactification->operator()(t);
+		
+		if (ft == FType(0.))
+		{
+			// return zero
+			return 0.;
+		}
+		else
+		{
+			// multiply by the Jacobian
+			return ft * Compactification->Jacobian(t);
+		}
     }
     
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
-    double scale (double x) const
+    inline double scale (double x) const
     {
 		return Compactification->scale(x);
     }
     
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
-    double unscale (double t) const
+    inline double unscale (double t) const
     {
         return Compactification->unscale(t);
     }

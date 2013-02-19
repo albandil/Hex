@@ -29,6 +29,7 @@
 #endif
 
 #include "complex.h"
+#include "misc.h"
 
 /**
  * \brief A comfortable number array class.
@@ -115,19 +116,19 @@ template <typename NumberType> class Array
 				delete [] array;
 		}
 		
-		// conversions
+		// conversions of 1-element array to number
 		operator NumberType () const
 		{
 			if (N == 1)
 				return *array;
 			else if (N > 1)
-				throw "[Array::operator 'NumberType'] array too long!\n";
+				throw exception("[Array::operator 'NumberType'] array too long, N = %d!", N);
 			else
-				throw "[Array::operator 'NumberType'] array contains no data!\n";
+				throw exception("[Array::operator 'NumberType'] array contains no data!");
 		}
 		
 		//
-		// storage length getter
+		// storage size
 		//
 		
 		size_t size() const { return N; }
@@ -154,7 +155,7 @@ template <typename NumberType> class Array
 			if (i < N)
 				return array[i];
 			else
-				throw "Index out of bounds!";
+				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
 		#endif
 		}
 		
@@ -162,7 +163,7 @@ template <typename NumberType> class Array
 		// element-wise access (const)
 		//
 		
-		inline const NumberType& operator[] (size_t i) const
+		inline NumberType const & operator[] (size_t i) const
 		{
 		#ifdef NDEBUG
 			return array[i];
@@ -170,7 +171,7 @@ template <typename NumberType> class Array
 			if (i < N)
 				return array[i];
 			else
-				throw "Index out of bounds!";
+				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
 		#endif
 		}
 		
@@ -468,7 +469,12 @@ template <typename NumberType> class Array
 					return false;
 				}
 				array = new Complex [N];
-				dset.read(array, H5::PredType::NATIVE_DOUBLE, dspc, dspc);
+				dset.read(
+					reinterpret_cast<double*>(array),
+					H5::PredType::NATIVE_DOUBLE,
+					dspc,
+					dspc
+				);
 				
 				return true;
 			}

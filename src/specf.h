@@ -14,7 +14,14 @@
 #define HEX_SPECF
 
 #include <limits>
+	/// Infinity
+	#define Inf (std::numeric_limits<double>::infinity())
+	/// Not-a-number
+	#define Nan (std::numeric_limits<double>::quiet_NaN())
+
 #include <gsl/gsl_sf.h>
+	/// second power
+	#define sqr(x) (gsl_sf_pow_int((x),2))
 
 #include "complex.h"
 #include "arrays.h"
@@ -79,15 +86,6 @@ public:
 	
 	/// Evaluate the function.
 	virtual T operator() (double x) const = 0;
-	
-// 	/// Vectorized evaluation
-// 	virtual Array<T> getValues(Array<double> x) const
-// 	{
-// 		Array<T> out(x.size());
-// 		for (size_t i = 0; i < x.size(); i++)
-// 			out[i] = getValue(x[i]);
-// 		return out;
-// 	}
 };
 
 /**
@@ -163,7 +161,7 @@ inline double dric_k(int n, double x)
  * \param r Radial coordinate.
  * \param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double F_asy(int l, double k, double r, double sigma = std::numeric_limits<double>::quiet_NaN());
+double F_asy(int l, double k, double r, double sigma = Nan);
 
 /**
  * \brief Coulomb phase shift.
