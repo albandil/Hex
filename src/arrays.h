@@ -24,7 +24,9 @@
 
 #include <assert.h>
 
+#ifndef NO_HDF
 #include <H5Cpp.h>
+#endif
 
 #include "complex.h"
 
@@ -389,6 +391,7 @@ template <typename NumberType> class Array
 			return c;
 		}
 		
+#ifndef NO_HDF
 		/**
 		 * Save array to HDF file.
 		 * \param name Filename.
@@ -474,6 +477,7 @@ template <typename NumberType> class Array
 				return false;
 			}
 		}
+#endif
 };
 
 // scalar product of two arrays.
@@ -824,11 +828,12 @@ template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
 /**
  * Load / save array from a HDF5 file.
  */
+#ifndef NO_HDF
 bool load_array(rArray& vec, const char* name, double* pdelta = 0);
 bool load_array(cArray& vec, const char* name);
 bool save_array(rArray const & vec, const char* name, const double * const pdelta = 0);
 bool save_array(cArray const & vec, const char* name);
-
+#endif
 /**
  * Write array to a text file.
  */

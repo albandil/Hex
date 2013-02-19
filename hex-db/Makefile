@@ -1,10 +1,10 @@
 CPP = g++
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include
-LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lhdf5 -lhdf5_cpp
+LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -O2
-CXXDEBUG = $(CFLAGS) -g -O2
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
+CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2
 
 SQLITEPP = lib/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction

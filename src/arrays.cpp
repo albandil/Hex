@@ -12,7 +12,9 @@
 
 #include <map>
 #include <vector>
+#ifndef NO_HDF
 #include <H5Cpp.h>
+#endif
 
 #include "arrays.h"
 #include "complex.h"
@@ -33,6 +35,7 @@ bool any(std::vector<bool> v)
 	return false;
 }
 
+#ifndef NO_HDF
 bool save_array(rArray const & vec, const char* name, const double * const pdelta)
 {
 	try
@@ -140,6 +143,7 @@ bool load_array(cArray & vec, const char* name)
 		return false;
 	}
 }
+#endif
 
 void write_array(const std::map<unsigned long long, Complex>& m, const char* filename)
 {
