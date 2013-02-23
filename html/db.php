@@ -179,10 +179,13 @@
 		<br/>
 		
 		<?php
+			include "hexdbexe.inc";	// defines $hexdbexe
+			include "hexdbdat.inc";	// defines $hexdbdat
+			
 			if (isset($_POST["qty"]) and isset($_POST["view"]))
 			{
 				// prepare Hex-db command line
-				$hexcmdline = "/network/home/benda/Hex/hex-db/bin/hex-db --database=/network/home/benda/Hex/hex-db/hex.db --" . $_POST["qty"];
+				$hexcmdline = $hexdbexe . " --database=" . $hexdbdat . " --" . $_POST["qty"];
 				if (isset($_POST["ni"])) $hexcmdline = $hexcmdline . " --ni=" . $_POST["ni"];
 				if (isset($_POST["li"])) $hexcmdline = $hexcmdline . " --li=" . $_POST["li"];
 				if (isset($_POST["mi"])) $hexcmdline = $hexcmdline . " --mi=" . $_POST["mi"];
