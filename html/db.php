@@ -60,34 +60,34 @@
 		<div class = "text">Choose what to compute:</div>
 		<center>
 			<select name = "qty" onchange="this.form.submit()">
-				<option value = "scatamp" <?php
-					if (!isset($_POST["qty"]) or $_POST["qty"] == "scatamp")
-						echo "selected = \"selected\"";
-					?> >scatering amplitude</option>
-				<option value = "dcs" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "dcs")
-						echo "selected = \"selected\"";
-					?> >differential cross section</option>
 				<option value = "ccs" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "ccs")
+					if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs")
 						echo "selected = \"selected\"";
 					?> >complete cross section</option>
-				<option value = "ics" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "ics")
-						echo "selected = \"selected\"";
-					?> >integral cross section</option>
-				<option value = "xcs" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "xcs")
-						echo "selected = \"selected\"";
-					?> >extrapolated cross section</option>
-				<option value = "momtf" <?php
-					if (isset($_POST["qty"]) and $_POST["qty"] == "momtf")
-						echo "selected = \"selected\"";
-					?> >momentum transfer</option>
 				<option value = "colls" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "colls")
 						echo "selected = \"selected\"";
 					?> >collision strength</option>
+				<option value = "dcs" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "dcs")
+						echo "selected = \"selected\"";
+					?> >differential cross section</option>
+				<option value = "xcs" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "xcs")
+						echo "selected = \"selected\"";
+					?> >extrapolated cross section</option>
+				<option value = "ics" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "ics")
+						echo "selected = \"selected\"";
+					?> >integral cross section</option>
+				<option value = "momtf" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "momtf")
+						echo "selected = \"selected\"";
+					?> >momentum transfer</option>
+				<option value = "scatamp" <?php
+					if (isset($_POST["qty"]) and $_POST["qty"] == "scatamp")
+						echo "selected = \"selected\"";
+					?> >scatering amplitude</option>
 				<option value = "tcs" <?php
 					if (isset($_POST["qty"]) and $_POST["qty"] == "tcs")
 						echo "selected = \"selected\"";
@@ -97,9 +97,9 @@
 
 		<div class = "text">Set initial atomic state(s):</div>
 		<center>
-			ni = <input type = "number" name = "ni" size = "3" value = "<?php if (isset($_POST["ni"])) echo $_POST["ni"]; ?>"/>
-			li = <input type = "number" name = "li" size = "3" value = "<?php if (isset($_POST["li"])) echo $_POST["li"]; ?>"/>
-			mi = <input type = "number" name = "mi" size = "3" value = "<?php if (isset($_POST["mi"])) echo $_POST["mi"]; ?>"/>
+			ni = <input type = "number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
+			li = <input type = "number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
+			mi = <input type = "number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
 		</center>
 		
 		<?php
@@ -107,15 +107,15 @@
 			{
 				printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tnf = <input type = \"number\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "");
-				printf("\t\t\tlf = <input type = \"number\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "");
-				printf("\t\t\tmf = <input type = \"number\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "");
+				printf("\t\t\tnf = <input type = \"number\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+				printf("\t\t\tlf = <input type = \"number\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+				printf("\t\t\tmf = <input type = \"number\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
 				printf("\t\t</center>\n");
 			}
 		?>
 		
 		<?php
-			if (!isset($_POST["qty"])) //~ scatamp
+			if (isset($_POST["qty"]) and $_POST["qty"] == "scatamp") //~ scatamp
 			{
 				printf("\t\t<div class = \"text\">Set global quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
@@ -123,7 +123,7 @@
 				printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
-			else if ($_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
+			else if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
 			{
 				// do nothing
 			}
@@ -152,7 +152,7 @@
 		?>
 
 		<?php
-			if (!isset($_POST["qty"]) or $_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
+			if ($_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
 			{
 				printf("\t\t<div class = \"text\">Set angular range:</div>\n");
 				printf("\t\t<center>\n");
@@ -164,14 +164,14 @@
 		?>
 
 		<?php
-			if ($_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
+			if (!isset($_POST["qty"]) or $_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
 				or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 			{
 				printf("\t\t<div class = \"text\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tEmin = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", $_POST["Emin"]);
-				printf("\t\t\tEmax = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", $_POST["Emax"]);
-				printf("\t\t\tΔE = <input type = \"text\" name = \"dE\" size = \"5\" value = \"%s\"/>\n", $_POST["dE"]);
+				printf("\t\t\tEmin = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : 0.65);
+				printf("\t\t\tEmax = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : 0.85);
+				printf("\t\t\tΔE = <input type = \"text\" name = \"dE\" size = \"5\" value = \"%s\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : 0.001);
 				printf("\t\t</center>\n");
 			}
 		?>
@@ -182,7 +182,7 @@
 			if (isset($_POST["qty"]) and isset($_POST["view"]))
 			{
 				// prepare Hex-db command line
-				$hexcmdline = "hex-db --database=/home/jacob/public_html/hex.db --" . $_POST["qty"];
+				$hexcmdline = "/network/home/benda/Hex/hex-db/bin/hex-db --database=/network/home/benda/Hex/hex-db/hex.db --" . $_POST["qty"];
 				if (isset($_POST["ni"])) $hexcmdline = $hexcmdline . " --ni=" . $_POST["ni"];
 				if (isset($_POST["li"])) $hexcmdline = $hexcmdline . " --li=" . $_POST["li"];
 				if (isset($_POST["mi"])) $hexcmdline = $hexcmdline . " --mi=" . $_POST["mi"];
@@ -201,7 +201,7 @@
 					$nums = range($_POST["Emin"], $_POST["Emax"], $_POST["dE"]);
 				
 				// set PATH to include hex-db executable
-				putenv("PATH=" . "/home/jacob/Dokumenty/prog/Hex/hex-db/bin:" . $_ENV["PATH"]);
+//				putenv("PATH=" . "/home/jacob/Dokumenty/prog/Hex/hex-db/bin:" . $_ENV["PATH"]);
 				
 				// launch hex-db process
 				$prochex = proc_open (
@@ -293,6 +293,11 @@
 		}
 	?>
 
+	</td></tr><tr><td colspan="2" width = "100%">
+		<center>
+			<div class = "sekce">Available data:</div>
+			<div class = "output"><img src = "avail.png"/></div>
+		</center>
 	</td></tr></table>
 
 	</div> <!-- rám -->
