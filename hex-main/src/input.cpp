@@ -13,6 +13,9 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <fstream>
+#include <string>
+#include <tuple>
 
 #include <getopt.h>
 
@@ -24,7 +27,7 @@
  * can be specified using the --input/-i option.
  */
 
-void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile, int& zipcount)
+void parse_command_line(int argc, char* argv[], std::ifstream& inputfile, std::string& zipfile, int& zipcount)
 {
 	// set short options
 	const char* const short_options  = "eih";
@@ -41,37 +44,44 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile
 	
 	// switch all options
 	int next_option = 0;
-	do {
+	do
+	{
 		next_option = getopt_long(argc, argv, short_options, long_options, 0);
+		
 		switch (next_option)
 		{
 			case 'e':
+			{
 				// produce sample input file
-				FILE *h;
-				h = std::fopen("example.inp", "w");
-				if (h == 0)
-				{
-					std::printf("Error: Cannot write to \"example.inp\"\n");
-					abort();
-				}
-				std::fprintf (h,
+				std::ofstream out("example.inp");
+				if (out.bad())
+					throw exception("Error: Cannot write to \"example.inp\"\n");
+				
+				out <<
 					"# B-spline parameters \n"
 					"# order     R0    Rmax       θ\n"
-					"      4   60.0    100.0    0.63\n"
+					"      4     60     100    0.63\n"
 					"\n"
 					"# real knot sequences\n"
-					"0.0  0.1   3.0   -1\n"
-					"0.0  2.0  60.0\n"
-					"  4   20    58\n"
+					"0.0  0.1   3   -1\n"
+					"0.0  2.0  60\n"
+					"  4   20  58\n"
 					"\n"
 					"# complex knot sequences\n"
-					"60.0    -1\n"
-					"100.0\n"
-					"  41\n"
+					" 60    -1\n"
+					"100\n"
+					" 41\n"
 					"\n"
-					"# initial / final atomic state\n"
-					"# ni minli maxli maxnf maxlf\n"
-					"  1     -1    -1     1    -1\n"
+					"# initial atomic states\n"
+					"# ni\n"
+					"  1\n"
+					"# angular states (li, mi)\n"
+					"  0  -1\n"
+					"  0\n"
+					"\n"
+					"# final atomic states (nf, lf)\n"
+					"  1  -1\n"
+					"  0\n"
 					"\n"
 					"# angular momenta\n"
 					"# L  ℓ\n"
@@ -84,27 +94,23 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile
 					"\n"
 					"# magnetic field\n"
 					"0\n"
-				);
-				std::fclose(h);
+				;
+				
+				out.close();
 				exit(0);
-				break;
-				
+			}
 			case 'i':
+			{
 				// set custom input file
-				FILE *g;
-				g = std::fopen(optarg, "r");
-				if (g)
-					inputfile = g;
-				else
-				{
-					std::printf("Error: Input file \"%s\" not found.\n", optarg);
-					abort();
-				}
+				inputfile.open(optarg);
+				if (inputfile.bad())
+					throw exception("Error: Input file \"%s\" not found.\n", optarg);
 				break;
-				
+			}
 			case 'h':
+			{
 				// print usage information
-				std::printf (
+				std::cout <<
 					"                                                       \n"
 					"         __  __                                        \n"
 					"        / /_/ /  ___   __  __                          \n"
@@ -123,50 +129,56 @@ void parse_command_line(int argc, char* argv[], FILE*& inputfile, char*& zipfile
 					"\t--zipfile <filename> (-z)  solution file to zip      \n"
 					"\t--zipcount <number>  (-n)  zip samples               \n"
 					"                                                       \n"
-				);
+				;
 				exit(0);
-				
+			}
 			case 'z':
+			{
 				// zip B-spline expansion file
-				zipfile = strdup(basename(optarg));
+				zipfile = std::string(basename(optarg));
 				break;
-				
+			}
 			case 'n':
+			{
 				// zip samples
 				zipcount = atol(optarg);
 				break;
-				
+			}
 			case -1:
+			{
 				// end of command line option list
 				break;
-				
+			}
 			default:
+			{
 				// unknown option
-				std::printf("Unknown option.\n");
+				std::cout << "Unknown option." << std::endl;
 				abort();
-		};
+			}
+		}; // switch opetion
+		
 	} while (next_option != -1);
 }
 
-long read_int(FILE *f) throw (int)
+long read_int(std::ifstream& f)
 {
 	// text buffer
-	char buff[1024];
+	std::string s;
 	
-	for/*ever*/(;;)
+	while (not f.eof())
 	{
 		// read string
-		if (std::fscanf(f, "%s", buff) == EOF)
-			throw 0;
+		f >> s;
 		
-		if (strlen(buff) == 0)
+		// check length
+		if (s.size() == 0)
 			continue;
 		
 		// check if it is a beginning of a comment
-		if (buff[0] == '#')
+		if (s[0] == '#')
 		{
 			// get the rest of the line
-			std::fgets(buff, 1024, f);
+			std::getline(f, s);
 			continue;
 		}
 		
@@ -175,32 +187,32 @@ long read_int(FILE *f) throw (int)
 	
 	// convert to long
 	char* tail;
-	long val = strtol(buff, &tail, 10);
+	long val = strtol(s.c_str(), &tail, 10);
 	if (*tail != 0)
-		throw 0;
+		throw exception ("Can't read int.\n");
 	else
 		return val;
 }
 
-double read_dbl(FILE *f) throw (int)
+double read_dbl(std::ifstream& f)
 {
 	// text buffer
-	char buff[1024];
+	std::string s;
 	
-	for/*ever*/(;;)
+	while (not f.eof())
 	{
 		// read string
-		if (std::fscanf(f, "%s", buff) == EOF)
-			throw 0;
+		f >> s;
 		
-		if (strlen(buff) == 0)
+		// check length
+		if (s.size() == 0)
 			continue;
 		
 		// check if it is a beginning of a comment
-		if (buff[0] == '#')
+		if (s[0] == '#')
 		{
 			// get the rest of the line
-			std::fgets(buff, 1024, f);
+			std::getline(f, s);
 			continue;
 		}
 		
@@ -209,19 +221,20 @@ double read_dbl(FILE *f) throw (int)
 	
 	// convert to double
 	char* tail;
-	double val = strtod(buff, &tail);
+	double val = strtod(s.c_str(), &tail);
 	if (*tail != 0)
-		throw 0;
+		throw exception ("Can't read double.\n");
 	else
 		return val;
 }
 
-void parse_input_file(
-	FILE* inputfile,
+void parse_input_file (
+	std::ifstream& inputfile,
 	int& order, double& R0, double& ecstheta, double& Rmax,
 	rArray& rknots, rArray& cknots,
-	int& ni, int& maxnf,
-	int& minli, int& maxli, int& maxlf,
+	int& ni,
+	std::vector<std::tuple<int,int,int>>& instates,
+	std::vector<std::tuple<int,int,int>>& outstates,
 	int& L, int& maxell,
 	rArray& Ei, double& B
 ){
@@ -233,16 +246,16 @@ void parse_input_file(
 		R0 = read_dbl(inputfile);
 		Rmax = read_dbl(inputfile);
 		ecstheta = read_dbl(inputfile);
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check B-spline parameters.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check B-spline parameters.\n");
 	}
 	
-	std::fprintf(stdout, "\n-----   B-spline environment  -------\n");
-	std::fprintf(stdout, "order = %d\n", order);
-	std::fprintf(stdout, "R0 = %g\n", R0);
-	std::fprintf(stdout, "Rmax = %g\n", Rmax);
-	std::fprintf(stdout, "ecsθ = %g\n", ecstheta);
+	std::cout << "\n-----   B-spline environment  -------\n";
+	std::cout << "order = " << order << "\n";
+	std::cout << "R0 = " << R0 << "\n";
+	std::cout << "Rmax = " << "\n";
+	std::cout << "ecsθ = " << ecstheta << "\n";
 	
 	// load real knot data
 	std::vector<double> rknots_begin, rknots_end, rknots_samples;
@@ -253,9 +266,9 @@ void parse_input_file(
 			rknots_end.push_back(read_dbl(inputfile));
 		for (size_t i = 0; i < rknots_begin.size(); i++)
 			rknots_samples.push_back(read_dbl(inputfile));
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check real knot data.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check real knot data.\n");
 	}
 	
 	// construct real knot sequence
@@ -265,10 +278,10 @@ void parse_input_file(
 		rknots = concatenate(rknots, new_knots);
 	}
 	
-	std::fprintf(stdout, "\n----------   Real knots  ------------\n");
+	std::cout << "\n----------   Real knots  ------------\n";
 	for (auto knot = rknots.begin(); knot != rknots.end(); knot++)
-		std::fprintf(stdout, "%g  ", *knot);
-	std::fprintf(stdout, "\n");
+		std::cout << *knot << " ";
+	std::cout << std::endl;
 	
 	// load complex knot data
 	std::vector<double> cknots_begin, cknots_end, cknots_samples;
@@ -279,9 +292,9 @@ void parse_input_file(
 			cknots_end.push_back(read_dbl(inputfile));
 		for (size_t i = 0; i < cknots_begin.size(); i++)
 			cknots_samples.push_back(read_int(inputfile));
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check complex knot data.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check complex knot data.\n");
 	}
 	
 	// construct complex(-to-be) knot sequence
@@ -295,45 +308,97 @@ void parse_input_file(
 			)
 		);
 
-	std::fprintf(stdout, "\n---------  Complex knots  ------------\n");
+	std::cout << "\n---------  Complex knots  ------------\n";
 	for (auto knot = cknots.begin(); knot != cknots.end(); knot++)
-		std::fprintf(stdout, "%g  ", *knot);
-	std::fprintf(stdout, "\n");
+		std::cout << *knot << " ";
+	std::cout << std::endl;
 	
-	// load atomic states
+	// load initial principal quantum number
 	try {
 		ni = read_int(inputfile);
-		minli = read_int(inputfile);
-		maxli = read_int(inputfile);
-		maxnf = read_int(inputfile);
-		maxlf = read_int(inputfile);
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check atomic state data.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check \"ni\".\n");
+	}
+	
+	// load initial atomic angular states
+	std::vector<int> lis, mis;
+	int maxli = 0;
+	try {
+		while ((x = read_int(inputfile)) != -1.)
+		{
+			lis.push_back(x);
+			if (lis.back() >= ni)
+				throw exception("Input error: Angular momentum greater than \"ni\".\n");
+			if (lis.back() > maxli)
+				maxli = lis.back();
+		}
+		for (size_t i = 0; i < lis.size(); i++)
+		{
+			mis.push_back(read_int(inputfile));
+			if (std::abs(mis[i]) > lis[i])
+				throw exception("Input error: Magnetic number greater than \"li\".\n");
+			
+			instates.push_back(std::make_tuple(ni,lis[i],mis[i]));
+		}
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check initial atomic state data.\n");
+	}
+	
+	// load final atomic quantum numbers
+	std::vector<int> nfs, lfs;
+	int maxlf = 0;
+	try {
+		while ((x = read_int(inputfile)) != -1.)
+			nfs.push_back(x);
+		
+		for (size_t i = 0; i < nfs.size(); i++)
+		{
+			lfs.push_back(read_int(inputfile));
+			if (lfs[i] > nfs[i])
+				throw exception("Input error: Angular momentum greater than \"nf\".\n");
+			if (lfs[i] > maxlf)
+				maxlf = lfs[i];
+			
+			outstates.push_back(std::make_tuple(nfs[i],lfs[i],0));
+		}
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check final atomic state data.\n");
 	}
 	
 	// load total quantum numbers
 	try {
+		
 		L = read_int(inputfile);
 		maxell = read_int(inputfile);
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check angular momentum data.\n");
-		abort();
+		
+		if (maxell < maxli)
+			throw exception("Input error: ℓ is smaller than some initial angular momenta.\n");
+		
+		if (maxell < maxlf)
+			throw exception("Input error: ℓ is smaller than some final angular momenta.\n");
+			
+	} catch (std::exception e) {
+		
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check angular momentum data.\n");
+		
 	}
 	
-	std::fprintf(stdout, "\n----------  Angular momentum limits  -------------\n");
-	std::fprintf(stdout, "L = %d, ℓ = %d\n", L, maxell);
+	std::cout << "\n----------  Angular momentum limits  -------------\n";
+	std::cout << "L = " << L << ", ℓ = " << maxell << "\n";
 	
-	std::fprintf(stdout, "\n----------  Initial atomic states  -------------\n");
-	for (int li = (minli < 0) ? 0 : minli; li <= maxell and li < ni and (maxli < 0 or li <= maxli); li++)
-		fprintf(stdout, "[%d %d] ", ni, li);
-	std::fprintf(stdout, "\n");
+	std::cout << "\n----------  Initial atomic states  -------------\n";
+	for (auto state : instates)
+		std::cout << "[" << std::get<0>(state) << " " << std::get<1>(state) << " " << std::get<2>(state) << "] ";
+	std::cout << "\n";
 	
-	std::fprintf(stdout, "\n----------  Final atomic states  -------------\n");
-	for (int nf = 0; nf <= maxnf; nf++)
-		for (int lf = 0; lf <= maxell and lf < nf and (maxlf < 0 or lf <= maxlf); lf++)
-			std::fprintf(stdout, "[%d %d] ", nf, lf);
-	std::fprintf(stdout, "\n");
+	std::cout << "\n----------  Final atomic states  -------------\n";
+	for (auto state : outstates)
+		std::cout << "[" << std::get<0>(state) << " " << std::get<1>(state) << " " << std::get<2>(state) << "] ";
+	std::cout << "\n";
 	
 	// load initial energies
 	std::vector<double> Ei_begin, Ei_end, Ei_samples;
@@ -344,28 +409,27 @@ void parse_input_file(
 			Ei_end.push_back(read_dbl(inputfile));
 		for (size_t i = 0; i < Ei_begin.size(); i++)
 			Ei_samples.push_back(read_int(inputfile));
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check energy data.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check energy data.\n");
 	}
 	
 	// construct energy sequence
 	for (unsigned i = 0; i < Ei_begin.size(); i++)
 		Ei = concatenate(Ei, linspace(Ei_begin[i], Ei_end[i], Ei_samples[i]));
 	
-	std::fprintf(stdout, "\n---  Initial projectile energies  ----\n");
-	std::fprintf(stdout, "lowest energy: %g\n", Ei.front());
-	std::fprintf(stdout, "highest energy: %g\n", Ei.back());
-	std::fprintf(stdout, "total enegies: %ld\n", Ei.size());
+	std::cout << "\n---  Initial projectile energies  ----\n";
+	std::cout << "lowest energy: " << Ei.front() << "\n";
+	std::cout << "highest energy: " << Ei.back() << "\n";
+	std::cout << "total enegies: " << Ei.size() << "\n";
 	
 	try {
 		B = read_dbl(inputfile);
-		std::fprintf(stdout, "\n---------- Other parameters -----------\n");
-		std::fprintf(stdout, "magnetic field: %g a.u.\n", B);
-	} catch (...) {
-		std::fprintf(stderr, "Input error: Check magnetic field data.\n");
-		abort();
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check magnetic field data.\n");
 	}
 	
-	std::fprintf(stdout, "\n");
+	std::cout << "\n---------- Other parameters -----------\n";
+	std::cout << "magnetic field: " << B << " a.u.\n\n";
 }

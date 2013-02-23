@@ -9,7 +9,7 @@ LIBRARY = $(SUITESPARSELIBS) -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas 
 CFLAGS = -O3 -fopenmp -Wall -std=c++0x -fPIC $(INCLUDE) #-DHEX_USE_LU_SCRATCH
 LFLAGS = -O3 -fopenmp -fPIC $(LIBRARY)
 
-all: bin/hex bin/hex-mpi
+all: bin/hex 
 
 docu:
 	doxygen

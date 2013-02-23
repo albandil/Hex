@@ -16,6 +16,13 @@
 #include <exception>
 #include <cstdio>
 
+#include <limits>
+
+/// Infinity
+#define Inf (std::numeric_limits<double>::infinity())
+/// Not-a-number
+#define Nan (std::numeric_limits<double>::quiet_NaN())
+
 /**
  * Custom exception class with easy printf-like constructor.
  */

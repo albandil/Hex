@@ -221,6 +221,11 @@ template <typename NumberType> class Array
 			array = new_array;
 		}
 		
+		bool empty() const
+		{
+			return N == 0;
+		}
+		
 		//
 		// assignment operator from Array const reference
 		//

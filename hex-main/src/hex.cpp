@@ -17,6 +17,7 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+#include <tuple>
 
 #include <gsl/gsl_errno.h>
 #include <omp.h>
@@ -28,6 +29,7 @@
 #include "bspline.h"
 #include "complex.h"
 #include "input.h"
+#include "misc.h"
 #include "moments.h"
 #include "slater.h"
 #include "spmatrix.h"
@@ -48,18 +50,19 @@ int main(int argc, char* argv[])
 	gsl_set_error_handler_off();
 	
 	// variables that can be set by the user from the command line
-	FILE* inputfile = 0;					// input file
-	char* zipfile = 0;						// HDF solution expansion file to zip
-	int   zipcount = 0;						// zip sample count
+	std::ifstream inputfile;			// input file
+	std::string zipfile;				// HDF solution expansion file to zip
+	int   zipcount = 0;					// zip sample count
 	
 	// get input from command line
 	parse_command_line(argc, argv, inputfile, zipfile, zipcount);
 	
 	// check input file
-	if (inputfile == 0 and (inputfile = fopen("hex.inp", "r")) == 0)
+	if (not inputfile.is_open())
 	{
-		fprintf(stderr, "Input error: Cannot open the file \"hex.inp\".\n");
-		abort();
+		inputfile.open("hex.inp");
+		if (inputfile.bad())
+			throw exception("Input error: Cannot open the file \"hex.inp\".\n");
 	}
 	
 	// create main variables
@@ -67,28 +70,32 @@ int main(int argc, char* argv[])
 	double R0, Rmax, ecstheta;			// B-spline knot sequence
 	rArray real_knots;					// real knot sequence
 	rArray complex_knots;				// complex knot sequence
-	int ni, minli, maxli, maxnf, maxlf;	// atomic state parameters
+	int ni;								// atomic state parameters
 	int L;								// global conserved variables
 	int maxell;							// angular momentum limits
 	rArray Ei;							// energies in Rydbergs
 	double B = 0;						// magnetic field in a.u.
 	
+	// initial and final atomic states
+	std::vector<std::tuple<int,int,int>> instates, outstates;
+	
 	// get input from input file
-	parse_input_file(
+	parse_input_file (
 		inputfile, order, R0, ecstheta, Rmax,
-		real_knots, complex_knots, ni, maxnf, 
-		minli, maxli, maxlf,
+		real_knots, complex_knots, ni, 
+		instates, outstates,
 		L, maxell, Ei, B
 	);
 	
+	// is there something to compute?
+	if (Ei.empty() or instates.empty() or outstates.empty())
+	{
+		std::cout << "Nothing to compute.\n";
+		exit(0);
+	}
+	
 	// shorthand for total number of energies
 	unsigned Nenergy = Ei.size();
-	
-	// adjust angular momentum limits
-	if (minli < 0) minli = 0;
-	if (maxli < 0) maxli = maxell;
-	if (maxlf < 0) maxlf = maxell;
-	if (maxli >= ni) maxli = ni - 1;
 	
 	// projectile momenta, initial and final
 	std::vector<double> ki(Nenergy), kf(Nenergy);		// in a.u.
@@ -108,7 +115,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	if (zipfile != 0)
+	if (zipfile.size() != 0)
 	{
 		cArray sol;			// stored solution expansion
 		cArray ev;			// evaluated solution
@@ -116,14 +123,14 @@ int main(int argc, char* argv[])
 		
 		std::cout << "Zipping B-spline expansion of the solution: \"" << zipfile << "\"" << std::endl;
 		
-		sol.hdfload(zipfile);
+		sol.hdfload(zipfile.c_str());
 		grid = linspace(0., Rmax, zipcount + 1);
 		ev = zip (sol, grid, grid);
 		
 		// setup output filename
-		char outf1[3 + strlen(zipfile)], outf2[3 + strlen(zipfile)];
-		sprintf(outf1, "%s.re", zipfile);
-		sprintf(outf2, "%s.im", zipfile);
+		char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
+		sprintf(outf1, "%s.re", zipfile.c_str());
+		sprintf(outf2, "%s.im", zipfile.c_str());
 		
 		write_2D_data (
 			zipcount + 1,
@@ -474,9 +481,11 @@ int main(int argc, char* argv[])
 		// we may have already computed all solutions for this energy... is it so?
 		bool all_done = true;
 		for (int Spin = 0; Spin <= 1; Spin++)
-		for (int li = minli; li <= maxli; li++)
-		for (int mi = -li; mi <= li; mi++)
+		for (auto instate : instates)
 		{
+			int li = std::get<1>(instate);
+			int mi = std::get<2>(instate);
+			
 			// compose filename of the output file for this solution
 			std::ostringstream oss;
 			oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
@@ -555,18 +564,18 @@ int main(int argc, char* argv[])
 		// For all initial states ------------------------------------------- //
 		//
 		
-		for (int li = minli; li <= maxli; li++)
+		for (auto instate : instates)
 		{
+			int li = std::get<1>(instate);
+			int mi = std::get<2>(instate);
+			
 			// compute P-overlaps and P-expansion
 			cArray Pi_overlaps, Pi_expansion;
 			Pi_overlaps = overlapP(ni,li,weight_end_damp);
-			Pi_overlaps.hdfsave("Pi_overlaps_full.hdf");
 			Pi_expansion = S.solve(Pi_overlaps);
-			Pi_expansion.hdfsave("Pi_expansion.hdf");
 			CooMatrix Pi_coo(Nspline, 1, Pi_expansion.begin());
 			
 			for (int Spin = 0; Spin <= 1; Spin++)
-			for (int mi = -li; mi <= li; mi++)
 			{
 				// we may have already computed solution for this state and energy... is it so?
 				std::ostringstream cur_oss;
@@ -766,17 +775,17 @@ int main(int argc, char* argv[])
 				// save solution to disk
 				current_solution.hdfsave(cur_oss.str().c_str());
 				
-				if (ie == 0)
-				{
-					size_t N = 1001;
-					cArray psi = zip(current_solution, linspace(0., Rmax, N), linspace(0., Rmax, N));
-					std::ostringstream oss0;
-					oss0 << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".arr";
-					write_2D_data (
-						N, N, oss0.str().c_str(),
-						[ = ](size_t i, size_t j) -> double { return psi[i * N + j].real(); }
-					);
-				}
+// 				if (ie == 0)
+// 				{
+// 					size_t N = 1001;
+// 					cArray psi = zip(current_solution, linspace(0., Rmax, N), linspace(0., Rmax, N));
+// 					std::ostringstream oss0;
+// 					oss0 << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".arr";
+// 					write_2D_data (
+// 						N, N, oss0.str().c_str(),
+// 						[ = ](size_t i, size_t j) -> double { return psi[i * N + j].real(); }
+// 					);
+// 				}
 				
 			} // end of For mi, Spin
 		} // end of For li
@@ -814,11 +823,17 @@ int main(int argc, char* argv[])
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
 	for (int Spin = 0; Spin <= 1; Spin++)
-	for (int li = minli; li <= maxli; li++)
-	for (int mi = -li; mi <= li; mi++)
-	for (int nf = 1; nf <= maxnf; nf++)
-	for (int lf = 0; lf <= maxlf and lf < nf; lf++)
-		transitions.push_back(std::make_tuple(Spin,li,mi,nf,lf));
+	for (auto instate  : instates)
+	for (auto outstate : outstates)
+		transitions.push_back (
+			std::make_tuple (
+				Spin,
+				/*li*/ std::get<1>(instate),
+				/*mi*/ std::get<2>(instate),
+				/*nf*/ std::get<0>(outstate),
+				/*lf*/ std::get<1>(outstate)
+			)
+		);
 	
 	int finished = 0;
 	

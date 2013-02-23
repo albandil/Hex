@@ -13,12 +13,6 @@
 #ifndef HEX_SPECF
 #define HEX_SPECF
 
-#include <limits>
-	/// Infinity
-	#define Inf (std::numeric_limits<double>::infinity())
-	/// Not-a-number
-	#define Nan (std::numeric_limits<double>::quiet_NaN())
-
 #include <gsl/gsl_sf.h>
 	/// second power
 	#define sqr(x) (gsl_sf_pow_int((x),2))
