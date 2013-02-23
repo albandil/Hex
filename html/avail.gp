@@ -64,7 +64,7 @@ do for [line_index = 1:num_lines] {
 
 	# plot
 #	plot (x < minE || x > maxE) ? 0/0 : H ls maxL+1 notitle
-	set object line_index rect from minE,H-W to maxE,H+W fillcolor palette cb line_index
+	set object line_index rect from minE,H-W to maxE,H+W fillcolor palette cb maxL
 # 	plot line_index/10. lc palette cb line_index notitle
 }
 
