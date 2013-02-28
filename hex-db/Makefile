@@ -1,6 +1,8 @@
+.PHONY: all exe lib clean
+
 CPP = g++
 
-CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include
+CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include -fPIC
 LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
@@ -11,10 +13,14 @@ SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,lib/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
-all: bin/hex-db
+all: exe lib
 
 clean:
 	rm -f obj/*.o bin/hex-db*
+
+exe: bin/hex-db
+
+lib: bin/hex-db.so
 
 VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
@@ -27,6 +33,10 @@ bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variab
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
+bin/hex-db.so: obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o $(VARS_OBJECTS) $(SQLITEPP)
+	@mkdir -p $(@D)
+	$(CPP) $^ $(LFLAGS) -fPIC -shared -o $@
+
 # -----------------------------------------------------------------------------
 # Release
 
@@ -34,7 +44,7 @@ $(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arr
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 
-obj/ui.o: src/ui.cpp src/hex-db.h src/variables.h
+obj/ui.o: src/ui.cpp src/hex-db.h src/interfaces.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
 	
@@ -57,12 +67,12 @@ obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
 obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXRILIS) -c $< -o $@
-
+	
 # -----------------------------------------------------------------------------
 # SQLite++ library
 
 $(SQLITEPPOBJ) : obj/%.o : lib/sqlitepp/%.cpp
-	g++ -O2 -c $^ -o $@
+	g++ -O2 -fPIC -c $^ -o $@
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
 	ar cr $@ $^
