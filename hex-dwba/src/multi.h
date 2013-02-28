@@ -27,8 +27,9 @@
  *             \frac{r_<^\lambda}{r_>^{\lambda+1}} 
  *           - \frac{\delta_{\lambda 0}}{r_2} 
  *           - \delta_{\lambda 0} U_\alpha(r_2)
- *         \right) \psi_\alpha(r_1) \mathrm{d}r_1 \ .
+ *         \right) \psi_\alpha(r_1) \mathrm{d}r_1 
  * \f]
+ * as a result from direct integration.
  */
 class PhiFunctionDirIntegral : public RadialFunction<double>
 {
@@ -64,8 +65,9 @@ private:
  *             \frac{r_<^\lambda}{r_>^{\lambda+1}} 
  *           - \frac{\delta_{\lambda 0}}{r_2} 
  *           - \delta_{\lambda 0} U_\alpha(r_2)
- *         \right) \psi_\alpha(r_1) \mathrm{d}r_1 \ .
+ *         \right) \psi_\alpha(r_1) \mathrm{d}r_1 
  * \f]
+ * as a result of Chebyshev approximation of \ref PhiFunctionDirIntegral .
  */
 class PhiFunctionDir : public RadialFunction<double>
 {
@@ -92,9 +94,6 @@ private:
 	/// Save to a HDF file.
 	void save(std::string filename) const;
 	
-	/// Chebyshev approximation evaluated at infinity.
-	double Cb_inf;
-	
 	/// Truncation index of the Chebyshev approximation.
 	int Tail;
 	
@@ -110,8 +109,8 @@ private:
 	/// whether the integral is identical zero for all "x2"
 	bool Zero;
 	
-	/// integrand
-	PhiFunctionDirIntegral Integrand;
+	/// integranl
+	PhiFunctionDirIntegral Integral;
 	
 	/**
 		* Compactification of the function

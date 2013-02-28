@@ -103,7 +103,7 @@ bool load_array(rArray & vec, const char* name, double* pdelta)
 		H5::DataSet dset = h5file.openDataSet("data");
 		H5::DataSpace dspc = dset.getSpace();
 		size_t N = dspc.getSimpleExtentNpoints();
-		vec = std::vector<double>(N);
+		vec.resize(N);
 		dset.read(&vec[0], H5::PredType::NATIVE_DOUBLE, dspc, dspc);
 		
 		// load delta (if wanted)
@@ -133,7 +133,7 @@ bool load_array(cArray & vec, const char* name)
 		H5::DataSet dset = h5file.openDataSet("data");
 		H5::DataSpace dspc = dset.getSpace();
 		size_t N = dspc.getSimpleExtentNpoints();
-		vec = std::vector<Complex>(N/2);
+		vec.resize(N/2);
 		dset.read(reinterpret_cast<Complex*>(&vec[0]), H5::PredType::NATIVE_DOUBLE, dspc, dspc);
 		
 		return true;

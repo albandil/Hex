@@ -17,6 +17,7 @@
 #include <gsl/gsl_sf.h>
 
 #include "hydrogen.h"
+#include "specf.h"
 
 double Hydrogen::lastZeroBound(int n, int l)
 {
@@ -125,9 +126,14 @@ double Hydrogen::evalBoundState(int n, int l, double r)
 	double psi;
 	
 	try {
+		
 		psi = r*gsl_sf_hydrogenicR(n, l, 1., r);
+		
 	} catch (o2scl::exc_range_error e) {
+		
+		// probably due to the underflow error
 		return 0.;
+		
 	}
 	
 	return psi;
@@ -140,7 +146,7 @@ double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
 		return 0.;
 	
 	//normalization
-	double norm = sqrt(2./M_PI) / k;
+	double norm = sqrt(2./M_PI)/k;
 	
 	// some local variables
 	double F, exp_F;
@@ -151,14 +157,14 @@ double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
   		gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
 		return norm * F;
 		
-	} catch (std::exception & e) {
+	} catch (std::exception e) {
 		
 		// evaluation failed
 		
 		if (k * r > 1)
 		{
 			// probably due to "iteration process out of control" for large radii
-			return F_asy(l, k, r, sigma);
+			return F_asy(l, k, r, (finite(sigma) ? sigma : F_sigma(l,k)));
 		}
 		else
 		{
@@ -171,15 +177,25 @@ double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
 	}
 }
 
+double Hydrogen::evalFreeStatePhase(double k, int l, double sigma)
+{
+	return l * 0.5 * M_PI + (finite(sigma) ? sigma : F_sigma(l,k));
+}
+
 double Hydrogen::evalSturmian(int n, int l, double r, double lambda)
 {
 	double S;
 	
 	try {
+		
 		S = n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
 			* exp(-lambda*r) * pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
+		
 	} catch (o2scl::exc_range_error e) {
+		
+		// probably due to the underflow error
 		return 0.;
+		
 	}
 	
 	return S;

@@ -526,6 +526,7 @@ public:
 			}
 			else
 			{
+				/* do nothing */
 			}
 
 			// save function evaluations and sum

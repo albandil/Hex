@@ -14,13 +14,21 @@
 #define HEX_INTERPOLATE
 
 #include <algorithm>
-#include <limits>
+
 #include "arrays.h"
 
 #define INTERPOLATE_AUTO	-1
 #define INTERPOLATE_LINEAR	0
 #define INTERPOLATE_CSPLINE	1
 
+/**
+ * \brief Return interpolated values.
+ * 
+ * Returns an array of interpolates of the array y0 for every value of x.
+ * \param x0 X-values for the discrete samples.
+ * \param y0 Discrete samples
+ * \param x  Evaluation (interpolation) points.
+ */
 template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & y0, rArray const & x)
 {
 	// output array

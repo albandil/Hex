@@ -74,10 +74,10 @@ PhiFunctionDir::PhiFunctionDir (
 	int lam, 
 	DistortingPotential const & U, 
 	HydrogenFunction const & psi
-) : Cb_inf(0.), Lam(lam), U(U), Diag(psin == psi), 
+) : Lam(lam), U(U), Diag(psin == psi), 
 	Zero(lam == 0 and Diag and (DistortingPotential(psi) == U)),
-	Integrand(psin,lam,psi),
-	CompactIntegral(Integrand,0.,false)
+	Integral(psin,lam,psi),
+	CompactIntegral(Integral,0.,false)
 {
 	if (Zero)
 		return;
@@ -102,9 +102,6 @@ PhiFunctionDir::PhiFunctionDir (
 	
 	// get optimal truncation index
 	Tail = CompactIntegralCb.tail(1e-10);
-	
-	// evaluate Phi at positive infinity
-	Cb_inf = CompactIntegralCb.clenshaw(1., Tail);
 }
 
 double PhiFunctionDir::operator() (double x) const
@@ -113,9 +110,9 @@ double PhiFunctionDir::operator() (double x) const
 		return 0.;
 	
 	if (Lam == 0 and Diag)
-		return Cb_inf - CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail) - U.plusMonopole(x);
+		return CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail) - U.plusMonopole(x);
 	
-	return Cb_inf - CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
+	return CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
 }
 
 std::string PhiFunctionDir::name(HydrogenFunction const & psin, int lam, HydrogenFunction const & psi)

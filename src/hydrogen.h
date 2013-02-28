@@ -56,10 +56,28 @@ public:
 	//@}
 	
 	/**
-	 * Evaluate free state (Coulomb wave function) \f$ F_{kl}(r) \f$.
+	 * Evaluate free state
+	 * \f[
+	 *     \psi_{\mathbf{k}lm}(\mathbf{r}) = \frac{1}{k} \sqrt{\frac{2}{\pi}} F_l(k,r) 
+	 * 			Y_{lm} (\mathbf{\hat{r}})
+	 * 			Y_{lm}^\ast(\mathbf{\hat{k}})
+	 * \f]
+	 * Use precomputed value of the Coulomb phase shift "sigma" if available.
+	 * Complete wave function is further modified by a complex unit factor,
+	 * \f[
+	 *     \Psi_{\mathbf{k}lm}(\mathbf{r}) = \mathrm{i}^l 
+	 * 			\mathrm{e}^{\mathrm{i}\sigma_l(k)}
+	 * 			\psi_{\mathbf{k}lm}(\mathbf{r}) \ .
+	 * \f]
+	 * The missing phase (as a real number) can be retrieved by \ref evalFreeStatePhase .
+	 */
+	static double evalFreeState(double k, int l, double r, double sigma = Nan);
+	
+	/**
+	 * Evaluate phase of the free state function.
 	 * Use precomputed value of the Coulomb phase shift "sigma" if available.
 	 */
-	static double evalFreeState(double k, int l, double r, double sigma = std::numeric_limits<double>::quiet_NaN());
+	static double evalFreeStatePhase(double k, int l, double sigma = Nan);
 	
 	/**
 	 * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.

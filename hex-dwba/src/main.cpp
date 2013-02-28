@@ -24,6 +24,30 @@
 
 int main(int argc, char *argv[])
 {
+/// DEBUG
+// 	DistortingPotential U(1);
+// 	
+// 	int ll = atoi(argv[1]);
+// 	
+// 	DistortedWave phi = U.getDistortedWave(2.,ll);
+// 	IrregularWave eta = U.getIrregularWave(2.,ll);
+// 	HyperbolicWave theta = U.getHyperbolicWave(2.,ll);
+// 	ForbiddenWave zeta = U.getForbiddenWave(2.,ll);
+// 	
+// 	for (int ix = 1; ix < 1000; ix++)
+// 	{
+// 		double x = ix * 0.01;
+// 		
+// 		std::cout
+// 			<< x << "\t"
+// 			<< phi(x) << "\t"
+// 			<< eta(x).real() << "\t"
+// 			<< theta(x) << "\t"
+// 			<< zeta(x) << "\n";
+// 	}
+// 	
+// 	exit(0);
+	
 // 	gsl_set_error_handler_off();
 	
 	if (argc != 8)

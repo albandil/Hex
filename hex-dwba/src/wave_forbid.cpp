@@ -30,17 +30,8 @@
 // -------------------------------------------------------------------------- //
 
 ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U)
+	: Evaluations(0), U(_U), kn(_kn), ln(_ln)
 {
-	kn = _kn;
-	ln = _ln;
-	U = _U;
-	
-	this->kn = _kn;
-	this->ln = _ln;
-	this->U = _U;
-	
-	Evaluations = 0;
-	
 	// get far coordinate
 	double r = U.getFarRadius();
 	
@@ -49,17 +40,14 @@ ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U
 	h = r / (samples - 1);	// grid step
 	
 	// create grid
-	grid = rArray(samples);
+	grid.resize(samples);
 	for (int i = 0; i < samples; i++)
-		grid[i] = h * i;
-	
-	// create auxiliary complex arrry
-	cArray carray(samples);
+		grid[i] = i * h;
 	
 	// look for relevant data
 	char filename[50];
 	sprintf(filename, "dwf-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
-	if (not load_array(carray, filename))
+	if (not load_array(array, filename))
 	{
 		// prepare derivative callback MFPTR-wrapper
 		o2scl::ode_funct_mfptr<ForbiddenWave> derivs(this, &ForbiddenWave::derivs);
@@ -70,31 +58,55 @@ ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U
 		adapt_stepper.set_step(stepper);
 		
 		// data arrays
-		o2scl::ovector xg(samples-1);
-		o2scl::omatrix yg(samples-1,2), ypg(samples-1,2), yerrg(samples-1,2);
+		o2scl::ovector xg(samples);
+		o2scl::omatrix yg(samples,2), ypg(samples,2), yerrg(samples,2);
 		
 		// create grid
-		for (int i = 0; i < samples - 1; i++)
-			xg[i] = h * (i + 1);
+		for (int i = 0; i < samples; i++)
+			xg[i] = h * (samples - i - 1);
 		
-		// set RIGHT boundary condition
-		yg[0][0] = h;	// FIXME
-		yg[0][1] = h;	// FIXME
+		// set FAR RIGHT boundary condition
+		yg[0][0] =  ric_k_scaled(ln,kn*r);
+		yg[0][1] = dric_k_scaled(ln,kn*r) * kn;
 		
 		// solve
-		solve2(xg, samples, h, yg, ypg, yerrg, adapt_stepper, derivs, NORMALIZE_ON_OVERFLOW);
+		int nx = solve2(xg, samples, -h, yg, ypg, yerrg, adapt_stepper, derivs, RETURN_ON_OVERFLOW);
+		
+		// match modified irregular Riccati-Bessel function of the second kind
+		if (nx != samples)
+		{
+			// matching grid point for ζ
+			double rx = xg[nx];
+			
+			// evaluate "k" for the purpose of determining the scaling factor
+			double eval_k = ric_k_scaled(ln,kn*rx);
+			
+			// scaling factor
+			double scale = yg[nx][0] / eval_k;
+			
+			// scale "k" for the rest of the solutions
+			for (int i = nx + 1; i < samples - 1; i++)
+			{
+				double r = xg[i];
+				eval_k = ric_k_scaled(ln,kn*r);
+				
+				// scale "k"
+				yg[i][0] = scale * eval_k;
+			}
+		}
+		
+		// copy array to class storage
+		array = rArray(samples);
+		array[0] = 0.;
+		for (int i = 1; i < samples; i++)
+			array[i] = yg[samples-i-1][0];
 		
 		// save for recyclation
-		save_array(carray, filename);
-	}
-	else
-	{
-		// TODO
+		save_array(array, filename);
 	}
 	
 	// setup the interpolator
-	this->interpolator_re.set(grid, array_re, array_re.size());
-	this->interpolator_im.set(grid, array_im, array_im.size());
+	this->interpolator.set(grid, array, array.size());
 }
 
 ForbiddenWave ForbiddenWave::operator=(ForbiddenWave const & W)
@@ -103,13 +115,11 @@ ForbiddenWave ForbiddenWave::operator=(ForbiddenWave const & W)
 	ln = W.ln;
 	U = W.U;
 	grid = W.grid;
-	array_re = W.array_re;
-	array_im = W.array_im;
+	array = W.array;
 	samples = W.samples;
 	h = W.h;
 	
-	interpolator_re.set(grid, array_re, array_re.size());
-	interpolator_im.set(grid, array_im, array_im.size());
+	interpolator.set(grid, array, array.size());
 	
 	return *this;
 }
@@ -117,30 +127,24 @@ ForbiddenWave ForbiddenWave::operator=(ForbiddenWave const & W)
 int ForbiddenWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
 {
 	dydx[0] = y[1];
-	dydx[1] = (x == 0.) ? 0. : (kn*kn + 2.*U(x) + ln*(ln+1)/(x*x)) * y[0];
+	dydx[1] = (x == 0.) ? 0. : (2.*U(x) + ln*(ln+1)/(x*x)) * y[0] + 2*kn*y[1];
 	return 0;
 }
 
-void ForbiddenWave::toFile(const char* filename) const
-{
-	int N = array_re.size();
-	cArray array(N);
-	for (int i = 0; i < N; i++)
-		array[i] = Complex(array_re[i], array_im[i]);
-	
-	write_array(grid, array, filename);
-}
-
-Complex ForbiddenWave::operator()(double x) const
+double ForbiddenWave::operator()(double x) const
 {
 	if (x > grid.back())
 		
 		// extrapolate
-		return pow(Complex(0.,1.),ln+1) * ric_i(ln,kn*x) + pow(Complex(0.,1.),-ln) * 2. / M_PI * ric_k(ln,kn*x);
+		return ric_k(ln,kn*x);
 	
 	else
 		
 		// interpolate
-		return Complex(interpolator_re.interp(x), interpolator_im.interp(x));
+		return interpolator.interp(x) * exp(-kn*x);
 }
 
+void ForbiddenWave::toFile(const char* filename) const
+{
+	write_array(grid, array, filename);
+}

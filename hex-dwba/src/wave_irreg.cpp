@@ -29,22 +29,6 @@
 //                                                                            //
 // -------------------------------------------------------------------------- //
 
-IrregularWave IrregularWave::operator=(const IrregularWave& W)
-{
-	U = W.U;
-	kn = W.kn;
-	ln = W.ln;
-	samples = W.samples;
-	h = W.h;
-	array_im = W.array_im;
-	array_re = W.array_re;
-	
-	interpolator_im.set(W.grid, W.array_im, W.array_im.size());
-	interpolator_re.set(W.grid, W.array_re, W.array_re.size());
-	
-	return *this;
-}
-
 IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U)
 	: Evaluations(0), U(_U), kn(_kn), ln(_ln)
 {
@@ -85,19 +69,11 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		
 		// create grid
 		for (int i = 0; i < samples; i++)
-		{
 			xg[i] = h * (samples - i - 1);
-			y1g[i][0] = y1g[i][1] = 0.;
-			y2g[i][0] = y2g[i][1] = 0.;
-			y1pg[i][0] = y1pg[i][1] = 0.;
-			y2pg[i][0] = y2pg[i][1] = 0.;
-			y1errg[i][0] = y1errg[i][1] = 0.;
-			y2errg[i][0] = y2errg[i][1] = 0.;
-		}
 		
 		// set (right) boundary conditions from asymptotics of Riccati-Bessel function
-		y1g[0][0] = -ric_n(ln,kn*xg[0]);			// Re η(R)
-		y1g[0][1] = -kn*dric_n(ln,kn*xg[0]);		// Re η'(R)
+		y1g[0][0] = -ric_n(ln,kn*xg[0]);		// Re η(R)
+		y1g[0][1] = -kn*dric_n(ln,kn*xg[0]);	// Re η'(R)
 		y2g[0][0] = ric_j(ln,kn*xg[0]);			// Im η(R)
 		y2g[0][1] = kn*dric_j(ln,kn*xg[0]);		// Im η'(R)
 		
@@ -125,12 +101,10 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 			if (err != GSL_SUCCESS and err != GSL_ELOSS)
 			{
 				// if an error was encountered (other than loss of accuracy)
-				fprintf (
-					stderr,
-					"[distort_irregular_allowed] Error %d (\"%s\") while evaluating G[%d](%g,%g).\n",
+				throw exception (
+					"[IrregularWave] Error %d (\"%s\") while evaluating G[%d](%g,%g).\n",
 					err, gsl_strerror(err), ln, kn, rx
 				);
-				abort();
 			}
 			else
 			{
@@ -193,21 +167,6 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 			array[i] = Complex(array_re[i], array_im[i]);
 		}
 		
-		// remove the harmonic asymptotic tail
-// 		for (int i = samples - 1; i > 0; i--)
-// 		{
-// 			double asy_re = -ric_n(ln,kn*grid[i]);
-// 			double asy_im =  ric_j(ln,kn*grid[i]);
-// 			if (fabs(array_re[i] - asy_re) > 1e-10 or fabs(array_im[i] - asy_im) > 1e-10)
-// 			{
-// 				grid.resize(i + 1);
-// 				array_re.resize(i + 1);
-// 				array_im.resize(i + 1);
-// 				array.resize(i + 1);
-// 				break;
-// 			}
-// 		}
-		
 		save_array(array, etaname);
 	}
 	else
@@ -224,6 +183,22 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 	// setup the interpolator
 	this->interpolator_re.set(grid, array_re, array_re.size());
 	this->interpolator_im.set(grid, array_im, array_im.size());
+}
+
+IrregularWave IrregularWave::operator=(const IrregularWave& W)
+{
+	U = W.U;
+	kn = W.kn;
+	ln = W.ln;
+	samples = W.samples;
+	h = W.h;
+	array_im = W.array_im;
+	array_re = W.array_re;
+	
+	interpolator_im.set(W.grid, W.array_im, W.array_im.size());
+	interpolator_re.set(W.grid, W.array_re, W.array_re.size());
+	
+	return *this;
 }
 
 int IrregularWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)

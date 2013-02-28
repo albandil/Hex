@@ -129,6 +129,59 @@ void DWBA2::DWBA2_energy_driver (
 	// set Green's function distorting potential
 	DistortingPotential Ug(1);	// = U(1s)
 	
+	
+	
+	/// DEBUG
+	{
+		for (int Nn = 1; Nn <= 20; Nn++)
+		{
+			// get intermediate state
+			HydrogenFunction psin(Nn,Ln);
+			
+			// compute contribution from this discrete intermediate state
+			Complex cDD_Nn;
+			DWBA2::DWBA2_En (
+				Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf,
+				psii, psif, psin,
+				Ui, Uf, Ug,
+				chii, chif,
+				cDD_Nn
+			);
+			
+			std::cerr << -1./(Nn*Nn) << "\t" << cDD_Nn.real() << "\t" << cDD_Nn.imag() << "\n";
+		}
+		
+		double min_Kn = 0;						// just after ionization
+		double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
+		
+		for (int i = 1; i < 25; i++)
+		{
+			double Kn = min_Kn + (max_Kn - min_Kn) * (i / 25.);
+			
+			// get intermediate state
+			HydrogenFunction psin(Kn,Ln);
+			
+			// compute amplitude
+			Complex dd;
+			DWBA2::DWBA2_En (
+				Ei, Ni, Kn*Kn, Ln, lami, lamf,
+				psii, psif, psin,
+				Ui, Uf, Ug,
+				chii, chif,
+				dd
+			);
+			
+			dd *= Kn * Kn;
+			
+			std::cerr << Kn*Kn << "\t" << dd.real() << "\t" << dd.imag() << "\n";
+		}
+	}
+	exit(0);
+	///
+	
+	
+	
+	
 	// sum over discrete intermadiate states
 	for (int Nn = 1; ; Nn++)
 	{

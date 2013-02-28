@@ -72,6 +72,17 @@ template <typename NumberType> class Array
 				array[i] = x;
 		}
 		
+		// constructor, copies a length-n "array
+		Array(size_t n, NumberType* x) : N(n)
+		{
+			// reserve space
+			array = new NumberType [N];
+					
+			// set to zero
+			for (size_t i = 0; i < N; i++)
+				array[i] = x[i];
+		}
+		
 		// copy constructor from Array const reference
 		Array(Array<NumberType> const & a)
 		{

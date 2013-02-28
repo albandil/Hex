@@ -13,9 +13,11 @@
 #ifndef HEX_SPECF
 #define HEX_SPECF
 
+#include <cmath>
 #include <gsl/gsl_sf.h>
-	/// second power
-	#define sqr(x) (gsl_sf_pow_int((x),2))
+
+/// second power
+#define sqr(x) (gsl_sf_pow_int((x),2))
 
 #include "complex.h"
 #include "arrays.h"
@@ -29,36 +31,50 @@
 
 /**
  * \brief Ricatti-Bessel function of the first kind, \f$ \hat{j}_n(x) \f$.
+ * 
+ * \f$ \hat{j}_0(x) = \sin x \f$
  */
 #define ric_j(n,x)			((x)*gsl_sf_bessel_jl(n,x))
 /**
  * \brief Ricatti-Bessel function of the second kind, \f$ \hat{y}_n(x) \f$.
+ * 
+ * \f$ \hat{n}_0(x) = \cos x \f$
  */
 #define ric_n(n,x)			((x)*gsl_sf_bessel_yl(n,x))
 /**
  * \brief Scaled modified Ricatti-Bessel function of the first kind, \f$ \mathrm{e}^{-x} \hat{i}_n(x) \f$.
+ * 
+ * \f$ \mathrm{e}^{-x} \hat{i}_0(x) = \mathrm{e}^{-x} \sinh x \f$
  */
 #define ric_i_scaled(n,x)	((x)*gsl_sf_bessel_il_scaled(n,x))
 /**
  * \brief Scaled modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^x \hat{k}_n(x) \f$.
+ * 
+ * \f$ \mathrm{e}^{x} \hat{k}_0(x) = 1 \f$.
  */
-#define ric_k_scaled(n,x)	((x)*gsl_sf_bessel_kl_scaled(n,x))
+#define ric_k_scaled(n,x)	((x)*gsl_sf_bessel_kl_scaled(n,x)*2./M_PI)
 /**
  * \brief Modified Ricatti-Bessel function of the first kind, \f$ \hat{i}_n(x) \f$.
+ * 
+ * \f$ \hat{i}_0(x) = \sinh x \f$
  */
-#define ric_i(n,x)			(exp(fabs(x))* ric_i_scaled(n,x))
+#define ric_i(n,x)			(exp( x) * ric_i_scaled(n,x))
 /**
  * \brief Modified Ricatti-Bessel function of the second kind, \f$ \hat{k}_n(x) \f$.
+ * 
+ * \f$ \hat{k}_0(x) = \mathrm{e}^{-x} \f$.
  */
-#define ric_k(n,x)			(exp(-x)     * ric_k_scaled(n,x))
+#define ric_k(n,x)			(exp(-x) * ric_k_scaled(n,x))
 /**
  * \brief Ricatti-Hankel function of the first kind, \f$ \hat{h}_n^{(+)}(x) \f$.
+ * 
+ * \f$ \hat{h}_0^{(+)}(x) = -\mathrm{i} \exp (\mathrm{i}x) \f$.
  */
-#define ric_h_plus(n,x) 	Complex( ric_n(n,x), ric_j(n,x))
+#define ric_h_plus(n,x) 	Complex(ric_j(n,x), ric_n(n,x))
 /**
  * \brief Derivative of Ricatti-Hankel function of the first kind, \f$ {\hat{h}_n^{(+)}}'(x) \f$.
  */
-#define dric_h_plus(n,x)	Complex(dric_n(n,x),dric_j(n,x))
+#define dric_h_plus(n,x)	Complex(dric_j(n,x),dric_n(n,x))
 
 /**
  * \brief Spherical harmonic function.
@@ -66,13 +82,7 @@
 Complex sphY(int l, int m, double theta, double phi);
 
 /**
- * \brief Base class for radial distorted functions.
- * 
- * This class serves as a heritage base for
- * \ref DistortingPotential,
- * \ref DistortedWave,
- * \ref HydrogenFunction
- * and others.
+ * \brief Base class for real functions.
  */
 template <typename T> class RadialFunction
 {
@@ -105,47 +115,47 @@ inline double dric_n(int n, double x)
 }
 
 /**
- * \brief Scaled derivative of modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^{-x} \hat{i}_n'(x) \f$.
- */
-inline double dric_i_scaled(int n, double x)
-{
-	if (n == 0)
-		return 0.5 * (1 + exp(-2*x)); // = exp(-x) cosh(x)
-	
-	return gsl_sf_bessel_il_scaled(n,x) + (n * ric_i_scaled(n-1,x) - (n+1) * ric_i_scaled(n+1,x)) / (2*n+1);
-}
-
-/**
- * \brief Scaled derivative of modified Ricatti-Bessel function of the second kind, \f$ \hat{i}_n'(x) \f$.
+ * \brief Derivative of the modified Ricatti-Bessel function of the second kind, \f$ \hat{i}_n'(x) \f$.
  */
 inline double dric_i(int n, double x)
 {
 	if (n == 0)
 		return cosh(x);
 	
-	return exp(fabs(x)) * (gsl_sf_bessel_il_scaled(n,x) + (n * ric_i_scaled(n-1,x) - (n+1) * ric_i_scaled(n+1,x)) / (2*n+1));
+	return exp(x) * (gsl_sf_bessel_il_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1));
 }
 
 /**
- * \brief Scaled derivative of modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^x \hat{k}_n'(x) \f$.
- */
-inline double dric_k_scaled(int n, double x)
-{
-	if (n == 0)
-		return 1/x;
-	
-	return gsl_sf_bessel_kl_scaled(n,x) + (n * ric_k_scaled(n-1,x) - (n+1) * ric_k_scaled(n+1,x)) / (2*n+1);
-}
-
-/**
- * \brief Derivative of modified Ricatti-Bessel function of the second kind, \f$ \hat{k}_n'(x) \f$.
+ * \brief Derivative of the modified Ricatti-Bessel function of the second kind, \f$ \hat{k}_n'(x) \f$.
  */
 inline double dric_k(int n, double x)
 {
 	if (n == 0)
-		return exp(-x)/x;
+		return -exp(-x);
 	
-	return exp(-x) * (gsl_sf_bessel_kl_scaled(n,x) + (n * ric_k_scaled(n-1,x) - (n+1) * ric_k_scaled(n+1,x)) / (2*n+1));
+	return -exp(-x) * (gsl_sf_bessel_kl_scaled(n,x) + (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1));
+}
+
+/**
+ * \brief Derivative of scaled modified Ricatti-Bessel function of the second kind, \f$ (\mathrm{e}^{-x} \hat{i}_n(x))' \f$.
+ */
+inline double dric_i_scaled(int n, double x)
+{
+	if (n == 0)
+		return exp(-2*x);
+	
+	return exp(-x) * (dric_i(n,x) - ric_i(n,x));
+}
+
+/**
+ * \brief Scaled derivative of modified Ricatti-Bessel function of the second kind, \f$ (\mathrm{e}^x \hat{k}_n(x)) \f$.
+ */
+inline double dric_k_scaled(int n, double x)
+{
+	if (n == 0)
+		return 0;
+	
+	return exp(x) * (dric_k(n,x) + ric_k(n,x));
 }
 
 /**

@@ -34,6 +34,9 @@ bool DistortingPotential::operator== (DistortingPotential const & V) const
 
 double DistortingPotential::operator() (double x) const
 {
+	if (n == 0 and k == 0)
+		return 0.;
+	
 	if (n == 1)
 		return -(1.+1./x)*exp(-2.*x);
 	
