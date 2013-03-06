@@ -54,7 +54,7 @@
 	</table>
 	</center>
 
-	<table width = "100%"><tr><td valign = "top" width = "50%">
+	<table width = "100%" style = "table-layout:fixed;"><tr><td valign = "top" width = "50%">
 
 	<div class = "sekce">Input:</div>
 
