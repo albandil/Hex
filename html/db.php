@@ -31,7 +31,7 @@
 	
 	<link rel="icon" type="image/gif" href="hexe-small.gif" />
 	
-	<style>
+	<style type="text/css">
 		<!-- @import "style.css"; -->
 	</style>
 </head>
@@ -45,7 +45,7 @@
 	<center>
 	<table border = "0">
 		<tr><td>
-			<a href = "index.html"><img src = "hexe.gif"/></a>
+			<a href = "index.html"><img src = "hexe.gif" border = "0" alt = "logo"/></a>
 		</td><td>
 			<div class = "nadpis">Hex</div>
 			
@@ -109,9 +109,9 @@
 			{
 				printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tnf = <input type = \"number\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
-				printf("\t\t\tlf = <input type = \"number\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
-				printf("\t\t\tmf = <input type = \"number\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
+				printf("\t\t\tnf = <input type = \"text\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+				printf("\t\t\tlf = <input type = \"text\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+				printf("\t\t\tmf = <input type = \"text\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
 				printf("\t\t</center>\n");
 			}
 		?>
@@ -121,8 +121,8 @@
 			{
 				printf("\t\t<div class = \"text\">Set global quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tE = <input type = \"number\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-				printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+				printf("\t\t\tE = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+				printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
 			else if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
@@ -137,16 +137,16 @@
 				{
 					case "scatamp":
 					case "dcs":
-						printf("\t\t\tE = <input type = \"number\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\tE = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "momtf":
-						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "ics":
 					case "colls":
-						printf("\t\t\tL = <input type = \"number\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
-						printf("\t\t\tS = <input type = \"number\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\tL = <input type = \"text\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
+						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 				}
 				printf("\t\t</center>\n");
@@ -301,7 +301,7 @@
 	</td></tr><tr><td colspan="2" width = "100%">
 		<center>
 			<div class = "sekce">Available data:</div>
-			<div class = "output"><img src = "avail.png"/></div>
+			<div class = "output"><img src = "avail.png" alt = "avail.png"/></div>
 		</center>
 	</td></tr></table>
 
