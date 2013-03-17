@@ -99,9 +99,9 @@
 
 		<div class = "text">Set initial atomic state(s):</div>
 		<center>
-			ni = <input type = "number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
-			li = <input type = "number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
-			mi = <input type = "number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
+			ni = <input type = "text" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
+			li = <input type = "text" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
+			mi = <input type = "text" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
 		</center>
 		
 		<?php
