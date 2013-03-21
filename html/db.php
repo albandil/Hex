@@ -1,17 +1,4 @@
 <?php
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2013                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
 	if (isset($_POST["download"]))
 	{
 		header("Content-Type: text/plain");
@@ -34,6 +21,16 @@
 	<style type="text/css">
 		<!-- @import "style.css"; -->
 	</style>
+
+	<script type="text/x-mathjax-config">
+		MathJax.Hub.Config({
+			extensions: ["tex2jax.js"],
+			jax: ["input/TeX","output/HTML-CSS"],
+// 			tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+		});
+	</script>
+
+	<script src="http://www.mathjax.org/mathjax/MathJax.js"></script>
 </head>
  
 <body>
@@ -97,11 +94,38 @@
 			</select>
 		</center>
 
+		<div class = "text">Choose units:</div>
+		<center>
+			<span class = "text">Energy: <select name = "Eunits">
+				<option value = "Ry" <?php
+					if (!isset($_POST["Eunits"]) or $_POST["Eunits"] == "Ry")
+						echo "selected = \"selected\"";
+					?> >Rydberg</option>
+				<option value = "a.u." <?php
+					if (isset($_POST["Eunits"]) and $_POST["Eunits"] == "a.u.")
+						echo "selected = \"selected\"";
+					?> >Hartree (a.u.)</option>
+				<option value = "eV" <?php
+					if (isset($_POST["Eunits"]) and $_POST["Eunits"] == "eV")
+						echo "selected = \"selected\"";
+					?> >eV</option>
+			</select> ,  Output: <select name = "Tunits">
+				<option value = "a.u." <?php
+					if (!isset($_POST["Tunits"]) or $_POST["Tunits"] == "a.u.")
+						echo "selected = \"selected\"";
+					?> >a.u.</option>
+				<option value = "cgs" <?php
+					if (isset($_POST["Tunits"]) and $_POST["Tunits"] == "cgs")
+						echo "selected = \"selected\"";
+					?> >cgs</sup></option>
+			</select>
+		</center>
+
 		<div class = "text">Set initial atomic state(s):</div>
 		<center>
-			ni = <input type = "text" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
-			li = <input type = "text" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
-			mi = <input type = "text" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
+			\(n_i\) = <input type = "text" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
+			\(l_i\) = <input type = "text" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
+			\(m_i\) = <input type = "text" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
 		</center>
 		
 		<?php
@@ -109,9 +133,9 @@
 			{
 				printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tnf = <input type = \"text\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
-				printf("\t\t\tlf = <input type = \"text\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
-				printf("\t\t\tmf = <input type = \"text\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
+				printf("\t\t\t\\(n_f\\) = <input type = \"text\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+				printf("\t\t\t\\(l_f\\) = <input type = \"text\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+				printf("\t\t\t\\(m_f\\) = <input type = \"text\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
 				printf("\t\t</center>\n");
 			}
 		?>
@@ -121,8 +145,8 @@
 			{
 				printf("\t\t<div class = \"text\">Set global quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tE = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-				printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+				printf("\t\t\t\\(E\\) = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+				printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
 			else if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
@@ -137,16 +161,16 @@
 				{
 					case "scatamp":
 					case "dcs":
-						printf("\t\t\tE = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(E\\) = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "momtf":
-						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "ics":
 					case "colls":
-						printf("\t\t\tL = <input type = \"text\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
-						printf("\t\t\tS = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(L\\) = <input type = \"text\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 				}
 				printf("\t\t</center>\n");
@@ -158,9 +182,9 @@
 			{
 				printf("\t\t<div class = \"text\">Set angular range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tθmin = <input type = \"text\" name = \"thmin\" size = \"5\" value = \"%s\"/>\n", $_POST["thmin"]);
-				printf("\t\t\tθmax = <input type = \"text\" name = \"thmax\" size = \"5\" value = \"%s\"/>\n", $_POST["thmax"]);
-				printf("\t\t\tΔθ = <input type = \"text\" name = \"dth\" size = \"5\" value = \"%s\"/>\n", $_POST["dth"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" name = \"thmin\" size = \"5\" value = \"%s\"/>\n", $_POST["thmin"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" name = \"thmax\" size = \"5\" value = \"%s\"/>\n", $_POST["thmax"]);
+				printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" name = \"dth\" size = \"5\" value = \"%s\"/>\n", $_POST["dth"]);
 				printf("\t\t</center>\n");
 			}
 		?>
@@ -169,11 +193,33 @@
 			if (!isset($_POST["qty"]) or $_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
 				or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 			{
+				// unit transform
+				$Eunits = 1.;
+				if (isset($_POST["Eunits"]))
+				{
+					switch ($_POST["Eunits"])
+					{
+						case "au":
+							$Eunits = 0.5;
+							break;
+						case "eV":
+							$Eunits = 13.605692;
+							break;
+						default:
+							break;
+					}
+				}
+				
+				// default energies in Rydberg units
+				$Emin_def = 0.65 * $Eunits;
+				$Emax_def = 0.85 * $Eunits;
+				$DE_def = 0.001 * $Eunits;
+				
 				printf("\t\t<div class = \"text\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\tEmin = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : 0.65);
-				printf("\t\t\tEmax = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : 0.85);
-				printf("\t\t\tΔE = <input type = \"text\" name = \"dE\" size = \"5\" value = \"%s\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : 0.001);
+				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : $Emin_def);
+				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : $Emax_def);
+				printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" name = \"dE\" size = \"5\" value = \"%s\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : $DE_def);
 				printf("\t\t</center>\n");
 			}
 		?>
@@ -183,6 +229,14 @@
 		<?php
 			include "hexdbexe.inc";	// defines $hexdbexe
 			include "hexdbdat.inc";	// defines $hexdbdat
+			
+			// units
+			$strEunits = "Ry";
+			if (isset($_POST["Eunits"]))
+				$strEunits = $_POST["Eunits"];
+			$strTunits = "a.u.";
+			if (isset($_POST["Tunits"]))
+				$strTunits = $_POST["Tunits"];
 			
 			if (isset($_POST["qty"]) and isset($_POST["view"]))
 			{
@@ -197,6 +251,9 @@
 				if (isset($_POST["E"])) $hexcmdline = $hexcmdline . " --Ei=" . $_POST["E"];
 				if (isset($_POST["L"])) $hexcmdline = $hexcmdline . " --L=" . $_POST["L"];
 				if (isset($_POST["S"])) $hexcmdline = $hexcmdline . " --S=" . $_POST["S"];
+				
+				$hexcmdline = $hexcmdline . " --Eunits=" . $strEunits;
+				$hexcmdline = $hexcmdline . " --Tunits=" . $strTunits;
 				
 				// compute standard input for Hex-db (energies or angles)
 				if ($_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
@@ -248,7 +305,8 @@
 
 	</td><td valign = "top" width = "50%">
 
-	<div class = sekce>Output:</div>
+	<div class = "sekce">Output:</div>
+	<div class = "text">This section contains a graphical preview of selected data.</div>
 
 	<?php
 		if (isset($_POST["qty"]) and (isset($_POST["view"]) or isset($_POST["download"])))
@@ -263,6 +321,16 @@
 			// write to Gnuplot standard input
 			fwrite($pipes2[0], "set terminal png size 500,300\n");
 			fwrite($pipes2[0], "unset key\n");
+			fwrite($pipes2[0], "set xlabel \"Ei [" . $strEunits . "]\"\n");
+			
+			if ($_POST["qty"] == "colls")
+				fwrite($pipes2[0], "set ylabel \"omega\"\n");
+			else
+				fwrite($pipes2[0], "set ylabel \"" . $_POST["qty"] . " [" . $strTunits . "]\"\n");
+			
+			if (isset($_POST["Tunits"]) and $_POST["Tunits"] == "cgs")
+				fwrite($pipes2[0], "set format y '%g'\n");
+				
 			if ($_POST["qty"] == "scatamp")
 			{
 				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
@@ -301,7 +369,29 @@
 	</td></tr><tr><td colspan="2" width = "100%">
 		<center>
 			<div class = "sekce">Available data:</div>
+			<div class = "text">
+				This section contains a graphical representation of data stored in the database
+				at the moment. For every initial atomic state (vertical axis) the blue boxes
+				show energy intervals (horizontal axis) covered by the data. In the (hopefully
+				not so far) future all initial states will be covered completely with sufficient
+				precision. Until that time one can use this chart as a simple measure
+				of trusworthiness of the datasets. The darker the colour, the more partial waves
+				have been included in the computation. A very simple way of how to verify that a
+				particular chunk of energies has been computed with final precision is to compare
+				"complete" and "extrapolated" cross section. If these two cross sections match,
+				they ought to be reliable. The scattering amplitude may still not be converged,
+				though, even in that case. The comparison is being served by default when
+				the extrapolated cross section is requested: The resulting text file will
+				contain both the "extrapolated" (\(\sigma_x\)) and the "complete" (\(\sigma_c\))
+				cross section.
+			</div>
 			<div class = "output"><img src = "avail.png" alt = "avail.png"/></div>
+			<div class = "text">
+				If your preview plot of a cross section contains a suspicious drop or rise,
+				it may be a consequence of insufficient partial wave count. For the technical
+				details on the computational settings that were used to produce the data see the
+				<a href = "database.html">database</a> page.
+			</div>
 		</center>
 	</td></tr></table>
 
