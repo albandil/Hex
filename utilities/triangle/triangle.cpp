@@ -16,6 +16,12 @@ int triangles (int maxl, int L)
 
 int main (int argc, char *argv[])
 {
+	if (argc < 3)
+	{
+		std::cout << "Use: triangle <max L> <max ell>\n";
+		return 0;
+	}
+	
 	int MaxL = atoi(argv[1]);
 	int MaxEll = atoi(argv[2]);
 	
