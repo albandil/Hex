@@ -39,10 +39,15 @@ std::string const & ScatteringAmplitude::SQL_CreateTable() const
 }
 
 bool ScatteringAmplitude::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & angles
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -52,7 +57,7 @@ bool ScatteringAmplitude::run (
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "Ei", Id);
+	double E = As<double>(sdata, "Ei", Id) * efactor;
 	
 	// the scattering amplitudes
 	cArray amplitudes(angles.size());
@@ -140,10 +145,10 @@ bool ScatteringAmplitude::run (
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Scattering amplitudes for\n"
+		"# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
-	    "#     S = " << S << ", E = " << E << "\n"
+	    "#     S = " << S << ", E = " << E/efactor << unit_name(Eunits) << "\n"
 	    "# ordered by angle in radians\n"
 		"# \n"
 	    "# θ\t Re f\t Im f\n";
@@ -151,8 +156,8 @@ bool ScatteringAmplitude::run (
 	{
 		std::cout << 
 			angles[i] << "\t" << 
-			amplitudes[i].real() << "\t" <<
-			amplitudes[i].imag() << "\n";
+			amplitudes[i].real() * lfactor << "\t" <<
+			amplitudes[i].imag() * lfactor << "\n";
 	}
 	
 	return true;

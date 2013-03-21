@@ -23,13 +23,15 @@ std::string HelpText =
 	"Options:\n"
 	"  --help            Display this information.\n"
 	"  --new             Create new database.\n"
-	"  --database <name> Use database <name> instead of default \"hex.db\".\n"
-	"  --import <file>   Import SQL batch file.\n"
+	"  --database=<name> Use database <name> instead of default \"hex.db\".\n"
+	"  --import=<file>   Import SQL batch file.\n"
 	"  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
 	"  --<var>           Compute/retrieve scattering variable <var>.\n"
 	"  --vars            Display all available scattering variables.\n"
-	"  --<param> <val>   Set scattering parameter <param> to the value <val>.\n"
-	"  --params <var>    Display all available scattering parameters for variable <var>.\n"
+	"  --<param>=<val>   Set scattering parameter <param> to the value <val>.\n"
+	"  --params=<var>    Display all available scattering parameters for variable <var>.\n"
+	"  --Eunits=<Eunits> Set units for energy: Ry, a.u. or eV.\n"
+	"  --Tunits=<Tunits> Set units for output: a.u. or cgs.\n"
 	"\n"
 	"Usage examples:\n"
 	"\n"
@@ -120,6 +122,10 @@ int main(int argc, char* argv[])
 	// used scattering event data
 	std::map<std::string,std::string> sdata;
 	
+	// units
+	eUnit Eunits = eUnit_Ry;
+	lUnit Lunits = lUnit_au;
+	
 	// for all argv-s
 	for (int i = 1; i < argc; i++)
 	{
@@ -146,7 +152,7 @@ int main(int argc, char* argv[])
 				std::cout << "(name)\t\t(description)" << std::endl;
 				for (Variable const * var : vlist)
 					std::cout << var->id() << "\t\t" << var->description() << std::endl;
-				},
+			},
 			"params",   1, [ & ](std::string opt) -> void {
 				VariableList::const_iterator it = std::find_if (
 					vlist.begin(),
@@ -173,6 +179,30 @@ int main(int argc, char* argv[])
 						std::cout << "\n\"theta\" is to be specified using STDIN.\n";
 					else if (Ei_present)
 						std::cout << "\n\"Ei\" is to be specified using STDIN.\n";
+				}
+			},
+			"Eunits",   1, [ & ](std::string opt) -> void { 
+				if (opt == std::string("Ry"))
+					Eunits = eUnit_Ry;
+				else if (opt == std::string("a.u."))
+					Eunits = eUnit_au;
+				else if (opt == std::string("eV"))
+					Eunits = eUnit_eV;
+				else
+				{
+					std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+					abort();
+				}
+			},
+			"Tunits",   1, [ & ](std::string opt) -> void {
+				if (opt == std::string("a.u."))
+					Lunits = lUnit_au;
+				else if (opt == std::string("cgs"))
+					Lunits = lUnit_cgs;
+				else
+				{
+					std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+					abort();
 				}
 			},
 			/* default*/ [ & ](std::string arg, std::string par) -> bool {
@@ -253,5 +283,5 @@ int main(int argc, char* argv[])
 	}
 	
 	// retrieve all requested data
-	return run (vars, sdata, nums);
+	return run (Eunits, Lunits, vars, sdata, nums);
 }

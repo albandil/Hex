@@ -149,6 +149,7 @@ void update ()
 }
 
 int run (
+	eUnit Eunits, lUnit Lunits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & nums)
@@ -168,7 +169,7 @@ int run (
 		}
 		
 		// try to compute the results
-		if (not var->run(db, sdata, nums))
+		if (not var->run(Eunits, Lunits, db, sdata, nums))
 		{
 			// this can easily happen
 			std::cerr << "Computation of \"" << varname << "\" failed." << std::endl;

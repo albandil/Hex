@@ -39,10 +39,15 @@ std::string const & TotalCrossSection::SQL_CreateTable() const
 }
 
 bool TotalCrossSection::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -72,17 +77,17 @@ bool TotalCrossSection::run (
 	}
 	
 	// interpolate
-	rArray tcs = interpolate(E_arr, sigma_arr, energies);
+	rArray tcs = interpolate(E_arr, sigma_arr, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Total cross section for\n"
+		"# Total cross section in " << unit_name(Lunits) << " for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << "\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 	    "#\n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << tcs[i] << "\n";
+		std::cout << energies[i] << "\t" << tcs[i]*lfactor*lfactor << "\n";
 	
 	return true;
 }

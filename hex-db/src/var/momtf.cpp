@@ -41,10 +41,15 @@ std::string const & MomentumTransfer::SQL_Update() const
 }
 
 bool MomentumTransfer::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);
@@ -143,19 +148,19 @@ bool MomentumTransfer::run (
 	eta *= 1. / (4. * M_PI * M_PI);
 	
 	// interpolate
-	eta = interpolate(eta_energies, eta, energies);
+	eta = interpolate(eta_energies, eta, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Momentum transfer for\n" <<
+		"# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
 	    "#     S = " << S << "\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 		"#\n" <<
 	    "# E\t η\n";
 	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << eta[i] << "\n";
+		std::cout << energies[i] << "\t" << eta[i]*lfactor*lfactor << "\n";
 	
 	return true;
 }

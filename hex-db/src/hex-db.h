@@ -206,10 +206,24 @@
  * </pre>
  */
 
+/// Energy units
+enum eUnit {
+	eUnit_Ry,	// Rydberg (13.605692 eV, default)
+	eUnit_au,	// Hartree (2 Ry)
+	eUnit_eV	// electron-Volt
+};
+
+/// Output (length) units
+enum lUnit {
+	lUnit_au,	// atomic units (Bohr radius a₀=5.29x10⁻⁹ cm)
+	lUnit_cgs	// centimeters (1 cm = (1cm/a₀) a₀)
+};
+
 /**
  * Run the computations.
  */
 int run (
+	eUnit Eunits, lUnit lUnits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & nums

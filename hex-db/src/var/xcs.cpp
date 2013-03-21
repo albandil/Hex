@@ -39,10 +39,15 @@ std::string const & ExtrapolatedCrossSection::SQL_Update() const
 }
 
 bool ExtrapolatedCrossSection::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -127,7 +132,7 @@ bool ExtrapolatedCrossSection::run (
 	}
 	
 	// compute complete cross section
-	rArray ccs = interpolate(Efull, sigmafull, energies);
+	rArray ccs = interpolate(Efull, sigmafull, energies * efactor);
 	
 	// reshape arrays for compatible indexing by energies
 	rArray dsigma0empty(dsigma0.size());	// zero-filled ghost
@@ -142,18 +147,18 @@ bool ExtrapolatedCrossSection::run (
 	sigmafull -= dsigma0 * dsigma0 / (dsigma0 - dsigma1);
 	
 	// interpolate
-	rArray xcs = interpolate(Efull, sigmafull, energies);
+	rArray xcs = interpolate(Efull, sigmafull, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Extrapolated and complete cross section for\n" <<
+		"# Extrapolated and complete cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 		"#\n" <<
 	    "# E\t σx\t σc\n";
 	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << xcs[i] << "\t" << ccs[i] << "\n";
+		std::cout << energies[i] << "\t" << xcs[i]*lfactor*lfactor << "\t" << ccs[i]*lfactor*lfactor << "\n";
 	
 	return true;
 }

@@ -55,10 +55,15 @@ std::string const & TMatrix::SQL_Update() const
 }
 
 bool TMatrix::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);
@@ -102,23 +107,23 @@ bool TMatrix::run (
 	}
 	
 	// interpolate
-	cArray T_out = interpolate(E_arr, T_arr, energies);
+	cArray T_out = interpolate(E_arr, T_arr, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# T-matrices for\n" <<
+		"# T-matrices in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
 	    "#     L = " << L << ", S = " << S << ", ℓ = " << ell << "\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 	    "# \n" <<
 	    "# E\t Re T\t Im T\n";
 	for (size_t i = 0; i < energies.size(); i++)
 	{
 		std::cout << 
 			energies[i] << "\t" << 
-			T_out[i].real() << "\t" <<
-			T_out[i].imag() << "\n";
+			T_out[i].real()*lfactor << "\t" <<
+			T_out[i].imag()*lfactor << "\n";
 	}
 	
 	return true;

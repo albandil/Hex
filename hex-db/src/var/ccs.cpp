@@ -54,10 +54,15 @@ std::string const & CompleteCrossSection::SQL_Update() const
 }
 
 bool CompleteCrossSection::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -93,18 +98,18 @@ bool CompleteCrossSection::run (
 	}
 	
 	// interpolate
-	rArray ccs = interpolate(E_arr, sigma_arr, energies);
+	rArray ccs = interpolate(E_arr, sigma_arr, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Complete cross section for\n" <<
+		"# Complete cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 	    "# \n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << (finite(ccs[i]) ? ccs[i] : 0.) << "\n";
+		std::cout << energies[i] << "\t" << (finite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << "\n";
 	
 	return true;
 }

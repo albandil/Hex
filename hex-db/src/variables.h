@@ -20,6 +20,37 @@
 #include <sqlitepp/sqlitepp.hpp>
 
 #include "arrays.h"
+#include "hex-db.h"
+
+/**
+ * \brief Energy units change.
+ * 
+ * Returns factor that can be used to transform from the unit system A
+ * to the unit system B.
+ */
+double change_units(eUnit A, eUnit B);
+
+/**
+ * \brief Lengths units change.
+ * 
+ * Returns factor that can be used to transform from the unit system A
+ * to the unit system B.
+ */
+double change_units(lUnit A, lUnit B);
+
+/**
+ * \brief Energy unit name.
+ * 
+ * Return energy unit name as string.
+ */
+std::string unit_name(eUnit u);
+
+/**
+ * \brief Length unit name.
+ * 
+ * Return length unit name as string.
+ */
+std::string unit_name(lUnit u);
 
 /**
  * \brief Convert dictionary entry to a numeric type.
@@ -87,6 +118,7 @@ public:
 	
 	/// write out requested data
 	virtual bool run (
+		eUnit Eunits, lUnit Lunits,
 		sqlitepp::session & db,
 		std::map<std::string,std::string> const & data1,
 		rArray const & data2
@@ -162,6 +194,7 @@ private:
 		std::string const & SQL_Update() const; \
 \
 		bool run ( \
+			eUnit Eunits, lUnit Lunits, \
 			sqlitepp::session & db, \
 			std::map<std::string,std::string> const & data1, \
 			rArray const & data2 \

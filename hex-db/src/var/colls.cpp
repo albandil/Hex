@@ -42,10 +42,15 @@ std::string const & CollisionStrength::SQL_Update() const
 }
 
 bool CollisionStrength::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -86,15 +91,15 @@ bool CollisionStrength::run (
 	}
 	
 	// interpolate
-	rArray omegas = energies * (2*L+1) * (2*S+1) * interpolate(E_arr, sigma_arr, energies);
+	rArray omegas = energies * (2*L+1) * (2*S+1) * interpolate(E_arr, sigma_arr, energies * efactor) * efactor;
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Collision strength for\n"
+		"# Collision strength (dimensionless) for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
 	    "#     L = " << L << ", S = " << S << "\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 	    "# \n" <<
 	    "# E\t Ω\n";
 	for (size_t i = 0; i < energies.size(); i++)

@@ -58,10 +58,15 @@ std::string const & IntegralCrossSection::SQL_Update() const
 }
 
 bool IntegralCrossSection::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & energies
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -102,19 +107,19 @@ bool IntegralCrossSection::run (
 	}
 	
 	// interpolate
-	rArray ics = interpolate(E_arr, sigma_arr, energies);
+	rArray ics = interpolate(E_arr, sigma_arr, energies * efactor);
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Integral cross section for\n" <<
+		"# Integral cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
 	    "#     L = " << L << ", S = " << S << "\n" <<
-	    "# ordered by energy in Rydbergs\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 		"#\n" <<
 	    "# E\t σ\n";
 	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << ics[i] << "\n";
+		std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\n";
 	
 	return true;
 }

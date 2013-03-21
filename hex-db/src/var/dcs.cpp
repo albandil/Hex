@@ -41,10 +41,15 @@ const std::string & DifferentialCrossSection::SQL_Update() const
 }
 
 bool DifferentialCrossSection::run (
+	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
 	rArray const & angles
 ) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -54,7 +59,7 @@ bool DifferentialCrossSection::run (
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "Ei", Id);
+	double E = As<double>(sdata, "Ei", Id) * efactor;
 	double ki = sqrt(E);
 	double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
 	
@@ -132,13 +137,14 @@ bool DifferentialCrossSection::run (
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Differential cross section for \n" <<
+		"# Differential cross section in " << unit_name(Lunits) << " for \n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-	    "#     S = " << S << ", E = " << E << " ordered by angle in radians\n" <<
+	    "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits)
+		             << " ordered by angle in radians\n" <<
 	    "# θ\t dσ\n";
 	for (size_t i = 0; i < angles.size(); i++)
-		std::cout << angles[i] << "\t" << dcs[i] << "\n";
+		std::cout << angles[i] << "\t" << dcs[i]*lfactor*lfactor << "\n";
 	
 	return true;
 }
