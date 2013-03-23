@@ -28,7 +28,7 @@
 
 #define EPS_CONTRIB 1e-8
 
-void DWBA2::DWBA2_Ln (
+void DWBA2_Ln (
 	double Ei, int li, int lf, double ki, double kf, 
 	int Ni, int Nf, int Li, int Lf, int Ln,
 	DistortingPotential const & Ui,
@@ -74,7 +74,7 @@ void DWBA2::DWBA2_Ln (
 		Complex DD_N_prev = 0;
 		
 		// compute energy sum/integral
-		DWBA2::DWBA2_energy_driver (
+		DWBA2_energy_driver (
 			Ei, li, lf, ki, kf, 
 			Ni, Nf, Li, Lf, Ln,
 			lami, lamf, 
@@ -112,7 +112,7 @@ void DWBA2::DWBA2_Ln (
 	DD_lf_li_Ln *= factor;
 }
 
-void DWBA2::DWBA2_energy_driver (
+void DWBA2_energy_driver (
 	double Ei, int li, int lf, double ki, double kf, 
 	int Ni, int Nf, int Li, int Lf, int Ln,
 	int lami, int lamf, 
@@ -129,134 +129,107 @@ void DWBA2::DWBA2_energy_driver (
 	// set Green's function distorting potential
 	DistortingPotential Ug(1);	// = U(1s)
 	
-	
-	
-	/// DEBUG
-	{
-		for (int Nn = 1; Nn <= 20; Nn++)
-		{
-			// get intermediate state
-			HydrogenFunction psin(Nn,Ln);
-			
-			// compute contribution from this discrete intermediate state
-			Complex cDD_Nn;
-			DWBA2::DWBA2_En (
-				Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf,
-				psii, psif, psin,
-				Ui, Uf, Ug,
-				chii, chif,
-				cDD_Nn
-			);
-			
-			std::cerr << -1./(Nn*Nn) << "\t" << cDD_Nn.real() << "\t" << cDD_Nn.imag() << "\n";
-		}
-		
-		double min_Kn = 0;						// just after ionization
-		double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
-		
-		for (int i = 1; i < 25; i++)
-		{
-			double Kn = min_Kn + (max_Kn - min_Kn) * (i / 25.);
-			
-			// get intermediate state
-			HydrogenFunction psin(Kn,Ln);
-			
-			// compute amplitude
-			Complex dd;
-			DWBA2::DWBA2_En (
-				Ei, Ni, Kn*Kn, Ln, lami, lamf,
-				psii, psif, psin,
-				Ui, Uf, Ug,
-				chii, chif,
-				dd
-			);
-			
-			dd *= Kn * Kn;
-			
-			std::cerr << Kn*Kn << "\t" << dd.real() << "\t" << dd.imag() << "\n";
-		}
-	}
-	exit(0);
-	///
-	
-	
-	
-	
-	// sum over discrete intermadiate states
-	for (int Nn = 1; ; Nn++)
-	{
-		// info
-		std::cout << "---------------------------------------\n";
-		std::cout << "(discrete loop) Nn = " << Nn << "\n";
+	// computes contribution from a discrete state
+	auto DiscreteContribution = [ & ](int Nn) -> Complex {
 		
 		// get intermediate state
 		HydrogenFunction psin(Nn,Ln);
 		
 		// compute contribution from this discrete intermediate state
-		Complex cDD_Nn;
-		DWBA2::DWBA2_En (
+		Complex contrib;
+		DWBA2_En (
 			Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf,
 			psii, psif, psin,
 			Ui, Uf, Ug,
 			chii, chif,
-			cDD_Nn
+			contrib
 		);
 		
-		// update sums
-		cDD += cDD_Nn;
+		std::cerr << -1./(Nn*Nn) << "\t" << contrib.real() << "\t" << contrib.imag() << "\n";
 		
-		std::cout << "cDD_Nn = " << cDD_Nn << ", cDD = " << cDD << " [" << std::abs(cDD_Nn)/std::abs(cDD) << "]" << std::endl;
-		
-		// check convergence
-		if (std::abs(cDD_Nn) < EPS * std::abs(cDD))
-			break;
-	}
+		return contrib;
+	};
 	
-	// integrate over intermediate continuum using Clenshaw-Curtis quadrature
-	//  - only integrate over allowed energies
-	//  - disable recurrence for maximal reuse of evaluations
-	
-	double min_Kn = 0;						// just after ionization
-	double max_Kn = sqrt(Ei - 1./(Ni*Ni));	// all energy of the projectile
-	
-	// integrand
-	auto DD_integrand = [&](double Kn) -> Complex {
+	// computes contribution density from a continuum state
+	auto ContinuumContribution = [ & ](double Kn) -> Complex {
 		
-		std::cout << "---------------------------------------\n";
-		std::cout << "(continuum loop) Kn = " << Kn << "\n";
-		
-		if (Kn == 0.)
+		if (Kn == 0. or not finite(Kn))
 			return Complex(0.);
 		
 		// get intermediate state
 		HydrogenFunction psin(Kn,Ln);
 		
 		// compute amplitude
-		Complex dd;
-		DWBA2::DWBA2_En (
+		Complex contrib;
+		DWBA2_En (
 			Ei, Ni, Kn*Kn, Ln, lami, lamf,
 			psii, psif, psin,
 			Ui, Uf, Ug,
 			chii, chif,
-			dd
+			contrib
 		);
 		
-		std::cout << "(continuum loop) Kn = " << Kn << ", dd = " << dd << "\n";
+		std::cerr << Kn*Kn << "\t" << Kn*Kn*contrib.real() << "\t" << Kn*Kn*contrib.imag() << "\n";
 		
-		return dd;
-		
+		return contrib * Kn * Kn;
 	};
 	
+	// compactification of the previous function
+	CompactificationR<decltype(ContinuumContribution),Complex>
+		compact(ContinuumContribution, 0., false, 1.0);
+	
+
+#if 0
+	for (int Nn = 1; Nn <= 20; Nn++)
+		DiscreteContribution(Nn);
+		
+	
+	for (double Kn = 0; Kn < 5; Kn += 0.01)
+		compact(compact.scale(Kn));
+	
+	exit(0);
+#endif
+		
+	
+	// sum over discrete intermadiate states
+	for (int Nn = 1; ; Nn++)
+	{
+		// update sums
+		Complex contrib = DiscreteContribution(Nn);
+		cDD += contrib;
+		
+		if (std::abs(contrib) < EPS * std::abs(cDD))
+			break;
+	}
+	
+	std::cout << "Discrete DD: " << cDD << "\n";
+	
+	// integrate over intermediate continuum using Clenshaw-Curtis quadrature
+	//  - disable recurrence for maximal reuse of evaluations
+	
 	// integration system
-	ClenshawCurtis<decltype(DD_integrand),Complex> QDD(DD_integrand);
+	ClenshawCurtis<decltype(ContinuumContribution),Complex> QDD(ContinuumContribution);
 	QDD.setLim(false);
 	QDD.setRec(false);
 	QDD.setEps(1e-5);
+	QDD.setVerbose(false);
+	
+	// integrate over allowed region
+	Complex DD_allowed = QDD.integrate(0., sqrt(Ei - 1./(Ni*Ni)));
+	cDD += DD_allowed;
+	
+	std::cout << "Allowed continuum DD: " << DD_allowed << "\n";
 	QDD.setVerbose(true);
-	cDD += QDD.integrate(min_Kn, max_Kn);
+	
+	// integrate over forbidden region
+	double momentum_cutoff = 10;
+	Complex DD_forbidden = QDD.integrate(sqrt(Ei - 1./(Ni*Ni)), momentum_cutoff);
+	cDD += DD_forbidden;
+	
+	std::cout << "Forbidden continuum DD: " << DD_forbidden << "\n";
 }
 
-void DWBA2::DWBA2_En (
+void DWBA2_En (
 	double Ei, int Ni,
 	double Eatn, int ln,
 	int lami, int lamf,
@@ -268,67 +241,43 @@ void DWBA2::DWBA2_En (
 	DistortingPotential const & Ug,
 	DistortedWave const & chii,
 	DistortedWave const & chif,
-	Complex & DD
+	Complex & tmat
 ) {
-	// get projectile wave number
-	double kn = sqrt(Ei - 1./(Ni*Ni) - Eatn);	std::cout << "kn = " << kn << std::endl;
+	std::cout << "\nDWBA_En\n-------\n\tEatn = " << Eatn << "\n";
 	
-	// construct Green's function parts
-	DistortedWave gphi = Ug.getDistortedWave(kn,ln);	std::cout << "gphi OK\n";
-	IrregularWave geta = Ug.getIrregularWave(kn,ln);	std::cout << "geta OK\n";
+	// get projectile wave number
+	double kn_sqr = Ei - 1./(Ni*Ni) - Eatn;
+	double kn = sqrt(std::abs(kn_sqr));
 	
 	// construct direct inner integrals
-	PhiFunctionDir phii(psin, lami, Ui, psii);	std::cout << "phii OK\n";
-	PhiFunctionDir phif(psin, lamf, Uf, psif);	std::cout << "phif OK\n";
+	PhiFunctionDir phii(psin, lami, Ui, psii);	std::cout << "\tphii OK\n";
+	PhiFunctionDir phif(psin, lamf, Uf, psif);	std::cout << "\tphif OK\n";
 	
-	// get integration upper bound
-	double fari = 5. * psii.far(1e-8);
-	double farf = 5. * psif.far(1e-8);
-	
-	// Green's function integrand
-	auto integrand = [&](double r1) -> Complex {
+	// allowed/forbidden regime
+	if (kn_sqr > 0)
+	{
+		std::cout << "\tAllowed regime, kn = " << kn << "\n";
 		
-		// inner integrand variations
-		
-		auto integrand1 = [&](double r2) -> Complex {
-			return gphi(r2) * phii(r2) * chii(r2);
-		};
-		auto integrand2 = [&](double r2) -> Complex {
-			if (not finite(r2))
-				return 0.;
-			return geta(r2) * phii(r2) * chii(r2);
-		};
-		
-		// integration systems
-		
-		ClenshawCurtis<decltype(integrand1),Complex> Q1(integrand1);
-		Q1.setLim(false);
-		Q1.setRec(false);
-		Q1.setEps(1e-7);
-		
-		ClenshawCurtis<decltype(integrand2),Complex> Q2(integrand2);
-		Q2.setLim(false);
-		Q2.setRec(false);
-		Q2.setEps(1e-7);
+		// construct Green's function parts
+		DistortedWave gphi = Ug.getDistortedWave(kn,ln);	std::cout << "\tgphi OK\n";
+		IrregularWave geta = Ug.getIrregularWave(kn,ln);	std::cout << "\tgeta OK\n";
 		
 		// integrate
+		tmat = GreensFunctionIntegral(chif, phif, psif, gphi, geta, psii, phii, chii, false);
+	}
+	else
+	{
+		std::cout << "\tForbidden regime, kn = " << kn << "\n";
 		
-		Complex q1 = Q1.integrate(0., std::min(r1,fari));
-		Complex q2 = Q2.integrate(std::min(r1,fari), fari);
+		// construct Green's function parts
+		HyperbolicWave gtheta = Ug.getHyperbolicWave(kn,ln);	std::cout << "\tgtheta OK\n";
+		ForbiddenWave gzeta = Ug.getForbiddenWave(kn,ln);	std::cout << "\tgzeta OK\n";
 		
-		// evaulate outer integrand
+		// return only scaled values
+		gtheta.scale(true);
+		gzeta.scale(true);
 		
-		return phif(r1) * (geta(r1) * q1 + gphi(r1) * q2);
-	};
-	
-	// outer integration system
-	ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
-	Q.setLim(false);
-	Q.setRec(false);
-	Q.setEps(1e-5);
-	
-	std::cout << "[DWBA2_En] Green's integral\n";
-	
-	// integrate
-	DD = Q.integrate(0., farf);
+		// integrate
+		tmat = GreensFunctionIntegral(chif, phif, psif, gtheta, gzeta, psii, phii, chii, true);
+	}
 }

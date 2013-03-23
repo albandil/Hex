@@ -73,6 +73,8 @@ public:
 	
 	void toFile(const char * filename) const;
 	
+	void scale(bool s);
+	
 	mutable unsigned Evaluations;
 	
 private:
@@ -100,6 +102,8 @@ private:
 	
 	/// samples
 	rArray array;
+	
+	bool Scaled;
 };
 
 #endif

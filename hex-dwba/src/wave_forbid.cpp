@@ -30,7 +30,7 @@
 // -------------------------------------------------------------------------- //
 
 ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U)
-	: Evaluations(0), U(_U), kn(_kn), ln(_ln)
+	: Evaluations(0), U(_U), kn(_kn), ln(_ln), Scaled(false)
 {
 	// get far coordinate
 	double r = U.getFarRadius();
@@ -136,15 +136,20 @@ double ForbiddenWave::operator()(double x) const
 	if (x > grid.back())
 		
 		// extrapolate
-		return ric_k(ln,kn*x);
+		return Scaled ? ric_k_scaled(ln,kn*x) : ric_k(ln,kn*x);
 	
 	else
 		
 		// interpolate
-		return interpolator.interp(x) * exp(-kn*x);
+		return Scaled ? interpolator.interp(x) : interpolator.interp(x) * exp(-kn*x);
 }
 
 void ForbiddenWave::toFile(const char* filename) const
 {
 	write_array(grid, array, filename);
+}
+
+void ForbiddenWave::scale(bool s)
+{
+	Scaled = s;
 }

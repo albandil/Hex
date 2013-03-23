@@ -40,18 +40,18 @@ static const double p[g+2] = {
 
 Complex gamma(Complex z)
 {
-        if (real(z) < 0.5)
-        {
-                 return pi / (sin(pi*z) * gamma(1. - z));
-        }
-         z -= 1.;
-        Complex x = p[0];
-        for (int i = 1; i < g + 2; i++)
-        {
-                x += p[i] / (z + Complex(i,0));
-        }
-        Complex t = z + (g + 0.5);
-        return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
+	if (real(z) < 0.5)
+	{
+		return pi / (sin(pi*z) * gamma(1. - z));
+	}
+	z -= 1.;
+	Complex x = p[0];
+	for (int i = 1; i < g + 2; i++)
+	{
+			x += p[i] / (z + Complex(i,0));
+	}
+	Complex t = z + (g + 0.5);
+	return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
 }
 
 double F_sigma(int l, double k)

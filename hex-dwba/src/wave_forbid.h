@@ -51,6 +51,8 @@ public:
 	 */
 	void toFile(const char * filename) const;
 	
+	void scale(bool s);
+	
 	/// (debuging parameter) number of evaluations
 	mutable unsigned Evaluations;
 	
@@ -79,6 +81,8 @@ private:
 	
 	/// samples
 	rArray array;
+	
+	bool Scaled;
 };
 
 #endif

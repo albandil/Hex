@@ -53,7 +53,7 @@ obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/multi.o: src/multi.cpp src/multi.h src/chebyshev.h src/compact.h src/specf.h
+obj/multi.o: src/multi.cpp src/multi.h src/chebyshev.h src/compact.h src/specf.h src/hydrogen.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

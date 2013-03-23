@@ -508,7 +508,8 @@ public:
 			for (int twok = 2; twok < N; twok += 2)
 				sum -= coefs[twok] / (twok*twok - 1.);
 			
-			if (Verbose) std::cout << "[ClenshawCurtis_ff] Sum = " << sum << "\n";
+			if (Verbose)
+				std::cout << "[ClenshawCurtis_ff] N = " << N << ", Sum = " << sum << "\n";
 			
 			// check convergence
 			if (std::abs(sum - FType(2.) * sum_prev) <= EpsRel * std::abs(sum))
@@ -534,9 +535,19 @@ public:
 			sum_prev = sum;
 		}
 		
-		if (Verbose) std::cout << "[ClenshawCurtis_ff] Bisecting.\n";
-		
+		//
 		// no convergence? -> bisect
+		//
+		
+		// cancel bisection if interval too tiny
+		if (std::abs(x2-x1) < EpsAbs)
+			return 0;
+		
+		if (Verbose)
+			std::cout << "[ClenshawCurtis_ff] Bisecting to ("
+			          << x1 << "," << (x2+x1)/2 << ") and ("
+					  << (x2+x1)/2 << "," << x2 << ")\n";
+				
 		int n1, n2;
 		FType i1 = integrate_ff(x1, (x2+x1)/2, &n1);
 		FType i2 = integrate_ff((x2+x1)/2, x2, &n2);

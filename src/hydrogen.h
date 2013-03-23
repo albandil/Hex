@@ -22,17 +22,15 @@
 #define DEFAULT_MAXSTEPS	1000
 
 /**
- * Utility class holding information about the hydrogen atom.
+ * Namespace holding routines concerned with the hydrogen atom.
  */
-class Hydrogen
+namespace Hydrogen
 {
-public:
-	
 	/**
 	 * Bound state \f$ P_{nl}(r) = rR_{nl}(r) \f$.
 	 */
-	static double evalBoundState(int n, int l, double r);
-	static double lastZeroBound(int n, int l);
+	double evalBoundState(int n, int l, double r);
+	double lastZeroBound(int n, int l);
 	
 	/**
 	 * Sturmian wave function
@@ -41,7 +39,7 @@ public:
 	 * (\lambda_\ell r)^{\ell+1} \exp(-\lambda_\ell r/2) L_{k-1}^{2\ell+2}(\lambda_\ell r)
 	 * \f]
 	 */
-	static double evalSturmian(int n, int l, double r, double lambda = DEFAULT_LAMBDA);
+	double evalSturmian(int n, int l, double r, double lambda = DEFAULT_LAMBDA);
 	
 	/**
 	 * Return radial distance in the exponential decreasing regions,
@@ -50,10 +48,16 @@ public:
 	 * \warning A naive hunt & bisection algorithm is used, which will collapse
 	 * if any of the roots lies in the vicinity of \f$ r_k = 2^k \f$.
 	 */
-	//@{
-	static double getFarRadius(int n, int l, double eps, int max_steps = DEFAULT_MAXSTEPS);
-	static double getFarRadiusS(int n, int l, double lambda, double eps, int max_steps = DEFAULT_MAXSTEPS);
-	//@}
+	double getBoundFar(int n, int l, double eps, int max_steps = DEFAULT_MAXSTEPS);
+	
+	/**
+	 * Return radial distance in the exponential decreasing regions,
+	 * for which the radial function is equal to "eps".
+	 * 
+	 * \warning A naive hunt & bisection algorithm is used, which will collapse
+	 * if any of the roots lies in the vicinity of \f$ r_k = 2^k \f$.
+	 */
+	double getSturmFar(int n, int l, double lambda, double eps, int max_steps = DEFAULT_MAXSTEPS);
 	
 	/**
 	 * Evaluate free state
@@ -71,18 +75,35 @@ public:
 	 * \f]
 	 * The missing phase (as a real number) can be retrieved by \ref evalFreeStatePhase .
 	 */
-	static double evalFreeState(double k, int l, double r, double sigma = Nan);
+	double evalFreeState(double k, int l, double r, double sigma = Nan);
 	
 	/**
 	 * Evaluate phase of the free state function.
 	 * Use precomputed value of the Coulomb phase shift "sigma" if available.
 	 */
-	static double evalFreeStatePhase(double k, int l, double sigma = Nan);
+	double evalFreeStatePhase(double k, int l, double sigma = Nan);
 	
 	/**
 	 * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
 	 */
-	static double evalFreeState_asy(double k, int l, double r);
+	double evalFreeState_asy(double k, int l, double r);
+	
+	/**
+	 * \brief Return sufficiently far radius for using the asymptotic form of the free state.
+	 * 
+	 * Return radial distance in the oscillating region,
+	 * for which the radial function less than "eps" in some zero-node of the
+	 * asymptotical form. The asymptotic form is
+	 * \f[
+	 *      F_\ell(k,r) \propto \sin \left(kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k)\right) \ ,
+	 * \f]
+	 * so the free state will be evaluated in such radii that the following
+	 * is fulfilled:
+	 * \f[
+	 *      n\pi = kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k) \ .
+	 * \f]
+	 */
+	double getFreeFar(double k, int l, double Sigma = Nan, double eps = 1e-10, int max_steps = DEFAULT_MAXSTEPS);
 };
 
 /**
@@ -92,25 +113,37 @@ class HydrogenFunction : public RadialFunction<double>
 {
 public:
 	
-	HydrogenFunction() : n(0), k(0), l(0), Sigma(0) {}
-	HydrogenFunction(int n, int l) : n(n), k(0), l(l), Sigma(0) {}
-	HydrogenFunction(double k, int l) : n(0), k(k), l(l), Sigma(F_sigma(l,k)) {}
+	/// Constructor for empty function
+	HydrogenFunction()
+		: n(0), k(0), l(0), Sigma(0), Far(far(1e-3,20)) {}
+	
+	/// Constructor for bound state
+	HydrogenFunction(int n, int l)
+		: n(n), k(0), l(l), Sigma(0), Far(far(1e-3,20)) {}
+	
+	/// Constructor for free state
+	HydrogenFunction(double k, int l)
+		: n(0), k(k), l(l), Sigma(F_sigma(l,k)), Far(far(1e-3,20)) {}
 	
 	/**
 	 * \brief Get far radius.
 	 * 
 	 * Compute far radius \f$ R \f$. For \f$ r > R \f$ the hydrogen radial function
-	 * will always be less than 'eps'.
+	 * will always be less than 'eps'. Or, if the function is a free state
+	 * wave function, return the smallest radius such that the value of the
+	 * precise free state is less than "eps" and the value of the asymptotic form
+	 * is zero. (I.e. the free state will be evaluated at the zeros of the asymptotic
+	 * form.)
 	 */
-	inline double far (double eps, int max_steps = 1000) const
+	inline double far (double eps = 1e-10, int max_steps = 1000) const
 	{
 		if (n != 0)
 		{
-			return Hydrogen::getFarRadius(n,l,eps,max_steps);
+			return Hydrogen::getBoundFar(n,l,eps,max_steps);
 		}
 		else
 		{
-			throw "Coulomb function has no \"far\"!";
+			return Hydrogen::getFreeFar(k,l,Sigma,eps,max_steps);
 		}
 	};
 	
@@ -127,9 +160,20 @@ public:
 	inline double operator() (double r) const
 	{
 		if (n != 0)
+		{
+			// this state is bound
 			return Hydrogen::evalBoundState(n, l, r);
+		}
 		else
-			return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? std::numeric_limits<double>::quiet_NaN() : Sigma);
+		{
+			// this state is free
+			
+			// check if we are far enough to use the asymptotic form
+			if (r > Far)
+				return Hydrogen::evalFreeState_asy(k, l, r);
+			else
+				return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? Nan : Sigma);
+		}
 	}
 	
 	/// Comparison
@@ -151,6 +195,9 @@ private:
 	
 	/// Coulomb phase shift.
 	double Sigma;
+	
+	/// Far radius
+	double Far;
 };
 
 /**
@@ -168,7 +215,10 @@ public:
 	 * Compute far radius \f$ R \f$. For \f$ r > R \f$ the hydrogen Sturmian function
 	 * will always be less than 'eps'.
 	 */
-	inline double far (double eps, int max_steps = 1000) const { return Hydrogen::getFarRadiusS(n,l,lambda,eps,max_steps); };
+	inline double far (double eps, int max_steps = 1000) const
+	{
+		return Hydrogen::getSturmFar(n,l,lambda,eps,max_steps);
+	};
 	
 	/**
 	 * Get principal quantum number.
@@ -188,7 +238,10 @@ public:
 	/**
 	 * Evaluate the function.
 	 */
-	inline double operator() (double r) const { return Hydrogen::evalSturmian(n, l, r, lambda); }
+	inline double operator() (double r) const
+	{
+		return Hydrogen::evalSturmian(n, l, r, lambda);
+	}
 	
 private:
 	

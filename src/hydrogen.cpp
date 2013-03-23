@@ -19,13 +19,16 @@
 #include "hydrogen.h"
 #include "specf.h"
 
-double Hydrogen::lastZeroBound(int n, int l)
+namespace Hydrogen
+{
+
+double lastZeroBound(int n, int l)
 {
 	// all Laguerre(r) roots are less or equal to
 	return (n + l + (n - l - 2.) * sqrt(n + l));
 }
 
-double Hydrogen::getFarRadius(int n, int l, double eps, int max_steps)
+double getBoundFar(int n, int l, double eps, int max_steps)
 {
 	// all Laguerre(2r/n) roots are less or equal to
 	double last_zero_ubound = lastZeroBound(n, l) * 0.5 * n;
@@ -73,7 +76,7 @@ double Hydrogen::getFarRadius(int n, int l, double eps, int max_steps)
 	return 0.5 * (near + far);
 }
 
-double Hydrogen::getFarRadiusS(int n, int l, double lambda, double eps, int max_steps)
+double getSturmFar(int n, int l, double lambda, double eps, int max_steps)
 {
 	// all Laguerre(2r) roots are less or equal to
 	double last_zero_ubound = lastZeroBound(n,l) * 0.5;
@@ -121,7 +124,7 @@ double Hydrogen::getFarRadiusS(int n, int l, double lambda, double eps, int max_
 	return 0.5 * (near + far);
 }
 
-double Hydrogen::evalBoundState(int n, int l, double r)
+double evalBoundState(int n, int l, double r)
 {
 	double psi;
 	
@@ -139,7 +142,7 @@ double Hydrogen::evalBoundState(int n, int l, double r)
 	return psi;
 }
 
-double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
+double evalFreeState(double k, int l, double r, double sigma)
 {
 	// Coulomb wave is a regular solution
 	if (r == 0.)
@@ -169,20 +172,18 @@ double Hydrogen::evalFreeState(double k, int l, double r, double sigma)
 		else
 		{
 			// some other problem
-			std::cerr << "Evaluation of hydrogen free state failed.\n";
-			std::cerr << e.what() << std::endl;
-			abort();
+			throw exception("Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\n", l, k, r);
 		}
 		
 	}
 }
 
-double Hydrogen::evalFreeStatePhase(double k, int l, double sigma)
+double evalFreeStatePhase(double k, int l, double sigma)
 {
 	return l * 0.5 * M_PI + (finite(sigma) ? sigma : F_sigma(l,k));
 }
 
-double Hydrogen::evalSturmian(int n, int l, double r, double lambda)
+double evalSturmian(int n, int l, double r, double lambda)
 {
 	double S;
 	
@@ -201,7 +202,84 @@ double Hydrogen::evalSturmian(int n, int l, double r, double lambda)
 	return S;
 }
 
-double Hydrogen::evalFreeState_asy(double k, int l, double r)
+double evalFreeState_asy(double k, int l, double r)
 {
 	return F_asy(l,k,r);
 }
+
+double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero)
+{
+	// find solution (r) of
+	//    n*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
+	// using trivial Banach contraction
+	
+	double kr = (2*nzero+l)*M_PI/2 - Sigma;
+	if (kr < 0)
+		return kr;
+	
+	while (max_steps-- > 0 and std::abs(kr) > eps)
+		kr = (2*nzero+l)*M_PI/2 - Sigma - log(2*kr)/k;
+	
+	return kr / k;
+}
+
+double getFreeFar(double k, int l, double Sigma, double eps, int max_steps)
+{
+	// precompute Coulomb shift
+	Sigma = finite(Sigma) ? Sigma : F_sigma(l,k);
+	
+	//
+	// hunt phase
+	//
+	
+	int idx;
+	double rzero = 0, eval = 0;
+	
+	// loop over sine zeros
+	for (idx = 1; log(idx) < max_steps*log(2); idx *= 2)
+	{
+		// get sine zero for current index
+		rzero = getFreeAsyZero(k,l,Sigma,eps/100,max_steps,idx);
+		if (rzero < 0)
+			continue;
+		
+		// evaluate Coulomb wave
+		eval = std::abs(evalFreeState(k,l,rzero,Sigma));
+		
+		// terminate if requested precision met
+		if (eval < eps)
+			break;
+	}
+	
+	// if a boundary was chosen, exit
+	if (idx == 0 or log(idx) >= max_steps*log(2))
+		return rzero;
+	
+	//
+	// bisect phase
+	//
+	
+	int idx_left = idx/2;
+	int idx_right = idx;
+	int idx_mid = (idx_right - idx_left) / 2;
+	while (idx_right - idx_mid > 2)
+	{
+		// get sine zero for current index
+		rzero = getFreeAsyZero(k,l,Sigma,eps/100,max_steps,idx_mid);
+		
+		// evaluate Coulomb wave
+		eval = std::abs(evalFreeState(k,l,rzero,Sigma));
+		
+		// move bisection guardians
+		if (eval > eps)
+			idx_left = idx_mid;
+		else
+			idx_right = idx_mid;
+		
+		idx_mid = (idx_right + idx_left) / 2;
+	}
+	
+	return idx_mid * M_PI;
+}
+
+}; // endof namespace Hydrogen

@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 				cArray DD_lf_li_Ln(MM), DE_lf_li_Ln(MM), ED_lf_li_Ln(MM), EE_lf_li_Ln(MM);
 				printf("\t\tLn = %d\n", Ln);
 				
-				DWBA2::DWBA2_Ln (
+				DWBA2_Ln (
 					Ei, li, lf, ki, kf, Ni, Nf, Li, Lf,
 					Ln,
 					Ui, Uf, psii, psif, chii, chif,
