@@ -569,6 +569,13 @@ int main(int argc, char* argv[])
 			int li = std::get<1>(instate);
 			int mi = std::get<2>(instate);
 			
+			// skip angular forbidden states
+			bool allowed = false;
+			for (int l = abs(li - L); l <= li + L; l++)
+				allowed = allowed or ClebschGordan(li,mi,l,0,L,mi);
+			if (not allowed)
+				continue;
+			
 			// compute P-overlaps and P-expansion
 			cArray Pi_overlaps, Pi_expansion;
 			Pi_overlaps = overlapP(ni,li,weight_end_damp);
@@ -615,6 +622,7 @@ int main(int argc, char* argv[])
 						Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
 						prefactor *= ClebschGordan(li,mi,l,0,L,mi);
 						
+						// skip angular forbidden right hand sides
 						for (int lambda = 0; lambda <= maxlambda; lambda++)
 						{
 							Complex _f1 = computef(lambda, l1, l2, li, l, L);
@@ -844,6 +852,13 @@ int main(int argc, char* argv[])
 		int mi   = std::get<2>(transitions[i]);
 		int nf   = std::get<3>(transitions[i]);
 		int lf   = std::get<4>(transitions[i]);
+		
+		// skip angular forbidden states
+		bool allowed = false;
+		for (int l = abs(li - L); l <= li + L; l++)
+			allowed = allowed or ClebschGordan(li,mi,l,0,L,mi);
+		if (not allowed)
+			continue;
 		
 		cArray Pf_overlaps = overlapP(nf,lf,weight_end_damp);
 		
