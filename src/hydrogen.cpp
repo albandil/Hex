@@ -17,6 +17,7 @@
 #include <gsl/gsl_sf.h>
 
 #include "hydrogen.h"
+#include "interpolate.h"
 #include "specf.h"
 
 namespace Hydrogen
@@ -202,9 +203,9 @@ double evalSturmian(int n, int l, double r, double lambda)
 	return S;
 }
 
-double evalFreeState_asy(double k, int l, double r)
+double evalFreeState_asy(double k, int l, double r, double sigma)
 {
-	return F_asy(l,k,r);
+	return F_asy(l,k,r,sigma);
 }
 
 double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero)
@@ -219,6 +220,22 @@ double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, 
 	
 	while (max_steps-- > 0 and std::abs(kr) > eps)
 		kr = (2*nzero+l)*M_PI/2 - Sigma - log(2*kr)/k;
+	
+	return kr / k;
+}
+
+double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, int ntop)
+{
+	// find solution (r) of
+	//    (n+1/4)*2*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
+	// using trivial Banach contraction
+	
+	double kr = (2*ntop+0.5*(l+1))*M_PI - Sigma;
+	if (kr < 0)
+		return kr;
+	
+	while (max_steps-- > 0 and std::abs(kr) > eps)
+		kr = (2*ntop+0.5*(l+1))*M_PI - Sigma - log(2*kr)/k;
 	
 	return kr / k;
 }
@@ -283,3 +300,164 @@ double getFreeFar(double k, int l, double Sigma, double eps, int max_steps)
 }
 
 }; // endof namespace Hydrogen
+
+void HydrogenFunction::init(double eps1, double eps2, int limit)
+{
+	// skip bound states, we need to initialize only the free states
+	if (k == 0.)
+		return;
+	
+	if (Verbose)
+		std::cout << "Hydrogen free function (k = " << k << ", l = " << l << ")\n";
+	
+	// find such a zero of asymptotic form, that gives fair
+	// zero when used to evaluate the precise wave
+	int izero;
+	int hunt = limit;
+	
+	// hunt
+	for (izero = 1; ; izero*=2, hunt--)
+	{
+		// free asymptotic state root
+		double xzero = Hydrogen::getFreeAsyZero(k,l,Sigma,1e-5,1000,izero);
+		
+		// evaluation of the precise free state
+		double yzero = Hydrogen::evalFreeState(k,l,xzero,Sigma);
+		
+		// evaluation of the asymptotic form
+		double zzero = Hydrogen::evalFreeState_asy(k,l,xzero,Sigma);
+		
+		// check validity
+		if (std::abs(yzero-zzero) < eps1)
+			break;
+	}
+	
+	if (Verbose)
+		std::cout << "\t -> izero (hunt) = " << izero << "\n";
+	
+	if (hunt == 0)
+		throw exception("izero not converged in limit %d\n", limit);
+		
+	// bisect
+	int ileft = 1, iright = izero;
+	while (iright - ileft > 2)
+	{
+		izero = (iright + ileft) / 2;
+		
+		// free asymptotic state root
+		double xzero = Hydrogen::getFreeAsyZero(k,l,Sigma,1e-5,1000,izero);
+		
+		// evaluation of the precise free state
+		double yzero = Hydrogen::evalFreeState(k,l,xzero,Sigma);
+		
+		// evaluation of the asymptotic form
+		double zzero = Hydrogen::evalFreeState_asy(k,l,xzero,Sigma);
+		
+		// check validity
+		if (std::abs(yzero-zzero) < eps1)
+			iright = izero;
+		else
+			ileft = izero;
+	}
+	
+	if (Verbose)
+		std::cout << "\t -> izero (bisect) = " << izero << "\n";
+	
+	// precompute amplitudes far enough, so that we
+	// can use the asymptotic form everywhere
+	int itop;
+	hunt = limit;
+	
+	// hunt
+	for (itop = izero; ; itop*=2, hunt--)
+	{
+		// local maximum coordinate
+		double xtop = Hydrogen::getFreeAsyTop(k,l,Sigma,1e-5,1000,itop);
+		
+		// local maximum evaluation
+		double ytop = Hydrogen::evalFreeState(k,l,xtop,Sigma);
+		
+		// local maximum asymptotic value
+		double ztop = Hydrogen::evalFreeState_asy(k,l,xtop,Sigma);
+		
+		// check if there are enough of them
+		if (std::abs(ytop - ztop) < eps2)
+			break;
+	}
+	
+	if (Verbose)
+		std::cout << "\t -> itop (hunt) = " << itop << "\n";
+	
+	if (hunt == 0)
+		throw exception("itop not converged in limit %d\n", limit);
+	
+	// bisect
+	ileft = 1;
+	iright = itop;
+	while (iright - ileft > 2)
+	{
+		itop = (iright + ileft) / 2;
+		
+		// local maximum coordinate
+		double xtop = Hydrogen::getFreeAsyTop(k,l,Sigma,1e-5,1000,itop);
+		
+		// local maximum evaluation
+		double ytop = Hydrogen::evalFreeState(k,l,xtop,Sigma);
+		
+		// local maximum asymptotic value
+		double ztop = Hydrogen::evalFreeState_asy(k,l,xtop,Sigma);
+		
+		// check if there are enough of them
+		if (std::abs(ytop - ztop) < eps2)
+			iright = itop;
+		else
+			ileft = itop;
+	}
+	
+	if (Verbose)
+		std::cout << "\t -> itop (bisect) = " << itop << "\n";
+	
+	// store computed values
+	for (int i = izero; i <= itop; i++)
+	{
+		// local maximum coordinate
+		double xtop = Hydrogen::getFreeAsyTop(k,l,Sigma,1e-5,1000,i);
+		
+		// local maximum evaluation
+		double ytop = Hydrogen::evalFreeState(k,l,xtop,Sigma);
+		
+		// local maximum asymptotic value
+		double ztop = Hydrogen::evalFreeState_asy(k,l,xtop,Sigma);
+		
+		// store scaling factor
+		xAmplitudes.push_back(xtop);
+		yAmplitudes.push_back(ytop/ztop);
+	}
+}
+
+double HydrogenFunction::operator()(double r) const
+{
+	if (n != 0)
+	{
+		// this state is bound
+		// -------------------
+		return Hydrogen::evalBoundState(n, l, r);
+	}
+	else
+	{
+		// this state is free
+		// ------------------
+		
+		// if too near, return precise value
+		if (r < xAmplitudes.front())
+			return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? Nan : Sigma);
+		
+		// else get scale factor
+		double scale = 1.;
+		
+		if (r < xAmplitudes.back())
+			scale = interpolate (xAmplitudes, yAmplitudes, { r });
+		
+		return scale * Hydrogen::evalFreeState_asy(k, l, r, Sigma);
+	}
+}

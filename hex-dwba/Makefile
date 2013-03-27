@@ -57,7 +57,7 @@ obj/multi.o: src/multi.cpp src/multi.h src/chebyshev.h src/compact.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/hydrogen.o: src/hydrogen.cpp src/hydrogen.h
+obj/hydrogen.o: src/hydrogen.cpp src/hydrogen.h src/interpolate.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

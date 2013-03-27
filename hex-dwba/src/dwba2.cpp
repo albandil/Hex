@@ -159,6 +159,11 @@ void DWBA2_energy_driver (
 		// get intermediate state
 		HydrogenFunction psin(Kn,Ln);
 		
+		std::cout << "\nCreate psin... \n";
+		psin.verbose(true);
+		psin.init(1e-3, 1e-5, 10000);
+		psin.verbose(false);
+		
 		// compute amplitude
 		Complex contrib;
 		DWBA2_En (

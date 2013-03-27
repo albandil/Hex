@@ -86,7 +86,17 @@ namespace Hydrogen
 	/**
 	 * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
 	 */
-	double evalFreeState_asy(double k, int l, double r);
+	double evalFreeState_asy(double k, int l, double r, double sigma);
+	
+	/**
+	 * Find zeros of the free function asymptotics.
+	 */
+	double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero);
+	
+	/**
+	 * Find local maxima of the free function asymptotics.
+	 */
+	double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, int ntop);
 	
 	/**
 	 * \brief Return sufficiently far radius for using the asymptotic form of the free state.
@@ -113,17 +123,18 @@ class HydrogenFunction : public RadialFunction<double>
 {
 public:
 	
-	/// Constructor for empty function
-	HydrogenFunction()
-		: n(0), k(0), l(0), Sigma(0), Far(far(1e-3,20)) {}
-	
 	/// Constructor for bound state
 	HydrogenFunction(int n, int l)
-		: n(n), k(0), l(l), Sigma(0), Far(far(1e-3,20)) {}
+		: n(n), k(0), l(l), Sigma(0), Verbose(false) {}
 	
 	/// Constructor for free state
 	HydrogenFunction(double k, int l)
-		: n(0), k(k), l(l), Sigma(F_sigma(l,k)), Far(far(1e-3,20)) {}
+		: n(0), k(k), l(l), Sigma(F_sigma(l,k)), Verbose(false) {}
+	
+	/**
+	 * Initialize some internals for free state evaluation speed-up.
+	 */
+	void init(double eps1, double eps2, int limit);
 	
 	/**
 	 * \brief Get far radius.
@@ -156,25 +167,12 @@ public:
 	/// Get Coulomb wave momentum.
 	inline double getK () const { return k; }
 	
+	/// Verbosity control
+	bool verbose() const { return Verbose; }
+	void verbose(bool b) { Verbose = b; }
+	
 	/// Evaluate the function.
-	inline double operator() (double r) const
-	{
-		if (n != 0)
-		{
-			// this state is bound
-			return Hydrogen::evalBoundState(n, l, r);
-		}
-		else
-		{
-			// this state is free
-			
-			// check if we are far enough to use the asymptotic form
-			if (r > Far)
-				return Hydrogen::evalFreeState_asy(k, l, r);
-			else
-				return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? Nan : Sigma);
-		}
-	}
+	double operator() (double r) const;
 	
 	/// Comparison
 	inline bool operator== (HydrogenFunction const & psi) const
@@ -183,6 +181,12 @@ public:
 	}
 
 private:
+	
+	/// Free wave amplitude scaling.
+	//@{
+	rArray xAmplitudes;
+	rArray yAmplitudes;
+	//@}
 	
 	/// Principal quantum number of bound state.
 	int n;
@@ -196,8 +200,8 @@ private:
 	/// Coulomb phase shift.
 	double Sigma;
 	
-	/// Far radius
-	double Far;
+	/// Verbosity
+	bool Verbose;
 };
 
 /**
