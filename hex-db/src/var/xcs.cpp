@@ -131,8 +131,11 @@ bool ExtrapolatedCrossSection::run (
 		sigmafull.push_back(sigma);
 	}
 	
+	// threshold for ionization
+	double Eion = 1./(ni*ni);
+	
 	// compute complete cross section
-	rArray ccs = (efactor * energies.front() < 1.) ? 
+	rArray ccs = (efactor * energies.front() < Eion) ? 
 		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
 		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline);
 	

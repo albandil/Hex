@@ -76,8 +76,11 @@ bool TotalCrossSection::run (
 		sigma_arr.push_back(sigma);
 	}
 	
+	// threshold for ionization
+	double Eion = 1./(ni*ni);
+	
 	// interpolate
-	rArray tcs = (efactor * energies.front() < 1.) ? 
+	rArray tcs = (efactor * energies.front() < Eion) ? 
 		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
 		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
 	
