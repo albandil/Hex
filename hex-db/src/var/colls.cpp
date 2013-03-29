@@ -91,7 +91,12 @@ bool CollisionStrength::run (
 	}
 	
 	// interpolate
-	rArray omegas = energies * (2*L+1) * (2*S+1) * interpolate(E_arr, sigma_arr, energies * efactor) * efactor;
+	rArray interp = (efactor * energies.front() < 1.) ? 
+		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
+		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+		
+	// compute collision strength
+	rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
 	
 	// write out
 	std::cout << this->logo() <<

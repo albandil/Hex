@@ -132,7 +132,9 @@ bool ExtrapolatedCrossSection::run (
 	}
 	
 	// compute complete cross section
-	rArray ccs = interpolate(Efull, sigmafull, energies * efactor);
+	rArray ccs = (efactor * energies.front() < 1.) ? 
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline);
 	
 	// reshape arrays for compatible indexing by energies
 	rArray dsigma0empty(dsigma0.size());	// zero-filled ghost
@@ -147,7 +149,9 @@ bool ExtrapolatedCrossSection::run (
 	sigmafull -= dsigma0 * dsigma0 / (dsigma0 - dsigma1);
 	
 	// interpolate
-	rArray xcs = interpolate(Efull, sigmafull, energies * efactor);
+	rArray xcs = (efactor * energies.front() < 1.) ? 
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline);
 	
 	// write out
 	std::cout << this->logo() <<

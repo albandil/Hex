@@ -3,7 +3,7 @@
 CPP = g++
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include -fPIC
-LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas
+LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
 CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2

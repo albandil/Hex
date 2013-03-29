@@ -77,7 +77,9 @@ bool TotalCrossSection::run (
 	}
 	
 	// interpolate
-	rArray tcs = interpolate(E_arr, sigma_arr, energies * efactor);
+	rArray tcs = (efactor * energies.front() < 1.) ? 
+		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
+		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
 	
 	// write out
 	std::cout << this->logo() <<

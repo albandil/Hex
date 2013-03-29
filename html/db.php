@@ -318,7 +318,7 @@
 				$pipes2
 			);
 			
-			// write to Gnuplot standard input
+			// write to Gnuplot's standard input
 			fwrite($pipes2[0], "set terminal png size 500,300\n");
 			fwrite($pipes2[0], "unset key\n");
 			fwrite($pipes2[0], "set xlabel \"Ei [" . $strEunits . "]\"\n");
@@ -331,6 +331,9 @@
 			if (isset($_POST["Tunits"]) and $_POST["Tunits"] == "cgs")
 				fwrite($pipes2[0], "set format y '%g'\n");
 				
+// 			if ($nums[0] >= 1)
+// 				fwrite($pipes2[0], "set logscale\n");
+			
 			if ($_POST["qty"] == "scatamp")
 			{
 				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
