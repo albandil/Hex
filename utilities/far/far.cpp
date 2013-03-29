@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
 	int l = atoi(argv[2]);
 	double eps = atof(argv[3]);
 	
-	std::cout << Hydrogen::getFarRadius(n,l,eps);
+	std::cout << Hydrogen::getBoundFar(n,l,eps);
 	
 	return 0;
 }
