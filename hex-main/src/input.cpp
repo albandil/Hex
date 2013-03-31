@@ -189,9 +189,16 @@ long read_int(std::ifstream& f)
 	char* tail;
 	long val = strtol(s.c_str(), &tail, 10);
 	if (*tail != 0)
-		throw exception ("Can't read int.\n");
+	{
+		if (s == "*")
+			throw false;
+		else
+			throw exception ("Can't read int.\n");
+	}
 	else
+	{
 		return val;
+	}
 }
 
 double read_dbl(std::ifstream& f)
@@ -223,9 +230,16 @@ double read_dbl(std::ifstream& f)
 	char* tail;
 	double val = strtod(s.c_str(), &tail);
 	if (*tail != 0)
-		throw exception ("Can't read double.\n");
+	{
+		if (s == "*")
+			throw false;
+		else
+			throw exception ("Can't read double.\n");
+	}
 	else
+	{
 		return val;
+	}
 }
 
 void parse_input_file (
@@ -249,6 +263,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check B-spline parameters.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	std::cout << "\n-----   B-spline environment  -------\n";
@@ -269,6 +285,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check real knot data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	// construct real knot sequence
@@ -295,6 +313,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check complex knot data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	// construct complex(-to-be) knot sequence
@@ -319,6 +339,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check \"ni\".\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	// load initial atomic angular states
@@ -333,17 +355,38 @@ void parse_input_file (
 			if (lis.back() > maxli)
 				maxli = lis.back();
 		}
-		for (size_t i = 0; i < lis.size(); i++)
-		{
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check initial atomic state data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
+	}
+	
+	for (size_t i = 0; i < lis.size(); i++)
+	{
+		try {
+			
 			mis.push_back(read_int(inputfile));
 			if (std::abs(mis[i]) > lis[i])
 				throw exception("Input error: Magnetic number greater than \"li\".\n");
 			
 			instates.push_back(std::make_tuple(ni,lis[i],mis[i]));
+			
+		} catch (std::exception e) {
+			
+			std::cerr << e.what() << std::endl;
+			throw exception("Input error: Check initial atomic state data.\n");
+			
+		} catch (bool b) {
+			
+			// wildcard "*" found
+			for (int j = -lis[j]; j <= lis[i]; j++)
+			{
+				mis.push_back(j);
+				instates.push_back(std::make_tuple(ni,lis[i],j));
+			}
+			
 		}
-	} catch (std::exception e) {
-		std::cerr << e.what() << std::endl;
-		throw exception("Input error: Check initial atomic state data.\n");
 	}
 	
 	// load final atomic quantum numbers
@@ -352,21 +395,43 @@ void parse_input_file (
 	try {
 		while ((x = read_int(inputfile)) != -1.)
 			nfs.push_back(x);
-		
-		for (size_t i = 0; i < nfs.size(); i++)
-		{
+	} catch (std::exception e) {
+		std::cerr << e.what() << std::endl;
+		throw exception("Input error: Check final atomic state data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
+	}
+	
+	for (size_t i = 0; i < nfs.size(); i++)
+	{
+		try {
+			
 			lfs.push_back(read_int(inputfile));
+			
 			if (lfs[i] > nfs[i])
 				throw exception("Input error: Angular momentum greater than \"nf\".\n");
 			if (lfs[i] > maxlf)
 				maxlf = lfs[i];
 			
 			outstates.push_back(std::make_tuple(nfs[i],lfs[i],0));
+			
+		} catch (std::exception e) {
+			
+			std::cerr << e.what() << std::endl;
+			throw exception("Input error: Check final atomic state data.\n");
+			
+		} catch (bool b) {
+			
+			// wildcard "*" found, add all allowed angular momenta
+			for (int j = 0; j < nfs[i]; j++)
+			{
+				lfs.push_back(j);
+				outstates.push_back(std::make_tuple(nfs[i],j,0));
+			}
+			
 		}
-	} catch (std::exception e) {
-		std::cerr << e.what() << std::endl;
-		throw exception("Input error: Check final atomic state data.\n");
 	}
+	
 	
 	// load total quantum numbers
 	try {
@@ -385,6 +450,8 @@ void parse_input_file (
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check angular momentum data.\n");
 		
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	std::cout << "\n----------  Angular momentum limits  -------------\n";
@@ -412,6 +479,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check energy data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	// construct energy sequence
@@ -428,6 +497,8 @@ void parse_input_file (
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
 		throw exception("Input error: Check magnetic field data.\n");
+	} catch (bool b) {
+		throw exception("Wildcard not accepted here.\n");
 	}
 	
 	std::cout << "\n---------- Other parameters -----------\n";
