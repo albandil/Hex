@@ -118,7 +118,7 @@ public:
     {
         Tout d_j = 0, d_jp1 = 0, d_jp2 = 0;
         double one_x = scale(x);
-        double two_x = 2 * one_x;
+        double two_x = scale(2*x); // FIXME ???
 
         for (int j = m - 1; j >= 1; j--)
         {
@@ -283,7 +283,7 @@ public:
 	 * \param  f Function to integrate of the signature FType(*)(double x).
 	 */ 
 	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
-		Limit(true), Recurrence(true), NLevel(32), L(1.0), Verbose(false) {}
+		Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false) {}
 	
 	/// Get relative tolerance.
 	inline double eps() const { return EpsRel; }
@@ -303,14 +303,20 @@ public:
 	/// Set relative tolerance.
 	inline void setRange(double l) { L = l; }
 	
-	/// Get level subdivision.
-	inline int subdiv() const { return NLevel; }
+	/// Get subdivision breadth limit.
+	inline int subdiv() const { return NNest; }
 	
-	/// Set limit flag.
-	inline void setSubdiv(int nlevel) { NLevel = nlevel; }
+	/// Set subdivision breadth limit.
+	inline void setSubdiv(int nlevel) { NNest = nlevel; }
+	
+	/// Get subdivision width limit.
+	inline int stack() const { return NStack; }
+	
+	/// Set subdivision width limit.
+	inline void setStack(int nlevel) { NStack = nlevel; }
 	
 	/// Get limit flag.
-	inline bool Lim() const { return Limit; }
+	inline bool lim() const { return Limit; }
 	
 	/// Set limit flag.
 	inline void setLim(bool limit) { Limit = limit; }
@@ -356,7 +362,8 @@ public:
 			cc_G.setTol(EpsAbs);
 			cc_G.setLim(Limit);
 			cc_G.setRec(Recurrence);
-			cc_G.setSubdiv(NLevel);
+			cc_G.setSubdiv(NNest);
+			cc_G.setStack(NStack);
 			cc_G.setRange(L);
 			
 			// integrate
@@ -375,7 +382,8 @@ public:
 			cc_G.setTol(EpsAbs);
 			cc_G.setLim(Limit);
 			cc_G.setRec(Recurrence);
-			cc_G.setSubdiv(NLevel);
+			cc_G.setSubdiv(NNest);
+			cc_G.setStack(NStack);
 			cc_G.setRange(L);
 			
 			// integrate
@@ -390,8 +398,7 @@ public:
 	 * Clenshaw-Curtis quadrature for finite interval (a,b).
 	 * \param x1 Left bound (allowed infinite).
 	 * \param x2 Right bound (allowed infinite).
-	 * \param n On input, maximal subdivision for a single bisection. Use *n = -1
-	 *          to disable recurrence. On output, evaluations needed for a converged result.
+	 * \param n On output, evaluations needed for a converged result.
 	 */
 	FType integrate_ff (double x1, double x2, int * n = nullptr) const
 	{
@@ -413,10 +420,13 @@ public:
 		std::vector<Complex> fvals_prev, fvals;
 
 		// integral approximation
-		FType sum_prev = Nan;
+		FType sum, sum_prev = Nan;
 
+		// get nesting limit
+		int maxN = gsl_sf_pow_int(2,NNest);
+		
 		// convergence loop
-		for (int N = 4; N <= NLevel or not Recurrence; N *= 2)
+		for (int N = 4; N <= maxN or not Recurrence; N *= 2)
 		{
 			double pi_over_N = M_PI / N;
 
@@ -426,21 +436,23 @@ public:
 			if (coefs.empty())
 			{
 				// evaluate f everywhere
+// 				# pragma omp parallel for
 				for (int k = 0; k < N; k++)
 				{
 					fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
 
 					if (not finite(std::abs(fvals[k])))
-						throw exception("[integrate_ff] \"%g\" when evaluating function.", fvals[k]);
+						throw exception("[integrate_ff] \"%g\" when evaluating function at %g", fvals[k], cos(k * pi_over_N));
 				}
 				fvals[N] = f(-1);
 
 				if (not finite(std::abs(fvals[N])))
-					throw exception("[integrate_ff] \"%g\" when evaluating function.", fvals[N]);
+					throw exception("[integrate_ff] \"%g\" when evaluating function at -1.", fvals[N]);
 			}
 			else
 			{
 				// evaluate just the new half, recycle older evaluations
+// 				# pragma omp parallel for
 				for (int k = 0; k < N; k++)
 				{
 					fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
@@ -504,18 +516,21 @@ public:
 #endif
 			
 			// sum the quadrature rule
-			FType sum = 0.5 * (coefs[0] - coefs[N] / (N*N - 1.));
+			sum = 0.5 * (coefs[0] - coefs[N] / (N*N - 1.));
 			for (int twok = 2; twok < N; twok += 2)
 				sum -= coefs[twok] / (twok*twok - 1.);
 			
 			if (Verbose)
-				std::cout << "[ClenshawCurtis_ff] N = " << N << ", Sum = " << sum << "\n";
+				std::cout << "[ClenshawCurtis_ff] N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
 			
 			// check convergence
-			if (std::abs(sum - FType(2.) * sum_prev) <= EpsRel * std::abs(sum))
+			if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
 			{
 				if (n != nullptr)
 					*n = N;
+				
+				if (Verbose)
+					std::cout << "[ClenshawCurtis_ff] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
 				
 				return FType(2. * (x2 - x1) / N) * sum;
 			}
@@ -523,6 +538,8 @@ public:
 				  and finite(std::abs(sum_prev)) 
 				  and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
 			{
+				if (Verbose)
+					std::cout << "[ClenshawCurtis_ff] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
 				return FType(0.);
 			}
 			else
@@ -531,7 +548,7 @@ public:
 			}
 
 			// save function evaluations and sum
-			fvals_prev = fvals;
+			fvals_prev = std::move(fvals);
 			sum_prev = sum;
 		}
 		
@@ -541,16 +558,37 @@ public:
 		
 		// cancel bisection if interval too tiny
 		if (std::abs(x2-x1) < EpsAbs)
+		{
+			if (Verbose)
+				std::cout << "[ClenshawCurtis_ff] Interval smaller than " << EpsAbs << "\n";
 			return 0;
+		}
+		
+		// cancel bisection if stack full
+		if (NStack == 0)
+		{
+			if (Verbose)
+				std::cout << "[ClenshawCurtis_ff] Bisection inhibited due to internal stack shortage.\n";
+			return FType(2. * (x2 - x1) / maxN) * sum;
+		}
 		
 		if (Verbose)
 			std::cout << "[ClenshawCurtis_ff] Bisecting to ("
 			          << x1 << "," << (x2+x1)/2 << ") and ("
 					  << (x2+x1)/2 << "," << x2 << ")\n";
-				
+		
 		int n1, n2;
+		double this_EpsAbs = EpsAbs;
+		
+		NStack--;
+		EpsAbs = 0.5 * (2. * (x2 - x1) / maxN) * std::abs(sum) * EpsRel;
+		
 		FType i1 = integrate_ff(x1, (x2+x1)/2, &n1);
 		FType i2 = integrate_ff((x2+x1)/2, x2, &n2);
+		
+		NStack++;
+		EpsAbs = this_EpsAbs;
+		
 		if (n != nullptr) *n = n1 + n2;
 		return i1 + i2;
 	}
@@ -637,7 +675,7 @@ private:
 	double EpsRel;
 	
 	/// Relative precision
-	double EpsAbs;
+	mutable double EpsAbs;
 	
 	/**
 	 * \brief Whether to use \ref lim for evaluating integration boundaries.
@@ -658,8 +696,22 @@ private:
 	 */
 	bool Recurrence;
 	
-	/// Level subdivision limit.
-	int NLevel;
+	/**
+	 * \brief Breadth limit for bisection.
+	 * 
+	 * Sets the maximal evaluations count for a single bisection level.
+	 * When the limit is reached, a new bisection will be done. Thus, the
+	 * integration rule will be nested NLevel-times before doing so.
+	 */
+	int NNest;
+	
+	/**
+	 * \brief Depth limit for bisection.
+	 * 
+	 * Sets the subdivision level count. The initial integration interval
+	 * will be subdivided into 2^NStack pieces if totally non-convergent.
+	 */
+	mutable int NStack;
 	
 	/// Compactification parameter
 	double L;

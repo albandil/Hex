@@ -159,11 +159,6 @@ void DWBA2_energy_driver (
 		// get intermediate state
 		HydrogenFunction psin(Kn,Ln);
 		
-		std::cout << "\nCreate psin... \n";
-		psin.verbose(true);
-		psin.init(1e-3, 1e-5, 10000);
-		psin.verbose(false);
-		
 		// compute amplitude
 		Complex contrib;
 		DWBA2_En (
@@ -179,20 +174,24 @@ void DWBA2_energy_driver (
 		return contrib * Kn * Kn;
 	};
 	
+
+#if 0
+	
 	// compactification of the previous function
 	CompactificationR<decltype(ContinuumContribution),Complex>
 		compact(ContinuumContribution, 0., false, 1.0);
 	
-
-#if 0
-	for (int Nn = 1; Nn <= 20; Nn++)
-		DiscreteContribution(Nn);
+// 	for (int Nn = 1; Nn <= 20; Nn++)
+// 		DiscreteContribution(Nn);
 		
 	
-	for (double Kn = 0; Kn < 5; Kn += 0.01)
-		compact(compact.scale(Kn));
+// 	for (double Kn = 0; Kn < 5; Kn += 0.01)
+// 		compact(compact.scale(Kn));
 	
+	ContinuumContribution(0.016730783);
+		
 	exit(0);
+	
 #endif
 		
 	
@@ -212,23 +211,52 @@ void DWBA2_energy_driver (
 	// integrate over intermediate continuum using Clenshaw-Curtis quadrature
 	//  - disable recurrence for maximal reuse of evaluations
 	
-	// integration system
+	//
+	// allowed regime
+	//
+	
 	ClenshawCurtis<decltype(ContinuumContribution),Complex> QDD(ContinuumContribution);
 	QDD.setLim(false);
 	QDD.setRec(false);
+	QDD.setTol(1e-5);
 	QDD.setEps(1e-5);
 	QDD.setVerbose(false);
 	
 	// integrate over allowed region
-	Complex DD_allowed = QDD.integrate(0., sqrt(Ei - 1./(Ni*Ni)));
+	Complex DD_allowed = QDD.integrate (
+		0.,
+		sqrt(Ei - 1./(Ni*Ni))
+	);
 	cDD += DD_allowed;
 	
 	std::cout << "Allowed continuum DD: " << DD_allowed << "\n";
-	QDD.setVerbose(true);
+	
+	//
+	// forbidden regime
+	//
+	
+	CompactIntegrand<decltype(ContinuumContribution),Complex> cQDD (
+		ContinuumContribution,
+		sqrt(Ei - 1./(Ni*Ni)),
+		Inf,
+		false,
+		1.0
+	);
+	ClenshawCurtis<decltype(cQDD),Complex> iQDD(cQDD);
+	iQDD.setLim(false);
+	iQDD.setRec(false);
+	iQDD.setTol(1e-5);
+	iQDD.setEps(1e-5);
+	iQDD.setVerbose(true);
+	
+	/// DEBUG FIXME
+	double momentum_cutoff = 10;
 	
 	// integrate over forbidden region
-	double momentum_cutoff = 10;
-	Complex DD_forbidden = QDD.integrate(sqrt(Ei - 1./(Ni*Ni)), momentum_cutoff);
+	Complex DD_forbidden = iQDD.integrate (
+		cQDD.scale(sqrt(Ei - 1./(Ni*Ni))),
+		cQDD.scale(momentum_cutoff)
+	);
 	cDD += DD_forbidden;
 	
 	std::cout << "Forbidden continuum DD: " << DD_forbidden << "\n";
@@ -254,9 +282,14 @@ void DWBA2_En (
 	double kn_sqr = Ei - 1./(Ni*Ni) - Eatn;
 	double kn = sqrt(std::abs(kn_sqr));
 	
+	std::cout << "\tpsin.far() = " << psin.getFar() << std::endl;
+	
 	// construct direct inner integrals
-	PhiFunctionDir phii(psin, lami, Ui, psii);	std::cout << "\tphii OK\n";
-	PhiFunctionDir phif(psin, lamf, Uf, psif);	std::cout << "\tphif OK\n";
+	std::cout << "\tcomputing phii... " << std::flush;
+	PhiFunctionDir phii(psin, lami, Ui, psii);
+	std::cout << "ok\n\tcomputing phif... " << std::flush;
+	PhiFunctionDir phif(psin, lamf, Uf, psif);
+	std::cout << "on\n";
 	
 	// allowed/forbidden regime
 	if (kn_sqr > 0)
@@ -264,19 +297,25 @@ void DWBA2_En (
 		std::cout << "\tAllowed regime, kn = " << kn << "\n";
 		
 		// construct Green's function parts
-		DistortedWave gphi = Ug.getDistortedWave(kn,ln);	std::cout << "\tgphi OK\n";
-		IrregularWave geta = Ug.getIrregularWave(kn,ln);	std::cout << "\tgeta OK\n";
+		std::cout << "\tcomputing gphi... " << std::flush;
+		DistortedWave gphi = Ug.getDistortedWave(kn,ln);
+		std::cout << "ok\n\tcomputing geta... " << std::flush;
+		IrregularWave geta = Ug.getIrregularWave(kn,ln);
+		std::cout << "ok\n";
 		
 		// integrate
 		tmat = GreensFunctionIntegral(chif, phif, psif, gphi, geta, psii, phii, chii, false);
 	}
 	else
 	{
-		std::cout << "\tForbidden regime, kn = " << kn << "\n";
+		std::cout << "\tForbidden regime, kn = " << kn << "i\n";
 		
 		// construct Green's function parts
-		HyperbolicWave gtheta = Ug.getHyperbolicWave(kn,ln);	std::cout << "\tgtheta OK\n";
-		ForbiddenWave gzeta = Ug.getForbiddenWave(kn,ln);	std::cout << "\tgzeta OK\n";
+		std::cout << "\tcomputing gtheta... " << std::flush;
+		HyperbolicWave gtheta = Ug.getHyperbolicWave(kn,ln);
+		std::cout << "ok\n\tcomputing gzeta... " << std::flush;
+		ForbiddenWave gzeta = Ug.getForbiddenWave(kn,ln);
+		std::cout << "ok\n";
 		
 		// return only scaled values
 		gtheta.scale(true);

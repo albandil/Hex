@@ -690,6 +690,29 @@ template <typename T> Array<T> logspace(T x0, T x1, size_t N)
 }
 
 /**
+ * Write array to standard output. Array will be written as a single column.
+ * \param array The array to write.
+ */
+template <typename NumberType> void write_array(Array<NumberType> const & array)
+{
+	for (size_t i = 0; i < array.size(); i++) 
+	{
+		if (typeid(NumberType) == typeid(double))
+		{
+			std::cout << array[i] << std::endl;
+		}
+		else if (typeid(NumberType) == typeid(Complex))
+		{
+			std::cout << Complex(array[i]).real() << "\t" << Complex(array[i]).imag() << std::endl;
+		}
+		else
+		{
+			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType).name() << std::endl;
+		}
+	}
+}
+
+/**
  * Write array to file. Array will be written as a single column into
  * an ASCII file.
  * \param array The array to write.

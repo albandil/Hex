@@ -31,7 +31,7 @@ double PhiFunctionDirIntegral::operator()(double x2) const
 	//
 		
 	auto integrand1 = [&](double x1) -> double {
-		if (x2 == 0. or not finite(x1))
+		if (x1 == 0. or x2 == 0. or not finite(x1))
 			return 0.;
 		return Psin(x1) * pow(x1/x2, Lam) * Psi(x1);
 	};
@@ -88,6 +88,14 @@ PhiFunctionDir::PhiFunctionDir (
 	if (Zero)
 		return;
 	
+// 	for (int ix = 0; ix <= 1000; ix++)
+// 	{
+// 		double x = ix * 0.01;
+// 		std::cout << x << "\t" 
+// 		          << Integral(x) << "\t"
+// 		          << CompactIntegral(CompactIntegral.scale(x)) << std::endl;
+// 	}
+	
 	// try to load PhiFunctionDir from a HDF file
 	if (not load(name(psin, lam, psi)))
 	{	
@@ -100,6 +108,10 @@ PhiFunctionDir::PhiFunctionDir (
 			// check convergence
 			if (CompactIntegralCb.tail(1e-10) != N)
 				break;
+			
+			// non-convergent cases need to be done in some other way
+			if (N == 1024)
+				/* TODO */;
 		}
 		
 		// save PhiFunctionDir to a HDF file
@@ -130,7 +142,7 @@ std::string PhiFunctionDir::name(HydrogenFunction const & psin, int lam, Hydroge
 	    << psin.getN() << "-" << psin.getK() << "-" << psin.getL() << "-"
 		<< lam << "-"
 		<< psi.getN()  << "-" << psi.getK()  << "-" << psi.getL()
-		<< ".hdf";
+		<< ".arr";
 	return oss.str();
 }
 

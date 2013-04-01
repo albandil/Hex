@@ -31,6 +31,7 @@ namespace Hydrogen
 	 */
 	double evalBoundState(int n, int l, double r);
 	double lastZeroBound(int n, int l);
+	double getBoundN(int n, int l);
 	
 	/**
 	 * Sturmian wave function
@@ -125,16 +126,11 @@ public:
 	
 	/// Constructor for bound state
 	HydrogenFunction(int n, int l)
-		: n(n), k(0), l(l), Sigma(0), Verbose(false) {}
+		: n(n), k(0), l(l), Sigma(0), Verbose(false), Far(far()) {}
 	
 	/// Constructor for free state
 	HydrogenFunction(double k, int l)
-		: n(0), k(k), l(l), Sigma(F_sigma(l,k)), Verbose(false) {}
-	
-	/**
-	 * Initialize some internals for free state evaluation speed-up.
-	 */
-	void init(double eps1, double eps2, int limit);
+		: n(0), k(k), l(l), Sigma(F_sigma(l,k)), Verbose(false), Far(far()) {}
 	
 	/**
 	 * \brief Get far radius.
@@ -149,13 +145,9 @@ public:
 	inline double far (double eps = 1e-10, int max_steps = 1000) const
 	{
 		if (n != 0)
-		{
 			return Hydrogen::getBoundFar(n,l,eps,max_steps);
-		}
 		else
-		{
 			return Hydrogen::getFreeFar(k,l,Sigma,eps,max_steps);
-		}
 	};
 	
 	/// Get principal quantum number.
@@ -166,6 +158,9 @@ public:
 	
 	/// Get Coulomb wave momentum.
 	inline double getK () const { return k; }
+	
+	/// Get precomputed far radius.
+	inline double getFar() const { return Far; }
 	
 	/// Verbosity control
 	bool verbose() const { return Verbose; }
@@ -182,12 +177,6 @@ public:
 
 private:
 	
-	/// Free wave amplitude scaling.
-	//@{
-	rArray xAmplitudes;
-	rArray yAmplitudes;
-	//@}
-	
 	/// Principal quantum number of bound state.
 	int n;
 	
@@ -202,6 +191,9 @@ private:
 	
 	/// Verbosity
 	bool Verbose;
+	
+	/// Far value.
+	double Far;
 };
 
 /**

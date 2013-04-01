@@ -17,6 +17,7 @@
 #include "chebyshev.h"
 #include "potential.h"
 #include "specf.h"
+#include "../../hex-main/src/bspline.h"
 
 /**
  * Main DWBA2-part function that will compute a scattering amplitude
@@ -81,8 +82,8 @@ template <
 	std::cout << "\tGreen's integral\n";
 	
 	// get integration upper bound
-	double fari = 5. * psii.far(1e-8);
-	double farf = 5. * psif.far(1e-8);
+	double fari = 5. * psii.far(1e-7);
+	double farf = 5. * psif.far(1e-7);
 	
 	// Green's function integrand
 	auto integrand = [&](double r1) -> Complex {
@@ -106,20 +107,36 @@ template <
 		
 		// integration systems
 		
-		ClenshawCurtis<decltype(integrand1),Complex> Q1(integrand1);
+		CompactIntegrand<decltype(integrand1),Complex> inte1(integrand1, 0., fari, false, 1.0);
+		ClenshawCurtis<decltype(inte1),Complex> Q1(inte1);
 		Q1.setLim(false);
 		Q1.setRec(false);
-		Q1.setEps(1e-7);
+		Q1.setEps(1e-6);
+		Q1.setTol(1e-6);
+// 		Q1.setVerbose(true);
 		
-		ClenshawCurtis<decltype(integrand2),Complex> Q2(integrand2);
+		CompactIntegrand<decltype(integrand2), Complex> inte2(integrand2, 0., fari, false, 1.0);
+		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
 		Q2.setLim(false);
 		Q2.setRec(false);
-		Q2.setEps(1e-7);
+		Q2.setEps(1e-6);
+		Q1.setTol(1e-6);
+// 		Q2.setVerbose(true);
 		
 		// integrate
 		
-		Complex q1 = Q1.integrate(0., std::min(r1,fari));
-		Complex q2 = Q2.integrate(std::min(r1,fari), fari);
+		int n1,n2;
+		Complex q1 = Q1.integrate (
+			inte1.scale(0.),
+			inte1.scale(std::min(r1,fari)),
+			&n1
+		);
+		Complex q2 = Q2.integrate (
+			inte2.scale(std::min(r1,fari)),
+			inte2.scale(fari),
+			&n2
+		);
+// 		std::cout << "n1 = " << n1 << ", n2 = " << n2 << "\n";
 		
 		// evaulate outer integrand
 		
@@ -127,13 +144,39 @@ template <
 	};
 	
 	// outer integration system
-	ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
+	CompactIntegrand<decltype(integrand),Complex> inte(integrand);
+	ClenshawCurtis<decltype(inte),Complex> Q(inte);
 	Q.setLim(false);
 	Q.setRec(false);
-	Q.setEps(1e-5);
+	Q.setEps(1e-4);
+	Q.setTol(1e-6);
+	Q.setVerbose(true);
+	
+	std::cout << "\tFar = " << farf << std::endl;
+	std::cout << "\tIntegrand(1) = " << integrand(1.) << std::endl;
+	
+	/// DEBUG
+// 	std::ofstream g("out.g");
+// 	for (int ix = 0; ix < 10000; ix++)
+// 	{
+// 		double x = ix * 0.01;
+// 		Complex inte = integrand(x);
+// 		
+// 		g << x << "\t" 
+// 		  << chii(x) << "\t"
+// 		  << phii(x) << "\t"
+// 		  << gphi(x) << "\t"
+// 		  << Complex(geta(x)).real() << "\t"
+// 		  << Complex(geta(x)).imag() << "\t"
+// 		  << inte.real() << "\t" 
+// 		  << inte.imag() << "\n";
+// 	}
 	
 	// integrate
-	return Q.integrate(0., farf);
+	return Q.integrate (
+		inte.scale(0.),
+		inte.scale(farf)
+	);
 }
 
 #endif
