@@ -38,6 +38,18 @@ void import(const char* sqlname);
  */
 void update();
 
+/**
+ * \brief Dump contents of the T-matrix table.
+ * 
+ * The output can be used to construct an equivalent table.
+ * The corresponding code is
+ * \code
+ * sqlite> .mode insert
+ * sqlite> select * from tmat
+ * \endcode
+ */
+void dump(const char* dumpname);
+
 #if 0
 
 /**

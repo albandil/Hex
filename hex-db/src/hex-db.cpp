@@ -148,6 +148,50 @@ void update ()
 	}
 }
 
+void dump (const char* dumpfile)
+{
+	sqlitepp::statement st(db);
+	std::string dumpline, dumpcmd =
+		"SELECT 'INSERT INTO " + TMatrix::Id + " VALUES(' || "
+		"quote(ni) || ',' || "
+		"quote(li) || ',' || "
+		"quote(mi) || ',' || "
+		"quote(nf) || ',' || "
+		"quote(lf) || ',' || "
+		"quote(mf) || ',' || "
+		"quote(L) || ',' || "
+		"quote(S) || ',' || "
+		"quote(Ei) || ',' || "
+		"quote(ell) || ',' || "
+		"quote(Re_t_ell) || ',' || "
+		"quote(Im_T_ell) || ')' FROM " + TMatrix::Id + ";";
+	
+	try {
+		
+		// create statement
+		st << dumpcmd, sqlitepp::into(dumpline);
+		
+		// open output file
+		std::ofstream outfile(dumpfile);
+		if (outfile.bad())
+		{
+			std::cerr << "Couldn't open file \"" << dumpfile << "\".\n";
+			exit(-1);
+		}
+		
+		// get and write data
+		while (st.exec())
+			outfile << dumpline << std::endl;
+		
+	} catch (sqlitepp::exception & e) {
+		
+		std::cerr << "ERROR: Dump failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+		std::cerr << "       Failed SQL command was: \"" << dumpcmd << "\"" << std::endl;
+		exit(-1);
+		
+	}
+}
+
 int run (
 	eUnit Eunits, lUnit Lunits,
 	std::vector<std::string> const & vars,

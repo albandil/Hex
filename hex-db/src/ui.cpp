@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
 	}
 	
 	// program parameters
-	std::string dbname = "hex.db", sqlfile;
+	std::string dbname = "hex.db", sqlfile, dumpfile;
 	bool create_new = false, doupdate = false, doimport = false;
 	
 	// scattering variables to compute
@@ -135,14 +135,22 @@ int main(int argc, char* argv[])
 		while (arg.front() == '-')
 			arg.erase(0,1);
 		
-		// split at equation sign or space (if present)
+		// split at equation sign (if present)
 		std::string::iterator eq;
 		eq = std::find(arg.begin(), arg.end(), '=');
-		if (eq == arg.end())
-			eq = std::find(arg.begin(), arg.end(), ' ');
 		std::string argnam = arg.substr(0, eq - arg.begin());
 		std::string argpar;
 		if (eq != arg.end()) argpar = arg.substr(eq + 1 - arg.begin(), arg.end() - eq - 1);
+		
+		// if there is no equation sign, check if the next argument is parameter
+		if (eq == arg.end())
+		{
+			if (i+1 < argc and argv[i+1][0] != '-')
+			{
+				argpar = argv[i+1];
+				i++;
+			}
+		}
 		
 		// switch option name
 		bool OK = SwitchInput ( argnam, argpar,
@@ -151,6 +159,7 @@ int main(int argc, char* argv[])
 			"database", 1, [ & ](std::string opt) -> void { dbname = opt; },
 			"import",   1, [ & ](std::string opt) -> void { doimport = true; sqlfile = opt; },
 			"update",   0, [ & ](std::string opt) -> void { doupdate = true; },
+			"dump",     1, [ & ](std::string opt) -> void { dumpfile = opt; },
 			"vars",     0, [ & ](std::string opt) -> void {
 				std::cout << "(name)\t\t(description)" << std::endl;
 				for (Variable const * var : vlist)
@@ -263,6 +272,10 @@ int main(int argc, char* argv[])
 	// update
 	if (doimport or doupdate)
 		update();
+	
+	// dump contents of "tmat" table
+	if (not dumpfile.empty())
+		dump(dumpfile.c_str());
 	
 	// is there anything more to do?
 	if (vars.empty())
