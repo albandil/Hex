@@ -135,8 +135,11 @@ int main(int argc, char* argv[])
 		while (arg.front() == '-')
 			arg.erase(0,1);
 		
-		// split at equation sign (if present)
-		std::string::iterator eq = std::find(arg.begin(), arg.end(), '=');
+		// split at equation sign or space (if present)
+		std::string::iterator eq;
+		eq = std::find(arg.begin(), arg.end(), '=');
+		if (eq == arg.end())
+			eq = std::find(arg.begin(), arg.end(), ' ');
 		std::string argnam = arg.substr(0, eq - arg.begin());
 		std::string argpar;
 		if (eq != arg.end()) argpar = arg.substr(eq + 1 - arg.begin(), arg.end() - eq - 1);
