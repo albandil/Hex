@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
 		// if there is no equation sign, check if the next argument is parameter
 		if (eq == arg.end())
 		{
-			if (i+1 < argc and argv[i+1][0] != '-')
+			if (i+1 < argc and (strlen(argv[i+1]) == 1 or argv[i+1][0] != '-'))
 			{
 				argpar = argv[i+1];
 				i++;

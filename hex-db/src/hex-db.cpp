@@ -172,16 +172,25 @@ void dump (const char* dumpfile)
 		st << dumpcmd, sqlitepp::into(dumpline);
 		
 		// open output file
-		std::ofstream outfile(dumpfile);
-		if (outfile.bad())
+		std::ofstream outfile;
+		if (dumpfile != std::string("-"))
 		{
-			std::cerr << "Couldn't open file \"" << dumpfile << "\".\n";
-			exit(-1);
+			outfile.open(dumpfile);
+			if (outfile.bad())
+			{
+				std::cerr << "Couldn't open file \"" << dumpfile << "\".\n";
+				exit(-1);
+			}
 		}
 		
 		// get and write data
 		while (st.exec())
-			outfile << dumpline << std::endl;
+		{
+			if (dumpfile != std::string("-"))
+				outfile << dumpline << std::endl;
+			else
+				std::cout << dumpline << std::endl;
+		}
 		
 	} catch (sqlitepp::exception & e) {
 		
