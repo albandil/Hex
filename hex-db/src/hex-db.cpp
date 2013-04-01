@@ -184,12 +184,19 @@ void dump (const char* dumpfile)
 		}
 		
 		// get and write data
-		while (st.exec())
+		if (dumpfile != std::string("-"))
 		{
-			if (dumpfile != std::string("-"))
+			outfile << "BEGIN TRANSACTION" << std::endl;
+			while (st.exec())
 				outfile << dumpline << std::endl;
-			else
+			outfile << "COMMIT" << std::endl;
+		}
+		else
+		{
+			std::cout << "BEGIN TRANSACTION" << std::endl;
+			while (st.exec())
 				std::cout << dumpline << std::endl;
+			std::cout << "COMMIT" << std::endl;
 		}
 		
 	} catch (sqlitepp::exception & e) {
