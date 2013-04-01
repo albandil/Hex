@@ -400,7 +400,7 @@
 
 	</div> <!-- rám -->
 
-	<div class = "pata">Jakub Benda ⓒ 2013</div>
+	<div class = "pata">Jakub Benda &copy; 2013</div>
 
 </body>
 

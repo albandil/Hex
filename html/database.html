@@ -46,7 +46,29 @@
 
 	<div class = "sekce">Hex-data</div>
 
-	<div class = "text">Data contained in the database:</div>
+	<div class = "text">
+		The database is represented as a single <a href = "http://www.sqlite.org/">SQLite</a>
+		file and the user interface <a href = "hex-db.html">hex-db</a> uses the
+		C/C++ API of SQLite to access the data. The whole database can also be easily
+		reconstructed using hex-db from the published data:
+	</div>
+	<div style = "font-family:monospace;background:black;color:white;margin:10px;padding:5px">
+		&gt; hex-db --database &lt;path-to-DB-file&gt; --new --import Hex-130321.sql --update
+	</div>
+	<div class = "text" style = "text-indent:0;">
+		The most recent data pack can be obtained below. You will need to decompress
+		it first. The file is compressed by LZMA2 (xz), which can be decoded e.g. by
+		<a href = "http://www.7-zip.org/">7zip</a> (Windows) or using the standard
+		<a href = "http://tukaani.org/xz/">xz-tools</a> (Linux). Expect the resulting
+		file to inflate approximately ten times!
+	</div>
+	<center>
+		<span style = "margin:10px;padding:5px;background:yellow;">
+			<a href = "Hex-130321.sql.xz">Hex-130321.sql.xz</a> - 19.1 MiB
+		</span>
+	</center>
+
+	<div class = "text" style = "text-indent:0;">Data contained in the database:</div>
 
 	<div><center>
 		<table class="logtable">
