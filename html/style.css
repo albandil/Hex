@@ -9,7 +9,7 @@ td {
 }
 div {
 	color: black;
-	font-family: "Verdana", sans-serif;
+	font-family: "Arial", sans-serif;
 }
 div.grid {
 	margin-left: auto;
@@ -50,10 +50,14 @@ table.logtable th, table.logtable td {
 	border-color: black;
 }
 div.nadpis {
+	text-align: left;
 	font-size: 60px;
+	color: #880000;
 }
 div.podnadpis {
+	text-align: left;
 	font-size: 20px;
+	color: #880000;
 }
 div.sekce {
 	font-size: 20px;
@@ -67,9 +71,16 @@ div.output {
 	border-color: black;
 }
 div.text {
+	font-family: "Arial", sans-serif;
 	margin: 10px;
 	text-align: justify;
 	text-indent: 15px;
+}
+div.text-noindent {
+	font-family: "Arial", sans-serif;
+	margin: 10px;
+	text-align: justify;
+	text-indent: 0px;
 }
 div.smalltext {
 	margin: 10px;
@@ -89,14 +100,19 @@ ul {
 	margin: 10px;
 	color: black;
 	text-align: justify;
-	font-family: "Verdana", sans-serif;
+	font-family: "Arial", sans-serif;
 }
 span {
-	font-family: "Verdana", sans-serif;
+	font-family: "Arial", sans-serif;
 }
-a.module {
-/* 	font-family: "Verdana", sans-serif; */
+a {
+/* 	font-weight: bold; */
+	font-family: "Arial", sans-serif;
 	color:  #880000;
-	font-style: bold;
-    text-decoration: none;
+}
+a:link, a:visited {
+	text-decoration: none
+}
+a:hover {
+	text-decoration: underline
 }

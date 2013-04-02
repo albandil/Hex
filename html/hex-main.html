@@ -30,6 +30,7 @@
 
 	<!-- header -->
 
+	<center>
 	<table border = "0">
 		<tr><td>
 			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
@@ -39,21 +40,25 @@
 			<div class = "podnadpis">scattering database</div>
 		</td></tr>
 	</table>
+	</center>
 
 	<!-- body -->
 
 	<div class = "sekce">Hex-main</div>
 
-	<div class = "text">Low energy module <span class = "module">hex-main</span>
-	computes precise two-electron wave function from the non-relativistic
-	Schrödinger equation,
+	<div class = "text">
+	Low energy module hex-main computes a precise two-electron wave function
+	from the non-relativistic Schrödinger equation,
+	</div>
 
 	\[
 		(E - H) \Psi_{\mathrm{sc}}^S = H_{\mathrm{int}} \Psi_{\mathrm{inc}}^S \ .
 	\]
 
+	<div class = "text-noindent">
 	The wave function \( \Psi_{\mathrm{sc}} \) is expanded into bipolar spherical
 	functions,
+	</div>
 
 	\[
 		\Psi_{\mathrm{sc}}^S(\mathbf{r}_1,\mathbf{r}_2) = \sum_{\ell_1 \ell_2 L M}
@@ -61,25 +66,37 @@
 		(\hat{\mathbf{r}}_1,\hat{\mathbf{r}}_2) \ ,
 	\]
 
-	and the radial part into product base of B-splines,
+	<div class = "text-noindent">
+	and the radial part into the product base of B-splines,
+	</div>
 
 	\[
 		\psi_{\mathrm{sc},\ell_1\ell_2}^{LMS}(r_1,r_1) = \sum_{ij}
 		\psi_{\mathrm{sc},\ell_1\ell_2ij}^{LMS} B_i(r_1) B_j(r_2) \ .
 	\]
 
+	<div class = "text-noindent">
 	The Schrödinger equation is then transformed into a matrix equation for
 	sufficient amount of coupled angular momentum states \( (\ell_1,\ell_2) \) .
 	The ECS (exterior complex scaling) method is used to avoid specifiying
 	a specific outgoing boundary condition. Every \( \{LMS\} \) partial wave
 	is solved independently.
-
 	</div>
 
 	<div class = "text">
 	For details see the <a href = "hex-main/index.html">Doxygen documentation</a>.
 	</div>
 	
+	<div class = "sekce">External links</div>
+
+	<div class = "text-noindent">
+	[1] <a href = "http://researchrepository.murdoch.edu.au/225/">Bartlett P.; PhD Thesis (2005).</a>
+	</div>
+
+	<div class = "text-noindent">
+	[2] <a href = "http://iopscience.iop.org/0953-4075/37/4/017">McCurdy, Martín; J. Phys. B: At. Mol. Opt. Phys. 37 (2004) 917–936.</a>
+	</div>
+
 	</div> <!-- rám -->
 
 	<div class = "pata">Jakub Benda &copy; 2013</div>

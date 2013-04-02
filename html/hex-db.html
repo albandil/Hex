@@ -30,6 +30,7 @@
 
 	<!-- header -->
 
+	<center>
 	<table border = "0">
 		<tr><td>
 			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
@@ -39,11 +40,42 @@
 			<div class = "podnadpis">scattering database</div>
 		</td></tr>
 	</table>
+	</center>
 
 	<!-- body -->
+	
+	<div class = "sekce">Hex-db</div>
+
+	<div class = "text">
+	Hex-db is a command line interface (CLI) that is used to access a background
+	SQLite database. On request, the program computes many different scattering
+	variables like scattering amplitude, differential and integral cross section
+	and many more. Moreover, due to its modular structure the implementation of
+	other derived scattering variables is really straightforward.
+	</div>
+
+	<div class = "text">
+	The intermediate SQLite database file contains T-matrices imported from the
+	results of other programs (hex-main, hex-dwba and hex-pwba) and also some
+	precomputed derived variables (e.g. integral cross sections) whose run-time
+	evaluation would be too costly. This optimization greatly reduces the time
+	necessary for obtaining a result.
+	</div>
+
+	<div class = "text">
+	The program can be used as a stand-alone interface, or as a part of a more
+	complicated scripted pipeline, or as a backend of the <a href = "db.php">Web
+	interface</a> that is offered on this portal.
+	</div>
 
 	<div class = "text">
 	For details see the <a href = "hex-db/index.html">Doxygen documentation</a>.
+	</div>
+
+	<div class = "sekce">External links</div>
+
+	<div class = "text-noindent">
+	[1] <a href = "http://www.sqlite.org/">SQLite home page.</a>
 	</div>
 
 	</div> <!-- rám -->

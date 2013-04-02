@@ -30,17 +30,44 @@
 
 	<!-- header -->
 
+	<center>
 	<table border = "0">
 		<tr><td>
-			<a href = "index.html"><img src = "hexe.gif"/></a>
+			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
 		</td><td>
 			<div class = "nadpis">Hex</div>
 			
 			<div class = "podnadpis">scattering database</div>
 		</td></tr>
 	</table>
+	</center>
 
 	<!-- body -->
+
+	<div class = "sekce">Hex-pwba</div>
+
+	<div class = "text">
+	This program computes the T-matrix from the basic first order Born
+	approximation,
+	</div>
+	
+	\[
+		T = -4\pi^2 \left<\Psi_f\right| H_{\mathrm{full}} - H_{\mathrm{free}} \left|\Psi_i\right> \ .
+	\]
+
+	<div class = "text-noindent">
+	The initial and final states \( \Psi \) are taken as products of the atomic
+	(\(\psi\)) and projectile (\(\beta\)) function. The exchange is accounted
+	for by the (anti)symmetrization
+	</div>
+	
+	\[
+		\Psi(1,2) = \psi(1)\beta(2) + (-1)^S \beta(1)\psi(2) \ ,
+	\]
+
+	<div class = "text-noindent">
+	depending on the total spin.
+	</div>
 
 	<div class = "text">
 	For details see the <a href = "hex-pwba/index.html">Doxygen documentation</a>.
