@@ -117,8 +117,8 @@
 				<option value = "cgs" <?php
 					if (isset($_POST["Tunits"]) and $_POST["Tunits"] == "cgs")
 						echo "selected = \"selected\"";
-					?> >cgs</sup></option>
-			</select>
+					?> >cgs</option>
+			</select></span>
 		</center>
 
 		<div class = "text">Set initial atomic state(s):</div>
