@@ -95,13 +95,8 @@ span {
 	font-family: "Verdana", sans-serif;
 }
 a.module {
-	font-family: "Verdana", sans-serif;
-	color: #775566;
-	font-style: italic;
-}
-
-div.module {
-	font-family: "Verdana", sans-serif;
-	color: #775566;
-	font-style: italic;
+/* 	font-family: "Verdana", sans-serif; */
+	color:  #880000;
+	font-style: bold;
+    text-decoration: none;
 }

@@ -16,28 +16,30 @@
  
 <body>
 
-	<div class = "ramec">
+	<div class = "ramec" style = "width:750px;">
 
 	<!-- header -->
 
+	<center>
 	<table border = "0">
 		<tr><td>
 			<a href = "index.html"><img src = "hexe.gif" border = "0"/></a>
 		</td><td>
-			<div class = "nadpis">Hex</div>
+			<div class = "nadpis" style = "color:#880000;">Hex</div>
 			
-			<div class = "podnadpis">scattering database</div>
+			<div class = "podnadpis" style = "color:#880000;">scattering database</div>
 		</td></tr>
 	</table>
+	</center>
 
 	<!-- explanation -->
 
-	<div class = "text">
+	<div class = "text"  style = "color:#880000;">
 		“<b>Hex</b>” stands for “<b>H</b>ydrogen-<b>e</b>lectron <b>c</b>ollision<b>s</b>”.
 		This acronym actually covers several distinct things:
 	</div>
 
-	<ul>
+	<ul  style = "color:#880000;">
 		<li>
 			low-energy scattering code implementing direct solution of Schrödinger equation
 			using exterior complex scaling workaround for boundary condition, a.k.a.
@@ -61,20 +63,39 @@
 		</li>
 	</ul>
 	
-	<img src = "logo.png" style = "float: right; width: 100px; margin: 10px;"/>
+	<br/>
 	
-	<div class = "text">
+	<img src = "logo.png" style = "float: right; width: 200px; margin-left: 20px; margin-right: 20px;"/>
+	
+	<div class = "text" style = "">
+        The source code of the programs can be downloaded at one's own risk (!),
+        as the programs haven't been officially published yet, at the
+        &nbsp;<a href = "http://sourceforge.net/projects/hecs/">SourceForge</a> page.
+    </div>
+	
+	<br/>
+	
+	<div class = "text" style = "">
 		The package is maintained by the Institute of Theoretical Physics at the
 		Charles University in Prague, Czech Republic, in the collaboration with
 		the Astronomical Institute of the Czech Academy of Sciences.
 	</div>
 
-	<form name = "goto" action = "db.php" method = "post" style = "margin: 10px;">
-		<center>
-			<input type = "submit" value = "Go to web interface"/>
-		</center>
-	</forn>
-
+	<br/>
+	
+	<center>
+        <span style = "padding: 10px; margin: 10px; border: solid; border-width: 1px; background: #880000;"><a href = "db.php" style = "color: white; text-decoration: none;">Go to web interface</a></span>
+	</center>
+	
+	<!--<form name = "goto" action = "db.php" method = "post" style = "margin:10px">
+        <center>
+            <input type = "submit" value = "Go to web interface"/>
+        </center>
+    </form>-->
+	
+	
+	<br/><br/>
+	
 	</div> <!-- rám -->
 
 	<div class = "pata">Jakub Benda &copy; 2013</div>
