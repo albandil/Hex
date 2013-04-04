@@ -85,9 +85,16 @@ void create_new_database()
 
 void import (const char* sqlname)
 {
-	std::ifstream ifs(sqlname);
+	// open file, if necessary
+	std::ifstream ifs;
+	if (std::string(sqlname) != std::string("-"))
+		ifs.open(sqlname);
 	
-	if (not ifs.good())
+	// get input stream
+	std::istream& is = (std::string(sqlname) != std::string("-")) ? ifs : std::cin;
+	
+	// test input stream
+	if (not is.good())
 	{
 		std::cerr << "ERROR: Cannot open file \"" << sqlname << "\"" << std::endl;
 		exit(-1);
@@ -99,7 +106,7 @@ void import (const char* sqlname)
 		sqlitepp::statement st(db);
 		
 		std::string cmd;
-		getline(ifs, cmd);
+		getline(is, cmd);
 		
 		if (cmd.size() == 0)
 			continue;
@@ -118,7 +125,7 @@ void import (const char* sqlname)
 			
 		}
 		
-	} while (not ifs.eof());
+	} while (not is.eof());
 }
 
 void update ()
