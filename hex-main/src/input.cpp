@@ -270,7 +270,7 @@ void parse_input_file (
 	std::cout << "\n-----   B-spline environment  -------\n";
 	std::cout << "order = " << order << "\n";
 	std::cout << "R0 = " << R0 << "\n";
-	std::cout << "Rmax = " << "\n";
+	std::cout << "Rmax = " << Rmax << "\n";
 	std::cout << "ecsθ = " << ecstheta << "\n";
 	
 	// load real knot data
