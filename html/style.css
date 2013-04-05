@@ -105,6 +105,10 @@ ul {
 span {
 	font-family: "Arial", sans-serif;
 }
+span.sekce {
+	font-family: "Arial", sans-serif;
+	font-size: 20px;
+}
 a {
 /* 	font-weight: bold; */
 	font-family: "Arial", sans-serif;
