@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
 	// Setup B-spline environment ------------------------------------------ //
 	//
 	setup_knot_sequence(order, real_knots, R0, ecstheta, complex_knots, Rmax);
-	fprintf(stdout, "B-spline total count: %d\n\n", Nspline);
+	std::cout << "B-spline total count: " << Nspline << "\n\n";
 	//
 	// --------------------------------------------------------------------- //
 	
@@ -153,8 +153,7 @@ int main(int argc, char* argv[])
 		exit(0);
 	}
 	
-	fprintf(stdout, "Loading/precomputing derivative overlaps... ");
-	fflush(stdout);
+	std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
 	
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
@@ -171,8 +170,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	fprintf(stdout, "ok\nLoading/precomputing integral moments... ");
-	fflush(stdout);
+	std::cout << "ok\nLoading/precomputing integral moments... " << std::flush;
 	
 	
 	// Precompute useful integral moments ---------------------------------- //
@@ -214,8 +212,9 @@ int main(int argc, char* argv[])
 		).hdfsave("Mm2.hdf");
 	// --------------------------------------------------------------------- //
 	
-	fprintf(stdout, "ok\n");
-	fflush(stdout);
+	
+	std::cout << "ok\n";
+	
 	
 	// Precompute two-electron integrals ----------------------------------- //
 	//
@@ -247,11 +246,11 @@ int main(int argc, char* argv[])
 	{
 		#pragma omp master
 		{
-			fprintf(
-				stdout,
-				"Precomputing multipole integrals (λ = 0 .. %d) using %d threads.\n",
-				maxlambda, omp_get_num_threads()
-			); fflush(stdout);
+			std::cout << "Precomputing multipole integrals (λ = 0 .. " 
+			          << maxlambda 
+			          << ") using " 
+					  << omp_get_num_threads() 
+					  << " threads.\n";
 		}
 	}
 	
@@ -265,8 +264,7 @@ int main(int argc, char* argv[])
 		oss2 << "R_tr[" << lambda << "].hdf";
 		if (R_tr[lambda].hdfload(oss2.str().c_str()))
 		{
-			fprintf(stdout, "\t- integrals for λ = %d successfully loaded\n", lambda);
-			fflush(stdout);
+			std::cout << "\t- integrals for λ = " << lambda << " successfully loaded\n";
 			continue; // no need to compute
 		}
 		
@@ -306,8 +304,8 @@ int main(int argc, char* argv[])
 				
 				#pragma omp critical
 				{
-					fprintf(stdout, "\r\t- multipole λ = %d... %3.0f %%", lambda, i * 100. / Nspline);
-					fflush(stdout);
+					std::printf ("\r\t- multipole λ = %d... %3.0f %%", lambda, i * 100. / Nspline);
+					std::fflush (stdout);
 				}
 				
 				for (int j = i; j < Nspline; j++)
@@ -376,20 +374,17 @@ int main(int argc, char* argv[])
 		
 		R_tr[lambda].hdfsave(oss2.str().c_str());
 		
-		fprintf(stdout, "\r\t- multipole λ = %d... ok            \n", lambda);
-		fflush(stdout);
+		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";
 		
 	}
-	fprintf(stdout, "\t- R_tr[λ] has %ld nonzero elements\n", R_tr[0].size());
-	fflush(stdout);
+	std::cout << "\t- R_tr[λ] has " << R_tr[0].size() << " nonzero elements\n";
 	// --------------------------------------------------------------------- //
 	
 	
 	unsigned Hsize = Nspline * Nspline * (maxell + 1) * (maxell + 1);
-	fprintf(stdout, "Hamiltonian properties:\n");
-	fprintf(stdout, "\t-> hamiltonian size: %d\n", Hsize);
-	fprintf(stdout, "Loading/computing B-spline expansions... ");
-	fflush(stdout);
+	std::cout << "Hamiltonian properties:\n";
+	std::cout << "\t-> hamiltonian size: " << Hsize << "\n";
+	std::cout << "Loading/computing B-spline expansions... " << std::flush;
 	
 	
 	//
@@ -435,14 +430,13 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	fprintf(stdout, "ok\n");
-	fflush(stdout);
+	std::cout << "ok\n";
 	
 	
 	// Precompute some accelerators ---------------------------------------- //
 	//
 	// Kronecker producs
-	fprintf(stdout, "Creating Kronecker products... "); fflush(stdout);
+	std::cout << "Creating Kronecker products... " << std::flush;
 	CsrMatrix S_kron_S   = kron(S, S).tocsr();
 	CooMatrix S_kron_Mm1_tr = kron(S, Mm1_tr);
 	CsrMatrix S_kron_Mm2 = kron(S, Mm2).tocsr().sparse_like(S_kron_S);
@@ -459,7 +453,7 @@ int main(int argc, char* argv[])
 		R_tr_csr.begin(),
 		[ & ](const CooMatrix& coo) -> CsrMatrix { return coo.tocsr().sparse_like(S_kron_S); }
 	);
-	fprintf(stdout, "ok\n");
+	std::cout << "ok\n";
 	
 
 	// For all right hand sides -------------------------------------------- //
@@ -468,13 +462,13 @@ int main(int argc, char* argv[])
 	for (unsigned ie = 0; ie < Nenergy; ie++)
 	{
 		// print progress information
-		fprintf(stdout,
+		std::printf (
 			"\nSolving the system for Ei[%d] = %g (%3.0f %% finished, typically %4d CG iterations per energy)\n",
 			ie,
 		    Ei[ie],
 			ie * 100. / Nenergy,
 			computations_done == 0 ? 0 : iterations_done / computations_done
-		); fflush(stdout);
+		);
 		
 		cArray current_solution, previous_solution;
 		
@@ -486,6 +480,13 @@ int main(int argc, char* argv[])
 			int li = std::get<1>(instate);
 			int mi = std::get<2>(instate);
 			
+			// skip angular forbidden states
+			bool allowed = false;
+			for (int l = abs(li - L); l <= li + L; l++)
+				allowed = allowed or ClebschGordan(li,mi,l,0,L,mi);
+			if (not allowed)
+				continue;
+			
 			// compose filename of the output file for this solution
 			std::ostringstream oss;
 			oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
@@ -496,7 +497,7 @@ int main(int argc, char* argv[])
 		}
 		if (all_done)
 		{
-			fprintf(stdout, "\tAll solutions for Ei[%d] = %g loaded.\n", ie, Ei[ie]); fflush(stdout);
+			std::cout << "\tAll solutions for Ei[" << ie << "] = " << Ei[ie] << " loaded.\n";
 			continue;
 		}
 		
@@ -552,13 +553,11 @@ int main(int argc, char* argv[])
 			std::chrono::duration<int> sec;
 			
 			// factorize
-			fprintf(stdout, "\tLU factorization %d of (%d,%d) block started\n", iblock, l1, l2);
-			fflush(stdout);
+			std::cout << "\tLU factorization " << iblock << " of (" << l1 << "," << l2 << ") block started\n";
 			start = std::chrono::steady_clock::now();
 			lufts[iblock] = blocks[iblock].factorize();
 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-			printf("\tLU factorization %d of (%d,%d) block done after %d s\n", iblock, l1, l2, sec.count()); 
-			fflush(stdout);
+			std::cout << "\tLU factorization " << iblock << " of (" << l1 << "," << l2 << ") block done after " << sec.count() << " s\n";
 		}
 		
 		// For all initial states ------------------------------------------- //
@@ -593,7 +592,7 @@ int main(int argc, char* argv[])
 				// create right hand side
 				cArray chi ( (maxell+1)*(maxell+1)*Nspline*Nspline );
 				
-				fprintf(stdout, "\tCreate RHS\n"); fflush(stdout);
+				std::cout << "\tCreate RHS\n";
 				
 				// for all segments constituting the RHS
 				# pragma omp parallel for collapse(2)
@@ -764,7 +763,7 @@ int main(int argc, char* argv[])
 				
 				// custom conjugate gradients callback-based solver
 				double tolerance = 1e-10;
-				fprintf(stdout, "\tStart CG callback with tolerance %g\n", tolerance); fflush(stdout);
+				std::cout << "\tStart CG callback with tolerance " << tolerance << "\n";
 				unsigned iterations = cg_callbacks(
 					chi,					// right-hand side
 					current_solution,		// on input, the initial guess, on return, the solution
@@ -774,7 +773,7 @@ int main(int argc, char* argv[])
 					apply_preconditioner,	// preconditioner callback
 					matrix_multiply			// matrix multiplication callback
 				);
-				fprintf(stdout, "\tEnd CG callback\n"); fflush(stdout);
+				std::cout << "\tEnd CG callback\n";
 				
 				// update progress
 				computations_done++;
@@ -804,9 +803,9 @@ int main(int argc, char* argv[])
 		
 	} // end of For ie = 0, ..., Nenergy - 1
 	
-	fprintf(stdout, "\rSolving the systems... ok                                                            \n");
-	fprintf(stdout, "\t(typically %4d CG iterations per energy)\n", iterations_done / Nenergy);
-	fflush(stdout);
+	std::cout << "\rSolving the systems... ok                                                            \n";
+	std::cout << "\t(typically " << iterations_done/Nenergy << " CG iterations per energy)\n";
+	
 	// --------------------------------------------------------------------- //
 	
 // 	size_t N = 2001;
@@ -819,15 +818,14 @@ int main(int argc, char* argv[])
 	
 	// Create SQL batch file
 	char filename[100];
-	sprintf(filename, "%d-%d.sql", ni, L);
-	FILE* fsql = fopen(filename, "w");
-	fprintf(fsql, "BEGIN TRANSACTION;\n");
+	std::sprintf(filename, "%d-%d.sql", ni, L);
+	FILE* fsql = std::fopen(filename, "w");
+	std::fprintf(fsql, "BEGIN TRANSACTION;\n");
 	
 	// Extract the cross sections ------------------------------------------ //
 	//
 	
-	fprintf(stdout, "\rExtracting T-matrices... %3.0f%%     ", 0.);
-	fflush(stdout);
+	std::cout << "\rExtracting T-matrices..." << std::flush;
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
 	for (int Spin = 0; Spin <= 1; Spin++)
@@ -904,7 +902,7 @@ int main(int argc, char* argv[])
 				if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
 				if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
 				{
-					fprintf(fsql, "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e,%e);\n",
+					std::fprintf(fsql, "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e,%e);\n",
 						ni, li, mi, nf, lf, mf, L, Spin, Ei[ie], ell, T_ell[i].real(), T_ell[i].imag()
 					);
 				}
@@ -914,9 +912,9 @@ int main(int argc, char* argv[])
 			// print out the total cross section for quick overview
 			//
 			
-			sprintf(filename, "sigma-%d-%d-%d-%d-%d-%d-%d-%d.dat", ni, li, mi, nf, lf, mf, L, Spin);
-			FILE* ftxt = fopen(filename, "w");
-			fprintf(ftxt, "# Ei [Ry] sigma [a0^2]\n");
+			std::sprintf(filename, "sigma-%d-%d-%d-%d-%d-%d-%d-%d.dat", ni, li, mi, nf, lf, mf, L, Spin);
+			FILE* ftxt = std::fopen(filename, "w");
+			std::fprintf(ftxt, "# Ei [Ry] sigma [a0^2]\n");
 			for (unsigned ie = 0; ie < Nenergy; ie++)
 			{
 				double sigma = 0.;
@@ -928,27 +926,24 @@ int main(int argc, char* argv[])
 				}
 				if (finite(sigma))
 				{
-					fprintf(ftxt, "%g\t%g\n", Ei[ie], sigma);
+					std::fprintf(ftxt, "%g\t%g\n", Ei[ie], sigma);
 				}
 			}
-			fclose(ftxt);
+			std::fclose(ftxt);
 		}
 		
 		finished++;
 		
-		fprintf(stdout, "\rExtracting T-matrices... %3.0f%%     ", finished * 100. / transitions.size());
-		fflush(stdout);
+		std::printf("\rExtracting T-matrices... %3.0f%%     ", finished * 100. / transitions.size());
+		std::cout << std::flush;
 	}
-	fprintf(stdout, "\rExtracting T-matrices... ok       \n"); fflush(stdout);
+	std::cout << "\rExtracting T-matrices... ok       \n";
 	// --------------------------------------------------------------------- //
 	
-	fprintf(fsql, "COMMIT;\n");
-	fclose(fsql);
+	std::fprintf(fsql, "COMMIT;\n");
+	std::fclose(fsql);
 	
-	fprintf(stdout, "\nDone.\n\n");
-	fflush(stdout);
-	
-	fclose(stdout);
+	std::cout << "\nDone.\n\n";
 	
 	return 0;
 }
