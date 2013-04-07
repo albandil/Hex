@@ -16,7 +16,7 @@ num_lines = `cat avail.out | wc -l`
 
 # set colour scheme
 set palette model HSV functions 0.7,gray,1
-set cbrange [0:7]
+set cbrange [0:10]
 
 # set colours
 do for [ll = 1:9] {
@@ -31,7 +31,7 @@ set grid
 set xlabel "Ei - the impact energy in Rydbergs"
 set ytics 10,10
 set ylabel "initial state"
-set cblabel "partial waves available"
+set cblabel "max total L (partial wave)"
 
 spectr(li) = ((li==0) ? "s" : ((li==1) ? "p" : ((li==2) ? "d" : "?")))
 
@@ -64,7 +64,7 @@ do for [line_index = 1:num_lines] {
 
 	# plot
 #	plot (x < minE || x > maxE) ? 0/0 : H ls maxL+1 notitle
-	set object line_index rect from minE,H-W to maxE,H+W fillcolor palette cb maxL
+	set object line_index rect from minE,H-W to maxE,H+W fillcolor palette cb maxL+1
 # 	plot line_index/10. lc palette cb line_index notitle
 }
 
