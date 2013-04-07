@@ -25,6 +25,30 @@
 #define RETURN_ON_OVERFLOW 		1
 #define NORMALIZE_ON_OVERFLOW	2
 
+/**
+ * \brief Second-order differential equation solver.
+ * 
+ * This routine is adapted from the O₂scl file "ode_iv_solve.h".
+ * The modification it the following:
+ * - When the solution reaches some dangerously high absolute value, the function
+ *   either exits (returning the last solved index that was kept inside the
+ *   limits) or renormalizes the up-to-now solution so that the overflow is
+ *   avoided.
+ * \param xg Independent variable grid.
+ * \param N Size of the grid.
+ * \param h Grid spacing.
+ * \param yg (out) Solution.
+ * \param ypg (out) Solution derivative.
+ * \param yerrg (out) Estimated error.
+ * \param adapt_stepper Adaptive stepper class of the type o2scl::gsl_astep<decltype(derivs)>.
+ * \param derivs Second derivative callback of the signature
+ * \code
+ *   int derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+ * \endcode
+ * 
+ * \return N for successful run of n < N for forced terminantion on overflow,
+ *         where n is the index of last valid field in yg and ypg.
+ */
 template <class AdaptiveStepper, class DerivativeCallback>
 int solve2(
 	o2scl::ovector xg, int N, double h,								// grid info

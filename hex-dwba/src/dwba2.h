@@ -45,7 +45,7 @@ void DWBA2_Ln (
 void DWBA2_energy_driver (
 	double Ei, int li, int lf, double ki, double kf, 
 	int Ni, int Nf, int Li, int Lf, int Ln,
-	int lami, int lamf, 
+	int lami, int lamf, int ln,
 	HydrogenFunction const & psii, 
 	HydrogenFunction const & psif, 
 	DistortingPotential const & Ui,
@@ -57,7 +57,7 @@ void DWBA2_energy_driver (
 void DWBA2_En (
 	double Ei, int Ni,
 	double Kn, int Ln,
-	int lami, int lamf,
+	int lami, int lamf, int ln,
 	HydrogenFunction const & psii,
 	HydrogenFunction const & psif,
 	HydrogenFunction const & psin,
@@ -111,17 +111,19 @@ template <
 		ClenshawCurtis<decltype(inte1),Complex> Q1(inte1);
 		Q1.setLim(false);
 		Q1.setRec(false);
+		Q1.setSubdiv(15);
 		Q1.setEps(1e-6);
 		Q1.setTol(1e-6);
-// 		Q1.setVerbose(true);
+// 		Q1.setVerbose(true, "Green 1");
 		
 		CompactIntegrand<decltype(integrand2), Complex> inte2(integrand2, 0., fari, false, 1.0);
 		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
 		Q2.setLim(false);
 		Q2.setRec(false);
+		Q2.setSubdiv(15);
 		Q2.setEps(1e-6);
-		Q1.setTol(1e-6);
-// 		Q2.setVerbose(true);
+		Q2.setTol(1e-6);
+// 		Q2.setVerbose(true, "Green 2");
 		
 		// integrate
 		
@@ -148,9 +150,10 @@ template <
 	ClenshawCurtis<decltype(inte),Complex> Q(inte);
 	Q.setLim(false);
 	Q.setRec(false);
+	Q.setSubdiv(15);
 	Q.setEps(1e-4);
 	Q.setTol(1e-6);
-	Q.setVerbose(true);
+	Q.setVerbose(true, "Outer Green integral");
 	
 	std::cout << "\tFar = " << farf << std::endl;
 	std::cout << "\tIntegrand(1) = " << integrand(1.) << std::endl;

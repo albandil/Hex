@@ -87,72 +87,57 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		int n1 = solve2(xg, samples, -h, y1g, y1pg, y1errg, adapt_stepper, derivs, RETURN_ON_OVERFLOW);
 		int n2 = solve2(xg, samples, -h, y2g, y2pg, y2errg, adapt_stepper, derivs, RETURN_ON_OVERFLOW);
 		
+		int nx = std::min(n1,n2);		// matching grid point index
+		double rx;						// matching grid point for Re η	
+		
 		// match irregular Coulomb function
-		gsl_sf_result F, Fp, G, Gp;
-		double exp_F, exp_G;
-		if (n1 != samples or n2 != samples)
+		if (nx < samples - 1)
 		{
-			int nx = std::min(n1,n2);		// matching grid point index
-			double rx = xg[nx];				// matching grid point for Re η	
-			bool warn = true;				// warn if something goes wrong
+			rx = xg[nx];
 			
-			// evaluate G for the purpose of determining the scaling factor
-			int err = gsl_sf_coulomb_wave_FG_e(-1./kn, kn*rx, ln, 0, &F, &Fp, &G, &Gp, &exp_F, &exp_G);
-			if (err != GSL_SUCCESS and err != GSL_ELOSS)
+			// evaluate G so that we can scale missing values from it
+			gsl_sf_result Fx, Fpx, Gx, Gpx, F, Fp, G, Gp;
+			double exp_Fx, exp_Gx, exp_F, exp_G;
+			int err = gsl_sf_coulomb_wave_FG_e(-1./kn, kn*rx, ln, 0, &Fx, &Fpx, &Gx, &Gpx, &exp_Fx, &exp_Gx);
+			
+			// only use the value if valid
+			if (err == GSL_SUCCESS)
 			{
-				// if an error was encountered (other than loss of accuracy)
-				throw exception (
-					"[IrregularWave] Error %d (\"%s\") while evaluating G[%d](%g,%g).\n",
-					err, gsl_strerror(err), ln, kn, rx
-				);
-			}
-			else
-			{
-				// scale G for the rest of the solutions
-				double const_re = y1g[nx][0] / G.val;	// scaling factor for real part
-				double const_im = y2g[nx][0] / G.val;	// scaling factor for imag part
+				// scale the rest of the solutions
 				for (int i = nx + 1; i < samples - 1; i++)
 				{
-					double r = xg[i];
-					int err = gsl_sf_coulomb_wave_FG_e(-1./kn, kn*r, ln, 0, &F, &Fp, &G, &Gp, &exp_F, &exp_G);
-					if (err == GSL_SUCCESS or err == GSL_ELOSS)
+					if (gsl_sf_coulomb_wave_FG_e(-1./kn, kn*xg[i], ln, 0, &F, &Fp, &G, &Gp, &exp_F, &exp_G) == GSL_SUCCESS)
 					{
-						// take both precise and inaccurate solution, but warn in the latter case
-						if (err == GSL_ELOSS)
-						{
-							if (warn)
-							{
-								fprintf(stderr, "\t\t\tG[%d](%g,%g) inaccurate.\n", ln, kn, r);
-								warn = false;
-							}
-							
-							abort();
-						}
+						double scale = G.val / Gx.val;
 						
 						// scale G if needed
 						if (i > n1)
-							y1g[i][0] = const_re * G.val;
+							y1g[i][0] = y1g[nx][0] * scale;
 						if (i > n2)
-							y2g[i][0] = const_im * G.val;
+							y2g[i][0] = y2g[nx][0] * scale;
 					}
 					else
 					{
-						// some other more peculiar error
-						if (warn)
-						{
-							fprintf (
-								stderr,
-								"[distort_irregular_allowed] Error %d (\"%s\") while evaluating G[%d](%g,%g).\n",
-								err, gsl_strerror(err), ln, kn, r
-							);
-							warn = false;
-						}
-						
-						abort();
-						
-						y1g[i][0] = y2g[i][0] = 0.;
+						// unsuccessfull evaluation
+						nx = i - 1;
+						break;
 					}
 				}
+			}
+		}
+		
+		// if still not done ...
+		if (nx < samples - 1)
+		{
+			// ... match the "origin" solution 1/r^ℓ
+			for (int i = nx + 1; i < samples - 1; i++)
+			{
+				double scale =  pow(xg[nx]/xg[i], ln);
+				
+				if (i > n1)
+					y1g[i][0] = y1g[nx][0] * scale;
+				if (i > n2)
+					y2g[i][0] = y2g[nx][0] * scale;
 			}
 		}
 		

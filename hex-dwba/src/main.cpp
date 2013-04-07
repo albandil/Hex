@@ -10,8 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <cstdio>
-#include <cstdlib>
+#include <iostream>
 
 #include <gsl/gsl_sf.h>
 
@@ -24,36 +23,12 @@
 
 int main(int argc, char *argv[])
 {
-/// DEBUG
-// 	DistortingPotential U(1);
-// 	
-// 	int ll = atoi(argv[1]);
-// 	
-// 	DistortedWave phi = U.getDistortedWave(2.,ll);
-// 	IrregularWave eta = U.getIrregularWave(2.,ll);
-// 	HyperbolicWave theta = U.getHyperbolicWave(2.,ll);
-// 	ForbiddenWave zeta = U.getForbiddenWave(2.,ll);
-// 	
-// 	for (int ix = 1; ix < 1000; ix++)
-// 	{
-// 		double x = ix * 0.01;
-// 		
-// 		std::cout
-// 			<< x << "\t"
-// 			<< phi(x) << "\t"
-// 			<< eta(x).real() << "\t"
-// 			<< theta(x) << "\t"
-// 			<< zeta(x) << "\n";
-// 	}
-// 	
-// 	exit(0);
-	
 // 	gsl_set_error_handler_off();
 	
 	if (argc != 8)
 	{
-		printf("\nusage:\n");
-		printf("\tdwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> <order>\n\n");
+		std::cout << "\nUsage:\n";
+		std::cout << "\tdwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> <order>\n\n";
 		return 0;
 	}
 	
@@ -98,7 +73,9 @@ int main(int argc, char *argv[])
 	{
 		cArray Tdir_lf(MM), Texc_lf(MM), DD_lf(MM), DE_lf(MM), ED_lf(MM), EE_lf(MM);
 		
-		printf("lf = %d\n", lf);
+		std::cout << "---------------------------------------\n";
+		std::cout << "lf = " << lf << "\n";
+		std::cout << "---------------------------------------\n";
 		
 		DistortedWave chif = Ui.getDistortedWave(kf,lf);
 		
@@ -113,7 +90,9 @@ int main(int argc, char *argv[])
 		
 		for (int li = 0; ; li++)
 		{
-			printf("\tli = %d\n", li);
+			std::cout << "---------------------------------------\n";
+			std::cout << "li = " << li << "\n";
+			std::cout << "---------------------------------------\n";
 			
 			// conserve angular momentum
 			if (li < lf - Li - Lf)
@@ -175,7 +154,9 @@ int main(int argc, char *argv[])
 			for (int Ln = 0; ; Ln++)
 			{
 				cArray DD_lf_li_Ln(MM), DE_lf_li_Ln(MM), ED_lf_li_Ln(MM), EE_lf_li_Ln(MM);
-				printf("\t\tLn = %d\n", Ln);
+				std::cout << "---------------------------------------\n";
+				std::cout << "Ln = " << Ln << "\n";
+				std::cout << "---------------------------------------\n";
 				
 				DWBA2_Ln (
 					Ei, li, lf, ki, kf, Ni, Nf, Li, Lf,
@@ -194,8 +175,10 @@ int main(int argc, char *argv[])
 				// relative changes of second-order amplitudes
 				cArray relchng_singlet = (DD_lf_li_Ln + DE_lf_li_Ln + ED_lf_li_Ln + EE_lf_li_Ln) / (DD_lf_li + DE_lf_li + ED_lf_li + EE_lf_li);
 				cArray relchng_triplet = (DD_lf_li_Ln - DE_lf_li_Ln - ED_lf_li_Ln + EE_lf_li_Ln) / (DD_lf_li - DE_lf_li - ED_lf_li + EE_lf_li);
-					
-				printf("\t\t\tδ %g %g\n", abs(relchng_singlet[0]), abs(relchng_triplet[0]));
+				
+				std::cout << "---------------------------------------\n";
+				std::cout << "δ " << abs(relchng_singlet[0]) << " " << abs(relchng_triplet[0]) << "\n";
+				std::cout << "---------------------------------------\n";
 					
 				if (std::max(max(abs(relchng_singlet)), max(abs(relchng_triplet))) <= sigmaeps)
 					break; // OK, converged
@@ -229,28 +212,28 @@ int main(int argc, char *argv[])
 		if (compute_DD and DD_contrib < accelerator_eps)
 		{
 			compute_DD = false;
-			printf("\tabandoning DD part of DWBA-2\n");
+			std::cout << "Abandoning DD part of DWBA-2\n";
 		}
 		if (compute_DE and DE_contrib < accelerator_eps)
 		{
 			compute_DE = false;
-			printf("\tabandoning DE part of DWBA-2\n");
+			std::cout << "Abandoning DE part of DWBA-2\n";
 		}
 		if (compute_ED and ED_contrib < accelerator_eps)
 		{
 			compute_ED = false;
-			printf("\tabandoning ED part of DWBA-2\n");
+			std::cout << "Abandoning ED part of DWBA-2\n";
 		}
 		if (compute_EE and EE_contrib < accelerator_eps)
 		{
 			compute_EE = false;
-			printf("\tabandoning EE part of DWBA-2\n");
+			std::cout << "Abandoning EE part of DWBA-2\n";
 		}
 	}
 	
 	// extract integral cross section for all transitions
 	double sumsumsigma = 0;
-	printf("\n%g\t", Ei);
+	std::cout << "\n" << Ei << "\t";
 	for (int Mi = -Li; Mi <= Li; Mi++)
 	{
 		double sumsigma = 0;
@@ -269,13 +252,13 @@ int main(int argc, char *argv[])
 			
 			sigma /= 4 * M_PI * M_PI;
 			
-			printf("%g ", sigma);
+			std::cout << sigma << " ";
 			sumsigma += sigma;
 		}
-		printf("%g ", sumsigma);
+		std::cout << sumsigma << " ";
 		sumsumsigma += sumsigma;
 	}
-	printf("%g %ld\n", sumsumsigma, Tdir.size());
+	std::cout << sumsumsigma << " " << Tdir.size() << "\n";
 	
-	return EXIT_SUCCESS;
+	return 0;
 }
