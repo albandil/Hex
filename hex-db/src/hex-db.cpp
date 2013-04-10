@@ -100,30 +100,54 @@ void import (const char* sqlname)
 		exit(-1);
 	}
 	
-	// NOTE assuming one statement per line
-	do
-	{
+	// input line number
+	int line = 0;
+	
+	do {
+		
+		// query statement
 		sqlitepp::statement st(db);
 		
-		std::string cmd;
+		// read line from input stream
+		std::string cmd, cmd1;
 		getline(is, cmd);
 		
+		// skip empty lines
 		if (cmd.size() == 0)
 			continue;
 		
-		st << cmd;
-		
-		try {
-		
-			st.exec();
+		// for all statements on this line
+		do {
 			
-		} catch (sqlitepp::exception & e) {
-		
-			std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-			std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-			exit(-1);
+			// position of semicolon
+			int semicolon = std::find(cmd.begin(), cmd.end(), ';') - cmd.begin();
 			
-		}
+			// split string
+			cmd1 = cmd.substr(0, semicolon);
+			cmd = cmd.substr(semicolon + 1, std::string::npos);
+			
+			// trim spaces
+			cmd1 = trim(cmd1);
+			cmd = trim(cmd);
+			
+			// try to execute the first command
+			try {
+				
+				st << cmd1;
+				st.exec();
+				
+			} catch (sqlitepp::exception & e) {
+			
+				std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+				std::cerr << "       [Line " << line << "] Failed SQL command was: \"" << cmd1 << "\"" << std::endl;
+				exit(-1);
+				
+			}
+			
+		} while (cmd.size() > 0);
+		
+		// move on to the next line
+		line++;
 		
 	} while (not is.eof());
 }

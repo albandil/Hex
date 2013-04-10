@@ -42,12 +42,9 @@ double PhiFunctionDirIntegral::operator()(double x2) const
 	// integration system
 	ClenshawCurtis<decltype(R1),double> Q1(R1);
 	Q1.setEps(1e-10);	// be precise
-// 	Q1.setVerbose(true);
 	
 	// integrate
-// 	std::cout << "i1 = ?\n";
 	double i1 = (x2 == 0) ? 0. : Q1.integrate(R1.scale(0.), R1.scale(x2)) / x2;
-// 	std::cout << "i1 = " << i1 << "\n";
 	
 	//
 	// infinite integrand:
@@ -67,9 +64,7 @@ double PhiFunctionDirIntegral::operator()(double x2) const
 	Q2.setEps(1e-10);
 	
 	// integrate
-// 	std::cout << "i2 = ?\n";
 	double i2 = Q2.integrate(R2.scale(x2), R2.scale(Inf));
-// 	std::cout << "i2 = " << i2 << "\n";
 	
 	// sum the two integrals
 	return i1 + i2;

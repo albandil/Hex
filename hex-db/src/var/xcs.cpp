@@ -131,13 +131,22 @@ bool ExtrapolatedCrossSection::run (
 		sigmafull.push_back(sigma);
 	}
 	
+	// write header
+	std::cout << this->logo() <<
+		"# Extrapolated and complete cross section in " << unit_name(Lunits) << " for\n" <<
+		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
+	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
+		"#\n" <<
+	    "# E\t σx\t σc\n";
+	
 	// threshold for ionization
 	double Eion = 1./(ni*ni);
 	
 	// compute complete cross section
-	rArray ccs = (efactor * energies.front() < Eion) ? 
+	rArray ccs = (energies[0] < 0) ? sigmafull : ((efactor * energies.front() < Eion) ? 
 		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
-		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline);
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline));
 	
 	// reshape arrays for compatible indexing by energies
 	rArray dsigma0empty(dsigma0.size());	// zero-filled ghost
@@ -152,20 +161,22 @@ bool ExtrapolatedCrossSection::run (
 	sigmafull -= dsigma0 * dsigma0 / (dsigma0 - dsigma1);
 	
 	// interpolate
-	rArray xcs = (efactor * energies.front() < 1.) ? 
+	rArray xcs = (energies[0] < 0) ? sigmafull : ((efactor * energies.front() < 1.) ? 
 		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
-		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline);
+		interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline));
 	
-	// write out
-	std::cout << this->logo() <<
-		"# Extrapolated and complete cross section in " << unit_name(Lunits) << " for\n" <<
-		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-		"#\n" <<
-	    "# E\t σx\t σc\n";
-	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << xcs[i]*lfactor*lfactor << "\t" << ccs[i]*lfactor*lfactor << "\n";
+	if (energies[0] < 0.)
+	{
+		// negative energy indicates full output
+		for (size_t i = 0; i < Efull.size(); i++)
+			std::cout << Efull[i] / efactor << "\t" << xcs[i]*lfactor*lfactor << "\n";
+	}
+	else
+	{
+		// output
+		for (size_t i = 0; i < energies.size(); i++)
+			std::cout << energies[i] << "\t" << xcs[i]*lfactor*lfactor << "\t" << ccs[i]*lfactor*lfactor << "\n";
+	}
 	
 	return true;
 }

@@ -147,10 +147,7 @@ bool MomentumTransfer::run (
 	}
 	eta *= 1. / (4. * M_PI * M_PI);
 	
-	// interpolate
-	eta = interpolate(eta_energies, eta, energies * efactor);
-	
-	// write out
+	// write header
 	std::cout << this->logo() <<
 		"# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
@@ -159,8 +156,22 @@ bool MomentumTransfer::run (
 	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 		"#\n" <<
 	    "# E\t η\n";
-	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << eta[i]*lfactor*lfactor << "\n";
+	
+	if (energies[0] < 0.)
+	{
+		// negative energy indicates full output
+		for (size_t i = 0; i < eta_energies.size(); i++)
+			std::cout << eta_energies[i] / efactor << "\t" << eta[i] * lfactor * lfactor << "\n";
+	}
+	else
+	{
+		// interpolate
+		eta = interpolate(eta_energies, eta, energies * efactor);
+		
+		// output
+		for (size_t i = 0; i < energies.size(); i++)
+			std::cout << energies[i] << "\t" << eta[i] * lfactor * lfactor << "\n";
+	}
 	
 	return true;
 }

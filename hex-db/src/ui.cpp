@@ -270,7 +270,7 @@ int main(int argc, char* argv[])
 		import(sqlfile.c_str());
 	
 	// update
-	if (doimport or doupdate)
+	if (doupdate)
 		update();
 	
 	// dump contents of "tmat" table

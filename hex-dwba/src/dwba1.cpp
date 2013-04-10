@@ -10,12 +10,6 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef Inf
-	#include <limits>
-	#define Inf (std::numeric_limits<double>::infinity())
-	#define Nan (std::numeric_limits<double>::quiet_NaN())
-#endif
-
 #include "complex.h"
 #include "potential.h"
 #include "dwba1.h"
@@ -23,7 +17,10 @@
 #include "integrate.h"
 #include "specf.h"
 
-Complex DWBA1::computeDirect1e(DistortingPotential const& U, int l, double k)
+namespace DWBA1
+{
+
+Complex computeDirect1e(DistortingPotential const& U, int l, double k)
 {
 	// get distorted wave
 	DistortedWave chi_kl = U.getDistortedWave(k,l);
@@ -47,7 +44,7 @@ Complex DWBA1::computeDirect1e(DistortingPotential const& U, int l, double k)
 		(Q1.result() - Q2.result() * chi_kl.getPhasef()) * chi_kl.getPhasef();
 }
 
-Complex DWBA1::computeExchange1e(
+Complex computeExchange1e(
 	DistortingPotential const& U,
 	int Ni, int Li, double ki,
 	int Nf, int Lf, double kf
@@ -80,7 +77,7 @@ Complex DWBA1::computeExchange1e(
 		sqrt((2*Lf+1)/(4*M_PI)) * Q1.result() * Q2.result() / (ki*kf);
 }
 
-Complex DWBA1::computeDirect2e(
+Complex computeDirect2e(
 	const DistortingPotential& U, int lambda,
 	int Nf, int Lf, double kf, int lf,
 	int Ni, int Li, double ki, int li
@@ -141,7 +138,7 @@ Complex DWBA1::computeDirect2e(
 		sqrt((2*li+1)/(4*M_PI)) / (2.*lambda+1.) * Q.result() / (ki*kf);
 }
 
-Complex DWBA1::computeExchange2e(
+Complex computeExchange2e(
 	const DistortingPotential& U, int lambda,
 	int Nf, int Lf, double kf, int lf,
 	int Ni, int Li, double ki, int li
@@ -201,3 +198,5 @@ Complex DWBA1::computeExchange2e(
 	return pow(4*M_PI,3) * phasef * pow(Complex(0.,1.),li-lf) * 
 		sqrt((2*li+1)/(4*M_PI)) / (2.*lambda+1.) * Q.result() / (ki*kf);
 }
+
+}; // end of namespace DWBA1

@@ -106,15 +106,7 @@ bool IntegralCrossSection::run (
 		sigma_arr.push_back(sigma);
 	}
 	
-	// threshold for ionization
-	double Eion = 1./(ni*ni);
-	
-	// interpolate
-	rArray ics = (efactor * energies.front() < Eion) ? 
-		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
-		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
-	
-	// write out
+	// write header
 	std::cout << this->logo() <<
 		"# Integral cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
@@ -123,8 +115,27 @@ bool IntegralCrossSection::run (
 	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 		"#\n" <<
 	    "# E\t σ\n";
-	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\n";
+	
+	if (energies[0] < 0.)
+	{
+		// negative energy indicates full output
+		for (size_t i = 0; i < E_arr.size(); i++)
+			std::cout << E_arr[i] / efactor << "\t" << sigma_arr[i] * lfactor * lfactor << "\n";
+	}
+	else
+	{
+		// threshold for ionization
+		double Eion = 1./(ni*ni);
+		
+		// interpolate
+		rArray ics = (efactor * energies.front() < Eion) ? 
+			interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
+			interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+		
+		// output
+		for (size_t i = 0; i < energies.size(); i++)
+			std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\n";
+	}
 	
 	return true;
 }

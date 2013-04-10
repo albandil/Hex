@@ -22,6 +22,51 @@
 		<!-- @import "style.css"; -->
 	</style>
 
+	<script>
+		function jsAvailClick()
+		{
+			if (document.getElementById("avail-more-1").style.display == "none")
+			{
+				// change the title text
+				document.getElementById("avail-link").innerHTML = "&#x25B2; Available data &#x25B2;"
+				
+				// display info
+				document.getElementById("avail-more-1").style.display = "block";
+				document.getElementById("avail-more-2").style.display = "block";
+				document.getElementById("avail-more-3").style.display = "block";
+			}
+			else
+			{
+				// change the title text
+				document.getElementById("avail-link").innerHTML = "&#x25BC; Available data &#x25BC;"
+				
+				// hide info
+				document.getElementById("avail-more-1").style.display = "none";
+				document.getElementById("avail-more-2").style.display = "none";
+				document.getElementById("avail-more-3").style.display = "none";
+			}
+		}
+		function jsContextClick()
+		{
+			if (document.getElementById("context-more-1").style.display == "none")
+			{
+				// change the title text
+				document.getElementById("context-link").innerHTML = "&#x25B2; Data context &#x25B2;"
+
+				// display info
+				document.getElementById("context-more-1").style.display = "block";
+			}
+			else
+			{
+				// change the title text
+				document.getElementById("context-link").innerHTML = "&#x25BC; Data context &#x25BC;"
+
+				// display info
+				document.getElementById("context-more-1").style.display = "none";
+			}
+		}
+	</script>
+
 	<script type="text/x-mathjax-config">
 		MathJax.Hub.Config({
 			extensions: ["tex2jax.js"],
@@ -155,7 +200,7 @@
 			}
 			else
 			{
-				printf("\t\t<div class = \"text\">Set global quantum numbers:</div>\n");
+				printf("\t\t<div class = \"text\" title = \"'L' is the total angular momentum, 'S' is the total spin.\">Set global quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
 				switch ($_POST["qty"])
 				{
@@ -215,7 +260,7 @@
 				$Emax_def = 0.85 * $Eunits;
 				$DE_def = 0.001 * $Eunits;
 				
-				printf("\t\t<div class = \"text\">Set energy range:</div>\n");
+				printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
 				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : $Emin_def);
 				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : $Emax_def);
@@ -261,7 +306,7 @@
 				if ($_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
 					or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 					$nums = range($_POST["Emin"], $_POST["Emax"], $_POST["dE"]);
-				
+
 				// set PATH to include hex-db executable
 //				putenv("PATH=" . "/home/jacob/Dokumenty/prog/Hex/hex-db/bin:" . $_ENV["PATH"]);
 				
@@ -344,7 +389,10 @@
 			}
 			else
 			{
-				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
+				if ($_POST["Emin"] < 0 and $nums[0] < 0)
+					fwrite($pipes2[0], "set grid; set logscale; plot \"-\" using 1:2 with lines\n");
+				else
+					fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
 				fwrite($pipes2[0], $hexoutput);
 				fwrite($pipes2[0], "e\n");
 			}
@@ -370,32 +418,54 @@
 	?>
 
 	</td></tr><tr><td colspan="2" width = "100%">
-		<center>
-			<div class = "sekce">Available data:</div>
-			<div class = "text">
-				This section contains a graphical representation of data stored in the database
-				at the moment. For every initial atomic state (vertical axis) the blue boxes
-				show energy intervals (horizontal axis) covered by the data. In the (hopefully
-				not so far) future all initial states will be covered completely with sufficient
-				precision. Until that time one can use this chart as a simple measure
-				of trusworthiness of the datasets. The darker the colour, the more partial waves
-				have been included in the computation. A very simple way of how to verify that a
-				particular chunk of energies has been computed with final precision is to compare
-				"complete" and "extrapolated" cross section. If these two cross sections match,
-				they ought to be reliable. The scattering amplitude may still not be converged,
-				though, even in that case. The comparison is being served by default when
-				the extrapolated cross section is requested: The resulting text file will
-				contain both the "extrapolated" (\(\sigma_x\)) and the "complete" (\(\sigma_c\))
-				cross section.
-			</div>
-			<div class = "output"><img src = "avail.png" alt = "avail.png"/></div>
-			<div class = "text">
-				If your preview plot of a cross section contains a suspicious drop or rise,
-				it may be a consequence of insufficient partial wave count. For the technical
-				details on the computational settings that were used to produce the data see the
-				<a href = "database.html">database</a> page.
-			</div>
-		</center>
+
+		<div style="height: 1px; background-color: #880000; text-align: center">
+			<span class = "sekce" style = "text-align: center; position: relative; top: -10px; background: white;">
+				<a name = "avail-head"></a><a href = "#avail-head" id = "avail-link" onclick = "jsAvailClick()">&nbsp;&#x25BC; Available data &#x25BC;&nbsp;</a>
+			</span>
+		</div>
+		<br/>
+		<div class = "text" style = "display: none;" id = "avail-more-1">
+			This section contains a graphical representation of data stored in the database
+			at the moment. For every initial atomic state (vertical axis) the blue boxes
+			show energy intervals (horizontal axis) covered by the data. In the (hopefully
+			not so far) future all initial states will be covered completely with sufficient
+			precision. Until that time one can use this chart as a simple measure
+			of trusworthiness of the datasets. The darker the colour, the more partial waves
+			have been included in the computation. A very simple way of how to verify that a
+			particular chunk of energies has been computed with final precision is to compare
+			"complete" and "extrapolated" cross section. If these two cross sections match,
+			they ought to be reliable. The scattering amplitude may still not be converged,
+			though, even in that case. The comparison is being served by default when
+			the extrapolated cross section is requested: The resulting text file will
+			contain both the "extrapolated" (\(\sigma_x\)) and the "complete" (\(\sigma_c\))
+			cross section.
+		</div>
+		<div class = "output" style = "display: none;" id = "avail-more-2">
+			<img src = "avail.png" alt = "avail.png"/>
+		</div>
+		<div class = "text" style = "display: none;" id = "avail-more-3">
+			If your preview plot of a cross section contains a suspicious drop or rise,
+			it may be a consequence of insufficient partial wave count. For the technical
+			details on the computational settings that were used to produce the data see the
+			<a href = "database.html">database</a> page.
+		</div>
+
+	</td></tr><tr><td colspan="2" width = "100%">
+
+		<div style="height: 1px; background-color: #880000; text-align: center">
+			<span class = "sekce" style = "text-align: center; position: relative; top: -10px; background: white;">
+				<a name = "context-head"></a><a href = "#context-head" id = "context-link" onclick = "jsContextClick()">&nbsp;&#x25BC; Data in context &#x25BC;&nbsp;</a>
+			</span>
+		</div>
+		<br/>
+		<div class = "text" style = "display: none;" id = "context-more-1">
+			Under construction... 
+		</div>
+		<div class = "output" style = "display: none;" id = "context-more-2">
+			<img src = "empty.png" alt = "comparison"/>
+		</div>
+
 	</td></tr></table>
 
 	</div> <!-- rám -->

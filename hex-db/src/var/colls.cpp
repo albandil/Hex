@@ -90,18 +90,7 @@ bool CollisionStrength::run (
 		sigma_arr.push_back(sigma);
 	}
 	
-	// threshold for ionization
-	double Eion = 1./(ni*ni);
-	
-	// interpolate
-	rArray interp = (efactor * energies.front() < Eion) ? 
-		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
-		interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
-		
-	// compute collision strength
-	rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
-	
-	// write out
+	// write header
 	std::cout << this->logo() <<
 		"# Collision strength (dimensionless) for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
@@ -110,8 +99,31 @@ bool CollisionStrength::run (
 	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<
 	    "# \n" <<
 	    "# E\t Ω\n";
-	for (size_t i = 0; i < energies.size(); i++)
-		std::cout << energies[i] << "\t" << omegas[i] << "\n";
+	
+	if (energies[0] < 0.)
+	{
+		// negative energy indicates full output
+		for (size_t i = 0; i < E_arr.size(); i++)
+			std::cout << E_arr[i] / efactor << "\t" << E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigma_arr[i] << "\n";
+	}
+	else
+	{
+		
+		// threshold for ionization
+		double Eion = 1./(ni*ni);
+		
+		// interpolate
+		rArray interp = (efactor * energies.front() < Eion) ? 
+			interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
+			interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+			
+		// compute collision strength
+		rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
+		
+		// output
+		for (size_t i = 0; i < energies.size(); i++)
+			std::cout << energies[i] << "\t" << omegas[i] << "\n";
+	}
 	
 	return true;
 }

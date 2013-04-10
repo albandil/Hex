@@ -71,15 +71,35 @@ void DWBA2_Ln (
 	for (int lamf = lamf_min; lamf <= lamf_max; lamf++)
 	{
 		// contributions to the scattering amplitude
-		Complex DD_N_prev = 0;
+		Complex DD_N_prev = 0, DD_N_prev_1 = 0;
 		
-		// compute energy sum/integral
-		DWBA2_energy_driver (
-			Ei, li, lf, ki, kf, 
-			Ni, Nf, Li, Lf, Ln,
-			lami, lamf, 
-			psii, psif, Ui, Uf, chii, chif, DD_N_prev
-		);
+		// for all Green's function angular momenta
+		for (int ln = 0; ; ln++)
+		{
+			// skip too low ln-s
+			if (Ln + ln < std::max(std::abs(li - Li), std::abs(lf - Lf)) or 
+				Ln - ln > std::min(         li + Li,           lf + Lf))
+				continue;
+			
+			// exit loop if ln too high
+			if (ln - Ln > std::min(Li + li, Lf + lf))
+				break;
+			
+			std::cout << "---------------------------------------\n";
+			std::cout << "ln = " << ln << "\n";
+			std::cout << "---------------------------------------\n";
+			
+			// compute energy sum/integral
+			DWBA2_energy_driver (
+				Ei, li, lf, ki, kf, 
+				Ni, Nf, Li, Lf, Ln,
+				lami, lamf, ln,
+				psii, psif, Ui, Uf, chii, chif, DD_N_prev_1
+			);
+			
+			// update T-matrix contribution
+			DD_N_prev += DD_N_prev_1;
+		}
 		
 		// add all lambda- and M- dependent angular factors
 		for (int Mi = -Li; Mi <= Li; Mi++)
@@ -115,7 +135,7 @@ void DWBA2_Ln (
 void DWBA2_energy_driver (
 	double Ei, int li, int lf, double ki, double kf, 
 	int Ni, int Nf, int Li, int Lf, int Ln,
-	int lami, int lamf, 
+	int lami, int lamf, int ln,
 	HydrogenFunction const & psii, 
 	HydrogenFunction const & psif, 
 	DistortingPotential const & Ui,
@@ -138,7 +158,7 @@ void DWBA2_energy_driver (
 		// compute contribution from this discrete intermediate state
 		Complex contrib;
 		DWBA2_En (
-			Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf,
+			Ei, Ni, -1./(Nn*Nn), Ln, lami, lamf, ln,
 			psii, psif, psin,
 			Ui, Uf, Ug,
 			chii, chif,
@@ -162,7 +182,7 @@ void DWBA2_energy_driver (
 		// compute amplitude
 		Complex contrib;
 		DWBA2_En (
-			Ei, Ni, Kn*Kn, Ln, lami, lamf,
+			Ei, Ni, Kn*Kn, Ln, lami, lamf, ln,
 			psii, psif, psin,
 			Ui, Uf, Ug,
 			chii, chif,
@@ -196,7 +216,7 @@ void DWBA2_energy_driver (
 		
 	
 	// sum over discrete intermadiate states
-	for (int Nn = 1; ; Nn++)
+	for (int Nn = Ln + 1; ; Nn++)
 	{
 		// update sums
 		Complex contrib = DiscreteContribution(Nn);
@@ -218,9 +238,10 @@ void DWBA2_energy_driver (
 	ClenshawCurtis<decltype(ContinuumContribution),Complex> QDD(ContinuumContribution);
 	QDD.setLim(false);
 	QDD.setRec(false);
-	QDD.setTol(1e-5);
-	QDD.setEps(1e-5);
-	QDD.setVerbose(false);
+	QDD.setSubdiv(15);
+	QDD.setTol(1e-4);
+	QDD.setEps(1e-4);
+	QDD.setVerbose(false, "Allowed regime integral");
 	
 	// integrate over allowed region
 	Complex DD_allowed = QDD.integrate (
@@ -245,9 +266,10 @@ void DWBA2_energy_driver (
 	ClenshawCurtis<decltype(cQDD),Complex> iQDD(cQDD);
 	iQDD.setLim(false);
 	iQDD.setRec(false);
-	iQDD.setTol(1e-5);
-	iQDD.setEps(1e-5);
-	iQDD.setVerbose(true);
+	iQDD.setSubdiv(15);
+	iQDD.setTol(1e-4);
+	iQDD.setEps(1e-4);
+	iQDD.setVerbose(true, "Forbidden regime integral");
 	
 	/// DEBUG FIXME
 	double momentum_cutoff = 10;
@@ -260,12 +282,13 @@ void DWBA2_energy_driver (
 	cDD += DD_forbidden;
 	
 	std::cout << "Forbidden continuum DD: " << DD_forbidden << "\n";
+	std::cerr << std::endl << std::endl;
 }
 
 void DWBA2_En (
 	double Ei, int Ni,
-	double Eatn, int ln,
-	int lami, int lamf,
+	double Eatn, int Ln,
+	int lami, int lamf, int ln,
 	HydrogenFunction const & psii,
 	HydrogenFunction const & psif,
 	HydrogenFunction const & psin,

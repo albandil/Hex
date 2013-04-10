@@ -97,7 +97,7 @@ public:
     /**
      * Return full approximation value.
      */
-    Tout operator() (Tin x) const
+    Tout operator() (Tin const & x) const
     {
         Tout ret = 0.5 * C[0];
         double xp = scale (x);
@@ -114,11 +114,11 @@ public:
      * Use Clenshaw recurrence formula for evaluation of 'm' terms.
      * The formula has the advantage of not evaluating goniometric funtions.
      */
-    Tout clenshaw (Tin x, int m) const
+    Tout clenshaw (Tin const & x, int const & m) const
     {
         Tout d_j = 0, d_jp1 = 0, d_jp2 = 0;
         double one_x = scale(x);
-        double two_x = scale(2*x); // FIXME ???
+        double two_x = 2 * one_x; // due to linearity of 'scale'
 
         for (int j = m - 1; j >= 1; j--)
         {
@@ -283,7 +283,8 @@ public:
 	 * \param  f Function to integrate of the signature FType(*)(double x).
 	 */ 
 	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
-		Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false) {}
+		Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
+		vName("ClenshawCurtis_ff") {}
 	
 	/// Get relative tolerance.
 	inline double eps() const { return EpsRel; }
@@ -331,7 +332,7 @@ public:
 	inline bool verbose() const { return Verbose; }
 	
 	/// Set verbose flag.
-	inline void setVerbose(bool verbose) { Verbose = verbose; }
+	inline void setVerbose(bool verbose, std::string name = "ClenshawCurtis_ff") { Verbose = verbose; vName = name; }
 	
 	/**
 	 * Clenshaw-Curtis quadrature, main interface.
@@ -426,7 +427,7 @@ public:
 		int maxN = gsl_sf_pow_int(2,NNest);
 		
 		// convergence loop
-		for (int N = 4; N <= maxN or not Recurrence; N *= 2)
+		for (int N = 4; N <= maxN /*or not Recurrence*/; N *= 2)
 		{
 			double pi_over_N = M_PI / N;
 
@@ -436,29 +437,27 @@ public:
 			if (coefs.empty())
 			{
 				// evaluate f everywhere
-// 				# pragma omp parallel for
 				for (int k = 0; k < N; k++)
 				{
 					fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
 
 					if (not finite(std::abs(fvals[k])))
-						throw exception("[integrate_ff] \"%g\" when evaluating function at %g", fvals[k], cos(k * pi_over_N));
+						throw exception("[%s] \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
 				}
 				fvals[N] = f(-1);
 
 				if (not finite(std::abs(fvals[N])))
-					throw exception("[integrate_ff] \"%g\" when evaluating function at -1.", fvals[N]);
+					throw exception("[%s] \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
 			}
 			else
 			{
 				// evaluate just the new half, recycle older evaluations
-// 				# pragma omp parallel for
 				for (int k = 0; k < N; k++)
 				{
 					fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
 					
 					if (not finite(std::abs(fvals[k])))
-						throw exception("[integrate_ff] \"%g\" when evaluating function.", fvals[k]);
+						throw exception("[%s] \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
 				}
 				fvals[N] = fvals_prev[N/2];
 			}
@@ -510,7 +509,7 @@ public:
 				}
 				else
 				{
-					throw exception("[ClenshawCurtis_ff] Can't handle datatype.");
+					throw exception("[%s] Can't handle datatype.", vName.c_str());
 				}
 			}
 #endif
@@ -521,7 +520,7 @@ public:
 				sum -= coefs[twok] / (twok*twok - 1.);
 			
 			if (Verbose)
-				std::cout << "[ClenshawCurtis_ff] N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
+				std::cout << "[" << vName << "] N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
 			
 			// check convergence
 			if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
@@ -530,7 +529,7 @@ public:
 					*n = N;
 				
 				if (Verbose)
-					std::cout << "[ClenshawCurtis_ff] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
+					std::cout << "[" << vName << "] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
 				
 				return FType(2. * (x2 - x1) / N) * sum;
 			}
@@ -539,7 +538,7 @@ public:
 				  and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
 			{
 				if (Verbose)
-					std::cout << "[ClenshawCurtis_ff] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
+					std::cout << "[" << vName << "] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
 				return FType(0.);
 			}
 			else
@@ -552,6 +551,9 @@ public:
 			sum_prev = sum;
 		}
 		
+		if (not Recurrence)
+			throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
+		
 		//
 		// no convergence? -> bisect
 		//
@@ -560,7 +562,7 @@ public:
 		if (std::abs(x2-x1) < EpsAbs)
 		{
 			if (Verbose)
-				std::cout << "[ClenshawCurtis_ff] Interval smaller than " << EpsAbs << "\n";
+				std::cout << "[" << vName << "] Interval smaller than " << EpsAbs << "\n";
 			return 0;
 		}
 		
@@ -568,12 +570,12 @@ public:
 		if (NStack == 0)
 		{
 			if (Verbose)
-				std::cout << "[ClenshawCurtis_ff] Bisection inhibited due to internal stack shortage.\n";
+				std::cout << "[" << vName << "] Bisection inhibited due to internal stack limit.\n";
 			return FType(2. * (x2 - x1) / maxN) * sum;
 		}
 		
 		if (Verbose)
-			std::cout << "[ClenshawCurtis_ff] Bisecting to ("
+			std::cout << "[" << vName << "] Bisecting to ("
 			          << x1 << "," << (x2+x1)/2 << ") and ("
 					  << (x2+x1)/2 << "," << x2 << ")\n";
 		
@@ -718,6 +720,9 @@ private:
 	
 	/// Display debugging information.
 	bool Verbose;
+	
+	/// Debuggin information identification.
+	std::string vName;
 };
 
 #endif
