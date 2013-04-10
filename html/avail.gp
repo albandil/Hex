@@ -1,6 +1,5 @@
 if ((GPVAL_VERSION == 4.3 || GPVAL_VERSION == 4.2) \
 &&  (!strstrt(GPVAL_COMPILE_OPTIONS,"+OBJECTS"))) \
-    print ">>> Skipping demo <<<\n" ; \
     print "This copy of gnuplot was built without support for placing rectangles\n" ; \
     exit ;
 

@@ -1,7 +1,7 @@
 SUITESPARSELIBS = /usr/local/lib/libumfpack.a /usr/local/lib/libamd.a /usr/local/lib/libcholmod.a /usr/local/lib/libcolamd.a /usr/local/lib/libcholmod.a /usr/local/lib/libcamd.a /usr/local/lib/libccolamd.a /usr/local/lib/libmetis.a /usr/local/lib/libsuitesparseconfig.a
 
 CXXFLAGS = -g -fPIC -std=c++0x -Wall -fopenmp
-LFLAGS = -g -fPIC $(SUITESPARSELIBS) -lm_p -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -fopenmp -lpng -lcln -lfftw3
+LFLAGS = -g -fPIC $(SUITESPARSELIBS) -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -fopenmp -lpng -lcln -lfftw3
 
 all: bin/dwba
 
