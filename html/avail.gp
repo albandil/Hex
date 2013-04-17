@@ -24,7 +24,7 @@ do for [ll = 1:9] {
 
 # set frame
 set logscale x
-set xrange [0.1:100]
+set xrange [0.01:100]
 set yrange [0:2]
 set grid
 set xlabel "Ei - the impact energy in Rydbergs"
