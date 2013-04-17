@@ -93,7 +93,7 @@ public:
 	 * format.
 	 * \param b Vector to multiply with.
 	 */
-	cArray dotT(cArray const &  b) const;
+	cArray dotT(cArrayView const &  b) const;
 	
 	// Getters
 	
@@ -227,8 +227,8 @@ public:
 	 * Ordinary matrix-vector product, \f$ A\cdot b \f$.
 	 * \param b Vector to multiply with.
 	 */
-	cArray dot(cArray const &  b) const;
-	cArray sdot(cArray const &  b) const;
+	cArray dot(cArrayView const &  b) const;
+	cArray sdot(cArrayView const &  b) const;
 	
 	// Getters
 	
@@ -318,11 +318,20 @@ public:
 			}
 		}
 		
-		cArray solve(cArray const & b, unsigned eqs = 1)
+		cArray solve(cArrayView const & b, unsigned eqs = 1)
 		{
 			// reserve space for the solution
 			cArray x(b.size());
 			
+			// solve
+			solve(b, x, eqs);
+			
+			// return the result
+			return x;
+		}
+		
+		void solve(cArrayView const & b, cArrayView & x, unsigned eqs = 1)
+		{
 			// solve for all RHSs
 			for (size_t eq = 0; eq < eqs; eq++)
 			{
@@ -331,11 +340,11 @@ public:
 					break;
 				
 				// solve for current RHS
-				long status = umfpack_zl_solve(
+				long status = umfpack_zl_solve (
 					UMFPACK_Aat,
 					__matrix__->_p_.data(), __matrix__->_i_.data(),
 					reinterpret_cast<const double*>(__matrix__->_x_.data()), 0,
-					reinterpret_cast<double*>(x.data() + eq * __matrix__->_n_), 0,
+					reinterpret_cast<double*>(&x[0] + eq * __matrix__->_n_), 0,
 					reinterpret_cast<const double*>(&b[0] + eq * __matrix__->_n_), 0,
 					__Numeric__, 0, 0
 				);
@@ -347,8 +356,6 @@ public:
 					umfpack_zl_report_status(0, status);
 				}
 			}
-			
-			return x;
 		}
 		
 // 	private:

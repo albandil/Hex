@@ -15,6 +15,7 @@
 
 #include <complex>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -31,6 +32,167 @@
 #include "complex.h"
 #include "misc.h"
 
+template <typename NumberType> class Array;
+
+/**
+ * \brief Array shallow copy.
+ */
+template <typename NumberType> class ArrayView
+{
+	private:
+		
+		size_t N;
+		NumberType * array;
+		
+	public:
+		
+		// alias
+		typedef NumberType DataType;
+		
+		// empty constructor
+		ArrayView() : N(0), array(nullptr) {}
+		
+		// construct view from Array const lvalue reference
+		ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
+		{
+			N = (n > 0) ? n : a.size();
+			array = const_cast<NumberType*>(a.data()) + i;
+		}
+		
+		// destructor
+		~ArrayView() {}
+		
+		//
+		// assignments
+		//
+		
+		virtual ArrayView<NumberType> & operator= (Array<NumberType> const & v)
+		{
+			if (v.size() != N)
+				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
+			
+			memcpy (
+				array,
+				v.data(),
+				N * sizeof(NumberType)
+			);
+			
+			return *this;
+		}
+		
+		//
+		// element-wise access (non-const)
+		//
+		
+		virtual NumberType& operator[] (size_t i)
+		{
+		#ifdef NDEBUG
+			return array[i];
+		#else
+			// bounds check
+			if (i < N)
+				return array[i];
+			else
+				throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+		#endif
+		}
+		
+		//
+		// element-wise access (const)
+		//
+		
+		virtual NumberType const & operator[] (size_t i) const
+		{
+		#ifdef NDEBUG
+			return array[i];
+		#else
+			if (i < N)
+				return array[i];
+			else
+				throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+		#endif
+		}
+		
+		// getters
+		virtual size_t size() const { return N; }
+		
+		//
+		// reduced arithmetic operators with other arrays
+		//
+		
+		ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.size());
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] += b[i];
+
+			return *this;
+		}
+		
+		ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.N);
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] += b.array[i];
+
+			return *this;
+		}
+		
+		ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.size());
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] -= b[i];
+
+			return *this;
+		}
+		
+		ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.N);
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] -= b.array[i];
+
+			return *this;
+		}
+		
+		ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.size());
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] += b[i];
+
+			return *this;
+		}
+		
+		ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
+		{
+			// check if sizes match
+ 			assert(N == b.N);
+			
+			// run over elements
+			for (size_t i = 0; i < N; i++)
+				array[i] /= b.array[i];
+
+			return *this;
+		}
+};
+
 /**
  * \brief A comfortable number array class.
  * 
@@ -41,12 +203,12 @@
  * - a collection of overloaded arithmetic operators (sum of two arrays,
  *   difference, multiplication by a number etc.)
  */
-template <typename NumberType> class Array
+template <typename NumberType> class Array : public ArrayView<NumberType>
 {
-	protected:
+	private:
 		
-		size_t N;			// length of the storage
-		NumberType *array;	// storage
+		size_t N;
+		NumberType * array;
 		
 	public:
 		
@@ -59,7 +221,7 @@ template <typename NumberType> class Array
 		) -> decltype(NumberType1(0)*NumberType2(0));
 				
 		// default constructor, creates an empty array
-		Array() : N(0), array(0) {}
+		Array() : N(0), array(nullptr) {}
 		
 		// constructor, creates a length-n "x"-filled array
 		Array(size_t n, NumberType x = 0) : N(n)
@@ -83,7 +245,7 @@ template <typename NumberType> class Array
 				array[i] = x[i];
 		}
 		
-		// copy constructor from Array const reference
+		// copy constructor from Array const lvalue reference
 		Array(Array<NumberType> const & a)
 		{
 			// reserve space
@@ -93,6 +255,18 @@ template <typename NumberType> class Array
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
 				array[i] = a.array[i];
+		}
+		
+		// copy constructor from Array rvalue reference
+		Array(Array<NumberType> && a)
+		{
+			// copy content
+			N = a.N;
+			array = a.array;
+			
+			// clear rvalue
+			a.N = 0;
+			a.array = nullptr;
 		}
 		
 		// copy constructor from std::vector
@@ -123,7 +297,7 @@ template <typename NumberType> class Array
 		// destructor
 		~Array()
 		{
-			if (array != 0)
+			if (array != nullptr)
 				delete [] array;
 		}
 		
@@ -238,7 +412,7 @@ template <typename NumberType> class Array
 		}
 		
 		//
-		// assignment operator from Array const reference
+		// assignment operators
 		//
 		
 		Array<NumberType>& operator = (Array<NumberType> const &  b)
@@ -261,6 +435,27 @@ template <typename NumberType> class Array
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
 				array[i] = b.array[i];
+			
+			return *this;
+		}
+		
+		Array<NumberType>& operator = (Array<NumberType> &&  b)
+		{
+			// if we already have some allocated space, check its size,
+			// so that we do not free it uselessly
+			if (array != nullptr)
+			{
+				delete [] array;
+				array = nullptr;
+			}
+			
+			// move content
+			N = b.N;
+			array = b.array;
+			
+			// clear rvalue
+			b.N = 0;
+			b.array = nullptr;
 			
 			return *this;
 		}
@@ -833,6 +1028,10 @@ typedef Array<Complex>		cArray;
 typedef Array<long double>	qArray;
 typedef Array<rArray> rArrays;
 typedef Array<cArray> cArrays;
+
+typedef ArrayView<double> rArrayView;
+typedef ArrayView<Complex> cArrayView;
+typedef ArrayView<long double> qArrayView;
 
 /**
  * Variadic template recurrence starter. For documentation of the function

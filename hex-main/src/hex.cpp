@@ -660,7 +660,8 @@ int main(int argc, char* argv[])
 				}
 				
 				// CG preconditioner callback
-				auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void {
+				auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+				{
 					
 					// apply a block inversion preconditioner
 					# pragma omp parallel for collapse (2) schedule (dynamic,1)
@@ -674,30 +675,21 @@ int main(int argc, char* argv[])
 						// get diagonal block index
 						int iblock = l1 * (maxell + 1) + l2;
 						
-						// create a copy of a RHS segment
-						cArray r_block(Nspline * Nspline);
-						memcpy(
-							&r_block[0],						// dest
-							&r[0] + iblock * Nspline * Nspline,	// src
-							Nspline * Nspline * sizeof(Complex)	// n
-						);
+						// create copy-to view of "z"
+						cArrayView zview(z, iblock * Nspline * Nspline, Nspline * Nspline);
 						
-						// multiply by an inverted block
-						cArray z_block;
-						z_block = lufts[iblock].solve(r_block);
+						// create copy-from view of "r"
+						cArrayView rview(r, iblock * Nspline * Nspline, Nspline * Nspline);
 						
-						// copy output segment to the whole array
-						memcpy(
-							&z[0] + iblock * Nspline * Nspline,	// dest
-							&z_block[0],						// src
-							Nspline * Nspline * sizeof(Complex)	// n
-						);
+						// copy the correcponding slice of "r" multiplied by a correct block inversion
+						zview = lufts[iblock].solve(rview);
 					}
 					
 				};
 				
 				// CG matrix multiplication callback
-				auto matrix_multiply = [ & ](const cArray& p, cArray& q) -> void {
+				auto matrix_multiply = [ & ](const cArray& p, cArray& q) -> void
+				{
 					
 					// multiply by the matrix of the system
 					# pragma omp parallel for collapse (2) schedule (dynamic,1)
@@ -711,8 +703,8 @@ int main(int argc, char* argv[])
 						// get diagonal block index
 						int block = l1 * (maxell + 1) + l2;
 						
-						// product
-						cArray q_block(Nspline * Nspline);
+						// product (copy-to view of "q")
+						cArrayView q_block(q, block * Nspline * Nspline, Nspline * Nspline);
 						
 						// multiply block-row of the matrix with "p"
 						for (int l1p = 0; l1p <= maxell; l1p++)
@@ -725,13 +717,8 @@ int main(int argc, char* argv[])
 							// get diagonal block index
 							int blockp = l1p * (maxell + 1) + l2p;
 							
-							// corresponding fragment of "p"
-							cArray p_block(Nspline * Nspline);
-							memcpy(
-								&p_block[0],						// dest
-								&p[0] + blockp * Nspline * Nspline,	// src
-								Nspline * Nspline * sizeof(Complex)	// n
-							);
+							// corresponding (copy-from) fragment of "p"
+							cArrayView p_block(p, blockp * Nspline * Nspline, Nspline * Nspline);
 							
 							// multiply by hamiltonian terms
 							if (block == blockp)
@@ -750,13 +737,6 @@ int main(int argc, char* argv[])
 								}
 							}
 						}
-						
-						// copy product to output
-						memcpy(
-							&q[0] + block * Nspline * Nspline,	// dest
-							&q_block[0],						// src
-							Nspline * Nspline * sizeof(Complex)	// n
-						);
 					}
 					
 				};
@@ -764,7 +744,7 @@ int main(int argc, char* argv[])
 				// custom conjugate gradients callback-based solver
 				double tolerance = 1e-10;
 				std::cout << "\tStart CG callback with tolerance " << tolerance << "\n";
-				unsigned iterations = cg_callbacks(
+				unsigned iterations = cg_callbacks (
 					chi,					// right-hand side
 					current_solution,		// on input, the initial guess, on return, the solution
 					tolerance,				// requested precision, |A·x - b|² < ε·|b|²

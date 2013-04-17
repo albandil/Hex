@@ -115,7 +115,7 @@ CooMatrix stairs(size_t N)
 
 // ------------------------------------------------------------------------- //
 
-cArray CscMatrix::dotT(const cArray&  b) const
+cArray CscMatrix::dotT(const cArrayView&  b) const
 {
 	// create output array
 	cArray c (_n_);
@@ -299,7 +299,7 @@ bool CscMatrix::hdfload(const char* name)
 
 // ------------------------------------------------------------------------- //
 
-cArray CsrMatrix::dot(const cArray& b) const
+cArray CsrMatrix::dot(const cArrayView& b) const
 {
 	// create output array
 	cArray c(_m_);

@@ -109,6 +109,7 @@ cArray computeLambda(
 			CooMatrix Sp(Nspline, 1, Pf_overlaps.begin());
 			
 			// compute radial factor
+			#pragma omp parallel for
 			for (int l = 0; l <= maxell; l++)
 			{
 				// we don't need to compute forbidden transition
