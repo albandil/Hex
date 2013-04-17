@@ -179,6 +179,73 @@ void update ()
 	}
 }
 
+void optimize()
+{
+	sqlitepp::statement st(db);
+	st << "VACUUM";
+	try {
+		
+		st.exec();
+		
+	} catch (sqlitepp::exception & e) {
+		
+		std::cerr << "ERROR: Database optimizaion failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+		exit(-1);
+		
+	}
+}
+
+void avail()
+{
+	std::cout << "\"--avail\" not implemented yet. Use the following code directly in sqlite3:\n";
+	std::cout << "\n";
+	std::cout << "CREATE TEMP TABLE MaxLs AS\n";
+	std::cout << "    SELECT\n";
+	std::cout << "        ni, li, mi, Ei, MAX(L) AS MaxL\n";
+	std::cout << "    FROM\n";
+	std::cout << "        tmat\n";
+	std::cout << "    GROUP BY\n";
+	std::cout << "        ni,li,mi,Ei\n";
+	std::cout << "    ORDER BY\n";
+	std::cout << "        Ei ASC;\n";
+	std::cout << "\n";
+	std::cout << "CREATE TEMP TABLE StackedLs AS\n";
+	std::cout << "    SELECT\n";
+	std::cout << "        LThis.ni, LThis.li, LThis.mi,\n";
+	std::cout << "        LThis.Ei AS ThisE, LThis.MaxL AS ThisL\n";
+	std::cout << "    FROM\n";
+	std::cout << "        MaxLs AS LThis \n";
+	std::cout << "    LEFT OUTER JOIN MaxLs AS LPrev\n";
+	std::cout << "        ON LThis.rowid = LPrev.rowid + 1 \n";
+	std::cout << "        AND LThis.ni = LPrev.ni \n";
+	std::cout << "        AND LThis.li = LPrev.li \n";
+	std::cout << "        AND LThis.mi = LPrev.mi\n";
+	std::cout << "    LEFT OUTER JOIN MaxLs AS LNext\n";
+	std::cout << "        ON LThis.rowid = LNext.rowid - 1 \n";
+	std::cout << "        AND LThis.ni = LNext.ni \n";
+	std::cout << "        AND LThis.li = LNext.li \n";
+	std::cout << "        AND LThis.mi = LNext.mi\n";
+	std::cout << "    WHERE\n";
+	std::cout << "        LNext.MaxL IS NULL OR LPrev.MaxL IS NULL OR LPrev.MaxL <> LNext.MaxL\n";
+	std::cout << "    ORDER BY \n";
+	std::cout << "        LThis.ni, LThis.li, LThis.mi, ThisE;\n";
+	std::cout << "\n";
+	std::cout << "CREATE TEMP TABLE SStackedLs AS\n";
+	std::cout << "    SELECT\n";
+	std::cout << "        T1.ni, T1.li, T1.mi, T1.ThisE AS MinE, (CASE WHEN T2.ThisE IS NULL THEN T1.ThisE ELSE T2.ThisE END) AS MaxE, T1.ThisL AS MaxL\n";
+	std::cout << "    FROM \n";
+	std::cout << "        StackedLs AS T1\n";
+	std::cout << "    LEFT OUTER JOIN StackedLs AS T2\n";
+	std::cout << "        ON T1.rowid = T2.rowid - 1\n";
+	std::cout << "        AND T1.ni = T2.ni\n";
+	std::cout << "        AND T1.li = T2.li\n";
+	std::cout << "        AND T1.mi = T2.mi\n";
+	std::cout << "    WHERE T1.ThisL = T2.ThisL OR T2.ThisL IS NULL\n";
+	std::cout << "\n";
+	std::cout << "SELECT * FROM SStackedLs;\n";
+	std::cout << "\n";
+}
+
 void dump (const char* dumpfile)
 {
 	sqlitepp::statement st(db);

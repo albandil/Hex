@@ -39,6 +39,30 @@ void import(const char* sqlname);
 void update();
 
 /**
+ * \brief Optimize the SQLite database file.
+ * 
+ * Reduces the occupied space.
+ */
+void optimize();
+
+/**
+ * \brief Print data summary.
+ * 
+ * Prints highest partial waves for consecutive energy ranges per initial state.
+ * Example:
+ * \code
+   1   0   0    0.05     0.6    3
+   1   0   0    0.65     0.85   4
+   1   0   0    0.8501   0.89   3
+   1   0   0    0.8905   0.97   0
+   1   0   0    1.2      5.0    6
+   1   0   0    5.2     40.0    9
+   1   0   0   40.0     40.0    9
+ * \endcode
+ */
+void avail();
+
+/**
  * \brief Dump contents of the T-matrix table.
  * 
  * The output can be used to construct an equivalent table.

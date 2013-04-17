@@ -23,9 +23,11 @@ std::string HelpText =
 	"Options:\n"
 	"  --help            Display this information.\n"
 	"  --new             Create new database.\n"
-	"  --database=<name> Use database <name> instead of default \"hex.db\".\n"
+	"  --database=<name> Use database <name> instead of the default \"hex.db\".\n"
 	"  --import=<file>   Import SQL batch file.\n"
 	"  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
+	"  --optimize        Execute VACUUM command, i.e. minimize the occupied space.\n"
+	"  --avail           Print out available data.\n"
 	"  --<var>           Compute/retrieve scattering variable <var>.\n"
 	"  --vars            Display all available scattering variables.\n"
 	"  --<param>=<val>   Set scattering parameter <param> to the value <val>.\n"
@@ -115,6 +117,7 @@ int main(int argc, char* argv[])
 	// program parameters
 	std::string dbname = "hex.db", sqlfile, dumpfile;
 	bool create_new = false, doupdate = false, doimport = false;
+	bool dooptimize = false, doavail = false;
 	
 	// scattering variables to compute
 	std::vector<std::string> vars;
@@ -159,6 +162,8 @@ int main(int argc, char* argv[])
 			"database", 1, [ & ](std::string opt) -> void { dbname = opt; },
 			"import",   1, [ & ](std::string opt) -> void { doimport = true; sqlfile = opt; },
 			"update",   0, [ & ](std::string opt) -> void { doupdate = true; },
+			"optimize", 0, [ & ](std::string opt) -> void { dooptimize = true; },
+			"avail",    0, [ & ](std::string opt) -> void { doavail = true; },
 			"dump",     1, [ & ](std::string opt) -> void { dumpfile = opt; },
 			"vars",     0, [ & ](std::string opt) -> void {
 				std::cout << "(name)\t\t(description)" << std::endl;
@@ -272,6 +277,14 @@ int main(int argc, char* argv[])
 	// update
 	if (doupdate)
 		update();
+	
+	// vacuum
+	if (dooptimize)
+		optimize();
+	
+	// print out available data
+	if (doavail)
+		avail();
 	
 	// dump contents of "tmat" table
 	if (not dumpfile.empty())
