@@ -48,6 +48,10 @@ int main(int argc, char* argv[])
 	//
 	
 	gsl_set_error_handler_off();
+    
+    // disable buffering of the standard output 
+    // (so that all text messages are immediatelly visible)
+    setvbuf(stdout, nullptr, _IONBF, 0);
 	
 	// variables that can be set by the user from the command line
 	std::ifstream inputfile;			// input file
@@ -153,7 +157,7 @@ int main(int argc, char* argv[])
 		exit(0);
 	}
 	
-	std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
+	std::cout << "Loading/precomputing derivative overlaps... ";
 	
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
@@ -170,7 +174,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	std::cout << "ok\nLoading/precomputing integral moments... " << std::flush;
+	std::cout << "ok\nLoading/precomputing integral moments... ";
 	
 	
 	// Precompute useful integral moments ---------------------------------- //
@@ -305,7 +309,6 @@ int main(int argc, char* argv[])
 				#pragma omp critical
 				{
 					std::printf ("\r\t- multipole λ = %d... %3.0f %%", lambda, i * 100. / Nspline);
-					std::fflush (stdout);
 				}
 				
 				for (int j = i; j < Nspline; j++)
@@ -384,7 +387,7 @@ int main(int argc, char* argv[])
 	unsigned Hsize = Nspline * Nspline * (maxell + 1) * (maxell + 1);
 	std::cout << "Hamiltonian properties:\n";
 	std::cout << "\t-> hamiltonian size: " << Hsize << "\n";
-	std::cout << "Loading/computing B-spline expansions... " << std::flush;
+	std::cout << "Loading/computing B-spline expansions... ";
 	
 	
 	//
@@ -436,7 +439,7 @@ int main(int argc, char* argv[])
 	// Precompute some accelerators ---------------------------------------- //
 	//
 	// Kronecker producs
-	std::cout << "Creating Kronecker products... " << std::flush;
+	std::cout << "Creating Kronecker products... ";
 	CsrMatrix S_kron_S   = kron(S, S).tocsr();
 	CooMatrix S_kron_Mm1_tr = kron(S, Mm1_tr);
 	CsrMatrix S_kron_Mm2 = kron(S, Mm2).tocsr().sparse_like(S_kron_S);
@@ -805,7 +808,7 @@ int main(int argc, char* argv[])
 	// Extract the cross sections ------------------------------------------ //
 	//
 	
-	std::cout << "\rExtracting T-matrices..." << std::flush;
+	std::cout << "\rExtracting T-matrices...";
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
 	for (int Spin = 0; Spin <= 1; Spin++)
@@ -915,7 +918,6 @@ int main(int argc, char* argv[])
 		finished++;
 		
 		std::printf("\rExtracting T-matrices... %3.0f%%     ", finished * 100. / transitions.size());
-		std::cout << std::flush;
 	}
 	std::cout << "\rExtracting T-matrices... ok       \n";
 	// --------------------------------------------------------------------- //
