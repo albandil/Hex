@@ -52,11 +52,18 @@ template <typename NumberType> class ArrayView
 		// empty constructor
 		ArrayView() : N(0), array(nullptr) {}
 		
+		// construct view from Array non-const lvalue reference
+		ArrayView(Array<NumberType> & a, size_t i = 0, size_t n = 0)
+		{
+			N = (n > 0) ? n : a.size();
+			array = &a[0] + i;
+		}
+		
 		// construct view from Array const lvalue reference
 		ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
 		{
 			N = (n > 0) ? n : a.size();
-			array = const_cast<NumberType*>(a.data()) + i;
+			array = const_cast<NumberType*>(&a[0]) + i;
 		}
 		
 		// destructor
@@ -128,7 +135,7 @@ template <typename NumberType> class ArrayView
 			// run over elements
 			for (size_t i = 0; i < N; i++)
 				array[i] += b[i];
-
+			
 			return *this;
 		}
 		
@@ -140,7 +147,7 @@ template <typename NumberType> class ArrayView
 			// run over elements
 			for (size_t i = 0; i < N; i++)
 				array[i] += b.array[i];
-
+			
 			return *this;
 		}
 		
@@ -152,7 +159,7 @@ template <typename NumberType> class ArrayView
 			// run over elements
 			for (size_t i = 0; i < N; i++)
 				array[i] -= b[i];
-
+			
 			return *this;
 		}
 		
@@ -164,7 +171,7 @@ template <typename NumberType> class ArrayView
 			// run over elements
 			for (size_t i = 0; i < N; i++)
 				array[i] -= b.array[i];
-
+			
 			return *this;
 		}
 		
@@ -175,8 +182,8 @@ template <typename NumberType> class ArrayView
 			
 			// run over elements
 			for (size_t i = 0; i < N; i++)
-				array[i] += b[i];
-
+				array[i] /= b[i];
+			
 			return *this;
 		}
 		
@@ -188,8 +195,15 @@ template <typename NumberType> class ArrayView
 			// run over elements
 			for (size_t i = 0; i < N; i++)
 				array[i] /= b.array[i];
-
+			
 			return *this;
+		}
+		
+		// some other functions
+		void clear()
+		{
+			if (N > 0 and array != nullptr)
+				memset(array, 0, N * sizeof(NumberType));
 		}
 };
 

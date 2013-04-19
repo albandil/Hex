@@ -1091,7 +1091,7 @@ unsigned cg_callbacks(
 	// residual; initialized to starting residual using the initial guess
 	cArray r(N);
 #ifdef WITH_MPI
-	fprintf(stdout, "\t[cg:%d] Computing residual...\n", MPI::COMM_WORLD.Get_rank()); fflush(stdout);
+	std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Computing residual...\n";
 #endif
 	matrix_multiply(x, r);
 	r = b - r;
@@ -1107,14 +1107,16 @@ unsigned cg_callbacks(
 	for/*ever*/ (k = 0; ; k++)
 	{
 #ifdef WITH_MPI
-		fprintf(stdout, "\t[cg:%d] Residual relative magnitude: %g\n", MPI::COMM_WORLD.Get_rank(), r.norm() / b.norm()); fflush(stdout);
+		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() 
+				  << "] Residual relative magnitude: " << r.norm() / b.norm() << "\n";
 #else
-		fprintf(stdout, "\t[cg] Residual relative magnitude after %d iterations: %g\n", k, r.norm() / b.norm()); fflush(stdout);
+		std::cout << "\t[cg] Residual relative magnitude after "
+		          << k << " iterations: " << r.norm() / b.norm() << "\n";
 #endif
 		
 		// apply desired preconditioner
 #ifdef WITH_MPI
-		fprintf(stdout, "\t[cg:%d] Applying preconditioner\n", MPI::COMM_WORLD.Get_rank()); fflush(stdout);
+		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Applying preconditioner\n";
 #endif
 		apply_preconditioner(r, z);
 		
@@ -1134,7 +1136,7 @@ unsigned cg_callbacks(
 		
 		// move to next Krylov subspace by multiplying A·p
 #ifdef WITH_MPI
-		fprintf(stdout, "\t[cg:%d] Krylov space update...\n", MPI::COMM_WORLD.Get_rank()); fflush(stdout);
+		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Krylov space update...\n";
 #endif
 		matrix_multiply(p, q);
 		
@@ -1153,7 +1155,8 @@ unsigned cg_callbacks(
 		if (k >= max_iterations)
 		{
 #ifdef WITH_MPI
-			fprintf(stdout, "\t[cg:%d] Iteration limit %d reached.\n", MPI::COMM_WORLD.Get_rank(), max_iterations); fflush(stdout);
+			std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() 
+			          << "] Iteration limit " << max_iterations << " reached.\n";
 #endif
 			break;
 		}

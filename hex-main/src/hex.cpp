@@ -708,6 +708,7 @@ int main(int argc, char* argv[])
 						
 						// product (copy-to view of "q")
 						cArrayView q_block(q, block * Nspline * Nspline, Nspline * Nspline);
+						q_block.clear(); // initialize with zeros
 						
 						// multiply block-row of the matrix with "p"
 						for (int l1p = 0; l1p <= maxell; l1p++)
