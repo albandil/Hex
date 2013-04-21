@@ -8,6 +8,8 @@ LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
 CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2
 
+CXXFLAGS = $(CXXDEBUG)
+
 SQLITEPP = lib/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,lib/sqlitepp/%.cpp,$(SQLITEPPNAMES))
@@ -42,31 +44,31 @@ bin/hex-db.so: obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o 
 
 $(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 
 obj/ui.o: src/ui.cpp src/hex-db.h src/interfaces.h src/variables.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/angs.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/specf.o: src/specf.cpp src/complex.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/angs.o: src/angs.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
-	$(CPP) $(CXXRILIS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 # -----------------------------------------------------------------------------
 # SQLite++ library
