@@ -173,8 +173,11 @@ void DWBA2_energy_driver (
 	// computes contribution density from a continuum state
 	auto ContinuumContribution = [ & ](double Kn) -> Complex {
 		
-		if (Kn == 0. or not finite(Kn))
+		if (Kn == 0. or not finite(Kn) or std::abs(Ei - 1./(Ni*Ni) - Kn*Kn) < 1e-8)
+		{
+			std::cerr << Kn*Kn << "\t" << 0. << "\t" << 0. << "\n";
 			return Complex(0.);
+		}
 		
 		// get intermediate state
 		HydrogenFunction psin(Kn,Ln);
@@ -198,8 +201,8 @@ void DWBA2_energy_driver (
 #if 0
 	
 	// compactification of the previous function
-	CompactificationR<decltype(ContinuumContribution),Complex>
-		compact(ContinuumContribution, 0., false, 1.0);
+// 	CompactificationR<decltype(ContinuumContribution),Complex>
+// 		compact(ContinuumContribution, 0., false, 1.0);
 	
 // 	for (int Nn = 1; Nn <= 20; Nn++)
 // 		DiscreteContribution(Nn);
@@ -208,7 +211,7 @@ void DWBA2_energy_driver (
 // 	for (double Kn = 0; Kn < 5; Kn += 0.01)
 // 		compact(compact.scale(Kn));
 	
-	ContinuumContribution(0.016730783);
+// 	ContinuumContribution(sqrt(3));
 		
 	exit(0);
 	
@@ -272,7 +275,7 @@ void DWBA2_energy_driver (
 	iQDD.setVerbose(true, "Forbidden regime integral");
 	
 	/// DEBUG FIXME
-	double momentum_cutoff = 10;
+	double momentum_cutoff = Inf;
 	
 	// integrate over forbidden region
 	Complex DD_forbidden = iQDD.integrate (

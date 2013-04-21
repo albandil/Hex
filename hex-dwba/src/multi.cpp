@@ -11,64 +11,10 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <cmath>
+#include <sstream>
 
+#include "hydrogen.h"
 #include "multi.h"
-
-PhiFunctionDirIntegral::PhiFunctionDirIntegral (
-	HydrogenFunction const & psin, 
-	int lam,
-	HydrogenFunction const & psi
-) : Lam(lam), Psi(psi), Psin(psin) {}
-
-double PhiFunctionDirIntegral::operator()(double x2) const
-{
-// 	std::cout << "[PhiFunctionDirIntegral::operator()] x2 = " << x2 << "\n";
-	if (not finite(x2))
-		return 0.;
-	
-	//
-	// finite integrand
-	//
-		
-	auto integrand1 = [&](double x1) -> double {
-		if (x1 == 0. or x2 == 0. or not finite(x1))
-			return 0.;
-		return Psin(x1) * pow(x1/x2, Lam) * Psi(x1);
-	};
-	
-	// compactification
-	CompactIntegrand<decltype(integrand1),double> R1(integrand1, 0., Inf, false, 1.0);
-	
-	// integration system
-	ClenshawCurtis<decltype(R1),double> Q1(R1);
-	Q1.setEps(1e-10);	// be precise
-	
-	// integrate
-	double i1 = (x2 == 0) ? 0. : Q1.integrate(R1.scale(0.), R1.scale(x2)) / x2;
-	
-	//
-	// infinite integrand:
-	//
-	
-	auto integrand2 = [&](double x1) -> double {
-		if (x1 == 0. or not finite(x1))
-			return 0.;
-		return Psin(x1) * pow(x2/x1, Lam) * Psi(x1) / x1;
-	};
-	
-	// compactification
-	CompactIntegrand<decltype(integrand2),double> R2(integrand2, 0., Inf, false, 1.0);
-	
-	// integration system
-	ClenshawCurtis<decltype(R2),double> Q2(R2);
-	Q2.setEps(1e-10);
-	
-	// integrate
-	double i2 = Q2.integrate(R2.scale(x2), R2.scale(Inf));
-	
-	// sum the two integrals
-	return i1 + i2;
-};
 
 PhiFunctionDir::PhiFunctionDir (
 	HydrogenFunction const & psin, 
@@ -76,86 +22,78 @@ PhiFunctionDir::PhiFunctionDir (
 	DistortingPotential const & U, 
 	HydrogenFunction const & psi
 ) : Lam(lam), U(U), Diag(psin == psi), 
-	Zero(lam == 0 and Diag and (DistortingPotential(psi) == U)),
-	Integral(psin,lam,psi),
-	CompactIntegral(Integral,0.,false)
+	Zero(lam == 0 and Diag and (DistortingPotential(psi) == U))
 {
 	if (Zero)
 		return;
 	
-// 	for (int ix = 0; ix <= 1000; ix++)
-// 	{
-// 		double x = ix * 0.01;
-// 		std::cout << x << "\t" 
-// 		          << Integral(x) << "\t"
-// 		          << CompactIntegral(CompactIntegral.scale(x)) << std::endl;
-// 	}
+	std::ostringstream oss;
+	oss << "phidir-" << lam << "-"
+	    << psi.getK()  << "-" << psi.getN()  << "-" << psi.getL()  << "-"
+	    << psin.getK() << "-" << psin.getN() << "-" << psin.getL() << "~";
+	std::string name1 = oss.str() + "1.hdf";
+	std::string name2 = oss.str() + "2.hdf";
 	
-	// try to load PhiFunctionDir from a HDF file
-	if (not load(name(psin, lam, psi)))
-	{	
-		// convergence loop
-		for (int N = 16; ; N *= 2)
+	rArray a, b;
+	if (load_array(a, name1.c_str()) and load_array(b, name2.c_str()))
+	{
+		Cheb_L = Chebyshev<double,double>(a);
+		Cheb_mLm1 = Chebyshev<double,double>(b);
+		
+		Cheb_L_tail = Cheb_L.tail(1e-10);
+		Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10);
+	}
+	else
+	{
+		bool Cheb_L_conv = false;
+		bool Cheb_mLm1_conv = false;
+		
+		auto inte1 = [&](double x) -> double { return psin(x)*psi(x)*pow(x,Lam); };
+		auto inte2 = [&](double x) -> double { return psin(x)*psi(x)*pow(x,-Lam-1); };
+		
+		CompactIntegrand<decltype(inte1),double> compact1(inte1);
+		CompactIntegrand<decltype(inte2),double> compact2(inte2);
+		
+		for (int N = 16; not Cheb_L_conv or not Cheb_mLm1_conv; N *= 2)
 		{
-			// construct a Chebyshev approximation of the compactified function
-			CompactIntegralCb = Chebyshev<double,double> (CompactIntegral, N);
-			
-			// check convergence
-			if (CompactIntegralCb.tail(1e-10) != N)
-				break;
-			
-			// non-convergent cases need to be done in some other way
-			if (N == 1024)
-				/* TODO */;
+			if (not Cheb_L_conv)
+			{
+				Cheb_L.generate(compact1, N);
+				if ((Cheb_L_tail = Cheb_L.tail(1e-10)) < N)
+				{
+					Cheb_L_conv = true;
+					Cheb_L = Cheb_L.integrate();
+				}
+			}
+			if (not Cheb_mLm1_conv)
+			{
+				Cheb_mLm1.generate(compact2, N);
+				if ((Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10)) < N)
+				{
+					Cheb_mLm1_conv = true;
+					Cheb_mLm1 = Cheb_mLm1.integrate();
+				}
+			}
 		}
 		
-		// save PhiFunctionDir to a HDF file
-		save(name(psin, lam, psi));
+		save_array(Cheb_L.coeffs(), name1.c_str());
+		save_array(Cheb_mLm1.coeffs(), name2.c_str());
 	}
 	
-	// get optimal truncation index
-	Tail = CompactIntegralCb.tail(1e-10);
+	Cheb_mLm1_inf = Cheb_mLm1.clenshaw(1, Cheb_mLm1_tail);
+	Cheb_L_zero = Cheb_L.clenshaw(-1, Cheb_L_tail);
 }
 
-double PhiFunctionDir::operator() (double x) const
+double PhiFunctionDir::operator() (double r) const
 {
+	double x = (r - 1) / (r + 1);
+	
 	if (Zero)
 		return 0.;
 	
-	if (Lam == 0 and Diag)
-		return CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail) - U.plusMonopole(x);
+	if (r == 0)
+		return 0.;	// FIXME
 	
-	return CompactIntegralCb.clenshaw(CompactIntegral.scale(x), Tail);
-}
-
-std::string PhiFunctionDir::name(HydrogenFunction const & psin, int lam, HydrogenFunction const & psi)
-{
-	// compose the filename
-	//   "phidir-<psin>-<lam>-<psi>.hdf"
-	std::ostringstream oss;
-	oss << "phidir-"
-	    << psin.getN() << "-" << psin.getK() << "-" << psin.getL() << "-"
-		<< lam << "-"
-		<< psi.getN()  << "-" << psi.getK()  << "-" << psi.getL()
-		<< ".arr";
-	return oss.str();
-}
-
-bool PhiFunctionDir::load(std::string filename)
-{
-	rArray coeffs;
-	
-	// load coefficients
-	if (load_array(coeffs, filename.c_str()))
-	{
-		CompactIntegralCb = Chebyshev<double,double> (coeffs);
-		return true;
-	}
-	
-	return false;
-}
-
-void PhiFunctionDir::save(std::string filename) const
-{
-	save_array(CompactIntegralCb.coeffs(), filename.c_str());
+	return pow(r,Lam) * (Cheb_mLm1_inf - Cheb_mLm1.clenshaw(x, Cheb_mLm1_tail))
+		+ pow(r, -Lam-1) * (Cheb_L.clenshaw(x, Cheb_L_tail) - Cheb_L_zero);
 }

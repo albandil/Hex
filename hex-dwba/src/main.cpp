@@ -10,6 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <cstdio>
 #include <iostream>
 
 #include <gsl/gsl_sf.h>
@@ -24,6 +25,10 @@
 int main(int argc, char *argv[])
 {
 // 	gsl_set_error_handler_off();
+	
+	// disable STDOUT/STDERR buffering
+	setvbuf(stdout, 0, _IONBF, 0);
+	setvbuf(stderr, 0, _IONBF, 0);
 	
 	if (argc != 8)
 	{

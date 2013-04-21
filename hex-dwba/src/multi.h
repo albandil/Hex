@@ -14,47 +14,10 @@
 #define HEX_DWBA_MULTI
 
 #include "arrays.h"
+#include "hydrogen.h"
 #include "potential.h"
 #include "chebyshev.h"
 #include "specf.h"
-
-/**
- * Auxiliary class holding information about intermediate integration.
- * When evaluated, it shall return
- * \f[
- *     \int 
- *         \psi_n(r_1) \left(
- *             \frac{r_<^\lambda}{r_>^{\lambda+1}} 
- *           - \frac{\delta_{\lambda 0}}{r_2} 
- *           - \delta_{\lambda 0} U_\alpha(r_2)
- *         \right) \psi_\alpha(r_1) \mathrm{d}r_1 
- * \f]
- * as a result from direct integration.
- */
-class PhiFunctionDirIntegral : public RadialFunction<double>
-{
-public:
-	
-	PhiFunctionDirIntegral (
-		HydrogenFunction const & psin, 
-		int lam,
-		HydrogenFunction const & psi
-	);
-	
-	/// evaluated integral
-	double operator() (double x2) const;
-	
-private:
-	
-	/// λ
-	int Lam;
-	
-	/// psi
-	HydrogenFunction Psi;
-	
-	/// psin
-	HydrogenFunction Psin;
-};
 	
 /**
  * Auxiliary class holding information about intermediate integration.
@@ -85,22 +48,7 @@ public:
 	
 private:
 	
-	/// Compose filename of the HDF storage file.
-	static std::string name(HydrogenFunction const & psin, int lam, HydrogenFunction const & psi);
-	
-	/// Load from a HDF file.
-	bool load(std::string filename);
-	
-	/// Save to a HDF file.
-	void save(std::string filename) const;
-	
-	/// Truncation index of the Chebyshev approximation.
-	int Tail;
-	
-	/// λ (a constructor parameter)
 	int Lam;
-	
-	/// U (a constructor parameter)
 	DistortingPotential U;
 	
 	/// whether psin == psi
@@ -109,23 +57,17 @@ private:
 	/// whether the integral is identical zero for all "x2"
 	bool Zero;
 	
-	/// integranl
-	PhiFunctionDirIntegral Integral;
+	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^\lambda \psi_i(r) \f$.
+	Chebyshev<double,double> Cheb_L;
 	
-	/**
-		* Compactification of the function
-		* \f[
-		*     \Phi(r_2) = \int_0^\infty \psi_n(r_1) \left(
-		*          \frac{r_<^\lambda}{r_>^{\lambda+1}}
-		*        - \delta_{\lambda 0} \frac{1}{r_2}
-		*        - \delta_{\lambda 0} U_\alpha(r_2)
-		*     \right) \psi_\alpha(r_1) \mathrm{d}r_1 \ .
-		* \f]
-		*/
-	CompactificationR<PhiFunctionDirIntegral,double> CompactIntegral;
+	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^{-\lambda-1} \psi_i(r) \f$.
+	Chebyshev<double,double> Cheb_mLm1;
 	
-	/// Chebyshev approximation of the compactified function \f$ \Phi(r_2) \f$.
-	Chebyshev<double,double> CompactIntegralCb;
+	int Cheb_mLm1_tail;
+	int Cheb_L_tail;
+	
+	double Cheb_mLm1_inf;
+	double Cheb_L_zero;
 };
 
 #endif

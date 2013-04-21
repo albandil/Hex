@@ -114,7 +114,8 @@ template <
 		Q1.setSubdiv(15);
 		Q1.setEps(1e-6);
 		Q1.setTol(1e-6);
-// 		Q1.setVerbose(true, "Green 1");
+ 		Q1.setVerbose(false, "Green 1");
+		Q1.setThrowAll(false);
 		
 		CompactIntegrand<decltype(integrand2), Complex> inte2(integrand2, 0., fari, false, 1.0);
 		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
@@ -123,7 +124,8 @@ template <
 		Q2.setSubdiv(15);
 		Q2.setEps(1e-6);
 		Q2.setTol(1e-6);
-// 		Q2.setVerbose(true, "Green 2");
+ 		Q2.setVerbose(false, "Green 2");
+		Q2.setThrowAll(false);
 		
 		// integrate
 		

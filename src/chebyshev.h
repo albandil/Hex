@@ -47,7 +47,32 @@ public:
 	 */
     template <class Functor> Chebyshev (Functor const & f, int n, Tin a = -1, Tin b = 1)
     {
-        N  = n;
+        generate(f, n, a, b);
+    }
+	
+	/**
+	 * \brief Constructor.
+	 * 
+	 * \param array Array of precomputed Chebyshev coefficients.
+	 * \param a Left boundary of the approximation interval.
+	 * \param b Right boundary of the approximation interval.
+	 */
+    Chebyshev (Array<Tout> const & array, Tin a = -1, Tin b = 1)
+	{
+		N  = array.size();
+        xt = 0.5 * (b + a);
+        m  = 0.5 * (b - a);
+		
+		// copy coefficients
+		C = array;
+	}
+	
+	/**
+	 * \brief Chebyshev approximation of a given function.
+	 */
+	template <class Functor> void generate (Functor const & f, int n, Tin a = -1, Tin b = 1)
+	{
+		N  = n;
         xt = 0.5 * (b + a);
         m  = 0.5 * (b - a);
 		
@@ -75,23 +100,6 @@ public:
             C[j] *= 2;
             C[j] /= N;
         }
-    }
-	
-	/**
-	 * \brief Constructor.
-	 * 
-	 * \param array Array of precomputed Chebyshev coefficients.
-	 * \param a Left boundary of the approximation interval.
-	 * \param b Right boundary of the approximation interval.
-	 */
-    Chebyshev (Array<Tout> const & array, Tin a = -1, Tin b = 1)
-	{
-		N  = array.size();
-        xt = 0.5 * (b + a);
-        m  = 0.5 * (b - a);
-		
-		// copy coefficients
-		C = array;
 	}
 	
     /**
@@ -249,6 +257,14 @@ public:
 		return C;
 	}
     
+    /**
+	 * Get k-th root of the N-order Chebyshev polynomial.
+	 */
+    inline static double node (int k, int N)
+	{
+		return cos(M_PI * (k + 0.5) / N);
+	}
+    
 private:
 
     /// map interval (xt-m,xt+m) to (-1,1)
@@ -284,7 +300,7 @@ public:
 	 */ 
 	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
 		Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
-		vName("ClenshawCurtis_ff") {}
+		vName("ClenshawCurtis_ff"), Throw(true) {}
 	
 	/// Get relative tolerance.
 	inline double eps() const { return EpsRel; }
@@ -333,6 +349,12 @@ public:
 	
 	/// Set verbose flag.
 	inline void setVerbose(bool verbose, std::string name = "ClenshawCurtis_ff") { Verbose = verbose; vName = name; }
+	
+	/// Set warn flag.
+	inline void setThrowAll(bool t) { Throw = t; }
+	
+	/// Get warn flag.
+	inline bool throwall() const { return Throw; }
 	
 	/**
 	 * Clenshaw-Curtis quadrature, main interface.
@@ -509,7 +531,7 @@ public:
 				}
 				else
 				{
-					throw exception("[%s] Can't handle datatype.", vName.c_str());
+					throw exception("[%s] Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
 				}
 			}
 #endif
@@ -552,7 +574,18 @@ public:
 		}
 		
 		if (not Recurrence)
-			throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
+		{
+			if (Throw)
+			{
+				throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
+				
+			}
+			else
+			{
+				std::cout << "[" << vName << "] WARNING: Insufficient evaluation limit " << maxN << ".\n";
+				return FType(2. * (x2 - x1) / maxN) * sum;
+			}
+		}
 		
 		//
 		// no convergence? -> bisect
@@ -723,6 +756,9 @@ private:
 	
 	/// Debuggin information identification.
 	std::string vName;
+	
+	/// Throw on non-critical errors.
+	bool Throw;
 };
 
 #endif
