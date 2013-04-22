@@ -606,47 +606,63 @@ int main(int argc, char* argv[])
 					if (abs(l1 - l2) > L or l1 + l2 < L)
 						continue;
 					
+					// setup storage
 					int iblock = l1 * (maxell + 1) + l2;
-					cArray chi_block(Nspline * Nspline);
+					cArrayView chi_block(chi, iblock * Nspline * Nspline, Nspline * Nspline);
+					chi_block.clear();
 					
 					// for all allowed angular momenta (by momentum composition) of the projectile
 					for (int l = abs(li - L); l <= li + L; l++)
 					{
+						// (anti)symmetrization
+						int Sign = ((Spin + L + li + l) % 2 == 0) ? 1. : -1.;
+						
+						// compute energy- and angular momentum-dependent prefactor
+						Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
+						prefactor *= ClebschGordan(li,mi,l,0,L,mi);
+						if (prefactor == 0.)
+							continue;
+						
 						cArray Pj1, Pj2;
 						const CooMatrix& ji_coo_E_l = ji_coo[ie * (maxell + 1) + l];
 						Pj1 = kron(Pi_coo, ji_coo_E_l).todense();
 						Pj2 = kron(ji_coo_E_l, Pi_coo).todense();
 						
-						// (anti)symmetrization
-						Complex Sign = ((Spin + L + li + l) % 2 == 0) ? 1. : -1.;
-						
-						// compute energy- and angular momentum-dependent prefactor
-						Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
-						prefactor *= ClebschGordan(li,mi,l,0,L,mi);
-						
 						// skip angular forbidden right hand sides
 						for (int lambda = 0; lambda <= maxlambda; lambda++)
 						{
-							Complex _f1 = computef(lambda, l1, l2, li, l, L);
-							Complex _f2 = computef(lambda, l1, l2, l, li, L);
+							Complex f1 = computef(lambda, l1, l2, li, l, L);
+							Complex f2 = computef(lambda, l1, l2, l, li, L);
 							
-							chi_block += prefactor * _f1 * R_tr[lambda].dot(Pj1).todense();
-							chi_block += prefactor * _f2 * R_tr[lambda].dot(Pj2).todense() * Sign;
+							if (f1 != 0.)
+							{
+								chi_block += (prefactor * f1) * R_tr[lambda].dot(Pj1).todense();
+							}
+							
+							if (f2 != 0.)
+							{
+								if (Sign > 0)
+									chi_block += (prefactor * f2) * R_tr[lambda].dot(Pj2).todense();
+								else
+									chi_block -= (prefactor * f2) * R_tr[lambda].dot(Pj2).todense();
+							}
 						}
 						
 						if (li == l1 and l == l2)
+						{
+							// direct contribution
 							chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1).todense();
+						}
 						
-						if (li == l2 and l == l1)					
-							chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2).todense() * Sign;
+						if (li == l2 and l == l1)
+						{
+							// exchange contribution
+							if (Sign > 0)
+								chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2).todense();
+							else
+								chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2).todense();
+						}
 					}
-					
-					// copy the block into the whole array
-					memcpy(
-						&chi[0] + iblock * Nspline * Nspline,	// dest
-						&chi_block[0],							// src
-						Nspline * Nspline * sizeof(Complex)		// n
-					);
 				}
 				
 				// Solve the Equations ------------------------------------------------- //
