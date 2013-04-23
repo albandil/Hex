@@ -238,27 +238,27 @@
 			if (!isset($_POST["qty"]) or $_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
 				or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 			{
-				// unit transform
-				$Eunits = 1.;
-				if (isset($_POST["Eunits"]))
-				{
-					switch ($_POST["Eunits"])
-					{
-						case "au":
-							$Eunits = 0.5;
-							break;
-						case "eV":
-							$Eunits = 13.605692;
-							break;
-						default:
-							break;
-					}
-				}
+// 				// unit transform
+// 				$Eunits = 1.;
+// 				if (isset($_POST["Eunits"]))
+// 				{
+// 					switch ($_POST["Eunits"])
+// 					{
+// 						case "au":
+// 							$Eunits = 0.5;
+// 							break;
+// 						case "eV":
+// 							$Eunits = 13.605692;
+// 							break;
+// 						default:
+// 							break;
+// 					}
+// 				}
 				
 				// default energies in Rydberg units
-				$Emin_def = 0.65 * $Eunits;
-				$Emax_def = 0.85 * $Eunits;
-				$DE_def = 0.001 * $Eunits;
+				$Emin_def = -1;
+				$Emax_def = 0;
+				$DE_def = 1;
 				
 				printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
