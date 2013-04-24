@@ -14,6 +14,7 @@
 #define HEX_SPMATRIX
 
 #include <assert.h>
+#include <chrono>
 #include <complex>
 #include <cstring>
 #include <vector>
@@ -1084,6 +1085,9 @@ unsigned cg_callbacks(
 	TFunctor1 apply_preconditioner,
 	TFunctor2 matrix_multiply
 ) {
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();;
+	std::chrono::duration<int> sec;
+	
 	// some arrays (search directions etc.)
 	size_t N = b.size();
 	cArray p(N), q(N), z(N);
@@ -1106,12 +1110,16 @@ unsigned cg_callbacks(
 	unsigned k;
 	for/*ever*/ (k = 0; ; k++)
 	{
+		sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+		
 #ifdef WITH_MPI
 		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() 
-				  << "] Residual relative magnitude: " << r.norm() / b.norm() << "\n";
+				  << "] Residual relative magnitude: " << r.norm() / b.norm()
+				  << " (" << sec.count()/60 << " min)\n";
 #else
 		std::cout << "\t[cg] Residual relative magnitude after "
-		          << k << " iterations: " << r.norm() / b.norm() << "\n";
+		          << k << " iterations: " << r.norm() / b.norm()
+				  << " (" << sec.count()/60 << " min)\n";
 #endif
 		
 		// apply desired preconditioner
