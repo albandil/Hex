@@ -16,7 +16,7 @@ obj/angs.o: src/angs.cpp src/angs.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/main.o: src/main.cpp src/dwba1.h src/complex.h src/arrays.h src/dwba1.h src/dwba2.h src/potential.h src/hydrogen.h
+obj/main.o: src/main.cpp src/dwba1.h src/complex.h src/arrays.h src/dwba1.h src/dwba2.h src/potential.h src/hydrogen.h src/clenshawcurtis.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
@@ -52,7 +52,7 @@ obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h src/clenshawcurtis.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

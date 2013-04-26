@@ -13,6 +13,7 @@
 #include <cmath>
 #include <sstream>
 
+#include "chebyshev.h"
 #include "hydrogen.h"
 #include "multi.h"
 
@@ -58,7 +59,6 @@ PhiFunctionDir::PhiFunctionDir (
 		{
 			if (not Cheb_L_conv)
 			{
-				std::cout << "Generate Cheb_L\n";
 				Cheb_L.generate(compact1, N);
 				if ((Cheb_L_tail = Cheb_L.tail(1e-10)) < N)
 				{
@@ -68,7 +68,6 @@ PhiFunctionDir::PhiFunctionDir (
 			}
 			if (not Cheb_mLm1_conv)
 			{
-				std::cout << "Generate Cheb_mLm1\n";
 				Cheb_mLm1.generate(compact2, N);
 				if ((Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10)) < N)
 				{

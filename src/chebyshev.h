@@ -69,114 +69,16 @@ public:
 	}
 	
 	/**
-	 * \brief Chebyshev approximation of a given function.
+	 * \brief Compute the transformation.
+	 * 
+	 * Generate and store the Chebyshev coefficients.
+	 * \param f Function of the signature Tout(*)(Tin) to be approximated.
+	 * \param n Number of the coefficients to compute.
+	 * \param a Left boundary of the approximation inerval.
+	 * \param b Right boundary of the approximation inerval.
 	 */
-	template <class Functor> void generate (Functor const & f, int n, Tin a = -1, Tin b = 1)
-	{
-		N  = n;
-        xt = 0.5 * (b + a);
-        m  = 0.5 * (b - a);
-        
-#if 0
-		// evaluate nodes and function
-        std::vector<double> x(N);
-        std::vector<Tout> fval(N);
-        for (int k = 0; k < N; k++)
-        {
-            x[k] = cos(M_PI * (k + 0.5) / N);
-            fval[k] = f(unscale(x[k]));
-        }
-		
-        // compute the coefficients
-        C.resize(N);
-        for (int j = 0; j < N; j++)
-        {
-            C[j] = 0;
-			
-            for (int k = 0; k < N; k++)
-                C[j] += fval[k] * cos(M_PI * j * (k + 0.5) / N);
-			
-            C[j] *= 2;
-            C[j] /= N;
-        }
-#else
-// 		// evaluate nodes and function
-//         std::vector<Tout> fval(N), D;
-//         for (int k = 0; k < N; k++)
-//         {
-//             double xk = cos(M_PI * (k + 0.5) / N);
-//             fval[k] = f(unscale(xk));
-//         }
-// 		
-//         // compute the coefficients
-//         D.resize(N);
-//         for (int j = 0; j < N; j++)
-//         {
-//             D[j] = 0;
-// 			
-//             for (int k = 0; k < N; k++)
-//                 D[j] += fval[k] * cos(M_PI * j * (k + 0.5) / N);
-// 			
-//             D[j] *= 2;
-//             D[j] /= N;
-//         }
-
-
-		// evaluate nodes and function
-        cArray fvals(4*N);
-        for (int k = 0; k < N; k++)
-        {
-            double xk = cos(M_PI * (k + 0.5) / N);
-			// fvals[2*k] = fvals[4*N-2*k] = 0.; // OK
-            fvals[2*k+1] = fvals[4*N-(2*k+1)] = f(unscale(xk));
-        }
-		
-		for (int k = 0; k < 2*N; k++)
-			std::cout << fvals[2*k] << "\t" << fvals[2*k+1] << "\n";
-		std::cout << "\n";
-		
-		// compute the coefficients using FFT/DCT-II
-		cArray ftraf(4*N);
-		fftw_plan plan = fftw_plan_dft_1d (
-			4*N,
-			reinterpret_cast<fftw_complex*>(&fvals[0]),
-			reinterpret_cast<fftw_complex*>(&ftraf[0]),
-			FFTW_FORWARD,
-			0
-		);
-		fftw_execute(plan);
-		fftw_destroy_plan(plan);
-		
-		// create type-correct pointer
-		Tout const * ftraf_ptr = reinterpret_cast<Tout*>(&ftraf[0]);
-		
-		// normalization
-		double scal = 1./N;
-		
-		for (int a = 0; a < N; a++)
-			std::cout << a << " DCT-II: " << ftraf[a]*scal << " " << ftraf[N+a]*scal << "\n";
-// 			std::cout << a << " C: " << D[a] << ", DCT-II: " << ftraf[a]*scal << " " << ftraf[N+a]*scal << "\n";
-		
-		// copy coefficients
-		C.resize(N);
-		if (typeid(Tout) == typeid(Complex))
-		{
-			// copy whole complex number
-			for (int i = 0; i < N; i++)
-				C[i] = *(ftraf_ptr + i) * scal;
-		}
-		else if (typeid(Tout) == typeid(double))
-		{
-			// copy just real part
-			for (int i = 0; i < N; i++)
-				C[i] = *(ftraf_ptr + 2*i) * scal;
-		}
-		else
-		{
-			throw exception("[Chebyshev] Can't handle datatype \"%s\".", typeid(Tout).name());
-		}
-#endif
-	}
+	template <class Functor>
+	void generate (Functor const & f, int n, Tin a = -1, Tin b = 1);
 	
     /**
      * Return full approximation value.
@@ -366,474 +268,84 @@ private:
     Tin m;
 };
 
-template <class Functor, typename FType> class ClenshawCurtis
+//
+// template member specializations
+//
+
+/**
+ * \brief Chebyshev approximation of a given real function.
+ */
+template<> template <class Functor> 
+void Chebyshev<double,double>::generate (Functor const & f, int n, double a, double b)
 {
-public:
+	N  = n;
+	xt = 0.5 * (b + a);
+	m  = 0.5 * (b - a);
+	C.resize(N);
 	
-	/**
-	 * Constructor.
-	 * \param  f Function to integrate of the signature FType(*)(double x).
-	 */ 
-	ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
-		Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
-		vName("ClenshawCurtis_ff"), Throw(true) {}
+	// input array
+	rArray fvals(N);
 	
-	/// Get relative tolerance.
-	inline double eps() const { return EpsRel; }
+	// create the FFTW plan
+	fftw_plan plan = fftw_plan_r2r_1d (N, &fvals[0], &C[0], FFTW_REDFT10, 0);
 	
-	/// Set relative tolerance.
-	inline void setEps(double epsrel) { EpsRel = epsrel; }
-	
-	/// Get absolute tolerance.
-	inline double tol() const { return EpsAbs; }
-	
-	/// Set absolute tolerance.
-	inline void setTol(double epsabs) { EpsAbs = epsabs; }
-	
-	/// Get range parameter.
-	inline double getRange() const { return L; }
-	
-	/// Set relative tolerance.
-	inline void setRange(double l) { L = l; }
-	
-	/// Get subdivision breadth limit.
-	inline int subdiv() const { return NNest; }
-	
-	/// Set subdivision breadth limit.
-	inline void setSubdiv(int nlevel) { NNest = nlevel; }
-	
-	/// Get subdivision width limit.
-	inline int stack() const { return NStack; }
-	
-	/// Set subdivision width limit.
-	inline void setStack(int nlevel) { NStack = nlevel; }
-	
-	/// Get limit flag.
-	inline bool lim() const { return Limit; }
-	
-	/// Set limit flag.
-	inline void setLim(bool limit) { Limit = limit; }
-	
-	/// Get recurrence flag.
-	inline bool Rec() const { return Recurrence; }
-	
-	/// Set limit flag.
-	inline void setRec(bool recurrence) { Recurrence = recurrence; }
-	
-	/// Get verbose flag.
-	inline bool verbose() const { return Verbose; }
-	
-	/// Set verbose flag.
-	inline void setVerbose(bool verbose, std::string name = "ClenshawCurtis_ff") { Verbose = verbose; vName = name; }
-	
-	/// Set warn flag.
-	inline void setThrowAll(bool t) { Throw = t; }
-	
-	/// Get warn flag.
-	inline bool throwall() const { return Throw; }
-	
-	/**
-	 * Clenshaw-Curtis quadrature, main interface.
-	 * \param x1 Left bound (allowed infinite).
-	 * \param x2 Right bound (allowed infinite).
-	 * \param n On input, maximal subdivision for a single bisection. (No effect
-	 *          for double infinite intervals.) On output, evaluations needed for 
-	 *          converged result.
-	 */
-	FType integrate (double x1, double x2, int * n = nullptr) const
+	// evaluate nodes and function
+	double pi_over_N = M_PI / N;
+	for (int k = 0; k < N; k++)
 	{
-		if (x1 == x2)
-			return 0.;
-		
-		// if both bounds are infinite, call a specialized function
-		if (not finite(x1) and not finite(x2))
-			return integrate_ii(n);
-
-		// lower bound is infinite
-		if (not finite(x1))
-		{
-			// the compactified functor
-			CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
-			
-			// quadrature system
-			ClenshawCurtis<decltype(G),FType> cc_G(G);
-			cc_G.setEps(EpsRel);
-			cc_G.setTol(EpsAbs);
-			cc_G.setLim(Limit);
-			cc_G.setRec(Recurrence);
-			cc_G.setSubdiv(NNest);
-			cc_G.setStack(NStack);
-			cc_G.setRange(L);
-			
-			// integrate
-			return -cc_G.integrate_ff(-1., 1., n);	// (-∞,x2)->(1,-1)
-		}
-
-		// upper bound is infinite
-		if (not finite(x2))
-		{
-			// the compactified functor
-			CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
-			
-			// quadrature system
-			ClenshawCurtis<decltype(G),FType> cc_G(G);
-			cc_G.setEps(EpsRel);
-			cc_G.setTol(EpsAbs);
-			cc_G.setLim(Limit);
-			cc_G.setRec(Recurrence);
-			cc_G.setSubdiv(NNest);
-			cc_G.setStack(NStack);
-			cc_G.setRange(L);
-			
-			// integrate
-			return cc_G.integrate_ff(-1., 1., n);	// (x1,+∞)->(-1,1)
-		}
-
-		// both bounds are finite
-		return integrate_ff(x1, x2, n);
+		double xk = cos(pi_over_N * (k + 0.5));
+		fvals[k] = f(unscale(xk));
 	}
 	
-	/**
-	 * Clenshaw-Curtis quadrature for finite interval (a,b).
-	 * \param x1 Left bound (allowed infinite).
-	 * \param x2 Right bound (allowed infinite).
-	 * \param n On output, evaluations needed for a converged result.
-	 */
-	FType integrate_ff (double x1, double x2, int * n = nullptr) const
+	// execute the transform
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
+	
+	// normalize
+	double scal = 1./N;
+	for (double & c : C)
+		c *= scal;
+}
+
+/**
+ * \brief Chebyshev approximation of a given complex function.
+ */
+template<> template <class Functor>
+void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, double b)
+{
+	N  = n;
+	xt = 0.5 * (b + a);
+	m  = 0.5 * (b - a);
+	C.resize(N);
+	
+	// input array
+	cArray fvals(4*N), ftraf(4*N);
+	
+	// create the FFTW plan
+	fftw_plan plan = fftw_plan_dft_1d (
+		4*N,
+		reinterpret_cast<fftw_complex*>(&fvals[0]),
+		reinterpret_cast<fftw_complex*>(&ftraf[0]),
+		FFTW_FORWARD,
+		0
+	);
+	
+	// evaluate nodes and function
+	double pi_over_N = M_PI / N;
+	for (int k = 0; k < N; k++)
 	{
-		// check interval bounds
-		if (x1 == x2)
-			return FType(0);
-		if (x1 > x2)
-			return -integrate_ff(x2, x1, n);
-
-		// scaled F
-		auto f = [&](double x) -> FType {
-			return F(x1 + 0.5 * (1.0 + x) * (x2 - x1));
-		};
-
-		// Chebyshev coefficients
-		std::vector<FType> coefs;
-
-		// evaluated function f
-		std::vector<Complex> fvals_prev, fvals;
-
-		// integral approximation
-		FType sum, sum_prev = Nan;
-
-		// get nesting limit
-		int maxN = gsl_sf_pow_int(2,NNest);
-		
-		// convergence loop
-		for (int N = 4; N <= maxN /*or not Recurrence*/; N *= 2)
-		{
-			double pi_over_N = M_PI / N;
-
-			fvals.resize(2*N + 1);
-
-			// is this the first iteration?
-			if (coefs.empty())
-			{
-				// evaluate f everywhere
-				for (int k = 0; k < N; k++)
-				{
-					fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
-
-					if (not finite(std::abs(fvals[k])))
-						throw exception("[%s] \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
-				}
-				fvals[N] = f(-1);
-
-				if (not finite(std::abs(fvals[N])))
-					throw exception("[%s] \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
-			}
-			else
-			{
-				// evaluate just the new half, recycle older evaluations
-				for (int k = 0; k < N; k++)
-				{
-					fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
-					
-					if (not finite(std::abs(fvals[k])))
-						throw exception("[%s] \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
-				}
-				fvals[N] = fvals_prev[N/2];
-			}
-
-			coefs.resize(N + 1);
-
-#if 0
-			// compute coefficients
-			for (int j = 0; j <= N; j++)
-			{
-				// first and last coef just in half
-				if (j % 2 == 0)
-					coefs[j] = 0.5 * (fvals[0] + fvals[N]).real();
-				else
-					coefs[j] = 0.5 * (fvals[0] - fvals[N]).real();
-
-				// rest of the coefs
-				for (int k = 1; k < N; k++)
-					coefs[j] += fvals[k].real() * cos(j * k * pi_over_N);
-			}
-#else
-			// compute coefficients using FFT/DCT-I
-			std::vector<Complex> ftraf(2*N);
-			fftw_plan plan = fftw_plan_dft_1d (
-				2*N,
-				reinterpret_cast<fftw_complex*>(&fvals[0]),
-				reinterpret_cast<fftw_complex*>(&ftraf[0]),
-				FFTW_BACKWARD,
-				0
-			);
-			fftw_execute(plan);
-			fftw_destroy_plan(plan);
-			
-			// create type-correct pointer
-			FType const * ftraf_ptr = reinterpret_cast<FType*>(&ftraf[0]);
-			
-			// copy result
-			if (typeid(FType) == typeid(Complex))
-			{
-				// copy whole complex number
-				for (int i = 0; i <= N; i++)
-					coefs[i] = 0.5 * (*(ftraf_ptr + i));
-			}
-			else if (typeid(FType) == typeid(double))
-			{
-				// copy just real part
-				for (int i = 0; i <= N; i++)
-					coefs[i] = 0.5 * (*(ftraf_ptr + 2*i));
-			}
-			else
-			{
-				throw exception("[%s] Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
-			}
-#endif
-			
-			// sum the quadrature rule
-			sum = 0.5 * (coefs[0] - coefs[N] / (N*N - 1.));
-			for (int twok = 2; twok < N; twok += 2)
-				sum -= coefs[twok] / (twok*twok - 1.);
-			
-			if (Verbose)
-				std::cout << "[" << vName << "] N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
-			
-			// check convergence
-			if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
-			{
-				if (n != nullptr)
-					*n = N;
-				
-				if (Verbose)
-					std::cout << "[" << vName << "] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
-				
-				return FType(2. * (x2 - x1) / N) * sum;
-			}
-			else if ( finite(std::abs(sum)) 
-				  and finite(std::abs(sum_prev)) 
-				  and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
-			{
-				if (Verbose)
-					std::cout << "[" << vName << "] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
-				return FType(0.);
-			}
-			else
-			{
-				/* do nothing */
-			}
-
-			// save function evaluations and sum
-			fvals_prev = std::move(fvals);
-			sum_prev = sum;
-		}
-		
-		if (not Recurrence)
-		{
-			if (Throw)
-			{
-				throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
-				
-			}
-			else
-			{
-				std::cout << "[" << vName << "] WARNING: Insufficient evaluation limit " << maxN << ".\n";
-				return FType(2. * (x2 - x1) / maxN) * sum;
-			}
-		}
-		
-		//
-		// no convergence? -> bisect
-		//
-		
-		// cancel bisection if interval too tiny
-		if (std::abs(x2-x1) < EpsAbs)
-		{
-			if (Verbose)
-				std::cout << "[" << vName << "] Interval smaller than " << EpsAbs << "\n";
-			return 0;
-		}
-		
-		// cancel bisection if stack full
-		if (NStack == 0)
-		{
-			if (Verbose)
-				std::cout << "[" << vName << "] Bisection inhibited due to internal stack limit.\n";
-			return FType(2. * (x2 - x1) / maxN) * sum;
-		}
-		
-		if (Verbose)
-			std::cout << "[" << vName << "] Bisecting to ("
-			          << x1 << "," << (x2+x1)/2 << ") and ("
-					  << (x2+x1)/2 << "," << x2 << ")\n";
-		
-		int n1, n2;
-		double this_EpsAbs = EpsAbs;
-		
-		NStack--;
-		EpsAbs = 0.5 * (2. * (x2 - x1) / maxN) * std::abs(sum) * EpsRel;
-		
-		FType i1 = integrate_ff(x1, (x2+x1)/2, &n1);
-		FType i2 = integrate_ff((x2+x1)/2, x2, &n2);
-		
-		NStack++;
-		EpsAbs = this_EpsAbs;
-		
-		if (n != nullptr) *n = n1 + n2;
-		return i1 + i2;
+		double xk = cos(pi_over_N * (k + 0.5));
+		fvals[2*k+1] = fvals[4*N-(2*k+1)] = f(unscale(xk));
 	}
 	
-	/**
-	 * Clenshaw-Curtis quadrature for infinite-infinite interval (-∞,+∞).
-	 * \param n On output, evaluations needed for 
-	 *          converged result.
-	 */
-	FType integrate_ii (int * n = nullptr) const
-	{
-		// function values, new and previous
-		std::vector<FType> fvals, fvals_prev;
-
-		// weights, new and previous
-		std::vector<double> weights, weights_prev;
-
-		// previous integral
-		FType sum_prev = Nan;
-
-		// main loop
-		for (int N = 2; ; N *= 2)
-		{
-			fvals.resize(N);
-			weights.resize(N);
-
-			// precompute values
-			if (fvals_prev.empty())
-			{
-				// compute all values
-				for (int i = 1; i <= N - 1; i++)
-				{
-					double x = i * M_PI / N;
-					fvals[i] = F(L / tan(x));
-					if (not finite(std::abs(fvals[i])))
-						fvals[i] = 0;
-					weights[i] = 1. / sqr(sin(x));
-				}
-			}
-			else
-			{
-				// compute new values only
-				for (int i = 1; i < N - 1; i++)
-				{
-					if (i % 2 == 0)
-					{
-						fvals[i] = fvals_prev[i/2];
-						weights[i] = weights_prev[i/2];
-					}
-					else
-					{
-						double x = i * M_PI / N;
-						fvals[i] = F(L / tan(x));
-						if (not finite(std::abs(fvals[i])))
-							fvals[i] = 0;
-						weights[i] = 1. / sqr(sin(x));
-					}
-				}
-			}
-
-			// evaluate the integral
-			FType sum = 0.;
-			for (int i = 1; i <= N - 1; i++)
-				sum += weights[i] * fvals[i];
-			if (std::abs(sum - FType(2.) * sum_prev) < EpsRel * std::abs(sum))
-			{
-				if (n != nullptr) *n = N;
-				return FType(L * M_PI / N) * sum;
-			}
-
-			// save precomputed values
-			sum_prev = sum;
-			fvals_prev = fvals;
-			weights_prev = weights;
-		}
-	}
+	// execute the transform
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
 	
-private:
-	
-	/// Function to integrate
-	Functor const & F;
-	
-	/// Relative precision
-	double EpsRel;
-	
-	/// Relative precision
-	mutable double EpsAbs;
-	
-	/**
-	 * \brief Whether to use \ref lim for evaluating integration boundaries.
-	 * 
-	 * Whether to use limit (limit = true) when evaluating F(x1) and
-	 * F(x2) for improper arguments x1=-∞ and/or x2=+∞. Otherwise 
-	 * (limit = false) the functor will be simply evaluated at
-	 * possibly infinite boundaries and it has to cope itself with the
-	 * input.
-	 */
-	bool Limit;
-	
-	/**
-	 * \brief Enable recurrent subdivision.
-	 * 
-	 * Whether to divide-and-conquer if current level doesn't converge
-	 * after NLevel evaluations.
-	 */
-	bool Recurrence;
-	
-	/**
-	 * \brief Breadth limit for bisection.
-	 * 
-	 * Sets the maximal evaluations count for a single bisection level.
-	 * When the limit is reached, a new bisection will be done. Thus, the
-	 * integration rule will be nested NLevel-times before doing so.
-	 */
-	int NNest;
-	
-	/**
-	 * \brief Depth limit for bisection.
-	 * 
-	 * Sets the subdivision level count. The initial integration interval
-	 * will be subdivided into 2^NStack pieces if totally non-convergent.
-	 */
-	mutable int NStack;
-	
-	/// Compactification parameter
-	double L;
-	
-	/// Display debugging information.
-	bool Verbose;
-	
-	/// Debuggin information identification.
-	std::string vName;
-	
-	/// Throw on non-critical errors.
-	bool Throw;
-};
+	// copy normalized coefficients
+	double scal = 1./N;
+	for (int i = 0; i < N; i++)
+		C[i] = ftraf[i] * scal;
+}
 
 #endif

@@ -15,6 +15,7 @@
 
 #include "arrays.h"
 #include "chebyshev.h"
+#include "clenshawcurtis.h"
 #include "potential.h"
 #include "specf.h"
 #include "../../hex-main/src/bspline.h"
