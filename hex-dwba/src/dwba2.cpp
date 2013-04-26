@@ -211,7 +211,7 @@ void DWBA2_energy_driver (
 // 	for (double Kn = 0; Kn < 5; Kn += 0.01)
 // 		compact(compact.scale(Kn));
 	
-// 	ContinuumContribution(sqrt(3));
+	ContinuumContribution(27.0062);
 		
 	exit(0);
 	

@@ -29,6 +29,10 @@
 /// Kronecker delta
 #define DELTA(a,b)       ((a) == (b) ? 1 : 0)
 
+//
+// Ricatti-Bessel functions.
+//
+
 /**
  * \brief Ricatti-Bessel function of the first kind, \f$ \hat{j}_n(x) \f$.
  * 
@@ -41,6 +45,17 @@
  * \f$ \hat{n}_0(x) = \cos x \f$
  */
 #define ric_n(n,x)			((x)*gsl_sf_bessel_yl(n,x))
+
+//
+// Modified Bessel function of the first kind.
+//
+
+/**
+ * \brief Scaled modified spherical Bessel function of the first kind, \f$ \mathrm{e}^{-x} i_n(x) \f$.
+ * 
+ * \f$ \mathrm{e}^{-x} i_0(x) = \mathrm{e}^{-x} \frac{1}{x} \sinh x \f$
+ */
+#define sph_i_scaled(n,x)	(gsl_sf_bessel_il_scaled(n,x))
 /**
  * \brief Scaled modified Ricatti-Bessel function of the first kind, \f$ \mathrm{e}^{-x} \hat{i}_n(x) \f$.
  * 
@@ -48,23 +63,52 @@
  */
 #define ric_i_scaled(n,x)	((x)*gsl_sf_bessel_il_scaled(n,x))
 /**
- * \brief Scaled modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^x \hat{k}_n(x) \f$.
+ * \brief Modified spherical Bessel function of the first kind, \f$ i_n(x) \f$.
  * 
- * \f$ \mathrm{e}^{x} \hat{k}_0(x) = 1 \f$.
+ * \f$ i_0(x) = \frac{1}{x} \sinh x \f$
  */
-#define ric_k_scaled(n,x)	((x)*gsl_sf_bessel_kl_scaled(n,x)*2./M_PI)
+#define sph_i(n,x)	        (exp(x)*sph_i_scaled(n,x))
 /**
  * \brief Modified Ricatti-Bessel function of the first kind, \f$ \hat{i}_n(x) \f$.
  * 
  * \f$ \hat{i}_0(x) = \sinh x \f$
  */
-#define ric_i(n,x)			(exp( x) * ric_i_scaled(n,x))
+#define ric_i(n,x)			(exp(x)*ric_i_scaled(n,x))
+
+
+//
+// Modified Bessel function of the second kind.
+//
+
+/**
+ * \brief Scaled modified spherical Bessel function of the second kind, \f$ \mathrm{e}^x k_n(x) \f$.
+ * 
+ * \f$ \mathrm{e}^{x} k_0(x) = \frac{1}{x} \f$.
+ */
+#define sph_k_scaled(n,x)	(gsl_sf_bessel_kl_scaled(n,x)*M_2_PI)
+/**
+ * \brief Scaled modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^x \hat{k}_n(x) \f$.
+ * 
+ * \f$ \mathrm{e}^{x} \hat{k}_0(x) = 1 \f$.
+ */
+#define ric_k_scaled(n,x)	((x)*sph_k_scaled(n,x))
+/**
+ * \brief Modified spherical Bessel function of the second kind, \f$ k_n(x) \f$.
+ * 
+ * \f$ k_0(x) = \frac{1}{x} \mathrm{e}^{-x} \f$.
+ */
+#define sph_k(n,x)	        (exp(-x)*sph_k_scaled(n,x))
 /**
  * \brief Modified Ricatti-Bessel function of the second kind, \f$ \hat{k}_n(x) \f$.
  * 
  * \f$ \hat{k}_0(x) = \mathrm{e}^{-x} \f$.
  */
 #define ric_k(n,x)			(exp(-x) * ric_k_scaled(n,x))
+
+//
+// Ricatti-Hankel functions.
+//
+
 /**
  * \brief Ricatti-Hankel function of the first kind, \f$ \hat{h}_n^{(+)}(x) \f$.
  * 
@@ -75,6 +119,10 @@
  * \brief Derivative of Ricatti-Hankel function of the first kind, \f$ {\hat{h}_n^{(+)}}'(x) \f$.
  */
 #define dric_h_plus(n,x)	Complex(dric_j(n,x),dric_n(n,x))
+
+//
+// Other special functions.
+//
 
 /**
  * \brief Spherical harmonic function.
@@ -122,7 +170,7 @@ inline double dric_i(int n, double x)
 	if (n == 0)
 		return cosh(x);
 	
-	return exp(x) * (gsl_sf_bessel_il_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1));
+	return exp(x) * (sph_i_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1));
 }
 
 /**
@@ -133,7 +181,7 @@ inline double dric_k(int n, double x)
 	if (n == 0)
 		return -exp(-x);
 	
-	return -exp(-x) * (gsl_sf_bessel_kl_scaled(n,x) + (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1));
+	return exp(-x) * (sph_k_scaled(n,x) - (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1));
 }
 
 /**
@@ -144,7 +192,7 @@ inline double dric_i_scaled(int n, double x)
 	if (n == 0)
 		return exp(-2*x);
 	
-	return exp(-x) * (dric_i(n,x) - ric_i(n,x));
+	return sph_i_scaled(n,x) - ric_i_scaled(n,x) + (n * ric_i_scaled(n-1,x) + (n+1) * ric_i_scaled(n+1,x)) / (2*n+1);
 }
 
 /**
@@ -155,7 +203,7 @@ inline double dric_k_scaled(int n, double x)
 	if (n == 0)
 		return 0;
 	
-	return exp(x) * (dric_k(n,x) + ric_k(n,x));
+	return sph_k_scaled(n,x) + ric_k_scaled(n,x) - (n * ric_k_scaled(n-1,x) + (n+1) * ric_k_scaled(n+1,x)) / (2*n+1);
 }
 
 /**

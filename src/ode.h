@@ -25,6 +25,8 @@
 #define RETURN_ON_OVERFLOW 		1
 #define NORMALIZE_ON_OVERFLOW	2
 
+#include "misc.h"
+
 /**
  * \brief Second-order differential equation solver.
  * 
@@ -84,13 +86,17 @@ int solve2(
 		bool done = false;
 		while (not done and ret == 0)
 		{
-			ret = adapt_stepper.astep_full(
+			ret = adapt_stepper.astep_full (
 				x,xnext,xg[i],h,2,ystart,dydx_start,
 				y_row,yerr_row,dydx_row,derivs
 			);
+			
+			if (not finite(y_row[0]))
+				throw exception("[solve2] Infinite result for i = %d", i);
+			
 			nsteps++;
 			if (ret != 0 and first_ret != 0)
-					first_ret = ret;
+				first_ret = ret;
 			if (nsteps > ntrial)
 			{
 				std::string str="Too many steps required (ntrial="+o2scl::itos(ntrial)+

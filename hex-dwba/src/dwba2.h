@@ -97,6 +97,14 @@ template <
 				return gphi(r2) * phii(r2) * chii(r2);
 		};
 		auto integrand2 = [&](double r2) -> Complex {
+// 			if (r1 == 1.)
+// 			{
+// 				std::cout << "-------------\n" << std::flush;
+// 				std::cout << r2 << std::endl << std::flush;
+// 				std::cout << chii(r2) << "\n";
+// 				std::cout << geta(r2) << "\n";
+// 				std::cout << phii(r2) << "\n";
+// 			}
 			if (not finite(r2))
 				return 0.;
 			if (scaling)
@@ -135,6 +143,12 @@ template <
 			inte1.scale(std::min(r1,fari)),
 			&n1
 		);
+		
+// 		if (r1 == 1)
+// 		{
+// 			std::cout << "!!!\n" << std::flush;
+// 		}
+		
 		Complex q2 = Q2.integrate (
 			inte2.scale(std::min(r1,fari)),
 			inte2.scale(fari),

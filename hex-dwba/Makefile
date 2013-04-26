@@ -32,17 +32,20 @@ obj/spmatrix.o: src/spmatrix.cpp src/spmatrix.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_distort.o: src/wave_distort.cpp src/wave_distort.h src/arrays.h src/complex.h src/potential.h
+obj/wave_distort.o: src/wave_distort.cpp src/wave_distort.h src/arrays.h src/complex.h src/potential.h src/ode.h src/specf.h src/misc.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 	
-obj/wave_irreg.o: src/wave_irreg.cpp src/wave_irreg.h src/arrays.h src/complex.h
+obj/wave_irreg.o: src/wave_irreg.cpp src/wave_irreg.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h
+	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_forbid.o: src/wave_forbid.cpp src/wave_forbid.h src/arrays.h src/complex.h
+obj/wave_forbid.o: src/wave_forbid.cpp src/wave_forbid.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h
+	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrays.h src/complex.h
+obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h
+	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
 obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h src/potential.h src/hydrogen.h

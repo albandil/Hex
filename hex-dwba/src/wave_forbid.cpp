@@ -128,20 +128,22 @@ int ForbiddenWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2s
 {
 	dydx[0] = y[1];
 	dydx[1] = (x == 0.) ? 0. : (2.*U(x) + ln*(ln+1)/(x*x)) * y[0] + 2*kn*y[1];
+	
 	return 0;
 }
 
 double ForbiddenWave::operator()(double x) const
 {
 	if (x > grid.back())
-		
+	{
 		// extrapolate
 		return Scaled ? ric_k_scaled(ln,kn*x) : ric_k(ln,kn*x);
-	
+	}
 	else
-		
+	{
 		// interpolate
 		return Scaled ? interpolator.interp(x) : interpolator.interp(x) * exp(-kn*x);
+	}
 }
 
 void ForbiddenWave::toFile(const char* filename) const

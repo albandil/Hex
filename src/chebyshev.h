@@ -20,6 +20,7 @@
 
 #include <fftw3.h>
 
+#include "arrays.h"
 #include "compact.h"
 #include "misc.h"
 
@@ -75,8 +76,9 @@ public:
 		N  = n;
         xt = 0.5 * (b + a);
         m  = 0.5 * (b - a);
-		
-        // evaluate nodes and function
+        
+#if 0
+		// evaluate nodes and function
         std::vector<double> x(N);
         std::vector<Tout> fval(N);
         for (int k = 0; k < N; k++)
@@ -84,7 +86,7 @@ public:
             x[k] = cos(M_PI * (k + 0.5) / N);
             fval[k] = f(unscale(x[k]));
         }
-        
+		
         // compute the coefficients
         C.resize(N);
         for (int j = 0; j < N; j++)
@@ -92,14 +94,88 @@ public:
             C[j] = 0;
 			
             for (int k = 0; k < N; k++)
-            {
-                double Tj_xk = cos(M_PI * j * (k + 0.5) / N);
-                C[j] += fval[k] * Tj_xk;
-            }
+                C[j] += fval[k] * cos(M_PI * j * (k + 0.5) / N);
 			
             C[j] *= 2;
             C[j] /= N;
         }
+#else
+// 		// evaluate nodes and function
+//         std::vector<Tout> fval(N), D;
+//         for (int k = 0; k < N; k++)
+//         {
+//             double xk = cos(M_PI * (k + 0.5) / N);
+//             fval[k] = f(unscale(xk));
+//         }
+// 		
+//         // compute the coefficients
+//         D.resize(N);
+//         for (int j = 0; j < N; j++)
+//         {
+//             D[j] = 0;
+// 			
+//             for (int k = 0; k < N; k++)
+//                 D[j] += fval[k] * cos(M_PI * j * (k + 0.5) / N);
+// 			
+//             D[j] *= 2;
+//             D[j] /= N;
+//         }
+
+
+		// evaluate nodes and function
+        cArray fvals(4*N);
+        for (int k = 0; k < N; k++)
+        {
+            double xk = cos(M_PI * (k + 0.5) / N);
+			// fvals[2*k] = fvals[4*N-2*k] = 0.; // OK
+            fvals[2*k+1] = fvals[4*N-(2*k+1)] = f(unscale(xk));
+        }
+		
+		for (int k = 0; k < 2*N; k++)
+			std::cout << fvals[2*k] << "\t" << fvals[2*k+1] << "\n";
+		std::cout << "\n";
+		
+		// compute the coefficients using FFT/DCT-II
+		cArray ftraf(4*N);
+		fftw_plan plan = fftw_plan_dft_1d (
+			4*N,
+			reinterpret_cast<fftw_complex*>(&fvals[0]),
+			reinterpret_cast<fftw_complex*>(&ftraf[0]),
+			FFTW_FORWARD,
+			0
+		);
+		fftw_execute(plan);
+		fftw_destroy_plan(plan);
+		
+		// create type-correct pointer
+		Tout const * ftraf_ptr = reinterpret_cast<Tout*>(&ftraf[0]);
+		
+		// normalization
+		double scal = 1./N;
+		
+		for (int a = 0; a < N; a++)
+			std::cout << a << " DCT-II: " << ftraf[a]*scal << " " << ftraf[N+a]*scal << "\n";
+// 			std::cout << a << " C: " << D[a] << ", DCT-II: " << ftraf[a]*scal << " " << ftraf[N+a]*scal << "\n";
+		
+		// copy coefficients
+		C.resize(N);
+		if (typeid(Tout) == typeid(Complex))
+		{
+			// copy whole complex number
+			for (int i = 0; i < N; i++)
+				C[i] = *(ftraf_ptr + i) * scal;
+		}
+		else if (typeid(Tout) == typeid(double))
+		{
+			// copy just real part
+			for (int i = 0; i < N; i++)
+				C[i] = *(ftraf_ptr + 2*i) * scal;
+		}
+		else
+		{
+			throw exception("[Chebyshev] Can't handle datatype \"%s\".", typeid(Tout).name());
+		}
+#endif
 	}
 	
     /**
@@ -501,7 +577,7 @@ public:
 					coefs[j] += fvals[k].real() * cos(j * k * pi_over_N);
 			}
 #else
-			// compute coefficients using FFT
+			// compute coefficients using FFT/DCT-I
 			std::vector<Complex> ftraf(2*N);
 			fftw_plan plan = fftw_plan_dft_1d (
 				2*N,
@@ -517,22 +593,21 @@ public:
 			FType const * ftraf_ptr = reinterpret_cast<FType*>(&ftraf[0]);
 			
 			// copy result
-			for (int i = 0; i <= N; i++)
+			if (typeid(FType) == typeid(Complex))
 			{
-				if (typeid(FType) == typeid(Complex))
-				{
-					// copy whole complex number
+				// copy whole complex number
+				for (int i = 0; i <= N; i++)
 					coefs[i] = 0.5 * (*(ftraf_ptr + i));
-				}
-				else if (typeid(FType) == typeid(double))
-				{
-					// copy just real part
+			}
+			else if (typeid(FType) == typeid(double))
+			{
+				// copy just real part
+				for (int i = 0; i <= N; i++)
 					coefs[i] = 0.5 * (*(ftraf_ptr + 2*i));
-				}
-				else
-				{
-					throw exception("[%s] Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
-				}
+			}
+			else
+			{
+				throw exception("[%s] Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
 			}
 #endif
 			
