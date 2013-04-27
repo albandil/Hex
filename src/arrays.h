@@ -621,37 +621,103 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		/**
 		 * Save array to HDF file.
 		 * \param name Filename.
+		 * \param compress Whether to apply a trivial compression (contract the repeated zeros).
+		 * \param consec Minimal consecutive occurences for compression.
 		 */
-		bool hdfsave(const char* name) const
+		bool hdfsave(const char* name, bool compress = false, int consec = 10) const
 		{
+			// compressed array
+			Array<NumberType> carray;
+			
+			// zero blocks
+			Array<int> zero_blocks;
+			
+			// consecutive zeros counter
+			int zero_counter = 0;
+			
+			if (compress)
+			{
+				// analyze: find compressible segments
+				for (size_t i = 0; i < N; i++)
+				{
+					if (array[i] == 0.)
+					{
+						// another consecutive zero
+						zero_counter++;
+					}
+					else if (zero_counter >= consec)
+					{
+						// end of large zero block -> compress
+						zero_blocks.push_back(i-zero_counter);
+						zero_blocks.push_back(i);
+						zero_counter = 0;
+					}
+					else
+					{
+						// end of tiny zero block -> do not bother with compression
+						zero_counter = 0;
+					}
+					
+				}
+				if (zero_counter >= 10)
+				{
+					zero_blocks.push_back(N-zero_counter);
+					zero_blocks.push_back(N);
+				}
+				
+				// invert selection: get non-zero blocks
+				Array<int> nonzero_blocks;
+				nonzero_blocks.push_back(0);
+				nonzero_blocks.append(zero_blocks.begin(), zero_blocks.end());
+				nonzero_blocks.push_back(N);
+				
+				// compress: copy only nonzero elements
+				for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
+				{
+					int start = nonzero_blocks[2*iblock];
+					int end = nonzero_blocks[2*iblock+1];
+					carray.append (
+						array + start,
+						array + end
+					);
+				}
+			}
+			
+			// save to HDF file
 			try
 			{
 				H5::H5File h5file(name, H5F_ACC_TRUNC);
 				
-				// all arrays are rank-1
-				int rank = 1;
-				hsize_t length;
-				
-				// determine number of doubles in array
-				if (typeid(NumberType) == typeid (double))
+				// save data as an interleaved array
+				if (compress)
 				{
-					length = N;
-				}
-				else if (typeid(NumberType) == typeid (Complex))
-				{
-					length = 2*N;
+					hsize_t length1 = carray.size() * sizeof(NumberType) / sizeof(double);
+					
+					H5::DataSpace dspc1(/*rank*/1, &length1);
+					H5::IntType dtype1(H5::PredType::NATIVE_DOUBLE);
+					H5::DataSet dset1 = h5file.createDataSet("array", dtype1, dspc1);
+					dset1.write(&carray[0], H5::PredType::NATIVE_DOUBLE);
+					
+					hsize_t length2 = zero_blocks.size();
+					
+					// make zero_blocks index doubles, not elements
+					for (int& z : zero_blocks)
+						z *= sizeof(NumberType)/sizeof(double);
+					
+					H5::DataSpace dspc2(/*rank*/1, &length2);
+					H5::IntType dtype2(H5::PredType::NATIVE_INT);
+					H5::DataSet dset2 = h5file.createDataSet("zero_blocks", dtype2, dspc2);
+					dset2.write(&zero_blocks[0], H5::PredType::NATIVE_INT);
 				}
 				else
 				{
-					std::cerr << "Don't know how to store datatype with typeid " << typeid(NumberType).name() << std::endl;
-					return false;
-				};
-				
-				// save data as an interleaved array
-				H5::DataSpace dspc(rank, &length);
-				H5::IntType dtype(H5::PredType::NATIVE_DOUBLE);
-				H5::DataSet dset = h5file.createDataSet("array", dtype, dspc);
-				dset.write(array, H5::PredType::NATIVE_DOUBLE);
+					hsize_t length = N * sizeof(NumberType) / sizeof(double);
+					
+					H5::DataSpace dspc(/*rank*/1, &length);
+					H5::IntType dtype(H5::PredType::NATIVE_DOUBLE);
+					H5::DataSet dset = h5file.createDataSet("array", dtype, dspc);
+					dset.write(array, H5::PredType::NATIVE_DOUBLE);
+				}
 				
 				return true;
 			}
@@ -669,36 +735,91 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		{
 			try
 			{
-				H5::H5File h5file(name, H5F_ACC_RDONLY);
-				
 				// remove previous data
 				if (array != 0)
 					delete [] array;
 				
-				// load data 
+				// open file
+				H5::H5File h5file(name, H5F_ACC_RDONLY);
+				
+				// load data array (non-zero elements)
 				H5::DataSet dset = h5file.openDataSet("array");
 				H5::DataSpace dspc = dset.getSpace();
+				int nnz = dspc.getSimpleExtentNpoints() * sizeof(double) / sizeof(NumberType);
 				
-				// determine number of doubles in array
-				if (typeid(NumberType) == typeid(double))
-				{
-					N = dspc.getSimpleExtentNpoints();
-				}
-				else if (typeid(NumberType) == typeid(Complex))
-				{
-					N = dspc.getSimpleExtentNpoints() / 2;
-				}
-				else
-				{
-					std::cerr << "Don't know how to store datatype with typeid " << typeid(NumberType).name() << std::endl;
-					return false;
-				}
-				array = new Complex [N];
-				dset.read(
-					reinterpret_cast<double*>(array),
+				Array<NumberType> nnz_array(nnz);
+				
+				dset.read (
+					reinterpret_cast<double*>(&nnz_array[0]),
 					H5::PredType::NATIVE_DOUBLE,
 					dspc,
 					dspc
+				);
+				
+				// load compression information (if any)
+				H5::DataSet dsetz = h5file.openDataSet("zero_blocks");
+				H5::DataSpace dspcz = dsetz.getSpace();
+				int n = dspcz.getSimpleExtentNpoints();
+				
+				Array<int> zero_blocks;
+				
+				if (n == 0)
+				{
+					// no compression data
+					// -> move loaded data to internal storage and return
+					*this = std::move(nnz_array);
+					return true;
+				}
+				else
+				{
+					// there are some compression data
+					// -> load information about the zero blocks
+					zero_blocks.resize(n);
+					dsetz.read (
+						reinterpret_cast<int*>(&zero_blocks[0]),
+						H5::PredType::NATIVE_INT,
+						dspcz,
+						dspcz
+					);
+				}
+				
+				// make zero_blocks index elements, not doubles
+				for (int& z : zero_blocks)
+					z /= sizeof(NumberType)/sizeof(double);
+				
+				// compute final size
+				N = nnz;
+				for (size_t i = 0; i < zero_blocks.size()/2; i++)
+					N += zero_blocks[2*i+1] - zero_blocks[2*i];
+				
+				// resize and clean internal storage
+				array = new NumberType[N];
+				memset(array, 0, N * sizeof(NumberType));
+				
+				// copy nonzero chunks
+				int this_end = 0;	// index of last updated element in "this"
+				int load_end = 0;	// index of last used element in "nnz_array"
+				for (size_t i = 0; i < zero_blocks.size()/2; i++)
+				{
+					int zero_start = zero_blocks[2*i];
+					int zero_end = zero_blocks[2*i+1];
+					
+					// append nonzero data before this zero block
+					memcpy (
+						array + this_end,
+						&nnz_array[0] + load_end,
+						(zero_start - this_end) * sizeof(NumberType)
+					);
+					
+					// move cursors
+					load_end += zero_start - this_end;
+					this_end  = zero_end;
+				}
+				// append remaining data
+				memcpy (
+					array + this_end,
+					&nnz_array[0] + load_end,
+					(N - this_end) * sizeof(NumberType)
 				);
 				
 				return true;
@@ -868,7 +989,7 @@ template <typename T> Array<T> linspace(T start, T end, unsigned samples)
 	}
 	
 	for (unsigned i = 0; i < samples; i++)
-		space[i] = start + (end - start) * i / (samples - 1);
+		space[i] = start + (end - start) * T(i) / T(samples - 1);
 	return space;
 }
 

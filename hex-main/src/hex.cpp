@@ -780,7 +780,7 @@ int main(int argc, char* argv[])
 				iterations_done += iterations;
 				
 				// save solution to disk
-				current_solution.hdfsave(cur_oss.str().c_str());
+				current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
 				
 // 				if (ie == 0)
 // 				{
