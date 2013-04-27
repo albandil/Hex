@@ -50,7 +50,7 @@ bool CollisionStrength::run (
 	
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
-	double lfactor = change_units(lUnit_au, Lunits);
+// 	double lfactor = change_units(lUnit_au, Lunits);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);

@@ -119,6 +119,8 @@ std::string unit_name(eUnit u)
 			return std::string("eV");
 		case eUnit_Ry:
 			return std::string("Ry");
+		default:
+			return std::string("");
 	}
 }
 
@@ -130,5 +132,7 @@ std::string unit_name(lUnit u)
 			return std::string("a.u.");
 		case lUnit_cgs:
 			return std::string("CGS");
+		default:
+			return std::string("");
 	}
 }
