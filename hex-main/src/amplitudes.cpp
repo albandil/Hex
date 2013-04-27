@@ -25,7 +25,7 @@
 #include "special.h"
 #include "spmatrix.h"
 
-cArray computeLambda(
+cArray computeLambda (
 	const rArray& kf, const rArray& ki, int maxell,
 	int L, int Spin, int ni, int li, int mi, const rArray& Ei,
 	int lf, cArray Pf_overlaps, cArray jf_overlaps
@@ -64,7 +64,7 @@ cArray computeLambda(
 			double eval_r = R0 - wavelength * n / samples;
 			
 			// determine knot
-			int eval_knot = std::lower_bound(
+			int eval_knot = std::lower_bound (
 				t,
 				t + Nknot,
 				Complex(eval_r, 0.),
@@ -117,12 +117,19 @@ cArray computeLambda(
 					continue;
 				
 				// get correct solution (for this ang. mom.)
-				cArray PsiSc(Nspline * Nspline);
-				memcpy(
-					& PsiSc[0],
-					& solution[Nspline * Nspline * (lf * (maxell + 1) + l)],
-					Nspline * Nspline * sizeof(Complex)
+				cArrayView PsiSc (
+					solution, 
+					(lf * (maxell + 1) + l) * Nspline * Nspline, 
+					Nspline * Nspline
 				);
+				
+// 				cArray PsiSc(Nspline * Nspline);
+// 				memcpy (
+// 					& PsiSc[0],
+// 					& solution[Nspline * Nspline * (lf * (maxell + 1) + l)],
+// 					Nspline * Nspline * sizeof(Complex)
+// 				);
+				
 				rads[ie * (maxell + 1) + l] += Sp.transpose().dot(PsiSc).dot(Wj[l].todense()).todense()[0] / double(samples);
 			}
 		}

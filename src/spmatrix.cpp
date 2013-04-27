@@ -1231,12 +1231,12 @@ cArray CooMatrix::todense() const
 	return v;
 }
 
-CooMatrix& CooMatrix::operator *= (const cArray&  B)
+CooMatrix& CooMatrix::operator *= (cArray const &  B)
 {
 	return *this = this->dot(B);
 }
 
-CooMatrix CooMatrix::dot(const cArray& B)
+CooMatrix CooMatrix::dot(cArrayView const & B)
 {
 	// FIXME: This is a memory INEFFICIENT method.
 	// NOTE: Row-major storage assumed for B.
@@ -1262,7 +1262,7 @@ CooMatrix CooMatrix::dot(const cArray& B)
 		// for all columns of B
 		for (unsigned icol = 0; icol < C_cols; icol++)
 		{
-			C.add(
+			C.add (
 				row, icol,
 				_x_[i] * B[col*C_cols + icol]
 			);

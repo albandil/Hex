@@ -736,8 +736,12 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			try
 			{
 				// remove previous data
-				if (array != 0)
+				if (array != nullptr)
+				{
 					delete [] array;
+					array = nullptr;
+					N = 0;
+				}
 				
 				// open file
 				H5::H5File h5file(name, H5F_ACC_RDONLY);

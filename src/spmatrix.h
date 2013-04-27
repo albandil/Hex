@@ -821,7 +821,7 @@ public:
 	}
 	
 	// multiplication
-	CooMatrix dot (cArray const &  B);
+	CooMatrix dot (cArrayView const &  B);
 	
 	/**
 	 * Matrix multiplication
