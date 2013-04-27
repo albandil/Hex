@@ -15,7 +15,10 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include <png++/png.hpp>
+
+#ifdef WITH_PNGPP
+	#include <png++/png.hpp>
+#endif
 
 #include <H5Cpp.h>
 
@@ -427,6 +430,7 @@ CsrMatrix CsrMatrix::submatrix(unsigned a, unsigned b, unsigned c, unsigned d) c
 	return subm;
 }
 
+#ifdef WITHPNG
 CsrMatrix::PngGenerator::PngGenerator(const CsrMatrix* mat, double threshold)
 	: base_t(mat->cols(), mat->rows()), Mat(mat), buffer(mat->cols()), Threshold(threshold)
 {
@@ -467,6 +471,7 @@ void CsrMatrix::plot(const char* filename, double threshold) const
 	// write PNG file
 	png.write(out);
 }
+#endif
 
 CsrMatrix::LUft CsrMatrix::factorize() const
 {

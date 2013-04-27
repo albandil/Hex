@@ -13,15 +13,18 @@
 #ifndef HEX_SPMATRIX
 #define HEX_SPMATRIX
 
-#include <assert.h>
+#include <cassert>
 #include <chrono>
 #include <complex>
 #include <cstring>
 #include <vector>
+
+#ifdef WITH_PNGPP
 #include <png++/png.hpp>
+#endif
 
 #ifdef WITH_MPI
-	#include <mpi.h>
+#include <mpi.h>
 #endif
 
 #include <unistd.h>
@@ -264,6 +267,8 @@ public:
 	 */
 	CsrMatrix submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const;
 	
+#ifdef WITH_PNGPP
+	
 	/**
 	 * PNG row data generator for use in \ref plot function.
 	 */
@@ -293,6 +298,8 @@ public:
 	 * \param threshold Largest absolute value represented by white colour.
 	 */
 	void plot(const char* filename, double threshold = 0.) const;
+	
+#endif
 	
 	/**
 	 * LU factorization
