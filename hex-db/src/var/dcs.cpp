@@ -24,8 +24,8 @@ const std::string DifferentialCrossSection::Description = "Differential cross se
 const std::vector<std::string> DifferentialCrossSection::Dependencies = {
 	"ni", "li", "mi", 
 	"nf", "lf", "mf",
-	"L", "S",
-	"Ei", "ell", "theta"
+	"S",
+	"Ei", "theta"
 };
 
 const std::string & DifferentialCrossSection::SQL_CreateTable() const

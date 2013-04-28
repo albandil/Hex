@@ -34,6 +34,9 @@
  */
 template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & y0, rArray const & x)
 {
+	if (x0.size() == 1)
+		return y0;
+	
 	// output array
 	Array<T> y(x.size());
 	
@@ -90,6 +93,13 @@ inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray con
 {
 	// check equal sizes
 	assert(x0.size() == y0.size());
+	
+	// check if there is anything to interpolate
+	if (x0.size() < 2)
+	{
+		std::cerr << "Too few data (" << x0.size() << ") to interpolate.\n";
+		exit(-1);
+	}
 	
 	// setup the interpolator
 	o2scl::interp_o2scl_vec<const double*> itp (
