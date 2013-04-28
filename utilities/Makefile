@@ -4,7 +4,8 @@ all:
 	make -C triangle
 	make -C hdf2txt
 	make -C hdf2hdf
-	mkdir -p bin; cd bin; pwd; ln -fs ../stack/stack ../triangle/triangle ../far/far ../hdf2txt/hdf2txt ../hdf2hdf/hdf2hdf .
+	make -C chebeval
+	mkdir -p bin; cd bin; pwd; ln -fs ../stack/stack ../triangle/triangle ../far/far ../hdf2txt/hdf2txt ../hdf2hdf/hdf2hdf ../chebeval/chebeval .
 	
 clean:
 	make -C far clean
@@ -12,5 +13,6 @@ clean:
 	make -C triangle clean
 	make -C hdf2txt clean
 	make -C hdf2hdf clean
+	make -C chebeval clean
 	rm -rf bin
 	

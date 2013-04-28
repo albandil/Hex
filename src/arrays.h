@@ -407,6 +407,14 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			array = new_array;
 		}
 		
+		NumberType pop_back()
+		{
+			if (N > 0)
+				return *(array + (--N));
+			else
+				throw exception ("Array has no element to pop!");
+		}
+		
 		template <class InputIterator> void append (
 			InputIterator first, InputIterator last
 		) {
@@ -626,6 +634,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		 */
 		bool hdfsave(const char* name, bool compress = false, int consec = 10) const
 		{
+			H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
+			
 			// compressed array
 			Array<NumberType> carray;
 			
@@ -721,7 +731,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				
 				return true;
 			}
-			catch (...)
+			catch (H5::FileIException err)
 			{
 				return false;
 			}
@@ -733,6 +743,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		 */
 		bool hdfload(const char* name)
 		{
+			H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
+			
 			try
 			{
 				// remove previous data
@@ -761,10 +773,16 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				);
 				
 				// load compression information (if any)
-				H5::DataSet dsetz = h5file.openDataSet("zero_blocks");
-				H5::DataSpace dspcz = dsetz.getSpace();
-				int n = dspcz.getSimpleExtentNpoints();
-				
+				H5::DataSet dsetz;
+				H5::DataSpace dspcz;
+				int n;
+				try {
+					dsetz = h5file.openDataSet("zero_blocks");
+					dspcz = dsetz.getSpace();
+					n = dspcz.getSimpleExtentNpoints();
+				} catch (H5::FileIException err) {
+					n = 0;
+				}
 				Array<int> zero_blocks;
 				
 				if (n == 0)
@@ -828,7 +846,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				
 				return true;
 			}
-			catch (...)
+			catch (H5::FileIException err)
 			{
 				return false;
 			}
