@@ -221,7 +221,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 {
 	private:
 		
-		size_t N;
+		size_t N, Nres;
 		NumberType * array;
 		
 	public:
@@ -235,13 +235,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		) -> decltype(NumberType1(0)*NumberType2(0));
 				
 		// default constructor, creates an empty array
-		Array() : N(0), array(nullptr) {}
+		Array() : N(0), Nres(0), array(nullptr) {}
 		
 		// constructor, creates a length-n "x"-filled array
-		Array(size_t n, NumberType x = 0) : N(n)
+		Array(size_t n, NumberType x = 0) : N(n), Nres(n)
 		{
 			// reserve space
-			array = new NumberType [N];
+			array = new NumberType [Nres];
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -249,10 +249,10 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// constructor, copies a length-n "array
-		Array(size_t n, NumberType* x) : N(n)
+		Array(size_t n, NumberType* x) : N(n), Nres(n)
 		{
 			// reserve space
-			array = new NumberType [N];
+			array = new NumberType [Nres];
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -263,8 +263,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(Array<NumberType> const & a)
 		{
 			// reserve space
-			N = a.N;
-			array = new NumberType [N];
+			N = Nres = a.N;
+			array = new NumberType [Nres];
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -275,11 +275,12 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(Array<NumberType> && a)
 		{
 			// copy content
-			N = a.N;
+			N = Nres = a.N;
 			array = a.array;
 			
 			// clear rvalue
 			a.N = 0;
+			a.Nres = 0;
 			a.array = nullptr;
 		}
 		
@@ -287,8 +288,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(const std::vector<NumberType>&  a)
 		{
 			// reserve space
-			N = a.size();
-			array = new NumberType [N];
+			N = Nres = a.size();
+			array = new NumberType [Nres];
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -299,8 +300,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(std::initializer_list<NumberType> a)
 		{
 			// reserve space
-			N = a.end() - a.begin();
-			array = new NumberType [N];
+			N = Nres = a.end() - a.begin();
+			array = new NumberType [Nres];
 			
 			// run over the elements
 			size_t i = 0;
@@ -311,8 +312,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// destructor
 		~Array()
 		{
-			if (array != nullptr)
+			if (array != nullptr and Nres != 0)
+			{
+// 				std::cout << array << ": Nres = " << Nres << ", N = " << N << "\n";
 				delete [] array;
+			}
 		}
 		
 		// conversions of 1-element array to number
@@ -333,7 +337,16 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		size_t size() const { return N; }
 		void resize (size_t n)
 		{
-			NumberType * new_array = new NumberType [n];
+			// do nothing special if already allocated space is sufficient
+			if (n <= Nres)
+			{
+				N = n;
+				return;
+			}
+			
+			// allocate more space
+			Nres = n;
+			NumberType * new_array = new NumberType [Nres];
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : NumberType(0);
 			delete [] array;
@@ -398,13 +411,18 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		
 		void push_back(NumberType a)
 		{
-			NumberType* new_array = new NumberType [N + 1];
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = array[i];
-			new_array[N] = a;
+			if (Nres == N)
+			{
+				// reallocate space
+				Nres++;
+				NumberType* new_array = new NumberType [Nres];
+				memcpy(new_array, array, N * sizeof(NumberType));
+				delete [] array;
+				array = new_array;
+			}
+			
+			array[N] = a;
 			N++;
-			delete [] array;
-			array = new_array;
 		}
 		
 		NumberType pop_back()
@@ -415,17 +433,27 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				throw exception ("Array has no element to pop!");
 		}
 		
-		template <class InputIterator> void append (
-			InputIterator first, InputIterator last
-		) {
-			NumberType* new_array = new NumberType [N + last - first];
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = array[i];
-			for (InputIterator it = first; it != last; it++)
-				new_array[N + it - first] = *it;
-			N += last - first;
-			delete [] array;
-			array = new_array;
+		template <class Ptr> void append (Ptr first, Ptr last)
+		{
+			size_t chunk = last - first;
+			if (Nres < N + chunk)
+			{
+				// reallocate space
+				Nres += chunk;
+				NumberType* new_array = new NumberType [Nres];
+				
+				// copy old data
+				memcpy (new_array, array, N * sizeof(NumberType));
+				delete [] array;
+				array = new_array;
+			}
+			
+			// copy new data
+			memcpy (
+				array + N,
+				&*first,
+				(last - first) * sizeof(NumberType)
+			);
 		}
 		
 		bool empty() const
@@ -444,7 +472,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			if (array != 0 and N != b.N)
 			{
 				delete [] array;
-				array = 0;
+				array = nullptr;
+				Nres = 0;
+				N = 0;
 			}
 			
 			// set the new dimension
@@ -452,11 +482,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			
 			// if necessary, reserve space
 			if (array == 0)
+			{
+				Nres = N;
 				array = new NumberType [N];
+			}
 			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = b.array[i];
+			// copy the elements
+			memcpy (array, b.array, N * sizeof(NumberType));
 			
 			return *this;
 		}
@@ -469,14 +501,17 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			{
 				delete [] array;
 				array = nullptr;
+				N = Nres = 0;
 			}
 			
 			// move content
 			N = b.N;
+			Nres = b.Nres;
 			array = b.array;
 			
 			// clear rvalue
 			b.N = 0;
+			b.Nres = 0;
 			b.array = nullptr;
 			
 			return *this;
@@ -613,7 +648,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return c;
 		}
 		
-		// rrturn subarray
+		// return subarray
 		Array<NumberType> slice(size_t left, size_t right)
 		{
 			Array<NumberType> c(right - left);
@@ -752,7 +787,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				{
 					delete [] array;
 					array = nullptr;
-					N = 0;
+					N = Nres = 0;
 				}
 				
 				// open file
@@ -815,7 +850,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 					N += zero_blocks[2*i+1] - zero_blocks[2*i];
 				
 				// resize and clean internal storage
-				array = new NumberType[N];
+				Nres = N;
+				array = new NumberType[Nres];
 				memset(array, 0, N * sizeof(NumberType));
 				
 				// copy nonzero chunks

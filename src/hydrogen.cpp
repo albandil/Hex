@@ -10,6 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <cstdlib>
 #include <cmath>
 #include <cstddef>
 
@@ -178,7 +179,7 @@ double evalFreeState(double k, int l, double r, double sigma)
 		else
 		{
 			// some other problem
-			throw exception("Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\n", l, k, r);
+			throw exception("Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\nMessage: %s\n", l, k, r, e.what());
 		}
 		
 	}

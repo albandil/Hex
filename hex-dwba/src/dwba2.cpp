@@ -211,7 +211,7 @@ void DWBA2_energy_driver (
 // 	for (double Kn = 0; Kn < 5; Kn += 0.01)
 // 		compact(compact.scale(Kn));
 	
-	ContinuumContribution(27.0062);
+	ContinuumContribution(150);
 		
 	exit(0);
 	
@@ -325,7 +325,7 @@ void DWBA2_En (
 		// construct Green's function parts
 		std::cout << "\tcomputing gphi... " << std::flush;
 		DistortedWave gphi = Ug.getDistortedWave(kn,ln);
-		std::cout << "ok\n\tcomputing geta... " << std::flush;
+		std::cout << "ok\n\tcomputing gzeta... " << std::flush;
 		IrregularWave geta = Ug.getIrregularWave(kn,ln);
 		std::cout << "ok\n";
 		

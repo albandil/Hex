@@ -33,7 +33,7 @@ ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U
 	: Evaluations(0), U(_U), kn(_kn), ln(_ln), Scaled(false)
 {
 	// get far coordinate
-	double r = U.getFarRadius();
+	double r = U.getFarRadius()/kn;
 	
 	// determine discretization
 	samples = 10001;		// with both boundaries
@@ -46,8 +46,8 @@ ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U
 	
 	// look for relevant data
 	char filename[50];
-	sprintf(filename, "dwf-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
-	if (not load_array(array, filename))
+	sprintf(filename, "dwf-N%d-K%g-l%d-k%g.dwf", U.n, U.k, ln, kn);
+	if (not array.hdfload(filename))
 	{
 		// prepare derivative callback MFPTR-wrapper
 		o2scl::ode_funct_mfptr<ForbiddenWave> derivs(this, &ForbiddenWave::derivs);
@@ -97,12 +97,12 @@ ForbiddenWave::ForbiddenWave(double _kn, int _ln, DistortingPotential const & _U
 		
 		// copy array to class storage
 		array = rArray(samples);
-		array[0] = 0.;
 		for (int i = 1; i < samples; i++)
 			array[i] = yg[samples-i-1][0];
+		array[0] = array[1]; // FIXME this is the divergent solution, we cannot solve to origin
 		
 		// save for recyclation
-		save_array(array, filename);
+		array.hdfsave(filename);
 	}
 	
 	// setup the interpolator

@@ -65,17 +65,22 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
 		2*M_PI/(N*kn),			//  -> N samples per wave length and
 		r/1000					//  -> at least 1000 samples totally
 	);
-	this->samples = r/h + 1;	// with both boundaries
+	samples = r/h + 1;	// with both boundaries
 	
 	// create grid
-	grid = rArray(samples);
+	grid.resize(samples);
 	for (int i = 0; i < samples; i++)
 		grid[i] = h * i;
 	
 	// look for relevant data
 	char filename[50];
-	sprintf(filename, "dwr-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
-	if (not load_array(this->array, filename, &this->phase))
+	sprintf(filename, "dwr-N%d-K%g-l%d-k%g.dwf", U.n, U.k, ln, kn);
+	if (array.hdfload(filename))
+	{
+		// the last element is the phase shift
+		phase = array.pop_back();
+	}
+	else
 	{
 		// prepare derivative callback MFPTR-wrapper
 		o2scl::ode_funct_mfptr<DistortedWave> derivs(this, &DistortedWave::derivs);
@@ -121,12 +126,14 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
 				array[ir] = yg[ir-1][0] * inverse_norm;
 		}
 		
-		// save for recyclation
-		save_array(array, filename, &phase);
+		// save for recyclation, append last element on tail
+		array.push_back(phase);
+		array.hdfsave(filename);
+		array.pop_back();
 	}
 	
 	// setup the interpolator
-	this->interpolator.set(grid, array, array.size());
+	interpolator.set(grid, array, array.size());
 }
 
 double DistortedWave::operator() (double x) const

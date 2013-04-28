@@ -46,11 +46,11 @@ obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrays.h src/comple
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/integrate.h src/specf.h src/potential.h src/hydrogen.h
+obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/arrays.h src/integrate.h src/specf.h src/potential.h src/hydrogen.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h src/clenshawcurtis.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/arrays.h src/integrate.h src/specf.h src/potential.h src/angs.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h src/clenshawcurtis.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

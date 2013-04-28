@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 {
 	if (argc < 3)
 	{
-		std::cout << "\nUsage: ./chebeval <HDFfile> <samples>\n\n";
+		std::cerr << "\nUsage: ./chebeval <HDFfile> <samples>\n\n";
 		exit(-1);
 	}
 	
@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 	rArray coefs;
 	if (not coefs.hdfload(argv[1]))
 	{
-		std::cout << "Can't read file \"" << argv[1] << "\"\n";
+		std::cerr << "Can't read file \"" << argv[1] << "\"\n";
 		exit(-1);
 	}
 	
@@ -31,9 +31,9 @@ int main(int argc, char *argv[])
 	int samples = atoi(argv[2]);
 	
 	// evaluate the expansion
-	for (int i = 0; i < samples; i++)
+	for (int i = 0; i <= samples; i++)
 	{
-		double x = double(i)/(samples - 1);
+		double x = double(2*i-samples) / double(samples);
 		std::cout << x << "\t" << expansion.clenshaw(x,coefs.size()) << "\n";
 	}
 	

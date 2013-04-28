@@ -33,7 +33,7 @@ HyperbolicWave::HyperbolicWave(double _kn, int _ln, DistortingPotential const & 
 	: Evaluations(0), U(_U), kn(_kn), ln(_ln), Scaled(false)
 {
 	// get far coordinate
-	double r = U.getFarRadius();
+	double r = U.getFarRadius()/kn;
 	
 	// determine discretization
 	samples = 10001;		// with both boundaries
@@ -46,8 +46,8 @@ HyperbolicWave::HyperbolicWave(double _kn, int _ln, DistortingPotential const & 
 	
 	// look for relevant data
 	char etaname[50];
-	sprintf(etaname, "dwh-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
-	if (not load_array(array, etaname))
+	sprintf(etaname, "dwh-N%d-K%g-l%d-k%g.dwf", U.n, U.k, ln, kn);
+	if (not array.hdfload(etaname))
 	{
 		// data arrays
 		o2scl::ovector xg(samples-1);
@@ -78,7 +78,7 @@ HyperbolicWave::HyperbolicWave(double _kn, int _ln, DistortingPotential const & 
 		for (int i = 1; i < samples; i++)
 			array[i] = yg[i-1][0] * norm;
 		
-		save_array(array, etaname);
+		array.hdfsave(etaname);
 	}
 	
 	// setup the interpolator

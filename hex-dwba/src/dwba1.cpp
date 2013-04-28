@@ -10,6 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include "arrays.h"
 #include "complex.h"
 #include "potential.h"
 #include "dwba1.h"

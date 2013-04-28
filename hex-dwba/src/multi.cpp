@@ -32,11 +32,11 @@ PhiFunctionDir::PhiFunctionDir (
 	oss << "phidir-" << lam << "-"
 	    << psi.getK()  << "-" << psi.getN()  << "-" << psi.getL()  << "-"
 	    << psin.getK() << "-" << psin.getN() << "-" << psin.getL() << "~";
-	std::string name1 = oss.str() + "1.hdf";
-	std::string name2 = oss.str() + "2.hdf";
+	std::string name1 = oss.str() + "1.chb";
+	std::string name2 = oss.str() + "2.chb";
 	
 	rArray a, b;
-	if (load_array(a, name1.c_str()) and load_array(b, name2.c_str()))
+	if (a.hdfload(name1.c_str()) and b.hdfload(name2.c_str()))
 	{
 		Cheb_L = Chebyshev<double,double>(a);
 		Cheb_mLm1 = Chebyshev<double,double>(b);
@@ -77,8 +77,8 @@ PhiFunctionDir::PhiFunctionDir (
 			}
 		}
 		
-		save_array(Cheb_L.coeffs(), name1.c_str());
-		save_array(Cheb_mLm1.coeffs(), name2.c_str());
+		Cheb_L.coeffs().hdfsave(name1.c_str());
+		Cheb_mLm1.coeffs().hdfsave(name2.c_str());
 	}
 	
 	Cheb_mLm1_inf = Cheb_mLm1.clenshaw(1, Cheb_mLm1_tail);

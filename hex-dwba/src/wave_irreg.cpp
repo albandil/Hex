@@ -41,9 +41,9 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		2*M_PI/(N*kn),			//  -> N samples per wave length and
 		r/1000					//  -> at least 1000 samples total
 	);
-	this->samples = r/h + 1;	// with both boundaries
+	samples = r/h + 1;			// with both boundaries
 	
-	cArray array(samples);
+	cArray array; // auxiliary array for HDF I/O
 	
 	// create grid
 	grid = rArray(samples);
@@ -51,8 +51,8 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		grid[i] = h * i;
 	
 	char etaname[50];
-	sprintf(etaname, "dwi-N%d-K%g-l%d-k%g.arr", U.n, U.k, ln, kn);
-	if (not load_array(array, etaname))
+	sprintf(etaname, "dwi-N%d-K%g-l%d-k%g.dwf", U.n, U.k, ln, kn);
+	if (not array.hdfload(etaname))
 	{
 		// data arrays
 		o2scl::ovector xg(samples);
@@ -142,8 +142,9 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 		}
 		
 		// combine real and imaginary part
-		array_re = rArray(samples);
-		array_im = rArray(samples);
+		array.resize(samples);
+		array_re.resize(samples);
+		array_im.resize(samples);
 		array[0] = array_im[0] = array_re[0] = 0.;
 		for (int i = 1; i < samples; i++)
 		{
@@ -152,7 +153,7 @@ IrregularWave::IrregularWave(double _kn, int _ln, DistortingPotential const & _U
 			array[i] = Complex(array_re[i], array_im[i]);
 		}
 		
-		save_array(array, etaname);
+		array.hdfsave(etaname);
 	}
 	else
 	{
