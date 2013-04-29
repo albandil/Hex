@@ -78,18 +78,11 @@ template <typename NumberType> class ArrayView
 			if (v.size() != N)
 				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
 			
-<<<<<<< HEAD
-			memcpy(
-=======
 			if (N == 0)
 				return *this;
 			
-			memcpy (
->>>>>>> 7ffa5ddda7f145edb65dd50f3b3ae374e64c40fa
-				array,
-				v.data(),
-				N * sizeof(NumberType)
-			);
+			for (size_t i = 0; i < N; i++)
+				array[i] = v[i];
 			
 			return *this;
 		}
@@ -209,8 +202,8 @@ template <typename NumberType> class ArrayView
 		// some other functions
 		void clear()
 		{
-			if (N > 0 and array != nullptr)
-				memset(array, 0, N * sizeof(NumberType));
+			for (size_t i = 0; i < N; i++)
+				array[i] = NumberType(0);
 		}
 };
 
@@ -299,7 +292,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			array = new NumberType [Nres];
 			
 			// copy the elements
-			memcpy(array, &a[0], N * sizeof(NumberType));
+			for (size_t i = 0; i < N; i++)
+				array[i] = a[i];
 		}
 		
 		// copy constructor from initializer list
@@ -319,10 +313,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		~Array()
 		{
 			if (array != nullptr)
-			{
-// 				std::cout << array << ": Nres = " << Nres << ", N = " << N << "\n";
 				delete [] array;
-			}
 		}
 		
 		// conversions of 1-element array to number
@@ -346,15 +337,20 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			// do nothing special if already allocated space is sufficient
 			if (n <= Nres)
 			{
-				N = n;
+				for (; N < n; N++)
+					array[N] = NumberType(0);
 				return;
 			}
 			
 			// allocate more space
 			Nres = n;
 			NumberType * new_array = new NumberType [Nres];
+			
+			// copy data
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : NumberType(0);
+			
+			// replace data
 			delete [] array;
 			N = n;
 			array = new_array;
@@ -423,29 +419,26 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				NumberType* new_array = new NumberType [++Nres];
 				
 				// copy old data
-				memcpy(new_array, array, N * sizeof(NumberType));
+				for (size_t i = 0; i < N; i++)
+					new_array[i] = array[i];
+				
+				// replace
 				delete [] array;
 				array = new_array;
 			}
 			
-			array[N] = a;
-			N++;
+			array[N++] = a;
 		}
 		
 		NumberType pop_back()
 		{
 			if (N > 0)
-			{
-				N--;
-				return *(array + N);
-			}
+				return *(array + N--);
 			else
-			{
 				throw exception ("Array has no element to pop!");
-			}
 		}
 		
-		template <class Ptr> void append (Ptr first, Ptr last)
+		void append (iterator first, iterator last)
 		{
 			size_t chunk = last - first;
 			if (Nres < N + chunk)
@@ -455,17 +448,17 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				NumberType* new_array = new NumberType [Nres];
 				
 				// copy old data
-				memcpy (new_array, array, N * sizeof(NumberType));
+				for (size_t i = 0; i < N; i++)
+					new_array[i] = array[i];
+				
+				// replace data
 				delete [] array;
 				array = new_array;
 			}
 			
 			// copy new data
-			memcpy (
-				array + N,
-				&*first,
-				(last - first) * sizeof(NumberType)
-			);
+			for (size_t i = 0; i < chunk; i++)
+				array[N+i] = *(first + i);
 			N += chunk;
 		}
 		
@@ -500,7 +493,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			}
 			
 			// copy the elements
-			memcpy (array, b.array, N * sizeof(NumberType));
+			for (size_t i = 0; i < N; i++)
+				array[i] = b[i];
 			
 			return *this;
 		}
