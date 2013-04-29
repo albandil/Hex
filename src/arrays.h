@@ -78,7 +78,7 @@ template <typename NumberType> class ArrayView
 			if (v.size() != N)
 				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
 			
-			memcpy (
+			memcpy(
 				array,
 				v.data(),
 				N * sizeof(NumberType)
