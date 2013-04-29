@@ -78,6 +78,9 @@ template <typename NumberType> class ArrayView
 			if (v.size() != N)
 				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
 			
+			if (N == 0)
+				return *this;
+			
 			memcpy (
 				array,
 				v.data(),
@@ -291,9 +294,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			N = Nres = a.size();
 			array = new NumberType [Nres];
 			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a[i];
+			// copy the elements
+			memcpy(array, &a[0], N * sizeof(NumberType));
 		}
 		
 		// copy constructor from initializer list
@@ -312,7 +314,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// destructor
 		~Array()
 		{
-			if (array != nullptr and Nres != 0)
+			if (array != nullptr)
 			{
 // 				std::cout << array << ": Nres = " << Nres << ", N = " << N << "\n";
 				delete [] array;
@@ -414,8 +416,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			if (Nres == N)
 			{
 				// reallocate space
-				Nres++;
-				NumberType* new_array = new NumberType [Nres];
+				NumberType* new_array = new NumberType [++Nres];
+				
+				// copy old data
 				memcpy(new_array, array, N * sizeof(NumberType));
 				delete [] array;
 				array = new_array;
@@ -428,9 +431,14 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		NumberType pop_back()
 		{
 			if (N > 0)
-				return *(array + (--N));
+			{
+				N--;
+				return *(array + N);
+			}
 			else
+			{
 				throw exception ("Array has no element to pop!");
+			}
 		}
 		
 		template <class Ptr> void append (Ptr first, Ptr last)
@@ -439,7 +447,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			if (Nres < N + chunk)
 			{
 				// reallocate space
-				Nres += chunk;
+				Nres = N + chunk;
 				NumberType* new_array = new NumberType [Nres];
 				
 				// copy old data
@@ -454,6 +462,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				&*first,
 				(last - first) * sizeof(NumberType)
 			);
+			N += chunk;
 		}
 		
 		bool empty() const
@@ -469,19 +478,18 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		{
 			// if we already have some allocated space, check its size,
 			// so that we do not free it uselessly
-			if (array != 0 and N != b.N)
+			if (array != nullptr and N < b.N)
 			{
 				delete [] array;
 				array = nullptr;
-				Nres = 0;
-				N = 0;
+				Nres = N = 0;
 			}
 			
 			// set the new dimension
 			N = b.N;
 			
 			// if necessary, reserve space
-			if (array == 0)
+			if (array == nullptr)
 			{
 				Nres = N;
 				array = new NumberType [N];
@@ -495,8 +503,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		
 		Array<NumberType>& operator = (Array<NumberType> &&  b)
 		{
-			// if we already have some allocated space, check its size,
-			// so that we do not free it uselessly
+			// if we already have some allocated space delete it
 			if (array != nullptr)
 			{
 				delete [] array;
