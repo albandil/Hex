@@ -136,7 +136,7 @@ bool ScatteringAmplitude::run (
 				continue;
 			
 			// update value of "f"
-			Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E});
+			Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E})[0];
 			
 			for (size_t i = 0; i < angles.size(); i++)
 				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i], 0.);

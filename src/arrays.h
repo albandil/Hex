@@ -219,7 +219,7 @@ template <typename NumberType> class ArrayView
  */
 template <typename NumberType> class Array : public ArrayView<NumberType>
 {
-	private:
+	public:
 		
 		size_t N, Nres;
 		NumberType * array;
@@ -233,51 +233,49 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		template <typename NumberType1, typename NumberType2> friend auto operator | (
 			Array<NumberType1> const & a, Array<NumberType2> const & b
 		) -> decltype(NumberType1(0)*NumberType2(0));
-				
+		
 		// default constructor, creates an empty array
-		Array() : N(0), Nres(0), array(nullptr) {}
+		Array() : N(0), Nres(0), array(nullptr) { std::cout << "Empty\n"; }
 		
 		// constructor, creates a length-n "x"-filled array
-		Array(size_t n, NumberType x = 0) : N(n), Nres(n)
+		Array(size_t n, NumberType x = 0) : N(n), Nres(n), array(nullptr)
 		{
 			// reserve space
-			array = new NumberType [Nres];
-					
+			if (Nres != 0)
+				array = new NumberType [Nres]();
+			
 			// set to zero
 			for (size_t i = 0; i < N; i++)
 				array[i] = x;
 		}
 		
 		// constructor, copies a length-n "array
-		Array(size_t n, NumberType* x) : N(n), Nres(n)
+		Array(size_t n, NumberType* x) : N(n), Nres(n), array(nullptr)
 		{
 			// reserve space
-			array = new NumberType [Nres];
-					
+			if (Nres != 0)
+				array = new NumberType [Nres]();
+			
 			// set to zero
 			for (size_t i = 0; i < N; i++)
 				array[i] = x[i];
 		}
 		
 		// copy constructor from Array const lvalue reference
-		Array(Array<NumberType> const & a)
+		Array(Array<NumberType> const & a) : N(a.N), Nres(a.Nres), array(nullptr)
 		{
 			// reserve space
-			N = Nres = a.N;
-			array = new NumberType [Nres];
-	
+			if (Nres != 0)
+				array = new NumberType [Nres]();
+			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
 				array[i] = a.array[i];
 		}
 		
 		// copy constructor from Array rvalue reference
-		Array(Array<NumberType> && a)
+		Array(Array<NumberType> && a) : N(a.N), Nres(a.Nres), array(a.array)
 		{
-			// copy content
-			N = Nres = a.N;
-			array = a.array;
-			
 			// clear rvalue
 			a.N = 0;
 			a.Nres = 0;
@@ -285,11 +283,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from std::vector
-		Array(const std::vector<NumberType>&  a)
+		Array(std::vector<NumberType> const & a) : N(a.size()), Nres(N), array(nullptr)
 		{
 			// reserve space
-			N = Nres = a.size();
-			array = new NumberType [Nres];
+			if (Nres != 0)
+				array = new NumberType [Nres]();
 			
 			// copy the elements
 			for (size_t i = 0; i < N; i++)
@@ -297,11 +295,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from initializer list
-		Array(std::initializer_list<NumberType> a)
+		Array(std::initializer_list<NumberType> a) : N(a.end()-a.begin()), Nres(N), array(nullptr)
 		{
 			// reserve space
-			N = Nres = a.end() - a.begin();
-			array = new NumberType [Nres];
+			if (Nres != 0)
+				array = new NumberType [Nres]();
 			
 			// run over the elements
 			size_t i = 0;
@@ -314,17 +312,6 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		{
 			if (array != nullptr)
 				delete [] array;
-		}
-		
-		// conversions of 1-element array to number
-		operator NumberType () const
-		{
-			if (N == 1)
-				return *array;
-			else if (N > 1)
-				throw exception("[Array::operator 'NumberType'] array too long, N = %d!", N);
-			else
-				throw exception("[Array::operator 'NumberType'] array contains no data!");
 		}
 		
 		//
@@ -344,7 +331,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			
 			// allocate more space
 			Nres = n;
-			NumberType * new_array = new NumberType [Nres];
+			NumberType * new_array = new NumberType [Nres]();
 			
 			// copy data
 			for (size_t i = 0; i < n; i++)
@@ -397,82 +384,12 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		const NumberType* data() const { return array; }
 		
 		//
-		// STL-like iterator interface
-		//
-		
-		typedef NumberType* iterator;
-		typedef const NumberType* const_iterator;
-		iterator begin() { return array; }
-		const_iterator begin() const { return array; }
-		iterator end() { return array + N; }
-		const_iterator end() const { return array + N; }
-		NumberType & front() { return *array; }
-		NumberType const & front() const { return *array; }
-		NumberType & back() { return *(array + N - 1); }
-		NumberType const & back() const { return *(array + N - 1); }
-		
-		void push_back(NumberType a)
-		{
-			if (Nres == N)
-			{
-				// reallocate space
-				NumberType* new_array = new NumberType [++Nres];
-				
-				// copy old data
-				for (size_t i = 0; i < N; i++)
-					new_array[i] = array[i];
-				
-				// replace
-				delete [] array;
-				array = new_array;
-			}
-			
-			array[N++] = a;
-		}
-		
-		NumberType pop_back()
-		{
-			if (N > 0)
-				return *(array + N--);
-			else
-				throw exception ("Array has no element to pop!");
-		}
-		
-		void append (iterator first, iterator last)
-		{
-			size_t chunk = last - first;
-			if (Nres < N + chunk)
-			{
-				// reallocate space
-				Nres = N + chunk;
-				NumberType* new_array = new NumberType [Nres];
-				
-				// copy old data
-				for (size_t i = 0; i < N; i++)
-					new_array[i] = array[i];
-				
-				// replace data
-				delete [] array;
-				array = new_array;
-			}
-			
-			// copy new data
-			for (size_t i = 0; i < chunk; i++)
-				array[N+i] = *(first + i);
-			N += chunk;
-		}
-		
-		bool empty() const
-		{
-			return N == 0;
-		}
-		
-		//
 		// assignment operators
 		//
 		
-		Array<NumberType>& operator = (Array<NumberType> const &  b)
+		Array<NumberType>& operator = (Array<NumberType> const & b)
 		{
+			std::cout << "\top= from b.N = " << b.N << ", b.Nres = " << b.Nres << "\n";
 			// if we already have some allocated space, check its size,
 			// so that we do not free it uselessly
 			if (array != nullptr and N < b.N)
@@ -499,8 +416,10 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		Array<NumberType>& operator = (Array<NumberType> &&  b)
+		Array<NumberType>& operator = (Array<NumberType> && b)
 		{
+			std::cout << "op=&& from b.N = " << b.N << ", b.Nres = " << b.Nres << "\n";
+			
 			// if we already have some allocated space delete it
 			if (array != nullptr)
 			{
@@ -520,6 +439,82 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			b.array = nullptr;
 			
 			return *this;
+		}
+		
+		//
+		// STL-like iterator interface
+		//
+		
+		typedef NumberType* iterator;
+		typedef const NumberType* const_iterator;
+		iterator begin() { return array; }
+		const_iterator begin() const { return array; }
+		iterator end() { return array + N; }
+		const_iterator end() const { return array + N; }
+		NumberType & front() { return *array; }
+		NumberType const & front() const { return *array; }
+		NumberType & back() { return *(array + N - 1); }
+		NumberType const & back() const { return *(array + N - 1); }
+		
+		void push_back(NumberType const & a)
+		{
+			std::cout << "\npush \"" << a << "\" of type " << typeid(a).name() << " to " << array << " of N = " << N << ", Nres = " << Nres << "\n";
+			if (Nres == N)
+			{
+				std::cout << "\treallocate first\n";
+				
+				// reallocate space
+				NumberType* new_array = new NumberType [++Nres]();
+				
+				// copy old data
+				for (size_t i = 0; i < N; i++)
+					new_array[i] = array[i];
+				
+				// replace
+				delete [] array;
+				array = new_array;
+			}
+			std::cout << "\ttypeid(array[N]) = " << typeid(array[N]).name() << "\n";
+			array[N] = a;
+			std::cout << "\tpushed " << a << " to " << array[N] << "\n";
+			N++;
+		}
+		
+		NumberType pop_back()
+		{
+			if (N > 0)
+				return *(array + N--);
+			else
+				throw exception ("Array has no element to pop!");
+		}
+		
+		void append (const_iterator first, const_iterator last)
+		{
+			size_t chunk = last - first;
+			if (Nres < N + chunk)
+			{
+				// reallocate space
+				Nres = N + chunk;
+				NumberType* new_array = new NumberType [Nres]();
+				
+				// copy old data
+				for (size_t i = 0; i < N; i++)
+					new_array[i] = array[i];
+				
+				// replace data
+				delete [] array;
+				array = new_array;
+			}
+			
+			// copy new data
+			for (size_t i = 0; i < chunk; i++)
+				array[N+i] = *(first + i);
+			N += chunk;
+		}
+		
+		bool empty() const
+		{
+			return N == 0;
 		}
 		
 		//
@@ -856,7 +851,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				
 				// resize and clean internal storage
 				Nres = N;
-				array = new NumberType[Nres];
+				array = new NumberType[Nres]();
 				memset(array, 0, N * sizeof(NumberType));
 				
 				// copy nonzero chunks
@@ -1019,7 +1014,7 @@ inline Array<double> sqrabs (Array<Complex> const & A)
 // output to text stream.
 template <typename NumberType> std::ostream & operator << (std::ostream & out, Array<NumberType> const & a)
 {
-	out << "[";
+	out << a.N << "(" << a.Nres << ")[";
 	for (size_t i = 0; i < a.size(); i++)
 	{
 		if (i == 0)

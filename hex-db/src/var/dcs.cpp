@@ -96,18 +96,29 @@ bool DifferentialCrossSection::run (
 		sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
 		sqlitepp::use(S);
 	
+	std::cout << "pushink...\n";
+		
 	// load data using the statement
 	while (st.exec())
 	{
 		while ((int)E_ell.size() <= ell)
 		{
+			if (E_ell.size() > 0)
+				std::cout << "before: E_ell.back().Nres = " << E_ell.back().Nres << "\n";
+			
 			E_ell.push_back(rArray());
+			std::cout << "after: E_ell.back().N = " << E_ell.back().N << ", E_ell.back().Nres = " << E_ell.back().Nres << "\n";
+			
 			TE_ell.push_back(cArray());
 		}
+		
+		std::cout << "1\n";
 		
 		E_ell[ell].push_back(Ei);
 		TE_ell[ell].push_back(Complex(sum_Re_T_ell, sum_Im_T_ell));
 	}
+	
+	std::cout << "pushink...\n";
 	
 	// for all angles
 	for (int i = 0; i < (int)angles.size(); i++)
@@ -129,7 +140,7 @@ bool DifferentialCrossSection::run (
 		}
 		
 		// intepolate energies for unnormalized differential cross section
-		dcs[i] = interpolate(e, sqrabs(f), {E});
+		dcs[i] = interpolate(e, sqrabs(f), {E})[0];
 	}
 	
 	// normalize

@@ -18,7 +18,6 @@
 #include "clenshawcurtis.h"
 #include "potential.h"
 #include "specf.h"
-#include "../../hex-main/src/bspline.h"
 
 /**
  * Main DWBA2-part function that will compute a scattering amplitude
