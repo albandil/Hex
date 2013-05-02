@@ -1,4 +1,4 @@
-CXXFLAGS = -g -fPIC -std=c++0x -Wall -fopenmp
+CXXFLAGS = -g -fPIC -std=c++11 -Wall -fopenmp
 LFLAGS = -g -fPIC -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -fopenmp -lpng -lcln -lfftw3
 
 all: bin/dwba

@@ -78,11 +78,8 @@ template <typename NumberType> class ArrayView
 			if (v.size() != N)
 				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
 			
-			memcpy (
-				array,
-				v.data(),
-				N * sizeof(NumberType)
-			);
+			for (size_t i = 0; i < N; i++)
+				array[i] = v[i];
 			
 			return *this;
 		}
@@ -202,8 +199,8 @@ template <typename NumberType> class ArrayView
 		// some other functions
 		void clear()
 		{
-			if (N > 0 and array != nullptr)
-				memset(array, 0, N * sizeof(NumberType));
+			for (size_t i = 0; i < N; i++)
+				array[i] = NumberType(0);
 		}
 };
 
@@ -221,7 +218,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 {
 	private:
 		
-		size_t N, Nres;
+		size_t N;
 		NumberType * array;
 		
 	public:
@@ -235,13 +232,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		) -> decltype(NumberType1(0)*NumberType2(0));
 				
 		// default constructor, creates an empty array
-		Array() : N(0), Nres(0), array(nullptr) {}
+		Array() : N(0), array(nullptr) {}
 		
 		// constructor, creates a length-n "x"-filled array
-		Array(size_t n, NumberType x = 0) : N(n), Nres(n)
+		Array(size_t n, NumberType x = 0) : N(n)
 		{
 			// reserve space
-			array = new NumberType [Nres];
+			array = new NumberType [N]();
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -249,10 +246,10 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// constructor, copies a length-n "array
-		Array(size_t n, NumberType* x) : N(n), Nres(n)
+		Array(size_t n, NumberType* x) : N(n)
 		{
 			// reserve space
-			array = new NumberType [Nres];
+			array = new NumberType [N]();
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -263,8 +260,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(Array<NumberType> const & a)
 		{
 			// reserve space
-			N = Nres = a.N;
-			array = new NumberType [Nres];
+			N = a.N;
+			array = new NumberType [N]();
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -275,12 +272,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(Array<NumberType> && a)
 		{
 			// copy content
-			N = Nres = a.N;
+			N = a.N;
 			array = a.array;
 			
 			// clear rvalue
 			a.N = 0;
-			a.Nres = 0;
 			a.array = nullptr;
 		}
 		
@@ -288,8 +284,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(const std::vector<NumberType>&  a)
 		{
 			// reserve space
-			N = Nres = a.size();
-			array = new NumberType [Nres];
+			N = a.size();
+			array = new NumberType [N]();
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -300,8 +296,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		Array(std::initializer_list<NumberType> a)
 		{
 			// reserve space
-			N = Nres = a.end() - a.begin();
-			array = new NumberType [Nres];
+			N = a.end() - a.begin();
+			array = new NumberType [N]();
 			
 			// run over the elements
 			size_t i = 0;
@@ -312,11 +308,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// destructor
 		~Array()
 		{
-			if (array != nullptr and Nres != 0)
-			{
-// 				std::cout << array << ": Nres = " << Nres << ", N = " << N << "\n";
+			if (array != nullptr)
 				delete [] array;
-			}
 		}
 		
 		// conversions of 1-element array to number
@@ -337,16 +330,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		size_t size() const { return N; }
 		void resize (size_t n)
 		{
-			// do nothing special if already allocated space is sufficient
-			if (n <= Nres)
-			{
-				N = n;
-				return;
-			}
-			
-			// allocate more space
-			Nres = n;
-			NumberType * new_array = new NumberType [Nres];
+			NumberType * new_array = new NumberType [n]();
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : NumberType(0);
 			delete [] array;
@@ -411,18 +395,15 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		
 		void push_back(NumberType a)
 		{
-			if (Nres == N)
-			{
-				// reallocate space
-				Nres++;
-				NumberType* new_array = new NumberType [Nres];
-				memcpy(new_array, array, N * sizeof(NumberType));
-				delete [] array;
-				array = new_array;
-			}
+			// not very efficient... FIXME
 			
-			array[N] = a;
+			NumberType* new_array = new NumberType [N + 1]();
+			for (size_t i = 0; i < N; i++)
+				new_array[i] = array[i];
+			new_array[N] = a;
 			N++;
+			delete [] array;
+			array = new_array;
 		}
 		
 		NumberType pop_back()
@@ -433,27 +414,17 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				throw exception ("Array has no element to pop!");
 		}
 		
-		template <class Ptr> void append (Ptr first, Ptr last)
-		{
-			size_t chunk = last - first;
-			if (Nres < N + chunk)
-			{
-				// reallocate space
-				Nres += chunk;
-				NumberType* new_array = new NumberType [Nres];
-				
-				// copy old data
-				memcpy (new_array, array, N * sizeof(NumberType));
-				delete [] array;
-				array = new_array;
-			}
-			
-			// copy new data
-			memcpy (
-				array + N,
-				&*first,
-				(last - first) * sizeof(NumberType)
-			);
+		template <class InputIterator> void append (
+			InputIterator first, InputIterator last
+		) {
+			NumberType* new_array = new NumberType [N + last - first]();
+			for (size_t i = 0; i < N; i++)
+				new_array[i] = array[i];
+			for (InputIterator it = first; it != last; it++)
+				new_array[N + it - first] = *it;
+			N += last - first;
+			delete [] array;
+			array = new_array;
 		}
 		
 		bool empty() const
@@ -469,26 +440,22 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		{
 			// if we already have some allocated space, check its size,
 			// so that we do not free it uselessly
-			if (array != 0 and N != b.N)
+			if (array != nullptr and N != b.N)
 			{
 				delete [] array;
 				array = nullptr;
-				Nres = 0;
-				N = 0;
 			}
 			
 			// set the new dimension
 			N = b.N;
 			
 			// if necessary, reserve space
-			if (array == 0)
-			{
-				Nres = N;
-				array = new NumberType [N];
-			}
+			if (array == nullptr)
+				array = new NumberType [N]();
 			
-			// copy the elements
-			memcpy (array, b.array, N * sizeof(NumberType));
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = b.array[i];
 			
 			return *this;
 		}
@@ -501,17 +468,14 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			{
 				delete [] array;
 				array = nullptr;
-				N = Nres = 0;
 			}
 			
 			// move content
 			N = b.N;
-			Nres = b.Nres;
 			array = b.array;
 			
 			// clear rvalue
 			b.N = 0;
-			b.Nres = 0;
 			b.array = nullptr;
 			
 			return *this;
@@ -648,7 +612,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return c;
 		}
 		
-		// return subarray
+		// rrturn subarray
 		Array<NumberType> slice(size_t left, size_t right)
 		{
 			Array<NumberType> c(right - left);
@@ -669,7 +633,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		 */
 		bool hdfsave(const char* name, bool compress = false, int consec = 10) const
 		{
-			H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
+			H5::Exception::dontPrint();
 			
 			// compressed array
 			Array<NumberType> carray;
@@ -778,28 +742,27 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		 */
 		bool hdfload(const char* name)
 		{
-			H5Eset_auto(H5E_DEFAULT, nullptr, nullptr);
+			H5::Exception::dontPrint();
+			
+			// number of nonzero elements
+			int nnz;
+			
+			// array of nonzero elements
+			Array<NumberType> nnz_array;
+			
+			// starting and (one past) ending elements of the elided zero blocks
+			Array<int> zero_blocks;
 			
 			try
 			{
-				// remove previous data
-				if (array != nullptr)
-				{
-					delete [] array;
-					array = nullptr;
-					N = Nres = 0;
-				}
-				
 				// open file
 				H5::H5File h5file(name, H5F_ACC_RDONLY);
 				
 				// load data array (non-zero elements)
 				H5::DataSet dset = h5file.openDataSet("array");
 				H5::DataSpace dspc = dset.getSpace();
-				int nnz = dspc.getSimpleExtentNpoints() * sizeof(double) / sizeof(NumberType);
-				
-				Array<NumberType> nnz_array(nnz);
-				
+				nnz = dspc.getSimpleExtentNpoints() * sizeof(double) / sizeof(NumberType);
+				nnz_array.resize(nnz);
 				dset.read (
 					reinterpret_cast<double*>(&nnz_array[0]),
 					H5::PredType::NATIVE_DOUBLE,
@@ -818,7 +781,6 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				} catch (H5::FileIException err) {
 					n = 0;
 				}
-				Array<int> zero_blocks;
 				
 				if (n == 0)
 				{
@@ -839,53 +801,61 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 						dspcz
 					);
 				}
-				
-				// make zero_blocks index elements, not doubles
-				for (int& z : zero_blocks)
-					z /= sizeof(NumberType)/sizeof(double);
-				
-				// compute final size
-				N = nnz;
-				for (size_t i = 0; i < zero_blocks.size()/2; i++)
-					N += zero_blocks[2*i+1] - zero_blocks[2*i];
-				
-				// resize and clean internal storage
-				Nres = N;
-				array = new NumberType[Nres];
-				memset(array, 0, N * sizeof(NumberType));
-				
-				// copy nonzero chunks
-				int this_end = 0;	// index of last updated element in "this"
-				int load_end = 0;	// index of last used element in "nnz_array"
-				for (size_t i = 0; i < zero_blocks.size()/2; i++)
-				{
-					int zero_start = zero_blocks[2*i];
-					int zero_end = zero_blocks[2*i+1];
-					
-					// append nonzero data before this zero block
-					memcpy (
-						array + this_end,
-						&nnz_array[0] + load_end,
-						(zero_start - this_end) * sizeof(NumberType)
-					);
-					
-					// move cursors
-					load_end += zero_start - this_end;
-					this_end  = zero_end;
-				}
-				// append remaining data
-				memcpy (
-					array + this_end,
-					&nnz_array[0] + load_end,
-					(N - this_end) * sizeof(NumberType)
-				);
-				
-				return true;
 			}
 			catch (H5::FileIException err)
 			{
 				return false;
 			}
+			
+			// make zero_blocks index elements, not doubles
+			for (int& z : zero_blocks)
+				z /= sizeof(NumberType)/sizeof(double);
+			
+			// remove previous data
+			if (array != nullptr)
+			{
+				delete [] array;
+				array = nullptr;
+				N = 0;
+			}
+			
+			// compute final size
+			N = nnz;
+			for (size_t i = 0; i < zero_blocks.size()/2; i++)
+				N += zero_blocks[2*i+1] - zero_blocks[2*i];
+			
+			// resize and clean internal storage
+			array = new NumberType[N];
+			memset(array, 0, N * sizeof(NumberType));
+			
+			// copy nonzero chunks
+			int this_end = 0;	// index of last updated element in "this"
+			int load_end = 0;	// index of last used element in "nnz_array"
+			for (size_t i = 0; i < zero_blocks.size()/2; i++)
+			{
+				int zero_start = zero_blocks[2*i];
+				int zero_end = zero_blocks[2*i+1];
+				
+				// append nonzero data before this zero block
+				memcpy (
+					array + this_end,
+					&nnz_array[0] + load_end,
+					(zero_start - this_end) * sizeof(NumberType)
+				);
+				
+				// move cursors
+				load_end += zero_start - this_end;
+				this_end  = zero_end;
+			}
+			
+			// append remaining data
+			memcpy (
+				array + this_end,
+				&nnz_array[0] + load_end,
+				(N - this_end) * sizeof(NumberType)
+			);
+			
+			return true;
 		}
 #endif
 };
