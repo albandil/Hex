@@ -129,7 +129,7 @@ bool DifferentialCrossSection::run (
 		}
 		
 		// intepolate energies for unnormalized differential cross section
-		dcs[i] = interpolate(e, sqrabs(f), {E});
+		dcs[i] = interpolate(e, sqrabs(f), {E})[0];
 	}
 	
 	// normalize
