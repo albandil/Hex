@@ -162,17 +162,15 @@ int main(int argc, char* argv[])
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
 	//
-    CooMatrix D (Nspline,Nspline);
+	CooMatrix D (Nspline,Nspline);
 	//
 	if (not D.hdfload("D.hdf"))
-	{
-		D.symm_populate_band (
+		D.symm_populate_band(
 			order,	// band halfwidth
 			[ = ](unsigned i, unsigned j) -> Complex {
 				return computeD(i, j, Nknot - 1);
 			}
 		).hdfsave("D.hdf");
-	}
 	// --------------------------------------------------------------------- //
 	
 	

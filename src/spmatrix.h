@@ -366,7 +366,7 @@ public:
 			}
 		}
 		
-// 	private:
+	private:
 		void* __Numeric__;
 		const CsrMatrix* __matrix__;
 		char* filename;
