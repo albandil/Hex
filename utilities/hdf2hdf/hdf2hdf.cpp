@@ -18,9 +18,9 @@ int main(int argc, char *argv[])
 			files.push_back(std::string(argv[iarg]));
 	}
 	
-	if (files.size() < 2)
+	if (files.size() != 2)
 	{
-		std::cout << "HDF filenames missing!\n";
+		std::cout << "\nUsage:\n\thdf2hdf [--compress] <file1> <file2>\n";
 		return -1;
 	}
 	
