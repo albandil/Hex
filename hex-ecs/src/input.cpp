@@ -27,8 +27,13 @@
  * can be specified using the --input/-i option.
  */
 
-void parse_command_line(int argc, char* argv[], std::ifstream& inputfile, std::string& zipfile, int& zipcount)
-{
+void parse_command_line (
+	int argc, char* argv[],
+	std::ifstream& inputfile,
+	std::string& zipfile, int& zipcount,
+	bool& parallel,
+	bool& stg1, bool& stg12
+){
 	// set short options
 	const char* const short_options  = "eih";
 	
@@ -39,6 +44,9 @@ void parse_command_line(int argc, char* argv[], std::ifstream& inputfile, std::s
 		{"help",              0,   0, 'h'},
 		{"zipfile",           1,   0, 'z'},
 		{"zipcount",          1,   0, 'n'},
+		{"mpi",               0,   0, 'm'},
+		{"stg1",              0,   0, 'a'},
+		{"stg12",             0,   0, 'b'},
 		{0,                   0,   0,   0}
 	};
 	
@@ -128,6 +136,9 @@ void parse_command_line(int argc, char* argv[], std::ifstream& inputfile, std::s
 					"\t--input <filename>   (-i)  use custom input file     \n"
 					"\t--zipfile <filename> (-z)  solution file to zip      \n"
 					"\t--zipcount <number>  (-n)  zip samples               \n"
+					"\t--mpi                (-m)  use MPI                   \n"
+					"\t--stg1               (-a)  only do radial integrals  \n"
+					"\t--stg2               (-n)  only do integrals & solve \n"
 					"                                                       \n"
 				;
 				exit(0);
@@ -142,6 +153,24 @@ void parse_command_line(int argc, char* argv[], std::ifstream& inputfile, std::s
 			{
 				// zip samples
 				zipcount = atol(optarg);
+				break;
+			}
+			case 'a':
+			{
+				// run only the first part (computation of radial integrals)
+				stg1 = true;
+				break;
+			}
+			case 'b':
+			{
+				// run only the first two parts (computation of radial integrals and solution of the equations)
+				stg12 = true;
+				break;
+			}
+			case 'm':
+			{
+				// use MPI
+				parallel = true;
 				break;
 			}
 			case -1:

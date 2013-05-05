@@ -31,13 +31,18 @@
  *                  Default is "hex.inp".
  * \param zipfile A B-spline expansion of a solution to "zip". See \ref zip .
  * \param zipcount How many equidistant samples on each axis to use.
+ * \param parallel Whether to use OpenMPI.
+ * \param stg1 Run only first stage (computation of the radial integrals).
+ * \param stg12 Run everything except the extraction of amplitudes.
  */
 void parse_command_line (
 	int argc, 
 	char* argv[], 
 	std::ifstream & inputfile, 
 	std::string & zipfile, 
-	int & zipcount
+	int & zipcount,
+	bool & parallel,
+	bool & stg1, bool & stg12
 );
 
 /**

@@ -2,9 +2,11 @@ CPP = g++
 MPICPP = mpic++ -DWITH_MPI -DWITH_PNGPP
 
 SUITESPARSELIBS = /usr/local/lib/libumfpack.a /usr/local/lib/libamd.a /usr/local/lib/libcholmod.a /usr/local/lib/libcolamd.a /usr/local/lib/libcholmod.a /usr/local/lib/libcamd.a /usr/local/lib/libccolamd.a /usr/local/lib/libmetis.a /usr/local/lib/libsuitesparseconfig.a
+OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
+OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 
-INCLUDE = 
-LIBRARY = $(SUITESPARSELIBS) -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lz -lpthread -lm -lpng
+INCLUDE = $(OPENMPIINCLUDE)
+LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lz -lpthread -lm -lpng
 
 CFLAGS = -O3 -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) #-DHEX_USE_LU_SCRATCH
 LFLAGS = -O3 -fopenmp -fPIC $(LIBRARY)

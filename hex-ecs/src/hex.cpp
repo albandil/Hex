@@ -23,6 +23,10 @@
 #include <omp.h>
 #include <H5Cpp.h>
 
+#ifndef NO_MPI
+#include <mpi.h>
+#endif
+
 #include "amplitudes.h"
 #include "angs.h"
 #include "arrays.h"
@@ -56,10 +60,29 @@ int main(int argc, char* argv[])
 	// variables that can be set by the user from the command line
 	std::ifstream inputfile;			// input file
 	std::string zipfile;				// HDF solution expansion file to zip
-	int   zipcount = 0;					// zip sample count
+	int  zipcount = 0;					// zip sample count
+	bool parallel = false;				// whether to use OpenMPI
+	bool stg1 = false;					// whether to computate radial integrals only
+	bool stg12 = false;					// whether to computate radial integrals and solutions only
 	
 	// get input from command line
-	parse_command_line(argc, argv, inputfile, zipfile, zipcount);
+	parse_command_line (
+		argc, argv,
+		inputfile,
+		zipfile, zipcount,
+		parallel,
+		stg1, stg12
+	);
+	
+	// setup MPI
+	int Nproc = 1, iproc = 0;
+	if (parallel)
+	{
+		MPI::Init();
+		Nproc = MPI::COMM_WORLD.Get_size();
+		iproc = MPI::COMM_WORLD.Get_rank();
+	}
+	bool I_am_master = (iproc == 0);
 	
 	// check input file
 	if (not inputfile.is_open())
@@ -91,6 +114,13 @@ int main(int argc, char* argv[])
 		L, maxell, Ei, B
 	);
 	
+	// check MPI
+	if (parallel and Nproc != maxell + 1)
+	{
+		MPI::Finalize();
+		throw exception("Number of processes (%d) is different than number of angular momenta (%d).\n", Nproc, maxell+1);
+	}
+	
 	// is there something to compute?
 	if (Ei.empty() or instates.empty() or outstates.empty())
 	{
@@ -119,7 +149,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	if (zipfile.size() != 0)
+	if (zipfile.size() != 0 and I_am_master)
 	{
 		cArray sol;			// stored solution expansion
 		cArray ev;			// evaluated solution
@@ -158,7 +188,6 @@ int main(int argc, char* argv[])
 	}
 	
 	std::cout << "Loading/precomputing derivative overlaps... ";
-	
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
 	//
@@ -387,8 +416,16 @@ int main(int argc, char* argv[])
 	unsigned Hsize = Nspline * Nspline * (maxell + 1) * (maxell + 1);
 	std::cout << "Hamiltonian properties:\n";
 	std::cout << "\t-> hamiltonian size: " << Hsize << "\n";
-	std::cout << "Loading/computing B-spline expansions... ";
 	
+	// exit if reqested
+	if (stg1)
+	{
+		if (parallel)
+			MPI::Finalize();
+		exit(0);
+	}
+	
+	std::cout << "Loading/computing B-spline expansions... ";
 	
 	//
 	// expansion weights
@@ -514,6 +551,10 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
+			// skip computation of unwanted blocks for this process
+			if (parallel and l1 != iproc)
+				continue;
+			
 			// skip those angular momentum pairs that don't compose L
 			if (abs(l1 - l2) > L or l1 + l2 < L)
 				continue;
@@ -544,6 +585,10 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
+			// skip computation of unwanted blocks for this process
+			if (parallel and l1 != iproc)
+				continue;
+			
 			// skip those angular momentum pairs that don't compose L
 			if (abs(l1 - l2) > L or l1 + l2 < L)
 				continue;
@@ -687,6 +732,10 @@ int main(int argc, char* argv[])
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
+						// skip computation of unwanted blocks for this process
+						if (parallel and l1 != iproc)
+							continue;
+						
 						// skip those angular momentum pairs that don't compose L
 						if (abs(l1 - l2) > L or l1 + l2 < L)
 							continue;
@@ -704,6 +753,20 @@ int main(int argc, char* argv[])
 						zview = lufts[iblock].solve(rview);
 					}
 					
+					if (parallel)
+					{
+						// synchronize across processes
+						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
+						MPI::COMM_WORLD.Allgather (
+							&z[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
+							Nspline * Nspline * (maxell + 1), 	// this process chunk length
+							MPI::DOUBLE_COMPLEX, 				// this process chunk data type
+							&z[0],								// all data target
+							Nspline * Nspline * (maxell + 1),	// all data single chunk size
+							MPI::DOUBLE_COMPLEX					// all data type
+						);
+						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
+					}
 				};
 				
 				// CG matrix multiplication callback
@@ -711,10 +774,14 @@ int main(int argc, char* argv[])
 				{
 					
 					// multiply by the matrix of the system
-					# pragma omp parallel for collapse (2) schedule (dynamic,1)
+					# pragma omp parallel for schedule (dynamic,1)
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
+						// skip computation of unwanted blocks for this process
+						if (parallel and l1 != iproc)
+							continue;
+						
 						// skip those angular momentum pairs that don't compose L
 						if (abs(l1 - l2) > L or l1 + l2 < L)
 							continue;
@@ -759,6 +826,20 @@ int main(int argc, char* argv[])
 						}
 					}
 					
+					if (parallel)
+					{
+						// synchronize across processes
+						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
+						MPI::COMM_WORLD.Allgather (
+							&q[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
+							Nspline * Nspline * (maxell + 1), 	// this process chunk length
+							MPI::DOUBLE_COMPLEX, 				// this process chunk data type
+							&q[0],								// all data target
+							Nspline * Nspline * (maxell + 1),	// all data single chunk size
+							MPI::DOUBLE_COMPLEX					// all data type
+						);
+						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
+					}
 				};
 				
 				// custom conjugate gradients callback-based solver
@@ -816,6 +897,14 @@ int main(int argc, char* argv[])
 // 		[ = ](size_t i, size_t j) -> double { return psi0[i * N + j].real(); }
 // 	);	
 	
+	// exit if requested
+	if (stg12)
+	{
+		if (parallel)
+			MPI::Finalize();
+		exit(0);
+	}
+	
 	// Create SQL batch file
 	char filename[100];
 	std::sprintf(filename, "%d-%d.sql", ni, L);
@@ -825,7 +914,7 @@ int main(int argc, char* argv[])
 	// Extract the cross sections ------------------------------------------ //
 	//
 	
-	std::cout << "\rExtracting T-matrices...";
+	std::cout << "Extracting T-matrices...";
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
 	for (int Spin = 0; Spin <= 1; Spin++)
@@ -941,6 +1030,9 @@ int main(int argc, char* argv[])
 	
 	std::fprintf(fsql, "COMMIT;\n");
 	std::fclose(fsql);
+	
+	if (parallel)
+		MPI::Finalize();
 	
 	std::cout << "\nDone.\n\n";
 	
