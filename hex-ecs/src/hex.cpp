@@ -24,7 +24,7 @@
 #include <H5Cpp.h>
 
 #ifndef NO_MPI
-#include <mpi.h>
+	#include <mpi.h>
 #endif
 
 #include "amplitudes.h"
@@ -78,9 +78,13 @@ int main(int argc, char* argv[])
 	int Nproc = 1, iproc = 0;
 	if (parallel)
 	{
+#ifndef NO_MPI
 		MPI::Init();
 		Nproc = MPI::COMM_WORLD.Get_size();
 		iproc = MPI::COMM_WORLD.Get_rank();
+#else
+		std::cout << "WARNING: --mpi has no effect, as the program was build without the MPI support!\n";
+#endif
 	}
 	bool I_am_master = (iproc == 0);
 	
@@ -115,11 +119,13 @@ int main(int argc, char* argv[])
 	);
 	
 	// check MPI
+#ifndef NO_MPI
 	if (parallel and Nproc != maxell + 1)
 	{
 		MPI::Finalize();
 		throw exception("Number of processes (%d) is different than number of angular momenta (%d).\n", Nproc, maxell+1);
 	}
+#endif
 	
 	// is there something to compute?
 	if (Ei.empty() or instates.empty() or outstates.empty())
@@ -420,8 +426,10 @@ int main(int argc, char* argv[])
 	// exit if reqested
 	if (stg1)
 	{
+#ifndef NO_MPI
 		if (parallel)
 			MPI::Finalize();
+#endif
 		exit(0);
 	}
 	
@@ -551,9 +559,11 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
+#ifndef NO_MPI
 			// skip computation of unwanted blocks for this process
 			if (parallel and l1 != iproc)
 				continue;
+#endif
 			
 			// skip those angular momentum pairs that don't compose L
 			if (abs(l1 - l2) > L or l1 + l2 < L)
@@ -585,9 +595,11 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
+#ifndef NO_MPI
 			// skip computation of unwanted blocks for this process
 			if (parallel and l1 != iproc)
 				continue;
+#endif
 			
 			// skip those angular momentum pairs that don't compose L
 			if (abs(l1 - l2) > L or l1 + l2 < L)
@@ -732,9 +744,11 @@ int main(int argc, char* argv[])
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
+#ifndef NO_MPI
 						// skip computation of unwanted blocks for this process
 						if (parallel and l1 != iproc)
 							continue;
+#endif
 						
 						// skip those angular momentum pairs that don't compose L
 						if (abs(l1 - l2) > L or l1 + l2 < L)
@@ -753,6 +767,7 @@ int main(int argc, char* argv[])
 						zview = lufts[iblock].solve(rview);
 					}
 					
+#ifndef NO_MPI
 					if (parallel)
 					{
 						// synchronize across processes
@@ -767,6 +782,7 @@ int main(int argc, char* argv[])
 						);
 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
+#endif
 				};
 				
 				// CG matrix multiplication callback
@@ -778,9 +794,11 @@ int main(int argc, char* argv[])
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
+#ifndef NO_MPI
 						// skip computation of unwanted blocks for this process
 						if (parallel and l1 != iproc)
 							continue;
+#endif
 						
 						// skip those angular momentum pairs that don't compose L
 						if (abs(l1 - l2) > L or l1 + l2 < L)
@@ -826,6 +844,7 @@ int main(int argc, char* argv[])
 						}
 					}
 					
+#ifndef NO_MPI
 					if (parallel)
 					{
 						// synchronize across processes
@@ -840,6 +859,7 @@ int main(int argc, char* argv[])
 						);
 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
+#endif
 				};
 				
 				// custom conjugate gradients callback-based solver
@@ -900,8 +920,10 @@ int main(int argc, char* argv[])
 	// exit if requested
 	if (stg12)
 	{
+#ifndef NO_MPI
 		if (parallel)
 			MPI::Finalize();
+#endif
 		exit(0);
 	}
 	
@@ -937,9 +959,11 @@ int main(int argc, char* argv[])
 	
 	for (int i = 0; i < (int)transitions.size(); i++)
 	{
+#ifndef NO_MPI
 		// if MPI is active, compute only a subset of the transitions, corresponding to iproc
 		if (parallel and i % Nproc != iproc)
 			continue;
+#endif
 		
 		int Spin = std::get<0>(transitions[i]);
 		int li   = std::get<1>(transitions[i]);
@@ -1038,8 +1062,10 @@ int main(int argc, char* argv[])
 	std::fprintf(fsql, "COMMIT;\n");
 	std::fclose(fsql);
 	
+#ifndef NO_MPI
 	if (parallel)
 		MPI::Finalize();
+#endif
 	
 	std::cout << "\nDone.\n\n";
 	
