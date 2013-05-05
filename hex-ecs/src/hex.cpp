@@ -907,7 +907,10 @@ int main(int argc, char* argv[])
 	
 	// Create SQL batch file
 	char filename[100];
-	std::sprintf(filename, "%d-%d.sql", ni, L);
+	if (parallel)
+		std::sprintf(filename, "%d-%d-(%d).sql", ni, L, iproc);
+	else
+		std::sprintf(filename, "%d-%d.sql", ni, L);
 	FILE* fsql = std::fopen(filename, "w");
 	std::fprintf(fsql, "BEGIN TRANSACTION;\n");
 	
@@ -934,6 +937,10 @@ int main(int argc, char* argv[])
 	
 	for (int i = 0; i < (int)transitions.size(); i++)
 	{
+		// if MPI is active, compute only a subset of the transitions, corresponding to iproc
+		if (parallel and i % Nproc != iproc)
+			continue;
+		
 		int Spin = std::get<0>(transitions[i]);
 		int li   = std::get<1>(transitions[i]);
 		int mi   = std::get<2>(transitions[i]);
@@ -954,7 +961,7 @@ int main(int argc, char* argv[])
 		for (int mf = -lf; mf <= lf; mf++)
 		{
 			// compute expansions of final wave function for this final state (nf,lf)
-			std::transform(
+			std::transform (
 				Ei.begin(), Ei.end(),
 				kf.begin(),
 				[ = ](double E) -> double { return sqrt(E - 1./(ni*ni) + 1./(nf*nf) + (mf-mi)*B); }
