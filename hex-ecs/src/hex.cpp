@@ -771,7 +771,7 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
+// 						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
 						MPI::COMM_WORLD.Allgather (
 							&z[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
 							Nspline * Nspline * (maxell + 1), 	// this process chunk length
@@ -780,7 +780,7 @@ int main(int argc, char* argv[])
 							Nspline * Nspline * (maxell + 1),	// all data single chunk size
 							MPI::DOUBLE_COMPLEX					// all data type
 						);
-						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
+// 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
 #endif
 				};
@@ -848,7 +848,7 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
+// 						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
 						MPI::COMM_WORLD.Allgather (
 							&q[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
 							Nspline * Nspline * (maxell + 1), 	// this process chunk length
@@ -857,7 +857,7 @@ int main(int argc, char* argv[])
 							Nspline * Nspline * (maxell + 1),	// all data single chunk size
 							MPI::DOUBLE_COMPLEX					// all data type
 						);
-						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
+// 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
 #endif
 				};
