@@ -655,7 +655,7 @@ int main(int argc, char* argv[])
 				std::cout << "\tCreate RHS\n";
 				
 				// for all segments constituting the RHS
-				# pragma omp parallel for collapse(2)
+				# pragma omp parallel for collapse(2) schedule (dynamic,1)
 				for (int l1 = 0; l1 <= maxell; l1++)
 				for (int l2 = 0; l2 <= maxell; l2++)
 				{
@@ -790,7 +790,7 @@ int main(int argc, char* argv[])
 				{
 					
 					// multiply by the matrix of the system
-					# pragma omp parallel for schedule (dynamic,1)
+					# pragma omp parallel for collapse (2) schedule (dynamic,1)
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
