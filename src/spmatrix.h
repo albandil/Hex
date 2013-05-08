@@ -1095,15 +1095,15 @@ unsigned cg_callbacks(
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();;
 	std::chrono::duration<int> sec;
 	
+	// compute norm of the right hand side
+	double bnorm = b.norm();
+	
 	// some arrays (search directions etc.)
 	size_t N = b.size();
 	cArray p(N), q(N), z(N);
 	
 	// residual; initialized to starting residual using the initial guess
 	cArray r(N);
-#ifdef WITH_MPI
-	std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Computing residual...\n";
-#endif
 	matrix_multiply(x, r);
 	r = b - r;
 
@@ -1119,20 +1119,11 @@ unsigned cg_callbacks(
 	{
 		sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
 		
-#ifdef WITH_MPI
-		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() 
-				  << "] Residual relative magnitude: " << r.norm() / b.norm()
-				  << " (" << sec.count()/60 << " min)\n";
-#else
 		std::cout << "\t[cg] Residual relative magnitude after "
 		          << k << " iterations: " << r.norm() / b.norm()
 				  << " (" << sec.count()/60 << " min)\n";
-#endif
 		
 		// apply desired preconditioner
-#ifdef WITH_MPI
-		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Applying preconditioner\n";
-#endif
 		apply_preconditioner(r, z);
 		
 		// compute projection ρ = r·z
@@ -1150,9 +1141,6 @@ unsigned cg_callbacks(
 		}
 		
 		// move to next Krylov subspace by multiplying A·p
-#ifdef WITH_MPI
-		std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() << "] Krylov space update...\n";
-#endif
 		matrix_multiply(p, q);
 		
 		// compute projection ratio α
@@ -1162,19 +1150,21 @@ unsigned cg_callbacks(
 		x += alpha * p;
 		r -= alpha * q;
 		
-		// once in a while check convergence but do at least "min_iterations" iterations
-		if (k >= min_iterations and r.norm() / b.norm() < eps)
+		// compute and check norm
+		double rnorm = r.norm();
+		if (not finite(rnorm))
+		{
+			std::cout << "\t[cg] Oh my god... the norm of the solution is not finite. Something went wrong!\n";
+			break;
+		}
+		
+		// check convergence, but do at least "min_iterations" iterations
+		if (k >= min_iterations and rnorm / bnorm < eps)
 			break;
 		
 		// check iteration limit (stop at "max_iterations" iterations)
 		if (k >= max_iterations)
-		{
-#ifdef WITH_MPI
-			std::cout << "\t[cg:" << MPI::COMM_WORLD.Get_rank() 
-			          << "] Iteration limit " << max_iterations << " reached.\n";
-#endif
 			break;
-		}
 		
 		// move to the next iteration: store previous projection
 		rho_old = rho_new;
