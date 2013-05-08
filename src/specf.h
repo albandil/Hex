@@ -262,6 +262,4 @@ Complex cgamma_cfrac (double a, Complex z, int max_iter = 1000, int* iter = 0, d
  */
 Complex cgamma_series (double a, Complex z, int max_iter = 1000, int* iter = 0, double eps = 1e-10);
 
-//@}
-
 #endif

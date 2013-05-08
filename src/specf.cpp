@@ -62,9 +62,9 @@ double F_sigma(int l, double k)
 double F_asy(int l, double k, double r, double sigma)
 {
 	if (finite(sigma))
-		return sqrt(2./M_PI)/k * sin(k*r - l*M_PI/2. + log(2*k*r)/k + sigma);
+		return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + sigma);
 	else
-		return sqrt(2./M_PI)/k * sin(k*r - l*M_PI/2. + log(2*k*r)/k + F_sigma(l,k));
+		return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + F_sigma(l,k));
 }
 
 Complex cgamma_cfrac (double a, Complex z, int max_iter, int* iter, double eps)

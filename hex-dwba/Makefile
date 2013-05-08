@@ -6,11 +6,16 @@ all: bin/dwba
 bin/dwba: obj/main.o obj/potential.o obj/wave_distort.o \
           obj/dwba1.o obj/dwba2.o obj/hydrogen.o obj/arrays.o \
           obj/angs.o obj/specf.o obj/multi.o \
-          obj/wave_forbid.o obj/wave_hyperb.o obj/wave_irreg.o
+          obj/wave_forbid.o obj/wave_hyperb.o obj/wave_irreg.o \
+	  obj/coulomb.o
 	@mkdir -p $(@D)
 	g++ $^ $(LFLAGS) -o $@
 
 obj/angs.o: src/angs.cpp src/angs.h
+	@mkdir -p $(@D)
+	g++ -c $(CXXFLAGS) $< -o $@
+
+obj/coulomb.o: src/coulomb.cpp src/coulomb.h src/complex.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 

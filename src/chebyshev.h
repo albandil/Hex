@@ -52,7 +52,7 @@ public:
     }
 	
 	/**
-	 * \brief Constructor.
+	 * \brief Constructor from reference to array.
 	 * 
 	 * \param array Array of precomputed Chebyshev coefficients.
 	 * \param a Left boundary of the approximation interval.

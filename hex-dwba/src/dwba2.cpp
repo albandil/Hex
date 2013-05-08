@@ -218,7 +218,7 @@ void DWBA2_energy_driver (
 #endif
 		
 	
-	// sum over discrete intermadiate states
+	// sum over discrete intermediate states
 	for (int Nn = Ln + 1; ; Nn++)
 	{
 		// update sums
