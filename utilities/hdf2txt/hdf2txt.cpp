@@ -7,12 +7,15 @@ int main(int argc, char *argv[])
 {
 	if (argc < 2)
 	{
-		std::cout << "HDF file missing!\n";
-		return 0;
+		std::cout << "\nUsage:\n\t./hdf2txt <HDFfile>\n\n";
+		exit(0);
 	}
 	
+	// head HDF file
 	rArray a;
-	load_array(a, argv[1]);
+	a.hdfload(argv[1]);
+	
+	// write raw data
 	write_array(a);
 	
 	return 0;
