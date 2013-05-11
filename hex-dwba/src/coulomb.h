@@ -627,6 +627,9 @@ private:
 	// They are first put to zero and allocated in the program when they are needed.
 	// They are used for symmetry relations : F(l,eta,z) \propto F(l,-eta,-z) and h[omega](l,eta,z) = -h[omega](l,-eta,-z)
 	// and to calculate H+/H- from F(l,eta,z) and F(lp,eta,z) if |Im[l]| >= 1 and |z| <= 1.
+	
+	const bool noclean; 
+	// whether to not execute "delete" in the constructor; corresponds to the empty constructor
 };
 
 #endif
