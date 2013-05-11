@@ -644,7 +644,7 @@ int main(int argc, char* argv[])
 				// create right hand side
 				cArray chi ( (maxell+1)*(maxell+1)*Nspline*Nspline );
 				
-				std::cout << "\tCreate RHS\n";
+				std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << "\n";
 				
 				// for all segments constituting the RHS
 				# pragma omp parallel for collapse(2) schedule (dynamic,1)
