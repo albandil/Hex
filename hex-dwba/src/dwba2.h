@@ -76,7 +76,7 @@ Complex GreensFunctionIntegralAllowed (
 	HydrogenFunction const & psii, PhiFunction const & phii, DistortedWave const & chii
 );
 
-Complex GreensFunctionIntegralForbidden (
+double GreensFunctionIntegralForbidden (
 	// final state
 	DistortedWave const & chif, PhiFunction const & phif, HydrogenFunction const & psif, 
 	// intermediate state (Green's function

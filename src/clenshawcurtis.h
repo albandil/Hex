@@ -19,6 +19,7 @@
 #include <vector>
 
 #include <fftw3.h>
+#include <gsl/gsl_sf.h>
 
 #include "arrays.h"
 #include "compact.h"
@@ -302,7 +303,6 @@ public:
 			if (Throw)
 			{
 				throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
-				
 			}
 			else
 			{
@@ -387,7 +387,7 @@ public:
 					fvals[i] = F(L / tan(x));
 					if (not finite(std::abs(fvals[i])))
 						fvals[i] = 0;
-					weights[i] = 1. / sqr(sin(x));
+					weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
 				}
 			}
 			else
@@ -406,7 +406,7 @@ public:
 						fvals[i] = F(L / tan(x));
 						if (not finite(std::abs(fvals[i])))
 							fvals[i] = 0;
-						weights[i] = 1. / sqr(sin(x));
+						weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
 					}
 				}
 			}

@@ -27,9 +27,14 @@ int main(int argc, char *argv[])
 // 	gsl_set_error_handler_off();
 	
 	// disable STDOUT/STDERR buffering
-	setvbuf(stdout, 0, _IONBF, 0);
-	setvbuf(stderr, 0, _IONBF, 0);
+	std::setvbuf(stdout, 0, _IONBF, 0);
+	std::setvbuf(stderr, 0, _IONBF, 0);
 	
+	// initialize debug output file
+	std::ofstream logfile("dwba.log");
+	std::clog.rdbuf(logfile.rdbuf());
+	
+	// print usage info if called in a wrong way
 	if (argc != 8)
 	{
 		std::cout << "\nUsage:\n";
@@ -156,7 +161,7 @@ int main(int argc, char *argv[])
 				continue;
 			
 			// DWBA-2 part
-			for (int Ln = 0; ; Ln++)
+			for (int Ln = 2; ; Ln++)
 			{
 				cArray DD_lf_li_Ln(MM), DE_lf_li_Ln(MM), ED_lf_li_Ln(MM), EE_lf_li_Ln(MM);
 				std::cout << "---------------------------------------\n";

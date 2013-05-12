@@ -26,7 +26,12 @@
  * into finite sections using the callback function WaveCallback. It is supposed
  * that this function returns bounding coordinates of these intervals for every
  * integer \f$ n \ge 1 \f$ supplied. Usually, one wavelength is chosen as the
- * measure and WaveCallback returns \f$ n \f$-multiple of the wavelength.
+ * measure and WaveCallback returns \f$ 1.5n \f$-multiple of the wavelength.
+ * Creating intervals of length equal to 1.5×λ makes the sequence of contributions
+ * alternate and <b>dramatically</b> improves the convergence (e.g. 70 times
+ * less intervals have to be integrated for sin(x)/x when Aitken Δ²-process is
+ * used twice). This reducion also lowers possible rounding errors.
+ * 
  * The integrand is integrated using Clenshaw-Curtis quadrature on every single
  * interval starting from the left-most. A sequence of partial sums of the
  * per-interval integrals is formed, accelerated using Aitken \f$ \Delta^2 \f$-process
@@ -39,7 +44,7 @@ class OscillatingIntegral
 		
 		OscillatingIntegral(Functor f, WaveCallback w)
 		    : F(f), W(w), Verbose(false), vName("OscillatingIntegral"),
-		      nIntervals(1000), EpsRel(1e-8), EpsAbs(1e-8) {}
+		      nIntervals(1000), EpsRel(1e-8), EpsAbs(1e-8), ThrowAll(true) {}
 		
 		bool verbose() const
 			{ return Verbose; }
@@ -61,6 +66,11 @@ class OscillatingIntegral
 		void setTol(double tol)
 			{ EpsAbs = tol; }
 		
+		bool throwall() const
+			{ return ThrowAll; }
+		void setThrowAll(bool flag)
+			{ ThrowAll = flag; }
+		
 		/**
 		 * \brief The integration routine.
 		 * 
@@ -80,6 +90,9 @@ class OscillatingIntegral
 				return 0.;
 			}
 			
+			if (Verbose)
+				std::cout << "[" << vName << "] integrate " << a << " to " << b << "\n";
+			
 			// reverse bounds
 			if (b < a)
 				return -integrate(b, a, n);
@@ -88,22 +101,37 @@ class OscillatingIntegral
 			Array<FType> psums;
 			
 			// accelerated partial sums
-			Array<FType> accel;
+			Array<FType> accel1, accel2;
 			
 			// Clenshaw-Curtis integrator
 			ClenshawCurtis<decltype(F),FType> Q(F);
 			Q.setEps(EpsRel);
+			Q.setVerbose(false, "OscillatingIntegral");
+			Q.setRec(false);
+			Q.setSubdiv(15);
+			Q.setThrowAll(ThrowAll);
 			
 			// loop over intervals
 			double left = a, right;
-			for (int n = 1; n <= nIntervals; n++)
+			int k;
+			for (k = 1; k <= nIntervals and left < b; k++)
 			{
 				// get right bound
-				right = W(n);
-				if (not std::isfinite(right) or right > b)
+				right = W(a,k);
+				if (not std::isfinite(right))
 				{
 					// forced termination by the callback control
 					break;
+				}
+				if (right < left)
+				{
+					// wrong supplied period
+					continue;
+				}
+				if (right > b)
+				{
+					// do not step out of integration domain
+					right = b;
 				}
 				
 				// copy absolute tolerance to the subordinate integrator
@@ -121,27 +149,61 @@ class OscillatingIntegral
 				else
 					psums.push_back(integ);
 				
-				// accelerate the series
+				// accelerate the series for the first time
 				if (psums.size() > 2)
 				{
 					FType f   = psums.back(2);
 					FType fp1 = psums.back(1);
 					FType fp2 = psums.back(0);
-					accel.push_back(fp2 - (fp2-fp1)*(fp2-fp1)/(fp2-2.*fp1+f));
+					accel1.push_back(fp2 - (fp2-fp1)*(fp2-fp1)/(fp2-2.*fp1+f));
+				}
+				
+				// accelerate the series for the second time
+				if (accel1.size() > 2)
+				{
+					FType f   = accel1.back(2);
+					FType fp1 = accel1.back(1);
+					FType fp2 = accel1.back(0);
+					accel2.push_back(fp2 - (fp2-fp1)*(fp2-fp1)/(fp2-2.*fp1+f));
 					
 					// check (relative) convergence on the accelerated series
-					if (std::abs(accel.back(0)-accel.back(1)) < EpsRel * std::abs(accel.back()))
-						return accel.back();
+					if (std::abs(accel2.back(0)-accel2.back(1)) < EpsRel * std::abs(accel2.back()))
+					{
+						if (n != nullptr) *n = k;
+						return accel2.back();
+					}
 					
 					// check (absolute) convergence on the accelerated series
-					if (std::isfinite(a) and std::isfinite(b) and std::abs(accel.back()) < EpsAbs * (b - a))
-						return accel.back();
+					if (std::isfinite(a) and std::isfinite(b) and std::abs(accel2.back()) < EpsAbs * (b - a))
+					{
+						if (n != nullptr) *n = k;
+						return accel2.back();
+					}
+				}
+				
+				if (Verbose)
+				{
+					std::cout << "[" << vName << "] " << k << " " 
+						<< left << " " << right << " " 
+						<< psums.back();
+						
+					if (accel1.size() > 0)
+						std::cout << " " << accel1.back();
+					if (accel2.size() > 0)
+						std::cout << " " << accel2.back();
+					
+					std::cout << "\n";
 				}
 				
 				// advance left bound
 				left = right;
 			}
-			return 0;
+			
+			// store iterations
+			if (n != nullptr) *n = k;
+			
+			// out of integration domain: return sum
+			return psums.back();
 		}
 		
 	private:
@@ -166,6 +228,9 @@ class OscillatingIntegral
 		
 		/// Absolute tolerance.
 		double EpsAbs;
+		
+		/// Whether to be choleric about errors (and throw every time).
+		bool ThrowAll;
 };
 
 #endif

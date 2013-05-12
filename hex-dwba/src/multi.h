@@ -25,7 +25,7 @@ class PhiFunction : public RadialFunction<double>
 		
 		virtual double operator() (double x) const = 0;
 		virtual bool isZero() const = 0;
-		virtual double wavenumber() const = 0;
+		virtual double k() const = 0;
 };
 
 /**
@@ -82,27 +82,32 @@ public:
 	bool isZero() const { return Zero; }
 	
 	/// Return effective wavenumber.
-	double wavenumber() const { return Wavenum; }
+	double k() const { return Wavenum; }
 	
 private:
 	
 	/// Compute Chebyshev expansion coefficients by evaluating the integrands.
-	void tryRealChebyshev (
-		HydrogenFunction const & psin, 
-		HydrogenFunction const & psi,
+	void tryFullRealChebyshev (
+		int cblimit,
+		bool & Cheb_L_conv,
+		bool & Cheb_mLm1_conv
+	);
+	
+	void tryFrontRealChebyshev (
 		int cblimit,
 		bool & Cheb_L_conv,
 		bool & Cheb_mLm1_conv
 	);
 	
 	/// Compute Chebyshev expansion coefficients by computing the complex integral.
-	void tryComplexChebyshev (
-		HydrogenFunction const & psin, 
-		HydrogenFunction const & psi,
+	void tryFullComplexChebyshev (
 		int cblimit,
 		bool & Cheb_L_conv,
 		bool & Cheb_mLm1_conv
 	);
+	
+	HydrogenFunction psin;
+	HydrogenFunction psi;
 	
 	int Lam;
 	DistortingPotential U;
@@ -116,11 +121,17 @@ private:
 	/// Wavenumber of the intermediate state.
 	double Wavenum;
 	
+	/// Use frontal approximation.
+	bool UseFront;
+	
 	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^\lambda \psi_i(r) \f$.
 	Chebyshev<double,double> Cheb_L;
 	
 	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^{-\lambda-1} \psi_i(r) \f$.
 	Chebyshev<double,double> Cheb_mLm1;
+	
+	Chebyshev<double,double> ACoeff, BCoeff;
+	int ATail, BTail;
 	
 	int Cheb_mLm1_tail;
 	int Cheb_L_tail;

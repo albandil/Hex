@@ -77,6 +77,12 @@ public:
 	 */
 	double getPhase() const;
 	
+	/// Wavenumber.
+	double k() const { return kn; }
+	
+	/// Angular momentum.
+	int l() const { return ln; }
+	
 	/**
 	 * \brief Return derivatives from the distorted wave equation.
 	 * 

@@ -1,5 +1,11 @@
-CXXFLAGS = -g -fPIC -std=c++11 -Wall -fopenmp
-LFLAGS = -g -fPIC -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -fopenmp -lpng -lcln -lfftw3
+CXXDEBUG = -g -fPIC -std=c++11 -Wall
+CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNDEBUG
+
+LDEBUG = -g -fPIC -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -lpng -lcln -lfftw3
+LRILIS = -O3 -fPIC -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -lpng -lcln -lfftw3
+
+CXXFLAGS = $(CXXDEBUG)
+LFLAGS = $(LDEBUG)
 
 all: bin/dwba
 
