@@ -1,9 +1,17 @@
 .PHONY: all clean
 
+LFLAGS = -lgsl -lgslcblas
+
 all: triangle
 
-triangle: triangle.cpp
-	g++ triangle.cpp -o triangle
+triangle: triangle.o angs.o
+	g++ $^ -o $@ $(LFLAGS)
+
+triangle.o: triangle.cpp angs.h
+	g++ -c $< -o $@
+
+angs.o: angs.cpp angs.h
+	g++ -c $< -o $@
 
 clean:
-	rm -rf triangle
+	rm -rf triangle *.o

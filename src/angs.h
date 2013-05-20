@@ -32,4 +32,10 @@ double ClebschGordan(int l1, int m1, int l2, int m2, int L, int M);
  */
 double Gaunt(int l1, int m1, int l2, int m2, int l, int m);
 
+/**
+ * Compute number of angular momenta pairs \f$ \ell_1 \f$ and \f$ \ell_2 \f$ that
+ * are less than or equal to "maxell" and compose the total angular momentum \f$ L \f$.
+ */
+int triangle_count(int L, int maxell);
+
 #endif

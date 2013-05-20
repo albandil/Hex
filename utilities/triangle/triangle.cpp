@@ -1,18 +1,7 @@
 #include <iostream>
-#include <cmath>
 #include <cstdlib>
 
-int triangles (int maxl, int L)
-{
-	int n = 0;
-	
-	for (int l1 = 0; l1 <= maxl; l1++)
-		for (int l2 = 0; l2 <= maxl; l2++)
-			if (std::abs(l1-l2) <= L and l1+l2 >= L)
-				n++;
-	
-	return n;
-}
+#include "angs.h"
 
 int main (int argc, char *argv[])
 {
@@ -37,7 +26,7 @@ int main (int argc, char *argv[])
 		std::cout << maxl << "\t";
 		
 		for (int L = 0; L <= MaxL; L++)
-			std::cout << triangles(maxl,L) << "\t";
+			std::cout << triangle_count(maxl,L) << "\t";
 		
 		std::cout << std::endl;
 	}
