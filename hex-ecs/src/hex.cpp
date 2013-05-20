@@ -301,7 +301,47 @@ int main(int argc, char* argv[])
 		
 		std::ostringstream oss2;
 		oss2 << "R_tr[" << lambda << "].hdf";
-		if (R_tr[lambda].hdfload(oss2.str().c_str()))
+		
+		bool R_integ_exists; // whether there are valid precomputed data
+		
+		// master will load radial integrals
+		if (I_am_master)
+		{
+			R_integ_exist = R_tr[lambda].hdfload(oss2.str().c_str());
+		}
+		
+		if (parallel)
+		{
+			// master will broadcast existence information to other processes
+			MPI::COMM_WORLD.Bcast(&R_integ_exist, 1, MPI::BOOL, 0);
+			
+			// master will broadcast data to other processes
+			if (R_integ_exists)
+			{
+				// master will broadcast dimensions
+				int size = v.size();
+				int m = R_tr[lamda].rows();
+				int n = R_tr[lamda].cols();
+				MPI::COMM_WORLD.Bcast(&size, 1, MPI::INT, 0);
+				MPI::COMM_WORLD.Bcast(&m, 1, MPI::INT, 0);
+				MPI::COMM_WORLD.Bcast(&n, 1, MPI::INT, 0);
+				
+				// copy and resize intermediate arrays
+				Array<long> i = R_tr[lambda].i();         i.resize(size);
+				Array<long> j = R_tr[lambda].j();         j.resize(size);
+				Array<Complex> v = R_tr[lambda].v();      v.resize(size);
+				
+				// master will broadcast arrays
+				MPI::COMM_WORLD.Bcast(&i[0], size, MPI::LONG_INT, 0)
+				MPI::COMM_WORLD.Bcast(&j[0], size, MPI::LONG_INT, 0)
+				MPI::COMM_WORLD.Bcast(&v[0], size, MPI::DOUBLE_COMPLEX, 0)
+				
+				// reconstruct objects
+				R_tr[lambda] = CooMatrix(m, n, i, j, v);
+			}
+		}
+		
+		if (R_integ_exist)
 		{
 			std::cout << "\t- integrals for λ = " << lambda << " successfully loaded\n";
 			continue; // no need to compute
