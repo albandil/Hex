@@ -660,6 +660,9 @@ public:
 	size_t rows() const { return _m_; }
 	size_t cols() const { return _n_; }
 	size_t size() const { return _i_.size(); }
+	std::vector<long> const & i() const { return _i_; }
+	std::vector<long> const & j() const { return _j_; }
+	std::vector<Complex> const & v() const { return _x_; }
 	
 	Complex operator() (size_t ix, size_t iy) const
 	{
