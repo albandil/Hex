@@ -27,7 +27,11 @@
 /**
  * \brief Chebyshev approximation.
  * 
- * This class manages a Chebyshev approximation of a function with signature
+ * This class manages a Chebyshev approximation
+ * \f[
+ *     F(x) = \frac{c_0}{2} + \sum_{k=1}^N c_k T_k(x)
+ * \f]
+ * of a function F with signature
  * \code
  * Tout F(double Tin)
  * \endcode
@@ -36,8 +40,9 @@ template <typename Tin, typename Tout> class Chebyshev
 {
 public:
 
-    Chebyshev () {}
-
+    Chebyshev () : N(0), C(), xt(0.), m(0.) {}
+    Chebyshev (Chebyshev const & cb) : N(cb.N), C(cb.C), xt(cb.xt), m(cb.m) {}
+	
     /**
 	 * \brief Constructor.
 	 * 
@@ -105,17 +110,17 @@ public:
         Tout d_j = 0, d_jp1 = 0, d_jp2 = 0;
         double one_x = scale(x);
         double two_x = 2 * one_x; // due to linearity of 'scale'
-
+		
         for (int j = m - 1; j >= 1; j--)
         {
             d_j   = two_x * d_jp1 - d_jp2 + C[j];
-
+			
             d_jp2 = d_jp1;
             d_jp1 = d_j;
         }
-
+		
         d_j = one_x * d_jp1 - d_jp2 + 0.5 * C[0];
-
+		
         return d_j;
     }
 
@@ -125,7 +130,7 @@ public:
      * truncated after this term. If no such term exists, the total
      * count of terms is returned.
      *
-     * NOTE: The Chebyshev polynomial corresponding to the last considered
+     * @note The Chebyshev polynomial corresponding to the last considered
      * term can be negligible near some evaluation point 'x'. In that case,
      * its contribution might be shadowed by the contribution of the following
      * polynomial. So, the evaluated result can have worse precision than the
@@ -136,16 +141,16 @@ public:
     {
         double sum = std::abs(0.5 * C[0]);
         double abs_Ck;
-
+		
         for (int k = 1; k < N; k++)
         {
             abs_Ck = std::abs(C[k]);
             sum += abs_Ck;
-
+			
             if (abs_Ck <= eps * sum)
                 return k + 1;
         }
-
+		
         return N;
     }
 
@@ -157,46 +162,100 @@ public:
     {
         Tout ret = 0.5 * C[0];
         double xp = scale(x);
-
+		
         int k;
         for (k = 1; k < N; k++)
         {
             double Tk_x = cos(k * acos(xp));
             Tout delta = C[k] * Tk_x;
             ret += delta;
-
+			
             if (std::abs(delta) <= eps * std::abs(ret))
             {
                 k++;
                 break;
             }
         }
-
+		
         if (n != 0)
             *n = k;
-
+		
         return ret;
     }
+    
+    /**
+	 * Integration types.
+	 */
+	typedef enum {
+		Integ_Indef,
+		Integ_Low,
+		Integ_High
+	} Integration;
 
     /**
      * Return Chebyshev aproximation of the function primitive to the
      * stored Chebyshev approximation.
+	 * 
+	 * \param itype Whether to return general indefinite integral expansion
+	 * \f[
+	 *     \int_a^x f(x) \mathrm{d}x \ ,
+	 * \f]
+	 * (corresponds to "indef") or definite low
+	 * \f[
+	 *     \int_0^x f(x) \mathrm{d}x \ ,
+	 * \f]
+	 * (corresponds to "def_low") or definite high
+	 * \f[
+	 *     \int_x^\infty f(x) \mathrm{d}x \ .
+	 * \f]
      */
-    Chebyshev integrate () const
+    Chebyshev integrate (Integration itype = Integ_Indef) const
     {
         Chebyshev ret;
         ret.xt = xt;
         ret.m  = m;
         ret.N  = N;
-
+		
         ret.C.resize(ret.N);
         ret.C[0] = 0;
         ret.C[N-1] = ret.m * C[N-2] / (2.*(N-2.));
-
-        for (int i = 1; i < N - 1; i++)
-            ret.C[i] = ret.m * (C[i-1] - C[i+1]) / (2.*i);
-
-        return ret;
+		
+		for (int i = 1; i < N - 1; i++)
+			ret.C[i] = ret.m * (C[i-1] - C[i+1]) / (2.*i);
+		
+		// transform coefficients to get a definite integral, if requested
+		switch (itype)
+		{
+			case Integ_Indef:
+			{
+				// already done
+				break;
+			}
+			case Integ_Low:
+			{
+				// compute C[0] as an alternating sum of other coefficients
+				for (int i = 1; i < N; i += 2)
+					ret.C[0] += ret.C[i];
+				for (int i = 2; i < N; i += 2)
+					ret.C[0] -= ret.C[i];
+				break;
+			}
+			case Integ_High:
+			{
+				// compute C[0] as a sum of other coefficients and negate other coefficients
+				for (int i = 1; i < N; i++)
+				{
+					ret.C[0] += ret.C[i];
+					ret.C[i] = -ret.C[i];
+				}
+				break;
+			}
+		}
+		
+		// take into account the normalization (F = c_0/2 + ...)
+		ret.C[0] *= 2.;
+		
+		return ret;
     }
 
     /**
@@ -255,11 +314,11 @@ private:
         return (xt + m*x);
     }
 
-    /// Chebyshev coefficients
-    Array<Tout> C;
-
     /// coefficient number
     int N;
+
+    /// Chebyshev coefficients
+    Array<Tout> C;
 
     /// approximation interval center
     Tin xt;

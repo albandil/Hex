@@ -14,10 +14,8 @@
 #define HEX_DWBA_DWBA2
 
 #include "arrays.h"
-#include "chebyshev.h"
-#include "clenshawcurtis.h"
+#include "multi.h"
 #include "potential.h"
-#include "specf.h"
 
 /**
  * Main DWBA2-part function that will compute a scattering amplitude
@@ -69,101 +67,22 @@ void DWBA2_En (
 	Complex & DD
 );
 
-template <
-	class Chif, class Phif, class Psif,
-	class GPhi, class GEta,
-	class Psii, class Phii, class Chii
-> Complex GreensFunctionIntegral (
-	Chif const & chif, Phif const & phif, Psif const & psif,
-	GPhi const & gphi, GEta const & geta,
-	Psii const & psii, Phii const & phii, Chii const & chii,
-	bool scaling
-) {
-	std::cout << "\tGreen's integral\n";
-	
-	// get integration upper bound
-	double fari = 5. * psii.far(1e-7);
-	double farf = 5. * psif.far(1e-7);
-	
-	// Green's function integrand
-	auto integrand = [&](double r1) -> Complex {
-		
-		// inner integrand variations
-		
-		auto integrand1 = [&](double r2) -> Complex {
-			if (scaling)
-				return gphi(r2) * phii(r2) * chii(r2) * exp(r2 - r1);
-			else
-				return gphi(r2) * phii(r2) * chii(r2);
-		};
-		auto integrand2 = [&](double r2) -> Complex {
-			if (not finite(r2))
-				return 0.;
-			if (scaling)
-				return geta(r2) * phii(r2) * chii(r2) * exp(r1 - r2);
-			else
-				return geta(r2) * phii(r2) * chii(r2);
-		};
-		
-		// integration systems
-		
-		CompactIntegrand<decltype(integrand1),Complex> inte1(integrand1, 0., fari, false, 1.0);
-		ClenshawCurtis<decltype(inte1),Complex> Q1(inte1);
-		Q1.setLim(false);
-		Q1.setRec(false);
-		Q1.setSubdiv(15);
-		Q1.setEps(1e-6);
-		Q1.setTol(1e-6);
- 		Q1.setVerbose(false, "Green 1");
-		Q1.setThrowAll(false);
-		
-		CompactIntegrand<decltype(integrand2), Complex> inte2(integrand2, 0., fari, false, 1.0);
-		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
-		Q2.setLim(false);
-		Q2.setRec(false);
-		Q2.setSubdiv(15);
-		Q2.setEps(1e-6);
-		Q2.setTol(1e-6);
- 		Q2.setVerbose(false, "Green 2");
-		Q2.setThrowAll(false);
-		
-		// integrate
-		
-		int n1,n2;
-		Complex q1 = Q1.integrate (
-			inte1.scale(0.),
-			inte1.scale(std::min(r1,fari)),
-			&n1
-		);
-		
-		Complex q2 = Q2.integrate (
-			inte2.scale(std::min(r1,fari)),
-			inte2.scale(fari),
-			&n2
-		);
-		
-		// evaulate outer integrand
-		return phif(r1) * (geta(r1) * q1 + gphi(r1) * q2);
-	};
-	
-	// outer integration system
-	CompactIntegrand<decltype(integrand),Complex> inte(integrand);
-	ClenshawCurtis<decltype(inte),Complex> Q(inte);
-	Q.setLim(false);
-	Q.setRec(false);
-	Q.setSubdiv(15);
-	Q.setEps(1e-4);
-	Q.setTol(-1e-6);
-	Q.setVerbose(true, "Outer Green integral");
-	
-	std::cout << "\tFar = " << farf << std::endl;
-	
-	// integrate
-	return Q.integrate (
-		inte.scale(0.),
-		inte.scale(farf)
-	);
-}
+Complex GreensFunctionIntegralAllowed (
+	// final state
+	DistortedWave const & chif, PhiFunction const & phif, HydrogenFunction const & psif,
+	// intermediate state (Green's function
+	DistortedWave const & gphi, IrregularWave const & geta,
+	// initial state
+	HydrogenFunction const & psii, PhiFunction const & phii, DistortedWave const & chii
+);
+
+double GreensFunctionIntegralForbidden (
+	// final state
+	DistortedWave const & chif, PhiFunction const & phif, HydrogenFunction const & psif, 
+	// intermediate state (Green's function
+	HyperbolicWave const & gtheta, ForbiddenWave const & gzeta,
+	// initial state
+	HydrogenFunction const & psii, PhiFunction const & phii, DistortedWave const & chii
+);
 
 #endif
-

@@ -18,7 +18,16 @@
 #include "potential.h"
 #include "chebyshev.h"
 #include "specf.h"
-	
+
+class PhiFunction : public RadialFunction<double>
+{
+	public:
+		
+		virtual double operator() (double x) const = 0;
+		virtual bool isZero() const = 0;
+		virtual double k() const = 0;
+};
+
 /**
  * \brief Multipole function of the "direct" type.
  * 
@@ -51,9 +60,10 @@
  * \param cblimit Maximal number of Chebyshev evaluation points used. If the
  *     routine doesn't find a satisfactory approximation even after evaluating
  *     the function at 'cblimit' Chebyshev roots, the integrand is assumed
- *     to be highly oscillatory and an alternative method is used.
+ *     to be highly oscillatory and an alternative method is used. Minus one disables
+ *     the limit.
  */
-class PhiFunctionDir : public RadialFunction<double>
+class PhiFunctionDir : public PhiFunction
 {
 public:
 	
@@ -62,31 +72,42 @@ public:
 		int lam, 
 		DistortingPotential const & U, 
 		HydrogenFunction const & psi,
-		int cblimit = gsl_sf_pow_int(2,15)
+		int cblimit = 1024
 	);
 	
 	/// Evaluate the function.
 	double operator() (double x) const;
 	
+	/// Whether the function is identical zero.
+	bool isZero() const { return Zero; }
+	
+	/// Return effective wavenumber.
+	double k() const { return Wavenum; }
+	
 private:
 	
 	/// Compute Chebyshev expansion coefficients by evaluating the integrands.
-	void tryRealChebyshev (
-		HydrogenFunction const & psin, 
-		HydrogenFunction const & psi,
+	void tryFullRealChebyshev (
+		int cblimit,
+		bool & Cheb_L_conv,
+		bool & Cheb_mLm1_conv
+	);
+	
+	void tryFrontRealChebyshev (
 		int cblimit,
 		bool & Cheb_L_conv,
 		bool & Cheb_mLm1_conv
 	);
 	
 	/// Compute Chebyshev expansion coefficients by computing the complex integral.
-	void tryComplexChebyshev (
-		HydrogenFunction const & psin, 
-		HydrogenFunction const & psi,
+	void tryFullComplexChebyshev (
 		int cblimit,
 		bool & Cheb_L_conv,
 		bool & Cheb_mLm1_conv
 	);
+	
+	HydrogenFunction psin;
+	HydrogenFunction psi;
 	
 	int Lam;
 	DistortingPotential U;
@@ -97,17 +118,23 @@ private:
 	/// whether the integral is identical zero for all "x2"
 	bool Zero;
 	
+	/// Wavenumber of the intermediate state.
+	double Wavenum;
+	
+	/// Use frontal approximation.
+	bool UseFront;
+	
 	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^\lambda \psi_i(r) \f$.
 	Chebyshev<double,double> Cheb_L;
 	
 	/// Chebyshev approximations of the integrand \f$ \psi_n(r) r^{-\lambda-1} \psi_i(r) \f$.
 	Chebyshev<double,double> Cheb_mLm1;
 	
+	Chebyshev<double,double> ACoeff, BCoeff;
+	int ATail, BTail;
+	
 	int Cheb_mLm1_tail;
 	int Cheb_L_tail;
-	
-	double Cheb_mLm1_inf;
-	double Cheb_L_zero;
 };
 
 #endif

@@ -25,12 +25,12 @@
 
 #define SIGN(a) (((a) < 0) ? (-1.) : (1.))
 
-inline bool isfinite(Complex z)
+bool finite(Complex z)
 {
-	return isfinite(z.real()) and isfinite(z.imag());
+	return finite(z.real()) and finite(z.imag());
 }
 
-const double precision = 1E-10,sqrt_precision = 1E-5;
+const double precision = 1E-10, sqrt_precision = 1E-5;
 
 //
 // missing complex arithmetic
@@ -64,7 +64,7 @@ inline double inf_norm (Complex const & z)
 // log_const : log[0.5] + i.Pi/2
 Complex log_Gamma (Complex const & z)
 {
-	if (!std::isfinite(z.real()) or !std::isfinite(z.imag())) std::cout<<"z is not finite in log_Gamma."<<std::endl, abort ();
+	if (!finite(z)) std::cout<<"z is not finite in log_Gamma."<<std::endl, abort ();
 
 	const double x = real (z),y = imag (z);
 
@@ -514,7 +514,8 @@ Coulomb_wave_functions::Coulomb_wave_functions()
 	  neg_int_omega_one(false), 
 	  neg_int_omega_minus_one(false), 
 	  turning_point(false),
-	  prec_first_order_expansion(1.)
+	  prec_first_order_expansion(0.),
+	  noclean(true)
 {
 	
 }
@@ -549,7 +550,7 @@ Coulomb_wave_functions::Coulomb_wave_functions (bool is_it_normalized_c, Complex
       sym_constant_arg_pos ((is_it_normalized_c) ? (exp (-M_PI*(eta_c-(l_c+1.)*Complex (0.0,1.0)))) : (exp (M_PI*(l_c+1.)*Complex (0.0,1.0)))), 
       turning_point (std::max (1.0,std::abs (eta_c) + sqrt (std::abs (l_c*(l_c+1.0)) + std::abs (eta_c*eta_c)))),
       is_H_dir_int_naive (false),cwf_real_ptr (0),cwf_real_eta_plus_ptr (0),cwf_real_eta_minus_ptr (0),cwf_real_l_plus_ptr (0),cwf_real_l_minus_ptr (0),
-      cwf_minus_eta_ptr (0),cwf_lp_ptr (0),prec_first_order_expansion (0.1*sqrt_precision)
+      cwf_minus_eta_ptr (0),cwf_lp_ptr (0),prec_first_order_expansion (0.1*sqrt_precision),noclean(false)
 {
 	ODE_ptr = new class ODE_integration (l,2.0*eta);
 	debut = 0.0;
@@ -562,6 +563,9 @@ Coulomb_wave_functions::Coulomb_wave_functions (bool is_it_normalized_c, Complex
 
 Coulomb_wave_functions::~Coulomb_wave_functions()
 {
+	if (noclean)
+		return;
+	
 	delete cwf_real_ptr;
 
 	delete cwf_real_l_plus_ptr;
@@ -638,7 +642,7 @@ void Coulomb_wave_functions::asymptotic_expansion_H_dH_scaled (const int omega,C
 	{
 		const Complex z = 1.0/one_over_z;
 	
-		if (isfinite (log_cut_constant_AS) && (real (z) < 0.0) && (SIGN (imag (z)) == -omega))
+		if (finite (log_cut_constant_AS) && (real (z) < 0.0) && (SIGN (imag (z)) == -omega))
 		{
 			const Complex factor = exp (-two_I_omega*(z - eta*(M_LN2 + log (z))) - phase_shift + log_cut_constant_AS);
 
@@ -649,7 +653,7 @@ void Coulomb_wave_functions::asymptotic_expansion_H_dH_scaled (const int omega,C
 
 	if (!is_it_normalized)
 	{
-		if ((Cl_eta == 0.0) || (!isfinite (Cl_eta))) 
+		if ((Cl_eta == 0.0) || (!finite (Cl_eta))) 
 			H_scaled = exp (log_Cl_eta + log (H_scaled)),dH_scaled = exp (log_Cl_eta + log (dH_scaled));
 		else 
 			H_scaled *= Cl_eta,dH_scaled *= Cl_eta;
@@ -698,7 +702,7 @@ void Coulomb_wave_functions::H_dH_direct_integration (const int omega,Complex co
 		}
 		else ODE (debut_omega,H_debut,dH_debut,z_aft,H,dH);
 
-		if (!isfinite (H) || !isfinite (dH))
+		if (!finite (H) || !finite (dH))
 			std::cout<<"Numerical failure encountered in H_dH_direct_integration."<<std::endl,exit (1);
 
 		debut_omega = z_aft,H_debut = H,dH_debut = dH;
@@ -713,7 +717,7 @@ void Coulomb_wave_functions::H_dH_from_first_order_expansions (const int omega,C
 
 	const Complex I_omega(0,omega),norm_functions = (!is_it_normalized) ? (Cl_eta*Cl_eta) : (1.0);
 
-	if ((norm_functions == 0.0) || (!isfinite (norm_functions))) 
+	if ((norm_functions == 0.0) || (!finite (norm_functions))) 
 	{
 		const Complex log_norm = (!is_it_normalized) ? (2.0*log_Cl_eta) : (0.0);
 
@@ -753,11 +757,11 @@ void Coulomb_wave_functions::H_dH_with_F_dF_and_CF (const int omega,Complex cons
 
 			const Complex log_cut_constant_CFa = (omega == 1) ? (log_cut_constant_CFa_plus) : (log_cut_constant_CFa_minus);
 
-			if ((isfinite (log_cut_constant_CFa)) && (x < 0.0) && (SIGN (y) == -omega))
+			if ((finite (log_cut_constant_CFa)) && (x < 0.0) && (SIGN (y) == -omega))
 			{
 				const Complex cut_constant_CFa = (omega == 1) ? (cut_constant_CFa_plus) : (cut_constant_CFa_minus); 
 				
-				if ((cut_constant_CFa == 0.0) || (!isfinite (cut_constant_CFa)))
+				if ((cut_constant_CFa == 0.0) || (!finite (cut_constant_CFa)))
 					H -= exp (log_cut_constant_CFa + log (F)),dH -= exp (log_cut_constant_CFa + log (dF));
 				else 
 					H -= cut_constant_CFa*F,dH -= cut_constant_CFa*dF;
@@ -770,7 +774,7 @@ void Coulomb_wave_functions::H_dH_with_F_dF_and_CF (const int omega,Complex cons
 			const Complex cut_constant_CFb = (omega == 1) ? (cut_constant_CFb_plus) : (cut_constant_CFb_minus); 
 			const Complex constant = ((x < 0.0) && (SIGN (y) == omega)) ? (cut_constant_CFb) : (two_I_omega*norm_functions);
 
-			if ((constant == 0.0) || (!isfinite (constant))) 
+			if ((constant == 0.0) || (!finite (constant))) 
 			{
 				const Complex log_norm = (!is_it_normalized) ? (2.0*log_Cl_eta) : (0.0),log_two_I_omega(M_LN2,omega*M_PI_2);
 				const Complex log_cut_constant_CFb = (omega == 1) ? (log_cut_constant_CFb_plus) : (log_cut_constant_CFb_minus);
@@ -809,8 +813,8 @@ void Coulomb_wave_functions::H_dH_with_expansion (const int omega,Complex const 
 		if (inf_norm ((dF*Fp - dFp*F)*one_over_2lp1 - 1.0) < precision)
 		{
 			const Complex Cl_eta_2 = Cl_eta*Cl_eta,exp_I_omega_chi_over_sin_chi = exp_I_omega_chi*one_over_sin_chi;
-			const Complex F_Cl_eta_2 = ((Cl_eta_2 == 0.0) || (!isfinite (Cl_eta_2))) ? (exp (2.0*log_Cl_eta + log (F))) : (Cl_eta_2*F);
-			const Complex dF_Cl_eta_2 = ((Cl_eta_2 == 0.0) || (!isfinite (Cl_eta_2))) ? (exp (2.0*log_Cl_eta + log (dF))) : (Cl_eta_2*dF);
+			const Complex F_Cl_eta_2 = ((Cl_eta_2 == 0.0) || (!finite (Cl_eta_2))) ? (exp (2.0*log_Cl_eta + log (F))) : (Cl_eta_2*F);
+			const Complex dF_Cl_eta_2 = ((Cl_eta_2 == 0.0) || (!finite (Cl_eta_2))) ? (exp (2.0*log_Cl_eta + log (dF))) : (Cl_eta_2*dF);
 			
 			H = exp_I_omega_chi_over_sin_chi*F_Cl_eta_2 + Fp*one_over_2lp1;
 			dH = exp_I_omega_chi_over_sin_chi*dF_Cl_eta_2 + dFp*one_over_2lp1;
@@ -857,7 +861,7 @@ void Coulomb_wave_functions::F_dF_power_series (Complex const & z,Complex &F,Com
 		
 		if (is_it_normalized)
 		{
-			if ((Cl_eta == 0.0) || (!isfinite (Cl_eta))) F = exp (log_Cl_eta + log (F)),dF = exp (log_Cl_eta + log (dF));
+			if ((Cl_eta == 0.0) || (!finite (Cl_eta))) F = exp (log_Cl_eta + log (F)),dF = exp (log_Cl_eta + log (dF));
 			else F *= Cl_eta,dF *= Cl_eta;
 		}
 	}
@@ -921,7 +925,7 @@ void Coulomb_wave_functions::asymptotic_expansion_F_dF (Complex const & z,Comple
 
 	if (!is_it_normalized)
 	{
-		if ((Cl_eta == 0.0) || (!isfinite (Cl_eta))) F = exp (log (F) - log_Cl_eta),dF = exp (log (dF) - log_Cl_eta);
+		if ((Cl_eta == 0.0) || (!finite (Cl_eta))) F = exp (log (F) - log_Cl_eta),dF = exp (log (dF) - log_Cl_eta);
 		else F /= Cl_eta,dF /= Cl_eta;
 	}
 }
@@ -980,7 +984,7 @@ void Coulomb_wave_functions::F_dF_direct_integration (Complex const & z,Complex 
 
 		debut = z_aft,F_debut = F,dF_debut = dF;
 
-		if (!isfinite (F) || !isfinite (dF)) std::cout<<"Numerical failure encountered in F_dF_direct_integration."<<std::endl,exit (1);
+		if (!finite (F) || !finite (dF)) std::cout<<"Numerical failure encountered in F_dF_direct_integration."<<std::endl,exit (1);
 	}
 	is_it_successful = true;
 }
@@ -996,7 +1000,7 @@ void Coulomb_wave_functions::F_dF_with_symmetry_relations (Complex const & z,Com
 
 		cwf_minus_eta_ptr->debut = -debut; 
 
-		if ((sym_constant_debut == 0.0) || (!isfinite (sym_constant_debut))) 
+		if ((sym_constant_debut == 0.0) || (!finite (sym_constant_debut))) 
 		{
 			const Complex log_sym_constant_debut = (arg (debut) <= 0.0) ? (-log_sym_constant_arg_neg) : (-log_sym_constant_arg_pos);
 
@@ -1015,7 +1019,7 @@ void Coulomb_wave_functions::F_dF_with_symmetry_relations (Complex const & z,Com
 
 	cwf_minus_eta_ptr->F_dF (-z,F,dF);
 
-	if ((sym_constant == 0.0) || (!isfinite (sym_constant))) 
+	if ((sym_constant == 0.0) || (!finite (sym_constant))) 
 	{
 		const Complex log_sym_constant = (arg_z <= 0.0) ? (log_sym_constant_arg_neg) : (log_sym_constant_arg_pos);
 
@@ -1060,9 +1064,9 @@ void Coulomb_wave_functions::asymptotic_series (const int omega,Complex const & 
 			test = std::max (inf_norm (sum_term),inf_norm (dsum_term));
 			n++;
 		}
-		while ((test > precision) && (isfinite (test)));
+		while ((test > precision) && (finite (test)));
 
-		if (!isfinite (test)) {is_it_successful = false; return;}
+		if (!finite (test)) {is_it_successful = false; return;}
 	}
 
 	const Complex two_I_omega(0.0,2.0*omega);
@@ -1172,7 +1176,7 @@ void Coulomb_wave_functions::F_dF (Complex const & z,Complex &F,Complex &dF) con
 	}}}
   }
 
-  if (!isfinite (F) || !isfinite (dF)) std::cout<<"Numerical failure encountered in F_dF."<<std::endl,exit (1);
+  if (!finite (F) || !finite (dF)) std::cout<<"Numerical failure encountered in F_dF."<<std::endl,exit (1);
 
   if ((y == 0.0) && (eta_i == 0.0) && (l_i == 0.0)) F = real (F),dF = real (dF); 
   debut = z,F_debut = F,dF_debut = dF;
@@ -1208,7 +1212,7 @@ void Coulomb_wave_functions::G_dG (Complex const & z,Complex &G,Complex &dG) con
       {
 	const Complex I_Cl_eta_square = I*Cl_eta*Cl_eta;
 	
-	if ((I_Cl_eta_square == 0.0) || (!isfinite (I_Cl_eta_square)))
+	if ((I_Cl_eta_square == 0.0) || (!finite (I_Cl_eta_square)))
 	  G = H_plus - I*exp (2.0*log_Cl_eta + log (F)),dG = dH_plus - I*exp (2.0*log_Cl_eta + log (dF));
 	else
 	  G = H_plus - I_Cl_eta_square*F,dG = dH_plus - I_Cl_eta_square*dF;
@@ -1230,7 +1234,7 @@ void Coulomb_wave_functions::H_dH (const int omega,Complex const & z,Complex &H,
   {
     const Complex I_omega(0,omega),log_unscale = I_omega*(z - eta*(M_LN2 + log (z))),unscale = exp (log_unscale);
 
-    if ((unscale == 0.0) || (!isfinite (unscale)))
+    if ((unscale == 0.0) || (!finite (unscale)))
       H = exp (log (H_scaled) + log_unscale),dH = exp (log (dH_scaled) + log_unscale);
     else    
       H = H_scaled*unscale,dH = dH_scaled*unscale;
@@ -1263,7 +1267,7 @@ void Coulomb_wave_functions::H_dH (const int omega,Complex const & z,Complex &H,
     }
   }
 
-  if (!isfinite (H) || !isfinite (dH)) std::cout<<"Numerical failure encountered in H_dH."<<std::endl,exit (1);
+  if (!finite (H) || !finite (dH)) std::cout<<"Numerical failure encountered in H_dH."<<std::endl,exit (1);
 }
 
 void Coulomb_wave_functions::H_dH_scaled (const int omega,Complex const & z,Complex &H_scaled,Complex &dH_scaled) const
@@ -1302,13 +1306,13 @@ void Coulomb_wave_functions::H_dH_scaled (const int omega,Complex const & z,Comp
   
     const Complex I_omega(0,omega),log_scale = -I_omega*(z - eta*(M_LN2 + log (z))),scale = exp (log_scale);
     
-    if ((scale == 0.0) || (!isfinite (scale)))
+    if ((scale == 0.0) || (!finite (scale)))
       H_scaled = exp (log (H) + log_scale),dH_scaled = exp (log (dH) + log_scale);
     else
       H_scaled = H*scale,dH_scaled = dH*scale; 
   }
 
-  if (!isfinite (H_scaled) || !isfinite (dH_scaled)) std::cout<<"Numerical failure encountered in H_dH_scaled."<<std::endl,exit (1);
+  if (!finite (H_scaled) || !finite (dH_scaled)) std::cout<<"Numerical failure encountered in H_dH_scaled."<<std::endl,exit (1);
 }
 
 void Coulomb_wave_functions::F_dF_init (Complex const & z,Complex const & F,Complex const & dF)

@@ -35,7 +35,7 @@ void parse_command_line (
 	bool& stg1, bool& stg12
 ){
 	// set short options
-	const char* const short_options  = "eih";
+	const char* const short_options  = "eihznmab";
 	
 	// set long options
 	const option long_options[] = {
@@ -44,7 +44,9 @@ void parse_command_line (
 		{"help",              0,   0, 'h'},
 		{"zipfile",           1,   0, 'z'},
 		{"zipcount",          1,   0, 'n'},
+#ifndef NO_MPI
 		{"mpi",               0,   0, 'm'},
+#endif
 		{"stg1",              0,   0, 'a'},
 		{"stg12",             0,   0, 'b'},
 		{0,                   0,   0,   0}
@@ -167,12 +169,14 @@ void parse_command_line (
 				stg12 = true;
 				break;
 			}
+#ifndef NO_MPI
 			case 'm':
 			{
 				// use MPI
 				parallel = true;
 				break;
 			}
+#endif
 			case -1:
 			{
 				// end of command line option list

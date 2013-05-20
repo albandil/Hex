@@ -20,19 +20,20 @@
 #include "misc.h"
 #include "specf.h"
 
-
 /**
  * Limit
  * \f[
  *     \lim_{t \rightarrow x} F(t)
  * \f]
- * 
+ *
  * The bisection count will be written into *n if non-null.
  */
 template <class Functor, typename FType> FType lim (Functor F, double x, int * n = nullptr)
 {
     // initial position
-    double x0 = (x != 1.) ? 1. : 0.5;
+    double x0;
+    if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
+    if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
 
     // function value
     FType f0 = F(x0), f;
@@ -70,10 +71,10 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 template <typename FType> class ICompactification : public RadialFunction<FType>
 {
 public:
-	virtual ~ICompactification() {}
+    virtual ~ICompactification() {}
     virtual double scale (double x) const = 0;
     virtual double unscale (double t) const = 0;
-	virtual double Jacobian (double t) const = 0;
+    virtual double Jacobian (double t) const = 0;
     virtual FType operator() (double t) const = 0;
 };
 
@@ -103,9 +104,9 @@ public:
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
         if (not finite(a) or not finite(b))
-			throw exception("[CompactificationF] Interval has to be finite!");
+            throw exception("[CompactificationF] Interval has to be finite!");
     }
-    
+
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
     double scale (double x) const
     {
@@ -123,10 +124,10 @@ public:
     /// Evaluate Jacobian of the transformation.
     double Jacobian(double t) const
     {
-		assert(std::abs(t) <= 1.);
-		return D;
-	}
-    
+        assert(std::abs(t) <= 1.);
+        return D;
+    }
+
     /**
      * Evaluate the compactified function.
      * \param t Value from the compactified interval [-1,1].
@@ -164,54 +165,54 @@ public:
     CompactificationL (
         Functor f,
         double b = 0.,
-		bool limit = true,
+        bool limit = true,
         double L = 1.0
     ) : F(f), B(b), L(L), Limit(limit) {}
-    
+
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
     double scale (double x) const
     {
-		assert (x <= B);
-		return finite(x) ? (x - B + L) / (x - B - L) : 1.;
+        assert (x <= B);
+        return finite(x) ? (x - B + L) / (x - B - L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
     double unscale (double t) const
     {
         assert(std::abs(t) <= 1.);
-		return (t == 1.) ? Inf : B - L * (1. + t) / (1. - t);
+        return (t == 1.) ? Inf : B - L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
     double Jacobian(double t) const
     {
-		assert(std::abs(t) <= 1.);
-		return -2 * L / sqr(1. - t);
-	}
-    
+        assert(std::abs(t) <= 1.);
+        return -2 * L / ((1. - t) * (1. - t));
+    }
+
     /**
      * Evaluate the compactified function.
      * \param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
     {
-		if (t == 1.)
-		{
-			if (Limit)
-				return lim<decltype(F),FType>(F, Inf);
-			else
-				return F(Inf);
-		}
-		else
-		{
-			return F(B - L * (1. + t) / (1. - t));
-		}
+        if (t == 1.)
+        {
+            if (Limit)
+                return lim<decltype(F),FType>(F, Inf);
+            else
+                return F(Inf);
+        }
+        else
+        {
+            return F(B - L * (1. + t) / (1. - t));
+        }
     }
 
 private:
     Functor F;
     double B, L;
-	bool Limit;
+    bool Limit;
 };
 
 /**
@@ -238,30 +239,30 @@ public:
     CompactificationR (
         Functor f,
         double a = 0.,
-		bool limit = true,
+        bool limit = true,
         double L = 1.0
     ) : F(f), A(a), L(L), Limit(limit) {}
-    
+
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
     double scale (double x) const
     {
-		assert (x >= A);
-		return finite(x) ? (x - A - L) / (x - A + L) : 1.;
+        assert (x >= A);
+        return finite(x) ? (x - A - L) / (x - A + L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
     double unscale (double t) const
     {
         assert(std::abs(t) <= 1.);
-		return (t == 1.) ? Inf : A + L * (1. + t) / (1. - t);
+        return (t == 1.) ? Inf : A + L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
     double Jacobian(double t) const
     {
-		assert(std::abs(t) <= 1.);
-		return 2 * L / sqr(1. - t);
-	}
+        assert(std::abs(t) <= 1.);
+        return 2 * L / ((1. - t) * (1. - t));
+    }
 
     /**
      * Evaluate the compactified function.
@@ -269,23 +270,23 @@ public:
      */
     FType operator() (double t) const
     {
-		if (t == 1.)
-		{
-			if (Limit)
-				return lim<decltype(F),FType>(F,Inf);
-			else
-				return F(Inf);
-		}
-		else
-		{
-			return F(A + L * (1. + t) / (1. - t));
-		}
+        if (t == 1.)
+        {
+            if (Limit)
+                return lim<decltype(F),FType>(F,Inf);
+            else
+                return F(Inf);
+        }
+        else
+        {
+            return F(A + L * (1. + t) / (1. - t));
+        }
     }
 
 private:
     Functor F;
     double A, L;
-	bool Limit;
+    bool Limit;
 };
 
 /**
@@ -307,54 +308,54 @@ public:
         Functor f,
         double a = 0.,
         double b = Inf,
-		bool limit = true,
+        bool limit = true,
         double L = 1.0
     ) : Compactification(nullptr) {
-		if (finite(a) and finite(b))
-			Compactification = new CompactificationF<Functor,FType> (f, a, b);
-		else if (finite(a) and not finite(b))
-			Compactification = new CompactificationR<Functor,FType> (f, a, limit, L);
-		else if (not finite(a) and finite(b))
-			Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
-		else
-			throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");
-	}
+        if (finite(a) and finite(b))
+            Compactification = new CompactificationF<Functor,FType> (f, a, b);
+        else if (finite(a) and not finite(b))
+            Compactification = new CompactificationR<Functor,FType> (f, a, limit, L);
+        else if (not finite(a) and finite(b))
+            Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
+        else
+            throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");
+    }
 
     ~CompactIntegrand ()
-	{
-		delete Compactification;
-	}
-    
+    {
+        delete Compactification;
+    }
+
     /**
      * Get the function multiplied by the Jacobian of the transform for the
      * purpose of integrating the original function.
-	 * 
-	 * \note Whenever the function value is zero, the Jacobian is not evaluated
-	 *       and a clean zero is returned.
+     *
+     * \note Whenever the function value is zero, the Jacobian is not evaluated
+     *       and a clean zero is returned.
      */
     inline FType operator() (double t) const
     {
-		// evaluate function
-		FType ft = Compactification->operator()(t);
-		
-		if (ft == FType(0.))
-		{
-			// return zero
-			return 0.;
-		}
-		else
-		{
-			// multiply by the Jacobian
-			return ft * Compactification->Jacobian(t);
-		}
+        // evaluate function
+        FType ft = Compactification->operator()(t);
+
+        if (ft == FType(0.))
+        {
+            // return zero
+            return 0.;
+        }
+        else
+        {
+            // multiply by the Jacobian
+            return ft * Compactification->Jacobian(t);
+        }
     }
-    
+
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
     inline double scale (double x) const
     {
-		return Compactification->scale(x);
+        return Compactification->scale(x);
     }
-    
+
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
     inline double unscale (double t) const
     {
@@ -362,8 +363,8 @@ public:
     }
 
 private:
-	
-	ICompactification<FType> * Compactification;
+
+    ICompactification<FType> * Compactification;
 };
 
 #endif

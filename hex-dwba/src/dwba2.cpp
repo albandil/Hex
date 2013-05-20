@@ -15,16 +15,19 @@
 #include <cmath>
 
 #include "angs.h"
+#include "clenshawcurtis.h"
 #include "complex.h"
 #include "dwba2.h"
 #include "hydrogen.h"
 #include "integrate.h"
 #include "multi.h"
+#include "oscint.h"
 #include "potential.h"
 #include "wave_distort.h"
 #include "wave_irreg.h"
 #include "wave_forbid.h"
 #include "wave_hyperb.h"
+#include "../../hex-ecs/src/bspline.h"
 
 #define EPS_CONTRIB 1e-8
 
@@ -198,7 +201,7 @@ void DWBA2_energy_driver (
 	};
 	
 
-#if 0
+#if 1
 	
 	// compactification of the previous function
 // 	CompactificationR<decltype(ContinuumContribution),Complex>
@@ -211,12 +214,12 @@ void DWBA2_energy_driver (
 // 	for (double Kn = 0; Kn < 5; Kn += 0.01)
 // 		compact(compact.scale(Kn));
 	
-	ContinuumContribution(150);
+	ContinuumContribution(50);
 		
 	exit(0);
 	
 #endif
-		
+	
 	
 	// sum over discrete intermediate states
 	for (int Nn = Ln + 1; ; Nn++)
@@ -274,13 +277,10 @@ void DWBA2_energy_driver (
 	iQDD.setEps(1e-4);
 	iQDD.setVerbose(true, "Forbidden regime integral");
 	
-	/// DEBUG FIXME
-	double momentum_cutoff = Inf;
-	
 	// integrate over forbidden region
 	Complex DD_forbidden = iQDD.integrate (
 		cQDD.scale(sqrt(Ei - 1./(Ni*Ni))),
-		cQDD.scale(momentum_cutoff)
+		cQDD.scale(Inf)
 	);
 	cDD += DD_forbidden;
 	
@@ -310,14 +310,41 @@ void DWBA2_En (
 	
 	std::cout << "\tpsin.far() = " << psin.getFar() << std::endl;
 	
+	// FIXME (artificial intermediate momentum cutoff)
+	if (kn > 100.)
+	{
+		tmat = 0.;
+		return;
+	}
+	
+	//
 	// construct direct inner integrals
+	//
+	
 	std::cout << "\tcomputing phii... " << std::flush;
 	PhiFunctionDir phii(psin, lami, Ui, psii);
-	std::cout << "ok\n\tcomputing phif... " << std::flush;
-	PhiFunctionDir phif(psin, lamf, Uf, psif);
-	std::cout << "on\n";
+	std::cout << "ok\n";
 	
+	if (phii.isZero())
+	{
+		tmat = 0.;
+		return;
+	}
+	
+	std::cout << "\tcomputing phif... " << std::flush;
+	PhiFunctionDir phif(psin, lamf, Uf, psif);
+	std::cout << "ok\n";
+	
+	if (phif.isZero())
+	{
+		tmat = 0.;
+		return;
+	}
+	
+	//
 	// allowed/forbidden regime
+	//
+	
 	if (kn_sqr > 0)
 	{
 		std::cout << "\tAllowed regime, kn = " << kn << "\n";
@@ -330,7 +357,7 @@ void DWBA2_En (
 		std::cout << "ok\n";
 		
 		// integrate
-		tmat = GreensFunctionIntegral(chif, phif, psif, gphi, geta, psii, phii, chii, false);
+		tmat = GreensFunctionIntegralAllowed(chif, phif, psif, gphi, geta, psii, phii, chii);
 	}
 	else
 	{
@@ -348,6 +375,159 @@ void DWBA2_En (
 		gzeta.scale(true);
 		
 		// integrate
-		tmat = GreensFunctionIntegral(chif, phif, psif, gtheta, gzeta, psii, phii, chii, true);
+		tmat = GreensFunctionIntegralForbidden(chif, phif, psif, gtheta, gzeta, psii, phii, chii);
 	}
+}
+
+Complex GreensFunctionIntegralAllowed (
+	// final state
+	DistortedWave const & chif, PhiFunction const & phif, HydrogenFunction const & psif,
+	// intermediate state (Green's function
+	DistortedWave const & gphi, IrregularWave const & geta,
+	// initial state
+	HydrogenFunction const & psii, PhiFunction const & phii, DistortedWave const & chii
+) {
+	std::cout << "\tGreen's integral (allowed)\n";
+	
+	// get integration upper bound
+	double fari = 5. * psii.far(1e-7);
+	double farf = 5. * psif.far(1e-7);
+	
+	// Green's function integrand
+	auto integrand = [&](double r1) -> Complex {
+		
+		// inner integrand variations
+		
+		auto integrand1 = [&](double r2) -> Complex { return gphi(r2) * phii(r2) * chii(r2); };
+		auto integrand2 = [&](double r2) -> Complex { return finite(r2) ? geta(r2) * phii(r2) * chii(r2) * exp(r1 - r2) : 0.; };
+		
+		// integration systems
+		
+		CompactIntegrand<decltype(integrand1),Complex> inte1(integrand1, 0., fari, false, 1.0);
+		ClenshawCurtis<decltype(inte1),Complex> Q1(inte1);
+		Q1.setLim(false);
+		Q1.setRec(false);
+		Q1.setSubdiv(15);
+		Q1.setEps(1e-6);
+		Q1.setTol(1e-6);
+ 		Q1.setVerbose(false, "Green 1");
+		Q1.setThrowAll(false);
+		
+		CompactIntegrand<decltype(integrand2), Complex> inte2(integrand2, 0., fari, false, 1.0);
+		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
+		Q2.setLim(false);
+		Q2.setRec(false);
+		Q2.setSubdiv(15);
+		Q2.setEps(1e-6);
+		Q2.setTol(1e-6);
+ 		Q2.setVerbose(false, "Green 2");
+		Q2.setThrowAll(false);
+		
+		// integrate
+		
+		int n1,n2;
+		Complex q1 = Q1.integrate(inte1.scale(0.), inte1.scale(std::min(r1,fari)), &n1);
+		Complex q2 = Q2.integrate(inte2.scale(std::min(r1,fari)), inte2.scale(fari), &n2);
+		
+		// evaulate outer integrand
+		return phif(r1) * (geta(r1) * q1 + gphi(r1) * q2);
+	};
+	
+	// outer integration system
+	CompactIntegrand<decltype(integrand),Complex> inte(integrand);
+	ClenshawCurtis<decltype(inte),Complex> Q(inte);
+	Q.setLim(false);
+	Q.setRec(false);
+	Q.setSubdiv(15);
+	Q.setEps(1e-4);
+	Q.setTol(0);
+	Q.setVerbose(true, "Outer Green integral");
+	
+	std::cout << "\tFar = " << farf << std::endl;
+	
+	// integrate
+	return Q.integrate(inte.scale(0.), inte.scale(farf));
+}
+
+double GreensFunctionIntegralForbidden (
+	// final state
+	DistortedWave const & chif, PhiFunction const & phif, HydrogenFunction const & psif,
+	// intermediate state (Green's function
+	HyperbolicWave const & gtheta, ForbiddenWave const & gzeta,
+	// initial state
+	HydrogenFunction const & psii, PhiFunction const & phii, DistortedWave const & chii
+) {
+	std::cout << "\tGreen's integral (forbidden)\n";
+	
+	// get integration upper bound
+	double fari = 5. * psii.far(1e-7);
+	double farf = 5. * psif.far(1e-7);
+	
+	// Green's function integrand
+	auto integrand = [&](double r1) -> double {
+		
+		// inner integrand variations
+		
+		auto inte1 = [&](double r2) -> double { return gtheta(r2) * phii(r2) * chii(r2) * exp(r2 - r1); };
+		auto inte2 = [&](double r2) -> double { return finite(r2) ? gzeta(r2) * phii(r2) * chii(r2) * exp(r1 - r2) : 0.; };
+		
+		// oscillating period callback
+		
+		auto wave_callback = [&](double x, int n) -> double {
+			return x + 3.*M_PI/phii.k() * n;
+		};
+		
+		// integration systems
+		
+		OscillatingIntegral<decltype(inte1),decltype(wave_callback),double> Q1(inte1, wave_callback);
+		Q1.setEps(1e-6);
+		Q1.setTol(0);
+		Q1.setThrowAll(false);
+ 		Q1.setVerbose(false, "Green 1");
+		
+		OscillatingIntegral<decltype(inte2),decltype(wave_callback),double> Q2(inte2, wave_callback);
+		Q2.setEps(1e-6);
+		Q2.setTol(0);
+		Q2.setThrowAll(false);
+ 		Q2.setVerbose(false, "Green 2");
+		
+		// integrate
+		
+		int n1, n2;
+		double q1 = Q1.integrate(0., std::min(r1,fari), &n1);
+		double q2 = Q2.integrate(std::min(r1,fari), fari, &n2);
+		
+		/// DEBUG
+		std::clog
+			<< r1 << "\t"
+			<< phif(r1) * (gzeta(r1) * q1 + gtheta(r1) * q2) << "\t"
+			<< q1 << "\t"
+			<< q2 << "\t"
+			<< n1 << "\t"
+			<< n2 << "\n"
+			<< std::flush;
+		///
+		
+		// evaulate outer integrand
+		return phif(r1) * (gzeta(r1) * q1 + gtheta(r1) * q2);
+	};
+	
+	std::cout << "\tFar = " << farf << std::endl;
+	
+	/// DEBUG
+	CompactificationR<decltype(integrand),double> inte(integrand);
+	for (int i = -999; i <= 999; i++)
+		integrand(inte.unscale(i*0.001));
+	///
+	
+	auto wave_callback = [&](double x, int n) -> double {
+ 		return x + 3.*M_PI/(phii.k() + chif.k() + chii.k()) * n;
+	};
+	
+	OscillatingIntegral<decltype(integrand),decltype(wave_callback),double> Q(integrand,wave_callback);
+	Q.setEps(1e-5);
+	Q.setTol(0);
+	Q.setVerbose(true, "Outer Green integral");
+	
+	return Q.integrate(0., farf);
 }

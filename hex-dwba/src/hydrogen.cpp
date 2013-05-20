@@ -19,6 +19,7 @@
 
 #include "hydrogen.h"
 #include "interpolate.h"
+#include "misc.h"
 #include "specf.h"
 
 namespace Hydrogen
@@ -343,10 +344,10 @@ double HydrogenFunction::operator()(double r) const
 Complex HydrogenFunction::operator()(Complex r) const
 {
 	if (n == 0)
-		return F(r);
+		throw exception("[HydrogenFunction] Do not use operator() for evaluating complex free states!");
 	
 	if (n == 1 and l == 0)
-		return 2. * r * exp(-2.*r);
+		return 2. * r * exp(-r);
 		
-	throw exception("Complex argument for bound state P{%d,%d}(r) not implemented.", n, l);
+	throw exception("[HydrogenFunction] Complex argument for bound state P{%d,%d}(r) not implemented.", n, l);
 }
