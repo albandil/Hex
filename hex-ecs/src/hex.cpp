@@ -118,15 +118,6 @@ int main(int argc, char* argv[])
 		L, maxell, Ei, B
 	);
 	
-	// check MPI
-#ifndef NO_MPI
-	if (parallel and Nproc != maxell + 1)
-	{
-		MPI::Finalize();
-		throw exception("Number of processes (%d) is different than number of angular momenta (%d).\n", Nproc, maxell+1);
-	}
-#endif
-	
 	// is there something to compute?
 	if (Ei.empty() or instates.empty() or outstates.empty())
 	{
@@ -535,7 +526,26 @@ int main(int argc, char* argv[])
 	);
 	std::cout << "ok\n";
 	
-
+	// Distribute LU factorizations among processes ------------------------ //
+	//
+	std::map<int,int> LUs;
+	int worker = 0;
+	std::cout << "Distributing " << triangle_count(L,maxell)
+	          << " diagonal blocks among " << Nproc 
+	          << " processes...";
+	for (int l1 = 0; l1 <= maxell; l1++)
+	for (int l2 = 0; l2 <= maxell; l2++)
+	{
+		// skip those angular momentum pairs that don't compose L
+		if (abs(l1 - l2) > L or l1 + l2 < L)
+				continue;
+		
+		int iblock = l1 * (maxell + 1) + l2;  // get block index
+		LUs[iblock] = worker;	                 // assign this block to worker
+		worker = (worker + 1) % Nproc;        // move to next worker
+	}
+	std::cout << "ok\n";
+		
 	// For all right hand sides -------------------------------------------- //
 	//
 	int iterations_done = 0, computations_done = 0;
@@ -591,18 +601,12 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
-#ifndef NO_MPI
-			// skip computation of unwanted blocks for this process
-			if (parallel and l1 != iproc)
-				continue;
-#endif
-			
-			// skip those angular momentum pairs that don't compose L
-			if (abs(l1 - l2) > L or l1 + l2 < L)
-				continue;
-			
 			// get diagonal block index
 			int iblock = l1 * (maxell + 1) + l2;
+			
+			// skip computation of unwanted blocks for this process
+			if (LUs.find(iblock) == LUs.end())
+				continue;
 			
 			// one-electron parts
 			CsrMatrix Hdiag;
@@ -627,18 +631,12 @@ int main(int argc, char* argv[])
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
 		{
-#ifndef NO_MPI
-			// skip computation of unwanted blocks for this process
-			if (parallel and l1 != iproc)
-				continue;
-#endif
-			
-			// skip those angular momentum pairs that don't compose L
-			if (abs(l1 - l2) > L or l1 + l2 < L)
-				continue;
-			
 			// get diagonal block index
 			int iblock = l1 * (maxell + 1) + l2;
+			
+			// skip computation of unwanted blocks for this process
+			if (LUs.find(iblock) == LUs.end())
+				continue;
 			
 			// timer info
 			std::chrono::steady_clock::time_point start;
@@ -776,18 +774,12 @@ int main(int argc, char* argv[])
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
-#ifndef NO_MPI
-						// skip computation of unwanted blocks for this process
-						if (parallel and l1 != iproc)
-							continue;
-#endif
-						
-						// skip those angular momentum pairs that don't compose L
-						if (abs(l1 - l2) > L or l1 + l2 < L)
-							continue;
-						
 						// get diagonal block index
 						int iblock = l1 * (maxell + 1) + l2;
+						
+						// skip computation of unwanted blocks for this process
+						if (LUs.find(iblock) == LUs.end())
+							continue;
 						
 						// create copy-to view of "z"
 						cArrayView zview(z, iblock * Nspline * Nspline, Nspline * Nspline);
@@ -803,7 +795,6 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-// 						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
 						MPI::COMM_WORLD.Allgather (
 							&z[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
 							Nspline * Nspline * (maxell + 1), 	// this process chunk length
@@ -812,7 +803,6 @@ int main(int argc, char* argv[])
 							Nspline * Nspline * (maxell + 1),	// all data single chunk size
 							MPI::DOUBLE_COMPLEX					// all data type
 						);
-// 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
 #endif
 				};
@@ -826,18 +816,12 @@ int main(int argc, char* argv[])
 					for (int l1 = 0; l1 <= maxell; l1++)
 					for (int l2 = 0; l2 <= maxell; l2++)
 					{
-#ifndef NO_MPI
-						// skip computation of unwanted blocks for this process
-						if (parallel and l1 != iproc)
-							continue;
-#endif
-						
-						// skip those angular momentum pairs that don't compose L
-						if (abs(l1 - l2) > L or l1 + l2 < L)
-							continue;
-						
 						// get diagonal block index
-						int block = l1 * (maxell + 1) + l2;
+						int iblock = l1 * (maxell + 1) + l2;
+						
+						// skip computation of unwanted blocks for this process
+						if (LUs.find(iblock) == LUs.end())
+							continue;
 						
 						// product (copy-to view of "q")
 						cArrayView q_block(q, block * Nspline * Nspline, Nspline * Nspline);
@@ -880,7 +864,6 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-// 						std::cout << "[Proc " << iproc << "] Waiting for PRECOND MPI_Gather...\n";
 						MPI::COMM_WORLD.Allgather (
 							&q[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
 							Nspline * Nspline * (maxell + 1), 	// this process chunk length
@@ -889,7 +872,6 @@ int main(int argc, char* argv[])
 							Nspline * Nspline * (maxell + 1),	// all data single chunk size
 							MPI::DOUBLE_COMPLEX					// all data type
 						);
-// 						std::cout << "[Proc " << iproc << "] PRECOND MPI_Gather done.\n";
 					}
 #endif
 				};
