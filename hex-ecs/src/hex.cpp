@@ -140,8 +140,15 @@ int main(int argc, char* argv[])
 	
 	// Setup B-spline environment ------------------------------------------ //
 	//
-	setup_knot_sequence(order, real_knots, R0, ecstheta, complex_knots, Rmax);
-	std::cout << "B-spline total count: " << Nspline << "\n\n";
+	Bspline::ECS().init(order, real_knots, R0, ecstheta, complex_knots, Rmax);
+	
+	// shortcuts
+	int Nspline = Bspline::ECS().Nspline();
+	int Nknot = Bspline::ECS().Nknot();
+	int Nreknot = Bspline::ECS().Nreknot();
+	
+	// info
+	std::cout << "B-spline total count: " << Bspline().Nspline() << "\n\n";
 	//
 	// --------------------------------------------------------------------- //
 	
@@ -156,7 +163,7 @@ int main(int argc, char* argv[])
 		
 		sol.hdfload(zipfile.c_str());
 		grid = linspace(0., Rmax, zipcount + 1);
-		ev = zip (sol, grid, grid);
+		ev = Bspline().zip(sol, grid, grid);
 		
 		// setup output filename
 		char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];

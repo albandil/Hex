@@ -44,12 +44,12 @@ void M_integrand(int n, Complex *in, Complex *out, void *data)
 	int a = ((int*)data)[2];
 	int iknot = ((int*)data)[3];
 	int iknotmax = ((int*)data)[4];
-	Complex R = t[iknotmax];
+	Complex R = Bspline::ECS().t(iknotmax);
 	
 	// evaluate B-splines
 	Complex values_i[n], values_j[n];
-	B(i, iknot, n, in, values_i);
-	B(j, iknot, n, in, values_j);
+	Bspline::ECS().B(i, iknot, n, in, values_i);
+	Bspline::ECS().B(j, iknot, n, in, values_j);
 	
 	// fill output array
 	int k;
@@ -72,6 +72,9 @@ void M_integrand(int n, Complex *in, Complex *out, void *data)
  */
 cArray computeMi(int a, int iknotmax)
 {
+	int Nspline = Bspline::ECS().Nspline();
+	int order = Bspline::ECS().order();
+	
 	int i, j, iknot;
 	size_t size = Nspline * (2 * order + 1) * (order + 1);
 	cArray m(size);
@@ -94,8 +97,8 @@ cArray computeMi(int a, int iknotmax)
 			for (iknot = ileft; iknot < iright; iknot++)
 			{
 				// get integration boundaries
-				Complex xa = t[iknot];
-				Complex xb = t[iknot+1];
+				Complex xa = Bspline::ECS().t(iknot);
+				Complex xb = Bspline::ECS().t(iknot+1);
 				
 				// throw away zero length intervals
 				if (xa == xb)
@@ -130,8 +133,8 @@ cArray computeMi(int a, int iknotmax)
 Complex computeD_iknot(int i, int j, int iknot)
 {
 	// get interval boundaries
-	Complex x1 = t[iknot];
-	Complex x2 = t[iknot + 1];
+	Complex x1 = Bspline::ECS().t(iknot);
+	Complex x2 = Bspline::ECS().t(iknot + 1);
 	
 	// throw away zero-length intervals
 	if (x1 == x2)
@@ -144,8 +147,8 @@ Complex computeD_iknot(int i, int j, int iknot)
 	
 	// evaluate B-splines at Gauss-Legendre nodes
 	Complex values_i[points], values_j[points];
-	dB(i, iknot, points, xs.data(), values_i);
-	dB(j, iknot, points, xs.data(), values_j);
+	Bspline::ECS().dB(i, iknot, points, xs.data(), values_i);
+	Bspline::ECS().dB(j, iknot, points, xs.data(), values_j);
 	
 	// result
 	Complex res = 0;
@@ -161,7 +164,7 @@ Complex computeD(int i, int j, int maxknot)
 {
 	// get boundary iknots
 	int left = std::max(i, j);
-	int right = std::min(i, j) + order;
+	int right = std::min(i, j) + Bspline::ECS().order();
 	
 	// cut at maxknot
 	if (right > maxknot)
@@ -180,8 +183,8 @@ Complex computeD(int i, int j, int maxknot)
 Complex computeM_iknot(int a, int i, int j, int iknot, Complex R)
 {
 	// get interval boundaries
-	Complex x1 = t[iknot];
-	Complex x2 = t[iknot + 1];
+	Complex x1 = Bspline::ECS().t(iknot);
+	Complex x2 = Bspline::ECS().t(iknot + 1);
 	
 	// throw away zero-length intervals
 	if (x1 == x2)
@@ -194,8 +197,8 @@ Complex computeM_iknot(int a, int i, int j, int iknot, Complex R)
 	
 	// evaluate B-splines at Gauss-Legendre nodes
 	Complex values_i[points], values_j[points];
-	B(i, iknot, points, xs.data(), values_i);
-	B(j, iknot, points, xs.data(), values_j);
+	Bspline::ECS().B(i, iknot, points, xs.data(), values_i);
+	Bspline::ECS().B(j, iknot, points, xs.data(), values_j);
 	
 	// result
 	Complex res = 0;
@@ -219,7 +222,7 @@ Complex computeM(int a, int i, int j, int maxknot)
 {
 	// get boundary iknots
 	int left = std::max(i, j);
-	int right = std::min(i, j) + order;
+	int right = std::min(i, j) + Bspline::ECS().order();
 	
 	// cut at maxknot
 	if (maxknot != 0 and right > maxknot)
@@ -230,7 +233,7 @@ Complex computeM(int a, int i, int j, int maxknot)
 	
 	// undergo integration on sub-intervals
 	for (int iknot = left; iknot <= right; iknot++)
-		res += computeM_iknot(a, i, j, iknot, t[maxknot]);
+		res += computeM_iknot(a, i, j, iknot, Bspline::ECS().t(maxknot));
 	
 	return res;
 }

@@ -30,8 +30,13 @@ cArray computeLambda (
 	int L, int Spin, int ni, int li, int mi, const rArray& Ei,
 	int lf, cArray Pf_overlaps, cArray jf_overlaps
 ) {
-	// parameters
-	unsigned Nenergy = kf.size();
+	// shorthands
+	unsigned Nenergy = kf.size();						// energy count
+	Complex const * const t = &(Bspline::ECS().t(0));	// B-spline knots
+	int order = Bspline::ECS().order();					// B-spline order
+	int Nspline = Bspline::ECS().Nspline();				// B-spline count
+	int Nknot = Bspline::ECS().Nknot();					// number of all knots
+	int Nreknot = Bspline::ECS().Nreknot();				// number of real knots
 	
 	// for all energies, compute the radial factors
 	cArray rads(Nenergy * (maxell + 1));
@@ -90,12 +95,12 @@ cArray computeLambda (
 				Complex val;
 				
 				// evaluate B-spline
-				val = _bspline(ispline, eval_knot-1, order, eval_r);
+				val = Bspline::ECS().bspline(ispline, eval_knot-1, order, eval_r);
 				if (val != 0.)
 					Bspline_R0.add(ispline, 0, val);
 				
 				// evaluate B-spline derivative
-				val = _dspline(ispline, eval_knot-1, order, eval_r);
+				val = Bspline::ECS().dspline(ispline, eval_knot-1, order, eval_r);
 				if (val != 0.)
 					Dspline_R0.add(ispline, 0, val);
 			}
@@ -122,13 +127,6 @@ cArray computeLambda (
 					(lf * (maxell + 1) + l) * Nspline * Nspline, 
 					Nspline * Nspline
 				);
-				
-// 				cArray PsiSc(Nspline * Nspline);
-// 				memcpy (
-// 					& PsiSc[0],
-// 					& solution[Nspline * Nspline * (lf * (maxell + 1) + l)],
-// 					Nspline * Nspline * sizeof(Complex)
-// 				);
 				
 				rads[ie * (maxell + 1) + l] += Sp.transpose().dot(PsiSc).dot(Wj[l].todense()).todense()[0] / double(samples);
 			}

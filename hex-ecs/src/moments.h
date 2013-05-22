@@ -33,7 +33,7 @@ Complex computeD_iknot(int i, int j, int iknot);
  * \param j B-spline index.
  * \param maxknot Right-most knot of any integration.
  */
-Complex computeD(int i, int j, int maxknot = Nknot - 1);
+Complex computeD(int i, int j, int maxknot = Bspline::ECS().Nknot() - 1);
 
 /**
  * Compute integral moment of coordinate power between the B-splines

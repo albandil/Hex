@@ -95,10 +95,10 @@ Complex quad (
 	int points, int iknot, Complex x1, Complex x2
 ){
 	// check boundaries
-	if (x1.real() < t[iknot].real() || t[iknot+1].real() < x1.real() ||
-		x2.real() < t[iknot].real() || t[iknot+1].real() < x2.real())
+	if (x1.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x1.real() or
+		x2.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x2.real())
 	{
-		fprintf(stderr, "[quad] Error: boundaries not for this iknot!\n");
+		std::fprintf(stderr, "[quad] Error: boundaries not for this iknot!\n");
 		exit(1);
 	}
 	
@@ -111,7 +111,7 @@ Complex quad (
 	f(points, xs.data(), values, data);
 	
 	// sum the results
-	Complex result = std::inner_product(
+	Complex result = std::inner_product (
 		values, values + points,
 		ws.begin(),
 		Complex(0.)

@@ -49,12 +49,12 @@ void R_inner_integrand(int n, Complex* in, Complex* out, void* data)
 	int iknot = std::get<3>(params);
 	int iknotmax = std::get<4>(params);
 	Complex x = std::get<5>(params);
-	Complex R = t[iknotmax];
+	Complex R = Bspline::ECS().t(iknotmax);
 	
 	// evaluate B-splines
 	Complex values_i[n], values_j[n];
-	B(i, iknot, n, in, values_i);
-	B(j, iknot, n, in, values_j);
+	Bspline::ECS().B(i, iknot, n, in, values_i);
+	Bspline::ECS().B(j, iknot, n, in, values_j);
 	
 	// fill output array
 	for (int k = 0; k < n; k++)
@@ -72,21 +72,21 @@ void R_outer_integrand(int n, Complex* in, Complex* out, void* data)
 	int L = ((int*)data)[4];
 	int iknot = ((int*)data)[5];
 	int iknotmax = ((int*)data)[6];
-	Complex R = t[iknotmax];	
+	Complex R = Bspline::ECS().t(iknotmax);
 	
 	// evaluate B-splines
 	Complex values_i[n], values_j[n];
-	B(i, iknot, n, in, values_i);
-	B(j, iknot, n, in, values_j);
+	Bspline::ECS().B(i, iknot, n, in, values_i);
+	Bspline::ECS().B(j, iknot, n, in, values_j);
 	
-	int points2 = order + L + 1;
+	int points2 = Bspline::ECS().order() + L + 1;
 	
 	// evaluate inner integral, fill output array
 	for (int u = 0; u < n; u++)
 	{
 		auto data2 = std::make_tuple(k,l,L,iknot,iknotmax,in[u]);
 		out[u] = values_i[u] * values_j[u] / in[u] * damp(0, in[u], R)
- 					* quad(&R_inner_integrand, &data2, points2, iknot, t[iknot], in[u]);
+ 			* quad(&R_inner_integrand, &data2, points2, iknot, Bspline::ECS().t(iknot), in[u]);
 	}
 }
 
@@ -100,7 +100,7 @@ Complex computeRtri(int L, int k, int l, int m, int n, int iknot, int iknotmax)
 	int data[7] = {k, l, m, n, L, iknot, iknotmax};
 	int points = 20; //15; // raise point count - this is not a poly! TODO ???
 	
-	return quad(&R_outer_integrand, data, points, iknot, t[iknot], t[iknot+1]);
+	return quad(&R_outer_integrand, data, points, iknot, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
 }
 
 
@@ -109,6 +109,8 @@ Complex computeRtri(int L, int k, int l, int m, int n, int iknot, int iknotmax)
  */
 Complex computeRdiag(int L, int a, int b, int c, int d, int iknot, int iknotmax)
 {
+	int order = Bspline::ECS().order();
+	
 	// throw away if any B-spline identically zero here
 	if (iknot < a or a + order < iknot or
 		iknot < b or b + order < iknot or
@@ -117,7 +119,7 @@ Complex computeRdiag(int L, int a, int b, int c, int d, int iknot, int iknotmax)
 		return 0;
 	
 	// throw away zero length intervals as well
-	if (t[iknot] == t[iknot + 1])
+	if (Bspline::ECS().t(iknot) == Bspline::ECS().t(iknot + 1))
 		return 0.;
 	
 	return computeRtri(L,b,d,a,c,iknot,iknotmax) + computeRtri(L,a,c,b,d,iknot,iknotmax);
@@ -129,6 +131,9 @@ Complex computeR(int lambda,
 				 const cArray& Mtr_L, const cArray& Mtr_mLm1
 				 
 ){
+	int order = Bspline::ECS().order();
+	int Nreknot = Bspline::ECS().Nreknot();
+	
 	// check overlaps
 	if (abs(a-c) > order or abs(b-d) > order)
 		return 0.;

@@ -73,7 +73,7 @@ Complex dhydro_P(unsigned n, unsigned l, Complex z);
  */
 template <class Functor> cArray overlapP(int n, int l, Functor weightf)
 {
-	cArray res(Nspline);
+	cArray res(Bspline::ECS().Nspline());
 	
 	// per interval
 	int points = 20;
@@ -83,15 +83,15 @@ template <class Functor> cArray overlapP(int n, int l, Functor weightf)
 	cArray evalP(points);
 	
 	// for all knots
-	for (int iknot = 0; iknot < Nknot - 1; iknot++)
+	for (int iknot = 0; iknot < Bspline::ECS().Nknot() - 1; iknot++)
 	{
 		// skip zero length intervals
-		if (t[iknot] == t[iknot+1])
+		if (Bspline::ECS().t(iknot) == Bspline::ECS().t(iknot+1))
 			continue;
 		
 		// which points are to be used here?
-		cArray xs = p_points(points, t[iknot], t[iknot+1]);
-		cArray ws = p_weights(points, t[iknot], t[iknot+1]);
+		cArray xs = p_points(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		cArray ws = p_weights(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
 		
 		// evaluate the hydrogenic function
 		std::transform(
@@ -106,10 +106,10 @@ template <class Functor> cArray overlapP(int n, int l, Functor weightf)
 		);
 		
 		// for all relevant B-splines
-		for (int ispline = std::max((int)iknot-(int)order,0); ispline < Nspline and ispline <= iknot; ispline++)
+		for (int ispline = std::max(iknot-Bspline::ECS().order(),0); ispline < Bspline::ECS().Nspline() and ispline <= iknot; ispline++)
 		{
 			// evaluate the B-spline
-			B(ispline, iknot, points, xs.data(), evalB.data());
+			Bspline::ECS().B(ispline, iknot, points, xs.data(), evalB.data());
 			
 			// sum with weights
 			Complex sum = 0.;
@@ -139,7 +139,7 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 	int Nenergy = vk.size();
 	
 	// reserve space for the output array
-	size_t size = Nspline * Nenergy * (maxL2 + 1);
+	size_t size = Bspline::ECS().Nspline() * Nenergy * (maxL2 + 1);
 	cArray res(size);
 	
 	// per interval
@@ -147,15 +147,15 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 		
 	// for all knots
 	# pragma omp parallel for
-	for (int iknot = 0; iknot < Nknot - 1; iknot++)
+	for (int iknot = 0; iknot < Bspline::ECS().Nknot() - 1; iknot++)
 	{
 		// skip zero length intervals
-		if (t[iknot] == t[iknot+1])
+		if (Bspline::ECS().t(iknot) == Bspline::ECS().t(iknot+1))
 			continue;
 		
 		// which points are to be used here?
-		cArray xs = p_points(points, t[iknot], t[iknot+1]);
-		cArray ws = p_weights(points, t[iknot], t[iknot+1]);
+		cArray xs = p_points(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		cArray ws = p_weights(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
 		
 		// for all linear momenta (= energies)
 		for (int ie = 0; ie < Nenergy; ie++)
@@ -173,11 +173,11 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 				);
 				
 				// for all relevant B-splines
-				for (int ispline = std::max((int)iknot-(int)order,0); ispline < Nspline and ispline <= iknot; ispline++)
+				for (int ispline = std::max(iknot-Bspline::ECS().order(),0); ispline < Bspline::ECS().Nspline() and ispline <= iknot; ispline++)
 				{
 					// evaluate the B-spline
 					cArray evalB(points);
-					B(ispline, iknot, points, xs.data(), evalB.data());
+					Bspline::ECS().B(ispline, iknot, points, xs.data(), evalB.data());
 					
 					// sum with weights
 					LComplex sum = 0.;
@@ -185,7 +185,7 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 						sum += LComplex(ws[ipoint]) * evalj[ipoint] * LComplex(evalB[ipoint]);
 					
 					// store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
-					res[(ie * (maxL2 + 1) + l) * Nspline + ispline] += Complex(sum);
+					res[(ie * (maxL2 + 1) + l) * Bspline::ECS().Nspline() + ispline] += Complex(sum);
 				}
 			}
 		}

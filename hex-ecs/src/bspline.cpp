@@ -18,50 +18,34 @@
 #include "bspline.h"
 
 // ----------------------------------------------------------------------- //
-//  Global data                                                            //
-// ----------------------------------------------------------------------- //
-
-
-Complex* t = 0;	// knot sequence
-Complex rotation;	// ECS rotation factor
-double R0;			// ECS edge
-double Rmax;		// grid end
-int Nknot;		// knot count
-int Nreknot;	// real knot count
-int Nspline;	// B-spline count
-int Nintval;	// interval count (just shorthand for Nknot - 1)
-int order;		// B-spline order
-
-
-// ----------------------------------------------------------------------- //
 //  Recursive single-point B-spline evaluation                             //
 // ----------------------------------------------------------------------- //
 
 
-Complex _bspline(int i, int iknot, int k, Complex r)
+Complex Bspline::bspline(int i, int iknot, int k, Complex r) const
 {
 	if (k == 0)
 		return  (i == iknot) ? 1. : 0.;
 	
-	Complex A = _bspline(i,   iknot, k-1, r);
-	Complex B = _bspline(i+1, iknot, k-1, r);
+	Complex A = bspline(i,   iknot, k-1, r);
+	Complex B = bspline(i+1, iknot, k-1, r);
 	
-	Complex S1 = (t[i+k]   != t[i])   ? (r - t[i]) / (t[i+k] - t[i]) : 0.;
-	Complex S2 = (t[i+k+1] != t[i+1]) ? (t[i+k+1] - r) / (t[i+k+1] - t[i+1]) : 0.;
+	Complex S1 = (t_[i+k]   != t_[i])   ? (r - t_[i]) / (t_[i+k] - t_[i]) : 0.;
+	Complex S2 = (t_[i+k+1] != t_[i+1]) ? (t_[i+k+1] - r) / (t_[i+k+1] - t_[i+1]) : 0.;
 	
 	return A * S1 + B * S2;
 }
 
-Complex _dspline(int i, int iknot, int k, Complex r)
+Complex Bspline::dspline(int i, int iknot, int k, Complex r) const
 {
 	if (k == 0)
 		return 0.;
 	
-	Complex A = _bspline(i,   iknot, k-1, r);
-	Complex B = _bspline(i+1, iknot, k-1, r);
+	Complex A = bspline(i,   iknot, k-1, r);
+	Complex B = bspline(i+1, iknot, k-1, r);
 	
-	Complex S1 = (t[i+k]   != t[i])   ? double(k) / (t[i+k] - t[i]) : 0.;
-	Complex S2 = (t[i+k+1] != t[i+1]) ? double(k) / (t[i+k+1] - t[i+1]) : 0.;
+	Complex S1 = (t_[i+k]   != t_[i])   ? double(k) / (t_[i+k] - t_[i]) : 0.;
+	Complex S2 = (t_[i+k+1] != t_[i+1]) ? double(k) / (t_[i+k+1] - t_[i+1]) : 0.;
 	
 	return A * S1 - B * S2;
 }
@@ -72,16 +56,16 @@ Complex _dspline(int i, int iknot, int k, Complex r)
 // ----------------------------------------------------------------------- //
 
 
-void B(int i, int iknot, int n, const Complex* x, Complex* y)
+void Bspline::B(int i, int iknot, int n, const Complex* x, Complex* y) const
 {
 	for (int j = 0; j < n; j++)
-		y[j] = _bspline(i, iknot, order, x[j]);
+		y[j] = bspline(i, iknot, order_, x[j]);
 }
 
-void dB(int i, int iknot, int n, const Complex* x, Complex* y)
+void Bspline::dB(int i, int iknot, int n, const Complex* x, Complex* y) const
 {
 	for (int j = 0; j < n; j++)
-		y[j] = _dspline(i, iknot, order, x[j]);
+		y[j] = dspline(i, iknot, order_, x[j]);
 }
 
 
@@ -90,17 +74,15 @@ void dB(int i, int iknot, int n, const Complex* x, Complex* y)
 // ----------------------------------------------------------------------- //
 
 
-cArray zip(
-	cArray const & coeff,
-	rArray const & grid
-) {
+cArray Bspline::zip (cArray const & coeff, rArray const & grid) const
+{
 	// evaluated function
 	cArray f(grid.size());
 	
 	// rotate the grid
 	cArray x(grid.size());
 	for (size_t i = 0; i < grid.size(); i++)
-		x[i] = ECS_rotate(grid[i]);
+		x[i] = rotate(grid[i]);
 	
 	// iterators pointing to the left and right boundary of evaluation
 	// points subset belonging to some interknot interval
@@ -114,16 +96,16 @@ cArray zip(
 					};
 	
 	// for all intervals
-	for (int iknot = 0; iknot < Nknot - 1; iknot++)
+	for (int iknot = 0; iknot < Nknot_ - 1; iknot++)
 	{
 		// skip zero-length intervals
-		if (t[iknot] == t[iknot+1])
+		if (t_[iknot] == t_[iknot+1])
 			continue;
 		
 		// get subset of "x", that belongs to the interval
 		// t[iknot] .. t[iknot + 1]
-		left = std::lower_bound(right, x.end(), t[iknot], comp);
-		right = std::upper_bound(left, x.end(), t[iknot + 1], comp);
+		left = std::lower_bound(right, x.end(), t_[iknot], comp);
+		right = std::upper_bound(left, x.end(), t_[iknot + 1], comp);
 		
 		// for all points in range
 		for (auto ix = left; ix != right; ix++)
@@ -132,10 +114,10 @@ cArray zip(
 			Complex yn = 0;
 			
 			// for all splines
-			for (int ispline = std::max((int)iknot-(int)order,0); ispline <= iknot and ispline < Nspline; ispline++)
+			for (int ispline = std::max(iknot-order_,0); ispline <= iknot and ispline < Nspline_; ispline++)
 			{
 				Complex y1;
-				B(ispline, iknot, 1, &*ix, &y1);
+				B (ispline, iknot, 1, &*ix, &y1);
 				yn += coeff[ispline] * y1;
 			}
 			
@@ -147,20 +129,20 @@ cArray zip(
 	return f;
 }
 
-cArray zip(
+cArray Bspline::zip (
 	cArray const & coeff,
 	rArray const & xgrid,
 	rArray const & ygrid
-){
+) const {
 	// evaluated function
 	cArray f(xgrid.size() * ygrid.size());
 	
 	// rotate the grid
 	cArray x(xgrid.size()), y(ygrid.size());
 	for (size_t i = 0; i < xgrid.size(); i++)
-		x[i] = ECS_rotate(xgrid[i]);
+		x[i] = rotate(xgrid[i]);
 	for (size_t i = 0; i < ygrid.size(); i++)
-		y[i] = ECS_rotate(ygrid[i]);
+		y[i] = rotate(ygrid[i]);
 	
 	// iterators pointing to the left and right boundary of evaluation
 	// points subset belonging to some interknot interval
@@ -175,31 +157,31 @@ cArray zip(
 	xright = x.begin();
 	
 	// for all x-intervals
-	for (int ixknot = 0; ixknot < Nknot - 1; ixknot++)
+	for (int ixknot = 0; ixknot < Nknot_ - 1; ixknot++)
 	{
 		// skip zero-length intervals
-		if (t[ixknot] == t[ixknot+1])
+		if (t_[ixknot] == t_[ixknot+1])
 			continue;
 		
 		// get subset of "x", that belongs to the interval
 		// t[iknot] .. t[iknot + 1]
-		xleft = std::lower_bound(xright, x.end(), t[ixknot], comp);
-		xright = std::upper_bound(xleft, x.end(), t[ixknot + 1], comp);
+		xleft = std::lower_bound(xright, x.end(), t_[ixknot], comp);
+		xright = std::upper_bound(xleft, x.end(), t_[ixknot + 1], comp);
 		
 		yleft = y.begin();
 		yright = y.begin();
 		
 		// for all y-intervals
-		for (int iyknot = 0; iyknot < Nknot - 1; iyknot++)
+		for (int iyknot = 0; iyknot < Nknot_ - 1; iyknot++)
 		{
 			// skip zero-length intervals
-			if (t[iyknot] == t[iyknot+1])
+			if (t_[iyknot] == t_[iyknot+1])
 				continue;
 			
 			// get subset of "y", that belongs to the interval
 			// t[iknot] .. t[iknot + 1]
-			yleft = std::lower_bound(yright, y.end(), t[iyknot], comp);
-			yright = std::upper_bound(yleft, y.end(), t[iyknot + 1], comp);
+			yleft = std::lower_bound(yright, y.end(), t_[iyknot], comp);
+			yright = std::upper_bound(yleft, y.end(), t_[iyknot + 1], comp);
 			
 			// for all points in x-range
 			for (auto ix = xleft; ix != xright; ix++)
@@ -211,20 +193,20 @@ cArray zip(
 					Complex zn = 0;
 					
 					// for all x-splines contributing at ixknot
-					for (int ixspline = std::max((int)ixknot-(int)order,0);
-						 ixspline <= ixknot and ixspline < Nspline; ixspline++)
+					for (int ixspline = std::max(ixknot-order_,0);
+						 ixspline <= ixknot and ixspline < Nspline_; ixspline++)
 					{
 						Complex z1;
 						B(ixspline, ixknot, 1, &*ix, &z1);
 						
 						// for all y-splines contributing at iyknot
-						for (int iyspline = std::max((int)iyknot-(int)order,0);
-						     iyspline <= iyknot and iyspline < Nspline; iyspline++)
+						for (int iyspline = std::max(iyknot-order_,0);
+						     iyspline <= iyknot and iyspline < Nspline_; iyspline++)
 						{
 							Complex z2;
 							B(iyspline, iyknot, 1, &*iy, &z2);
 							
-							zn += coeff[ixspline*Nspline+iyspline] * z1 * z2;
+							zn += coeff[ixspline*Nspline_+iyspline] * z1 * z2;
 						}
 					}
 					
@@ -244,30 +226,31 @@ cArray zip(
 // ----------------------------------------------------------------------- //
 
 
-void setup_knot_sequence(int _order_, rArray rknots, double _R0_, double th, rArray cknots, double _Rmax_)
-{
+void Bspline::init (
+	int order, rArray rknots, double R0, double th, rArray cknots, double Rmax
+){
 	// globalize
-	order = _order_;
-	R0 = _R0_;
-	Rmax = _Rmax_;
+	order_ = order;
+	R0_ = R0;
+	Rmax_ = Rmax;
 	
 	// real and complex knot counts; both include the knot R₀
 	int rknots_len = rknots.size();
 	int cknots_len = cknots.size();
 	
 	// the complex rotation factor
-	rotation = Complex(cos(th),sin(th));
+	rotation_ = Complex(cos(th),sin(th));
 	
 	// join the sequences; rotate the complex one
-	t = new Complex [rknots_len + cknots_len - 1];
+	t_ = new Complex [rknots_len + cknots_len - 1];
 	for (int i = 0; i < rknots_len; i++)
-		t[i] = rknots[i];
+		t_[i] = rknots[i];
 	for (int i = 1; i < cknots_len; i++)
-		t[i + rknots_len - 1] = ECS_rotate(cknots[i]);
+		t_[i + rknots_len - 1] = rotate(cknots[i]);
 	
 	// set knot count and other global variables
-	Nreknot = rknots_len;
-	Nknot = rknots_len + cknots_len - 1;
-	Nintval = Nknot - 1;
-	Nspline = Nknot - order - 1;
+	Nreknot_ = rknots_len;
+	Nknot_ = rknots_len + cknots_len - 1;
+	Nintval_ = Nknot_ - 1;
+	Nspline_ = Nknot_ - order - 1;
 }
