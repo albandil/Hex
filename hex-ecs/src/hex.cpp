@@ -161,32 +161,51 @@ int main(int argc, char* argv[])
 		
 		std::cout << "Zipping B-spline expansion of the solution: \"" << zipfile << "\"" << std::endl;
 		
-		sol.hdfload(zipfile.c_str());
+		if (not sol.hdfload(zipfile.c_str()))
+			throw exception("Cannot load file %s.", zipfile.c_str());
+		
 		grid = linspace(0., Rmax, zipcount + 1);
-		ev = Bspline().zip(sol, grid, grid);
 		
-		// setup output filename
-		char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
-		std::sprintf(outf1, "%s.re", zipfile.c_str());
-		std::sprintf(outf2, "%s.im", zipfile.c_str());
-		
-		write_2D_data (
-			zipcount + 1,
-			zipcount + 1,
-			outf1,
-			[&](size_t i, size_t j) -> double {
-				return ev[i * (zipcount + 1) + j].real();
-			}
-		);
-		
-		write_2D_data (
-			zipcount + 1,
-			zipcount + 1,
-			outf2,
-			[&](size_t i, size_t j) -> double {
-				return ev[i * (zipcount + 1) + j].imag();
-			}
-		);
+		for (int ell = 0; ell <= maxell; ell++)
+		{
+			std::cout << "\t- partial wave l = " << ell << "\n";
+			
+			// zip this partial wave
+			ev = Bspline::ECS().zip (
+				cArrayView(
+					sol,
+					ell * Nspline * Nspline,
+					Nspline * Nspline
+				),
+				grid,
+				grid
+			);
+			
+			// setup output filename
+			char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
+			std::sprintf(outf1, "%s-ell%d.re", zipfile.c_str(), ell);
+			std::sprintf(outf2, "%s-ell%d.im", zipfile.c_str(), ell);
+			
+			// write real part
+			write_2D_data (
+				zipcount + 1,
+				zipcount + 1,
+				outf1,
+				[&](size_t i, size_t j) -> double {
+					return ev[i * (zipcount + 1) + j].real();
+				}
+			);
+			
+			// write imaginary part
+			write_2D_data (
+				zipcount + 1,
+				zipcount + 1,
+				outf2,
+				[&](size_t i, size_t j) -> double {
+					return ev[i * (zipcount + 1) + j].imag();
+				}
+			);
+		}
 		
 		exit(0);
 	}

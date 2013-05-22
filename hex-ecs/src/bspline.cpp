@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2012                              *
+ *                         Jakub Benda (c) 2013                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -74,7 +74,7 @@ void Bspline::dB(int i, int iknot, int n, const Complex* x, Complex* y) const
 // ----------------------------------------------------------------------- //
 
 
-cArray Bspline::zip (cArray const & coeff, rArray const & grid) const
+cArray Bspline::zip (cArrayView const & coeff, rArrayView const & grid) const
 {
 	// evaluated function
 	cArray f(grid.size());
@@ -116,6 +116,9 @@ cArray Bspline::zip (cArray const & coeff, rArray const & grid) const
 			// for all splines
 			for (int ispline = std::max(iknot-order_,0); ispline <= iknot and ispline < Nspline_; ispline++)
 			{
+				if (coeff[ispline] == 0.)
+					continue;
+				
 				Complex y1;
 				B (ispline, iknot, 1, &*ix, &y1);
 				yn += coeff[ispline] * y1;
@@ -130,10 +133,11 @@ cArray Bspline::zip (cArray const & coeff, rArray const & grid) const
 }
 
 cArray Bspline::zip (
-	cArray const & coeff,
-	rArray const & xgrid,
-	rArray const & ygrid
+	cArrayView const & coeff,
+	rArrayView const & xgrid,
+	rArrayView const & ygrid
 ) const {
+	
 	// evaluated function
 	cArray f(xgrid.size() * ygrid.size());
 	
@@ -149,7 +153,7 @@ cArray Bspline::zip (
 	cArray::iterator xleft, xright, yleft, yright;
 	
 	// comparator of points' distance from origin along the contour
-	auto comp = [ = ](const Complex& a, const Complex& b) -> bool {
+	auto comp = [](Complex const & a, Complex const & b) -> bool {
 		return a.real() < b.real();
 	};
 	
@@ -203,9 +207,11 @@ cArray Bspline::zip (
 						for (int iyspline = std::max(iyknot-order_,0);
 						     iyspline <= iyknot and iyspline < Nspline_; iyspline++)
 						{
+							if (coeff[ixspline*Nspline_+iyspline] == 0.)
+								continue;
+							
 							Complex z2;
 							B(iyspline, iyknot, 1, &*iy, &z2);
-							
 							zn += coeff[ixspline*Nspline_+iyspline] * z1 * z2;
 						}
 					}
@@ -227,7 +233,9 @@ cArray Bspline::zip (
 
 
 void Bspline::init (
-	int order, rArray rknots, double R0, double th, rArray cknots, double Rmax
+	int order, rArrayView const & rknots,
+	double R0, double th,
+	rArrayView const & cknots, double Rmax
 ){
 	// globalize
 	order_ = order;

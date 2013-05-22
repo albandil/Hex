@@ -45,7 +45,7 @@ public:
 	 * \param cknots To-be-complex knot array (including R₀ and Rmax).
 	 * \param Rmax   Last knot.
 	 */
-	void init (int order, rArray rknots, double R0, double th, rArray cknots, double Rmax);
+	void init (int order, rArrayView const & rknots, double R0, double th, rArrayView const & cknots, double Rmax);
 	
 	/** Function evaluates a B-spline in one point
 	 * \param i       Index of the B-spline.
@@ -100,7 +100,7 @@ public:
 	 * The length of \c coeff must be at least equal to the spline count and it is
 	 * these first \c Nspline coefficients that are used in evaluation.
 	 */
-	cArray zip (cArray const & coeff, rArray const & grid) const;
+	cArray zip (cArrayView const & coeff, rArrayView const & grid) const;
 	
 	/**
 	 * Evaluate 2D function given as a B-spline expansion over a carthesian product
@@ -111,7 +111,7 @@ public:
 	 * The length of \c coeff must be at least equal to the spline count squared and it is
 	 * these first \c Nspline**2 coefficients that are used in evaluation.
 	 */
-	cArray zip (cArray const & coeff, rArray const & xgrid, rArray const & ygrid) const;
+	cArray zip (cArrayView const & coeff, rArrayView const & xgrid, rArrayView const & ygrid) const;
 	
 	// getters
 	
