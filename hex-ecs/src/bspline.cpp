@@ -155,12 +155,12 @@ cArray Bspline::zip (
 	
 	// evaluate B-splines on x-grid
 	cArrays evBx(Nspline_);
+	cArray::iterator xleft = x.begin(), xright = x.begin();
 	for (int ispline = 0; ispline < Nspline_; ispline++)
 	{
 		// get relevant subset of x[]
-		cArray::const_iterator xleft, xright;
-		xleft = std::lower_bound (x.begin(), x.end(), t_[ispline], precede);
-		xright = std::upper_bound (x.begin(), x.end(), t_[ispline + order_ + 1], precede);
+		xleft = xright;
+		xright = std::upper_bound (xright, x.end(), t_[ispline + order_ + 1], precede);
 		
 		// setup evaluation vector
 		evBx[ispline].resize(xright-xleft);
@@ -171,9 +171,10 @@ cArray Bspline::zip (
 		// evaluate at x[]
 		for (cArray::const_iterator ix = xleft; ix != xright; ix++)
 		{
-			// increment knot, if too far
-			while ( not precede(*ix,t_[iknot + 1]) )
-				iknot++;
+			// increment knot
+			while ( ix->real() > t_[iknot+1].real() )
+				if (++iknot >= Nknot_)
+					throw exception("Some evaluation points are outside of grid.");
 			
 			// evaluate this spline at *ix
 			evBx[ispline][ix-xleft] = bspline(ispline, iknot, order_, *ix);
@@ -182,12 +183,12 @@ cArray Bspline::zip (
 	
 	// evaluate B-splines on y-grid
 	cArrays evBy(Nspline_);
+	cArray::iterator yleft = y.begin(), yright = y.begin();
 	for (int ispline = 0; ispline < Nspline_; ispline++)
 	{
 		// get relevant subset of y[]
-		cArray::const_iterator yleft, yright;
-		yleft = std::lower_bound (y.begin(), y.end(), t_[ispline], precede);
-		yright = std::upper_bound (y.begin(), y.end(), t_[ispline + order_ + 1], precede);
+		yleft = yright;
+		yright = std::upper_bound (yright, y.end(), t_[ispline + order_ + 1], precede);
 		
 		// setup evaluation vector
 		evBy[ispline].resize(yright-yleft);
@@ -198,32 +199,33 @@ cArray Bspline::zip (
 		// evaluate at y[]
 		for (cArray::const_iterator iy = yleft; iy != yright; iy++)
 		{
-			// increment knot, if too far
-			while ( not precede(*iy,t_[iknot + 1]) )
-				iknot++;
+			// increment knot
+			while ( iy->real() > t_[iknot+1].real() )
+				if (++iknot >= Nknot_)
+					throw exception("Some evaluation points are outside of grid.");
 			
 			// evaluate this spline at *ix
-			evBx[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);
+			evBy[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);
 		}
 	}
 	
 	// zip double expansion
+	xleft = xright = x.begin();
 	for (int ixspline = 0; ixspline < Nspline_; ixspline++)
 	{
 		// get relevant subset of x[]
-		cArray::const_iterator xleft, xright;
-		xleft = std::lower_bound (x.begin(), x.end(), t_[ixspline], precede);
-		xright = std::upper_bound (x.begin(), x.end(), t_[ixspline + order_ + 1], precede);
+		xleft = xright;
+		xright = std::upper_bound (xright, x.end(), t_[ixspline + order_ + 1], precede);
 		
 		// get relevant evaluations
 		cArray const & Bx_row = evBx[ixspline];
 		
+		yleft = yright = y.begin();
 		for (int iyspline = 0; iyspline < Nspline_; iyspline++)
 		{
 			// get relevant subset of y[]
-			cArray::const_iterator yleft, yright;
-			yleft = std::lower_bound (y.begin(), y.end(), t_[iyspline], precede);
-			yright = std::upper_bound (y.begin(), y.end(), t_[iyspline + order_ + 1], precede);
+			yleft = yright;
+			yright = std::upper_bound (yright, y.end(), t_[iyspline + order_ + 1], precede);
 			
 			// get relevant evaluations
 			cArray const & By_row = evBy[iyspline];
@@ -234,15 +236,11 @@ cArray Bspline::zip (
 			// loop over relevant points
 			for (cArray::const_iterator ix = xleft; ix != xright; ix++)
 			{
-				Complex Bx = Bx_row[ix-xleft];
-				Complex CBx = C * Bx;
+				Complex CBx = C * Bx_row[ix-xleft];
+				Complex *fx = &f[0] + (ix-x.begin()) * y.size();
 				
 				for (cArray::const_iterator iy = yleft; iy != yright; iy++)
-				{
-					Complex By = By_row[iy-yleft];
-					
-					f[(ix-x.begin()) * y.size() + (iy-y.begin())] += CBx * By;
-				}
+					fx[iy-y.begin()] += CBx * By_row[iy-yleft];
 			}
 		}
 	}
