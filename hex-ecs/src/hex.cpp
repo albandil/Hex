@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     
     // disable buffering of the standard output 
     // (so that all text messages are immediatelly visible)
-    setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
 	
 	// variables that can be set by the user from the command line
 	std::ifstream inputfile;			// input file
@@ -79,9 +79,9 @@ int main(int argc, char* argv[])
 	if (parallel)
 	{
 #ifndef NO_MPI
-		MPI::Init();
-		Nproc = MPI::COMM_WORLD.Get_size();
-		iproc = MPI::COMM_WORLD.Get_rank();
+		MPI_Init(&argc, &argv);
+		MPI_Comm_size(MPI_COMM_WORLD, &Nproc);
+		MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
 #else
 		std::cout << "WARNING: --mpi has no effect, as the program was build without the MPI support!\n";
 #endif
@@ -160,8 +160,8 @@ int main(int argc, char* argv[])
 		
 		// setup output filename
 		char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
-		sprintf(outf1, "%s.re", zipfile.c_str());
-		sprintf(outf2, "%s.im", zipfile.c_str());
+		std::sprintf(outf1, "%s.re", zipfile.c_str());
+		std::sprintf(outf2, "%s.im", zipfile.c_str());
 		
 		write_2D_data (
 			zipcount + 1,
@@ -293,46 +293,56 @@ int main(int argc, char* argv[])
 		std::ostringstream oss2;
 		oss2 << "R_tr[" << lambda << "].hdf";
 		
-		bool R_integ_exists; // whether there are valid precomputed data
+		int R_integ_exists; // whether there are valid precomputed data
 		
-		// master will load radial integrals
+		// master will load radial integrals...
+		//   We could let all processess load the data on their own, but if the
+		// task is executed on a cluster with remote storage and only symbolic
+		// links to precomputed radial integral HDFs are created, every process
+		// would download its copy of R_tr[*].hdf files from the remote storge.
+		// That would greatly raise the traffic and also delay the start of
+		// computation. If only the master process loads the data and then
+		// distributes them using local network, everything is smoother and
+		// faster ;-)
 		if (I_am_master)
 		{
-			R_integ_exist = R_tr[lambda].hdfload(oss2.str().c_str());
+			R_integ_exists = R_tr[lambda].hdfload(oss2.str().c_str());
 		}
 		
 		if (parallel)
 		{
 			// master will broadcast existence information to other processes
-			MPI::COMM_WORLD.Bcast(&R_integ_exist, 1, MPI::BOOL, 0);
+			MPI_Bcast(&R_integ_exists, 1, MPI_INT, 0, MPI_COMM_WORLD);
 			
 			// master will broadcast data to other processes
 			if (R_integ_exists)
 			{
-				// master will broadcast dimensions
-				int size = v.size();
-				int m = R_tr[lamda].rows();
-				int n = R_tr[lamda].cols();
-				MPI::COMM_WORLD.Bcast(&size, 1, MPI::INT, 0);
-				MPI::COMM_WORLD.Bcast(&m, 1, MPI::INT, 0);
-				MPI::COMM_WORLD.Bcast(&n, 1, MPI::INT, 0);
+				// get dimensions
+				int size = R_tr[lambda].size();
+				int m = R_tr[lambda].rows();
+				int n = R_tr[lambda].cols();
 				
-				// copy and resize intermediate arrays
-				Array<long> i = R_tr[lambda].i();         i.resize(size);
-				Array<long> j = R_tr[lambda].j();         j.resize(size);
-				Array<Complex> v = R_tr[lambda].v();      v.resize(size);
+				// master will broadcast dimensions
+				MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&m,    1, MPI_INT, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&n,    1, MPI_INT, 0, MPI_COMM_WORLD);
+				
+				// get arrays
+				std::vector<long>    i = R_tr[lambda].i();    i.resize(size);
+				std::vector<long>    j = R_tr[lambda].j();    j.resize(size);
+				std::vector<Complex> v = R_tr[lambda].v();    v.resize(size);
 				
 				// master will broadcast arrays
-				MPI::COMM_WORLD.Bcast(&i[0], size, MPI::LONG_INT, 0)
-				MPI::COMM_WORLD.Bcast(&j[0], size, MPI::LONG_INT, 0)
-				MPI::COMM_WORLD.Bcast(&v[0], size, MPI::DOUBLE_COMPLEX, 0)
+				MPI_Bcast(&i[0], i.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&j[0], j.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&v[0], v.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
 				
 				// reconstruct objects
 				R_tr[lambda] = CooMatrix(m, n, i, j, v);
 			}
 		}
 		
-		if (R_integ_exist)
+		if (R_integ_exists)
 		{
 			std::cout << "\t- integrals for λ = " << lambda << " successfully loaded\n";
 			continue; // no need to compute
@@ -459,15 +469,13 @@ int main(int argc, char* argv[])
 	{
 #ifndef NO_MPI
 		if (parallel)
-			MPI::Finalize();
+			MPI_Finalize();
 #endif
 		exit(0);
 	}
 	
-	std::cout << "Computing B-spline expansions... ";
 	
-	//
-	// expansion weights
+	// Expansion weights --------------------------------------------------- //
 	//
 	auto weight_edge_damp = [ R0 ](Complex z) -> double {
 		// this will suppress function value from R0+1 onwards
@@ -479,29 +487,30 @@ int main(int argc, char* argv[])
 		// which is useful for expanding everywhere-nonzero hydrogenic function
 		return tanh(Rmax - z.real());
 	};
-	
-	// Prepare B-spline overlaps and expansions of Ric-Bess functions ------- //
-	//
-	//  j-overlaps of shape [Nenergy × Nangmom × Nspline]
-	cArray ji_overlaps = overlapj(maxell,ki,weight_edge_damp);
-	ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
-	// 
-	//  compute expansions; solve the system
-	//      S * B_spline_expansion = B_spline_overlap
-	//
-	unsigned ji_expansion_count = ji_overlaps.size()/Nspline;
-	cArray ji_expansion = S.solve(ji_overlaps, ji_expansion_count);
-	ji_expansion.hdfsave("ji_expansion.hdf"); // just for debugging
-	//
-	// construct sparse matrices from the data
-	//
-	std::vector<CooMatrix> ji_coo(ji_overlaps.size()/Nspline);
-	for (unsigned idx_j = 0; idx_j < ji_expansion_count; idx_j++)
-		ji_coo[idx_j] = CooMatrix(Nspline, 1, ji_expansion.begin() + idx_j * Nspline);
 	// --------------------------------------------------------------------- //
 	
 	
+	// Prepare B-spline overlaps and expansions of Ric-Bess functions ------ //
+	//
+	std::cout << "Computing B-spline expansions... ";
+	
+	//  j-overlaps of shape [Nenergy × Nangmom × Nspline]
+	cArray ji_overlaps = overlapj(maxell,ki,weight_edge_damp);
+	ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
+	
+	//  compute expansions; solve the system
+	//      S * B_spline_expansion = B_spline_overlap
+	unsigned ji_expansion_count = ji_overlaps.size()/Nspline;
+	cArray ji_expansion = S.solve(ji_overlaps, ji_expansion_count);
+	ji_expansion.hdfsave("ji_expansion.hdf"); // just for debugging
+	
+	// construct sparse matrices from the data
+	std::vector<CooMatrix> ji_coo(ji_overlaps.size()/Nspline);
+	for (unsigned idx_j = 0; idx_j < ji_expansion_count; idx_j++)
+		ji_coo[idx_j] = CooMatrix(Nspline, 1, ji_expansion.begin() + idx_j * Nspline);
+	
 	std::cout << "ok\n";
+	// --------------------------------------------------------------------- //
 	
 	
 	// Precompute some accelerators ---------------------------------------- //
@@ -525,14 +534,16 @@ int main(int argc, char* argv[])
 		[ & ](const CooMatrix& coo) -> CsrMatrix { return coo.tocsr().sparse_like(S_kron_S); }
 	);
 	std::cout << "ok\n";
+	// --------------------------------------------------------------------- //
+	
 	
 	// Distribute LU factorizations among processes ------------------------ //
 	//
 	std::map<int,int> LUs;
 	int worker = 0;
-	std::cout << "Distributing " << triangle_count(L,maxell)
+	std::cout << "Balancing " << triangle_count(L,maxell)
 	          << " diagonal blocks among " << Nproc 
-	          << " processes...";
+	          << " worker processes...";
 	for (int l1 = 0; l1 <= maxell; l1++)
 	for (int l2 = 0; l2 <= maxell; l2++)
 	{
@@ -541,11 +552,13 @@ int main(int argc, char* argv[])
 				continue;
 		
 		int iblock = l1 * (maxell + 1) + l2;  // get block index
-		LUs[iblock] = worker;	                 // assign this block to worker
+		LUs[iblock] = worker;	              // assign this block to worker
 		worker = (worker + 1) % Nproc;        // move to next worker
 	}
 	std::cout << "ok\n";
-		
+	// --------------------------------------------------------------------- //
+	
+	
 	// For all right hand sides -------------------------------------------- //
 	//
 	int iterations_done = 0, computations_done = 0;
@@ -605,7 +618,7 @@ int main(int argc, char* argv[])
 			int iblock = l1 * (maxell + 1) + l2;
 			
 			// skip computation of unwanted blocks for this process
-			if (LUs.find(iblock) == LUs.end())
+			if (LUs.find(iblock) == LUs.end() or LUs[iblock] != iproc)
 				continue;
 			
 			// one-electron parts
@@ -635,19 +648,26 @@ int main(int argc, char* argv[])
 			int iblock = l1 * (maxell + 1) + l2;
 			
 			// skip computation of unwanted blocks for this process
-			if (LUs.find(iblock) == LUs.end())
+			if (LUs.find(iblock) == LUs.end() or LUs[iblock] != iproc)
 				continue;
 			
 			// timer info
 			std::chrono::steady_clock::time_point start;
 			std::chrono::duration<int> sec;
 			
-			// factorize
-			std::cout << "\tLU factorization " << iblock << " of (" << l1 << "," << l2 << ") block started\n";
+			// log output
+			std::cout << "\t[" << iproc << "] LU factorization " 
+			          << iblock << " of (" << l1 << "," << l2 << ") block started\n";
 			start = std::chrono::steady_clock::now();
+			
+			// factorize
 			lufts[iblock] = blocks[iblock].factorize();
+			
+			// log output
 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-			std::cout << "\tLU factorization " << iblock << " of (" << l1 << "," << l2 << ") block done after " << sec.count() << " s\n";
+			std::cout << "\t[" << iproc << "] LU factorization " 
+			          << iblock << " of (" << l1 << "," << l2 << ") block done after " 
+					  << sec.count() << " s\n";
 		}
 		
 		// For all initial states ------------------------------------------- //
@@ -778,7 +798,7 @@ int main(int argc, char* argv[])
 						int iblock = l1 * (maxell + 1) + l2;
 						
 						// skip computation of unwanted blocks for this process
-						if (LUs.find(iblock) == LUs.end())
+						if (LUs.find(iblock) == LUs.end() or LUs[iblock] != iproc)
 							continue;
 						
 						// create copy-to view of "z"
@@ -795,14 +815,21 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-						MPI::COMM_WORLD.Allgather (
-							&z[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
-							Nspline * Nspline * (maxell + 1), 	// this process chunk length
-							MPI::DOUBLE_COMPLEX, 				// this process chunk data type
-							&z[0],								// all data target
-							Nspline * Nspline * (maxell + 1),	// all data single chunk size
-							MPI::DOUBLE_COMPLEX					// all data type
-						);
+						for (unsigned iblock = 0; iblock < z.size() / (Nspline * Nspline); iblock++)
+						{
+							// skip inactive segments
+							if (LUs.find(iblock) == LUs.end())
+								continue;
+							
+							// relevant process will broadcast this segment's data
+							MPI_Bcast (
+								&z[0] + iblock * Nspline * Nspline,
+								Nspline * Nspline,
+								MPI_DOUBLE_COMPLEX,
+								LUs[iblock],
+								MPI_COMM_WORLD
+							);
+						}
 					}
 #endif
 				};
@@ -820,11 +847,11 @@ int main(int argc, char* argv[])
 						int iblock = l1 * (maxell + 1) + l2;
 						
 						// skip computation of unwanted blocks for this process
-						if (LUs.find(iblock) == LUs.end())
+						if (LUs.find(iblock) == LUs.end() or LUs[iblock] != iproc)
 							continue;
 						
 						// product (copy-to view of "q")
-						cArrayView q_block(q, block * Nspline * Nspline, Nspline * Nspline);
+						cArrayView q_block(q, iblock * Nspline * Nspline, Nspline * Nspline);
 						q_block.clear(); // initialize with zeros
 						
 						// multiply block-row of the matrix with "p"
@@ -842,10 +869,10 @@ int main(int argc, char* argv[])
 							cArrayView p_block(p, blockp * Nspline * Nspline, Nspline * Nspline);
 							
 							// multiply by hamiltonian terms
-							if (block == blockp)
+							if (iblock == blockp)
 							{
 								// reuse the diagonal block
-								q_block += blocks[block].dot(p_block);
+								q_block += blocks[iblock].dot(p_block);
 							}
 							else
 							{
@@ -864,14 +891,21 @@ int main(int argc, char* argv[])
 					if (parallel)
 					{
 						// synchronize across processes
-						MPI::COMM_WORLD.Allgather (
-							&q[0] + iproc * Nspline * Nspline * (maxell + 1), // this process chunk source
-							Nspline * Nspline * (maxell + 1), 	// this process chunk length
-							MPI::DOUBLE_COMPLEX, 				// this process chunk data type
-							&q[0],								// all data target
-							Nspline * Nspline * (maxell + 1),	// all data single chunk size
-							MPI::DOUBLE_COMPLEX					// all data type
-						);
+						for (unsigned iblock = 0; iblock < q.size() / (Nspline * Nspline); iblock++)
+						{
+							// skip inactive segments
+							if (LUs.find(iblock) == LUs.end())
+								continue;
+							
+							// relevant process will broadcast this segment's data
+							MPI_Bcast (
+								&q[0] + iblock * Nspline * Nspline,
+								Nspline * Nspline,
+								MPI_DOUBLE_COMPLEX,
+								LUs[iblock],
+								MPI_COMM_WORLD
+							);
+						}
 					}
 #endif
 				};
@@ -897,18 +931,6 @@ int main(int argc, char* argv[])
 				// save solution to disk
 				current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
 				
-// 				if (ie == 0)
-// 				{
-// 					size_t N = 1001;
-// 					cArray psi = zip(current_solution, linspace(0., Rmax, N), linspace(0., Rmax, N));
-// 					std::ostringstream oss0;
-// 					oss0 << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".arr";
-// 					write_2D_data (
-// 						N, N, oss0.str().c_str(),
-// 						[ = ](size_t i, size_t j) -> double { return psi[i * N + j].real(); }
-// 					);
-// 				}
-				
 			} // end of For mi, Spin
 		} // end of For li
 		
@@ -923,20 +945,13 @@ int main(int argc, char* argv[])
 	
 	// --------------------------------------------------------------------- //
 	
-// 	size_t N = 2001;
-// 	Array psi0 = zip(solution[0], linspace(0., Rmax, N), linspace(0., Rmax, N));
-// 	psi0.hdfsave("psi0.hdf");
-// 	write_2D_data(
-// 		N, N, "psi0.arr",
-// 		[ = ](size_t i, size_t j) -> double { return psi0[i * N + j].real(); }
-// 	);	
 	
 	// exit if requested
 	if (stg12)
 	{
 #ifndef NO_MPI
 		if (parallel)
-			MPI::Finalize();
+			MPI_Finalize();
 #endif
 		exit(0);
 	}
@@ -949,6 +964,7 @@ int main(int argc, char* argv[])
 		std::sprintf(filename, "%d-%d.sql", ni, L);
 	FILE* fsql = std::fopen(filename, "w");
 	std::fprintf(fsql, "BEGIN TRANSACTION;\n");
+	
 	
 	// Extract the cross sections ------------------------------------------ //
 	//
@@ -1078,7 +1094,7 @@ int main(int argc, char* argv[])
 	
 #ifndef NO_MPI
 	if (parallel)
-		MPI::Finalize();
+		MPI_Finalize();
 #endif
 	
 	std::cout << "\nDone.\n\n";
