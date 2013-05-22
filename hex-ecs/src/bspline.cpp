@@ -141,83 +141,107 @@ cArray Bspline::zip (
 	// evaluated function
 	cArray f(xgrid.size() * ygrid.size());
 	
-	// rotate the grid
+	// rotate the grids
 	cArray x(xgrid.size()), y(ygrid.size());
 	for (size_t i = 0; i < xgrid.size(); i++)
 		x[i] = rotate(xgrid[i]);
 	for (size_t i = 0; i < ygrid.size(); i++)
 		y[i] = rotate(ygrid[i]);
 	
-	// iterators pointing to the left and right boundary of evaluation
-	// points subset belonging to some interknot interval
-	cArray::iterator xleft, xright, yleft, yright;
-	
 	// comparator of points' distance from origin along the contour
-	auto comp = [](Complex const & a, Complex const & b) -> bool {
+	auto precede = [](Complex const & a, Complex const & b) -> bool {
 		return a.real() < b.real();
 	};
 	
-	xleft = x.begin();
-	xright = x.begin();
-	
-	// for all x-intervals
-	for (int ixknot = 0; ixknot < Nknot_ - 1; ixknot++)
+	// evaluate B-splines on x-grid
+	cArrays evBx(Nspline_);
+	for (int ispline = 0; ispline < Nspline_; ispline++)
 	{
-		// skip zero-length intervals
-		if (t_[ixknot] == t_[ixknot+1])
-			continue;
+		// get relevant subset of x[]
+		cArray::const_iterator xleft, xright;
+		xleft = std::lower_bound (x.begin(), x.end(), t_[ispline], precede);
+		xright = std::upper_bound (x.begin(), x.end(), t_[ispline + order_ + 1], precede);
 		
-		// get subset of "x", that belongs to the interval
-		// t[iknot] .. t[iknot + 1]
-		xleft = std::lower_bound(xright, x.end(), t_[ixknot], comp);
-		xright = std::upper_bound(xleft, x.end(), t_[ixknot + 1], comp);
+		// setup evaluation vector
+		evBx[ispline].resize(xright-xleft);
 		
-		yleft = y.begin();
-		yright = y.begin();
+		// evaluaion interval
+		int iknot = ispline;
 		
-		// for all y-intervals
-		for (int iyknot = 0; iyknot < Nknot_ - 1; iyknot++)
+		// evaluate at x[]
+		for (cArray::const_iterator ix = xleft; ix != xright; ix++)
 		{
-			// skip zero-length intervals
-			if (t_[iyknot] == t_[iyknot+1])
-				continue;
+			// increment knot, if too far
+			while ( not precede(*ix,t_[iknot + 1]) )
+				iknot++;
 			
-			// get subset of "y", that belongs to the interval
-			// t[iknot] .. t[iknot + 1]
-			yleft = std::lower_bound(yright, y.end(), t_[iyknot], comp);
-			yright = std::upper_bound(yleft, y.end(), t_[iyknot + 1], comp);
+			// evaluate this spline at *ix
+			evBx[ispline][ix-xleft] = bspline(ispline, iknot, order_, *ix);
+		}
+	}
+	
+	// evaluate B-splines on y-grid
+	cArrays evBy(Nspline_);
+	for (int ispline = 0; ispline < Nspline_; ispline++)
+	{
+		// get relevant subset of y[]
+		cArray::const_iterator yleft, yright;
+		yleft = std::lower_bound (y.begin(), y.end(), t_[ispline], precede);
+		yright = std::upper_bound (y.begin(), y.end(), t_[ispline + order_ + 1], precede);
+		
+		// setup evaluation vector
+		evBy[ispline].resize(yright-yleft);
+		
+		// evaluaion interval
+		int iknot = ispline;
+		
+		// evaluate at y[]
+		for (cArray::const_iterator iy = yleft; iy != yright; iy++)
+		{
+			// increment knot, if too far
+			while ( not precede(*iy,t_[iknot + 1]) )
+				iknot++;
 			
-			// for all points in x-range
-			for (auto ix = xleft; ix != xright; ix++)
+			// evaluate this spline at *ix
+			evBx[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);
+		}
+	}
+	
+	// zip double expansion
+	for (int ixspline = 0; ixspline < Nspline_; ixspline++)
+	{
+		// get relevant subset of x[]
+		cArray::const_iterator xleft, xright;
+		xleft = std::lower_bound (x.begin(), x.end(), t_[ixspline], precede);
+		xright = std::upper_bound (x.begin(), x.end(), t_[ixspline + order_ + 1], precede);
+		
+		// get relevant evaluations
+		cArray const & Bx_row = evBx[ixspline];
+		
+		for (int iyspline = 0; iyspline < Nspline_; iyspline++)
+		{
+			// get relevant subset of y[]
+			cArray::const_iterator yleft, yright;
+			yleft = std::lower_bound (y.begin(), y.end(), t_[iyspline], precede);
+			yright = std::upper_bound (y.begin(), y.end(), t_[iyspline + order_ + 1], precede);
+			
+			// get relevant evaluations
+			cArray const & By_row = evBy[iyspline];
+			
+			// get coefficient of the expansion
+			Complex C = coeff[ixspline * Nspline_ + iyspline];
+			
+			// loop over relevant points
+			for (cArray::const_iterator ix = xleft; ix != xright; ix++)
 			{
-				// for all points in y-range
-				for (auto iy = yleft; iy != yright; iy++)
+				Complex Bx = Bx_row[ix-xleft];
+				Complex CBx = C * Bx;
+				
+				for (cArray::const_iterator iy = yleft; iy != yright; iy++)
 				{
-					// evaluated B-splines
-					Complex zn = 0;
+					Complex By = By_row[iy-yleft];
 					
-					// for all x-splines contributing at ixknot
-					for (int ixspline = std::max(ixknot-order_,0);
-						 ixspline <= ixknot and ixspline < Nspline_; ixspline++)
-					{
-						Complex z1;
-						B(ixspline, ixknot, 1, &*ix, &z1);
-						
-						// for all y-splines contributing at iyknot
-						for (int iyspline = std::max(iyknot-order_,0);
-						     iyspline <= iyknot and iyspline < Nspline_; iyspline++)
-						{
-							if (coeff[ixspline*Nspline_+iyspline] == 0.)
-								continue;
-							
-							Complex z2;
-							B(iyspline, iyknot, 1, &*iy, &z2);
-							zn += coeff[ixspline*Nspline_+iyspline] * z1 * z2;
-						}
-					}
-					
-					// add evaluated point
-					f[(ix-x.begin())*ygrid.size()+(iy-y.begin())] = zn;
+					f[(ix-x.begin()) * y.size() + (iy-y.begin())] += CBx * By;
 				}
 			}
 		}

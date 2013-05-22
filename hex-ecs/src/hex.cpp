@@ -166,15 +166,20 @@ int main(int argc, char* argv[])
 		
 		grid = linspace(0., Rmax, zipcount + 1);
 		
-		for (int ell = 0; ell <= maxell; ell++)
+		for (int l1 = 0; l1 <= maxell; l1++)
+		for (int l2 = 0; l2 <= maxell; l2++)
 		{
-			std::cout << "\t- partial wave l = " << ell << "\n";
+			// skip zero segments
+			if (std::abs(l1 - l2) > L or l1 + l2 < L)
+				continue;
+			
+			std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
 			
 			// zip this partial wave
 			ev = Bspline::ECS().zip (
-				cArrayView(
+				cArrayView (
 					sol,
-					ell * Nspline * Nspline,
+					(l1 * (maxell + 1) + l2) * Nspline * Nspline,
 					Nspline * Nspline
 				),
 				grid,
@@ -183,8 +188,8 @@ int main(int argc, char* argv[])
 			
 			// setup output filename
 			char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
-			std::sprintf(outf1, "%s-ell%d.re", zipfile.c_str(), ell);
-			std::sprintf(outf2, "%s-ell%d.im", zipfile.c_str(), ell);
+			std::sprintf(outf1, "%s-(%d,%d).re", zipfile.c_str(), l1, l2);
+			std::sprintf(outf2, "%s-(%d,%d).im", zipfile.c_str(), l1, l2);
 			
 			// write real part
 			write_2D_data (
