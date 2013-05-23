@@ -3,7 +3,7 @@ if ((GPVAL_VERSION == 4.3 || GPVAL_VERSION == 4.2) \
     print "This copy of gnuplot was built without support for placing rectangles\n" ; \
     exit ;
 
-W = 0.5
+W = 0.45
 
 set terminal png size 1024,400
 set output "avail.png"
@@ -24,8 +24,8 @@ do for [ll = 1:9] {
 
 # set frame
 set logscale x
-set xrange [0.01:100]
-set yrange [0:2]
+set xrange [0.001:100]
+set yrange [0:6]
 set grid
 set xlabel "Ei - the impact energy in Rydbergs"
 set ytics 10,10

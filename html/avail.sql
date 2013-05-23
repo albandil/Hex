@@ -1,61 +1,27 @@
 -- .headers on
 .mode tabs
 
--- CREATE TABLE tmat (
--- 	ni INTEGER,
--- 	li INTEGER,
--- 	mi INTEGER,
--- 	Ei DOUBLE PRECISION,
--- 	L INTEGER
--- );
--- 
--- INSERT INTO tmat VALUES (1, 0, 0, 0.1, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.1, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.1, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.1, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.2, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.2, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.2, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.2, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.3, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.3, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.3, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.3, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.4, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.4, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.4, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.5, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.5, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.5, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.6, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.6, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.6, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.6, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.7, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.7, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.7, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.7, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.8, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.8, 1);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.8, 2);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.8, 3);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.9, 0);
--- INSERT INTO tmat VALUES (1, 0, 0, 0.9, 1);
--- INSERT INTO tmat VALUES (2, 0, 0, 0.5, 0);
--- INSERT INTO tmat VALUES (2, 0, 0, 0.5, 1);
-
-CREATE TEMP TABLE MaxLs AS
-	SELECT 
-		ni, li, mi, Ei, MAX(L) AS MaxL
+-- Get all available initial states.
+CREATE TEMP TABLE States AS 
+	SELECT DISTINCT
+		ni, li, mi
 	FROM
 		tmat
-	GROUP BY
-		ni,li,mi,Ei
 	ORDER BY
-		Ei ASC;
+		ni, li, mi;
 
--- SELECT * FROM MaxLs;
+-- For every initial state and every incident energy, get maximal partial wave.
+CREATE TEMP TABLE MaxLs AS
+	SELECT
+		S.ni AS ni, S.li AS li, S.mi AS mi, T.Ei AS Ei, MAX(T.L) AS MaxL
+	FROM
+		States AS S, tmat AS T 
+	WHERE 
+		S.ni = T.ni AND S.li = T.li AND S.mi = T.mi
+	GROUP BY
+		S.ni, S.li, S.mi, T.Ei;
 
+-- Collapse energy intervals of constant MaxL
 CREATE TEMP TABLE StackedLs AS
 	SELECT 
 		LThis.ni, LThis.li, LThis.mi, 
@@ -77,19 +43,14 @@ CREATE TEMP TABLE StackedLs AS
 	ORDER BY 
 		LThis.ni, LThis.li, LThis.mi, ThisE;
 
--- SELECT * FROM StackedLs;
-
-CREATE TEMP TABLE SStackedLs AS
-	SELECT 
-		T1.ni, T1.li, T1.mi, T1.ThisE AS MinE, (CASE WHEN T2.ThisE IS NULL THEN T1.ThisE ELSE T2.ThisE END) AS MaxE, T1.ThisL AS MaxL
-	FROM 
-		StackedLs AS T1
-		LEFT OUTER JOIN StackedLs AS T2
-		ON T1.rowid = T2.rowid - 1
-			AND T1.ni = T2.ni
-			AND T1.li = T2.li
-			AND T1.mi = T2.mi
-		WHERE T1.ThisL = T2.ThisL OR T2.ThisL IS NULL
-;
-
-SELECT * FROM SStackedLs;
+-- Print out the first and lase energies for every constant interval.
+SELECT 
+	T1.ni, T1.li, T1.mi, T1.ThisE AS MinE, (CASE WHEN T2.ThisE IS NULL THEN T1.ThisE ELSE T2.ThisE END) AS MaxE, T1.ThisL AS MaxL
+FROM 
+	StackedLs AS T1
+	LEFT OUTER JOIN StackedLs AS T2
+	ON T1.rowid = T2.rowid - 1
+		AND T1.ni = T2.ni
+		AND T1.li = T2.li
+		AND T1.mi = T2.mi
+	WHERE (T1.ThisL = T2.ThisL OR T2.ThisL IS NULL) AND MinE != MaxE;
