@@ -335,11 +335,16 @@ int main(int argc, char* argv[])
 		// computation. If only the master process loads the data and then
 		// distributes them using local network, everything is smoother and
 		// faster ;-)
+#ifndef NO_MPI
 		if (I_am_master)
 		{
+#endif
 			R_integ_exists = R_tr[lambda].hdfload(oss2.str().c_str());
+#ifndef NO_MPI
 		}
+#endif
 		
+#ifndef NO_MPI
 		if (parallel)
 		{
 			// master will broadcast existence information to other processes
@@ -372,6 +377,7 @@ int main(int argc, char* argv[])
 				R_tr[lambda] = CooMatrix(m, n, i, j, v);
 			}
 		}
+#endif
 		
 		if (R_integ_exists)
 		{
