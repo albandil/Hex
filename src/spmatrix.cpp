@@ -307,54 +307,6 @@ cArray CsrMatrix::dot(const cArrayView& b) const
 	// create output array
 	cArray c(_m_);
 	
-// #ifdef __INTEL_MKL__
-// 	
-// 	//
-// 	// test environment so that we can use 'long' == '_INTEGER_t' == 'MKL_INT'
-// 	//
-// 	
-// 	#ifdef MKL_ILP64
-// 	
-// 	// MKL uses 64bit integers, i.e. "long long". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(long long))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your ILP64 version of MKL uses 'long long', which is "
-// 			   "larger than 'long' on your specific system. Please recompile Hex WITHOUT the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// 	
-// 	#else // MKL_ILP64
-// 
-// 	// MKL uses 32bit integers, i.e. "int". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(int))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your LP64 version of MKL uses 'int', which is "
-// 			   "smaller than 'long' on your specific system. Please recompile Hex WITH the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// 	
-// 	#endif // MKL_ILP64
-// 	
-// 	// MKL optimized code
-// 	long __m = this->rows();
-// 	mkl_cspblas_zcsrgemv(
-// 		"N",	// do not transpose the matrix
-// 		&__m, 	// row count
-// 		const_cast<Complex*>(&_x_[0]),	// matrix elements
-// 		const_cast<long*>(&_p_[0]),		// row pointers
-// 		const_cast<long*>(&_i_[0]),		// column indices
-// 		const_cast<Complex*>(&b[0]),	// vector elements
-// 		&c[0]	// output storage
-// 	);
-// 	
-// #else // __INTEL_MKL__
-	
 	for (unsigned irow = 0; irow < _m_; irow++)
 	{
 		size_t idx1 = _p_[irow];
@@ -370,8 +322,6 @@ cArray CsrMatrix::dot(const cArrayView& b) const
 			c[irow] += _x_[idx] * b[icol];
 		}
 	}
-
-// #endif // __INTEL_MKL__
 	
 	return c;
 }
@@ -527,180 +477,180 @@ cArray CsrMatrix::solve(const cArray&  b, size_t eqs) const
 	return solution;
 }
 
-unsigned CsrMatrix::cg(
-	const cArray&  b, cArray&  x,
-	double eps,
-	unsigned min_iterations, unsigned max_iterations,
-	const PreconditionerInfo& pi
-) const
-{
-	// check dimensions
-	size_t N = b.size();
-	assert(rows() == N);
-	assert(cols() == N);
-	assert(x.size() == N);
-
-	//
-	// 1) Set up desired preconditioner
-	//
-	
-	// if Jacobi preconditioner is to be used, extract inverse diagonal
-	cArray Dm1;	// A's inverse diagonal as 1D-array
-	if (pi.preconditioner == P_JACOBI)
-	{
-		Dm1 = this->diag().transform(
-			[](Complex z) -> Complex {
-				return 1. / z;
-			}
-		);
-	}
-	
-	// if SSOR preconditioner is to be used, scale diagonals by omega
-	CsrMatrix A;		// this matrix with ω-scaled diagonal
-	cArray factor_D;		// the scaled diagonal itself as a 1D-array
-	Complex factor = (2. - pi.omega) / pi.omega;	// some other scaling factor
-	if (pi.preconditioner == P_SSOR)
-	{
-		A = this->nzTransform(
-			[ pi ](size_t i, size_t j, Complex z) -> Complex {
-				return (i == j) ? z / pi.omega : z;
-			}
-		);
-		factor_D = factor * A.diag();
-	}
-
-	// if block inversion preconditioner is to be used:
-	std::vector<CsrMatrix> blocks(pi.Nblock);
-	std::vector<CsrMatrix::LUft> lufts(pi.Nblock);
-	if (pi.preconditioner == P_BLOCK_INV)
-	{
-		// the dimension of a diagonal block
-		unsigned blocksize = N / pi.Nblock;
-		
-		// for all diagonal blocks
-		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-		{
-			// get a copy of iblock-th block
-			blocks[iblock] = submatrix(
-					iblock * blocksize, (iblock + 1) * blocksize,
-					iblock * blocksize, (iblock + 1) * blocksize
-			);
-			
-			// store the block's factorization
- 			lufts[iblock] = blocks[iblock].factorize();
-		}
-	}
-	
-	//
-	// 2) Declare/initialize used variables
-	//
-	
-	// some arrays (search directions etc.)
-	cArray p(N), q(N), z(N);
-	
-	// residual; initialized to starting residual using the initial guess
-	cArray r = b - this->dot(x);
-
-	// some other scalar variables
-	Complex rho_new;		// contains inner product r_i^T · r_i
-	Complex rho_old;		// contains inner product r_{i-1}^T · r_{i-1}
-	Complex alpha, beta;	// contains projection ratios
-	
-	//
-	// 3) Iterate
-	//
-	
-	unsigned k;
-	for/*ever*/ (k = 0; ; k++)
-	{
-		// apply desired preconditioner
-		if (pi.preconditioner == P_NONE)
-		{
-			z = r;
-		}
-		else if (pi.preconditioner == P_JACOBI)
-		{
-			z = Dm1 * r;
-		}
-		else if (pi.preconditioner == P_SSOR)
-		{
-			z = A.upperSolve( factor_D * A.lowerSolve(r) );
-		}
-		else if (pi.preconditioner == P_BLOCK_INV)
-		{
-			// solve the preconditioner equation set Mz = r
-			# pragma omp parallel for
-			for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-			{
-				size_t chunksize = cols() / pi.Nblock;
-				
-				// create a copy of a RHS segment
-				cArray r_block(chunksize);
-				memcpy(
-					&r_block[0],				// dest
-					&r[0] + iblock * chunksize,	// src
-					chunksize * sizeof(Complex)	// n
-				);
-				
-				// multiply by an inverted block
-				cArray z_block = lufts[iblock].solve(r_block, 1);
-				
-				// copy output segment to the whole array
-				memcpy(
-					&z[0] + iblock * chunksize,	// dest
-					&z_block[0],				// src
-					chunksize * sizeof(Complex)	// n
-				);
-			}
-		}
-		
-		// compute projection ρ = r·z
-		rho_new = (r|z);
-		
-		// setup search direction p
-		if (k == 0)
-		{
-			p = z;
-		}
-		else
-		{
-			beta = rho_new / rho_old;
-			p = z + beta * p;
-		}
-		
-		// move to next Krylov subspace by multiplying A·p
-		q = this->dot(p);
-		
-		// compute projection ratio α
-		alpha = rho_new / (p|q);
-		
-		// update the solution and the residual
-		x += alpha * p;
-		r -= alpha * q;
-		
-		// once in a while check convergence but do at least "min_iterations" iterations
-		if (k >= min_iterations and k % 4 == 0 and r.norm() / b.norm() < eps)
-			break;
-		
-		// check iteration limit (stop at "max_iterations" iterations)
-		if (k >= max_iterations)
-		{
-			printf("[CsrMatrix::cg] Iteration limit %d reached.\n", max_iterations);
-			break;
-		}
-		
-		// move to the next iteration: store previous projection
-		rho_old = rho_new;
-	}
-
-	// cleanup
-	
-	if (pi.preconditioner == P_BLOCK_INV)
-		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-			lufts[iblock].free();
-	
-	return k;
-}
+// unsigned CsrMatrix::cg(
+// 	const cArray&  b, cArray&  x,
+// 	double eps,
+// 	unsigned min_iterations, unsigned max_iterations,
+// 	const PreconditionerInfo& pi
+// ) const
+// {
+// 	// check dimensions
+// 	size_t N = b.size();
+// 	assert(rows() == N);
+// 	assert(cols() == N);
+// 	assert(x.size() == N);
+// 
+// 	//
+// 	// 1) Set up desired preconditioner
+// 	//
+// 	
+// 	// if Jacobi preconditioner is to be used, extract inverse diagonal
+// 	cArray Dm1;	// A's inverse diagonal as 1D-array
+// 	if (pi.preconditioner == P_JACOBI)
+// 	{
+// 		Dm1 = this->diag().transform(
+// 			[](Complex z) -> Complex {
+// 				return 1. / z;
+// 			}
+// 		);
+// 	}
+// 	
+// 	// if SSOR preconditioner is to be used, scale diagonals by omega
+// 	CsrMatrix A;		// this matrix with ω-scaled diagonal
+// 	cArray factor_D;		// the scaled diagonal itself as a 1D-array
+// 	Complex factor = (2. - pi.omega) / pi.omega;	// some other scaling factor
+// 	if (pi.preconditioner == P_SSOR)
+// 	{
+// 		A = this->nzTransform(
+// 			[ pi ](size_t i, size_t j, Complex z) -> Complex {
+// 				return (i == j) ? z / pi.omega : z;
+// 			}
+// 		);
+// 		factor_D = factor * A.diag();
+// 	}
+// 
+// 	// if block inversion preconditioner is to be used:
+// 	std::vector<CsrMatrix> blocks(pi.Nblock);
+// 	std::vector<CsrMatrix::LUft> lufts(pi.Nblock);
+// 	if (pi.preconditioner == P_BLOCK_INV)
+// 	{
+// 		// the dimension of a diagonal block
+// 		unsigned blocksize = N / pi.Nblock;
+// 		
+// 		// for all diagonal blocks
+// 		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
+// 		{
+// 			// get a copy of iblock-th block
+// 			blocks[iblock] = submatrix(
+// 					iblock * blocksize, (iblock + 1) * blocksize,
+// 					iblock * blocksize, (iblock + 1) * blocksize
+// 			);
+// 			
+// 			// store the block's factorization
+//  			lufts[iblock] = blocks[iblock].factorize();
+// 		}
+// 	}
+// 	
+// 	//
+// 	// 2) Declare/initialize used variables
+// 	//
+// 	
+// 	// some arrays (search directions etc.)
+// 	cArray p(N), q(N), z(N);
+// 	
+// 	// residual; initialized to starting residual using the initial guess
+// 	cArray r = b - this->dot(x);
+// 
+// 	// some other scalar variables
+// 	Complex rho_new;		// contains inner product r_i^T · r_i
+// 	Complex rho_old;		// contains inner product r_{i-1}^T · r_{i-1}
+// 	Complex alpha, beta;	// contains projection ratios
+// 	
+// 	//
+// 	// 3) Iterate
+// 	//
+// 	
+// 	unsigned k;
+// 	for/*ever*/ (k = 0; ; k++)
+// 	{
+// 		// apply desired preconditioner
+// 		if (pi.preconditioner == P_NONE)
+// 		{
+// 			z = r;
+// 		}
+// 		else if (pi.preconditioner == P_JACOBI)
+// 		{
+// 			z = Dm1 * r;
+// 		}
+// 		else if (pi.preconditioner == P_SSOR)
+// 		{
+// 			z = A.upperSolve( factor_D * A.lowerSolve(r) );
+// 		}
+// 		else if (pi.preconditioner == P_BLOCK_INV)
+// 		{
+// 			// solve the preconditioner equation set Mz = r
+// 			# pragma omp parallel for
+// 			for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
+// 			{
+// 				size_t chunksize = cols() / pi.Nblock;
+// 				
+// 				// create a copy of a RHS segment
+// 				cArray r_block(chunksize);
+// 				memcpy(
+// 					&r_block[0],				// dest
+// 					&r[0] + iblock * chunksize,	// src
+// 					chunksize * sizeof(Complex)	// n
+// 				);
+// 				
+// 				// multiply by an inverted block
+// 				cArray z_block = lufts[iblock].solve(r_block, 1);
+// 				
+// 				// copy output segment to the whole array
+// 				memcpy(
+// 					&z[0] + iblock * chunksize,	// dest
+// 					&z_block[0],				// src
+// 					chunksize * sizeof(Complex)	// n
+// 				);
+// 			}
+// 		}
+// 		
+// 		// compute projection ρ = r·z
+// 		rho_new = (r|z);
+// 		
+// 		// setup search direction p
+// 		if (k == 0)
+// 		{
+// 			p = z;
+// 		}
+// 		else
+// 		{
+// 			beta = rho_new / rho_old;
+// 			p = z + beta * p;
+// 		}
+// 		
+// 		// move to next Krylov subspace by multiplying A·p
+// 		q = this->dot(p);
+// 		
+// 		// compute projection ratio α
+// 		alpha = rho_new / (p|q);
+// 		
+// 		// update the solution and the residual
+// 		x += alpha * p;
+// 		r -= alpha * q;
+// 		
+// 		// once in a while check convergence but do at least "min_iterations" iterations
+// 		if (k >= min_iterations and k % 4 == 0 and r.norm() / b.norm() < eps)
+// 			break;
+// 		
+// 		// check iteration limit (stop at "max_iterations" iterations)
+// 		if (k >= max_iterations)
+// 		{
+// 			printf("[CsrMatrix::cg] Iteration limit %d reached.\n", max_iterations);
+// 			break;
+// 		}
+// 		
+// 		// move to the next iteration: store previous projection
+// 		rho_old = rho_new;
+// 	}
+// 
+// 	// cleanup
+// 	
+// 	if (pi.preconditioner == P_BLOCK_INV)
+// 		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
+// 			lufts[iblock].free();
+// 	
+// 	return k;
+// }
 
 void CsrMatrix::write(const char* filename) const
 {
@@ -1148,7 +1098,7 @@ CsrMatrix CooMatrix::tocsr() const
 	if (nz != 0)
 	{
 	
-		long status = umfpack_zl_triplet_to_col(
+		long status = umfpack_zl_triplet_to_col (
 			_n_,			// cols (rows of transposed matrix)
 			_m_,			// rows (cols of transposed matrix)
 			nz,				// data length
@@ -1236,7 +1186,7 @@ CooMatrix& CooMatrix::operator *= (cArray const &  B)
 	return *this = this->dot(B);
 }
 
-CooMatrix CooMatrix::dot(cArrayView const & B)
+CooMatrix CooMatrix::dot(cArrayView const & B) const
 {
 	// FIXME: This is a memory INEFFICIENT method.
 	// NOTE: Row-major storage assumed for B.
@@ -1271,6 +1221,46 @@ CooMatrix CooMatrix::dot(cArrayView const & B)
 	
 	// summation is done by shaking
 	return C.shake();
+}
+
+Complex CooMatrix::ddot(CooMatrix const & B) const
+{
+	assert(_m_ == B._m_);
+	assert(_n_ == B._n_);
+	
+	// sort by _i_ and _j_
+	if (not sorted() or not B.sorted())
+		throw exception("[CooMatrix] Sort matrices before ddot!");
+		
+	Complex result = 0;
+	
+	auto Ai = _i_.begin();
+	auto Aj = _j_.begin();
+	auto Av = _x_.begin();
+	
+	auto Bi = B._i_.begin();
+	auto Bj = B._j_.begin();
+	auto Bv = _x_.begin();
+	
+	while (Av != _x_.end() and Bv != B._x_.end())
+	{
+		if (*Ai < *Bi or (*Ai == *Bi and *Aj < *Bj))
+		{
+			Ai++; Aj++; Av++;
+		}
+		else if (*Ai > *Bi or (*Ai == *Bi and *Aj > *Bj))
+		{
+			Bi++; Bj++; Bv++;
+		}
+		else // (*Ai == *Bi and *Aj == *Bj)
+		{
+			result += (*Av) * (*Bv);
+			Ai++; Aj++; Av++;
+			Bi++; Bj++; Bv++;
+		}
+	}
+	
+	return result;
 }
 
 CooMatrix CooMatrix::shake() const
@@ -1341,6 +1331,8 @@ bool CooMatrix::hdfsave(const char* name) const
 
 bool CooMatrix::hdfload(const char* name)
 {
+	sorted_ = false;
+	
 #ifndef NO_HDF
 	try
 	{

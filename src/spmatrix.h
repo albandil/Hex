@@ -231,8 +231,7 @@ public:
 	 * Ordinary matrix-vector product, \f$ A\cdot b \f$.
 	 * \param b Vector to multiply with.
 	 */
-	cArray dot(cArrayView const &  b) const;
-	cArray sdot(cArrayView const &  b) const;
+	cArray dot(cArrayView const & b) const;
 	
 	// Getters
 	
@@ -386,42 +385,42 @@ public:
 	 */
 	cArray solve(cArray const & b, size_t eqs = 1) const;
 	
-	/**
-	 * Structure with information defining a preconditioner.
-	 */
-	typedef struct {
-		
-		/// preconditioner identification
-		unsigned preconditioner;
-		
-		/// parameter of SSOR iterations
-		double omega;
-		
-		/// number of equal blocks on diagonal (for block inversion preconditioner)
-		unsigned Nblock;
-		
-	} PreconditionerInfo;
+// 	/**
+// 	 * Structure with information defining a preconditioner.
+// 	 */
+// 	typedef struct {
+// 		
+// 		/// preconditioner identification
+// 		unsigned preconditioner;
+// 		
+// 		/// parameter of SSOR iterations
+// 		double omega;
+// 		
+// 		/// number of equal blocks on diagonal (for block inversion preconditioner)
+// 		unsigned Nblock;
+// 		
+// 	} PreconditionerInfo;
 	
-	/**
-	 * Solve a system of equations with this matrix using conjugate
-	 * gradient method.
-	 * \param b Vector of right hand sides.
-	 * \param x On entry initial guess, on return solution. Use zeros if no
-	 *          idea.
-	 * \param eps Relative stop precision.
-	 * \param min_iterations Minimal number of iterations.
-	 * \param max_iterations Maximal number of iterations.
-	 * \param pi Preconditioner parameters.
-	 * \return Number of iterations.
-	 */
-	unsigned cg(
-		cArray const & b,
-		cArray& x,
-		double eps,
-		unsigned min_iterations,
-		unsigned max_iterations,
-		const PreconditionerInfo& pi
-	) const;
+// 	/**
+// 	 * Solve a system of equations with this matrix using conjugate
+// 	 * gradient method.
+// 	 * \param b Vector of right hand sides.
+// 	 * \param x On entry initial guess, on return solution. Use zeros if no
+// 	 *          idea.
+// 	 * \param eps Relative stop precision.
+// 	 * \param min_iterations Minimal number of iterations.
+// 	 * \param max_iterations Maximal number of iterations.
+// 	 * \param pi Preconditioner parameters.
+// 	 * \return Number of iterations.
+// 	 */
+// 	unsigned cg (
+// 		cArray const & b,
+// 		cArray& x,
+// 		double eps,
+// 		unsigned min_iterations,
+// 		unsigned max_iterations,
+// 		const PreconditionerInfo& pi
+// 	) const;
 	
 	/**
 	 * Save matrix to HDF file.
@@ -592,13 +591,13 @@ public:
 	// Empty constructors
 	
 	CooMatrix()
-		: _m_(0), _n_(0) {}
+		: _m_(0), _n_(0), sorted_(true) {}
 	CooMatrix(size_t m, size_t n)
-		: _m_(m), _n_(n) {}
-	CooMatrix(const CooMatrix& A)
-		: _m_(A._m_), _n_(A._n_), _i_(A._i_), _j_(A._j_), _x_(A._x_) {}
-	CooMatrix(size_t m, size_t n, const std::vector<long>& i, const std::vector<long>& j, const std::vector<Complex>& x)
-		: _m_(m), _n_(n), _i_(i), _j_(j), _x_(x) {}
+		: _m_(m), _n_(n), sorted_(true) {}
+	CooMatrix(CooMatrix const & A)
+		: _m_(A._m_), _n_(A._n_), _i_(A._i_), _j_(A._j_), _x_(A._x_), sorted_(false) {}
+	CooMatrix(size_t m, size_t n, std::vector<long> const & i, std::vector<long> const & j, std::vector<Complex> const & x)
+		: _m_(m), _n_(n), _i_(i), _j_(j), _x_(x), sorted_(false) {}
 	
 	/**
 	 * Copy constructor initialized from dense array.
@@ -607,7 +606,7 @@ public:
 	 * \param a Column-major ordered dense array with matrix elements.
 	 *          Only nonzero elements are copied into internal storage.
 	 */
-	template <class T> CooMatrix(size_t m, size_t n, T a) : _m_(m), _n_(n)
+	template <class T> CooMatrix(size_t m, size_t n, T a) : _m_(m), _n_(n), sorted_(false)
 	{
 		// initialize from column-major formatted input
 		size_t i = 0;
@@ -710,6 +709,8 @@ public:
 			}
 		}
 		
+		sorted_ = false;
+		
 		return *this;
 	}
 	
@@ -741,17 +742,21 @@ public:
 			}
 		}
 		
+		sorted_ = false;
+		
 		return *this;
 	}
 	
 	// Assignment
-	CooMatrix& operator = (const CooMatrix& A)
+	CooMatrix & operator = (CooMatrix const & A)
 	{
 		_m_ = A._m_;
 		_n_ = A._n_;
 		_i_ = A._i_;
 		_j_ = A._j_;
 		_x_ = A._x_;
+		
+		sorted_ = A.sorted_;
 		
 		return *this;
 	}
@@ -765,6 +770,8 @@ public:
 		_i_.push_back(i);
 		_j_.push_back(j);
 		_x_.push_back(v);
+		
+		sorted_ = false;
 	}
 	
 	/// Transposition, implemented as an interchange of "i" and "j" data.
@@ -778,6 +785,8 @@ public:
 		tr._j_ = _i_;
 		tr._x_ = _x_;
 		
+		tr.sorted_ = false;
+		
 		return tr;
 	}
 	
@@ -790,6 +799,8 @@ public:
 		_i_.insert(_i_.end(), A._i_.begin(), A._i_.end());
 		_j_.insert(_j_.end(), A._j_.begin(), A._j_.end());
 		_x_.insert(_x_.end(), A._x_.begin(), A._x_.end());
+		
+		sorted_ = false;
 		
 		return *this;
 	}
@@ -810,6 +821,8 @@ public:
 		for (size_t i = prev_size; i < _x_.size(); i++)
 			_x_[i] = -_x_[i];
 		
+		sorted_ = false;
+		
 		return *this;
 	}
 	
@@ -824,7 +837,14 @@ public:
 	}
 	
 	// multiplication
-	CooMatrix dot (cArrayView const &  B);
+	CooMatrix dot (cArrayView const &  B) const;
+	
+	/**
+	 * Double inner matrix-matrix product, \f$ A : B \f$.
+	 * \note Works only on sorted data.
+	 * \param B Other matrix.
+	 */
+	Complex ddot(CooMatrix const & B) const;
 	
 	/**
 	 * Matrix multiplication
@@ -844,6 +864,7 @@ public:
 	
 	/**
 	 * Change dimension of the matrix.
+	 * \warning No row/column index range checking.
 	 */
 	void resize(size_t m, size_t n)
 	{
@@ -854,7 +875,7 @@ public:
 	/**
 	 * Change matrix shape. Conserves volume, i.e. it holds
 	 * \f[
-	 * m \cdot n = m_0 \cdot n_0
+	 *                m \cdot n = m_0 \cdot n_0
 	 * \f]
 	 * \param m New row count.
 	 * \param n New column coount.
@@ -866,6 +887,7 @@ public:
 	
 	// sort indices (by _i_, then by _j_)
 	void sort();
+	bool sorted() const { return sorted_; }
 	
 	// Convert to CSC matrix.
 	CscMatrix tocsc() const;
@@ -921,6 +943,8 @@ private:
 	// ijv-representation
 	std::vector<long> _i_, _j_;
 	std::vector<Complex> _x_;
+	
+	bool sorted_;
 };
 
 
