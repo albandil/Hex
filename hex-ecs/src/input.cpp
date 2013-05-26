@@ -69,8 +69,8 @@ void parse_command_line (
 				
 				out <<
 					"# B-spline parameters \n"
-					"# order     R0    Rmax       θ\n"
-					"      4     60     100    0.63\n"
+					"# order      θ\n"
+					"      4   0.63\n"
 					"\n"
 					"# real knot sequences\n"
 					"0.0  0.1   3   -1\n"
@@ -277,7 +277,7 @@ double read_dbl(std::ifstream& f)
 
 void parse_input_file (
 	std::ifstream& inputfile,
-	int& order, double& R0, double& ecstheta, double& Rmax,
+	int& order, double& ecstheta, 
 	rArray& rknots, rArray& cknots,
 	int& ni,
 	std::vector<std::tuple<int,int,int>>& instates,
@@ -290,8 +290,6 @@ void parse_input_file (
 	// load B-spline parameters
 	try {
 		order = read_int(inputfile);
-		R0 = read_dbl(inputfile);
-		Rmax = read_dbl(inputfile);
 		ecstheta = read_dbl(inputfile);
 	} catch (std::exception e) {
 		std::cerr << e.what() << std::endl;
@@ -302,8 +300,6 @@ void parse_input_file (
 	
 	std::cout << "\n-----   B-spline environment  -------\n";
 	std::cout << "order = " << order << "\n";
-	std::cout << "R0 = " << R0 << "\n";
-	std::cout << "Rmax = " << Rmax << "\n";
 	std::cout << "ecsθ = " << ecstheta << "\n";
 	
 	// load real knot data

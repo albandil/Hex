@@ -121,6 +121,36 @@ template <typename NumberType> class ArrayView
 		virtual size_t size() const { return N; }
 		
 		//
+		// data pointer
+		//
+		
+		NumberType* data() { return array; }
+		const NumberType* data() const { return array; }
+		
+		//
+		// STL-like iterator interface
+		//
+		
+		typedef NumberType* iterator;
+		typedef const NumberType* const_iterator;
+		iterator begin()
+				{ return array; }
+		const_iterator begin() const
+				{ return array; }
+		iterator end()
+				{ return array + N; }
+		const_iterator end() const
+				{ return array + N; }
+		NumberType & front(int i = 0)
+				{ return *(array + i); }
+		NumberType const & front(int i = 0) const
+				{ return *(array + i); }
+		NumberType & back(int i = 0)
+				{ return *(array + N - 1 - i); }
+		NumberType const & back(int i = 0) const
+				{ return *(array + N - 1 - i); }
+		
+		//
 		// reduced arithmetic operators with other arrays
 		//
 		

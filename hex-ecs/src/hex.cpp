@@ -97,22 +97,22 @@ int main(int argc, char* argv[])
 	}
 	
 	// create main variables
-	int order;							// B-spline order
-	double R0, Rmax, ecstheta;			// B-spline knot sequence
-	rArray real_knots;					// real knot sequence
-	rArray complex_knots;				// complex knot sequence
-	int ni;								// atomic state parameters
-	int L;								// global conserved variables
-	int maxell;							// angular momentum limits
-	rArray Ei;							// energies in Rydbergs
-	double B = 0;						// magnetic field in a.u.
+	int order;				// B-spline order
+	double ecstheta;		// ECS rotation
+	rArray real_knots;		// real knot sequence
+	rArray complex_knots;	// complex knot sequence
+	int ni;					// atomic state parameters
+	int L;					// global conserved variables
+	int maxell;				// angular momentum limits
+	rArray Ei;				// energies in Rydbergs
+	double B = 0;			// magnetic field in a.u.
 	
 	// initial and final atomic states
 	std::vector<std::tuple<int,int,int>> instates, outstates;
 	
 	// get input from input file
 	parse_input_file (
-		inputfile, order, R0, ecstheta, Rmax,
+		inputfile, order, ecstheta,
 		real_knots, complex_knots, ni, 
 		instates, outstates,
 		L, maxell, Ei, B
@@ -140,7 +140,13 @@ int main(int argc, char* argv[])
 	
 	// Setup B-spline environment ------------------------------------------ //
 	//
-	Bspline::ECS().init(order, real_knots, R0, ecstheta, complex_knots, Rmax);
+	double R0 = real_knots.back();			// end of real grid
+	double Rmax = complex_knots.front();	// end of complex grid
+	
+	if (R0 >= Rmax)
+		throw exception("ERROR: Rmax (end of grid) must be greater than R0 (end of real grid)!");
+	
+	Bspline::ECS().init(order, real_knots, ecstheta, complex_knots);
 	
 	// shortcuts
 	int Nspline = Bspline::ECS().Nspline();

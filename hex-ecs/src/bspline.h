@@ -40,12 +40,10 @@ public:
 	 * Setup the knot sequence, which will consist of two parts.
 	 * \param order  B-spline order.
 	 * \param rknots Real knot array (usually including R₀).
-	 * \param R0     ECS turning point.
 	 * \param th     ECS angle in radians.
 	 * \param cknots To-be-complex knot array (including R₀ and Rmax).
-	 * \param Rmax   Last knot.
 	 */
-	void init (int order, rArrayView const & rknots, double R0, double th, rArrayView const & cknots, double Rmax);
+	void init (int order, rArrayView const & rknots, double th, rArrayView const & cknots);
 	
 	/** Function evaluates a B-spline in one point
 	 * \param i       Index of the B-spline.

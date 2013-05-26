@@ -254,15 +254,12 @@ cArray Bspline::zip (
 // ----------------------------------------------------------------------- //
 
 
-void Bspline::init (
-	int order, rArrayView const & rknots,
-	double R0, double th,
-	rArrayView const & cknots, double Rmax
-){
+void Bspline::init (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
+{
 	// globalize
 	order_ = order;
-	R0_ = R0;
-	Rmax_ = Rmax;
+	R0_ = rknots.back();
+	Rmax_ = cknots.back();
 	
 	// real and complex knot counts; both include the knot R₀
 	int rknots_len = rknots.size();

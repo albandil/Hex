@@ -68,9 +68,7 @@ void parse_command_line (
 void parse_input_file (
 	std::ifstream & inputfile,
 	int & order, 
-	double & R0,
 	double & ecstheta,
-	double & Rmax,
 	rArray & rknots,
 	rArray & cknots,
 	int & ni,
