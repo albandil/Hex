@@ -124,8 +124,8 @@ template <typename NumberType> class ArrayView
 		// data pointer
 		//
 		
-		NumberType* data() { return array; }
-		const NumberType* data() const { return array; }
+		virtual NumberType* data() { return array; }
+		virtual const NumberType* data() const { return array; }
 		
 		//
 		// STL-like iterator interface
@@ -133,28 +133,28 @@ template <typename NumberType> class ArrayView
 		
 		typedef NumberType* iterator;
 		typedef const NumberType* const_iterator;
-		iterator begin()
+		virtual iterator begin ()
 				{ return array; }
-		const_iterator begin() const
+		virtual const_iterator begin () const
 				{ return array; }
-		iterator end()
+		virtual iterator end ()
 				{ return array + N; }
-		const_iterator end() const
+		virtual const_iterator end () const
 				{ return array + N; }
-		NumberType & front(int i = 0)
+		virtual NumberType & front (int i = 0)
 				{ return *(array + i); }
-		NumberType const & front(int i = 0) const
+		virtual NumberType const & front (int i = 0) const
 				{ return *(array + i); }
-		NumberType & back(int i = 0)
+		virtual NumberType & back (int i = 0)
 				{ return *(array + N - 1 - i); }
-		NumberType const & back(int i = 0) const
+		virtual NumberType const & back (int i = 0) const
 				{ return *(array + N - 1 - i); }
 		
 		//
 		// reduced arithmetic operators with other arrays
 		//
 		
-		ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.size());
@@ -166,7 +166,7 @@ template <typename NumberType> class ArrayView
 			return *this;
 		}
 		
-		ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.N);
@@ -178,7 +178,7 @@ template <typename NumberType> class ArrayView
 			return *this;
 		}
 		
-		ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.size());
@@ -190,7 +190,7 @@ template <typename NumberType> class ArrayView
 			return *this;
 		}
 		
-		ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.N);
@@ -202,7 +202,7 @@ template <typename NumberType> class ArrayView
 			return *this;
 		}
 		
-		ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.size());
@@ -214,7 +214,7 @@ template <typename NumberType> class ArrayView
 			return *this;
 		}
 		
-		ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
+		virtual ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
 		{
 			// check if sizes match
  			assert(N == b.N);
@@ -227,7 +227,7 @@ template <typename NumberType> class ArrayView
 		}
 		
 		// some other functions
-		void clear()
+		virtual void clear()
 		{
 			for (size_t i = 0; i < N; i++)
 				array[i] = NumberType(0);
