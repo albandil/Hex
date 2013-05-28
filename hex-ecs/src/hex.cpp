@@ -53,17 +53,17 @@ int main(int argc, char* argv[])
 	
 	gsl_set_error_handler_off();
     
-    // disable buffering of the standard output 
-    // (so that all text messages are immediatelly visible)
-    std::setvbuf(stdout, nullptr, _IONBF, 0);
+	// disable buffering of the standard output 
+	// (so that all text messages are immediatelly visible)
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	
 	// variables that can be set by the user from the command line
-	std::ifstream inputfile;			// input file
-	std::string zipfile;				// HDF solution expansion file to zip
-	int  zipcount = 0;					// zip sample count
-	bool parallel = false;				// whether to use OpenMPI
-	bool stg1 = false;					// whether to computate radial integrals only
-	bool stg12 = false;					// whether to computate radial integrals and solutions only
+	std::ifstream inputfile;    // input file
+	std::string zipfile;        // HDF solution expansion file to zip
+	int  zipcount = 0;          // zip sample count
+	bool parallel = false;      // whether to use OpenMPI
+	bool stg1 = false;          // whether to computate radial integrals only
+	bool stg12 = false;         // whether to computate radial integrals and solutions only
 	
 	// get input from command line
 	parse_command_line (
@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
 		MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
 #else
 		std::cout << "WARNING: --mpi has no effect, as the program was build without the MPI support!\n";
+		parallel = false;
 #endif
 	}
 	bool I_am_master = (iproc == 0);
@@ -97,15 +98,15 @@ int main(int argc, char* argv[])
 	}
 	
 	// create main variables
-	int order;				// B-spline order
-	double ecstheta;		// ECS rotation
-	rArray real_knots;		// real knot sequence
-	rArray complex_knots;	// complex knot sequence
-	int ni;					// atomic state parameters
-	int L;					// global conserved variables
-	int maxell;				// angular momentum limits
-	rArray Ei;				// energies in Rydbergs
-	double B = 0;			// magnetic field in a.u.
+	int order;              // B-spline order
+	double ecstheta;        // ECS rotation
+	rArray real_knots;      // real knot sequence
+	rArray complex_knots;   // complex knot sequence
+	int ni;                 // atomic state parameters
+	int L;                  // global conserved variables
+	int maxell;             // angular momentum limits
+	rArray Ei;              // energies in Rydbergs
+	double B = 0;           // magnetic field in a.u.
 	
 	// initial and final atomic states
 	std::vector<std::tuple<int,int,int>> instates, outstates;
@@ -118,6 +119,8 @@ int main(int argc, char* argv[])
 		L, maxell, Ei, B
 	);
 	
+	std::cout << "Input file read.\n";
+
 	// is there something to compute?
 	if (Ei.empty() or instates.empty() or outstates.empty())
 	{
@@ -130,7 +133,7 @@ int main(int argc, char* argv[])
 	
 	// projectile momenta, initial and final
 	std::vector<double> ki(Nenergy), kf(Nenergy);		// in a.u.
-	std::transform(
+	std::transform (
 		Ei.begin(), Ei.end(),
 		ki.begin(),
 		[ = ](double E) -> double { return sqrt(E); }
@@ -140,30 +143,30 @@ int main(int argc, char* argv[])
 	
 	// Setup B-spline environment ------------------------------------------ //
 	//
-	double R0 = real_knots.back();			// end of real grid
-	double Rmax = complex_knots.front();	// end of complex grid
+	double R0 = real_knots.back();          // end of real grid
+	double Rmax = complex_knots.back();     // end of complex grid
 	
 	if (R0 >= Rmax)
-		throw exception("ERROR: Rmax (end of grid) must be greater than R0 (end of real grid)!");
-	
+		throw exception("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
+
 	Bspline::ECS().init(order, real_knots, ecstheta, complex_knots);
 	
 	// shortcuts
 	int Nspline = Bspline::ECS().Nspline();
-	int Nknot = Bspline::ECS().Nknot();
+	int Nknot   = Bspline::ECS().Nknot();
 	int Nreknot = Bspline::ECS().Nreknot();
 	
 	// info
-	std::cout << "B-spline total count: " << Bspline().Nspline() << "\n\n";
+	std::cout << "B-spline total count: " << Nspline << "\n\n";
 	//
 	// --------------------------------------------------------------------- //
 	
 	
 	if (zipfile.size() != 0 and I_am_master)
 	{
-		cArray sol;			// stored solution expansion
-		cArray ev;			// evaluated solution
-		rArray grid;		// real evaluation grid
+		cArray sol;     // stored solution expansion
+		cArray ev;      // evaluated solution
+		rArray grid;    // real evaluation grid
 		
 		std::cout << "Zipping B-spline expansion of the solution: \"" << zipfile << "\"" << std::endl;
 		
@@ -228,7 +231,7 @@ int main(int argc, char* argv[])
 	CooMatrix D (Nspline,Nspline);
 	//
 	if (not D.hdfload("D.hdf"))
-		D.symm_populate_band(
+		D.symm_populate_band (
 			order,	// band halfwidth
 			[ = ](unsigned i, unsigned j) -> Complex {
 				return computeD(i, j, Nknot - 1);
@@ -247,7 +250,7 @@ int main(int argc, char* argv[])
 	CooMatrix Mm2(Nspline, Nspline);
 	//
 	if (not S.hdfload("S.hdf"))
-		S.symm_populate_band(
+		S.symm_populate_band (
 			order,	// band halfwidth
 			[ = ](unsigned m, unsigned n) -> Complex {
 				return computeM(0, m, n);
@@ -255,7 +258,7 @@ int main(int argc, char* argv[])
 		).hdfsave("S.hdf");
 	//
 	if (not Mm1.hdfload("Mm1.hdf"))
-		Mm1.symm_populate_band(
+		Mm1.symm_populate_band (
 			order,	// band halfwidth
 			[ = ](unsigned m, unsigned n) -> Complex {
 				return computeM(-1, m, n);
@@ -263,7 +266,7 @@ int main(int argc, char* argv[])
 		).hdfsave("Mm1.hdf");
 	//
 	if (not Mm1_tr.hdfload("Mm1_tr.hdf"))
-		Mm1_tr.symm_populate_band(
+		Mm1_tr.symm_populate_band (
 			order,	// band halfwidth
 			[ = ](unsigned m, unsigned n) -> Complex {
 				return computeM(-1, m, n, Nreknot - 1);
@@ -271,7 +274,7 @@ int main(int argc, char* argv[])
 		).hdfsave("Mm1_tr.hdf");
 	//
 	if (not Mm2.hdfload("Mm2.hdf"))
-		Mm2.symm_populate_band(
+		Mm2.symm_populate_band (
 			order,	// band halfwidth
 			[ = ](unsigned m, unsigned n) -> Complex {
 				return computeM(-2, m, n);
@@ -316,8 +319,8 @@ int main(int argc, char* argv[])
 			std::cout << "Precomputing multipole integrals (λ = 0 .. " 
 			          << maxlambda 
 			          << ") using " 
-					  << omp_get_num_threads() 
-					  << " threads.\n";
+			          << omp_get_num_threads() 
+			          << " threads.\n";
 		}
 	}
 	
