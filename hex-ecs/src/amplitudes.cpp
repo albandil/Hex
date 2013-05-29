@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2012                              *
+ *                         Jakub Benda (c) 2013                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -26,17 +26,19 @@
 #include "spmatrix.h"
 
 cArray computeLambda (
-	const rArray& kf, const rArray& ki, int maxell,
-	int L, int Spin, int ni, int li, int mi, const rArray& Ei,
-	int lf, cArray Pf_overlaps, cArray jf_overlaps
+	rArray const & kf, rArray const & ki,
+	int maxell, int L, int Spin,
+	int ni, int li, int mi,
+	rArray const & Ei, int lf,
+	cArray const & Pf_overlaps
 ) {
 	// shorthands
-	unsigned Nenergy = kf.size();						// energy count
-	Complex const * const t = &(Bspline::ECS().t(0));	// B-spline knots
-	int order = Bspline::ECS().order();					// B-spline order
-	int Nspline = Bspline::ECS().Nspline();				// B-spline count
-	int Nknot = Bspline::ECS().Nknot();					// number of all knots
-	int Nreknot = Bspline::ECS().Nreknot();				// number of real knots
+	unsigned Nenergy = kf.size();                       // energy count
+	Complex const * const t = &(Bspline::ECS().t(0));   // B-spline knots
+	int order   = Bspline::ECS().order();               // B-spline order
+	int Nspline = Bspline::ECS().Nspline();             // B-spline count
+	int Nknot   = Bspline::ECS().Nknot();               // number of all knots
+	int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
 	
 	// for all energies, compute the radial factors
 	cArray rads(Nenergy * (maxell + 1));

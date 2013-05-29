@@ -34,10 +34,15 @@
  * \param jf_overlaps Riccati-Bessel function B-spline overlap integrals.
  * \return Vector of radial integrals.
  */
-cArray computeLambda(
-	const rArray& kf, const rArray& ki, int maxell,
-	int L, int Spin, int ni, int li, int mi, const rArray& Ei,
-	int lf, cArray Pf_overlaps, cArray jf_overlaps
+cArray computeLambda (
+	rArray const & kf,
+	rArray const & ki,
+	int maxell,
+	int L, int Spin,
+	int ni, int li, int mi,
+	rArray const & Ei,
+	int lf,
+	cArray const & Pf_overlaps
 );
 
 #endif
