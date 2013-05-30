@@ -8,34 +8,64 @@
 #include "../../src/compact.h"
 #include "../../src/chebyshev.h"
 
-int main(int argc, char *argv[])
+template<typename T> void load_and_write(const char* hdf, int samples)
 {
-	if (argc < 3)
-	{
-		std::cerr << "\nUsage: ./chebeval <HDFfile> <samples>\n\n";
-		exit(-1);
-	}
-	
 	// load coefficients
-	rArray coefs;
-	if (not coefs.hdfload(argv[1]))
+	Array<T> coefs;
+	if (not coefs.hdfload(hdf))
 	{
-		std::cerr << "Can't read file \"" << argv[1] << "\"\n";
+		std::cerr << "Can't read file \"" << hdf << "\"\n";
 		exit(-1);
 	}
 	
 	// create the expansion
-	Chebyshev<double,double> expansion(coefs);
-	
-	// get sample count
-	int samples = atoi(argv[2]);
+	Chebyshev<double,T> expansion(coefs);
 	
 	// evaluate the expansion
 	for (int i = 0; i <= samples; i++)
 	{
-		double x = double(2*i-samples) / double(samples);
-		std::cout << x << "\t" << expansion.clenshaw(x,coefs.size()) << "\n";
+		double x = (2.*i-samples) / samples;
+		
+		Complex y = expansion.clenshaw(x,coefs.size());
+		std::cout << x << "\t" << y.real() << "\t" << y.imag() << "\n";
 	}
+}
+
+int main(int argc, char *argv[])
+{
+	bool cpx = false;	// whether to zip complex expansion
+	std::string hdf;
+	int samples = -1;
+	
+	for (int iarg = 1; iarg < argc; iarg++)
+	{
+		if (strcmp(argv[iarg],"--complex") == 0)
+		{
+			cpx = true;
+		}
+		else if (hdf.empty())
+		{
+			hdf = std::string(argv[iarg]);
+		}
+		else
+		{
+			char* tail;
+			samples = strtol(argv[iarg], &tail, 10);
+			if (*tail != 0)
+				samples = -1;
+		}
+	}
+	
+	if (samples < 0)
+	{
+		std::cerr << "\nUsage: ./chebeval [--complex] <HDFfile> <samples>\n\n";
+		exit(-1);
+	}
+	
+	if (cpx)
+		load_and_write<Complex>(hdf.c_str(), samples);
+	else
+		load_and_write<double>(hdf.c_str(), samples);
 	
 	return 0;
 }
