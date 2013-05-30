@@ -385,43 +385,6 @@ public:
 	 */
 	cArray solve(cArray const & b, size_t eqs = 1) const;
 	
-// 	/**
-// 	 * Structure with information defining a preconditioner.
-// 	 */
-// 	typedef struct {
-// 		
-// 		/// preconditioner identification
-// 		unsigned preconditioner;
-// 		
-// 		/// parameter of SSOR iterations
-// 		double omega;
-// 		
-// 		/// number of equal blocks on diagonal (for block inversion preconditioner)
-// 		unsigned Nblock;
-// 		
-// 	} PreconditionerInfo;
-	
-// 	/**
-// 	 * Solve a system of equations with this matrix using conjugate
-// 	 * gradient method.
-// 	 * \param b Vector of right hand sides.
-// 	 * \param x On entry initial guess, on return solution. Use zeros if no
-// 	 *          idea.
-// 	 * \param eps Relative stop precision.
-// 	 * \param min_iterations Minimal number of iterations.
-// 	 * \param max_iterations Maximal number of iterations.
-// 	 * \param pi Preconditioner parameters.
-// 	 * \return Number of iterations.
-// 	 */
-// 	unsigned cg (
-// 		cArray const & b,
-// 		cArray& x,
-// 		double eps,
-// 		unsigned min_iterations,
-// 		unsigned max_iterations,
-// 		const PreconditionerInfo& pi
-// 	) const;
-	
 	/**
 	 * Save matrix to HDF file.
 	 * \param name Filename.

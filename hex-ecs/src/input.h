@@ -29,7 +29,7 @@
  * \param argv Argument list (including the executable name).
  * \param inputfile Alternative name for the input file.
  *                  Default is "hex.inp".
- * \param zipfile A B-spline expansion of a solution to "zip". See \ref zip .
+ * \param zipfile A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
  * \param zipcount How many equidistant samples on each axis to use.
  * \param parallel Whether to use OpenMPI.
  * \param stg1 Run only first stage (computation of the radial integrals).
@@ -50,9 +50,7 @@ void parse_command_line (
  * 
  * \param inputfile Handle to the input file.
  * \param order Order of the B-spline basis (typically 4).
- * \param R0 Complex grid start.
  * \param ecstheta Complex grid rotation.
- * \param Rmax Grid length
  * \param rknots Real knots (including R0).
  * \param cknots Unrotated complex knots (including R0).
  * \param ni Initial atomic energy state.

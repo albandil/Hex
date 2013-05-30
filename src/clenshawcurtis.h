@@ -49,22 +49,22 @@ public:
 	/// Set absolute tolerance.
 	inline void setTol(double epsabs) { EpsAbs = epsabs; }
 	
-	/// Get range parameter.
+	/// Get compacification parameter.
 	inline double getRange() const { return L; }
 	
-	/// Set relative tolerance.
+	/// Set compacification parameter.
 	inline void setRange(double l) { L = l; }
 	
-	/// Get subdivision breadth limit.
+	/// Get 2-log of maximal subdivision interval count.
 	inline int subdiv() const { return NNest; }
 	
-	/// Set subdivision breadth limit.
+	/// Set 2-log of maximal subdivision interval count.
 	inline void setSubdiv(int nlevel) { NNest = nlevel; }
 	
-	/// Get subdivision width limit.
+	/// Get subdivision level limit.
 	inline int stack() const { return NStack; }
 	
-	/// Set subdivision width limit.
+	/// Set subdivision level limit.
 	inline void setStack(int nlevel) { NStack = nlevel; }
 	
 	/// Get limit flag.

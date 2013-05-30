@@ -437,6 +437,12 @@ void parse_input_file (
 			
 			lfs.push_back(read_int(inputfile));
 			
+			if (nfs[i] == 0)
+			{
+				outstates.push_back(std::make_tuple(0,0,0));
+				continue;
+			}
+			
 			if (lfs[i] > nfs[i])
 				throw exception("Input error: Angular momentum greater than \"nf\".\n");
 			if (lfs[i] > maxlf)
@@ -450,6 +456,12 @@ void parse_input_file (
 			throw exception("Input error: Check final atomic state data.\n");
 			
 		} catch (bool b) {
+			
+			if (nfs[i] == 0)
+			{
+				outstates.push_back(std::make_tuple(0,0,0));
+				continue;
+			}
 			
 			// wildcard "*" found, add all allowed angular momenta
 			for (int j = 0; j < nfs[i]; j++)

@@ -281,3 +281,80 @@ void Bspline::init (int order, rArrayView const & rknots, double th, rArrayView 
 	Nintval_ = Nknot_ - 1;
 	Nspline_ = Nknot_ - order - 1;
 }
+
+// ----------------------------------------------------------------------- //
+//  Others                                                                 //
+// ----------------------------------------------------------------------- //
+
+int Bspline::knot(Complex x) const
+{
+	// get "lower" bound by bisection (will return the first equal or greater element)
+	Complex* iknot_notless = std::lower_bound (
+		t_,             // search from here ...
+		t_ + Nknot_,    // ... to here (exclusively)
+		x,              // and compare with respect to this item
+		// comparator using the real parts
+		[](Complex const & a, Complex const & x) -> bool {
+			return a.real() < x.real();
+		}
+	);
+	
+	// check if this is a valid knot
+	if (iknot_notless != t_ /* x > 0 */ and iknot_notless != t_ + Nknot_ /* x < Rmax */)
+		return iknot_notless - t_ - 1;
+	else
+		return -1;
+}
+
+Complex Bspline::eval(cArrayView const & coeff, double x) const
+{
+	Complex z = rotate(x);
+	
+	// get knot index
+	int iknot = knot(z);
+	
+	// get bounding B-splines
+	int leftspline = iknot-order_;
+	int rightspline = iknot;
+	
+	// evaluate B-splines
+	cArray evB(Nspline_);
+	for (int ispline = leftspline; ispline <= rightspline; ispline++)
+		evB[ispline] = bspline(ispline,iknot,order_,z);
+	
+	// sum expansion
+	Complex result = 0.;
+	for (int ispline = leftspline; ispline <= rightspline; ispline++)
+		result += coeff[ispline] * evB[ispline];
+	return result;
+}
+
+Complex Bspline::eval(cArrayView const & coeff, double x, double y) const
+{
+	Complex w = rotate(x);
+	Complex z = rotate(y);
+	
+	// get knot indices
+	int xknot = knot(w);
+	int yknot = knot(z);
+	
+	// get bounding B-splines
+	int leftxspline = xknot-order_;
+	int rightxspline = xknot;
+	int leftyspline = yknot-order_;
+	int rightyspline = yknot;
+	
+	// evaluate B-splines
+	cArray evBx(Nspline_), evBy(Nspline_);
+	for (int ixspline = leftxspline; ixspline <= rightxspline; ixspline++)
+		evBx[ixspline] = bspline(ixspline,xknot,order_,w);
+	for (int iyspline = leftyspline; iyspline <= rightyspline; iyspline++)
+		evBx[iyspline] = bspline(iyspline,yknot,order_,z);
+	
+	// sum the expansion
+	Complex result = 0.;
+	for (int ixspline = leftxspline; ixspline <= rightxspline; ixspline++)
+	for (int iyspline = leftyspline; iyspline <= rightyspline; iyspline++)
+		result += coeff[ixspline * Nspline_ + iyspline] * evBx[ixspline] * evBy[iyspline];
+	return result;
+}

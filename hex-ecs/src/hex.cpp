@@ -119,8 +119,6 @@ int main(int argc, char* argv[])
 		L, maxell, Ei, B
 	);
 	
-	std::cout << "Input file read.\n";
-
 	// is there something to compute?
 	if (Ei.empty() or instates.empty() or outstates.empty())
 	{
@@ -1002,14 +1000,21 @@ int main(int argc, char* argv[])
 		exit(0);
 	}
 	
-	// Create SQL batch file
-	char filename[100];
+	// compose output filename
+	std::ostringstream ossfile;
 	if (parallel)
-		std::sprintf(filename, "%d-%d-(%d).sql", ni, L, iproc);
+		ossfile << ni << "-" << L << "-(" << iproc << ").sql";
 	else
-		std::sprintf(filename, "%d-%d.sql", ni, L);
-	FILE* fsql = std::fopen(filename, "w");
-	std::fprintf(fsql, "BEGIN TRANSACTION;\n");
+		ossfile << ni << "-" << L << ".sql";
+	
+	// Create SQL batch file
+	std::ofstream fsql(ossfile.str().c_str());
+	
+	// set exponential format for floating point output
+	fsql.setf(std::ios_base::scientific);
+	
+	// write header
+	fsql << "BEGIN TRANSACTION;\n";
 	
 	
 	// Extract the cross sections ------------------------------------------ //
@@ -1054,78 +1059,119 @@ int main(int argc, char* argv[])
 		if (not allowed)
 			continue;
 		
-		cArray Pf_overlaps = overlapP(nf,lf,weight_end_damp);
-		
-		// compute radial integrals
-		cArrays Lambda(2 * lf + 1);
-		for (int mf = -lf; mf <= lf; mf++)
+		if (nf > 0)
 		{
-			// compute expansions of final wave function for this final state (nf,lf)
-			std::transform (
-				Ei.begin(), Ei.end(),
-				kf.begin(),
-				[ = ](double E) -> double { return sqrt(E - 1./(ni*ni) + 1./(nf*nf) + (mf-mi)*B); }
-			);
-			cArray jf_overlaps = overlapj(maxell,kf,weight_edge_damp);
+			//
+			// Discrete transition
+			//
 			
-			// compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-			Lambda[mf+lf] = computeLambda(kf, ki, maxell, L, Spin, ni, li, mi, Ei, lf, Pf_overlaps, jf_overlaps);
+			// precompute hydrogen function overlaps
+			cArray Pf_overlaps = overlapP(nf,lf,weight_end_damp);
+			
+			// compute radial integrals
+			cArrays Lambda(2 * lf + 1);
+			for (int mf = -lf; mf <= lf; mf++)
+			{
+				// compute expansions of final wave function for this final state (nf,lf)
+				std::transform (
+					Ei.begin(), Ei.end(),
+					kf.begin(),
+					[ = ](double E) -> double { return sqrt(E - 1./(ni*ni) + 1./(nf*nf) + (mf-mi)*B); }
+				);
+				
+				// compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
+				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, ni, li, mi, Ei, lf, Pf_overlaps));
+			}
+			
+			// save the data
+			for (int mf = -lf; mf <= lf; mf++)
+			{
+				// compute Tℓ
+				cArray T_ell(Lambda[mf+lf].size());
+				for (unsigned i = 0; i < T_ell.size(); i++)
+				{
+					int ie  = i / (maxell + 1);
+					int ell = i % (maxell + 1);
+					
+					T_ell[i] = Lambda[mf+lf][i] * 4. * M_PI / kf[ie] * pow(Complex(0.,1.), -ell)
+									* ClebschGordan(lf, mf, ell, mi - mf, L, mi) / sqrt(2.);
+				}
+				
+				//
+				// print out SQL
+				//
+				
+				for (unsigned i = 0; i < T_ell.size(); i++)
+				{
+					int ie  = i / (maxell + 1);
+					int ell = i % (maxell + 1);
+					
+					if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
+					if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
+					{
+						fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+						     << ni << "," << li << "," << mi << ","
+						     << nf << "," << lf << "," << mf << ","
+							 << L  << "," << Spin << ","
+							 << Ei[ie] << "," << ell << "," 
+							 << T_ell[i].real() << "," << T_ell[i].imag()
+							 << ");\n";
+					}
+				}
+				
+				//
+				// print out the total cross section for quick overview
+				//
+				
+				std::ostringstream sigmaname;
+				sigmaname << "sigma-" 
+				          << ni << "-" << li << "-" << mi << "-"
+						  << nf << "-" << lf << "-" << mf << "-"
+						  << L << "-" << Spin << ".dat";
+
+				std::ofstream ftxt(sigmaname.str().c_str());
+				
+				ftxt << "# Ei [Ry] sigma [a0^2]\n";
+				for (unsigned ie = 0; ie < Nenergy; ie++)
+				{
+					double sigma = 0.;
+					for (int ell = 0; ell <= maxell; ell++)
+					{
+						double Re_f_ell = -T_ell[ie * (maxell + 1) + ell].real() / (2 * M_PI);
+						double Im_f_ell = -T_ell[ie * (maxell + 1) + ell].imag() / (2 * M_PI);
+						sigma += 0.25 * (2*Spin + 1) * kf[ie] / ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
+					}
+					if (finite(sigma))
+					{
+						ftxt << Ei[ie] << "\t" << sigma << "\n";
+					}
+				}
+				ftxt.close();
+			}
 		}
-		
-		// save the data
-		for (int mf = -lf; mf <= lf; mf++)
+		else
 		{
-			// compute Tℓ
-			cArray T_ell(Lambda[mf+lf].size());
-			for (unsigned i = 0; i < T_ell.size(); i++)
+			//
+			// Ionization
+			//
+			
+			cArrays data = std::move(computeXi(maxell, L, Spin, ni, li, mi, Ei));
+			cArrays::const_iterator iter = data.begin();
+			
+			for (size_t ie = 0; ie < Ei.size(); ie++)
+			for (int l1 = 0; l1 <= maxell; l1++)
+			for (int l2 = std::abs(l1-L); l2 <= l1; l2++)
 			{
-				int ie  = i / (maxell + 1);
-				int ell = i % (maxell + 1);
+				// save data as BLOBs
+				fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+					 << ni << "," << li << "," << mi << ","
+					 << L  << "," << Spin << ","
+					 << Ei[ie] << "," << l1 << "," << l2 << ","
+					 << iter->toBlob() << ");\n";
 				
-				T_ell[i] = Lambda[mf+lf][i] * 4. * M_PI / kf[ie] * pow(Complex(0.,1.), -ell)
-								* ClebschGordan(lf, mf, ell, mi - mf, L, mi) / sqrt(2.);
+				// move to next data
+				iter++;
 			}
-			
-			//
-			// print out SQL
-			//
-			
-			for (unsigned i = 0; i < T_ell.size(); i++)
-			{
-				int ie  = i / (maxell + 1);
-				int ell = i % (maxell + 1);
-				
-				if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
-				if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
-				{
-					std::fprintf(fsql, "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e,%e);\n",
-						ni, li, mi, nf, lf, mf, L, Spin, Ei[ie], ell, T_ell[i].real(), T_ell[i].imag()
-					);
-				}
-			}
-			
-			//
-			// print out the total cross section for quick overview
-			//
-			
-			std::sprintf(filename, "sigma-%d-%d-%d-%d-%d-%d-%d-%d.dat", ni, li, mi, nf, lf, mf, L, Spin);
-			FILE* ftxt = std::fopen(filename, "w");
-			std::fprintf(ftxt, "# Ei [Ry] sigma [a0^2]\n");
-			for (unsigned ie = 0; ie < Nenergy; ie++)
-			{
-				double sigma = 0.;
-				for (int ell = 0; ell <= maxell; ell++)
-				{
-					double Re_f_ell = -T_ell[ie * (maxell + 1) + ell].real() / (2 * M_PI);
-					double Im_f_ell = -T_ell[ie * (maxell + 1) + ell].imag() / (2 * M_PI);
-					sigma += 0.25 * (2*Spin + 1) * kf[ie] / ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
-				}
-				if (finite(sigma))
-				{
-					std::fprintf(ftxt, "%g\t%g\n", Ei[ie], sigma);
-				}
-			}
-			std::fclose(ftxt);
 		}
 		
 		finished++;
@@ -1135,8 +1181,8 @@ int main(int argc, char* argv[])
 	std::cout << "\rExtracting T-matrices... ok       \n";
 	// --------------------------------------------------------------------- //
 	
-	std::fprintf(fsql, "COMMIT;\n");
-	std::fclose(fsql);
+	fsql << "COMMIT;\n";
+	fsql.close();
 	
 #ifndef NO_MPI
 	if (parallel)

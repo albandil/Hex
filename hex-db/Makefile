@@ -8,7 +8,7 @@ LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
 CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2
 
-CXXFLAGS = $(CXXDEBUG)
+CXXFLAGS = $(CXXRILIS)
 
 SQLITEPP = lib/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction
@@ -24,7 +24,7 @@ exe: bin/hex-db
 
 lib: bin/hex-db.so
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 

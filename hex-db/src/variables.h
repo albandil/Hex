@@ -228,6 +228,9 @@ AddNewVariableClass(MomentumTransfer);
 /// Create class for total cross section (tcs)
 AddNewVariableClass(TotalCrossSection);
 
+/// Create class for ionization amplitude radial part (ionf)
+AddNewVariableClass(IonizationF);
+
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;
 

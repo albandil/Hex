@@ -38,10 +38,11 @@
  * 
  * \return Value of Rtr.
  */
-Complex computeR(
+Complex computeR (
 	int lambda,
 	int i, int j, int k, int l,
-	cArray const & Mtr_L, cArray const & Mtr_mLm1
+	cArray const & Mtr_L,
+	cArray const & Mtr_mLm1
 );
 
 #endif

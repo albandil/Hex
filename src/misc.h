@@ -50,6 +50,11 @@ static inline std::string &trim(std::string &s)
 
 /**
  * Custom exception class with easy printf-like constructor.
+ * 
+ * Use something like:
+ * \code
+ * throw exception("[Error %d] Pointed has the value 0x%x!", id, ptr);
+ * \endcode
  */
 class exception : public std::exception
 {
@@ -58,11 +63,12 @@ public:
 	/// Constructor.
 	template <class ...Params> exception (Params ...p)
 	{
-		snprintf(message, 256, p...);
+		std::snprintf(message, 256, p...);
 	}
 	
 	/// Return pointer to the exception text.
-	const char* what() const noexcept (true) {
+	const char* what() const noexcept (true)
+	{
 		return message;
 	}
 	

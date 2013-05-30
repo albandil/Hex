@@ -23,7 +23,8 @@
 
 /**
  * Potential suppressing factor. 
- * \param r Radius.
+ * \param y Radial coordinate of some electron.
+ * \param x Radial coordinate of the other electron.
  * \param R Truncation radius.
  */
 inline double damp(Complex y, Complex x, Complex R)

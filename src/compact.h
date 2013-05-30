@@ -18,7 +18,6 @@
 #include <iostream>
 
 #include "misc.h"
-#include "specf.h"
 
 /**
  * Limit
@@ -68,7 +67,7 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 /**
  * An auxiliary interface class.
  */
-template <typename FType> class ICompactification : public RadialFunction<FType>
+template <typename FType> class ICompactification
 {
 public:
     virtual ~ICompactification() {}
@@ -295,7 +294,7 @@ private:
  * It is meant for the use in integration, so that one can just call its
  * operator() interface.
  */
-template <class Functor, typename FType> class CompactIntegrand : public RadialFunction<FType>
+template <class Functor, typename FType> class CompactIntegrand
 {
 public:
 

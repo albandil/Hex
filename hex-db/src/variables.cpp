@@ -23,7 +23,8 @@ VariableList::VariableList() :
 		new ExtrapolatedCrossSection,
 		new CollisionStrength,
 		new MomentumTransfer,
-		new TotalCrossSection
+		new TotalCrossSection,
+	    new IonizationF
 	})
 {}
 

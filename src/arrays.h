@@ -18,6 +18,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <numeric>
 #include <typeinfo>
@@ -420,13 +421,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		NumberType const & back(int i = 0) const
 				{ return *(array + N - 1 - i); }
 		
-		void push_back(NumberType a)
+		void push_back(NumberType const & a)
 		{
 			// not very efficient... FIXME
 			
 			NumberType* new_array = new NumberType [N + 1]();
 			for (size_t i = 0; i < N; i++)
-				new_array[i] = array[i];
+				new_array[i] = std::move(array[i]);
 			new_array[N] = a;
 			N++;
 			delete [] array;
@@ -606,7 +607,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		// complex conjugate
+		/**
+		 * Complex conjugate.
+		 */
 		Array<NumberType> conj() const
 		{
 			Array<NumberType> c = *this;
@@ -618,7 +621,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return c;
 		}
 		
-		// compute usual 2-norm
+		/**
+		 * Computes usual 2-norm.
+		 */
 		double norm() const
 		{
 			double ret = 0.;
@@ -630,7 +635,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return sqrt(ret);
 		}
 		
-		// apply user transformation
+		/** 
+		 * Applies a user transformation.
+		 */
 		template <class Functor> auto transform(Functor f) -> Array<decltype(f(NumberType(0)))>
 		{
 			Array<decltype(f(NumberType(0)))> c(N);
@@ -639,8 +646,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return c;
 		}
 		
-		// rrturn subarray
-		Array<NumberType> slice(size_t left, size_t right)
+		/**
+		 * Returns a subarray.
+		 * \note Obsolete. Use ArrayView instead.
+		 */
+		Array<NumberType> slice(size_t left, size_t right) const
 		{
 			Array<NumberType> c(right - left);
 			NumberType * ptr_c = &c[0];
@@ -649,6 +659,29 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				*ptr_c++ = array[i];
 			
 			return c;
+		}
+		
+		/**
+		 * Converts contents to SQL-readable BLOB (hexadecimal text format)
+		 */
+		virtual std::string toBlob() const
+		{
+			// get byte pointer
+			char const * dataptr = reinterpret_cast<char const*>(array);
+			
+			// get byte count
+			size_t count = N * sizeof(NumberType);
+			
+			// resulting string
+			std::ostringstream hexa;
+			hexa << "x'" << std::hex << std::setfill('0');
+			
+			// for all bytes
+			for (size_t i = 0; i < count; i++)
+				hexa << std::setw(2) << static_cast<unsigned>(dataptr[i]);
+			
+			hexa << "'";
+			return hexa.str();
 		}
 		
 #ifndef NO_HDF
@@ -725,25 +758,25 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				H5::H5File h5file(name, H5F_ACC_TRUNC);
 				
 				// save data as an interleaved array
-				if (compress)
+				if (zero_blocks.size() > 0)
 				{
 					hsize_t length1 = carray.size() * sizeof(NumberType) / sizeof(double);
 					
 					H5::DataSpace dspc1(/*rank*/1, &length1);
 					H5::IntType dtype1(H5::PredType::NATIVE_DOUBLE);
 					H5::DataSet dset1 = h5file.createDataSet("array", dtype1, dspc1);
-					dset1.write(&carray[0], H5::PredType::NATIVE_DOUBLE);
+					dset1.write(carray.data(), H5::PredType::NATIVE_DOUBLE);
 					
 					hsize_t length2 = zero_blocks.size();
 					
 					// make zero_blocks index doubles, not elements
 					for (int& z : zero_blocks)
 						z *= sizeof(NumberType)/sizeof(double);
-					
+						
 					H5::DataSpace dspc2(/*rank*/1, &length2);
 					H5::IntType dtype2(H5::PredType::NATIVE_INT);
 					H5::DataSet dset2 = h5file.createDataSet("zero_blocks", dtype2, dspc2);
-					dset2.write(&zero_blocks[0], H5::PredType::NATIVE_INT);
+					dset2.write(zero_blocks.data(), H5::PredType::NATIVE_INT);
 				}
 				else
 				{

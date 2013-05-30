@@ -111,6 +111,32 @@ public:
 	 */
 	cArray zip (cArrayView const & coeff, rArrayView const & xgrid, rArrayView const & ygrid) const;
 	
+	/**
+	 * Finds knot for 'x'.
+	 * \param x Complex coordinate.
+	 */
+	int knot (Complex x) const;
+	
+	/**
+	 * Evaluates a B-spline expansion in a single point x.
+	 * This function is faster than calling
+	 * \code
+	 *     Complex z = zip (coeff, rArray({x}));
+	 * \endcode
+	 * though the results are the same.
+	 */
+	Complex eval(cArrayView const & coeff, double x) const;
+	
+	/**
+	 * Evaluates a double B-spline expansion in a single point (x,y).
+	 * This function is faster than calling
+	 * \code
+	 *     Complex z = zip (coeff, rArray({x}), rArray({y}));
+	 * \endcode
+	 * though the results are the same.
+	 */
+	Complex eval(cArrayView const & coeff, double x, double y) const;
+	
 	// getters
 	
 	Complex const & t (int i) const { return *(t_ + i); }
