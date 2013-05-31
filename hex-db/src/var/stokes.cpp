@@ -18,43 +18,31 @@
 #include "../interpolate.h"
 #include "../variables.h"
 
-const std::string IonizationF::Id = "ionf";
-const std::string IonizationF::Description = "Ionization amplitude radial part.";
-const std::vector<std::string> IonizationF::Dependencies = {
-	"ni", "li", "mi", 
-	"L", "S",
-	"Ei", "l1", "l2"
+const std::string StokesParameters::Id = "stokes";
+const std::string StokesParameters::Description = "Reduced Stokes parameters.";
+const std::vector<std::string> StokesParameters::Dependencies = {
+	"ni", /* li = 0, mi = 0 */
+	"nf", /* lf = 1, |mf| ≤ 1 */
+	"Ei", "theta"
 };
 
-std::string const & IonizationF::SQL_CreateTable() const
-{
-	static const std::string cmd = "CREATE TABLE '" + Id + "' ("
-		"ni INTEGER, "
-		"li INTEGER, "
-		"mi INTEGER, "
-		"L  INTEGER, "
-		"S  INTEGER, "
-		"Ei DOUBLE PRECISION, "
-		"l1 INTEGER, "
-		"l2 INTEGER, "
-		"cheb BLOB, "
-		"PRIMARY KEY (ni,li,mi,L,S,Ei,l1,l2)"
-	")";
-	
-	return cmd;
-}
-
-std::string const & IonizationF::SQL_Update() const
+std::string const & StokesParameters::SQL_CreateTable() const
 {
 	static const std::string cmd = "";
 	return cmd;
 }
 
-bool IonizationF::run (
+std::string const & StokesParameters::SQL_Update() const
+{
+	static const std::string cmd = "";
+	return cmd;
+}
+
+bool StokesParameters::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	rArray const & angles
 ) const {
 	
 	// manage units
@@ -63,12 +51,23 @@ bool IonizationF::run (
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);
-	int li = As<int>(sdata, "li", Id);
-	int mi = As<int>(sdata, "mi", Id);
-	int  L = As<int>(sdata,  "L", Id);
-	int  S = As<int>(sdata,  "S", Id);
-	int l1 = As<int>(sdata, "l1", Id);
-	int l2 = As<int>(sdata, "l2", Id);
+	int nf = As<int>(sdata, "nf", Id);
+	int Ei = As<double>(sdata, "Ei", Id) * efactor;
+	
+	// Should return the following:
+	//    P₁ = 2λ - 1
+	//    P₂ = -2√2 R
+	//    P₃ = 2√2 I
+	// where
+	//    λ = <|f₀²|>
+	//    R = Re { <f₀* f₁> } / [ dσ/dΩ ]
+	//    I = Im { <f₀* f₁> } / [ dσ/dΩ ]
+	// where
+	//    f₀ ... is the scattering amplitude to mf = 0
+	//    f₁ ... is the scattering amplitude to mf = 1
+	//    dσ/dΩ ... is the DCS summed over mf
+	//    <.> ... stands for averaging over spin states, i.e.
+	//        <a> = [ a(S=0) + 3a(S=1) ] / 4
 	
 	// TODO
 	

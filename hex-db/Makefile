@@ -24,7 +24,7 @@ exe: bin/hex-db
 
 lib: bin/hex-db.so
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf stokes
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 

@@ -24,7 +24,8 @@ VariableList::VariableList() :
 		new CollisionStrength,
 		new MomentumTransfer,
 		new TotalCrossSection,
-	    new IonizationF
+		new IonizationF,
+		new StokesParameters
 	})
 {}
 

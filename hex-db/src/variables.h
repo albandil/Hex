@@ -231,6 +231,9 @@ AddNewVariableClass(TotalCrossSection);
 /// Create class for ionization amplitude radial part (ionf)
 AddNewVariableClass(IonizationF);
 
+/// Create class for stokes parameters (stokes)
+AddNewVariableClass(StokesParameters);
+
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;
 
