@@ -25,24 +25,24 @@ const std::vector<std::string> StokesParameters::Dependencies = {
 	"nf", /* lf = 1, |mf| ≤ 1 */
 	"Ei", "theta"
 };
+const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
 
-std::string const & StokesParameters::SQL_CreateTable() const
+std::vector<std::string> const & StokesParameters::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::string const & StokesParameters::SQL_Update() const
+std::vector<std::string> const & StokesParameters::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool StokesParameters::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & angles
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -53,6 +53,21 @@ bool StokesParameters::run (
 	int ni = As<int>(sdata, "ni", Id);
 	int nf = As<int>(sdata, "nf", Id);
 	int Ei = As<double>(sdata, "Ei", Id) * efactor;
+	
+	// angles
+	rArray angles;
+	
+	// get angle / angles
+	try {
+		
+		// is there a single angle specified using command line ?
+		angles.push_back(As<double>(sdata, "theta", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more angles specified using the STDIN ?
+		angles = readStandardInput<double>();
+	}
 	
 	// Should return the following:
 	//    P₁ = 2λ - 1

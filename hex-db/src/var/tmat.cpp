@@ -26,39 +26,40 @@ const std::vector<std::string> TMatrix::Dependencies = {
 	"L", "S",
 	"Ei", "ell"
 };
+const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
 
-std::string const & TMatrix::SQL_CreateTable() const
+std::vector<std::string> const & TMatrix::SQL_CreateTable() const
 {
-	static const std::string cmd = "CREATE TABLE '" + Id + "' ("
-		"ni INTEGER, "
-		"li INTEGER, "
-		"mi INTEGER, "
-		"nf INTEGER, "
-		"lf INTEGER, "
-		"mf INTEGER, "
-		"L  INTEGER, "
-		"S  INTEGER, "
-		"Ei DOUBLE PRECISION, "
-		"ell INTEGER, "
-		"Re_T_ell DOUBLE PRECISION, "
-		"Im_T_ell DOUBLE PRECISION, "
-		"PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
-	")";
-	
+	static const std::vector<std::string> cmd = {
+		"CREATE TABLE '" + TMatrix::Id + "' ("
+			"ni INTEGER, "
+			"li INTEGER, "
+			"mi INTEGER, "
+			"nf INTEGER, "
+			"lf INTEGER, "
+			"mf INTEGER, "
+			"L  INTEGER, "
+			"S  INTEGER, "
+			"Ei DOUBLE PRECISION, "
+			"ell INTEGER, "
+			"Re_T_ell DOUBLE PRECISION, "
+			"Im_T_ell DOUBLE PRECISION, "
+			"PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
+		")"
+	};
 	return cmd;
 }
 
-std::string const & TMatrix::SQL_Update() const
+std::vector<std::string> const & TMatrix::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool TMatrix::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -75,6 +76,21 @@ bool TMatrix::run (
 	int  L = As<int>(sdata,  "L", Id);
 	int  S = As<int>(sdata,  "S", Id);
 	int ell= As<int>(sdata, "ell",Id);
+	
+	// energies
+	rArray energies;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// energy and real and imarinary part of the T-matrix
 	double E, Re_T_ell, Im_T_ell;

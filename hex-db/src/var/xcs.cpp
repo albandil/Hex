@@ -25,24 +25,24 @@ const std::vector<std::string> ExtrapolatedCrossSection::Dependencies = {
 	"nf", "lf", "mf",
 	"Ei"
 };
+const std::vector<std::string> ExtrapolatedCrossSection::VecDependencies = { "Ei" };
 
-std::string const & ExtrapolatedCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & ExtrapolatedCrossSection::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::string const & ExtrapolatedCrossSection::SQL_Update() const
+std::vector<std::string> const & ExtrapolatedCrossSection::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool ExtrapolatedCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -56,6 +56,21 @@ bool ExtrapolatedCrossSection::run (
 	int nf = As<int>(sdata, "nf", Id);
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
+	
+	// energies
+	rArray energies;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// SQL interface variables
 	double E, sigma; int delta;

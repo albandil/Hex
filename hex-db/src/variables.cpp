@@ -11,7 +11,9 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <algorithm>
+
 #include "variables.h"
+#include "vec3d.h"
 
 VariableList::VariableList() :
 	list ({
@@ -24,10 +26,13 @@ VariableList::VariableList() :
 		new CollisionStrength,
 		new MomentumTransfer,
 		new TotalCrossSection,
-		new IonizationF,
+	    new IonizationF,
+		new IonizationAmplitude,
 		new StokesParameters
 	})
-{}
+{
+	
+}
 
 VariableList::~VariableList()
 {

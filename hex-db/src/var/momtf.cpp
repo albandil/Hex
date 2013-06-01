@@ -25,26 +25,24 @@ const std::vector<std::string> MomentumTransfer::Dependencies = {
 	"nf", "lf", "mf",
 	"S", "Ei"
 };
+const std::vector<std::string> MomentumTransfer::VecDependencies = { "Ei" };
 
-std::string const & MomentumTransfer::SQL_CreateTable() const
+std::vector<std::string> const & MomentumTransfer::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
-	
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::string const & MomentumTransfer::SQL_Update() const
+std::vector<std::string> const & MomentumTransfer::SQL_Update() const
 {
-	static const std::string cmd = "";
-	
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool MomentumTransfer::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -59,6 +57,21 @@ bool MomentumTransfer::run (
 	int lf = As<int>(sdata, "lf", Id);
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata,  "S", Id);
+	
+	// energies
+	rArray energies;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// SQL interface variables
 	double E, Re_T_ell, Im_T_ell;

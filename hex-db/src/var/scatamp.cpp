@@ -25,24 +25,24 @@ const std::vector<std::string> ScatteringAmplitude::Dependencies = {
 	"nf", "lf", "mf",
 	"S", "Ei"
 };
+const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "Ei" };
 
-std::string const & ScatteringAmplitude::SQL_Update() const
+std::vector<std::string> const & ScatteringAmplitude::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::string const & ScatteringAmplitude::SQL_CreateTable() const
+std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool ScatteringAmplitude::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & angles
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -58,6 +58,21 @@ bool ScatteringAmplitude::run (
 	int mf = As<int>(sdata, "mf", Id);
 	int  S = As<int>(sdata, "S", Id);
 	double E = As<double>(sdata, "Ei", Id) * efactor;
+	
+	// angles
+	rArray angles;
+	
+	// get angle / angles
+	try {
+		
+		// is there a single angle specified using command line ?
+		angles.push_back(As<double>(sdata, "theta", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more angles specified using the STDIN ?
+		angles = readStandardInput<double>();
+	}
 	
 	// the scattering amplitudes
 	cArray amplitudes(angles.size());

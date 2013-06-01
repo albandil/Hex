@@ -25,24 +25,24 @@ const std::vector<std::string> TotalCrossSection::Dependencies = {
 	"nf", "lf", "mf",
 	"Ei"
 };
+const std::vector<std::string> TotalCrossSection::VecDependencies = { "Ei" };
 
-std::string const & TotalCrossSection::SQL_Update() const
+std::vector<std::string> const & TotalCrossSection::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::string const & TotalCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & TotalCrossSection::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool TotalCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -56,7 +56,19 @@ bool TotalCrossSection::run (
 	
 	// energies and cross sections
 	double E, sigma;
-	rArray E_arr, sigma_arr;
+	rArray energies, E_arr, sigma_arr;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// compose query
 	sqlitepp::statement st(db);

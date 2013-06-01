@@ -183,19 +183,13 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					std::cout << "Variable \"" << opt << "\" uses the following parameters:\n\t";
-					bool theta_present = false;
-					bool Ei_present = false;
-					for (std::string param : (*it)->dependencies())
-					{
-						std::cout << param << " ";
-						if (param == std::string("theta")) theta_present = true;
-						if (param == std::string("Ei")) Ei_present = true;
-					}
-					if (theta_present)
-						std::cout << "\n\"theta\" is to be specified using STDIN.\n";
-					else if (Ei_present)
-						std::cout << "\n\"Ei\" is to be specified using STDIN.\n";
+					std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
+					for (std::string v : (*it)->deps())
+						std::cout << v << " ";
+					std::cout << "\n\nof that one of the following can be read from the standard input:\n\n\t";
+					for (std::string v : (*it)->vdeps())
+						std::cout << v << " ";
+					std::cout << "\n\n";
 				}
 			},
 			"Eunits",   1, [ & ](std::string opt) -> void { 
@@ -237,7 +231,7 @@ int main(int argc, char* argv[])
 				// try to find it in the variable dependencies
 				for (const Variable* var : vlist)
 				{
-					std::vector<std::string> const & deps = var->dependencies();
+					std::vector<std::string> const & deps = var->deps();
 					if (std::find(deps.begin(), deps.end(), arg) != deps.end())
 					{
 						// check parameter
@@ -294,23 +288,6 @@ int main(int argc, char* argv[])
 	if (vars.empty())
 		return 0;
 	
-	// read all standard input
-	char str[100];
-	rArray nums;
-	while (gets(str) != 0)
-	{
-		// manage Czech locale
-		for (char& c : str) if (c == ',') c = '.';
-		
-		// convert to number
-		char* tail;
-		double num = strtod(str, &tail);
-		if (*tail == 0)
-			nums.push_back(num);
-		else
-			fprintf(stderr, "The input \"%s\" is not a valid number.", str);
-	}
-	
 	// retrieve all requested data
-	return run (Eunits, Lunits, vars, sdata, nums);
+	return run (Eunits, Lunits, vars, sdata);
 }

@@ -31,8 +31,8 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 {
     // initial position
     double x0;
-    if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
-    if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
+    if (x > 0.) x0 = finite(x) ? 0.5 * x :  1.;
+    if (x < 0.) x0 = finite(x) ? 0.5 * x : -1.;
 
     // function value
     FType f0 = F(x0), f;

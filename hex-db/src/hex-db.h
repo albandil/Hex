@@ -225,8 +225,7 @@ enum lUnit {
 int run (
 	eUnit Eunits, lUnit lUnits,
 	std::vector<std::string> const & vars,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & nums
+	std::map<std::string,std::string> const & sdata
 );
 
 #endif

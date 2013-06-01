@@ -684,6 +684,47 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return hexa.str();
 		}
 		
+		/**
+		 * Decode string from SQL-readable BLOB (hexadecimal format) to general binary.
+		 */
+		virtual void fromBlob(std::string const & s)
+		{
+			if (array != nullptr and N != 0)
+				delete [] array;
+			
+			// the first character outght to be "x" or "X"
+			// the second character outght to be "'"
+			// the last character ought to be "'" as well
+			if ((s[0] != 'x' and s[0] != 'X') or s[1] != '\'' or s.back() != '\'')
+				throw exception ("[Array::fromBlob] Blob has wrong format, %s.", s.c_str());
+			
+			// create substring
+			std::string ss(s.begin() + 2, s.end() - 1);
+			
+			// compute size
+			size_t bytes = ss.size() / 2;
+			N = bytes / sizeof(NumberType);
+			
+			// allocate space
+			array = new NumberType [N];
+			
+			// for all bytes
+			for (size_t i = 0; i < bytes; i++)
+			{
+				unsigned byte;
+				std::stringstream sst;
+				
+				// put two hexa digits from "ss" to "sst"
+				sst << std::hex << std::string(ss.begin() + 2*bytes, ss.begin() + 2*(bytes+1));
+				
+				// read those two digits as a single byte
+				sst >> byte;
+				
+				// store this byte
+				reinterpret_cast<unsigned char*>(array)[i] = byte;
+			}
+		}
+		
 #ifndef NO_HDF
 		/**
 		 * Save array to HDF file.

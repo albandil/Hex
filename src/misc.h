@@ -63,7 +63,7 @@ public:
 	/// Constructor.
 	template <class ...Params> exception (Params ...p)
 	{
-		std::snprintf(message, 256, p...);
+		snprintf(message, 256, p...);
 	}
 	
 	/// Return pointer to the exception text.

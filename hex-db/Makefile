@@ -24,18 +24,18 @@ exe: bin/hex-db
 
 lib: bin/hex-db.so
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf stokes
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp stokes
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 
 # -----------------------------------------------------------------------------
 # Main targets
 
-bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o obj/vec3d.o $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-bin/hex-db.so: obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db.so: obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o obj/vec3d.o $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -fPIC -shared -o $@
 
@@ -69,6 +69,11 @@ obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
 obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
+	
+obj/vec3d.o: src/vec3d.cpp src/vec3d.h src/misc.h
+	@mkdir -p $(@D)
+	$(CPP) $(CXXFLAGS) -c $< -o $@
+
 	
 # -----------------------------------------------------------------------------
 # SQLite++ library

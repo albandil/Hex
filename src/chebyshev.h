@@ -21,7 +21,6 @@
 #include <fftw3.h>
 
 #include "arrays.h"
-#include "compact.h"
 #include "misc.h"
 
 /**

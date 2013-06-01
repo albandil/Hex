@@ -25,43 +25,46 @@ const std::vector<std::string> IntegralCrossSection::Dependencies = {
 	"L", "S",
 	"Ei"
 };
+const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 
-std::string const & IntegralCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
 {
-	static const std::string cmd = "CREATE TABLE '" + IntegralCrossSection::Id + "' ("
-		"ni INTEGER, "
-		"li INTEGER, "
-		"mi INTEGER, "
-		"nf INTEGER, "
-		"lf INTEGER, "
-		"mf INTEGER, "
-		"L  INTEGER, "
-		"S  INTEGER, "
-		"Ei DOUBLE PRECISION, "
-		"sigma DOUBLE PRECISION, "
-		"PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
-	")";
+	static const std::vector<std::string> cmd = {
+		"CREATE TABLE '" + IntegralCrossSection::Id + "' ("
+			"ni INTEGER, "
+			"li INTEGER, "
+			"mi INTEGER, "
+			"nf INTEGER, "
+			"lf INTEGER, "
+			"mf INTEGER, "
+			"L  INTEGER, "
+			"S  INTEGER, "
+			"Ei DOUBLE PRECISION, "
+			"sigma DOUBLE PRECISION, "
+			"PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
+		")"
+	};
 	
 	return cmd;
 }
 
-std::string const & IntegralCrossSection::SQL_Update() const
+std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
 {
-	static const std::string cmd = "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+	static const std::vector<std::string> cmd = {
+		"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
 		"SELECT ni, li, mi, nf, lf, mf, L, S, Ei, "
 		    "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell+Im_T_ell*Im_T_ell)/157.91367 " // 16π²
 		"FROM " + TMatrix::Id + " "
 		"WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
-		"GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei";
-	
+		"GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei"
+	};
 	return cmd;
 }
 
 bool IntegralCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -80,7 +83,19 @@ bool IntegralCrossSection::run (
 	
 	// energies and cross sections
 	double E, sigma;
-	rArray E_arr, sigma_arr;
+	rArray energies, E_arr, sigma_arr;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// compose query
 	sqlitepp::statement st(db);

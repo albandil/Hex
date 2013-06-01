@@ -21,6 +21,7 @@
 
 #include "arrays.h"
 #include "hex-db.h"
+#include "vec3d.h"
 
 /**
  * \brief Energy units change.
@@ -53,6 +54,42 @@ std::string unit_name(eUnit u);
 std::string unit_name(lUnit u);
 
 /**
+ * Write out std::pair.
+ */
+inline std::ostream & operator << (std::ostream & os, std::pair<vec3d,vec3d> const & p)
+{
+	os << p.first << " " << p.second;
+	return os;
+}
+
+/**
+ * Read in std::pair.
+ */
+inline std::istream & operator >> (std::istream & is, std::pair<vec3d,vec3d> & p)
+{
+	is >> p.first;
+	is >> p.second;
+	return is;
+}
+
+/**
+ * Read data from standard input.
+ */
+template<typename T> std::vector<T> readStandardInput()
+{
+	std::vector<T> data;
+	
+	T x;
+	while (std::cin.good())
+	{
+		std::cin >> x;
+		data.push_back(x);
+	}
+	
+	return data;
+}
+
+/**
  * \brief Convert dictionary entry to a numeric type.
  * 
  * Being given a dictionary (= string-string map) and a keyword,
@@ -72,14 +109,11 @@ template <typename T> T As (
 	// check existence of the keyword
 	std::map<std::string,std::string>::const_iterator it = dict.find(keyword);
 	if (it == dict.end())
-	{
-		std::cerr << "ERROR: \"" << name << "\" requires specifying the parameter \"--" << keyword << "\"!\n";
-		exit(-1);
-	}
+		throw exception ("ERROR: \"%s\" requires specifying the parameter \"--%s\"!\n", name.c_str(), keyword.c_str());
 	
 	// convert to int
 	T x;
-	std::stringstream ss(it->second);
+	std::istringstream ss(it->second);
 	ss >> x;
 	return x;
 }
@@ -105,14 +139,17 @@ public:
 	/// Longer description text for use in program help.
 	virtual std::string const & description() const = 0;
 	
-	/// SQL statement that creates the required table, or empty string if not needed.
-	virtual std::string const & SQL_CreateTable() const = 0;
+	/// SQL statements that create the required table, or empty vector if not needed.
+	virtual std::vector<std::string> const & SQL_CreateTable() const = 0;
 	
-	/// SQL statement that updates the table after insetion of new data.
-	virtual std::string const & SQL_Update() const = 0;
+	/// SQL statements that update the table after insetion of new data.
+	virtual std::vector<std::string> const & SQL_Update() const = 0;
 	
-	/// List of scattering event parameters that have to be specified by user.
-	virtual std::vector<std::string> const & dependencies() const = 0;
+	/// List of all scattering event parameters that have to be specified by user.
+	virtual std::vector<std::string> const & deps() const = 0;
+	
+	/// List of vectorizable scattering event parameters that have to be specified by user.
+	virtual std::vector<std::string> const & vdeps() const = 0;
 
 	// others
 	
@@ -120,8 +157,7 @@ public:
 	virtual bool run (
 		eUnit Eunits, lUnit Lunits,
 		sqlitepp::session & db,
-		std::map<std::string,std::string> const & data1,
-		rArray const & data2
+		std::map<std::string,std::string> const & params
 	) const = 0;
 	
 	/// Returns the program logo for use in output.
@@ -188,16 +224,18 @@ private:
 		std::string const & description() const { return Description; } \
 \
 		static const std::vector<std::string> Dependencies; \
-		std::vector<std::string> const & dependencies() const { return Dependencies; } \
+		std::vector<std::string> const & deps() const { return Dependencies; } \
 \
-		std::string const & SQL_CreateTable() const; \
-		std::string const & SQL_Update() const; \
+		static const std::vector<std::string> VecDependencies; \
+		std::vector<std::string> const & vdeps() const { return VecDependencies; } \
+\
+		std::vector<std::string> const & SQL_CreateTable() const; \
+		std::vector<std::string> const & SQL_Update() const; \
 \
 		bool run ( \
 			eUnit Eunits, lUnit Lunits, \
 			sqlitepp::session & db, \
-			std::map<std::string,std::string> const & data1, \
-			rArray const & data2 \
+			std::map<std::string,std::string> const & params \
 		) const; \
 };
 
@@ -230,6 +268,9 @@ AddNewVariableClass(TotalCrossSection);
 
 /// Create class for ionization amplitude radial part (ionf)
 AddNewVariableClass(IonizationF);
+
+/// Create class for ionization amplitude (ionamp)
+AddNewVariableClass(IonizationAmplitude);
 
 /// Create class for stokes parameters (stokes)
 AddNewVariableClass(StokesParameters);

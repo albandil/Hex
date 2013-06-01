@@ -60,9 +60,9 @@ void create_new_database()
 {
 	// create tables
 	for (const Variable* var : vlist)
+	for (std::string const & cmd : var->SQL_CreateTable())
 	{
 		sqlitepp::statement st(db);
-		std::string cmd = var->SQL_CreateTable();
 		
 		if (cmd.size() == 0)
 			continue;
@@ -155,10 +155,9 @@ void import (const char* sqlname)
 void update ()
 {
 	for (const Variable* var : vlist)
+	for (std::string const & cmd : var->SQL_Update())
 	{
 		sqlitepp::statement st(db);
-	
-		std::string cmd = var->SQL_Update();
 	
 		if (cmd.size() == 0)
 			continue;
@@ -309,8 +308,8 @@ void dump (const char* dumpfile)
 int run (
 	eUnit Eunits, lUnit Lunits,
 	std::vector<std::string> const & vars,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & nums)
+	std::map<std::string,std::string> const & sdata
+)
 {
 	// for all requested variables (mostly there will be just one)
 	for (std::string const & varname : vars)
@@ -327,7 +326,7 @@ int run (
 		}
 		
 		// try to compute the results
-		if (not var->run(Eunits, Lunits, db, sdata, nums))
+		if (not var->run(Eunits, Lunits, db, sdata))
 		{
 			// this can easily happen
 			std::cerr << "Computation of \"" << varname << "\" failed." << std::endl;

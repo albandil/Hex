@@ -25,30 +25,35 @@ const std::vector<std::string> CompleteCrossSection::Dependencies = {
 	"nf", "lf", "mf",
 	"Ei"
 };
+const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 
-std::string const & CompleteCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable() const
 {
-	static std::string cmd = "CREATE TABLE '" + CompleteCrossSection::Id + "' ("
-		"ni INTEGER, "
-		"li INTEGER, "
-		"mi INTEGER, "
-		"nf INTEGER, "
-		"lf INTEGER, "
-		"mf INTEGER, "
-		"Ei DOUBLE PRECISION, "
-		"sigma DOUBLE PRECISION, "
-		"PRIMARY KEY (ni,li,mi,nf,lf,mf,Ei)"
-	")";
+	static std::vector<std::string> cmd = {
+		"CREATE TABLE '" + CompleteCrossSection::Id + "' ("
+			"ni INTEGER, "
+			"li INTEGER, "
+			"mi INTEGER, "
+			"nf INTEGER, "
+			"lf INTEGER, "
+			"mf INTEGER, "
+			"Ei DOUBLE PRECISION, "
+			"sigma DOUBLE PRECISION, "
+			"PRIMARY KEY (ni,li,mi,nf,lf,mf,Ei)"
+		")"
+	};
 	
 	return cmd;
 }
 	
-std::string const & CompleteCrossSection::SQL_Update() const
+std::vector<std::string> const & CompleteCrossSection::SQL_Update() const
 {
-	static std::string cmd = "INSERT OR REPLACE INTO '" + CompleteCrossSection::Id + "' "
-		"SELECT ni, li, mi, nf, lf, mf, Ei, sum(sigma) "
-		"FROM '" + IntegralCrossSection::Id + "' "
-		"GROUP BY ni, li, mi, nf, lf, mf, Ei";
+	static std::vector<std::string> cmd = {
+		"INSERT OR REPLACE INTO '" + CompleteCrossSection::Id + "' "
+			"SELECT ni, li, mi, nf, lf, mf, Ei, sum(sigma) "
+			"FROM '" + IntegralCrossSection::Id + "' "
+			"GROUP BY ni, li, mi, nf, lf, mf, Ei"
+	};
 	
 	return cmd;
 }
@@ -56,8 +61,7 @@ std::string const & CompleteCrossSection::SQL_Update() const
 bool CompleteCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & energies
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -74,7 +78,19 @@ bool CompleteCrossSection::run (
 	
 	// energies and cross sections
 	double E, sigma;
-	rArray E_arr, sigma_arr;
+	rArray energies, E_arr, sigma_arr;
+	
+	// get energy / energies
+	try {
+		
+		// is there a single energy specified using command line ?
+		energies.push_back(As<double>(sdata, "Ei", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more energies specified using the STDIN ?
+		energies = readStandardInput<double>();
+	}
 	
 	// compose query
 	sqlitepp::statement st(db);

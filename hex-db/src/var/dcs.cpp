@@ -27,24 +27,24 @@ const std::vector<std::string> DifferentialCrossSection::Dependencies = {
 	"S",
 	"Ei", "theta"
 };
+const std::vector<std::string> DifferentialCrossSection::VecDependencies = { "theta" };
 
-const std::string & DifferentialCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & DifferentialCrossSection::SQL_CreateTable() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-const std::string & DifferentialCrossSection::SQL_Update() const
+std::vector<std::string> const & DifferentialCrossSection::SQL_Update() const
 {
-	static const std::string cmd = "";
+	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
 bool DifferentialCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata,
-	rArray const & angles
+	std::map<std::string,std::string> const & sdata
 ) const {
 	
 	// manage units
@@ -66,6 +66,21 @@ bool DifferentialCrossSection::run (
 	// check if this is an allowed transition
 	if (not finite(ki) or not finite(kf))
 		return true;
+	
+	// angles
+	rArray angles;
+	
+	// get angle / angles
+	try {
+		
+		// is there a single angle specified using command line ?
+		angles.push_back(As<double>(sdata, "theta", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more angles specified using the STDIN ?
+		angles = readStandardInput<double>();
+	}
 	
 	// the scattering amplitudes
 	rArrays energies(angles.size());
