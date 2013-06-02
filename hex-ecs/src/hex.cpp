@@ -194,15 +194,15 @@ int main(int argc, char* argv[])
 			);
 			
 			// setup output filename
-			char outf1[3 + zipfile.size()], outf2[3 + zipfile.size()];
-			std::sprintf(outf1, "%s-(%d,%d).re", zipfile.c_str(), l1, l2);
-			std::sprintf(outf2, "%s-(%d,%d).im", zipfile.c_str(), l1, l2);
+			std::ostringstream outf1, outf2;
+			outf1 << zipfile << "-(" << l1 << "," << l2 << ").re";
+			outf2 << zipfile << "-(" << l1 << "," << l2 << ").im";
 			
 			// write real part
 			write_2D_data (
 				zipcount + 1,
 				zipcount + 1,
-				outf1,
+				outf1.str().c_str(),
 				[&](size_t i, size_t j) -> double {
 					return ev[i * (zipcount + 1) + j].real();
 				}
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
 			write_2D_data (
 				zipcount + 1,
 				zipcount + 1,
-				outf2,
+				outf2.str().c_str(),
 				[&](size_t i, size_t j) -> double {
 					return ev[i * (zipcount + 1) + j].imag();
 				}
@@ -410,7 +410,7 @@ int main(int argc, char* argv[])
 		
 		#pragma omp parallel \
 			default (none) \
-			shared (stdout, Rtr_i, Rtr_j, Rtr_v) \
+			shared (std::cout, Rtr_i, Rtr_j, Rtr_v) \
 			firstprivate (Nspline, order, Mtr_L, Mtr_mLm1, lambda)
 		{
 			// reserve threads' private storage
@@ -428,7 +428,8 @@ int main(int argc, char* argv[])
 				
 				#pragma omp critical
 				{
-					std::printf ("\r\t- multipole λ = %d... %3.0f %%", lambda, i * 100. / Nspline);
+					std::cout << "\r\t- multipole λ = " << lambda << "... "
+					          << int(trunc(i * 100. / Nspline + 0.5)) << " %";
 				}
 				
 				for (int j = i; j < Nspline; j++)
@@ -584,10 +585,11 @@ int main(int argc, char* argv[])
 	// Distribute LU factorizations among processes ------------------------ //
 	//
 	std::map<int,int> LUs;
+	std::vector<int> info(Nproc);
 	int worker = 0;
-	std::cout << "Balancing " << triangle_count(L,maxell)
+	std::cout << "\nBalancing " << triangle_count(L,maxell)
 	          << " diagonal blocks among " << Nproc 
-	          << " worker processes...";
+	          << " worker processes...\n";
 	for (int l1 = 0; l1 <= maxell; l1++)
 	for (int l2 = 0; l2 <= maxell; l2++)
 	{
@@ -595,11 +597,16 @@ int main(int argc, char* argv[])
 		if (abs(l1 - l2) > L or l1 + l2 < L)
 				continue;
 		
+		info[worker]++;                       // add work to the process 'worker'
+		
 		int iblock = l1 * (maxell + 1) + l2;  // get block index
 		LUs[iblock] = worker;	              // assign this block to worker
 		worker = (worker + 1) % Nproc;        // move to next worker
 	}
-	std::cout << "ok\n";
+	// print statistics
+	std::cout << "\t-> average " << triangle_count(L,maxell)/double(Nproc) << " blocks/process\n";
+	std::cout << "\t-> min " << *std::min_element(info.begin(), info.end()) << " blocks/process\n";
+	std::cout << "\t-> max " << *std::max_element(info.begin(), info.end()) << " blocks/process\n";
 	// --------------------------------------------------------------------- //
 	
 	
@@ -609,13 +616,10 @@ int main(int argc, char* argv[])
 	for (unsigned ie = 0; ie < Nenergy; ie++)
 	{
 		// print progress information
-		std::printf (
-			"\nSolving the system for Ei[%d] = %g (%3.0f %% finished, typically %4d CG iterations per energy)\n",
-			ie,
-		    Ei[ie],
-			ie * 100. / Nenergy,
-			computations_done == 0 ? 0 : iterations_done / computations_done
-		);
+		std::cout << "\nSolving the system for Ei[" << ie << "] = " << Ei[ie] << " ("
+		          << int(trunc(ie * 100. / Nenergy + 0.5)) << " % finished, typically "
+		          << (computations_done == 0 ? 0 : iterations_done / computations_done)
+		          << " CG iterations per energy)\n";
 		
 		cArray current_solution, previous_solution;
 		
@@ -1176,7 +1180,9 @@ int main(int argc, char* argv[])
 		
 		finished++;
 		
-		std::printf("\rExtracting T-matrices... %3.0f%%     ", finished * 100. / transitions.size());
+		std::cout << "\rExtracting T-matrices... " 
+		          << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
+				  << " %        ";
 	}
 	std::cout << "\rExtracting T-matrices... ok       \n";
 	// --------------------------------------------------------------------- //
