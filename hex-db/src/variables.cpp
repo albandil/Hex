@@ -28,6 +28,7 @@ VariableList::VariableList() :
 		new TotalCrossSection,
 	    new IonizationF,
 		new IonizationAmplitude,
+	    new TripleDifferentialCrossSection,
 		new StokesParameters
 	})
 {

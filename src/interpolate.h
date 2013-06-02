@@ -14,15 +14,10 @@
 #define HEX_INTERPOLATE
 
 #include <algorithm>
-#include <cassert>
 
 #include <o2scl/interp.h>
 
 #include "arrays.h"
-
-#define INTERPOLATE_AUTO	-1
-#define INTERPOLATE_LINEAR	0
-#define INTERPOLATE_CSPLINE	1
 
 /**
  * \brief Return linearly interpolated values.
@@ -34,6 +29,9 @@
  */
 template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & y0, rArray const & x)
 {
+	if (x0.size() == 0)
+		throw exception ("Nothing to interpolate.\n");
+	
 	if (x0.size() == 1)
 		return y0;
 	
@@ -91,15 +89,11 @@ template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & 
  */
 inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, int interpolation)
 {
-	// check equal sizes
-	assert(x0.size() == y0.size());
+	if (x0.size() == 0)
+		throw exception ("Nothing to interpolate.\n");
 	
-	// check if there is anything to interpolate
-	if (x0.size() < 2)
-	{
-		std::cerr << "Too few data (" << x0.size() << ") to interpolate.\n";
-		exit(-1);
-	}
+	if (x0.size() == 1)
+		return y0;
 	
 	// setup the interpolator
 	o2scl::interp_o2scl_vec<const double*> itp (

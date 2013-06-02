@@ -80,7 +80,7 @@ template<typename T> std::vector<T> readStandardInput()
 	std::vector<T> data;
 	
 	T x;
-	while (std::cin.good())
+	while (not std::cin.eof())
 	{
 		std::cin >> x;
 		data.push_back(x);
