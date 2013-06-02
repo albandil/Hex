@@ -28,6 +28,11 @@ const std::vector<std::string> TMatrix::Dependencies = {
 };
 const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
 
+bool TMatrix::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & TMatrix::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd = {

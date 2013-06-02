@@ -19,7 +19,6 @@
 #include <vector>
 #include <fstream>
 
-#include <sqlite3.h>
 #include <sqlitepp/sqlitepp.hpp>
 
 #include "angs.h"
@@ -33,27 +32,14 @@
 sqlitepp::session db;	// database handle
 VariableList vlist;		// list of scattering variables
 
-void db_sqrt(sqlite3_context* pdb, int n, sqlite3_value** val)
-{
-	sqlite3_result_double(pdb, sqrt(sqlite3_value_double(*val)));
-}
-
 void initialize(const char* dbname)
 {
 	// open database
 	db.open(dbname);
 	
-	// define SQRT function
-	sqlite3_create_function (
-		db.impl(),
-		"sqrt",
-		1,
-		SQLITE_UTF8,
-		nullptr,
-		&db_sqrt,
-		nullptr,
-		nullptr
-	);
+	// initialize variables
+	for (const Variable* var : vlist)
+		var->initialize(db);
 }
 
 void create_new_database()

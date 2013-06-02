@@ -19,7 +19,7 @@
 
 std::ostream & operator << (std::ostream & os, vec3d const & v)
 {
-	os << "(" << v.x << " " << v.y << " " << v.z << ")";
+	os << "( " << v.x << " " << v.y << " " << v.z << " )";
 	return os;
 }
 
@@ -38,7 +38,7 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 	while (true)
 	{
 		// read a character
-		is >> c;
+		is >> std::noskipws >> c;
 		
 		// skip left parenthesis and quotation marks
 		if (c == '(' or c == '"')
@@ -58,11 +58,14 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 		// terminate on non-numerical characters
 		if (numc.find(c) == std::string::npos)
 			throw exception ("ERROR: Unexpected character '%c'.", c);
+		
+		// add character to string
+		xs.push_back(c);
 	}
 	while (true)
 	{
 		// read a character
-		is >> c;
+		is >> std::noskipws >> c;
 		
 		if (isspace(c))
 		{
@@ -78,11 +81,14 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 		// terminate on non-numerical characters
 		if (numc.find(c) == std::string::npos)
 			throw exception ("ERROR: Unexpected character '%c'.", c);
+		
+		// add character to string
+		ys.push_back(c);
 	}
 	while (true)
 	{
 		// read a character
-		is >> c;
+		is >> std::noskipws >> c;
 		
 		// break on right parenthesis or quotation marks
 		if (c == ')' or c == '"')
@@ -102,6 +108,9 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 		// terminate on other non-numerical characters
 		if (numc.find(c) == std::string::npos)
 			throw exception ("ERROR: Unexpected character '%c'.", c);
+		
+		// add character to string
+		zs.push_back(c);
 	}
 	
 	// convert components

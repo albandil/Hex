@@ -27,6 +27,11 @@ const std::vector<std::string> StokesParameters::Dependencies = {
 };
 const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
 
+bool StokesParameters::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & StokesParameters::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd;

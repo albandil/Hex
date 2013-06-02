@@ -22,32 +22,32 @@
 #include "../variables.h"
 #include "../vec3d.h"
 
-const std::string IonizationAmplitude::Id = "ionamp";
-const std::string IonizationAmplitude::Description = "Ionization amplitude.";
-const std::vector<std::string> IonizationAmplitude::Dependencies = {
+const std::string TripleDifferentialCrossSection::Id = "tdcs";
+const std::string TripleDifferentialCrossSection::Description = "Triple differential ionization cross section.";
+const std::vector<std::string> TripleDifferentialCrossSection::Dependencies = {
 	"ni", "li", "mi", 
 	"S", "Ei", "dirs"
 };
-const std::vector<std::string> IonizationAmplitude::VecDependencies = { "dirs" };
+const std::vector<std::string> TripleDifferentialCrossSection::VecDependencies = { "dirs" };
 
-bool IonizationAmplitude::initialize(sqlitepp::session & db) const
+bool TripleDifferentialCrossSection::initialize(sqlitepp::session & db) const
 {
 	return true;
 }
 
-std::vector<std::string> const & IonizationAmplitude::SQL_CreateTable() const
+std::vector<std::string> const & TripleDifferentialCrossSection::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-std::vector<std::string> const & IonizationAmplitude::SQL_Update() const
+std::vector<std::string> const & TripleDifferentialCrossSection::SQL_Update() const
 {
 	static const std::vector<std::string> cmd;
 	return cmd;
 }
 
-bool IonizationAmplitude::run (
+bool TripleDifferentialCrossSection::run (
 	eUnit Eunits, lUnit Lunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
@@ -129,7 +129,7 @@ bool IonizationAmplitude::run (
 	}
 	
 	// for all directions and energy shares evaluate the amplitude
-	cArray ampls(dirs.size());
+	rArray tdcs(dirs.size());
 	for (size_t idir = 0; idir < dirs.size(); idir++)
 	{
 		// compute energy sharing factor
@@ -180,26 +180,27 @@ bool IonizationAmplitude::run (
 		}
 		
 		// interpolate
-		ampls[idir] = interpolate(E_arr, ampls0, { Ei })[0];
+		tdcs[idir] = 0.25 * (2 * S + 1) * interpolate (
+			E_arr,
+			sqrabs(ampls0) * k1 * k2 / sqrt(Ei),
+			{ Ei }
+		)[0];
 	}
-	
-	std::cout << "b\n";
 	
 	// write out
 	std::cout << this->logo() <<
-		"# Ionization amplitudes in " << unit_name(Lunits) << " for\n" <<
+		"# Triple differential cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
 	    "# ordered by direcion triplets" << "\n" <<
 	    "# \n" <<
-	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tRe F\tIm F\n";
+	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\n";
 	for (size_t i = 0; i < dirs.size(); i++)
 	{
 		std::cout << 
 			dirs[i].first << "\t" << 
 			dirs[i].second<< "\t" << 
-			ampls[i].real()*lfactor << "\t" <<
-			ampls[i].imag()*lfactor << "\n";
+			tdcs[i]*lfactor*lfactor << "\n";
 	}
 	
 	return true;

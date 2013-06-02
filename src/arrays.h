@@ -663,11 +663,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		
 		/**
 		 * Converts contents to SQL-readable BLOB (hexadecimal text format)
+		 * 
+		 * \warning The data are stored in the endianness of the current machine.
 		 */
 		virtual std::string toBlob() const
 		{
 			// get byte pointer
-			char const * dataptr = reinterpret_cast<char const*>(array);
+			unsigned char const * dataptr = reinterpret_cast<unsigned char const*>(array);
 			
 			// get byte count
 			size_t count = N * sizeof(NumberType);
@@ -685,7 +687,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		/**
-		 * Decode string from SQL-readable BLOB (hexadecimal format) to general binary.
+		 * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
+		 * 
+		 * \warning The data are assumed to posess the endianness of the current machine.
 		 */
 		virtual void fromBlob(std::string const & s)
 		{
@@ -715,13 +719,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				std::stringstream sst;
 				
 				// put two hexa digits from "ss" to "sst"
-				sst << std::hex << std::string(ss.begin() + 2*bytes, ss.begin() + 2*(bytes+1));
+				sst << std::hex << ss.substr(2*i, 2);
 				
 				// read those two digits as a single byte
 				sst >> byte;
 				
 				// store this byte
-				reinterpret_cast<unsigned char*>(array)[i] = byte;
+				reinterpret_cast<char*>(array)[i] = byte;
 			}
 		}
 		

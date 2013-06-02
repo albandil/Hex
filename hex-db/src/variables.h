@@ -153,6 +153,9 @@ public:
 
 	// others
 	
+	/// initialize (e.g.) by defining external routines for SQLite
+	virtual bool initialize (sqlitepp::session & db) const = 0;
+	
 	/// write out requested data
 	virtual bool run (
 		eUnit Eunits, lUnit Lunits,
@@ -217,6 +220,8 @@ private:
 { \
 	public: \
 \
+		bool initialize(sqlitepp::session & db) const; \
+\
 		static const std::string Id; \
 		std::string const & id() const { return Id; } \
 \
@@ -271,6 +276,9 @@ AddNewVariableClass(IonizationF);
 
 /// Create class for ionization amplitude (ionamp)
 AddNewVariableClass(IonizationAmplitude);
+
+/// Triple ionization differential cross section (tdcs).
+AddNewVariableClass(TripleDifferentialCrossSection);
 
 /// Create class for stokes parameters (stokes)
 AddNewVariableClass(StokesParameters);

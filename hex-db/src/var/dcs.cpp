@@ -29,6 +29,11 @@ const std::vector<std::string> DifferentialCrossSection::Dependencies = {
 };
 const std::vector<std::string> DifferentialCrossSection::VecDependencies = { "theta" };
 
+bool DifferentialCrossSection::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & DifferentialCrossSection::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd;

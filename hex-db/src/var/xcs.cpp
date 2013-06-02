@@ -27,6 +27,11 @@ const std::vector<std::string> ExtrapolatedCrossSection::Dependencies = {
 };
 const std::vector<std::string> ExtrapolatedCrossSection::VecDependencies = { "Ei" };
 
+bool ExtrapolatedCrossSection::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & ExtrapolatedCrossSection::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd;

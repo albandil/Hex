@@ -27,6 +27,11 @@ const std::vector<std::string> ScatteringAmplitude::Dependencies = {
 };
 const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "Ei" };
 
+bool ScatteringAmplitude::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & ScatteringAmplitude::SQL_Update() const
 {
 	static const std::vector<std::string> cmd;

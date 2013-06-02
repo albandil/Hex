@@ -28,6 +28,11 @@ const std::vector<std::string> CollisionStrength::Dependencies = {
 };
 const std::vector<std::string> CollisionStrength::VecDependencies = { "Ei" };
 
+bool CollisionStrength::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & CollisionStrength::SQL_CreateTable() const
 {
 	static std::vector<std::string> cmd;

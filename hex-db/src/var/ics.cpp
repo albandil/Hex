@@ -14,8 +14,86 @@
 #include <string>
 #include <vector>
 
+#include <fftw3.h>
+#include <sqlite3.h>
+
 #include "../interpolate.h"
 #include "../variables.h"
+
+// -------------------------------------------------------------------------- //
+
+//
+// custom function for evaluation of square root within a SQL statement
+//
+
+void db_sqrt(sqlite3_context* pdb, int n, sqlite3_value** val)
+{
+	sqlite3_result_double(pdb, sqrt(sqlite3_value_double(*val)));
+}
+
+//
+// custom function for evaluation of Gauss-Chebyshev integration of a
+// squared Chebyshev expansion
+//
+
+void db_gausschebsqr(sqlite3_context* pdb, int n, sqlite3_value** val)
+{
+	// get blob data as text; reinterpret_cast is save as we are using
+	// the low ASCII only
+	std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
+	
+	// convert text data to binary array
+	cArray coeffs;
+	coeffs.fromBlob(blob);
+	int N = coeffs.size();
+	
+	// setup FFTW
+	cArray mirror_coeffs(4*N+1), evalf(4*N);
+	fftw_plan plan = fftw_plan_dft_1d (
+		4*N,
+		reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
+		reinterpret_cast<fftw_complex*>(&evalf[0]),
+		FFTW_FORWARD,
+		0
+	);
+	
+	// mirror oddly around N (3N), evenly around 2N (0,4N)
+	for (int k = 0; k < N; k++)
+	{
+		mirror_coeffs[4*N-k] = mirror_coeffs[k] = coeffs[k];
+		mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -coeffs[k];
+	}
+	
+	// integrate
+	//    ₁                       n/2-1                
+	//   ⌠              dx     2π ===  |       2j+1     |²
+	// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
+	//   ⌡           √(1-x²)   n  ===  |        2n      |
+	//  ⁰                         j=0
+	// where
+	//                        N-1
+	//        2j+1       c₀   ===         j+½
+	//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
+	//         2n        2    ===          n
+	//                        k=1
+	// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
+	// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
+	
+	// evaluate the function using the FFT
+	fftw_execute(plan);
+	fftw_destroy_plan(plan);
+	
+	// sum contributions
+	double result = 0;
+	for (int j = 0; j < N/2; j++)
+		result += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
+	result *= 0.0625 * M_PI / coeffs.size(); // (FFTW magic) 1/4²
+	
+	// use result of the integration
+	sqlite3_result_double(pdb, result);
+}
+
+// -------------------------------------------------------------------------- //
 
 const std::string IntegralCrossSection::Id = "ics";
 const std::string IntegralCrossSection::Description = "Integral cross section.";
@@ -26,6 +104,41 @@ const std::vector<std::string> IntegralCrossSection::Dependencies = {
 	"Ei"
 };
 const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
+
+bool IntegralCrossSection::initialize(sqlitepp::session & db) const
+{
+	//
+	// define SQRT function
+	//
+	
+	sqlite3_create_function (
+		db.impl(),
+		"sqrt",
+		1,              // pass single argument
+		SQLITE_UTF8,
+		nullptr,
+		&db_sqrt,
+		nullptr,
+		nullptr
+	);
+	
+	//
+	// define Gauss-Chebyshev integration of squared Chebyshev expansion
+	//
+	
+	sqlite3_create_function (
+		db.impl(),
+		"gausschebsqr",
+		1,              // pass single argument
+		SQLITE_UTF8,
+		nullptr,
+		&db_gausschebsqr,
+		nullptr,
+		nullptr
+	);
+	
+	return true;
+}
 
 std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
 {
@@ -51,12 +164,23 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
 std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
 {
 	static const std::vector<std::string> cmd = {
+		
+		// insert discrete transitions
+		
 		"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-		"SELECT ni, li, mi, nf, lf, mf, L, S, Ei, "
-		    "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell+Im_T_ell*Im_T_ell)/157.91367 " // 16π²
-		"FROM " + TMatrix::Id + " "
-		"WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
-		"GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei"
+			"SELECT ni, li, mi, nf, lf, mf, L, S, Ei, "
+				"sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell+Im_T_ell*Im_T_ell)/157.91367 " // 16π²
+			"FROM " + TMatrix::Id + " "
+			"WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
+			"GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei",
+		
+		// insert ionization
+		
+		"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+			"SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
+				"SUM(0.25*(2*S+1)*gausschebsqr(QUOTE(cheb))) "
+			"FROM " + IonizationF::Id + " "
+			"GROUP BY ni, li, mi, L, S, Ei"
 	};
 	return cmd;
 }

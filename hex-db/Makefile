@@ -3,7 +3,7 @@
 CPP = g++
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include -fPIC
-LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl
+LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
 CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2
@@ -24,7 +24,7 @@ exe: bin/hex-db
 
 lib: bin/hex-db.so
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp stokes
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 

@@ -27,6 +27,11 @@ const std::vector<std::string> MomentumTransfer::Dependencies = {
 };
 const std::vector<std::string> MomentumTransfer::VecDependencies = { "Ei" };
 
+bool MomentumTransfer::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & MomentumTransfer::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd;

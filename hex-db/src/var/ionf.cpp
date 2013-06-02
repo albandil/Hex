@@ -32,6 +32,11 @@ const std::vector<std::string> IonizationF::Dependencies = {
 };
 const std::vector<std::string> IonizationF::VecDependencies = { "Eshare" };
 
+bool IonizationF::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & IonizationF::SQL_CreateTable() const
 {
 	static const std::vector<std::string> cmd = {
@@ -117,7 +122,7 @@ bool IonizationF::run (
 		E_arr.push_back(E);
 		
 		// decode Chebyshev expansion from hexadecimal format
-		cb.fromBlob(blob); 
+		cb.fromBlob(blob);
 		
 		// save Chebyshev expansion
 		cheb_arr.push_back (
@@ -127,6 +132,8 @@ bool IonizationF::run (
 				sqrt(E - 1./(ni*ni))  // highest energy
 			)
 		);
+		
+// 		std::cout << "E0 = " << E_arr.back() << ", coeffs = " << cheb_arr.back().str() << "\n";
 	}
 	
 	// for all energy shares
@@ -135,9 +142,9 @@ bool IonizationF::run (
 	{
 		// initialize k₁ and k₂ so that
 		//   1) (k₁)² + (k₂)² = Ei
-		//   2) (k₂)² / (k₁)² = Eshare
-		rArray k1 = sqrt(E_arr / (1 + Eshare[i]));
-		rArray k2 = sqrt(E_arr / (1 + Eshare[i]) * Eshare[i]);
+		//   2) (k₁)² / (k₂)² = Eshare / (1 - Eshare)
+		rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare[i]);
+		rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare[i]));
 		
 		// for all impact energies evaluate the radial part
 		cArray f0(E_arr.size());

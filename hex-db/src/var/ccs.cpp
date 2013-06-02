@@ -27,6 +27,11 @@ const std::vector<std::string> CompleteCrossSection::Dependencies = {
 };
 const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 
+bool CompleteCrossSection::initialize(sqlitepp::session & db) const
+{
+	return true;
+}
+
 std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable() const
 {
 	static std::vector<std::string> cmd = {
