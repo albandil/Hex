@@ -26,7 +26,7 @@ int main (int argc, char *argv[])
 		std::cout << maxl << "\t";
 		
 		for (int L = 0; L <= MaxL; L++)
-			std::cout << triangle_count(maxl,L) << "\t";
+			std::cout << triangle_count(L,maxl) << "\t";
 		
 		std::cout << std::endl;
 	}
