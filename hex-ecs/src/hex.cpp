@@ -228,13 +228,9 @@ int main(int argc, char* argv[])
 	//
 	CooMatrix D (Nspline,Nspline);
 	//
-	if (not D.hdfload("D.hdf"))
-		D.symm_populate_band (
-			order,	// band halfwidth
-			[ = ](unsigned i, unsigned j) -> Complex {
-				return computeD(i, j, Nknot - 1);
-			}
-		).hdfsave("D.hdf");
+	D.hdfload("D.hdf") or D.populate (
+		order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); }
+	).hdfsave("D.hdf");
 	// --------------------------------------------------------------------- //
 	
 	
@@ -243,41 +239,25 @@ int main(int argc, char* argv[])
 	
 	// Precompute useful integral moments ---------------------------------- //
 	//
-	CooMatrix S(Nspline, Nspline);
-	CooMatrix Mm1(Nspline, Nspline), Mm1_tr(Nspline, Nspline);
-	CooMatrix Mm2(Nspline, Nspline);
+	SymDiaMatrix S(Nspline, Nspline);
+	SymDiaMatrix Mm1(Nspline, Nspline), Mm1_tr(Nspline, Nspline);
+	SymDiaMatrix Mm2(Nspline, Nspline);
 	//
-	if (not S.hdfload("S.hdf"))
-		S.symm_populate_band (
-			order,	// band halfwidth
-			[ = ](unsigned m, unsigned n) -> Complex {
-				return computeM(0, m, n);
-			}
-		).hdfsave("S.hdf");
+	S.hdfload("S.hdf") or S.populate (
+		order, [=](int m, int n) -> Complex { return computeM(0, m, n); }
+	).hdfsave("S.hdf");
 	//
-	if (not Mm1.hdfload("Mm1.hdf"))
-		Mm1.symm_populate_band (
-			order,	// band halfwidth
-			[ = ](unsigned m, unsigned n) -> Complex {
-				return computeM(-1, m, n);
-			}
-		).hdfsave("Mm1.hdf");
+	Mm1.hdfload("Mm1.hdf") or Mm1.populate (
+		order, [=](int m, int n) -> Complex { return computeM(-1, m, n); }
+	).hdfsave("Mm1.hdf");
 	//
-	if (not Mm1_tr.hdfload("Mm1_tr.hdf"))
-		Mm1_tr.symm_populate_band (
-			order,	// band halfwidth
-			[ = ](unsigned m, unsigned n) -> Complex {
-				return computeM(-1, m, n, Nreknot - 1);
-			}
-		).hdfsave("Mm1_tr.hdf");
+	Mm1_tr.hdfload("Mm1_tr.hdf") or Mm1_tr.populate (
+		order,	[=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);}
+	).hdfsave("Mm1_tr.hdf");
 	//
-	if (not Mm2.hdfload("Mm2.hdf"))
-		Mm2.symm_populate_band (
-			order,	// band halfwidth
-			[ = ](unsigned m, unsigned n) -> Complex {
-				return computeM(-2, m, n);
-			}
-		).hdfsave("Mm2.hdf");
+	Mm2.hdfload("Mm2.hdf") or Mm2.populate (
+		order, [=](int m, int n) -> Complex { return computeM(-2, m, n); }
+	).hdfsave("Mm2.hdf");
 	// --------------------------------------------------------------------- //
 	
 	
@@ -297,7 +277,7 @@ int main(int argc, char* argv[])
 	// to the interchange of indices in multiindex and it is dense.
 	
 	int maxlambda = 2 * maxell;
-	std::vector<CooMatrix> R_tr(maxlambda + 1);
+	std::vector<CooMatrix> R_tr_coo(maxlambda + 1);
 	
 	//
 	//  a) (ijv)-representation of sparse amtrices
@@ -381,7 +361,7 @@ int main(int argc, char* argv[])
 				MPI_Bcast(&v[0], v.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
 				
 				// reconstruct objects
-				R_tr[lambda] = CooMatrix(m, n, i, j, v);
+				R_tr_coo[lambda] = CooMatrix(m, n, i, j, v);
 			}
 		}
 #endif
@@ -490,13 +470,13 @@ int main(int argc, char* argv[])
 		//
 		
 		size_t R_size = Nspline * Nspline;
-		R_tr[lambda] = CooMatrix (R_size, R_size, Rtr_i, Rtr_j, Rtr_v).shake();
+		R_tr_coo[lambda] = CooMatrix (R_size, R_size, Rtr_i, Rtr_j, Rtr_v).shake();
 		
 		//
 		// g) save them to disk
 		//
 		
-		R_tr[lambda].hdfsave(oss2.str().c_str());
+		R_tr_coo[lambda].hdfsave(oss2.str().c_str());
 		
 		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";
 		
@@ -562,21 +542,23 @@ int main(int argc, char* argv[])
 	//
 	// Kronecker producs
 	std::cout << "Creating Kronecker products... ";
-	CsrMatrix S_kron_S   = kron(S, S).tocsr();
-	CooMatrix S_kron_Mm1_tr = kron(S, Mm1_tr);
-	CsrMatrix S_kron_Mm2 = kron(S, Mm2).tocsr().sparse_like(S_kron_S);
-	CooMatrix Mm1_tr_kron_S = kron(Mm1_tr, S);
-	CsrMatrix Mm2_kron_S = kron(Mm2, S).tocsr().sparse_like(S_kron_S);
-	CsrMatrix half_D_minus_Mm1_tr_kron_S = kron(0.5 * D - Mm1_tr, S).tocsr().sparse_like(S_kron_S);
-	CsrMatrix S_kron_half_D_minus_Mm1_tr = kron(S, 0.5 * D - Mm1_tr).tocsr().sparse_like(S_kron_S);
+	SymDiaMatrix S_kron_S   = S.kron(S);
+	SymDiaMatrix S_kron_Mm1_tr = S.kron(Mm1_tr);
+	SymDiaMatrix S_kron_Mm2 = S.kron(Mm2);
+	SymDiaMatrix Mm1_tr_kron_S = Mm1_tr.kron(S);
+	SymDiaMatrix Mm2_kron_S = Mm2.kron(S);
+	SymDiaMatrix hslf_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
+	SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
+	SymDiaMatrix S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
 	
-	// CSR representation of R_tr matrices
-	std::vector<CsrMatrix> R_tr_csr(maxlambda + 1);
-	std::transform(
-		R_tr.begin(),
-		R_tr.end(),
-		R_tr_csr.begin(),
-		[ & ](const CooMatrix& coo) -> CsrMatrix { return coo.tocsr().sparse_like(S_kron_S); }
+	// DIA representation of R_tr_coo matrices
+	// - these will be used to construct blocks and in matrix multiplication
+	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
+	std::transform (
+		R_tr_coo.begin(),
+		R_tr_coo.end(),
+		R_tr_dia.begin(),
+		[ & ](CooMatrix const & coo) -> SymDiaMatrix { return coo.todia(); }
 	);
 	std::cout << "ok\n";
 	// --------------------------------------------------------------------- //
@@ -595,7 +577,7 @@ int main(int argc, char* argv[])
 	{
 		// skip those angular momentum pairs that don't compose L
 		if (abs(l1 - l2) > L or l1 + l2 < L)
-				continue;
+			continue;
 		
 		info[worker]++;                       // add work to the process 'worker'
 		
@@ -655,9 +637,19 @@ int main(int argc, char* argv[])
 		// get total energy of the system
 		double E = 0.5 * (Ei[ie] - 1./(ni*ni));
 		
-		// setup preconditioner - the diagonal block LU-factorizations
-		std::vector<CsrMatrix> blocks((maxell+1)*(maxell+1));
+		// diagonal blocks in CSR format
+		// - these will be used for UMFPACK factorization
+		// - need to exist physically for the LUft object to be valid!
+		std::vector<CsrMatrix> csr_blocks((maxell+1)*(maxell+1));
+		
+		// diagonal blocks in DIA format
+		// - these will be used in matrix multiplication
+		std::vector<SymDiaMatrix> dia_blocks((maxell+1)*(maxell+1));
+		
+		// LU factorization of the diagonal blocks
 		std::vector<CsrMatrix::LUft> lufts((maxell+1)*(maxell+1));
+		
+		// setup preconditioner - the diagonal block LU-factorizations
 		# pragma omp parallel for collapse (2) schedule (dynamic,1)
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
@@ -670,22 +662,23 @@ int main(int argc, char* argv[])
 				continue;
 			
 			// one-electron parts
-			CsrMatrix Hdiag;
-			Hdiag = half_D_minus_Mm1_tr_kron_S;
-			Hdiag &= ((0.5*l1*(l1+1)) * Mm2_kron_S);
-			Hdiag &= S_kron_half_D_minus_Mm1_tr;
-			Hdiag &= ((0.5*l2*(l2+1)) * S_kron_Mm2);
+			SymDiaMatrix Hdiag =
+			    half_D_minus_Mm1_tr_kron_S
+			    + ((0.5*l1*(l1+1)) * Mm2_kron_S)
+			    + S_kron_half_D_minus_Mm1_tr;
+			    + (0.5*l2*(l2+1)) * S_kron_Mm2;
 			
 			// two-electron part
 			for (int lambda = 0; lambda <= maxlambda; lambda++)
 			{
 				Complex _f = computef(lambda,l1,l2,l1,l2,L);
 				if (_f != 0.)
-					Hdiag &= _f * R_tr_csr[lambda];
+					Hdiag += _f * R_tr[lambda];
 			}
 			
 			// finalize the matrix
-			blocks[iblock] = (E*S_kron_S) ^ Hdiag;
+			dia_blocks[iblock] = E*S_kron_S - Hdiag;
+			csr_blocks[iblock] = dia_blocks[iblock].tocsr();
 		}
 		
 		// compute the LU factorizations
@@ -709,7 +702,7 @@ int main(int argc, char* argv[])
 			start = std::chrono::steady_clock::now();
 			
 			// factorize
-			lufts[iblock] = blocks[iblock].factorize();
+			lufts[iblock] = csr_blocks[iblock].factorize();
 			
 			// log output
 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
@@ -737,7 +730,6 @@ int main(int argc, char* argv[])
 			cArray Pi_overlaps, Pi_expansion;
 			Pi_overlaps = overlapP(ni,li,weight_end_damp);
 			Pi_expansion = S.solve(Pi_overlaps);
-			CooMatrix Pi_coo(Nspline, 1, Pi_expansion.begin());
 			
 			for (int Spin = 0; Spin <= 1; Spin++)
 			{
@@ -778,10 +770,9 @@ int main(int argc, char* argv[])
 						if (prefactor == 0.)
 							continue;
 						
-						cArray Pj1, Pj2;
-						const CooMatrix& ji_coo_E_l = ji_coo[ie * (maxell + 1) + l];
-						Pj1 = kron(Pi_coo, ji_coo_E_l).todense();
-						Pj2 = kron(ji_coo_E_l, Pi_coo).todense();
+						// compute outer products of B-spline expansions
+						cArray Pj1 = outer_product(Pi_expansion, ji_expansion[ie * (maxell + 1) + l]);
+						cArray Pj2 = outer_product(ji_expansion[ie * (maxell + 1) + l], Pi_expansion);
 						
 						// skip angular forbidden right hand sides
 						for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -791,31 +782,31 @@ int main(int argc, char* argv[])
 							
 							if (f1 != 0.)
 							{
-								chi_block += (prefactor * f1) * R_tr[lambda].dot(Pj1).todense();
+								chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1).todense();
 							}
 							
 							if (f2 != 0.)
 							{
 								if (Sign > 0)
-									chi_block += (prefactor * f2) * R_tr[lambda].dot(Pj2).todense();
+									chi_block += (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
 								else
-									chi_block -= (prefactor * f2) * R_tr[lambda].dot(Pj2).todense();
+									chi_block -= (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
 							}
 						}
 						
 						if (li == l1 and l == l2)
 						{
 							// direct contribution
-							chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1).todense();
+							chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1);
 						}
 						
 						if (li == l2 and l == l1)
 						{
-							// exchange contribution
+							// exchange contribution with the correct sign
 							if (Sign > 0)
-								chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2).todense();
+								chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2);
 							else
-								chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2).todense();
+								chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2);
 						}
 					}
 				}
@@ -929,7 +920,7 @@ int main(int argc, char* argv[])
 								{
 									Complex _f = computef(lambda, l1, l2, l1p, l2p, L);
 									if (_f != 0.)
-										q_block -= _f * R_tr_csr[lambda].dot(p_block);
+										q_block -= _f * R_tr_dia[lambda].dot(p_block);
 								}
 							}
 						}

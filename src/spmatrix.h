@@ -910,6 +910,102 @@ private:
 	bool sorted_;
 };
 
+class SymDiaMatrix
+{
+public:
+	//
+	// Constructors
+	//
+
+	SymDiaMatrix() {}
+	
+	SymDiaMatrix(int m, int n) : m_(m), n_(n) {}
+
+	SymDiaMatrix(SymDiaMatrix const & A) : m_(A.m), n_(A.n_), diag_(A.diag_) {}
+
+	SymDiaMatrix(SymDiaMatrix && A) : m_(A.m), n_(A.n) { diag_ = std::move(A.diag_); }
+
+	/**
+	 * @brief Plain symmetrical populator.
+	 *
+	 * @param d How many upper diagonals to populate. The main diagonal will be populated
+	 *          always.
+	 */
+	template <class Functor> void populate(unsigned d, Functor f)
+	{
+		// for all diagonals
+		for (int id = 0; id <= d; id++)
+		{
+			// elements on the current diagonal
+			std::vector<Complex> elems;
+
+			// for all elements of the diagonal
+			for (int icol = id; icol < n_; icol++)
+			{
+				// get the row index, too
+				int irow = icol - id;
+
+				// evaluate the element
+				elems.push_back(f(irow,icol));
+			}
+
+			// append this diagonal
+			diag_.push_back(std::make_pair(id), elems);
+		}
+	}
+
+	//
+	// Destructor
+	//
+
+	~SymDiaMatrix() {}
+
+	//
+	// Arithmetic and other operators
+	//
+
+	friend SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
+	friend SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
+
+	/**
+	 * @brief Dot product.
+	 *
+	 * This is a key member of the structure, defining e.g. the speed of conjugate
+	 * gradients and evaluation of the scattering amplitudes.
+	 * 
+	 * @param B Dense matrix. It is supposed to be stored by columns and to have
+	 *          dimensions n times k, where n is the column count of *this matrix.
+	 */
+	cArray dot (cArrayView const & B) const;
+
+	/**
+	 * @brief Kronecker product.
+	 *
+	 */
+	SymDiaMatrix kron (SymDiaMatrix const & B) const;
+
+	//
+	// HDF interface
+	//
+
+	bool hdfload(const char* name);
+
+	bool hdfsave(const char* name) const;
+
+	//
+	// Conversions to other formats
+	//
+
+	CsrMatrix tocsr() const;
+
+private:
+
+	// dimensions
+	size_t m_, n_;
+
+	// diagonals
+	std::vector<std::pair<int,std::vector<Complex>> diag_;
+};
 
 // --------------------------------------------------------------------------//
 // ---- Binary arithmetic operators ---------------------------------------- //
