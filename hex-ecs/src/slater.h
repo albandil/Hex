@@ -45,4 +45,12 @@ Complex computeR (
 	cArray const & Mtr_mLm1
 );
 
+void allSymmetries (
+	int i, int j, int k, int l,
+	Complex Rijkl_tr,
+	std::vector<long> & R_tr_i,
+	std::vector<long> & R_tr_j,
+	std::vector<Complex> & R_tr_v
+);
+
 #endif

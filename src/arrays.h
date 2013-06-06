@@ -1063,6 +1063,21 @@ template <typename NumberType1, typename NumberType2> auto operator / (
 	return c /= z;
 }
 
+template <typename NumberType1, typename NumberType2> auto outer_product (
+	ArrayView<NumberType1> const & a, ArrayView<NumberType2> & b
+) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+{
+	Array<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
+	
+	auto ic = c.begin();
+	
+	for (auto a_ : a)
+	for (auto b_ : b)
+		*(ic++) = a_ * b_;
+	
+	return c;
+}
+
 // other vectorized functions
 template <typename NumberType> Array<NumberType> sqrt (Array<NumberType> const & A)
 {
@@ -1529,6 +1544,28 @@ template <typename Tidx, typename Tval> void merge (
 	// copy to the first pair
 	idx1 = idx;
 	arr1 = arr;
+}
+
+/**
+ * Join elements from all subarrays.
+ */
+template <typename T> Array<T> join (Array<Array<T>> const & arrays)
+{
+	Array<size_t> partial_sizes(arrays.size() + 1);
+	
+	// get partial sizes
+	partial_sizes[0] = 0;
+	for (size_t i = 0; i < arrays.size(); i++)
+		partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
+	
+	// result array
+	Array<T> res(partial_sizes.back());
+	
+	// concatenate arrays
+	for (size_t i = 0; i < arrays.size(); i++)
+		ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
+	
+	return res;
 }
 
 #endif

@@ -51,6 +51,7 @@
 class CooMatrix;
 class CscMatrix;
 class CsrMatrix;
+class SymDiaMatrix;
 
 /**
  * \brief Complex CSC matrix.
@@ -63,7 +64,8 @@ class CsrMatrix;
  * The format is that used in UMFPACK with interleaved real and comples parts;
  * for explanation see UMFPACK Uses's Guide.
  */
-class CscMatrix {
+class CscMatrix
+{
 	
 public:
 	
@@ -79,7 +81,7 @@ public:
 		: _m_(m), _n_(n) {}
 	CscMatrix(const CscMatrix& A)
 		: _m_(A._m_), _n_(A._n_), _p_(A._p_), _i_(A._i_), _x_(A._x_) {}
-	CscMatrix(size_t m, size_t n, const std::vector<long>& p, const std::vector<long>& i, const std::vector<Complex>& x)
+	CscMatrix(size_t m, size_t n, std::vector<long> const & p, std::vector<long> const & i, std::vector<Complex> const & x)
 		: _m_(m), _n_(n), _p_(p), _i_(i), _x_(x) {}
 	
 	// Destructor
@@ -108,61 +110,21 @@ public:
 	/**
 	 * Multiplication by a real number.
 	 */
-	CscMatrix& operator *= (double r)
-	{
-		size_t N = _i_.size();
-		
-		for (size_t i = 0; i < N; i++)
-			_x_[i] *= r;
-		
-		return *this;
-	}
+	CscMatrix & operator *= (double r);
 	
 	/**
 	 * Addition of another CSC matrix.
 	 * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
 	 * checked.
 	 */
-	CscMatrix& operator &= (const CscMatrix&  B)
-	{
-		size_t N = _i_.size();
-		
-		assert(_m_ == B._m_);
-		assert(_n_ == B._n_);
-		assert(N == B._i_.size());
-		
-		for (size_t i = 0; i < N; i++)
-		{
-			assert(_i_[i] == B._i_[i]);
-			
-			_x_[i] += B._x_[i];
-		}
-		
-		return *this;
-	}
+	CscMatrix & operator &= (const CscMatrix&  B);
 	
 	/**
 	 * Subtraction of another CSC matrix.
 	 * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
 	 * checked.
 	 */
-	CscMatrix& operator ^= (const CscMatrix&  B)
-	{
-		size_t N = _i_.size();
-		
-		assert(_m_ == B._m_);
-		assert(_n_ == B._n_);
-		assert(N == B._i_.size());
-		
-		for (size_t i = 0; i < N; i++)
-		{
-			assert(_i_[i] == B._i_[i]);
-			
-			_x_[i] -= B._x_[i];
-		}
-		
-		return *this;
-	}
+	CscMatrix& operator ^= (const CscMatrix&  B);
 	
 	/**
 	 * Save matrix to HDF file.
@@ -218,9 +180,9 @@ public:
 		: _m_(0), _n_(0) {}
 	CsrMatrix(size_t m, size_t n)
 		: _m_(m), _n_(n) {}
-	CsrMatrix(const CsrMatrix& A)
+	CsrMatrix(CsrMatrix const & A)
 		: _m_(A._m_), _n_(A._n_), _p_(A._p_), _i_(A._i_), _x_(A._x_) {}
-	CsrMatrix(size_t m, size_t n, const std::vector<long>& p, const std::vector<long>& i, const std::vector<Complex>& x)
+	CsrMatrix(size_t m, size_t n, Array<long> const & p, Array<long> const & i, Array<Complex> const & x)
 		: _m_(m), _n_(n), _p_(p), _i_(i), _x_(x) {}
 	
 	// Destructor
@@ -264,7 +226,7 @@ public:
 	 * \param c Starting column.
 	 * \param d Ending column plus one.
 	 */
-	CsrMatrix submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const;
+// 	CsrMatrix submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const;
 	
 #ifdef WITH_PNGPP
 	
@@ -406,54 +368,21 @@ public:
 	/**
 	 * Multiplication by a number.
 	 */
-	CsrMatrix& operator *= (Complex r)
-	{
-		size_t N = _i_.size();
-		
-		for (size_t i = 0; i < N; i++)
-			_x_[i] *= r;
-		
-		return *this;
-	}
+	CsrMatrix & operator *= (Complex r);
 	
 	/**
 	 * Addition of another CSR matrix.
 	 * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
 	 * checked.
 	 */
-	CsrMatrix& operator &= (const CsrMatrix&  B)
-	{
-		size_t N = _i_.size();
-		
-		// check at least dimensions and non-zero element count
-		assert(_m_ == B._m_);
-		assert(_n_ == B._n_);
-		assert(N == B._i_.size());
-		
-		for (size_t i = 0; i < N; i++)
-			_x_[i] += B._x_[i];
-		
-		return *this;
-	}
+	CsrMatrix & operator &= (CsrMatrix const & B);
 	
 	/**
 	 * Subtraction of another CSR matrix.
 	 * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
 	 * checked.
 	 */
-	CsrMatrix& operator ^= (const CsrMatrix&  B)
-	{
-		size_t N = _i_.size();
-		
-		assert(_m_ == B._m_);
-		assert(_n_ == B._n_);
-		assert(N == B._i_.size());
-		
-		for (size_t i = 0; i < N; i++)
-			_x_[i] -= B._x_[i];
-		
-		return *this;
-	}
+	CsrMatrix& operator ^= (CsrMatrix const & B);
 	
 	/**
 	 * Sets fill-in elements so that the storage structure of this matrix
@@ -461,7 +390,7 @@ public:
 	 * “fast” arithmetic operators & and ^.
 	 * \return self
 	 */
-	CsrMatrix sparse_like(const CsrMatrix& B) const;
+	CsrMatrix sparse_like(CsrMatrix const & B) const;
 	
 	/**
 	 * Return dense array with diagonal elements of the matrix.
@@ -474,7 +403,7 @@ public:
 	 * won't be used or changed.
 	 * \param b Right-hand side.
 	 */
-	cArray upperSolve(cArray const & b) const;
+	cArray upperSolve(cArrayView const & b) const;
 	
 	/**
 	 * Solves lower triangular system of equations using backsubstitution.
@@ -482,7 +411,7 @@ public:
 	 * won't be used or changed.
 	 * \param b Right-hand side.
 	 */
-	cArray lowerSolve(cArray const & b) const;
+	cArray lowerSolve(cArrayView const & b) const;
 	
 	/**
 	 * Applies a user transformation on <b>nonzero</b> matrix elements.
@@ -524,9 +453,9 @@ private:
 	long _n_;
 	
 	// representation
-	std::vector<long> _p_;
-	std::vector<long> _i_;
-	std::vector<Complex> _x_;
+	Array<long> _p_;
+	Array<long> _i_;
+	Array<Complex> _x_;
 	
 };
 
@@ -858,6 +787,9 @@ public:
 	// Convert to CSR matrix.
 	CsrMatrix tocsr() const;
 	
+	// Convert to DIA format
+	SymDiaMatrix todia() const;
+	
 	/**
 	 * Solve the Ax = b problem, where "b" can be a matrix.
 	 * \param b Complex vector containing column-major ordered data; it may be
@@ -910,8 +842,13 @@ private:
 	bool sorted_;
 };
 
-class SymDiaMatrix
-{
+/**
+ * @brief Symmetric diagonal matrix.
+ * 
+ * Only the main and upper diagonals are stored.
+ */
+class SymDiaMatrix {
+	
 public:
 	//
 	// Constructors
@@ -919,39 +856,43 @@ public:
 
 	SymDiaMatrix() {}
 	
-	SymDiaMatrix(int m, int n) : m_(m), n_(n) {}
+	SymDiaMatrix(int n);
+	
+	SymDiaMatrix(int n, Array<int> const & id, Array<Complex> const & v);
+	
+	SymDiaMatrix(SymDiaMatrix const & A);
 
-	SymDiaMatrix(SymDiaMatrix const & A) : m_(A.m), n_(A.n_), diag_(A.diag_) {}
-
-	SymDiaMatrix(SymDiaMatrix && A) : m_(A.m), n_(A.n) { diag_ = std::move(A.diag_); }
+	SymDiaMatrix(SymDiaMatrix && A);
 
 	/**
 	 * @brief Plain symmetrical populator.
 	 *
-	 * @param d How many upper diagonals to populate. The main diagonal will be populated
-	 *          always.
+	 * @param d How many upper diagonals to populate. The main diagonal will
+	 *          be populated always.
 	 */
-	template <class Functor> void populate(unsigned d, Functor f)
+	template <class Functor> SymDiaMatrix & populate(unsigned d, Functor f)
 	{
+		// empty
+		elems_.clear();
+		
 		// for all diagonals
-		for (int id = 0; id <= d; id++)
+		for (size_t id = 0; id <= d; id++)
 		{
-			// elements on the current diagonal
-			std::vector<Complex> elems;
-
+			// add this diagonal
+			idiag_.push_back(id);
+			
 			// for all elements of the diagonal
 			for (int icol = id; icol < n_; icol++)
 			{
 				// get the row index, too
 				int irow = icol - id;
-
+				
 				// evaluate the element
-				elems.push_back(f(irow,icol));
+				elems_.push_back(f(irow,icol));
 			}
-
-			// append this diagonal
-			diag_.push_back(std::make_pair(id), elems);
 		}
+		
+		return *this;
 	}
 
 	//
@@ -959,14 +900,30 @@ public:
 	//
 
 	~SymDiaMatrix() {}
-
+	
+	//
+	// Getters
+	//
+	
+	Array<int>     const & diag() const { return idiag_; }
+	Array<Complex> const & data() const { return elems_; }
+	
+	bool is_compatible (SymDiaMatrix const & B) const;
+	
 	//
 	// Arithmetic and other operators
 	//
-
+	
+	SymDiaMatrix const & operator = (SymDiaMatrix && A);
+	SymDiaMatrix const & operator = (SymDiaMatrix const & A);
+	
 	friend SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
 	friend SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
+	friend SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
 
+	SymDiaMatrix const & operator += (SymDiaMatrix const & B);
+	SymDiaMatrix const & operator -= (SymDiaMatrix const & B);
+	
 	/**
 	 * @brief Dot product.
 	 *
@@ -996,15 +953,19 @@ public:
 	// Conversions to other formats
 	//
 
-	CsrMatrix tocsr() const;
+	CooMatrix tocoo() const;
 
 private:
 
-	// dimensions
-	size_t m_, n_;
+	// dimension (only square matrices allowed)
+	int n_;
 
-	// diagonals
-	std::vector<std::pair<int,std::vector<Complex>> diag_;
+	// diagonals: concatenated diagonals starting from the longest
+	// to the shortest
+	cArray elems_;
+	
+	// diagonal ids starting from zero (always)
+	Array<int> idiag_;
 };
 
 // --------------------------------------------------------------------------//
@@ -1171,7 +1132,7 @@ CooMatrix stairs(size_t N);
  * \return Iteration count.
  */
 template <typename TFunctor1, typename TFunctor2>
-unsigned cg_callbacks(
+unsigned cg_callbacks (
 	cArray const & b, cArray & x,
 	double eps,
 	unsigned min_iterations, unsigned max_iterations,

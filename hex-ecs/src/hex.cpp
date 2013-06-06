@@ -17,6 +17,7 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+#include <string>
 #include <tuple>
 
 #include <gsl/gsl_errno.h>
@@ -55,7 +56,7 @@ int main(int argc, char* argv[])
     
 	// disable buffering of the standard output 
 	// (so that all text messages are immediatelly visible)
-	std::setvbuf(stdout, nullptr, _IONBF, 0);
+	setvbuf(stdout, nullptr, _IONBF, 0);
 	
 	// variables that can be set by the user from the command line
 	std::ifstream inputfile;    // input file
@@ -226,7 +227,7 @@ int main(int argc, char* argv[])
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
 	//
-	CooMatrix D (Nspline,Nspline);
+	SymDiaMatrix D(Nspline);
 	//
 	D.hdfload("D.hdf") or D.populate (
 		order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); }
@@ -239,9 +240,9 @@ int main(int argc, char* argv[])
 	
 	// Precompute useful integral moments ---------------------------------- //
 	//
-	SymDiaMatrix S(Nspline, Nspline);
-	SymDiaMatrix Mm1(Nspline, Nspline), Mm1_tr(Nspline, Nspline);
-	SymDiaMatrix Mm2(Nspline, Nspline);
+	SymDiaMatrix S(Nspline);
+	SymDiaMatrix Mm1(Nspline), Mm1_tr(Nspline);
+	SymDiaMatrix Mm2(Nspline);
 	//
 	S.hdfload("S.hdf") or S.populate (
 		order, [=](int m, int n) -> Complex { return computeM(0, m, n); }
@@ -277,18 +278,7 @@ int main(int argc, char* argv[])
 	// to the interchange of indices in multiindex and it is dense.
 	
 	int maxlambda = 2 * maxell;
-	std::vector<CooMatrix> R_tr_coo(maxlambda + 1);
-	
-	//
-	//  a) (ijv)-representation of sparse amtrices
-	//
-	
-	std::vector<long>   Rtr_i, Rtr_j;
-	std::vector<Complex> Rtr_v;
-	
-	//
-	//  b) iterate over multipoles
-	//
+	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
 	
 	#pragma omp parallel
 	{
@@ -302,14 +292,12 @@ int main(int argc, char* argv[])
 		}
 	}
 	
+	// for all multipoles
 	for (int lambda = 0; lambda <= maxlambda; lambda++)
 	{
-		//
-		// c) look for precomputed data on disk
-		//
-		
+		// look for precomputed data on disk
 		std::ostringstream oss2;
-		oss2 << "R_tr[" << lambda << "].hdf";
+		oss2 << "R_tr_dia_" << lambda << ".hdf";
 		
 		int R_integ_exists; // whether there are valid precomputed data
 		
@@ -326,7 +314,7 @@ int main(int argc, char* argv[])
 		if (I_am_master)
 		{
 #endif
-			R_integ_exists = R_tr[lambda].hdfload(oss2.str().c_str());
+			R_integ_exists = R_tr_dia[lambda].hdfload(oss2.str().c_str());
 #ifndef NO_MPI
 		}
 #endif
@@ -341,27 +329,25 @@ int main(int argc, char* argv[])
 			if (R_integ_exists)
 			{
 				// get dimensions
-				int size = R_tr[lambda].size();
-				int m = R_tr[lambda].rows();
-				int n = R_tr[lambda].cols();
+				int diagsize = R_tr_dia[lambda].diag().size();
+				int datasize = R_tr_dia[lambda].data().size();
 				
 				// master will broadcast dimensions
-				MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&m,    1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&n,    1, MPI_INT, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&diagsize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&datasize, 1, MPI_INT, 0, MPI_COMM_WORLD);
 				
 				// get arrays
-				std::vector<long>    i = R_tr[lambda].i();    i.resize(size);
-				std::vector<long>    j = R_tr[lambda].j();    j.resize(size);
-				std::vector<Complex> v = R_tr[lambda].v();    v.resize(size);
+				Array<int>     diag = R_tr_dia[lambda].diag();
+				Array<Complex> data = R_tr_dia[lambda].data();
+				diag.resize(diagsize);
+				data.resize(datasize);
 				
 				// master will broadcast arrays
-				MPI_Bcast(&i[0], i.size(), MPI_LONG, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&j[0], j.size(), MPI_LONG, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&v[0], v.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&diag[0], diag.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
 				
 				// reconstruct objects
-				R_tr_coo[lambda] = CooMatrix(m, n, i, j, v);
+				R_tr_dia[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
 			}
 		}
 #endif
@@ -372,116 +358,60 @@ int main(int argc, char* argv[])
 			continue; // no need to compute
 		}
 		
-		//
-		// d) precompute necessary partial integral moments
-		// 
-		
-		// truncated moments λ and -λ-1
+		// precompute necessary partial integral moments
+		// - truncated moments λ and -λ-1
 		cArray Mtr_L    = computeMi( lambda,   Nreknot-1);
 		cArray Mtr_mLm1 = computeMi(-lambda-1, Nreknot-1);
 		
-		//
-		// e) compute elements of Rtr
-		//
+		// elements of R_tr
+		std::vector<long> R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
+		std::vector<Complex> R_tr_v, th_R_tr_v;
 		
-		Rtr_i.clear();
-		Rtr_j.clear();
-		Rtr_v.clear();
-		
-		#pragma omp parallel \
-			default (none) \
-			shared (std::cout, Rtr_i, Rtr_j, Rtr_v) \
-			firstprivate (Nspline, order, Mtr_L, Mtr_mLm1, lambda)
+		# pragma omp parallel default(none) \
+			private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
+			firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
+			shared (R_tr_i, R_tr_j, R_tr_v)
 		{
-			// reserve threads' private storage
-			int vol = Nspline * Nspline * order * order;
-			std::vector<long>   th_Rtr_i, th_Rtr_j;
-			std::vector<Complex> th_Rtr_v;
-			th_Rtr_i.reserve(vol);
-			th_Rtr_j.reserve(vol);
-			th_Rtr_v.reserve(vol);
-			
-			// [ij] multi-index loop
-			#pragma omp for schedule(dynamic)
+			// for all B-spline pairs
+			# pragma omp for collapse(2)
 			for (int i = 0; i < Nspline; i++)
+			for (int j = 0; j < Nspline; j++)
 			{
-				
-				#pragma omp critical
+				// for all nonzero, nonsymmetry R-integrals
+				for (int k = i; k < i + order and k < Nspline; k++) // enforce i ≤ k
+				for (int l = j; l < j + order and l < Nspline; l++) // enforce j ≤ l
 				{
-					std::cout << "\r\t- multipole λ = " << lambda << "... "
-					          << int(trunc(i * 100. / Nspline + 0.5)) << " %";
-				}
-				
-				for (int j = i; j < Nspline; j++)
-				{
-					// [ij] and [ji] multi-indices
-					int ij_multi = i * Nspline + j;
-					int ji_multi = j * Nspline + i;
+					// skip symmetry ijkl <-> jilk (others are accounted for in the limits
+					if (i > j and k > l)
+						continue;
 					
-					// [kl] multi-index loop; both "k" and "l" are restricted
-					// to relatively narrow band of width 2*order+1
-					for (int k = ((i > order)? i - order : 0); k < Nspline and k <= i + order; k++)
-					{
-						for (int l = ((j > order)? j - order : 0); l < Nspline and l <= j + order; l++)
-						{
-							// [kl] and [lk] multi-indices
-							int kl_multi = k * Nspline + l;
-							int lk_multi = l * Nspline + k;
-							
-							// compute the integral
-							Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-							
-							// coordinates of nonzero-elements
-							th_Rtr_i.push_back(ij_multi);
-							th_Rtr_j.push_back(kl_multi);
-							
-							// R₀-truncated integral
-							th_Rtr_v.push_back(Rijkl_tr.real());
-							
-							// if not at ij-diagonal, use symmetry
-							//  Rλ(i,j,k,l) = Rλ(j,i,l,k)
-							if (i != j)
-							{
-								// coordinates of nonzero-elements
-								th_Rtr_i.push_back(ji_multi);
-								th_Rtr_j.push_back(lk_multi);
-								
-								// R₀-truncated integral
-								th_Rtr_v.push_back(Rijkl_tr.real());
-							}
-						}
-					} // end of [jl] multi-index loop
+					// evaluate B-spline integral
+					Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
 					
+					// store all symmetries
+					allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
 				}
-			} // end of [ik] multi-index loop
-			
-			// copy threads' results to shared arrays
-			#pragma omp critical
-			{
-				Rtr_i.insert(Rtr_i.begin(), th_Rtr_i.begin(), th_Rtr_i.end());
-				Rtr_j.insert(Rtr_j.begin(), th_Rtr_j.begin(), th_Rtr_j.end());
-				Rtr_v.insert(Rtr_v.begin(), th_Rtr_v.begin(), th_Rtr_v.end());
 			}
 			
-		} // end of PARALLEL
+			# pragma omp critical
+			{
+				// merge the thread local arrays
+				R_tr_i.insert(R_tr_i.end(), th_R_tr_i.begin(), th_R_tr_i.end());
+				R_tr_j.insert(R_tr_j.end(), th_R_tr_j.begin(), th_R_tr_j.end());
+				R_tr_v.insert(R_tr_v.end(), th_R_tr_v.begin(), th_R_tr_v.end());
+			}
+		}
 		
-		//
-		// f) create coo-matrices
-		//
-		
-		size_t R_size = Nspline * Nspline;
-		R_tr_coo[lambda] = CooMatrix (R_size, R_size, Rtr_i, Rtr_j, Rtr_v).shake();
-		
-		//
-		// g) save them to disk
-		//
-		
-		R_tr_coo[lambda].hdfsave(oss2.str().c_str());
+		// create matrices and save them to disk
+		std::cout << "convert...\n";
+		R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia();
+		std::cout << "convert...OK\n";
+		R_tr_dia[lambda].hdfsave(oss2.str().c_str());
 		
 		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";
 		
 	}
-	std::cout << "\t- R_tr[λ] has " << R_tr[0].size() << " nonzero elements\n";
+	std::cout << "\t- R_tr[λ] has " << R_tr_dia[0].data().size() << " nonzero elements\n";
 	// --------------------------------------------------------------------- //
 	
 	
@@ -526,13 +456,8 @@ int main(int argc, char* argv[])
 	//  compute expansions; solve the system
 	//      S * B_spline_expansion = B_spline_overlap
 	unsigned ji_expansion_count = ji_overlaps.size()/Nspline;
-	cArray ji_expansion = S.solve(ji_overlaps, ji_expansion_count);
+	cArray ji_expansion = S.tocoo().tocsr().solve(ji_overlaps, ji_expansion_count);
 	ji_expansion.hdfsave("ji_expansion.hdf"); // just for debugging
-	
-	// construct sparse matrices from the data
-	std::vector<CooMatrix> ji_coo(ji_overlaps.size()/Nspline);
-	for (unsigned idx_j = 0; idx_j < ji_expansion_count; idx_j++)
-		ji_coo[idx_j] = CooMatrix(Nspline, 1, ji_expansion.begin() + idx_j * Nspline);
 	
 	std::cout << "ok\n";
 	// --------------------------------------------------------------------- //
@@ -547,19 +472,9 @@ int main(int argc, char* argv[])
 	SymDiaMatrix S_kron_Mm2 = S.kron(Mm2);
 	SymDiaMatrix Mm1_tr_kron_S = Mm1_tr.kron(S);
 	SymDiaMatrix Mm2_kron_S = Mm2.kron(S);
-	SymDiaMatrix hslf_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
+	SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
 	SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
 	SymDiaMatrix S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
-	
-	// DIA representation of R_tr_coo matrices
-	// - these will be used to construct blocks and in matrix multiplication
-	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
-	std::transform (
-		R_tr_coo.begin(),
-		R_tr_coo.end(),
-		R_tr_dia.begin(),
-		[ & ](CooMatrix const & coo) -> SymDiaMatrix { return coo.todia(); }
-	);
 	std::cout << "ok\n";
 	// --------------------------------------------------------------------- //
 	
@@ -671,14 +586,14 @@ int main(int argc, char* argv[])
 			// two-electron part
 			for (int lambda = 0; lambda <= maxlambda; lambda++)
 			{
-				Complex _f = computef(lambda,l1,l2,l1,l2,L);
-				if (_f != 0.)
-					Hdiag += _f * R_tr[lambda];
+				Complex f = computef(lambda,l1,l2,l1,l2,L);
+				if (f != 0.)
+					Hdiag += f * R_tr_dia[lambda];
 			}
 			
 			// finalize the matrix
 			dia_blocks[iblock] = E*S_kron_S - Hdiag;
-			csr_blocks[iblock] = dia_blocks[iblock].tocsr();
+			csr_blocks[iblock] = dia_blocks[iblock].tocoo().tocsr();
 		}
 		
 		// compute the LU factorizations
@@ -729,7 +644,7 @@ int main(int argc, char* argv[])
 			// compute P-overlaps and P-expansion
 			cArray Pi_overlaps, Pi_expansion;
 			Pi_overlaps = overlapP(ni,li,weight_end_damp);
-			Pi_expansion = S.solve(Pi_overlaps);
+			Pi_expansion = S.tocoo().tocsr().solve(Pi_overlaps);
 			
 			for (int Spin = 0; Spin <= 1; Spin++)
 			{
@@ -770,9 +685,16 @@ int main(int argc, char* argv[])
 						if (prefactor == 0.)
 							continue;
 						
+						// pick the correct Bessel function expansion
+						cArrayView Ji_expansion (
+							ji_expansion,
+							Nspline * (ie * (maxell + 1) + l),
+							Nspline
+						);
+						
 						// compute outer products of B-spline expansions
-						cArray Pj1 = outer_product(Pi_expansion, ji_expansion[ie * (maxell + 1) + l]);
-						cArray Pj2 = outer_product(ji_expansion[ie * (maxell + 1) + l], Pi_expansion);
+						cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
+						cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
 						
 						// skip angular forbidden right hand sides
 						for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -782,7 +704,7 @@ int main(int argc, char* argv[])
 							
 							if (f1 != 0.)
 							{
-								chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1).todense();
+								chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1);
 							}
 							
 							if (f2 != 0.)
@@ -911,7 +833,7 @@ int main(int argc, char* argv[])
 							if (iblock == blockp)
 							{
 								// reuse the diagonal block
-								q_block += blocks[iblock].dot(p_block);
+								q_block += dia_blocks[iblock].dot(p_block);
 							}
 							else
 							{
