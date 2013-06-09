@@ -67,6 +67,13 @@ template <typename NumberType> class ArrayView
 			array = const_cast<NumberType*>(&a[0]) + i;
 		}
 		
+		// construct from iterators
+		ArrayView(NumberType const * i, NumberType const * j)
+		{
+			N = j - i;
+			array = const_cast<NumberType*>(&(*i));
+		}
+		
 		// destructor
 		~ArrayView() {}
 		
@@ -77,7 +84,7 @@ template <typename NumberType> class ArrayView
 		virtual ArrayView<NumberType> & operator= (Array<NumberType> const & v)
 		{
 			if (v.size() != N)
-				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
+				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
 			
 			for (size_t i = 0; i < N; i++)
 				array[i] = v[i];
@@ -452,6 +459,28 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				new_array[N + it - first] = *it;
 			N += last - first;
 			delete [] array;
+			array = new_array;
+		}
+		
+		void insert (iterator it, NumberType x)
+		{
+			// create new array (one element longer)
+			NumberType* new_array = new NumberType [N + 1];
+			
+			// copy everything to the new location
+			for (int i = 0; i < it - array; i++)
+				new_array[i] = std::move(array[i]);
+			
+			// insert new element
+			*(new_array + (it - array)) = std::move(x);
+			
+			// copy the rest
+			for (int i = it - array; i < (int)N; i++)
+				new_array[i+1] = std::move(array[i]);
+			
+			// change pointers
+			delete [] array;
+			N++;
 			array = new_array;
 		}
 		
@@ -1102,7 +1131,7 @@ inline Array<double> sqrabs (Array<Complex> const & A)
 }
 
 // output to text stream.
-template <typename NumberType> std::ostream & operator << (std::ostream & out, Array<NumberType> const & a)
+template <typename NumberType> std::ostream & operator << (std::ostream & out, ArrayView<NumberType> const & a)
 {
 	out << "[";
 	for (size_t i = 0; i < a.size(); i++)
@@ -1563,7 +1592,10 @@ template <typename T> Array<T> join (Array<Array<T>> const & arrays)
 	
 	// concatenate arrays
 	for (size_t i = 0; i < arrays.size(); i++)
-		ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
+	{
+		if (arrays[i].size() > 0)
+			ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
+	}
 	
 	return res;
 }

@@ -955,16 +955,22 @@ public:
 
 	CooMatrix tocoo() const;
 
+	//
+	// Output
+	//
+	
+	friend std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A);
+	
 private:
 
 	// dimension (only square matrices allowed)
 	int n_;
 
 	// diagonals: concatenated diagonals starting from the longest
-	// to the shortest
+	// to the shortest (i.e. with rising right index)
 	cArray elems_;
 	
-	// diagonal ids starting from zero (always)
+	// diagonal right indices starting from zero
 	Array<int> idiag_;
 };
 

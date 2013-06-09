@@ -403,9 +403,7 @@ int main(int argc, char* argv[])
 		}
 		
 		// create matrices and save them to disk
-		std::cout << "convert...\n";
 		R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia();
-		std::cout << "convert...OK\n";
 		R_tr_dia[lambda].hdfsave(oss2.str().c_str());
 		
 		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";

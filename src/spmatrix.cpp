@@ -1149,8 +1149,6 @@ SymDiaMatrix CooMatrix::todia() const
 	// sort diagonals
 	std::sort(diags.begin(), diags.end());
 	
-	std::cout << "diags = " << diags << "\n";
-	
 	// all diagonals
 	cArrays elems(_m_);
 	
@@ -1176,11 +1174,12 @@ SymDiaMatrix CooMatrix::todia() const
 
 void CooMatrix::write(const char* filename) const
 {
-	FILE *f = fopen(filename, "w");
-	fprintf(f, "# Matrix %ld × %ld with %ld nonzero elements:\n\n", _m_, _n_, _x_.size());
+	std::ofstream f(filename);
+	
+	f << "# Matrix " << _m_ << " × " << _n_ << " with " << _x_.size() << " nonzero elements:\n\n";
+	
 	for (size_t i = 0; i < _i_.size(); i++)
-		fprintf(f, "%ld\t%ld\t%g\t%g\n", _i_[i], _j_[i], _x_[i].real(), _x_[i].imag());
-	fclose(f);
+		f << _i_[i] << "\t" << _j_[i] << "\t" << _x_[i].real() << "\t" << _x_[i].imag() << "\n";
 }
 
 
@@ -1427,13 +1426,21 @@ bool CooMatrix::hdfload(const char* name)
 SymDiaMatrix::SymDiaMatrix(int n) : n_(n) {}
 
 SymDiaMatrix::SymDiaMatrix(int n, Array<int> const & id, Array<Complex> const & v)
-	: n_(n), elems_(v), idiag_(id) {}
+	: n_(n), elems_(v), idiag_(id)
+{
+// 	std::cout << "Constructing from arrays.\n";
+}
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
-	: n_(A.n_), elems_(A.elems_), idiag_(A.idiag_) {}
+	: n_(A.n_), elems_(A.elems_), idiag_(A.idiag_)
+{
+// 	std::cout << "Constructing from l-value const reference.\n";
+}
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
 {
+// 	std::cout << "Constructing from r-value reference.\n";
+	
 	n_ = std::move(A.n_);
 	elems_ = std::move(A.elems_);
 	idiag_ = std::move(A.idiag_);
@@ -1461,6 +1468,8 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 
 SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix&& A)
 {
+// 	std::cout << "[SymDiaMatrix::operator=] (from r-value reference)\n";
+	
 	n_ = std::move(A.n_);
 	elems_ = std::move(A.elems_);
 	idiag_ = std::move(A.idiag_);
@@ -1469,6 +1478,8 @@ SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix&& A)
 
 SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix const & A)
 {
+// 	std::cout << "[SymDiaMatrix::operator=] (from l-value const reference)\n";
+	
 	n_ = A.n_;
 	elems_ = A.elems_;
 	idiag_ = A.idiag_;
@@ -1497,7 +1508,7 @@ bool SymDiaMatrix::is_compatible(const SymDiaMatrix& B) const
 	if (n_ != B.n_)
 		throw exception ("[SymDiaMatrix::operator+=] Unequal ranks.");
 	if (idiag_.size() != B.idiag_.size())
-		throw exception ("[SymDiaMatrix::operator+=] Unequal number of diagonals.");
+		throw exception ("[SymDiaMatrix::operator+=] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
 	for (size_t i = 0; i < idiag_.size(); i++)
 		if (idiag_[i] != B.idiag_[i])
 			throw exception ("[SymDiaMatrix::operator+=] Unequal distribution of diagonals.");
@@ -1653,70 +1664,98 @@ cArray SymDiaMatrix::dot(cArrayView const & __restrict B) const __restrict
 	return res;
 }
 
-SymDiaMatrix SymDiaMatrix::kron(SymDiaMatrix const & B) const
+SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
-	// initializations
-	Array<int> new_diags(idiag_.size()*B.idiag_.size());
-	Array<int>::iterator new_diags_iter = new_diags.begin();
+	// FIXME
+	return ::kron (this->tocoo(), B.tocoo()).todia();
 	
-	Array<Complex> new_elements(elems_.size()*B.elems_.size());
-	Array<Complex>::iterator new_elements_iter = new_elements.begin();
+// 	// new diagonals
+// 	Array<int> ids;
+// 	Array<cArray> diagonals;
+// 	
+// 	// elements
+// 	cArray::const_iterator ita, itb;
+// 	
+// 	ita = elems_.begin();
+// 	for (int ida = 0; ida < (int)idiag_.size(); ida++)
+// 	{
+// 		itb = B.elems_.begin();
+// 		for (int idb = 0; idb < (int)B.idiag_.size(); idb++)
+// 		{
+// 			// get data view of the current *this and B matrix
+// 			cArrayView Aview (ita, ita + n_   -   idiag_[ida]);
+// 			cArrayView Bview (itb, itb + B.n_ - B.idiag_[idb]);
+// 			
+// 			std::cout << "Aview = " << Aview << "\n";
+// 			std::cout << "Bview = " << Bview << "\n";
+// 			
+// 			// compute (both right and left) index of the new diagonal
+// 			int idleft = idiag_[ida] * B.n_ - B.idiag_[idb];
+// 			int idrigh = idiag_[ida] * B.n_ + B.idiag_[idb];
+// 			
+// 			// new elements
+// 			cArray new_diagonal_left(n_ * B.n_), new_diagonal_righ(n_ * B.n_);
+// 			cArray::iterator itndl = new_diagonal_left.begin();
+// 			cArray::iterator itndr = new_diagonal_righ.begin();
+// 			
+// 			// for all element pairs
+// 			for (Complex a : Aview)
+// 			{
+// 				// pad the left diagonal with zeros
+// 				for (int i = 0; i < B.idiag_[idb]; i++)
+// 					*(itndl++) = 0.;
+// 				
+// 				// compute elements
+// 				for (Complex b : Bview)
+// 					*(itndl++) = *(itndr++) = a * b;
+// 				
+// 				// pad the right diagonal with zeros
+// 				for (int i = 0; i < B.idiag_[idb]; i++)
+// 					*(itndr++) = 0.;
+// 			}
+// 			
+// 			// find correct place for these new diagonals & insert new diagonals
+// 			if (idleft > 0 and idleft != idrigh)
+// 			{
+// 				int l = std::lower_bound(ids.begin(), ids.end(), idleft)-ids.begin();
+// 				ids.push_back(l);
+// 				new_diagonal_left.resize(n_ * B.n_ - idleft);
+// 				diagonals.insert(diagonals.begin() + l, new_diagonal_left);
+// 				std::cout << "Add [" << l << "]: " << new_diagonal_left << "\n";
+// 			}
+// 			int r = std::lower_bound(ids.begin(), ids.end(), idrigh)-ids.begin();
+// 			ids.push_back(r);
+// 			new_diagonal_righ.resize(n_ * B.n_ - idrigh);
+// 			diagonals.insert(diagonals.begin() + r, new_diagonal_righ);
+// 			std::cout << "Add [" << r << "]: " << new_diagonal_righ << "\n";
+// 			
+// 			// move to next B-diagonal
+// 			itb += B.n_ - B.idiag_[idb];
+// 		}
+// 		
+// 		// move to next A-diagonal
+// 		ita += n_ - idiag_[ida];
+// 	}
+// 	
+// 	std::cout << "ids = " << ids << "\n";
+// 	std::cout << "join(diagonals) = " << join(diagonals) << "\n";
+// 	
+// 	// construct and return a new multi-diagonal matrix
+// 	return SymDiaMatrix(n_ * B.n_, ids, join(diagonals));
+}
+
+std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A)
+{
+	Array<Complex>::const_iterator iter = A.elems_.begin();
 	
-	Array<Complex>::const_iterator ita = elems_.begin();
-	Array<Complex>::const_iterator itb = B.elems_.begin();
-	
-	//
-	// create new diagonal indices
-	//
-	
-	for (int i = 0; i < (int)idiag_.size(); i++)
-	for (int j = -(int)B.idiag_.size(); j < (int)B.idiag_.size(); j++)
+	for (auto id : A.idiag_)
 	{
-		// get diagonal index
-		int id = i * n_ + j;
+		out << "[" << id << "]: ";
+		for (int i = 0; i < A.n_ - id; i++)
+			out << *(iter++) << " ";
 		
-		// skip negative diagonals
-		if (id < 0)
-			continue;
-		
-		// add a diagonal
-		*(new_diags_iter++) = id;
+		std::cout << "\n";
 	}
 	
-	//
-	// compute elements
-	//
-	
-	// for all A's diagonals
-	for (auto idA : idiag_)
-	{
-		// re-initialize B-iterator
-		itb = B.elems_.begin();
-		
-		// for all B's diagonals
-		for (auto idB : B.idiag_)
-		{
-			// for all elements in A's idA-th diagonal
-			for (int ia = 0; ia < n_ - idA; ia++)
-			{
-				// for all elements in B's idB-th diagonal
-				for (int ib = 0; ib < B.n_ - idB; ib++)
-				{
-					// add element to the resulting matrix
-					*(new_elements_iter++) = *(ita) * *(itb++);
-				}
-				
-				// pad with zeros
-				for (int ib = 0; ib < idB; ib++)
-				{
-					*(new_elements_iter++) = 0.;
-				}
-				
-				// advance A-iterator
-				ita++;
-			}
-		}
-	}
-	
-	return SymDiaMatrix (n_ * B.n_, new_diags, new_elements);
+	return out;
 }
