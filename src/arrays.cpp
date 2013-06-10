@@ -12,8 +12,9 @@
 
 #include <map>
 #include <vector>
+
 #ifndef NO_HDF
-#include <H5Cpp.h>
+	#include <H5Cpp.h>
 #endif
 
 #include "arrays.h"
@@ -198,36 +199,36 @@ void write_array(qArray const & array, const char* filename)
 	fclose(f);
 }
 
-rArray logspace(double x0, double x1, unsigned N)
-{
-	if (x0 <= 0 or x1 <= 0 or x1 < x0)
-	{
-		fprintf(stderr, "[logspace] It must be 0 < x1 <= x2 !\n");
-		abort();
-	}
-	
-	rArray grid(N);
-	
-	if (N == 1)
-		grid[0] = x0;
-	
-	if (N > 1)
-		for (unsigned i = 0; i < N; i++)
-			grid[i] = x0 * pow(x1 / x0, i / (N - 1.));
-	
-	return grid;
-}
+// rArray logspace(double x0, double x1, unsigned N)
+// {
+// 	if (x0 <= 0 or x1 <= 0 or x1 < x0)
+// 	{
+// 		fprintf(stderr, "[logspace] It must be 0 < x1 <= x2 !\n");
+// 		abort();
+// 	}
+// 	
+// 	rArray grid(N);
+// 	
+// 	if (N == 1)
+// 		grid[0] = x0;
+// 	
+// 	if (N > 1)
+// 		for (unsigned i = 0; i < N; i++)
+// 			grid[i] = x0 * pow(x1 / x0, i / (N - 1.));
+// 	
+// 	return grid;
+// }
 
-rArray linspace(double x0, double x1, unsigned N)
-{
-	rArray grid(N);
-	
-	if (N == 1)
-		grid[0] = x0;
-	
-	if (N > 1)
-		for (unsigned i = 0; i < N; i++)
-			grid[i] = x0 + (x1 - x0) * i / (N - 1);
-	
-	return grid;
-}
+// rArray linspace(double x0, double x1, unsigned N)
+// {
+// 	rArray grid(N);
+// 	
+// 	if (N == 1)
+// 		grid[0] = x0;
+// 	
+// 	if (N > 1)
+// 		for (unsigned i = 0; i < N; i++)
+// 			grid[i] = x0 + (x1 - x0) * i / (N - 1);
+// 	
+// 	return grid;
+// }

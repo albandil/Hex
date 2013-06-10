@@ -79,13 +79,15 @@ cArray computeLambda (
  * \param li Initial atomic state - orbital quantum number.
  * \param mi Initial atomic state - magnetic quantum number.
  * \param Ei Initial projectile energies.
+ * \param ics Ionization cross section (on return).
  * \return Vector of radial integrals.
  */
 cArrays computeXi (
 	int maxell,
 	int L, int Spin,
 	int ni, int li, int mi,
-	rArray const & Ei
+	rArray const & Ei,
+	rArray & ics
 );
 
 #endif

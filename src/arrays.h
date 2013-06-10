@@ -1210,42 +1210,42 @@ template <typename NumberType> void write_array(Array<NumberType> const & array,
  * \param array The array to write (data for second column).
  * \param filename Name of the file to create/overwrite.
  */
-template <typename NumberType1, typename NumberType2> void write_array(
-	Array<NumberType1> const & grid, Array<NumberType2> const & array, const char* filename
-)
-{
-	std::ofstream fout(filename);
-	for (size_t i = 0; i < grid.size(); i++)
-	{
-		if (typeid(NumberType1) == typeid (double))
-		{
-				fout << grid[i] << "\t";
-		}
-		else if (typeid(NumberType1) == typeid (Complex))
-		{
-			fout << Complex(grid[i]).real() << "\t" << Complex(grid[i]).imag() << "\t";
-		}
-		else
-		{
-			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType1).name() << std::endl;
-			return;
-		}
-		
-		if (typeid(NumberType2) == typeid (double))
-		{
-				fout << array[i] << std::endl;
-		}
-		else if (typeid(NumberType2) == typeid (Complex))
-		{
-			fout << Complex(array[i]).real() << "\t" << Complex(array[i]).imag() << std::endl;
-		}
-		else
-		{
-			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType2).name() << std::endl;
-			return;
-		}
-	}
-}
+// template <typename NumberType1, typename NumberType2> void write_array (
+// 	Array<NumberType1> const & grid, Array<NumberType2> const & array, const char* filename
+// )
+// {
+// 	std::ofstream fout(filename);
+// 	for (size_t i = 0; i < grid.size(); i++)
+// 	{
+// 		if (typeid(NumberType1) == typeid (double))
+// 		{
+// 			fout << grid[i] << "\t";
+// 		}
+// 		else if (typeid(NumberType1) == typeid (Complex))
+// 		{
+// 			fout << Complex(grid[i]).real() << "\t" << Complex(grid[i]).imag() << "\t";
+// 		}
+// 		else
+// 		{
+// 			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType1).name() << std::endl;
+// 			return;
+// 		}
+// 		
+// 		if (typeid(NumberType2) == typeid (double))
+// 		{
+// 			fout << array[i] << std::endl;
+// 		}
+// 		else if (typeid(NumberType2) == typeid (Complex))
+// 		{
+// 			fout << Complex(array[i]).real() << "\t" << Complex(array[i]).imag() << std::endl;
+// 		}
+// 		else
+// 		{
+// 			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType2).name() << std::endl;
+// 			return;
+// 		}
+// 	}
+// }
 
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {

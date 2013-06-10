@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <vector>
 
+#include <fftw3.h>
+
 #include "angs.h"
 #include "arrays.h"
 #include "bspline.h"
@@ -138,8 +140,9 @@ cArray computeLambda (
 	return rads;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei)
+cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei, rArray & ics)
 {
+	ics.resize(Ei.size());
 	cArrays results;
 	
 	// shorthands
@@ -149,7 +152,8 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 	int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
 	
 	// determine evaluation radius
-	double rho = t[Nreknot-2].real();
+	char const * HEX_RHO = getenv("HEX_RHO");
+ 	double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : atof(HEX_RHO);
 	
 	// auxiliary variables
 	cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
@@ -182,6 +186,17 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				(l1 * (maxell + 1) + l2) * Nspline * Nspline, 
 				Nspline * Nspline
 			);
+			
+			/// DEBUG
+			write_2D_data (
+				Nspline, Nspline,
+				"psi.dat",
+				[&](int i, int j) -> double {
+					return PsiSc[i*Nspline+j].real();
+				}
+			);
+			bool debug = true;
+			///
 			
 			// we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
 			auto fLSl1l2k1k2 = [&](double k1) -> Complex {
@@ -244,15 +259,18 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				};
 				
 				/// DEBUG
-// 				std::ofstream ofs("integrand.dat");
-// 				for (int ia = 0; ia < 1000; ia++)
-// 				{
-// 					double alpha = 0.5 * M_PI * ia / 1000;
-// 					Complex v = integrand(alpha);
-// 					ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
-// 				}
-// 				ofs.close();
-// 				exit(0);
+				if (debug)
+				{
+					std::ofstream ofs("integrand.dat");
+					for (int ia = 0; ia < 1000; ia++)
+					{
+						double alpha = 0.5 * M_PI * ia / 1000;
+						Complex v = integrand(alpha);
+						ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
+					}
+					ofs.close();
+// 					exit(0);
+				}
 				///
 				
 				// integrator
@@ -260,11 +278,14 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				Q.setEps(1e-6);
 				Complex res = 2. * k1 * k2 * rho * Q.integrate(0., 0.5 * M_PI) / (sqrt(M_PI));
 				
-// 				std::cout << k1 << "\t" << res << "\n";
-				
 				return res;
 				
 			};
+			
+			/// DEBUG
+			fLSl1l2k1k2(sqrt(0.5*(Ei[ie]-1./(ni*ni))));
+			debug = false;
+			///
 			
 			/// DEBUG
 // 			std::ofstream ofs("fLSl1l2k1k2.dat");
@@ -285,9 +306,6 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			// convergence loop
 			for (int N = 4; ; N *= 2)
 			{
-				
-// 				std::cout << "N = " << N << "\n";
-				
 				// build the approximation
 				CB.generate(fLSl1l2k1k2, N, 0., sqrt(Ei[ie] - 1./(ni*ni)));
 				
@@ -301,16 +319,59 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				if (CB.tail(1e-5) != N)
 					break;
 				
-// 				std::cout << CB.str() << "\n";
-				
 				// limit subdivision
 				if (N > 32768)
 					throw exception("ERROR: Non-convergent Chebyshev expansion.");
 			}
 			
-// 			exit(0);
-			
 			results.push_back(CB.coeffs());
+			
+			//
+			// integrate the expansion
+			//
+			
+			// setup FFTW
+			int N = CB.coeffs().size();
+			cArray mirror_coeffs(4*N+1), evalf(4*N);
+			fftw_plan plan = fftw_plan_dft_1d (
+				4*N,
+				reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
+				reinterpret_cast<fftw_complex*>(&evalf[0]),
+				FFTW_FORWARD,
+				0
+			);
+			
+			// mirror oddly around N (3N), evenly around 2N (0,4N)
+			for (int k = 0; k < N; k++)
+			{
+				mirror_coeffs[4*N-k] = mirror_coeffs[k] = CB.coeffs()[k];
+				mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -CB.coeffs()[k];
+			}
+			
+			// integrate
+			//    ₁                       n/2-1                
+			//   ⌠              dx     2π ===  |       2j+1     |²
+			// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
+			//   ⌡           √(1-x²)   n  ===  |        2n      |
+			//  ⁰                         j=0
+			// where
+			//                        N-1
+			//        2j+1       c₀   ===         j+½
+			//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
+			//         2n        2    ===          n
+			//                        k=1
+			// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
+			// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
+			
+			// evaluate the function using the FFT
+			fftw_execute(plan);
+			fftw_destroy_plan(plan);
+			
+			// sum contributions
+			ics[ie] = 0.;
+			for (int j = 0; j < N/2; j++)
+				ics[ie] += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
+			ics[ie] *= 0.0625 * M_PI / CB.coeffs().size(); // (FFTW magic) 1/4²
 		}
 	}
 	

@@ -18,7 +18,7 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o obj/gauss_weights.o obj/gauss_roots.o
+bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 

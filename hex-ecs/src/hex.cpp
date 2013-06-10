@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 		if (not sol.hdfload(zipfile.c_str()))
 			throw exception("Cannot load file %s.", zipfile.c_str());
 		
-		grid = linspace(0., Rmax, zipcount + 1);
+		grid = linspace(0., Rmax, zipcount);
 		
 		for (int l1 = 0; l1 <= maxell; l1++)
 		for (int l2 = 0; l2 <= maxell; l2++)
@@ -200,21 +200,21 @@ int main(int argc, char* argv[])
 			
 			// write real part
 			write_2D_data (
-				zipcount + 1,
-				zipcount + 1,
+				zipcount,
+				zipcount,
 				outf1.str().c_str(),
 				[&](size_t i, size_t j) -> double {
-					return ev[i * (zipcount + 1) + j].real();
+					return ev[i * zipcount + j].real();
 				}
 			);
 			
 			// write imaginary part
 			write_2D_data (
-				zipcount + 1,
-				zipcount + 1,
+				zipcount,
+				zipcount,
 				outf2.str().c_str(),
 				[&](size_t i, size_t j) -> double {
-					return ev[i * (zipcount + 1) + j].imag();
+					return ev[i * zipcount + j].imag();
 				}
 			);
 		}
@@ -1159,7 +1159,8 @@ int main(int argc, char* argv[])
 			// Ionization
 			//
 			
-			cArrays data = std::move(computeXi(maxell, L, Spin, ni, li, mi, Ei));
+			rArray ics;
+			cArrays data = std::move(computeXi(maxell, L, Spin, ni, li, mi, Ei, ics));
 			cArrays::const_iterator iter = data.begin();
 			
 			for (size_t ie = 0; ie < Ei.size(); ie++)
@@ -1176,6 +1177,11 @@ int main(int argc, char* argv[])
 				// move to next data
 				iter++;
 			}
+			
+			// print ionization cross section
+			std::ostringstream fname;
+			fname << "isigma-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << ".dat";
+			write_array(Ei, ics, fname.str().c_str());
 		}
 		
 		finished++;
