@@ -37,6 +37,11 @@ void initialize(const char* dbname)
 	// open database
 	db.open(dbname);
 	
+	// disable journaling
+	sqlitepp::statement st(db);
+	st << "PRAGMA journal_mode = OFF";
+	st.exec();
+	
 	// initialize variables
 	for (const Variable* var : vlist)
 		var->initialize(db);
