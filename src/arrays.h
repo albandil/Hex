@@ -40,7 +40,7 @@ template <typename NumberType> class Array;
  */
 template <typename NumberType> class ArrayView
 {
-	private:
+	protected:
 		
 		size_t N;
 		NumberType * array;
@@ -49,6 +49,8 @@ template <typename NumberType> class ArrayView
 		
 		// alias
 		typedef NumberType DataType;
+		typedef NumberType * iterator;
+		typedef NumberType const * const_iterator;
 		
 		// empty constructor
 		ArrayView() : N(0), array(nullptr) {}
@@ -67,6 +69,13 @@ template <typename NumberType> class ArrayView
 			array = const_cast<NumberType*>(&a[0]) + i;
 		}
 		
+		// construct from consecutive memory segment
+		ArrayView(NumberType const * i, NumberType const * j)
+		{
+			N = j - i;
+			array = const_cast<NumberType*>(&(*i));
+		}
+		
 		// destructor
 		~ArrayView() {}
 		
@@ -77,7 +86,7 @@ template <typename NumberType> class ArrayView
 		virtual ArrayView<NumberType> & operator= (Array<NumberType> const & v)
 		{
 			if (v.size() != N)
-				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", N, v.size());
+				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
 			
 			for (size_t i = 0; i < N; i++)
 				array[i] = v[i];
@@ -132,8 +141,6 @@ template <typename NumberType> class ArrayView
 		// STL-like iterator interface
 		//
 		
-		typedef NumberType* iterator;
-		typedef const NumberType* const_iterator;
 		virtual iterator begin ()
 				{ return array; }
 		virtual const_iterator begin () const
@@ -299,6 +306,18 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				array[i] = a.array[i];
 		}
 		
+		// copy constructor from ArrayView const lvalue reference
+		Array(ArrayView<NumberType> const & a)
+		{
+			// reserve space
+			N = a.size();
+			array = new NumberType [N]();
+	
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = a.data()[i];
+		}
+		
 		// copy constructor from Array rvalue reference
 		Array(Array<NumberType> && a)
 		{
@@ -312,7 +331,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from std::vector
-		Array(const std::vector<NumberType>&  a)
+		Array(std::vector<NumberType> const & a)
 		{
 			// reserve space
 			N = a.size();
@@ -334,6 +353,23 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			size_t i = 0;
 			for (auto it = a.begin(); it != a.end(); it++)
 				array[i++] = *it;
+		}
+		
+		// copy constructor from two forward iterators
+		template <typename ForwardIterator> Array(ForwardIterator i, ForwardIterator j)
+		{
+			// compute size
+			N = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				N++;
+			
+			// reserve space
+			array = new NumberType [N]();
+			
+			// run over the elements
+			size_t n = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				array[n++] = *k;
 		}
 		
 		// destructor
@@ -452,6 +488,28 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				new_array[N + it - first] = *it;
 			N += last - first;
 			delete [] array;
+			array = new_array;
+		}
+		
+		void insert (iterator it, NumberType x)
+		{
+			// create new array (one element longer)
+			NumberType* new_array = new NumberType [N + 1];
+			
+			// copy everything to the new location
+			for (int i = 0; i < it - array; i++)
+				new_array[i] = std::move(array[i]);
+			
+			// insert new element
+			*(new_array + (it - array)) = std::move(x);
+			
+			// copy the rest
+			for (int i = it - array; i < (int)N; i++)
+				new_array[i+1] = std::move(array[i]);
+			
+			// change pointers
+			delete [] array;
+			N++;
 			array = new_array;
 		}
 		
@@ -1063,6 +1121,21 @@ template <typename NumberType1, typename NumberType2> auto operator / (
 	return c /= z;
 }
 
+template <typename NumberType1, typename NumberType2> auto outer_product (
+	ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
+) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+{
+	Array<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
+	
+	auto ic = c.begin();
+	
+	for (auto a_ : a)
+	for (auto b_ : b)
+		*(ic++) = a_ * b_;
+	
+	return c;
+}
+
 // other vectorized functions
 template <typename NumberType> Array<NumberType> sqrt (Array<NumberType> const & A)
 {
@@ -1087,7 +1160,7 @@ inline Array<double> sqrabs (Array<Complex> const & A)
 }
 
 // output to text stream.
-template <typename NumberType> std::ostream & operator << (std::ostream & out, Array<NumberType> const & a)
+template <typename NumberType> std::ostream & operator << (std::ostream & out, ArrayView<NumberType> const & a)
 {
 	out << "[";
 	for (size_t i = 0; i < a.size(); i++)
@@ -1529,6 +1602,31 @@ template <typename Tidx, typename Tval> void merge (
 	// copy to the first pair
 	idx1 = idx;
 	arr1 = arr;
+}
+
+/**
+ * Join elements from all subarrays.
+ */
+template <typename T> Array<T> join (Array<Array<T>> const & arrays)
+{
+	Array<size_t> partial_sizes(arrays.size() + 1);
+	
+	// get partial sizes
+	partial_sizes[0] = 0;
+	for (size_t i = 0; i < arrays.size(); i++)
+		partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
+	
+	// result array
+	Array<T> res(partial_sizes.back());
+	
+	// concatenate arrays
+	for (size_t i = 0; i < arrays.size(); i++)
+	{
+		if (arrays[i].size() > 0)
+			ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
+	}
+	
+	return res;
 }
 
 #endif

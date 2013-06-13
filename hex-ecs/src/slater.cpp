@@ -191,3 +191,65 @@ Complex computeR(int lambda,
 	// sum the diagonal and offdiagonal contributions
 	return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
 }
+
+void allSymmetries (
+	int i, int j, int k, int l,
+	Complex Rijkl_tr,
+	std::vector<long> & R_tr_i,
+	std::vector<long> & R_tr_j,
+	std::vector<Complex> & R_tr_v
+){
+	// shorthand
+	int Nspline = Bspline::ECS().Nspline();
+	
+	{
+		// store the integral
+		R_tr_i.push_back(i * Nspline + j);
+		R_tr_j.push_back(k * Nspline + l);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	if (i != k) // i.e. i < k
+	{
+		// swap i <-> k (symmetry 1)
+		R_tr_i.push_back(k * Nspline + j);
+		R_tr_j.push_back(i * Nspline + l);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	if (j != l) // i.e. j < l
+	{
+		// swap j <-> l (symmetry 2)
+		R_tr_i.push_back(i * Nspline + l);
+		R_tr_j.push_back(k * Nspline + j);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	if (i != j or k != l) // i.e. i < j or k < l
+	{
+		// swap i <-> j and k <-> l (symmetry 3)
+		R_tr_i.push_back(j * Nspline + i);
+		R_tr_j.push_back(l * Nspline + k);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	if (i != k and (i != j or k != l)) // i.e. i < k and (i < j or k < l)
+	{
+		// swap i <-> k (symmetry 1) and i <-> j and k <-> l (symmetry 3)
+		R_tr_i.push_back(l * Nspline + i);
+		R_tr_j.push_back(j * Nspline + k);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	if (j != l and (i != j or k != l)) // i.e. j < l and (i < j or k < l)
+	{
+		// swap j <-> l (symmetry 2) and i <-> j and k <-> l (symmetry 3)
+		R_tr_i.push_back(j * Nspline + k);
+		R_tr_j.push_back(l * Nspline + i);
+		R_tr_v.push_back(Rijkl_tr);
+	}
+	
+	// NOTE there are two more symmetries, (1)+(2) and (1)+(2)+(3),
+	// but we don't need those for the construction of a symmetrical
+	// matrix, so we will not store them at all
+}

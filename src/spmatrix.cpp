@@ -14,6 +14,7 @@
 #include <complex>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <vector>
 
 #ifdef WITH_PNGPP
@@ -117,6 +118,52 @@ CooMatrix stairs(size_t N)
 // -- CSC matrix methods --------------------------------------------------- //
 
 // ------------------------------------------------------------------------- //
+
+CscMatrix & CscMatrix::operator *= (double r)
+{
+	size_t N = _i_.size();
+	
+	for (size_t i = 0; i < N; i++)
+		_x_[i] *= r;
+	
+	return *this;
+}
+
+CscMatrix & CscMatrix::operator &= (const CscMatrix&  B)
+{
+	size_t N = _i_.size();
+	
+	assert(_m_ == B._m_);
+	assert(_n_ == B._n_);
+	assert(N == B._i_.size());
+	
+	for (size_t i = 0; i < N; i++)
+	{
+		assert(_i_[i] == B._i_[i]);
+		
+		_x_[i] += B._x_[i];
+	}
+	
+	return *this;
+}
+
+CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
+{
+	size_t N = _i_.size();
+	
+	assert(_m_ == B._m_);
+	assert(_n_ == B._n_);
+	assert(N == B._i_.size());
+	
+	for (size_t i = 0; i < N; i++)
+	{
+		assert(_i_[i] == B._i_[i]);
+		
+		_x_[i] -= B._x_[i];
+	}
+	
+	return *this;
+}
 
 cArray CscMatrix::dotT(const cArrayView&  b) const
 {
@@ -302,6 +349,45 @@ bool CscMatrix::hdfload(const char* name)
 
 // ------------------------------------------------------------------------- //
 
+CsrMatrix & CsrMatrix::operator *= (Complex r)
+{
+	size_t N = _i_.size();
+	
+	for (size_t i = 0; i < N; i++)
+		_x_[i] *= r;
+	
+	return *this;
+}
+
+CsrMatrix & CsrMatrix::operator &= (CsrMatrix const &  B)
+{
+	size_t N = _i_.size();
+	
+	// check at least dimensions and non-zero element count
+	assert(_m_ == B._m_);
+	assert(_n_ == B._n_);
+	assert(N == B._i_.size());
+	
+	for (size_t i = 0; i < N; i++)
+		_x_[i] += B._x_[i];
+	
+	return *this;
+}
+
+CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
+{
+	size_t N = _i_.size();
+	
+	assert(_m_ == B._m_);
+	assert(_n_ == B._n_);
+	assert(N == B._i_.size());
+	
+	for (size_t i = 0; i < N; i++)
+		_x_[i] -= B._x_[i];
+	
+	return *this;
+}
+
 cArray CsrMatrix::dot(const cArrayView& b) const
 {
 	// create output array
@@ -326,59 +412,59 @@ cArray CsrMatrix::dot(const cArrayView& b) const
 	return c;
 }
 
-CsrMatrix CsrMatrix::submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const
-{
-	// if empty, return empty
-	if (b <= a or d <= c)
-		return CsrMatrix();
-	
-	CsrMatrix subm(b-a, d-c);
-	subm._p_.push_back(0);
-	
-	// for all relevant rows
-	for (unsigned irow = a; irow < b; irow++)
-	{
-		// get all columns
-		unsigned idx1 = _p_[irow];
-		unsigned idx2 = _p_[irow + 1];
-		
-		// get beginning of relevant row fragment
-		std::vector<long>::const_iterator i_iter_begin = std::lower_bound(
-			_i_.begin() + idx1,
-			_i_.begin() + idx2,
-			c
-		);
-		
-		// get end of relevant row fragment
-		std::vector<long>::const_iterator i_iter_end = std::lower_bound(
-			_i_.begin() + idx1,
-			_i_.begin() + idx2,
-			d
-		);
-		
-		// data length
-		size_t n = i_iter_end - i_iter_begin;
-		subm._p_.push_back(subm._p_.back() + n);
-		
-		// copy column indices (shifted by "c")
-		subm._i_.resize(subm._i_.size() + n);
-		std::transform(
-			i_iter_begin,
-			i_iter_end,
-			subm._i_.end() - n,
-			[ c ](long col) -> long { return col - c; }
-		);
-		
-		// copy data
-		subm._x_.insert(
-			subm._x_.end(),
-			_x_.data() + (i_iter_begin - _i_.begin()),
-			_x_.data() + (i_iter_end   - _i_.begin())
-		);
-	}
-	
-	return subm;
-}
+// CsrMatrix CsrMatrix::submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const
+// {
+// 	// if empty, return empty
+// 	if (b <= a or d <= c)
+// 		return CsrMatrix();
+// 	
+// 	CsrMatrix subm(b-a, d-c);
+// 	subm._p_.push_back(0);
+// 	
+// 	// for all relevant rows
+// 	for (unsigned irow = a; irow < b; irow++)
+// 	{
+// 		// get all columns
+// 		unsigned idx1 = _p_[irow];
+// 		unsigned idx2 = _p_[irow + 1];
+// 		
+// 		// get beginning of relevant row fragment
+// 		Array<long>::const_iterator i_iter_begin = std::lower_bound (
+// 			_i_.begin() + idx1,
+// 			_i_.begin() + idx2,
+// 			c
+// 		);
+// 		
+// 		// get end of relevant row fragment
+// 		Array<long>::const_iterator i_iter_end = std::lower_bound (
+// 			_i_.begin() + idx1,
+// 			_i_.begin() + idx2,
+// 			d
+// 		);
+// 		
+// 		// data length
+// 		size_t n = i_iter_end - i_iter_begin;
+// 		subm._p_.push_back(subm._p_.back() + n);
+// 		
+// 		// copy column indices (shifted by "c")
+// 		subm._i_.resize(subm._i_.size() + n);
+// 		std::transform(
+// 			i_iter_begin,
+// 			i_iter_end,
+// 			subm._i_.end() - n,
+// 			[ c ](long col) -> long { return col - c; }
+// 		);
+// 		
+// 		// copy data
+// 		subm._x_.insert(
+// 			subm._x_.end(),
+// 			_x_.data() + (i_iter_begin - _i_.begin()),
+// 			_x_.data() + (i_iter_end   - _i_.begin())
+// 		);
+// 	}
+// 	
+// 	return subm;
+// }
 
 #ifdef WITHPNG
 CsrMatrix::PngGenerator::PngGenerator(const CsrMatrix* mat, double threshold)
@@ -793,7 +879,7 @@ double CsrMatrix::norm() const
 	return res;
 }
 
-cArray CsrMatrix::upperSolve(const cArray&  b) const
+cArray CsrMatrix::upperSolve(cArrayView const &  b) const
 {
 	// check size
 	size_t N = b.size();
@@ -802,50 +888,6 @@ cArray CsrMatrix::upperSolve(const cArray&  b) const
 
 	// create output array
 	cArray x(N);
-	
-// #ifdef __INTEL_MKL__
-// 	
-// 	//
-// 	// test environment so that we can use 'long' == '_INTEGER_t'
-// 	//
-// #ifdef MKL_ILP64
-// 	// MKL uses 64bit integers, i.e. "long long". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(long long))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your ILP64 version of MKL uses 'long long', which is "
-// 			   "larger than 'long' on your specific system. Please recompile Hex WITHOUT the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// #else // MKL_ILP64
-// 	// MKL uses 32bit integers, i.e. "int". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(int))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your LP64 version of MKL uses 'int', which is "
-// 			   "smaller than 'long' on your specific system. Please recompile Hex WITH the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// #endif // MKL_ILP64
-// 	
-// 	long __m = this->rows();
-// 	mkl_cspblas_zcsrtrsv(
-// 		"U",	// use upper triangle
-// 		"N",	// do not transpose
-// 		"N",	// this matrix is not unit triangular
-// 		&__m,	// row count
-// 		const_cast<Complex*>(&_x_[0]), 	// matrix elements
-// 		const_cast<long*>(&_p_[0]),		// row pointers
-// 		const_cast<long*>(&_i_[0]),		// column indices
-// 		const_cast<Complex*>(&b[0]),	// rhs
-// 		&x[0]	// solution
-// 	);
-// 	
-// #else // __INTEL_MKL__
 	
 	// loop over rows
 	for (size_t i = 0; i < N; i++)
@@ -881,13 +923,11 @@ cArray CsrMatrix::upperSolve(const cArray&  b) const
 		// compute and store the new root
 		x[row] = (b[row] - accum) / a;
 	}
-	
-// #endif // __INTEL_MKL__
 
 	return x;
 }
 
-cArray CsrMatrix::lowerSolve(const cArray& b) const
+cArray CsrMatrix::lowerSolve(cArrayView const & b) const
 {
 	// check size
 	size_t N = b.size();
@@ -896,50 +936,6 @@ cArray CsrMatrix::lowerSolve(const cArray& b) const
 	
 	// create output array
 	cArray x(N);
-	
-// #ifdef __INTEL_MKL__
-// 
-// 	//
-// 	// test environment so that we can use 'long' == '_INTEGER_t'
-// 	//
-// #ifdef MKL_ILP64
-// 	// MKL uses 64bit integers, i.e. "long long". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(long long))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your ILP64 version of MKL uses 'long long', which is "
-// 			   "larger than 'long' on your specific system. Please recompile Hex WITHOUT the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// #else // MKL_ILP64
-// 	// MKL uses 32bit integers, i.e. "int". We have "long". Is it interchangeable?
-// 	if (sizeof(long) !=  sizeof(int))
-// 	{
-// 		// no, notify the user
-// 		printf("[Intel DSS] Error. Hex uses 'long' as internal representation of "
-// 		       "matrix indices. Your LP64 version of MKL uses 'int', which is "
-// 			   "smaller than 'long' on your specific system. Please recompile Hex WITH the "
-// 			   "-DMKL_ILP64 flag.\n");
-// 		abort();
-// 	}
-// #endif // MKL_ILP64
-// 	
-// 	long __m = this->rows();
-// 	mkl_cspblas_zcsrtrsv(
-// 		"L",	// use lower triangle
-// 		"N",	// do not transpose
-// 		"N",	// this matrix is not unit triangular
-// 		&__m,	// row count
-// 		const_cast<Complex*>(&_x_[0]), 	// matrix elements
-// 		const_cast<long*>(&_p_[0]),		// row pointers
-// 		const_cast<long*>(&_i_[0]),		// column indices
-// 		const_cast<Complex*>(&b[0]),	// rhs
-// 		&x[0]	// solution
-// 	);
-// 	
-// #else // __INTEL_MKL__
 	
 	// loop over rows
 	for (size_t row = 0; row < N; row++)
@@ -974,8 +970,6 @@ cArray CsrMatrix::lowerSolve(const cArray& b) const
 		// compute and store the new root
 		x[row] = (b[row] - accum) / a;
 	}
-	
-// #endif // __INTEL_MKL__
 	
 	return x;
 }
@@ -1127,14 +1121,55 @@ CsrMatrix CooMatrix::tocsr() const
 	return CsrMatrix(_m_, _n_, Ap, Ai, Ax);
 }
 
+SymDiaMatrix CooMatrix::todia() const
+{
+	// diagonal indices
+	std::set<int> diags;
+	
+	// elements per diagonal
+	cArrays elems(_m_);
+	
+	// for all nonzero elements
+	for (size_t i = 0; i < _x_.size(); i++)
+	{
+		// get row and column index
+		int irow = _i_[i];
+		int icol = _j_[i];
+		
+		// get diagonal
+		int diagonal = icol - irow;
+		
+		// we only want to store the upper triangle
+		if (diagonal < 0)
+			continue;
+		
+		// add this diagonal (if not already added)
+		diags.insert(diagonal);
+		
+		// reserve space for this diagonal if not already done
+		if (elems[diagonal].size() == 0)
+			elems[diagonal].resize(_m_ - diagonal);
+		
+		// add element
+		elems[diagonal][irow] = _x_[i];
+	}
+	
+	// concatenate the diagonals, construct matrix object
+	return SymDiaMatrix (
+		_m_,
+		Array<int>(diags.cbegin(), diags.cend()),
+		join(elems)
+	);
+}
 
 void CooMatrix::write(const char* filename) const
 {
-	FILE *f = fopen(filename, "w");
-	fprintf(f, "# Matrix %ld × %ld with %ld nonzero elements:\n\n", _m_, _n_, _x_.size());
+	std::ofstream f(filename);
+	
+	f << "# Matrix " << _m_ << " × " << _n_ << " with " << _x_.size() << " nonzero elements:\n\n";
+	
 	for (size_t i = 0; i < _i_.size(); i++)
-		fprintf(f, "%ld\t%ld\t%g\t%g\n", _i_[i], _j_[i], _x_[i].real(), _x_[i].imag());
-	fclose(f);
+		f << _i_[i] << "\t" << _j_[i] << "\t" << _x_[i].real() << "\t" << _x_[i].imag() << "\n";
 }
 
 
@@ -1376,4 +1411,363 @@ bool CooMatrix::hdfload(const char* name)
 #else /* NO_HDF */
 	return false;
 #endif
+}
+
+SymDiaMatrix::SymDiaMatrix(int n) : n_(n) {}
+
+SymDiaMatrix::SymDiaMatrix(int n, ArrayView<int> const & id, ArrayView<Complex> const & v)
+	: n_(n), elems_(v), idiag_(id)
+{
+// 	std::cout << "Constructing from arrays.\n";
+}
+
+SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
+	: n_(A.n_), elems_(A.elems_), idiag_(A.idiag_)
+{
+// 	std::cout << "Constructing from l-value const reference.\n";
+}
+
+SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
+{
+// 	std::cout << "Constructing from r-value reference.\n";
+	
+	n_ = std::move(A.n_);
+	elems_ = std::move(A.elems_);
+	idiag_ = std::move(A.idiag_);
+}
+
+SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
+{
+	if (is_compatible(B))
+	{
+		for (size_t i = 0; i < elems_.size(); i++)
+			elems_[i] += B.elems_[i];
+	}
+	return *this;
+}
+
+SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
+{
+	if (is_compatible(B))
+	{
+		for (size_t i = 0; i < elems_.size(); i++)
+			elems_[i] -= B.elems_[i];
+	}
+	return *this;
+}
+
+SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix&& A)
+{
+// 	std::cout << "[SymDiaMatrix::operator=] (from r-value reference)\n";
+	
+	n_ = std::move(A.n_);
+	elems_ = std::move(A.elems_);
+	idiag_ = std::move(A.idiag_);
+	return *this;
+}
+
+SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix const & A)
+{
+// 	std::cout << "[SymDiaMatrix::operator=] (from l-value const reference)\n";
+	
+	n_ = A.n_;
+	elems_ = A.elems_;
+	idiag_ = A.idiag_;
+	return *this;
+}
+
+SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B)
+{
+	A.is_compatible(B);
+	return SymDiaMatrix(A.n_, A.idiag_, A.elems_ + B.elems_);
+}
+
+SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B)
+{
+	A.is_compatible(B);
+	return SymDiaMatrix(A.n_, A.idiag_, A.elems_ - B.elems_);
+}
+
+SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A)
+{
+	return SymDiaMatrix(A.n_, A.idiag_, z * A.elems_);
+}
+
+bool SymDiaMatrix::is_compatible(const SymDiaMatrix& B) const
+{
+	if (n_ != B.n_)
+		throw exception ("[SymDiaMatrix::operator+=] Unequal ranks.");
+	if (idiag_.size() != B.idiag_.size())
+		throw exception ("[SymDiaMatrix::operator+=] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
+	for (size_t i = 0; i < idiag_.size(); i++)
+		if (idiag_[i] != B.idiag_[i])
+			throw exception ("[SymDiaMatrix::operator+=] Unequal distribution of diagonals.");
+	return true;
+}
+
+bool SymDiaMatrix::hdfload(const char* name)
+{
+#ifndef NO_HDF
+	try
+	{
+		H5::Exception::dontPrint();
+		H5::H5File h5file(name, H5F_ACC_RDONLY);
+		
+		// read rank
+		H5::DataSet dset_n = h5file.openDataSet("n");
+		H5::DataSpace dspc_n = dset_n.getSpace();
+		dset_n.read(&n_, H5::PredType::NATIVE_INT, dspc_n, dspc_n);
+		
+		// read diagonal indices
+		H5::DataSet dset_i = h5file.openDataSet("idiag");
+		H5::DataSpace dspc_i = dset_i.getSpace();
+		idiag_.resize( dspc_i.getSimpleExtentNpoints() );
+		dset_i.read(&idiag_[0], H5::PredType::NATIVE_INT, dspc_i, dspc_i);
+		
+		// read interleaved data
+		H5::DataSet dset_x = h5file.openDataSet("x");
+		H5::DataSpace dspc_x = dset_x.getSpace();
+		elems_.resize( dspc_x.getSimpleExtentNpoints() / 2 );
+		dset_x.read(&elems_[0], H5::PredType::NATIVE_DOUBLE, dspc_x, dspc_x);
+		
+		return true;
+	}
+	catch (H5::FileIException exc)
+	{
+		return false;
+	}
+#else /* NO_HDF */
+	return false;
+#endif
+}
+
+bool SymDiaMatrix::hdfsave(const char* name) const
+{
+#ifndef NO_HDF
+	try
+	{
+		H5::Exception::dontPrint();
+		H5::H5File h5file(name, H5F_ACC_TRUNC);
+		
+		// all arrays are rank-1
+		int rank = 1;
+		
+		// length of array
+		hsize_t length;
+		
+		// save rank
+		length = 1;
+		H5::DataSpace dspc_n(rank, &length);
+		H5::IntType dtype_n(H5::PredType::NATIVE_INT);
+		H5::DataSet dset_n = h5file.createDataSet("n", dtype_n, dspc_n);
+		dset_n.write(&n_, H5::PredType::NATIVE_INT);
+		
+		// save diagonal indices
+		length = idiag_.size();
+		H5::DataSpace dspc_i(rank, &length);
+		H5::IntType dtype_i(H5::PredType::NATIVE_INT);
+		H5::DataSet dset_i = h5file.createDataSet("idiag", dtype_i, dspc_i);
+		dset_i.write(idiag_.data(), H5::PredType::NATIVE_INT);
+		
+		// save interleaved data
+		length = 2 * elems_.size();
+		H5::DataSpace dspc_x(rank, &length);
+		H5::FloatType dtype_x(H5::PredType::NATIVE_DOUBLE);
+		H5::DataSet dset_x = h5file.createDataSet("x", dtype_x, dspc_x);
+		dset_x.write(elems_.data(), H5::PredType::NATIVE_DOUBLE);
+		
+		return true;
+	}
+	catch (...)
+	{
+		return false;
+	}
+#else /* NO_HDF */
+	return false;
+#endif
+}
+
+CooMatrix SymDiaMatrix::tocoo() const
+{
+	std::vector<long> i, j;
+	std::vector<Complex> v;
+	
+	auto el = elems_.begin();
+	
+	// for all diagonals
+	for (auto id : idiag_)
+	{
+		// for all elements in this diagonal
+		for (int iel = 0; iel < n_ - id; iel++)
+		{
+			// skip zero elements
+			if (*el == 0.)
+			{
+				el++;
+				continue;
+			}
+			
+			// add this element to COO
+			i.push_back(iel);
+			j.push_back(iel+id);
+			v.push_back(*el);
+			
+			// main diagonal shall be added only once
+			if (id == 0)
+			{
+				el++;
+				continue;
+			}
+			
+			// and also its symmetric counterpart
+			i.push_back(iel+id);
+			j.push_back(iel);
+			v.push_back(*el);
+			
+			// move on to the next element
+			el++;
+		}
+	}
+	
+	return CooMatrix(n_, n_, i, j, v);
+}
+
+cArray SymDiaMatrix::dot(cArrayView const & B) const
+{
+	// check dimensions
+	if ((int)B.size() != n_)
+		throw exception ("[SymDiaMatrix::dot] Incompatible dimensions.");
+	
+	// the result
+	cArray res(n_);
+	
+	// restricted pointers for maximization of the cache usage
+	Complex * __restrict rp_res = &res[0];
+	Complex const * const __restrict rp_elems_ = &elems_[0];
+	Complex const * const __restrict rp_B = &B[0];
+	
+	// for all elements in the main diagonal
+	for (int ielem = 0; ielem < n_; ielem++)
+		rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
+	
+	// beginning of the current diagonal
+	size_t beg = n_;
+	
+	// for all other diagonals
+	for (unsigned id = 1; id < idiag_.size(); id++)
+	{
+		// index of this diagonal
+		int idiag = idiag_[id];
+		
+		// number of elements in the current diagonal
+		int Nelem = n_ - idiag;
+		
+		// for all elements of the current diagonal
+		for (int ielem = 0; ielem < Nelem; ielem++)
+		{
+			rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
+			rp_res[ielem + idiag] += rp_elems_[beg + ielem] * rp_B[ielem];
+		}
+		
+		// move to the beginning of the next diagonal
+		beg += Nelem;
+	}
+	
+	return res;
+}
+
+SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
+{
+	// FIXME
+	return ::kron (this->tocoo(), B.tocoo()).todia();
+	
+// 	// new diagonals
+// 	Array<int> ids;
+// 	Array<cArray> diagonals;
+// 	
+// 	// elements
+// 	cArray::const_iterator ita, itb;
+// 	
+// 	ita = elems_.begin();
+// 	for (int ida = 0; ida < (int)idiag_.size(); ida++)
+// 	{
+// 		itb = B.elems_.begin();
+// 		for (int idb = 0; idb < (int)B.idiag_.size(); idb++)
+// 		{
+// 			// get data view of the current *this and B matrix
+// 			cArrayView Aview (ita, ita + n_   -   idiag_[ida]);
+// 			cArrayView Bview (itb, itb + B.n_ - B.idiag_[idb]);
+// 			
+// 			std::cout << "Aview = " << Aview << "\n";
+// 			std::cout << "Bview = " << Bview << "\n";
+// 			
+// 			// compute (both right and left) index of the new diagonal
+// 			int idleft = idiag_[ida] * B.n_ - B.idiag_[idb];
+// 			int idrigh = idiag_[ida] * B.n_ + B.idiag_[idb];
+// 			
+// 			// new elements
+// 			cArray new_diagonal_left(n_ * B.n_), new_diagonal_righ(n_ * B.n_);
+// 			cArray::iterator itndl = new_diagonal_left.begin();
+// 			cArray::iterator itndr = new_diagonal_righ.begin();
+// 			
+// 			// for all element pairs
+// 			for (Complex a : Aview)
+// 			{
+// 				// pad the left diagonal with zeros
+// 				for (int i = 0; i < B.idiag_[idb]; i++)
+// 					*(itndl++) = 0.;
+// 				
+// 				// compute elements
+// 				for (Complex b : Bview)
+// 					*(itndl++) = *(itndr++) = a * b;
+// 				
+// 				// pad the right diagonal with zeros
+// 				for (int i = 0; i < B.idiag_[idb]; i++)
+// 					*(itndr++) = 0.;
+// 			}
+// 			
+// 			// find correct place for these new diagonals & insert new diagonals
+// 			if (idleft > 0 and idleft != idrigh)
+// 			{
+// 				int l = std::lower_bound(ids.begin(), ids.end(), idleft)-ids.begin();
+// 				ids.push_back(l);
+// 				new_diagonal_left.resize(n_ * B.n_ - idleft);
+// 				diagonals.insert(diagonals.begin() + l, new_diagonal_left);
+// 				std::cout << "Add [" << l << "]: " << new_diagonal_left << "\n";
+// 			}
+// 			int r = std::lower_bound(ids.begin(), ids.end(), idrigh)-ids.begin();
+// 			ids.push_back(r);
+// 			new_diagonal_righ.resize(n_ * B.n_ - idrigh);
+// 			diagonals.insert(diagonals.begin() + r, new_diagonal_righ);
+// 			std::cout << "Add [" << r << "]: " << new_diagonal_righ << "\n";
+// 			
+// 			// move to next B-diagonal
+// 			itb += B.n_ - B.idiag_[idb];
+// 		}
+// 		
+// 		// move to next A-diagonal
+// 		ita += n_ - idiag_[ida];
+// 	}
+// 	
+// 	std::cout << "ids = " << ids << "\n";
+// 	std::cout << "join(diagonals) = " << join(diagonals) << "\n";
+// 	
+// 	// construct and return a new multi-diagonal matrix
+// 	return SymDiaMatrix(n_ * B.n_, ids, join(diagonals));
+}
+
+std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A)
+{
+	Array<Complex>::const_iterator iter = A.elems_.begin();
+	
+	for (auto id : A.idiag_)
+	{
+		out << "[" << id << "]: ";
+		for (int i = 0; i < A.n_ - id; i++)
+			out << *(iter++) << " ";
+		
+		std::cout << "\n";
+	}
+	
+	return out;
 }
