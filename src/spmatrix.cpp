@@ -1602,7 +1602,10 @@ CooMatrix SymDiaMatrix::tocoo() const
 		{
 			// skip zero elements
 			if (*el == 0.)
+			{
+				el++;
 				continue;
+			}
 			
 			// add this element to COO
 			i.push_back(iel);
@@ -1611,7 +1614,10 @@ CooMatrix SymDiaMatrix::tocoo() const
 			
 			// main diagonal shall be added only once
 			if (id == 0)
+			{
+				el++;
 				continue;
+			}
 			
 			// and also its symmetric counterpart
 			i.push_back(iel+id);
