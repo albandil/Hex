@@ -1592,7 +1592,7 @@ CooMatrix SymDiaMatrix::tocoo() const
 	std::vector<long> i, j;
 	std::vector<Complex> v;
 	
-	Array<Complex>::const_iterator el = elems_.begin();
+	auto el = elems_.begin();
 	
 	// for all diagonals
 	for (auto id : idiag_)
@@ -1600,15 +1600,26 @@ CooMatrix SymDiaMatrix::tocoo() const
 		// for all elements in this diagonal
 		for (int iel = 0; iel < n_ - id; iel++)
 		{
+			// skip zero elements
+			if (*el == 0.)
+				continue;
+			
 			// add this element to COO
 			i.push_back(iel);
 			j.push_back(iel+id);
 			v.push_back(*el);
 			
+			// main diagonal shall be added only once
+			if (id == 0)
+				continue;
+			
 			// and also its symmetric counterpart
 			i.push_back(iel+id);
 			j.push_back(iel);
-			v.push_back(*(el++));
+			v.push_back(*el);
+			
+			// move on to the next element
+			el++;
 		}
 	}
 	
@@ -1624,9 +1635,14 @@ cArray SymDiaMatrix::dot(cArrayView const & B) const
 	// the result
 	cArray res(n_);
 	
+	// restricted pointers for maximization of the cache usage
+	Complex * __restrict rp_res = &res[0];
+	Complex const * const __restrict rp_elems_ = &elems_[0];
+	Complex const * const __restrict rp_B = &B[0];
+	
 	// for all elements in the main diagonal
 	for (int ielem = 0; ielem < n_; ielem++)
-		res[ielem] = elems_[ielem] * B[ielem];
+		rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
 	
 	// beginning of the current diagonal
 	size_t beg = n_;
@@ -1643,8 +1659,8 @@ cArray SymDiaMatrix::dot(cArrayView const & B) const
 		// for all elements of the current diagonal
 		for (int ielem = 0; ielem < Nelem; ielem++)
 		{
-			res[ielem]         += elems_[beg + ielem] * B[ielem + idiag];
-			res[ielem + idiag] += elems_[beg + ielem] * B[ielem];
+			rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
+			rp_res[ielem + idiag] += rp_elems_[beg + ielem] * rp_B[ielem];
 		}
 		
 		// move to the beginning of the next diagonal

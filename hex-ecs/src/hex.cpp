@@ -694,6 +694,9 @@ int main(int argc, char* argv[])
 						cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
 						cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
 						
+						R_tr_dia[0].tocoo().tocsr().hdfsave("R_dia_tocsr.hdf");
+						R_tr_dia[0].dot(Pj1).hdfsave("R_Pj1_dia.hdf");
+						
 						// skip angular forbidden right hand sides
 						for (int lambda = 0; lambda <= maxlambda; lambda++)
 						{
