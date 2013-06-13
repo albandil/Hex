@@ -787,7 +787,7 @@ public:
 	// Convert to CSR matrix.
 	CsrMatrix tocsr() const;
 	
-	// Convert to DIA format
+	// Convert to symmetric DIA format (results in _m_ × _m_ matrix)
 	SymDiaMatrix todia() const;
 	
 	/**
@@ -858,7 +858,7 @@ public:
 	
 	SymDiaMatrix(int n);
 	
-	SymDiaMatrix(int n, Array<int> const & id, Array<Complex> const & v);
+	SymDiaMatrix(int n, ArrayView<int> const & id, ArrayView<Complex> const & v);
 	
 	SymDiaMatrix(SymDiaMatrix const & A);
 

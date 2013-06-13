@@ -14,6 +14,7 @@
 #include <complex>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <vector>
 
 #ifdef WITH_PNGPP
@@ -1122,54 +1123,43 @@ CsrMatrix CooMatrix::tocsr() const
 
 SymDiaMatrix CooMatrix::todia() const
 {
-	// Method:
-	//   Sort the elements not by row/column but by diagonal/position-in-diagonal.
+	// diagonal indices
+	std::set<int> diags;
 	
-	Array<int> diags;
+	// elements per diagonal
+	cArrays elems(_m_);
 	
-	// get non-zero diagonals
+	// for all nonzero elements
 	for (size_t i = 0; i < _x_.size(); i++)
 	{
 		// get row and column index
 		int irow = _i_[i];
 		int icol = _j_[i];
 		
-		// compute diagonal index
+		// get diagonal
 		int diagonal = icol - irow;
 		
 		// we only want to store the upper triangle
 		if (diagonal < 0)
 			continue;
 		
-		// store this diagonal if not already done
-		if (std::find(diags.begin(), diags.end(), diagonal) == diags.end())
-			diags.push_back(diagonal);
-	}
-	
-	// sort diagonals
-	std::sort(diags.begin(), diags.end());
-	
-	// all diagonals
-	cArrays elems(_m_);
-	
-	// for all nonzero elements
-	for (size_t i = 0; i < _x_.size(); i++)
-	{
-		// get diagonal
-		int diagonal = _j_[i] - _i_[i];
+		// add this diagonal (if not already added)
+		diags.insert(diagonal);
 		
-		// skip negative diagonals
-		if (diagonal < 0)
-			continue;
-		
-		// add to the diagonal
+		// reserve space for this diagonal if not already done
 		if (elems[diagonal].size() == 0)
 			elems[diagonal].resize(_m_ - diagonal);
-		elems[diagonal][_i_[i]] = _x_[i];
+		
+		// add element
+		elems[diagonal][irow] = _x_[i];
 	}
 	
-	// concatenate the diagonals
-	return SymDiaMatrix(_m_, diags, join(elems));
+	// concatenate the diagonals, construct matrix object
+	return SymDiaMatrix (
+		_m_,
+		Array<int>(diags.cbegin(), diags.cend()),
+		join(elems)
+	);
 }
 
 void CooMatrix::write(const char* filename) const
@@ -1425,7 +1415,7 @@ bool CooMatrix::hdfload(const char* name)
 
 SymDiaMatrix::SymDiaMatrix(int n) : n_(n) {}
 
-SymDiaMatrix::SymDiaMatrix(int n, Array<int> const & id, Array<Complex> const & v)
+SymDiaMatrix::SymDiaMatrix(int n, ArrayView<int> const & id, ArrayView<Complex> const & v)
 	: n_(n), elems_(v), idiag_(id)
 {
 // 	std::cout << "Constructing from arrays.\n";
@@ -1625,7 +1615,7 @@ CooMatrix SymDiaMatrix::tocoo() const
 	return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot(cArrayView const & __restrict B) const __restrict
+cArray SymDiaMatrix::dot(cArrayView const & B) const
 {
 	// check dimensions
 	if ((int)B.size() != n_)
@@ -1634,31 +1624,31 @@ cArray SymDiaMatrix::dot(cArrayView const & __restrict B) const __restrict
 	// the result
 	cArray res(n_);
 	
-	// position in the concatenated diagonals
-	size_t idx;
+	// for all elements in the main diagonal
+	for (int ielem = 0; ielem < n_; ielem++)
+		res[ielem] = elems_[ielem] * B[ielem];
 	
-	// for all diagonals d ≥ 0
-	idx = 0;
-	for (size_t id = 0; id < idiag_.size(); id++)
-	{
-		// for all columns of the diagonal
-		for (int icol = id; icol < n_; icol++)
-		{
-			// update product
-			res[icol-id] += elems_[idx++] * B[icol];
-		}
-	}
+	// beginning of the current diagonal
+	size_t beg = n_;
 	
-	// for all diagonals d < 0
-	idx = n_;
-	for (size_t id = 1; id < idiag_.size(); id++)
+	// for all other diagonals
+	for (unsigned id = 1; id < idiag_.size(); id++)
 	{
-		// for all columns of the diagonal
-		for (size_t icol = 0; icol < n_ - id; icol++)
+		// index of this diagonal
+		int idiag = idiag_[id];
+		
+		// number of elements in the current diagonal
+		int Nelem = n_ - idiag;
+		
+		// for all elements of the current diagonal
+		for (int ielem = 0; ielem < Nelem; ielem++)
 		{
-			// update product
-			res[icol+id] += elems_[idx++] * B[icol];
+			res[ielem]         += elems_[beg + ielem] * B[ielem + idiag];
+			res[ielem + idiag] += elems_[beg + ielem] * B[ielem];
 		}
+		
+		// move to the beginning of the next diagonal
+		beg += Nelem;
 	}
 	
 	return res;

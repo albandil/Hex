@@ -378,8 +378,8 @@ int main(int argc, char* argv[])
 			for (int j = 0; j < Nspline; j++)
 			{
 				// for all nonzero, nonsymmetry R-integrals
-				for (int k = i; k < i + order and k < Nspline; k++) // enforce i ≤ k
-				for (int l = j; l < j + order and l < Nspline; l++) // enforce j ≤ l
+				for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
+				for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
 				{
 					// skip symmetry ijkl <-> jilk (others are accounted for in the limits
 					if (i > j and k > l)
@@ -744,6 +744,8 @@ int main(int argc, char* argv[])
 						current_solution = previous_solution;
 				}
 				
+				chi.hdfsave("chi.hdf");
+				
 				// CG preconditioner callback
 				auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
 				{
@@ -838,9 +840,9 @@ int main(int argc, char* argv[])
 								// compute the offdiagonal block
 								for (int lambda = 0; lambda <= maxlambda; lambda++)
 								{
-									Complex _f = computef(lambda, l1, l2, l1p, l2p, L);
-									if (_f != 0.)
-										q_block -= _f * R_tr_dia[lambda].dot(p_block);
+									Complex f = computef(lambda, l1, l2, l1p, l2p, L);
+									if (f != 0.)
+										q_block -= f * R_tr_dia[lambda].dot(p_block);
 								}
 							}
 						}

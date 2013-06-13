@@ -40,7 +40,7 @@ template <typename NumberType> class Array;
  */
 template <typename NumberType> class ArrayView
 {
-	private:
+	protected:
 		
 		size_t N;
 		NumberType * array;
@@ -49,6 +49,8 @@ template <typename NumberType> class ArrayView
 		
 		// alias
 		typedef NumberType DataType;
+		typedef NumberType * iterator;
+		typedef NumberType const * const_iterator;
 		
 		// empty constructor
 		ArrayView() : N(0), array(nullptr) {}
@@ -67,7 +69,7 @@ template <typename NumberType> class ArrayView
 			array = const_cast<NumberType*>(&a[0]) + i;
 		}
 		
-		// construct from iterators
+		// construct from consecutive memory segment
 		ArrayView(NumberType const * i, NumberType const * j)
 		{
 			N = j - i;
@@ -139,8 +141,6 @@ template <typename NumberType> class ArrayView
 		// STL-like iterator interface
 		//
 		
-		typedef NumberType* iterator;
-		typedef const NumberType* const_iterator;
 		virtual iterator begin ()
 				{ return array; }
 		virtual const_iterator begin () const
@@ -306,6 +306,18 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				array[i] = a.array[i];
 		}
 		
+		// copy constructor from ArrayView const lvalue reference
+		Array(ArrayView<NumberType> const & a)
+		{
+			// reserve space
+			N = a.size();
+			array = new NumberType [N]();
+	
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = a.data()[i];
+		}
+		
 		// copy constructor from Array rvalue reference
 		Array(Array<NumberType> && a)
 		{
@@ -319,7 +331,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from std::vector
-		Array(const std::vector<NumberType>&  a)
+		Array(std::vector<NumberType> const & a)
 		{
 			// reserve space
 			N = a.size();
@@ -341,6 +353,23 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			size_t i = 0;
 			for (auto it = a.begin(); it != a.end(); it++)
 				array[i++] = *it;
+		}
+		
+		// copy constructor from two forward iterators
+		template <typename ForwardIterator> Array(ForwardIterator i, ForwardIterator j)
+		{
+			// compute size
+			N = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				N++;
+			
+			// reserve space
+			array = new NumberType [N]();
+			
+			// run over the elements
+			size_t n = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				array[n++] = *k;
 		}
 		
 		// destructor
@@ -1093,7 +1122,7 @@ template <typename NumberType1, typename NumberType2> auto operator / (
 }
 
 template <typename NumberType1, typename NumberType2> auto outer_product (
-	ArrayView<NumberType1> const & a, ArrayView<NumberType2> & b
+	ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
 ) -> Array<decltype(NumberType1(0) * NumberType2(0))>
 {
 	Array<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
