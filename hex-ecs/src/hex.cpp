@@ -578,7 +578,7 @@ int main(int argc, char* argv[])
 			SymDiaMatrix Hdiag =
 			    half_D_minus_Mm1_tr_kron_S
 			    + ((0.5*l1*(l1+1)) * Mm2_kron_S)
-			    + S_kron_half_D_minus_Mm1_tr;
+			    + S_kron_half_D_minus_Mm1_tr
 			    + (0.5*l2*(l2+1)) * S_kron_Mm2;
 			
 			// two-electron part
