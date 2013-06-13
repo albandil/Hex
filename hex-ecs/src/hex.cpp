@@ -343,7 +343,7 @@ int main(int argc, char* argv[])
 				data.resize(datasize);
 				
 				// master will broadcast arrays
-				MPI_Bcast(&diag[0], diag.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
+				MPI_Bcast(&diag[0], diag.size(), MPI_INT, 0, MPI_COMM_WORLD);
 				MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
 				
 				// reconstruct objects
