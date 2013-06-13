@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 			shared (R_tr_i, R_tr_j, R_tr_v)
 		{
 			// for all B-spline pairs
-			# pragma omp for collapse(2)
+			# pragma omp for schedule(dynamic,1)
 			for (int i = 0; i < Nspline; i++)
 			for (int j = 0; j < Nspline; j++)
 			{
