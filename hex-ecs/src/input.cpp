@@ -94,8 +94,8 @@ void parse_command_line (
 					"  0\n"
 					"\n"
 					"# angular momenta\n"
-					"# L  ℓ\n"
-					"  0  0\n"
+					"# L  S  Π  ℓ\n"
+					"  0  0  0  0\n"
 					"\n"
 					"# initial energies in Rydbergs\n"
 					"0.65   -1\n"
@@ -282,7 +282,7 @@ void parse_input_file (
 	int& ni,
 	std::vector<std::tuple<int,int,int>>& instates,
 	std::vector<std::tuple<int,int,int>>& outstates,
-	int& L, int& maxell,
+	int& L, int& Spin, int& Pi, int& maxell,
 	rArray& Ei, double& B
 ){
 	double x;
@@ -478,6 +478,8 @@ void parse_input_file (
 	try {
 		
 		L = read_int(inputfile);
+		Spin = read_int(inputfile);
+		Pi = read_int(inputfile);
 		maxell = read_int(inputfile);
 		
 		if (maxell < maxli)
@@ -496,7 +498,10 @@ void parse_input_file (
 	}
 	
 	std::cout << "\n----------  Angular momentum limits  -------------\n";
-	std::cout << "L = " << L << ", ℓ = " << maxell << "\n";
+	std::cout << "L = " << L << "\n";
+	std::cout << "S = " << Spin << "\n";
+	std::cout << "Π = " << Pi << "\n";
+	std::cout << "ℓ = " << maxell << "\n";
 	
 	std::cout << "\n----------  Initial atomic states  -------------\n";
 	for (auto state : instates)

@@ -29,7 +29,7 @@
 
 cArray computeLambda (
 	rArray const & kf, rArray const & ki,
-	int maxell, int L, int Spin,
+	int maxell, int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei, int lf,
 	cArray const & Pf_overlaps
@@ -48,7 +48,7 @@ cArray computeLambda (
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;
@@ -140,7 +140,7 @@ cArray computeLambda (
 	return rads;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei, rArray & ics)
+cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics)
 {
 	ics.resize(Ei.size());
 	cArrays results;

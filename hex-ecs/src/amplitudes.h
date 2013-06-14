@@ -47,7 +47,7 @@ cArray computeLambda (
 	rArray const & kf,
 	rArray const & ki,
 	int maxell,
-	int L, int Spin,
+	int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei,
 	int lf,
@@ -84,7 +84,7 @@ cArray computeLambda (
  */
 cArrays computeXi (
 	int maxell,
-	int L, int Spin,
+	int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei,
 	rArray & ics
