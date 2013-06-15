@@ -51,7 +51,8 @@ cArray computeLambda (
 	int ni, int li, int mi,
 	rArray const & Ei,
 	int lf,
-	cArray const & Pf_overlaps
+	cArray const & Pf_overlaps,
+	std::vector<std::pair<int,int>> const & coupled_states
 );
 
 /**
@@ -87,7 +88,8 @@ cArrays computeXi (
 	int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei,
-	rArray & ics
+	rArray & ics,
+	std::vector<std::pair<int,int>> const & coupled_states
 );
 
 #endif

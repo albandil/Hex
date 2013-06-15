@@ -33,7 +33,8 @@
 #include "complex.h"
 #include "misc.h"
 
-template <typename NumberType> class Array;
+template <typename DataType> class Array;
+template <typename NumberType> class NumberArray;
 
 /**
  * \brief Array shallow copy.
@@ -243,40 +244,30 @@ template <typename NumberType> class ArrayView
 };
 
 /**
- * \brief A comfortable number array class.
+ * \brief A comfortable data array class.
  * 
  * Class Array is intended as a Hex's replacement for std::vector\<NumberType\>.
  * Properties:
  * - basic iterator interface (members Array::begin(), Array::end()).
- * - HDF5 interface (ability to save and load to/from HDF5 data files)
- * - a collection of overloaded arithmetic operators (sum of two arrays,
- *   difference, multiplication by a number etc.)
  */
-template <typename NumberType> class Array : public ArrayView<NumberType>
+template <typename DataType> class Array : public ArrayView<DataType>
 {
+	
 	private:
 		
 		size_t N;
-		NumberType * array;
+		DataType * array;
 		
 	public:
 		
-		// alias
-		typedef NumberType DataType;
-		
-		// inner product of two arrays
-		template <typename NumberType1, typename NumberType2> friend auto operator | (
-			Array<NumberType1> const & a, Array<NumberType2> const & b
-		) -> decltype(NumberType1(0)*NumberType2(0));
-				
 		// default constructor, creates an empty array
 		Array() : N(0), array(nullptr) {}
 		
 		// constructor, creates a length-n "x"-filled array
-		Array(size_t n, NumberType x = 0) : N(n)
+		Array(size_t n, DataType x = 0) : N(n)
 		{
 			// reserve space
-			array = new NumberType [N]();
+			array = new DataType [N]();
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -284,10 +275,10 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// constructor, copies a length-n "array
-		Array(size_t n, NumberType* x) : N(n)
+		Array(size_t n, DataType* x) : N(n)
 		{
 			// reserve space
-			array = new NumberType [N]();
+			array = new DataType [N]();
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -295,11 +286,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from Array const lvalue reference
-		Array(Array<NumberType> const & a)
+		Array(Array<DataType> const & a)
 		{
 			// reserve space
 			N = a.N;
-			array = new NumberType [N]();
+			array = new DataType [N]();
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -307,11 +298,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from ArrayView const lvalue reference
-		Array(ArrayView<NumberType> const & a)
+		Array(ArrayView<DataType> const & a)
 		{
 			// reserve space
 			N = a.size();
-			array = new NumberType [N]();
+			array = new DataType [N]();
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -319,7 +310,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from Array rvalue reference
-		Array(Array<NumberType> && a)
+		Array(Array<DataType> && a)
 		{
 			// copy content
 			N = a.N;
@@ -331,11 +322,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from std::vector
-		Array(std::vector<NumberType> const & a)
+		Array(std::vector<DataType> const & a)
 		{
 			// reserve space
 			N = a.size();
-			array = new NumberType [N]();
+			array = new DataType [N]();
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -343,11 +334,11 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		}
 		
 		// copy constructor from initializer list
-		Array(std::initializer_list<NumberType> a)
+		Array(std::initializer_list<DataType> a)
 		{
 			// reserve space
 			N = a.end() - a.begin();
-			array = new NumberType [N]();
+			array = new DataType [N]();
 			
 			// run over the elements
 			size_t i = 0;
@@ -364,7 +355,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				N++;
 			
 			// reserve space
-			array = new NumberType [N]();
+			array = new DataType [N]();
 			
 			// run over the elements
 			size_t n = 0;
@@ -386,10 +377,356 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		size_t size() const { return N; }
 		void resize (size_t n)
 		{
-			NumberType * new_array = new NumberType [n]();
+			DataType * new_array = new DataType [n]();
+			for (size_t i = 0; i < n; i++)
+				new_array[i] = (i < N) ? array[i] : DataType(0);
+			delete [] array;
+			N = n;
+			array = new_array;
+		}
+		
+		//
+		// element-wise access (non-const)
+		//
+		
+		inline DataType& operator[] (size_t i)
+		{
+		#ifdef NDEBUG
+			return array[i];
+		#else
+			// bounds check
+			if (i < N)
+				return array[i];
+			else
+				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+		#endif
+		}
+		
+		//
+		// element-wise access (const)
+		//
+		
+		inline DataType const & operator[] (size_t i) const
+		{
+		#ifdef NDEBUG
+			return array[i];
+		#else
+			if (i < N)
+				return array[i];
+			else
+				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+		#endif
+		}
+		
+		//
+		// data pointer
+		//
+		
+		DataType* data() { return array; }
+		const DataType* data() const { return array; }
+		
+		//
+		// STL-like iterator interface
+		//
+		
+		typedef DataType* iterator;
+		typedef const DataType* const_iterator;
+		iterator begin()
+				{ return array; }
+		const_iterator begin() const
+				{ return array; }
+		iterator end()
+				{ return array + N; }
+		const_iterator end() const
+				{ return array + N; }
+		DataType & front(int i = 0)
+				{ return *(array + i); }
+		DataType const & front(int i = 0) const
+				{ return *(array + i); }
+		DataType & back(int i = 0)
+				{ return *(array + N - 1 - i); }
+		DataType const & back(int i = 0) const
+				{ return *(array + N - 1 - i); }
+		
+		void push_back(DataType const & a)
+		{
+			// not very efficient... FIXME
+			
+			DataType* new_array = new DataType [N + 1]();
+			for (size_t i = 0; i < N; i++)
+				new_array[i] = std::move(array[i]);
+			new_array[N] = a;
+			N++;
+			delete [] array;
+			array = new_array;
+		}
+		
+		DataType pop_back()
+		{
+			if (N > 0)
+				return *(array + (--N));
+			else
+				throw exception ("Array has no element to pop!");
+		}
+		
+		template <class InputIterator> void append (
+			InputIterator first, InputIterator last
+		) {
+			DataType* new_array = new DataType [N + last - first]();
+			for (size_t i = 0; i < N; i++)
+				new_array[i] = array[i];
+			for (InputIterator it = first; it != last; it++)
+				new_array[N + it - first] = *it;
+			N += last - first;
+			delete [] array;
+			array = new_array;
+		}
+		
+		void insert (iterator it, DataType x)
+		{
+			// create new array (one element longer)
+			DataType* new_array = new DataType [N + 1];
+			
+			// copy everything to the new location
+			for (int i = 0; i < it - array; i++)
+				new_array[i] = std::move(array[i]);
+			
+			// insert new element
+			*(new_array + (it - array)) = std::move(x);
+			
+			// copy the rest
+			for (int i = it - array; i < (int)N; i++)
+				new_array[i+1] = std::move(array[i]);
+			
+			// change pointers
+			delete [] array;
+			N++;
+			array = new_array;
+		}
+		
+		bool empty() const
+		{
+			return N == 0;
+		}
+		
+		//
+		// assignment operators
+		//
+		
+		Array<DataType>& operator = (Array<DataType> const &  b)
+		{
+			// if we already have some allocated space, check its size,
+			// so that we do not free it uselessly
+			if (array != nullptr and N != b.N)
+			{
+				delete [] array;
+				array = nullptr;
+			}
+			
+			// set the new dimension
+			N = b.N;
+			
+			// if necessary, reserve space
+			if (array == nullptr)
+				array = new DataType [N]();
+			
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = b.array[i];
+			
+			return *this;
+		}
+		
+		Array<DataType>& operator = (Array<DataType> &&  b)
+		{
+			// if we already have some allocated space, check its size,
+			// so that we do not free it uselessly
+			if (array != nullptr)
+			{
+				delete [] array;
+				array = nullptr;
+			}
+			
+			// move content
+			N = b.N;
+			array = b.array;
+			
+			// clear rvalue
+			b.N = 0;
+			b.array = nullptr;
+			
+			return *this;
+		}
+};
+
+/**
+ * \brief A comfortable number array class.
+ * 
+ * Class NumberArray is intended as a Hex's replacement for std::vector\<NumberType\>.
+ * Properties:
+ * - basic iterator interface (members Array::begin(), Array::end()).
+ * - HDF5 interface (ability to save and load to/from HDF5 data files)
+ * - a collection of overloaded arithmetic operators (sum of two arrays,
+ *   difference, multiplication by a number etc.)
+ */
+template <typename NumberType> class NumberArray : public Array<NumberType>
+{
+	private:
+		
+		size_t N;
+		NumberType * array;
+		
+		// allocate aligned memory
+		NumberType* alloc_(size_t n)
+		{
+			if (n < 1)
+				return nullptr;
+			
+			void* aligned_ptr;
+			posix_memalign(&aligned_ptr, __alignof(NumberType), n * sizeof(NumberType));
+			return reinterpret_cast<NumberType*>(aligned_ptr);
+		}
+		
+		// deallocate the memory
+		void destroy_()
+		{
+			if (array != nullptr)
+				free(array);
+			
+			array = nullptr;
+		}
+		
+	public:
+		
+		// alias
+		typedef NumberType DataType;
+		
+		// inner product of two arrays
+		template <typename NumberType1, typename NumberType2> friend auto operator | (
+			NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+		) -> decltype(NumberType1(0)*NumberType2(0));
+				
+		// default constructor, creates an empty array
+		NumberArray() : N(0), array(nullptr) {}
+		
+		// constructor, creates a length-n "x"-filled array
+		NumberArray(size_t n, NumberType x = 0) : N(n)
+		{
+			// reserve space
+			array = alloc_(N);
+			
+			// set to zero
+			for (size_t i = 0; i < N; i++)
+				array[i] = x;
+		}
+		
+		// constructor, copies a length-n "array
+		NumberArray(size_t n, NumberType* x) : N(n)
+		{
+			// reserve space
+			array = alloc_(N);
+					
+			// set to zero
+			for (size_t i = 0; i < N; i++)
+				array[i] = x[i];
+		}
+		
+		// copy constructor from Array const lvalue reference
+		NumberArray(NumberArray<NumberType> const & a)
+		{
+			// reserve space
+			N = a.N;
+			array = alloc_(N);
+	
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = a.array[i];
+		}
+		
+		// copy constructor from ArrayView const lvalue reference
+		NumberArray(ArrayView<NumberType> const & a)
+		{
+			// reserve space
+			N = a.size();
+			array = alloc_(N);
+	
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = a.data()[i];
+		}
+		
+		// copy constructor from Array rvalue reference
+		NumberArray(NumberArray<NumberType> && a)
+		{
+			// copy content
+			N = a.N;
+			array = a.array;
+			
+			// clear rvalue
+			a.N = 0;
+			a.array = nullptr;
+		}
+		
+		// copy constructor from std::vector
+		NumberArray(std::vector<NumberType> const & a)
+		{
+			// reserve space
+			N = a.size();
+			array = alloc_(N);
+			
+			// run over the elements
+			for (size_t i = 0; i < N; i++)
+				array[i] = a[i];
+		}
+		
+		// copy constructor from initializer list
+		NumberArray(std::initializer_list<NumberType> a)
+		{
+			// reserve space
+			N = a.end() - a.begin();
+			array = alloc_(N);
+			
+			// run over the elements
+			size_t i = 0;
+			for (auto it = a.begin(); it != a.end(); it++)
+				array[i++] = *it;
+		}
+		
+		// copy constructor from two forward iterators
+		template <typename ForwardIterator> NumberArray(ForwardIterator i, ForwardIterator j)
+		{
+			// compute size
+			N = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				N++;
+			
+			// reserve space
+			array = alloc_(N);
+			
+			// run over the elements
+			size_t n = 0;
+			for (ForwardIterator k = i; k != j; k++)
+				array[n++] = *k;
+		}
+		
+		// destructor
+		~NumberArray()
+		{
+			if (array != nullptr)
+				destroy_();
+		}
+		
+		//
+		// storage size
+		//
+		
+		size_t size() const { return N; }
+		void resize (size_t n)
+		{
+			NumberType * new_array = alloc_(n);
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : NumberType(0);
-			delete [] array;
+			destroy_();
 			N = n;
 			array = new_array;
 		}
@@ -461,12 +798,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		{
 			// not very efficient... FIXME
 			
-			NumberType* new_array = new NumberType [N + 1]();
+			NumberType* new_array = alloc_(N + 1);
 			for (size_t i = 0; i < N; i++)
 				new_array[i] = std::move(array[i]);
 			new_array[N] = a;
 			N++;
-			delete [] array;
+			if (array != nullptr)
+				destroy_();
 			array = new_array;
 		}
 		
@@ -481,20 +819,23 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		template <class InputIterator> void append (
 			InputIterator first, InputIterator last
 		) {
-			NumberType* new_array = new NumberType [N + last - first]();
+			NumberType* new_array = alloc_(N + last - first);
 			for (size_t i = 0; i < N; i++)
 				new_array[i] = array[i];
 			for (InputIterator it = first; it != last; it++)
 				new_array[N + it - first] = *it;
 			N += last - first;
-			delete [] array;
+			
+			if (array != nullptr)
+				destroy_();
+			
 			array = new_array;
 		}
 		
 		void insert (iterator it, NumberType x)
 		{
 			// create new array (one element longer)
-			NumberType* new_array = new NumberType [N + 1];
+			NumberType* new_array = alloc_(N + 1);
 			
 			// copy everything to the new location
 			for (int i = 0; i < it - array; i++)
@@ -508,7 +849,8 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				new_array[i+1] = std::move(array[i]);
 			
 			// change pointers
-			delete [] array;
+			if (array != nullptr)
+				destroy_();
 			N++;
 			array = new_array;
 		}
@@ -522,13 +864,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// assignment operators
 		//
 		
-		Array<NumberType>& operator = (Array<NumberType> const &  b)
+		NumberArray<NumberType>& operator = (NumberArray<NumberType> const &  b)
 		{
 			// if we already have some allocated space, check its size,
 			// so that we do not free it uselessly
 			if (array != nullptr and N != b.N)
 			{
-				delete [] array;
+				destroy_();
 				array = nullptr;
 			}
 			
@@ -537,7 +879,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			
 			// if necessary, reserve space
 			if (array == nullptr)
-				array = new NumberType [N]();
+				array = alloc_(N);
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -546,13 +888,13 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		Array<NumberType>& operator = (Array<NumberType> &&  b)
+		NumberArray<NumberType>& operator = (NumberArray<NumberType> &&  b)
 		{
 			// if we already have some allocated space, check its size,
 			// so that we do not free it uselessly
 			if (array != nullptr)
 			{
-				delete [] array;
+				destroy_();
 				array = nullptr;
 			}
 			
@@ -571,7 +913,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// reduced arithmetic operators with other arrays
 		//
 		
-		Array<NumberType>& operator += (Array<NumberType> const &  b)
+		NumberArray<NumberType>& operator += (NumberArray<NumberType> const &  b)
 		{
 			// check if sizes match
 			assert(N == b.N);
@@ -583,7 +925,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		Array<NumberType>& operator -= (Array<NumberType> const &  b)
+		NumberArray<NumberType>& operator -= (NumberArray<NumberType> const &  b)
 		{
 			// check if sizes match
 			assert(N == b.N);
@@ -596,7 +938,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		Array<NumberType>& operator *= (Array<NumberType> const &  b)
+		NumberArray<NumberType>& operator *= (NumberArray<NumberType> const &  b)
 		{
 			// check if sizes match
 			assert(N == b.N);
@@ -609,7 +951,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		Array<NumberType>& operator /= (Array<NumberType> const &  b)
+		NumberArray<NumberType>& operator /= (NumberArray<NumberType> const &  b)
 		{
 			// check size
 			assert(b.size() == N);
@@ -626,7 +968,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		// reduced arithmetic operators with complex numbers
 		//
 		
-		template <typename NumberType2> Array<NumberType>& operator += (NumberType2 z)
+		template <typename NumberType2> NumberArray<NumberType>& operator += (NumberType2 z)
 		{
 			// run over elements
 			for (size_t i = 0; i < N; i++)
@@ -635,7 +977,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		template <typename NumberType2> Array<NumberType>& operator -= (NumberType2 z)
+		template <typename NumberType2> NumberArray<NumberType>& operator -= (NumberType2 z)
 		{
 			// run over elements
 			for (size_t i = 0; i < N; i++)
@@ -645,7 +987,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		template <typename NumberType2> Array<NumberType>& operator *= (NumberType2 z)
+		template <typename NumberType2> NumberArray<NumberType>& operator *= (NumberType2 z)
 		{
 			// run over elements
 			for (size_t i = 0; i < N; i++)
@@ -655,7 +997,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			return *this;
 		}
 		
-		template <typename NumberType2> Array<NumberType>& operator /= (NumberType2 z)
+		template <typename NumberType2> NumberArray<NumberType>& operator /= (NumberType2 z)
 		{
 			// run over elements
 			for (size_t i = 0; i < N; i++)
@@ -668,9 +1010,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		/**
 		 * Complex conjugate.
 		 */
-		Array<NumberType> conj() const
+		NumberArray<NumberType> conj() const
 		{
-			Array<NumberType> c = *this;
+			NumberArray<NumberType> c = *this;
 			for (size_t i = 0; i < N; i++)
 			{
 				Complex z = c.array[i];
@@ -752,7 +1094,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 		virtual void fromBlob(std::string const & s)
 		{
 			if (array != nullptr and N != 0)
-				delete [] array;
+				destroy_();
 			
 			// the first character outght to be "x" or "X"
 			// the second character outght to be "'"
@@ -768,7 +1110,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			N = bytes / sizeof(NumberType);
 			
 			// allocate space
-			array = new NumberType [N];
+			array = alloc_(N);
 			
 			// for all bytes
 			for (size_t i = 0; i < bytes; i++)
@@ -981,7 +1323,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			// remove previous data
 			if (array != nullptr)
 			{
-				delete [] array;
+				destroy_();
 				array = nullptr;
 				N = 0;
 			}
@@ -992,7 +1334,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				N += zero_blocks[2*i+1] - zero_blocks[2*i];
 			
 			// resize and clean internal storage
-			array = new NumberType[N];
+			array = alloc_(N);
 			memset(array, 0, N * sizeof(NumberType));
 			
 			// copy nonzero chunks
@@ -1029,8 +1371,9 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 
 // scalar product of two arrays.
 template <typename NumberType1, typename NumberType2> auto operator | (
-	Array<NumberType1> const & a, Array<NumberType2> const & b
-) -> decltype(NumberType1(0)*NumberType2(0)) {
+	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+) -> decltype(NumberType1(0)*NumberType2(0))
+{
 	// store size
 	size_t N = a.N;
 	
@@ -1041,95 +1384,95 @@ template <typename NumberType1, typename NumberType2> auto operator | (
 	decltype(NumberType1(0)*NumberType2(0)) result = 0;
 	
 	// iterators
-	const NumberType1* const __a = &a[0];
-	const NumberType2* const __b = &b[0];
+	NumberType1 const * const __restrict pa = &a[0];
+	NumberType2 const * const __restrict pb = &b[0];
 	
 	// sum the products
 	for (size_t i = 0; i < N; i++)
-		result += __a[i] * __b[i];
+		result += pa[i] * pb[i];
 	
 	return result;
 }
 
 // arithmetic operators Array & Array
 template <typename NumberType1, typename NumberType2> auto operator + (
-	Array<NumberType1> const & a, Array<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) + NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) + NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
 	return c += b;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator - (
-	Array<NumberType1> const & a, Array<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) - NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) - NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
 	return c -= b;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	Array<NumberType1> const & a, Array<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) * NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
 	return c *= b;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator / (
-	Array<NumberType1> const & a, Array<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) / NumberType2(1))>
+	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
 {
-	Array<decltype(NumberType1(0) / NumberType2(1))> c = a;
+	NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
 	return c /= b;
 }
 
 // arithmetic operators Array & Number
 template <typename NumberType1, typename NumberType2> auto operator + (
-	Array<NumberType1> const & a, NumberType2 z
-) -> Array<decltype(NumberType1(0) + NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberType2 z
+) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) + NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
 	return c += z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator - (
-	Array<NumberType1> const & a, NumberType2 z
-) -> Array<decltype(NumberType1(0) - NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberType2 z
+) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) - NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
 	return c -= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	Array<NumberType1> const & a, NumberType2 z
-) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+	NumberArray<NumberType1> const & a, NumberType2 z
+) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) * NumberType2(0))> c = a;
+	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
 	return c *= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	NumberType1 z, Array<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+	NumberType1 z, NumberArray<NumberType2> const & b
+) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) * NumberType2(0))> c = b;
+	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = b;
 	return c *= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator / (
-	Array<NumberType1> const & a, NumberType2 z
-) -> Array<decltype(NumberType1(0) / NumberType2(1))>
+	NumberArray<NumberType1> const & a, NumberType2 z
+) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
 {
-	Array<decltype(NumberType1(0) / NumberType2(1))> c = a;
+	NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
 	return c /= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto outer_product (
 	ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
-) -> Array<decltype(NumberType1(0) * NumberType2(0))>
+) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	Array<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
+	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
 	
 	auto ic = c.begin();
 	
@@ -1233,7 +1576,7 @@ template <typename T> Array<T> logspace(T x0, T x1, size_t N)
  * Write array to standard output. Array will be written as a single column.
  * \param array The array to write.
  */
-template <typename NumberType> void write_array(Array<NumberType> const & array)
+template <typename NumberType> void write_array(NumberArray<NumberType> const & array)
 {
 	for (size_t i = 0; i < array.size(); i++) 
 	{
@@ -1258,7 +1601,7 @@ template <typename NumberType> void write_array(Array<NumberType> const & array)
  * \param array The array to write.
  * \param filename Name of the file to create/overwrite.
  */
-template <typename NumberType> void write_array(Array<NumberType> const & array, const char* filename)
+template <typename NumberType> void write_array(NumberArray<NumberType> const & array, const char* filename)
 {
 	std::ofstream fout(filename);
 	for (size_t i = 0; i < array.size(); i++) 
@@ -1368,14 +1711,14 @@ template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* file
 }
 
 // aliases
-typedef Array<double>		rArray;
-typedef Array<Complex>		cArray;
-typedef Array<long double>	qArray;
-typedef Array<rArray> rArrays;
-typedef Array<cArray> cArrays;
+typedef NumberArray<double>       rArray;
+typedef NumberArray<Complex>      cArray;
+typedef NumberArray<long double>  qArray;
+typedef Array<rArray>       rArrays;
+typedef Array<cArray>       cArrays;
 
-typedef ArrayView<double> rArrayView;
-typedef ArrayView<Complex> cArrayView;
+typedef ArrayView<double>      rArrayView;
+typedef ArrayView<Complex>     cArrayView;
 typedef ArrayView<long double> qArrayView;
 
 /**
@@ -1611,7 +1954,7 @@ template <typename Tidx, typename Tval> void merge (
 /**
  * Join elements from all subarrays.
  */
-template <typename T> Array<T> join (Array<Array<T>> const & arrays)
+template <typename T> NumberArray<T> join (Array<NumberArray<T>> const & arrays)
 {
 	Array<size_t> partial_sizes(arrays.size() + 1);
 	
@@ -1621,7 +1964,7 @@ template <typename T> Array<T> join (Array<Array<T>> const & arrays)
 		partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
 	
 	// result array
-	Array<T> res(partial_sizes.back());
+	NumberArray<T> res(partial_sizes.back());
 	
 	// concatenate arrays
 	for (size_t i = 0; i < arrays.size(); i++)

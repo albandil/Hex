@@ -32,7 +32,8 @@ cArray computeLambda (
 	int maxell, int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei, int lf,
-	cArray const & Pf_overlaps
+	cArray const & Pf_overlaps,
+	std::vector<std::pair<int,int>> const & coupled_states
 ) {
 	// shorthands
 	unsigned Nenergy = kf.size();                       // energy count
@@ -42,8 +43,9 @@ cArray computeLambda (
 	int Nknot   = Bspline::ECS().Nknot();               // number of all knots
 	int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
 	
+	cArray rads(Nenergy * (maxell + L + Pi + 1));
+	
 	// for all energies, compute the radial factors
-	cArray rads(Nenergy * (maxell + 1));
 	for (unsigned ie = 0; ie < Nenergy; ie++)
 	{
 		// compose filename of the data file for this solution
@@ -83,9 +85,9 @@ cArray computeLambda (
 			) - t;
 			
 			// evaluate j and dj at far radius
-			cArray j_R0(maxell + 1);
-			cArray dj_R0(maxell + 1);
-			for (int l = 0; l <= maxell; l++)
+			cArray j_R0(maxell + L + Pi + 1);
+			cArray dj_R0(maxell + L + Pi + 1);
+			for (int l = 0; l <= maxell + L + Pi; l++)
 			{
 				//evaluate the functions
 				j_R0[l] = ric_j(l, kf[ie] * eval_r);
@@ -110,8 +112,8 @@ cArray computeLambda (
 			}
 			
 			// evaluate Wronskians
-			CooMatrix Wj[maxell + 1];
-			for (int l = 0; l <= maxell; l++)
+			CooMatrix Wj[maxell + L + Pi + 1];
+			for (int l = 0; l <= maxell + L + Pi; l++)
 				Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
 				
 			// we need "P_overlaps" to have a 'dot' method
@@ -119,20 +121,18 @@ cArray computeLambda (
 			
 			// compute radial factor
 			#pragma omp parallel for
-			for (int l = 0; l <= maxell; l++)
+			for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 			{
-				// we don't need to compute forbidden transition
-				if (l < abs(lf-L) or l > lf + L)
+				// use blocks that result in requested final lf
+				int l1 = coupled_states[ill].first;
+				int l2 = coupled_states[ill].second;
+				if (l1 != lf)
 					continue;
 				
 				// get correct solution (for this ang. mom.)
-				cArrayView PsiSc (
-					solution, 
-					(lf * (maxell + 1) + l) * Nspline * Nspline, 
-					Nspline * Nspline
-				);
+				cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
 				
-				rads[ie * (maxell + 1) + l] += Sp.transpose().dot(PsiSc).dot(Wj[l].todense()).todense()[0] / double(samples);
+				rads[ie * (maxell + L + Pi + 1) + l2] += Sp.transpose().dot(PsiSc).dot(Wj[l2].todense()).todense()[0] / double(samples);
 			}
 		}
 	}
@@ -140,7 +140,7 @@ cArray computeLambda (
 	return rads;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics)
+cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
 {
 	ics.resize(Ei.size());
 	cArrays results;
@@ -160,42 +160,38 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
 	gsl_sf_result F1, F1p, G1, G1p, F2, F2p, G2, G2p;
 	double expF1, expG1, expF2, expG2, cos_alpha, sin_alpha;
 	
-	std::cout << "\n";
-	
 	// for all energies
 	for (size_t ie = 0; ie < Ei.size(); ie++)
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;
 		#pragma omp critical
 		solution.hdfload(oss.str().c_str());
 		
-		// for all angular states (triangle ℓ₂ ≤ ℓ₁)
-		for (int l1 = 0; l1 <= maxell; l1++)
-		for (int l2 = std::abs(l1-L); l2 <= l1; l2++)
+		// for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
+		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 		{
+			int l1 = coupled_states[ill].first;
+			int l2 = coupled_states[ill].second;
+			
 			std::cout << "\tEi[" << ie << "] = " << Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << "\n";
 			
 			// create subset of the solution
-			cArrayView PsiSc (
-				solution,
-				(l1 * (maxell + 1) + l2) * Nspline * Nspline, 
-				Nspline * Nspline
-			);
+			cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
 			
 			/// DEBUG
-			write_2D_data (
-				Nspline, Nspline,
-				"psi.dat",
-				[&](int i, int j) -> double {
-					return PsiSc[i*Nspline+j].real();
-				}
-			);
-			bool debug = true;
+// 			write_2D_data (
+// 				Nspline, Nspline,
+// 				"psi.dat",
+// 				[&](int i, int j) -> double {
+// 					return PsiSc[i*Nspline+j].real();
+// 				}
+// 			);
+// 			bool debug = true;
 			///
 			
 			// we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
@@ -259,18 +255,18 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
 				};
 				
 				/// DEBUG
-				if (debug)
-				{
-					std::ofstream ofs("integrand.dat");
-					for (int ia = 0; ia < 1000; ia++)
-					{
-						double alpha = 0.5 * M_PI * ia / 1000;
-						Complex v = integrand(alpha);
-						ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
-					}
-					ofs.close();
+// 				if (debug)
+// 				{
+// 					std::ofstream ofs("integrand.dat");
+// 					for (int ia = 0; ia < 1000; ia++)
+// 					{
+// 						double alpha = 0.5 * M_PI * ia / 1000;
+// 						Complex v = integrand(alpha);
+// 						ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
+// 					}
+// 					ofs.close();
 // 					exit(0);
-				}
+// 				}
 				///
 				
 				// integrator
@@ -283,8 +279,8 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
 			};
 			
 			/// DEBUG
-			fLSl1l2k1k2(sqrt(0.5*(Ei[ie]-1./(ni*ni))));
-			debug = false;
+// 			fLSl1l2k1k2(sqrt(0.5*(Ei[ie]-1./(ni*ni))));
+// 			debug = false;
 			///
 			
 			/// DEBUG

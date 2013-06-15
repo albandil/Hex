@@ -34,7 +34,7 @@ obj/angs.o: src/angs.cpp
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
-obj/arrays.o: src/arrays.cpp src/complex.h
+obj/arrays.o: src/arrays.cpp src/complex.h src/arrays.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
@@ -72,5 +72,5 @@ obj/special.o: src/special.cpp src/arrays.h
 
 obj/spmatrix.o: src/spmatrix.cpp src/arrays.h src/spmatrix.h
 	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
+	$(CPP) $(CFLAGS) -c $< -o $@ #-ftree-vectorizer-verbose=5
 

@@ -165,10 +165,36 @@ int main(int argc, char* argv[])
 	std::vector<std::pair<int,int>> coupled_states;
 	std::vector<int> workers;
 	
+	maxell *= 2;
+	
+	std::cout << "Setting up the coupled angular states...\n";
+	
 	// for given L, Π and maxell list all available (ℓ₁ℓ₂) pairs
 	for (int ell = L + Pi; ell <= L + Pi + maxell; ell++)
-	for (int l1 = 0; l1 <= ell; l1++)
-		coupled_states.push_back(std::make_pair(l1,ell-l1));
+	{
+		// skip wrong parity
+		if ((ell + L) % 2 != Pi % 2)
+			continue;
+		
+		std::cout << "\t-> [" << ell/2 << "] ";
+		for (int l1 = 0; l1 <= ell; l1++)
+		{
+			// skip non-L-constituting pairs
+			if (std::abs(2*l1-ell) > L)
+				continue;
+			
+			std::cout << "(" << l1 << "," << ell-l1 << ") ";
+			coupled_states.push_back(std::make_pair(l1,ell-l1));
+		}
+		std::cout << "\n";
+	}
+	
+	if (coupled_states.empty())
+	{
+		std::cout << "\t-> The matrix of the set contains no blocks.\n";
+		exit(0);
+	}
+	std::cout << "\n";
 	// --------------------------------------------------------------------- //
 	
 	if (zipfile.size() != 0 and I_am_master)
@@ -242,7 +268,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	std::cout << "ok\nLoading/precomputing integral moments... ";
+	std::cout << "ok\n\nLoading/precomputing integral moments... ";
 	
 	
 	// Precompute useful integral moments ---------------------------------- //
@@ -269,7 +295,7 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	std::cout << "ok\n";
+	std::cout << "ok\n\n";
 	
 	
 	// Precompute two-electron integrals ----------------------------------- //
@@ -284,7 +310,7 @@ int main(int argc, char* argv[])
 	// with respect to exchange of the multi-index [ij] and [kl], with respect
 	// to the interchange of indices in multiindex and it is dense.
 	
-	int maxlambda = 2 * (maxell + L + Pi);
+	int maxlambda = maxell + L + Pi;
 	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
 	
 	#pragma omp parallel
@@ -420,9 +446,9 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	unsigned Hsize = Nspline * Nspline * (maxell + 1) * (maxell + 1);
+	unsigned Hsize = Nspline * Nspline * coupled_states.size();
 	std::cout << "Hamiltonian properties:\n";
-	std::cout << "\t-> hamiltonian size: " << Hsize << "\n";
+	std::cout << "\t-> hamiltonian size: " << Hsize << "\n\n";
 	
 	// exit if reqested
 	if (stg1)
@@ -464,7 +490,7 @@ int main(int argc, char* argv[])
 	cArray ji_expansion = S.tocoo().tocsr().solve(ji_overlaps, ji_expansion_count);
 	ji_expansion.hdfsave("ji_expansion.hdf"); // just for debugging
 	
-	std::cout << "ok\n";
+	std::cout << "ok\n\n";
 	// --------------------------------------------------------------------- //
 	
 	
@@ -480,7 +506,7 @@ int main(int argc, char* argv[])
 	SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
 	SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
 	SymDiaMatrix S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
-	std::cout << "ok\n";
+	std::cout << "ok\n\n";
 	// --------------------------------------------------------------------- //
 	
 	
@@ -489,7 +515,7 @@ int main(int argc, char* argv[])
 	std::map<int,int> LUs;
 	std::vector<int> info(Nproc);
 	int worker = 0;
-	std::cout << "\nBalancing " << coupled_states.size()
+	std::cout << "Balancing " << coupled_states.size()
 	          << " diagonal blocks among " << Nproc 
 	          << " worker processes...\n";
 	for (unsigned ill = 0; ill < coupled_states.size(); ill++)
@@ -641,214 +667,219 @@ int main(int argc, char* argv[])
 			Pi_overlaps = overlapP(ni,li,weight_end_damp);
 			Pi_expansion = S.tocoo().tocsr().solve(Pi_overlaps);
 			
-// 			for (int Spin = 0; Spin <= 1; Spin++)
+			// we may have already computed solution for this state and energy... is it so?
+			std::ostringstream cur_oss;
+			cur_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+			if ( current_solution.hdfload(cur_oss.str().c_str()) )
+				continue;
+			
+			// create right hand side
+			cArray chi ( coupled_states.size()*Nspline*Nspline );
+			
+			std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << "\n";
+			
+			// for all segments constituting the RHS
+			# pragma omp parallel for 
+			for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 			{
-				// we may have already computed solution for this state and energy... is it so?
-				std::ostringstream cur_oss;
-				cur_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
-				if ( current_solution.hdfload(cur_oss.str().c_str()) )
-					continue;
+				int l1 = coupled_states[ill].first;
+				int l2 = coupled_states[ill].second;
 				
-				// create right hand side
-				cArray chi ( coupled_states.size()*Nspline*Nspline );
+				// setup storage
+				cArrayView chi_block(chi, ill * Nspline * Nspline, Nspline * Nspline);
+				chi_block.clear();
 				
-				std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << "\n";
+				// for all allowed angular momenta (by momentum composition) of the projectile
+				for (int l = abs(li - L); l <= li + L; l++)
+				{
+					// skip wrong parity
+					if ((L + li + l) % 2 != Pi % 2)
+						continue;
+					
+					// (anti)symmetrization
+					int Sign = ((Spin + Pi) % 2 == 0) ? 1. : -1.;
+					
+					// compute energy- and angular momentum-dependent prefactor
+					Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
+					prefactor *= ClebschGordan(li,mi,l,0,L,mi);
+					if (prefactor == 0.)
+						continue;
+					
+					// pick the correct Bessel function expansion
+					cArrayView Ji_expansion (
+						ji_expansion,
+						Nspline * (ie * (maxell + 1) + l), /*FIXME*/
+						Nspline
+					);
+					
+					// compute outer products of B-spline expansions
+					cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
+					cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
+					
+					// skip angular forbidden right hand sides
+					for (int lambda = 0; lambda <= maxlambda; lambda++)
+					{
+						Complex f1 = computef(lambda, l1, l2, li, l, L);
+						Complex f2 = computef(lambda, l1, l2, l, li, L);
+						
+						if (f1 != 0.)
+						{
+							chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1);
+						}
+						
+						if (f2 != 0.)
+						{
+							if (Sign > 0)
+								chi_block += (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
+							else
+								chi_block -= (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
+						}
+					}
+					
+					if (li == l1 and l == l2)
+					{
+						// direct contribution
+						chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1);
+					}
+					
+					if (li == l2 and l == l1)
+					{
+						// exchange contribution with the correct sign
+						if (Sign > 0)
+							chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2);
+						else
+							chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2);
+					}
+				}
+			}
+			
+			// Solve the Equations ------------------------------------------------- //
+			//
+			
+			// we may have already computed the previous solution - it will serve as initial guess
+			current_solution = cArray(chi.size());
+			if (ie > 0)
+			{
+				std::ostringstream prev_oss;
+				prev_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
+				if (previous_solution.hdfload(prev_oss.str().c_str()))
+					current_solution = previous_solution;
+			}
+			
+			// CG preconditioner callback
+			auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+			{
 				
-				// for all segments constituting the RHS
-				# pragma omp parallel for 
+				// apply a block inversion preconditioner
+				# pragma omp parallel for schedule (dynamic,1)
+				for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+				{
+					// skip computation of unwanted blocks for this process
+					if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+						continue;
+					
+					// create copy-to view of "z"
+					cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
+					
+					// create copy-from view of "r"
+					cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
+					
+					// copy the correcponding slice of "r" multiplied by a correct block inversion
+					zview = lufts[ill].solve(rview);
+				}
+				
+#ifndef NO_MPI
+				if (parallel)
+				{
+					// synchronize across processes
+					for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+					{
+						// relevant process will broadcast this segment's data
+						MPI_Bcast (
+							&z[0] + ill * Nspline * Nspline,
+							Nspline * Nspline,
+							MPI_DOUBLE_COMPLEX,
+							LUs[ill],
+							MPI_COMM_WORLD
+						);
+					}
+				}
+#endif
+			};
+			
+			// CG matrix multiplication callback
+			auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+			{
+				
+				// multiply by the matrix of the system
+				# pragma omp parallel for schedule (dynamic,1)
 				for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 				{
 					int l1 = coupled_states[ill].first;
 					int l2 = coupled_states[ill].second;
 					
-					// setup storage
-					cArrayView chi_block(chi, ill * Nspline * Nspline, Nspline * Nspline);
-					chi_block.clear();
+					// skip computation of unwanted blocks for this process
+					if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+						continue;
 					
-					// for all allowed angular momenta (by momentum composition) of the projectile
-					for (int l = abs(li - L); l <= li + L; l++)
+					// product (copy-to view of "q")
+					cArrayView q_block(q, ill * Nspline * Nspline, Nspline * Nspline);
+					q_block.clear(); // initialize with zeros
+					
+					// multiply block-row of the matrix with "p"
+					for (unsigned illp = 0; illp < coupled_states.size(); illp++)
 					{
-						// skip wrong parity
-						if ((L + li + l) % 2 != Pi % 2)
-							continue;
+						int l1p = coupled_states[illp].first;
+						int l2p = coupled_states[illp].second;
 						
-						// (anti)symmetrization
-						int Sign = ((Spin + Pi) % 2 == 0) ? 1. : -1.;
+						// corresponding (copy-from) fragment of "p"
+						cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
 						
-						// compute energy- and angular momentum-dependent prefactor
-						Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
-						prefactor *= ClebschGordan(li,mi,l,0,L,mi);
-						if (prefactor == 0.)
-							continue;
-						
-						// pick the correct Bessel function expansion
-						cArrayView Ji_expansion (
-							ji_expansion,
-							Nspline * (ie * (maxell + 1) + l), /*FIXME*/
-							Nspline
+						// multiply by hamiltonian terms
+						if (ill == illp)
+						{
+							// reuse the diagonal block
+							q_block += dia_blocks[ill].dot(p_block);
+						}
+						else
+						{
+							// compute the offdiagonal block
+							for (int lambda = 0; lambda <= maxlambda; lambda++)
+							{
+								Complex f = computef(lambda, l1, l2, l1p, l2p, L);
+								if (f != 0.)
+									q_block -= f * R_tr_dia[lambda].dot(p_block);
+							}
+						}
+					}
+				}
+				
+#ifndef NO_MPI
+				if (parallel)
+				{
+					// synchronize across processes
+					for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+					{
+						// relevant process will broadcast this segment's data
+						MPI_Bcast (
+							&q[0] + ill * Nspline * Nspline,
+							Nspline * Nspline,
+							MPI_DOUBLE_COMPLEX,
+							LUs[ill],
+							MPI_COMM_WORLD
 						);
-						
-						// compute outer products of B-spline expansions
-						cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
-						cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
-						
-						// skip angular forbidden right hand sides
-						for (int lambda = 0; lambda <= maxlambda; lambda++)
-						{
-							Complex f1 = computef(lambda, l1, l2, li, l, L);
-							Complex f2 = computef(lambda, l1, l2, l, li, L);
-							
-							if (f1 != 0.)
-							{
-								chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1);
-							}
-							
-							if (f2 != 0.)
-							{
-								if (Sign > 0)
-									chi_block += (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
-								else
-									chi_block -= (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
-							}
-						}
-						
-						if (li == l1 and l == l2)
-						{
-							// direct contribution
-							chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1);
-						}
-						
-						if (li == l2 and l == l1)
-						{
-							// exchange contribution with the correct sign
-							if (Sign > 0)
-								chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2);
-							else
-								chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2);
-						}
 					}
 				}
-				
-				// Solve the Equations ------------------------------------------------- //
-				//
-				
-				// we may have already computed the previous solution - it will serve as initial guess
-				current_solution = cArray(chi.size());
-				if (ie > 0)
-				{
-					std::ostringstream prev_oss;
-					prev_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
-					if (previous_solution.hdfload(prev_oss.str().c_str()))
-						current_solution = previous_solution;
-				}
-				
-				// CG preconditioner callback
-				auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
-				{
-					
-					// apply a block inversion preconditioner
-					# pragma omp parallel for schedule (dynamic,1)
-					for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-					{
-						// skip computation of unwanted blocks for this process
-						if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
-							continue;
-						
-						// create copy-to view of "z"
-						cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
-						
-						// create copy-from view of "r"
-						cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
-						
-						// copy the correcponding slice of "r" multiplied by a correct block inversion
-						zview = lufts[ill].solve(rview);
-					}
-					
-#ifndef NO_MPI
-					if (parallel)
-					{
-						// synchronize across processes
-						for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-						{
-							// relevant process will broadcast this segment's data
-							MPI_Bcast (
-								&z[0] + ill * Nspline * Nspline,
-								Nspline * Nspline,
-								MPI_DOUBLE_COMPLEX,
-								LUs[ill],
-								MPI_COMM_WORLD
-							);
-						}
-					}
 #endif
-				};
-				
-				// CG matrix multiplication callback
-				auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
-				{
-					
-					// multiply by the matrix of the system
-					# pragma omp parallel for schedule (dynamic,1)
-					for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-					{
-						int l1 = coupled_states[ill].first;
-						int l2 = coupled_states[ill].second;
-						
-						// skip computation of unwanted blocks for this process
-						if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
-							continue;
-						
-						// product (copy-to view of "q")
-						cArrayView q_block(q, ill * Nspline * Nspline, Nspline * Nspline);
-						q_block.clear(); // initialize with zeros
-						
-						// multiply block-row of the matrix with "p"
-						for (unsigned illp = 0; illp < coupled_states.size(); illp++)
-						{
-							int l1p = coupled_states[illp].first;
-							int l2p = coupled_states[illp].second;
-							
-							// corresponding (copy-from) fragment of "p"
-							cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
-							
-							// multiply by hamiltonian terms
-							if (ill == illp)
-							{
-								// reuse the diagonal block
-								q_block += dia_blocks[ill].dot(p_block);
-							}
-							else
-							{
-								// compute the offdiagonal block
-								for (int lambda = 0; lambda <= maxlambda; lambda++)
-								{
-									Complex f = computef(lambda, l1, l2, l1p, l2p, L);
-									if (f != 0.)
-										q_block -= f * R_tr_dia[lambda].dot(p_block);
-								}
-							}
-						}
-					}
-					
-#ifndef NO_MPI
-					if (parallel)
-					{
-						// synchronize across processes
-						for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-						{
-							// relevant process will broadcast this segment's data
-							MPI_Bcast (
-								&q[0] + ill * Nspline * Nspline,
-								Nspline * Nspline,
-								MPI_DOUBLE_COMPLEX,
-								LUs[ill],
-								MPI_COMM_WORLD
-							);
-						}
-					}
-#endif
-				};
-				
+			};
+			
+			if (chi.norm() == 0.)
+			{
+				std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings).\n";
+				current_solution.clear();
+			}
+			else
+			{
 				// custom conjugate gradients callback-based solver
 				double tolerance = 1e-10;
 				std::cout << "\tStart CG callback with tolerance " << tolerance << "\n";
@@ -864,13 +895,14 @@ int main(int argc, char* argv[])
 				std::cout << "\tEnd CG callback\n";
 				
 				// update progress
-				computations_done++;
 				iterations_done += iterations;
-				
-				// save solution to disk
-				current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
-				
-			} // end of For mi, Spin
+			}
+			
+			computations_done++;
+			
+			// save solution to disk
+			current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
+			
 		} // end of For li
 		
 		// free Numeric objects
@@ -918,7 +950,6 @@ int main(int argc, char* argv[])
 	std::cout << "Extracting T-matrices...";
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
-// 	for (int Spin = 0; Spin <= 1; Spin++)
 	for (auto instate  : instates)
 	for (auto outstate : outstates)
 		transitions.push_back (
@@ -975,7 +1006,7 @@ int main(int argc, char* argv[])
 				);
 				
 				// compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps));
+				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
 			}
 			
 			// save the data
@@ -985,8 +1016,8 @@ int main(int argc, char* argv[])
 				cArray T_ell(Lambda[mf+lf].size());
 				for (unsigned i = 0; i < T_ell.size(); i++)
 				{
-					int ie  = i / (maxell + 1);
-					int ell = i % (maxell + 1);
+					int ie  = i / (maxell + L + Pi + 1);
+					int ell = i % (maxell + L + Pi + 1);
 					
 					T_ell[i] = Lambda[mf+lf][i] * 4. * M_PI / kf[ie] * pow(Complex(0.,1.), -ell)
 									* ClebschGordan(lf, mf, ell, mi - mf, L, mi) / sqrt(2.);
@@ -998,8 +1029,8 @@ int main(int argc, char* argv[])
 				
 				for (unsigned i = 0; i < T_ell.size(); i++)
 				{
-					int ie  = i / (maxell + 1);
-					int ell = i % (maxell + 1);
+					int ie  = i / (maxell + L + Pi + 1);
+					int ell = i % (maxell + L + Pi + 1);
 					
 					if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
 					if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
@@ -1030,10 +1061,10 @@ int main(int argc, char* argv[])
 				for (unsigned ie = 0; ie < Nenergy; ie++)
 				{
 					double sigma = 0.;
-					for (int ell = 0; ell <= maxell; ell++)
+					for (int ell = 0; ell <= maxell + L + Pi; ell++)
 					{
-						double Re_f_ell = -T_ell[ie * (maxell + 1) + ell].real() / (2 * M_PI);
-						double Im_f_ell = -T_ell[ie * (maxell + 1) + ell].imag() / (2 * M_PI);
+						double Re_f_ell = -T_ell[ie * (maxell + L + Pi + 1) + ell].real() / (2 * M_PI);
+						double Im_f_ell = -T_ell[ie * (maxell + L + Pi + 1) + ell].imag() / (2 * M_PI);
 						sigma += 0.25 * (2*Spin + 1) * kf[ie] / ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
 					}
 					if (finite(sigma))
@@ -1051,22 +1082,18 @@ int main(int argc, char* argv[])
 			//
 			
 			rArray ics;
-			cArrays data = std::move(computeXi(maxell, L, Spin, Pi, ni, li, mi, Ei, ics));
-			cArrays::const_iterator iter = data.begin();
+			cArrays data = std::move(computeXi(maxell, L, Spin, Pi, ni, li, mi, Ei, ics, coupled_states));
 			
 			for (size_t ie = 0; ie < Ei.size(); ie++)
-			for (int l1 = 0; l1 <= maxell; l1++)
-			for (int l2 = std::abs(l1-L); l2 <= l1; l2++)
+			for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
 			{
 				// save data as BLOBs
 				fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
 					 << ni << "," << li << "," << mi << ","
 					 << L  << "," << Spin << "," << Pi << ","
-					 << Ei[ie] << "," << l1 << "," << l2 << ","
-					 << iter->toBlob() << ");\n";
-				
-				// move to next data
-				iter++;
+					 << Ei[ie] << "," << coupled_states[ill].first << ","
+					 << coupled_states[ill].second << ","
+					 << data[ie * coupled_states.size() + ill].toBlob() << ");\n";
 			}
 			
 			// print ionization cross section

@@ -1642,11 +1642,12 @@ cArray SymDiaMatrix::dot(cArrayView const & B) const
 	cArray res(n_);
 	
 	// restricted pointers for maximization of the cache usage
-	Complex * __restrict rp_res = &res[0];
+	Complex       *       __restrict rp_res    = &res[0];
 	Complex const * const __restrict rp_elems_ = &elems_[0];
-	Complex const * const __restrict rp_B = &B[0];
+	Complex const * const __restrict rp_B      = &B[0];
 	
 	// for all elements in the main diagonal
+	// NOTE This might auto-vectorize on complex-supporting architectures...?
 	for (int ielem = 0; ielem < n_; ielem++)
 		rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
 	
@@ -1663,6 +1664,7 @@ cArray SymDiaMatrix::dot(cArrayView const & B) const
 		int Nelem = n_ - idiag;
 		
 		// for all elements of the current diagonal
+		// NOTE This might auto-vectorize on complex-supporting architectures...?
 		for (int ielem = 0; ielem < Nelem; ielem++)
 		{
 			rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
