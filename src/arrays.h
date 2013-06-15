@@ -925,13 +925,17 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				H5::DataSet dset = h5file.openDataSet("array");
 				H5::DataSpace dspc = dset.getSpace();
 				nnz = dspc.getSimpleExtentNpoints() * sizeof(double) / sizeof(NumberType);
-				nnz_array.resize(nnz);
-				dset.read (
-					reinterpret_cast<double*>(&nnz_array[0]),
-					H5::PredType::NATIVE_DOUBLE,
-					dspc,
-					dspc
-				);
+				
+				if (nnz != 0)
+				{
+					nnz_array.resize(nnz);
+					dset.read (
+						reinterpret_cast<double*>(&nnz_array[0]),
+						H5::PredType::NATIVE_DOUBLE,
+						dspc,
+						dspc
+					);
+				}
 				
 				// load compression information (if any)
 				H5::DataSet dsetz;
@@ -1002,7 +1006,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 				// append nonzero data before this zero block
 				memcpy (
 					array + this_end,
-					&nnz_array[0] + load_end,
+					nnz_array.data() + load_end,
 					(zero_start - this_end) * sizeof(NumberType)
 				);
 				
@@ -1014,7 +1018,7 @@ template <typename NumberType> class Array : public ArrayView<NumberType>
 			// append remaining data
 			memcpy (
 				array + this_end,
-				&nnz_array[0] + load_end,
+				nnz_array.data() + load_end,
 				(N - this_end) * sizeof(NumberType)
 			);
 			
