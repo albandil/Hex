@@ -160,6 +160,7 @@ int main(int argc, char* argv[])
 	//
 	// --------------------------------------------------------------------- //
 	
+	
 	// Setup angular data -------------------------------------------------- //
 	//
 	std::vector<std::pair<int,int>> coupled_states;
@@ -189,13 +190,13 @@ int main(int argc, char* argv[])
 		std::cout << "\n";
 	}
 	
+	std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " blocks.\n";
+	
 	if (coupled_states.empty())
-	{
-		std::cout << "\t-> The matrix of the set contains no blocks.\n";
 		exit(0);
-	}
 	std::cout << "\n";
 	// --------------------------------------------------------------------- //
+	
 	
 	if (zipfile.size() != 0 and I_am_master)
 	{
