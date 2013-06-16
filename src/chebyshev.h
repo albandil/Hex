@@ -62,7 +62,7 @@ public:
 	 * \param a Left boundary of the approximation interval.
 	 * \param b Right boundary of the approximation interval.
 	 */
-    Chebyshev (Array<Tout> const & array, Tin a = -1, Tin b = 1)
+    Chebyshev (ArrayView<Tout> const & array, Tin a = -1, Tin b = 1)
 	{
 		N  = array.size();
         xt = 0.5 * (b + a);
@@ -288,7 +288,7 @@ public:
         return out.str();
     }
 
-    Array<Tout> const & coeffs() const
+    NumberArray<Tout> const & coeffs() const
     {
 		return C;
 	}
@@ -317,7 +317,7 @@ private:
     int N;
 
     /// Chebyshev coefficients
-    Array<Tout> C;
+    NumberArray<Tout> C;
 
     /// approximation interval center
     Tin xt;

@@ -1403,12 +1403,38 @@ template <typename NumberType1, typename NumberType2> auto operator + (
 	return c += b;
 }
 
+template <typename T1, typename T2> auto operator + (
+	Array<T1> const & a, Array<T2> const & b
+) -> Array<decltype(T1(0) + T2(0))>
+{
+	Array<decltype(T1(0) + T2(0))> c;
+	c.resize(std::min(a.size(),b.size()));
+	
+	for (size_t i = 0; i < c.size(); i++)
+		c.push_back(a[i] + b[i]);
+	
+	return c;
+}
+
 template <typename NumberType1, typename NumberType2> auto operator - (
 	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
 {
 	NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
 	return c -= b;
+}
+
+template <typename T1, typename T2> auto operator - (
+	Array<T1> const & a, Array<T2> const & b
+) -> Array<decltype(T1(0) - T2(0))>
+{
+	Array<decltype(T1(0) - T2(0))> c;
+	c.resize(std::min(a.size(),b.size()));
+	
+	for (size_t i = 0; i < c.size(); i++)
+		c.push_back(a[i] - b[i]);
+	
+	return c;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
@@ -1419,12 +1445,38 @@ template <typename NumberType1, typename NumberType2> auto operator * (
 	return c *= b;
 }
 
+template <typename T1, typename T2> auto operator * (
+	Array<T1> const & a, Array<T2> const & b
+) -> Array<decltype(T1(0) * T2(0))>
+{
+	Array<decltype(T1(0) * T2(0))> c;
+	c.resize(std::min(a.size(),b.size()));
+	
+	for (size_t i = 0; i < c.size(); i++)
+		c.push_back(a[i] * b[i]);
+	
+	return c;
+}
+
 template <typename NumberType1, typename NumberType2> auto operator / (
 	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
 {
 	NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
 	return c /= b;
+}
+
+template <typename T1, typename T2> auto operator / (
+	Array<T1> const & a, Array<T2> const & b
+) -> Array<decltype(T1(0) * T2(0))>
+{
+	Array<decltype(T1(0) * T2(0))> c;
+	c.resize(std::min(a.size(),b.size()));
+	
+	for (size_t i = 0; i < c.size(); i++)
+		c.push_back(a[i] / b[i]);
+	
+	return c;
 }
 
 // arithmetic operators Array & Number
@@ -1484,10 +1536,10 @@ template <typename NumberType1, typename NumberType2> auto outer_product (
 }
 
 // other vectorized functions
-template <typename NumberType> Array<NumberType> sqrt (Array<NumberType> const & A)
+template <typename NumberType> NumberArray<NumberType> sqrt (ArrayView<NumberType> const & A)
 {
 	size_t N = A.size();
-	Array<NumberType> B (N);
+	NumberArray<NumberType> B (N);
 
 	for (size_t i = 0; i < N; i++)
 		B[i] = sqrt(A[i]);
@@ -1495,7 +1547,7 @@ template <typename NumberType> Array<NumberType> sqrt (Array<NumberType> const &
 	return B;
 }
 
-inline Array<double> sqrabs (Array<Complex> const & A)
+inline NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 {
 	size_t N = A.size();
 	Array<double> B (N);
@@ -1528,9 +1580,9 @@ template <typename NumberType> std::ostream & operator << (std::ostream & out, A
  * \param end Right boundary and last sample for "samples" > 1.
  * \param samples Sample count.
  */
-template <typename T> Array<T> linspace(T start, T end, unsigned samples)
+template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
 {
-	Array<T> space(samples);
+	NumberArray<T> space(samples);
 	
 	if (samples == 0)
 		return space;
@@ -1552,7 +1604,7 @@ template <typename T> Array<T> linspace(T start, T end, unsigned samples)
  * \param x1 Right boundary and last sample for "samples" > 1.
  * \param N Sample count.
  */
-template <typename T> Array<T> logspace(T x0, T x1, size_t N)
+template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 {
 	if (x0 <= 0 or x1 <= 0 or x1 < x0)
 	{
@@ -1560,7 +1612,7 @@ template <typename T> Array<T> logspace(T x0, T x1, size_t N)
 		abort();
 	}
 	
-	Array<T> grid(N);
+	NumberArray<T> grid(N);
 	
 	if (N == 1)
 		grid[0] = x0;
@@ -1576,7 +1628,7 @@ template <typename T> Array<T> logspace(T x0, T x1, size_t N)
  * Write array to standard output. Array will be written as a single column.
  * \param array The array to write.
  */
-template <typename NumberType> void write_array(NumberArray<NumberType> const & array)
+template <typename NumberType> void write_array(ArrayView<NumberType> const & array)
 {
 	for (size_t i = 0; i < array.size(); i++) 
 	{
@@ -1601,7 +1653,7 @@ template <typename NumberType> void write_array(NumberArray<NumberType> const & 
  * \param array The array to write.
  * \param filename Name of the file to create/overwrite.
  */
-template <typename NumberType> void write_array(NumberArray<NumberType> const & array, const char* filename)
+template <typename NumberType> void write_array(ArrayView<NumberType> const & array, const char* filename)
 {
 	std::ofstream fout(filename);
 	for (size_t i = 0; i < array.size(); i++) 
@@ -1669,14 +1721,14 @@ template <typename NumberType> void write_array(NumberArray<NumberType> const & 
 
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {
-	FILE* f = fopen(filename, "w");
-	if (f == 0)
+	std::ofstream f(filename);
+	
+	if (f.bad())
 		return false;
 	
 	for (size_t i = 0; i < m; i++)
-		fprintf(f, "%g\n", fetch(i));
+		f << fetch(i) << "\n";
 	
-	fclose(f);
 	return true;
 }
 
@@ -1695,17 +1747,17 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
  */
 template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* filename, Fetcher fetch)
 {
-	FILE* f = fopen(filename, "w");
-	if (f == 0)
+	std::ofstream f(filename);
+	
+	if (f.bad())
 		return false;
 	
 	for (size_t i = 0; i < m; i++)
 	{
 		for (size_t j = 0; j < n; j++)
-			fprintf(f, "%g ", fetch(i,j));
-		fprintf(f, "\n");
+			f << fetch(i,j) << " ";
+		f << "\n";
 	}
-	fclose(f);
 	
 	return true;
 }
@@ -1790,7 +1842,7 @@ inline rArray abs (cArray const &u)
 	return v;
 }
 
-template <typename NumberType> NumberType min (Array<NumberType> const & a)
+template <typename NumberType> NumberType min (ArrayView<NumberType> const & a)
 {
 	NumberType z = a.front();
 	for (NumberType const * it = a.begin(); it != a.end(); it++)
@@ -1799,7 +1851,7 @@ template <typename NumberType> NumberType min (Array<NumberType> const & a)
 	return z;
 }
 
-template <typename NumberType> NumberType max (Array<NumberType> const & a)
+template <typename NumberType> NumberType max (ArrayView<NumberType> const & a)
 {
 	NumberType z = a.front();
 	for (NumberType const * it = a.begin(); it != a.end(); it++)
@@ -1822,7 +1874,7 @@ inline rArrays abs (cArrays const &u)
 }
 
 // return per-element power
-template <typename T> Array<T> pow(Array<T> const &u, double e)
+template <typename T> Array<T> pow(ArrayView<T> const & u, double e)
 {
 	Array<T> v(u.size());
 	
@@ -1846,16 +1898,16 @@ template <typename T> T sum(Array<T> v)
 }
 
 // summation of nested arrays
-template <typename T> Array<T> sums(Array<Array<T>> v)
+template <typename T> NumberArray<T> sums(Array<NumberArray<T>> v)
 {
 	if (v.size() == 0)
-		return Array<T>();	// empty array
+		return NumberArray<T>();	// empty array
 	
-	return std::accumulate(
+	return std::accumulate (
 		v.begin(),
 		v.end(),
-		Array<T> (v[0].size()),
-		[](Array<T> a, Array<T> b) -> Array<T> {
+		NumberArray<T> (v[0].size()),
+		[](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
 			return a + b;
 		}
 	);
@@ -1868,7 +1920,7 @@ template <typename T> Array<T> sums(Array<Array<T>> v)
  * \return Vector of bools for element-wise comparisons.
  */
 template <typename T>
-Array<bool> operator == (Array<T> u, T x)
+Array<bool> operator == (ArrayView<T> u, T x)
 {
 	Array<bool> v(u.size());
 	for (size_t i  = 0; i < u.size(); i++)
@@ -1956,7 +2008,7 @@ template <typename Tidx, typename Tval> void merge (
  */
 template <typename T> NumberArray<T> join (Array<NumberArray<T>> const & arrays)
 {
-	Array<size_t> partial_sizes(arrays.size() + 1);
+	NumberArray<size_t> partial_sizes(arrays.size() + 1);
 	
 	// get partial sizes
 	partial_sizes[0] = 0;

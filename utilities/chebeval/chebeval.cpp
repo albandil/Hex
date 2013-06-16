@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <string>
 
 #include "../../src/complex.h"
 #include "../../src/arrays.h"
@@ -11,7 +12,7 @@
 template<typename T> void load_and_write(const char* hdf, int samples)
 {
 	// load coefficients
-	Array<T> coefs;
+	NumberArray<T> coefs;
 	if (not coefs.hdfload(hdf))
 	{
 		std::cerr << "Can't read file \"" << hdf << "\"\n";

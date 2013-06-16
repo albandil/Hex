@@ -348,7 +348,7 @@ void parse_input_file (
 	
 	// construct complex(-to-be) knot sequence
 	for (unsigned i = 0; i < cknots_begin.size(); i++)
-		cknots = concatenate(
+		cknots = concatenate (
 			cknots,
 			linspace(
 				cknots_begin[i],
