@@ -50,7 +50,7 @@ public:
 	 * \param a Left boundary of the approximation interval.
 	 * \param b Right boundary of the approximation interval.
 	 */
-    template <class Functor> Chebyshev (Functor const & f, int n, Tin a = -1, Tin b = 1)
+    template <class Functor> Chebyshev (Functor const & f, int n, Tin a, Tin b)
     {
         generate(f, n, a, b);
     }
@@ -62,7 +62,7 @@ public:
 	 * \param a Left boundary of the approximation interval.
 	 * \param b Right boundary of the approximation interval.
 	 */
-    Chebyshev (ArrayView<Tout> const & array, Tin a = -1, Tin b = 1)
+    Chebyshev (ArrayView<Tout> const & array, Tin a, Tin b)
 	{
 		N  = array.size();
         xt = 0.5 * (b + a);
@@ -82,7 +82,7 @@ public:
 	 * \param b Right boundary of the approximation inerval.
 	 */
 	template <class Functor>
-	void generate (Functor const & f, int n, Tin a = -1, Tin b = 1);
+	void generate (Functor const & f, int n, Tin a, Tin b);
 	
     /**
      * Return full approximation value.

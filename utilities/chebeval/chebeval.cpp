@@ -20,7 +20,7 @@ template<typename T> void load_and_write(const char* hdf, int samples)
 	}
 	
 	// create the expansion
-	Chebyshev<double,T> expansion(coefs);
+	Chebyshev<double,T> expansion(coefs, -1, 1);
 	
 	// evaluate the expansion
 	for (int i = 0; i <= samples; i++)

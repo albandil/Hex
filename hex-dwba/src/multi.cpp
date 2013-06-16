@@ -42,8 +42,8 @@ PhiFunctionDir::PhiFunctionDir (
 	rArray a, b;
 	if (a.hdfload(name1.c_str()) and b.hdfload(name2.c_str()))
 	{
-		Cheb_L = Chebyshev<double,double>(a);
-		Cheb_mLm1 = Chebyshev<double,double>(b);
+		Cheb_L = Chebyshev<double,double>(a, -1, 1);
+		Cheb_mLm1 = Chebyshev<double,double>(b, -1, 1);
 		
 		Cheb_L_tail = Cheb_L.tail(1e-10);
 		Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10);
@@ -114,7 +114,7 @@ void PhiFunctionDir::tryFullRealChebyshev (
 	{
 		if (not Cheb_L_conv)
 		{
-			Cheb_L.generate(compact1, N);
+			Cheb_L.generate(compact1, N, -1, 1);
 			if ((Cheb_L_tail = Cheb_L.tail(1e-10)) < N)
 			{
 				Cheb_L_conv = true;
@@ -123,7 +123,7 @@ void PhiFunctionDir::tryFullRealChebyshev (
 		}
 		if (not Cheb_mLm1_conv)
 		{
-			Cheb_mLm1.generate(compact2, N);
+			Cheb_mLm1.generate(compact2, N, -1, 1);
 			if ((Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10)) < N)
 			{
 				Cheb_mLm1_conv = true;
@@ -329,23 +329,23 @@ void PhiFunctionDir::tryFullComplexChebyshev (
 		
 		if (not Cheb_L_conv)
 		{
-			Cheb_L.generate(compactA, N);
+			Cheb_L.generate(compactA, N, -1, 1);
 			
 			if ((Cheb_L_tail = Cheb_L.tail(1e-10)) < N)
 			{
 				// multiply all coefficients by missing coefficient sqrt(2/π)/k
-				Cheb_L = Chebyshev<double,double>(prefactor * Cheb_L.coeffs());
+				Cheb_L = Chebyshev<double,double>(prefactor * Cheb_L.coeffs(), -1, 1);
 				Cheb_L_conv = true;
 			}
 		}
 		if (not Cheb_mLm1_conv)
 		{
-			Cheb_mLm1.generate(compactB, N);
+			Cheb_mLm1.generate(compactB, N, -1, 1);
 			
 			if ((Cheb_mLm1_tail = Cheb_mLm1.tail(1e-10)) < N)
 			{
 				// multiply all coefficients by missing coefficient sqrt(2/π)/k
-				Cheb_mLm1 = Chebyshev<double,double>(prefactor * Cheb_mLm1.coeffs());
+				Cheb_mLm1 = Chebyshev<double,double>(prefactor * Cheb_mLm1.coeffs(), -1, 1);
 				Cheb_mLm1_conv = true;
 			}
 		}
