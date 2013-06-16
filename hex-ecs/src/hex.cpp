@@ -259,6 +259,7 @@ int main(int argc, char* argv[])
 	
 	std::cout << "Loading/precomputing derivative overlaps... ";
 	
+	
 	// Precompute matrix of derivative overlaps ---------------------------- //
 	//
 	SymDiaMatrix D(Nspline);
@@ -931,9 +932,9 @@ int main(int argc, char* argv[])
 	// compose output filename
 	std::ostringstream ossfile;
 	if (parallel)
-		ossfile << ni << "-" << L << "-" << S << "-" << Pi << "-(" << iproc << ").sql";
+		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << "-(" << iproc << ").sql";
 	else
-		ossfile << ni << "-" << L << "-" << S << "-" << Pi << ".sql";
+		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << ".sql";
 	
 	// Create SQL batch file
 	std::ofstream fsql(ossfile.str().c_str());
