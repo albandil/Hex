@@ -7,8 +7,8 @@ OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 INCLUDE = $(OPENMPIINCLUDE)
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lz -lpthread -lm -lpng -lfftw3
 
-CFLAGS = -O3 -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) #-DHEX_USE_LU_SCRATCH
-LFLAGS = -O3 -fopenmp -fPIC $(LIBRARY)
+CFLAGS = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) #-DHEX_USE_LU_SCRATCH
+LFLAGS = -Ofast -fopenmp -fPIC $(LIBRARY)
 
 all: bin/hex 
 

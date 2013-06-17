@@ -131,15 +131,15 @@ template <class Functor> cArray overlapP(int n, int l, Functor weightf)
  * \param weightf Weight function to multiply every value of the Bessel function.
  *                It is expected to have the "double operator() (Complex z)" interface,
  *                where the sent value is the complex coordinate.
- * \return Array of shape [vk.size() × (maxL2+1) × Nspline] in column-major format.
+ * \return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
  */
-template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Functor weightf)
+template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Functor weightf)
 {
 	// shorthand for energy count
 	int Nenergy = vk.size();
 	
 	// reserve space for the output array
-	size_t size = Bspline::ECS().Nspline() * Nenergy * (maxL2 + 1);
+	size_t size = Bspline::ECS().Nspline() * Nenergy * (maxell + 1);
 	cArray res(size);
 	
 	// per interval
@@ -161,7 +161,7 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 		for (int ie = 0; ie < Nenergy; ie++)
 		{
 			// for all angular momenta
-			for (int l = 0; l <= maxL2; l++)
+			for (int l = 0; l <= maxell; l++)
 			{
 				// evaluate the Riccati-Bessel function
 				std::vector<LComplex> evalj(points);
@@ -185,7 +185,7 @@ template <class Functor> cArray overlapj(int maxL2, std::vector<double> vk, Func
 						sum += LComplex(ws[ipoint]) * evalj[ipoint] * LComplex(evalB[ipoint]);
 					
 					// store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
-					res[(ie * (maxL2 + 1) + l) * Bspline::ECS().Nspline() + ispline] += Complex(sum);
+					res[(ie * (maxell + 1) + l) * Bspline::ECS().Nspline() + ispline] += Complex(sum);
 				}
 			}
 		}

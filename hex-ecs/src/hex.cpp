@@ -483,6 +483,7 @@ int main(int argc, char* argv[])
 	std::cout << "Computing B-spline expansions... ";
 	
 	//  j-overlaps of shape [Nenergy × Nangmom × Nspline]
+	//   where Mangmom = maxell + L + Pi
 	cArray ji_overlaps = overlapj(maxell/*FIXME*/,ki,weight_edge_damp);
 	ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
 	
@@ -710,7 +711,7 @@ int main(int argc, char* argv[])
 					// pick the correct Bessel function expansion
 					cArrayView Ji_expansion (
 						ji_expansion,
-						Nspline * (ie * (maxell + 1) + l), /*FIXME*/
+						Nspline * (ie * (maxlambda + 1) + l),
 						Nspline
 					);
 					

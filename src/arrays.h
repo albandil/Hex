@@ -564,6 +564,8 @@ template <typename DataType> class Array : public ArrayView<DataType>
  * 
  * Class NumberArray is intended as a Hex's replacement for std::vector\<NumberType\>.
  * Properties:
+ * - correct memory alignment of the storage
+ * - even number of allocated elements (zero padded) for the use in SSE accelerators
  * - basic iterator interface (members Array::begin(), Array::end()).
  * - HDF5 interface (ability to save and load to/from HDF5 data files)
  * - a collection of overloaded arithmetic operators (sum of two arrays,
@@ -579,12 +581,23 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		// allocate aligned memory
 		NumberType* alloc_(size_t n)
 		{
+			// is there anything to allocate?
 			if (n < 1)
 				return nullptr;
 			
+			// allocate the aligned memory; make sure there will be 2k elements
+			// so that we can always use pairs
 			void* aligned_ptr;
-			posix_memalign(&aligned_ptr, __alignof(NumberType), n * sizeof(NumberType));
-			return reinterpret_cast<NumberType*>(aligned_ptr);
+			posix_memalign(&aligned_ptr, __alignof(NumberType), (n + (n % 2)) * sizeof(NumberType));
+			
+			// get the number pointer
+			NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
+			
+			// clear the last element so that we may disregard it during multiplication
+			*(ptr + n + (n % 2) - 1) = 0;
+			
+			// return the pointer
+			return ptr;
 		}
 		
 		// deallocate the memory
