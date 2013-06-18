@@ -5,18 +5,47 @@
 
 int main(int argc, char *argv[])
 {
-	if (argc < 2)
+	bool cpx = false;	// whether to write complex expansion
+	std::string hdf;
+	
+	for (int iarg = 1; iarg < argc; iarg++)
 	{
-		std::cout << "\nUsage:\n\t./hdf2txt <HDFfile>\n\n";
+		if (strcmp(argv[iarg],"--complex") == 0)
+		{
+			cpx = true;
+		}
+		else if (hdf.empty())
+		{
+			hdf = std::string(argv[iarg]);
+		}
+		else
+			break;
+	}
+	
+	if (argc < 2 or hdf.empty())
+	{
+		std::cout << "\nUsage:\n\t./hdf2txt [--complex] <HDFfile>\n\n";
 		exit(0);
 	}
 	
-	// head HDF file
-	rArray a;
-	a.hdfload(argv[1]);
+	if (cpx)
+	{
+		// head HDF file
+		cArray a;
+		a.hdfload(hdf);
 	
-	// write raw data
-	write_array(a);
+		// write raw data
+		write_array(a);
+	}
+	else
+	{
+		// head HDF file
+		rArray a;
+		a.hdfload(hdf);
+	
+		// write raw data
+		write_array(a);
+	}
 	
 	return 0;
 }
