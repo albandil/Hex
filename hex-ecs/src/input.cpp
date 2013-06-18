@@ -21,6 +21,7 @@
 
 #include "arrays.h"
 #include "spmatrix.h"
+#include "input.h"
 
 /*
  * Load data from input file. Default filename is "hex.inp", but different
@@ -29,13 +30,13 @@
 
 void parse_command_line (
 	int argc, char* argv[],
-	std::ifstream& inputfile,
-	std::string& zipfile, int& zipcount,
-	bool& parallel,
-	bool& stg1, bool& stg12
+	std::ifstream & inputfile,
+	std::string & zipfile, int & zipcount,
+	bool & parallel,
+	int & itinerary
 ){
 	// set short options
-	const char* const short_options  = "eihznmab";
+	const char* const short_options  = "eihznmabc";
 	
 	// set long options
 	const option long_options[] = {
@@ -47,8 +48,9 @@ void parse_command_line (
 #ifndef NO_MPI
 		{"mpi",               0,   0, 'm'},
 #endif
-		{"stg1",              0,   0, 'a'},
-		{"stg12",             0,   0, 'b'},
+		{"stg-integ",         0,   0, 'a'},
+		{"stg-integ-solve",   0,   0, 'b'},
+		{"stg-extract",       0,   0, 'c'},
 		{0,                   0,   0,   0}
 	};
 	
@@ -160,13 +162,19 @@ void parse_command_line (
 			case 'a':
 			{
 				// run only the first part (computation of radial integrals)
-				stg1 = true;
+				itinerary = StgRadial;
 				break;
 			}
 			case 'b':
 			{
 				// run only the first two parts (computation of radial integrals and solution of the equations)
-				stg12 = true;
+				itinerary = StgRadial & StgSolve;
+				break;
+			}
+			case 'c':
+			{
+				// run only the third part (extraction of amplitudes)
+				itinerary = StgExtract;
 				break;
 			}
 #ifndef NO_MPI

@@ -144,6 +144,8 @@ public:
 	int Nknot() const { return Nknot_; }
 	int Nreknot() const { return Nreknot_; }
 	int order() const { return order_; }
+    double R0() const { return R0_; };
+	double Rmax() const { return Rmax_; };
 	
 private:
 	

@@ -13,10 +13,37 @@
 #ifndef _MOMTS_H_
 #define _MOMTS_H_
 
+#include <cmath>
 #include <vector>
 #include <complex>
 
 #include "bspline.h"
+
+class weightEdgeDamp
+{
+public:
+	double operator() (Complex z) const
+	{
+		double R0 = Bspline::ECS().R0();
+		
+		// this will suppress function value from R0+1 onwards
+		// which is useful for expanding (divergent) Ricatti-Bessel function
+		return (z.imag() == 0.) ? (1+tanh(R0 - 5 - z.real()))/2 : 0.;
+	}
+};
+
+class weightEndDamp
+{
+public:
+	double operator() (Complex z) const
+	{
+		double Rmax = Bspline::ECS().Rmax();
+		
+		// whis will suppress function value at Rmax
+		// which is useful for expanding everywhere-nonzero hydrogenic function
+		return tanh(Rmax - z.real());
+	}
+};
 
 /**
  * Compute derivative overlap of B-splines \f$ B_i \f$ and \f$ B_j \f$

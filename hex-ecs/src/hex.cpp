@@ -63,8 +63,9 @@ int main(int argc, char* argv[])
 	std::string zipfile;        // HDF solution expansion file to zip
 	int  zipcount = 0;          // zip sample count
 	bool parallel = false;      // whether to use OpenMPI
-	bool stg1 = false;          // whether to computate radial integrals only
-	bool stg12 = false;         // whether to computate radial integrals and solutions only
+	
+	// which stages to run (default: all)
+	int itinerary = StgNone;
 	
 	// get input from command line
 	parse_command_line (
@@ -72,8 +73,12 @@ int main(int argc, char* argv[])
 		inputfile,
 		zipfile, zipcount,
 		parallel,
-		stg1, stg12
+		itinerary
 	);
+	
+	// run the whole sequence if nothing specified
+	if (itinerary == StgNone)
+		itinerary = StgRadial | StgSolve | StgExtract;
 	
 	// setup MPI
 	int Nproc = 1, iproc = 0;
@@ -315,6 +320,16 @@ int main(int argc, char* argv[])
 	int maxlambda = maxell + L + Pi;
 	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
 	
+Stg1:
+{
+	
+	// skip two-electron integration if told so
+	if (not (itinerary & StgRadial))
+	{
+		std::cout << "Skipped computation of two-electron integrals.\n";
+		goto Stg2;
+	}
+	
 	#pragma omp parallel
 	{
 		#pragma omp master
@@ -448,34 +463,18 @@ int main(int argc, char* argv[])
 	// --------------------------------------------------------------------- //
 	
 	
-	unsigned Hsize = Nspline * Nspline * coupled_states.size();
 	std::cout << "Hamiltonian properties:\n";
-	std::cout << "\t-> hamiltonian size: " << Hsize << "\n\n";
+	std::cout << "\t-> hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n\n";
 	
-	// exit if reqested
-	if (stg1)
+}
+Stg2:
+{
+	// skip stage 2 if told so
+	if (not (itinerary & StgSolve))
 	{
-#ifndef NO_MPI
-		if (parallel)
-			MPI_Finalize();
-#endif
-		exit(0);
+		std::cout << "Skipped solution of the equation.\n";
+		goto Stg3;
 	}
-	
-	
-	// Expansion weights --------------------------------------------------- //
-	//
-	auto weight_edge_damp = [ R0 ](Complex z) -> double {
-		// this will suppress function value from R0+1 onwards
-		// which is useful for expanding (divergent) Ricatti-Bessel function
-		return (z.imag() == 0.) ? (1+tanh(R0 - 5 - z.real()))/2 : 0.;
-	};
-	auto weight_end_damp = [ Rmax ](Complex z) -> double {
-		// whis will suppress function value at Rmax
-		// which is useful for expanding everywhere-nonzero hydrogenic function
-		return tanh(Rmax - z.real());
-	};
-	// --------------------------------------------------------------------- //
 	
 	
 	// Prepare B-spline overlaps and expansions of Ric-Bess functions ------ //
@@ -484,7 +483,7 @@ int main(int argc, char* argv[])
 	
 	//  j-overlaps of shape [Nenergy × Nangmom × Nspline]
 	//   where Mangmom = maxell + L + Pi
-	cArray ji_overlaps = overlapj(maxell/*FIXME*/,ki,weight_edge_damp);
+	cArray ji_overlaps = overlapj(maxell,ki,weightEdgeDamp());
 	ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
 	
 	//  compute expansions; solve the system
@@ -667,7 +666,7 @@ int main(int argc, char* argv[])
 			
 			// compute P-overlaps and P-expansion
 			cArray Pi_overlaps, Pi_expansion;
-			Pi_overlaps = overlapP(ni,li,weight_end_damp);
+			Pi_overlaps = overlapP(ni,li,weightEndDamp());
 			Pi_expansion = S.tocoo().tocsr().solve(Pi_overlaps);
 			
 			// we may have already computed solution for this state and energy... is it so?
@@ -919,15 +918,14 @@ int main(int argc, char* argv[])
 	
 	// --------------------------------------------------------------------- //
 	
-	
-	// exit if requested
-	if (stg12)
+}
+Stg3:
+{
+	// skip stage 3 if told so
+	if (not (itinerary & StgExtract))
 	{
-#ifndef NO_MPI
-		if (parallel)
-			MPI_Finalize();
-#endif
-		exit(0);
+		std::cout << "Skipped extraction of amplitudes.\n";
+		goto End;
 	}
 	
 	// compose output filename
@@ -995,7 +993,7 @@ int main(int argc, char* argv[])
 			//
 			
 			// precompute hydrogen function overlaps
-			cArray Pf_overlaps = overlapP(nf,lf,weight_end_damp);
+			cArray Pf_overlaps = overlapP(nf,lf,weightEndDamp());
 			
 			// compute radial integrals
 			cArrays Lambda(2 * lf + 1);
@@ -1116,13 +1114,15 @@ int main(int argc, char* argv[])
 	
 	fsql << "COMMIT;\n";
 	fsql.close();
-	
+}
+End:
+{	
 #ifndef NO_MPI
 	if (parallel)
 		MPI_Finalize();
 #endif
 	
 	std::cout << "\nDone.\n\n";
-	
+}	
 	return 0;
 }

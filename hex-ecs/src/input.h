@@ -20,6 +20,13 @@
 
 #include "arrays.h"
 
+typedef enum {
+	StgNone    = 0x00,
+	StgRadial  = 0x01,
+	StgSolve   = 0x02,
+	StgExtract = 0x04
+} HexEcsStg;
+
 /**
  * Get information from the command line.
  * 
@@ -42,7 +49,7 @@ void parse_command_line (
 	std::string & zipfile, 
 	int & zipcount,
 	bool & parallel,
-	bool & stg1, bool & stg12
+	int & itinerary
 );
 
 /**
