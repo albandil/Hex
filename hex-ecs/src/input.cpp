@@ -129,7 +129,7 @@ void parse_command_line (
 					"       /  _  /  / __\\  \\ \\/ /                       \n"
 					"      /_/ /_/   \\__\\   /_/\\_\\                      \n"
 					"                                                       \n"
-					"    Jakub Benda, MFF UK (c) 2011                       \n"
+					"    Jakub Benda, MFF UK (c) 2013                       \n"
 					"                                                       \n"
 					"------------------------------------------------       \n"
 					"Available switches (short forms in parentheses):       \n"
@@ -141,8 +141,9 @@ void parse_command_line (
 					"\t--zipfile <filename> (-z)  solution file to zip      \n"
 					"\t--zipcount <number>  (-n)  zip samples               \n"
 					"\t--mpi                (-m)  use MPI                   \n"
-					"\t--stg1               (-a)  only do radial integrals  \n"
-					"\t--stg2               (-n)  only do integrals & solve \n"
+					"\t--stg-integ          (-a)  only do radial integrals  \n"
+					"\t--stg-integ-solve    (-b)  only do integrals & solve \n"
+					"\t--stg-extract        (-c)  only extract amplitudes   \n"
 					"                                                       \n"
 				;
 				exit(0);
