@@ -1137,13 +1137,13 @@ CooMatrix stairs(size_t N);
  *                        Should multiply the given vector by the matrix of the equation set.
  * \return Iteration count.
  */
-template <typename TFunctor1, typename TFunctor2>
+template <typename Preconditioner, typename Multiplier>
 unsigned cg_callbacks (
 	cArray const & b, cArray & x,
 	double eps,
 	unsigned min_iterations, unsigned max_iterations,
-	TFunctor1 apply_preconditioner,
-	TFunctor2 matrix_multiply
+	Preconditioner apply_preconditioner,
+	Multiplier matrix_multiply
 ) {
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();;
 	std::chrono::duration<int> sec;
@@ -1159,6 +1159,15 @@ unsigned cg_callbacks (
 	cArray r(N);
 	matrix_multiply(x, r);
 	r = b - r;
+	
+	// if the (non-zero) initial guess seems horribly wrong,
+	//    use rather the right hand side as the initial guess
+	if (r.norm() > 100000 * b.norm())
+	{
+		x.clear();
+		matrix_multiply(x, r);
+		r = b - r;
+	}
 
 	// some other scalar variables
 	Complex rho_new;		// contains inner product r_i^T · r_i
