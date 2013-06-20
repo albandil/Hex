@@ -36,6 +36,43 @@ bool any(std::vector<bool> v)
 	return false;
 }
 
+rArray abs (cArray const &u)
+{
+	rArray v(u.size());
+	
+	auto iu = u.begin();
+	auto iv = v.begin();
+	
+	while (iu != u.end())
+		*(iv++) = abs(*(iu++));
+	
+	return v;
+}
+
+rArrays abs (cArrays const &u)
+{
+	rArrays v(u.size());
+	
+	auto iu = u.begin();
+	auto iv = v.begin();
+	
+	while (iu != u.end())
+		*(iv++) = abs(*(iu++));
+	
+	return v;
+}
+
+NumberArray<double> sqrabs (NumberArray<Complex> const & A)
+{
+	size_t N = A.size();
+	Array<double> B (N);
+
+	for (size_t i = 0; i < N; i++)
+		B[i] = sqrabs(A[i]);
+
+	return B;
+}
+
 #ifndef NO_HDF
 bool save_array(rArray const & vec, const char* name, const double * const pdelta)
 {
@@ -198,40 +235,6 @@ void write_array(qArray const & array, const char* filename)
 		fprintf(f, "%ld %Lg\n", i, array[i]);
 	fclose(f);
 }
-
-// rArray logspace(double x0, double x1, unsigned N)
-// {
-// 	if (x0 <= 0 or x1 <= 0 or x1 < x0)
-// 	{
-// 		fprintf(stderr, "[logspace] It must be 0 < x1 <= x2 !\n");
-// 		abort();
-// 	}
-// 	
-// 	rArray grid(N);
-// 	
-// 	if (N == 1)
-// 		grid[0] = x0;
-// 	
-// 	if (N > 1)
-// 		for (unsigned i = 0; i < N; i++)
-// 			grid[i] = x0 * pow(x1 / x0, i / (N - 1.));
-// 	
-// 	return grid;
-// }
-
-// rArray linspace(double x0, double x1, unsigned N)
-// {
-// 	rArray grid(N);
-// 	
-// 	if (N == 1)
-// 		grid[0] = x0;
-// 	
-// 	if (N > 1)
-// 		for (unsigned i = 0; i < N; i++)
-// 			grid[i] = x0 + (x1 - x0) * i / (N - 1);
-// 	
-// 	return grid;
-// }
 
 void write_array(ArrayView<Complex> const & array)
 {

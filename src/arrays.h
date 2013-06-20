@@ -10,8 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_ARRAYS
-#define HEX_ARRAYS
+#ifndef HEX_ARRAYS_H
+#define HEX_ARRAYS_H
 
 #include <complex>
 #include <cstdio>
@@ -27,12 +27,13 @@
 #include <assert.h>
 
 #ifndef NO_HDF
-#include <H5Cpp.h>
+#include "hdffile.h"
 #endif
 
 #include "complex.h"
 #include "misc.h"
 
+class HDFFile;
 template <typename DataType> class Array;
 template <typename NumberType> class NumberArray;
 
@@ -60,14 +61,14 @@ template <typename NumberType> class ArrayView
 		ArrayView(Array<NumberType> & a, size_t i = 0, size_t n = 0)
 		{
 			N = (n > 0) ? n : a.size();
-			array = &a[0] + i;
+			array = a.data() + i;
 		}
 		
 		// construct view from Array const lvalue reference
 		ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
 		{
 			N = (n > 0) ? n : a.size();
-			array = const_cast<NumberType*>(&a[0]) + i;
+			array = const_cast<NumberType*>(a.data()) + i;
 		}
 		
 		// construct from consecutive memory segment
@@ -241,6 +242,8 @@ template <typename NumberType> class ArrayView
 			for (size_t i = 0; i < N; i++)
 				array[i] = NumberType(0);
 		}
+		
+		bool empty() const { return N == 0; }
 };
 
 /**
@@ -375,14 +378,25 @@ template <typename DataType> class Array : public ArrayView<DataType>
 		//
 		
 		size_t size() const { return N; }
-		void resize (size_t n)
+		size_t resize (size_t n)
 		{
+			if (n == 0)
+			{
+				if (array != nullptr)
+				{
+					delete [] array;
+					N = 0;
+				}
+				return 0;
+			}
+			
 			DataType * new_array = new DataType [n]();
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : DataType(0);
 			delete [] array;
 			N = n;
 			array = new_array;
+			return N;
 		}
 		
 		//
@@ -573,9 +587,9 @@ template <typename DataType> class Array : public ArrayView<DataType>
  */
 template <typename NumberType> class NumberArray : public Array<NumberType>
 {
-	private:
+	public:
 		
-		size_t N;
+		size_t N, Nres;
 		NumberType * array;
 		
 		// allocate aligned memory
@@ -585,10 +599,14 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 			if (n < 1)
 				return nullptr;
 			
-			// allocate the aligned memory; make sure there will be 2k elements
+			// allocate the aligned memory; make sure there will be even number of elements
 			// so that we can always use pairs
 			void* aligned_ptr;
-			posix_memalign(&aligned_ptr, __alignof(NumberType), (n + (n % 2)) * sizeof(NumberType));
+			posix_memalign (
+				&aligned_ptr,
+				std::max(__alignof(NumberType), sizeof(void*)),
+				(n + (n % 2)) * sizeof(NumberType)
+			);
 			
 			// get the number pointer
 			NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
@@ -605,7 +623,6 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		{
 			if (array != nullptr)
 				free(array);
-			
 			array = nullptr;
 		}
 		
@@ -620,13 +637,13 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		) -> decltype(NumberType1(0)*NumberType2(0));
 				
 		// default constructor, creates an empty array
-		NumberArray() : N(0), array(nullptr) {}
+		NumberArray() : N(0), Nres(0), array(nullptr) {}
 		
 		// constructor, creates a length-n "x"-filled array
-		NumberArray(size_t n, NumberType x = 0) : N(n)
+		NumberArray(size_t n, NumberType x = 0) : N(n), Nres(n)
 		{
 			// reserve space
-			array = alloc_(N);
+			array = alloc_(Nres);
 			
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -634,10 +651,10 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		}
 		
 		// constructor, copies a length-n "array
-		NumberArray(size_t n, NumberType* x) : N(n)
+		NumberArray(size_t n, NumberType* x) : N(n), Nres(n)
 		{
 			// reserve space
-			array = alloc_(N);
+			array = alloc_(Nres);
 					
 			// set to zero
 			for (size_t i = 0; i < N; i++)
@@ -648,8 +665,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		NumberArray(NumberArray<NumberType> const & a)
 		{
 			// reserve space
-			N = a.N;
-			array = alloc_(N);
+			N = Nres = a.N;
+			array = alloc_(Nres);
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -660,8 +677,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		NumberArray(ArrayView<NumberType> const & a)
 		{
 			// reserve space
-			N = a.size();
-			array = alloc_(N);
+			N = Nres = a.size();
+			array = alloc_(Nres);
 	
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -673,10 +690,12 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		{
 			// copy content
 			N = a.N;
+			Nres = a.Nres;
 			array = a.array;
 			
 			// clear rvalue
 			a.N = 0;
+			a.Nres = 0;
 			a.array = nullptr;
 		}
 		
@@ -684,8 +703,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		NumberArray(std::vector<NumberType> const & a)
 		{
 			// reserve space
-			N = a.size();
-			array = alloc_(N);
+			N = Nres = a.size();
+			array = alloc_(Nres);
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -696,8 +715,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		NumberArray(std::initializer_list<NumberType> a)
 		{
 			// reserve space
-			N = a.end() - a.begin();
-			array = alloc_(N);
+			N = Nres = a.end() - a.begin();
+			array = alloc_(Nres);
 			
 			// run over the elements
 			size_t i = 0;
@@ -714,7 +733,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 				N++;
 			
 			// reserve space
-			array = alloc_(N);
+			Nres = N;
+			array = alloc_(Nres);
 			
 			// run over the elements
 			size_t n = 0;
@@ -734,14 +754,44 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		//
 		
 		size_t size() const { return N; }
-		void resize (size_t n)
+		size_t resize (size_t n)
 		{
-			NumberType * new_array = alloc_(n);
+			if (n <= Nres)
+			{
+				N = n;
+				return N;
+			}
+			
+			Nres = n;
+			NumberType * new_array = alloc_(Nres);
+			
 			for (size_t i = 0; i < n; i++)
 				new_array[i] = (i < N) ? array[i] : NumberType(0);
+			
 			destroy_();
 			N = n;
+			
 			array = new_array;
+			
+			return N;
+		}
+		size_t reserve (size_t n)
+		{
+			if (n > Nres)
+			{
+				Nres = n;
+				NumberType* new_array = alloc_(Nres);
+				
+				if (N > 0)
+				{
+					memcpy(new_array, array, N * sizeof(NumberType));
+					destroy_();
+				}
+				
+				array = new_array;
+			}
+			
+			return Nres;
 		}
 		
 		//
@@ -809,16 +859,27 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		
 		void push_back(NumberType const & a)
 		{
-			// not very efficient... FIXME
+			if (N + 1 > Nres)
+			{
+				// double the capacity
+				Nres = 2 * Nres + 1;
+				
+				// allocate space
+				NumberType* new_array = alloc_(Nres);
+				
+				// copy original data
+				memcpy(new_array, array, N * sizeof(NumberType));
+				
+				// destroy original array
+				if (array != nullptr)
+					destroy_();
+				
+				// use new array
+				array = new_array;
+			}
 			
-			NumberType* new_array = alloc_(N + 1);
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = std::move(array[i]);
-			new_array[N] = a;
-			N++;
-			if (array != nullptr)
-				destroy_();
-			array = new_array;
+			// copy new element
+			array[N++] = a;
 		}
 		
 		NumberType pop_back()
@@ -832,40 +893,27 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		template <class InputIterator> void append (
 			InputIterator first, InputIterator last
 		) {
-			NumberType* new_array = alloc_(N + last - first);
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = array[i];
+			if (N + last - first > (int)Nres)
+			{
+				// raise the capacity
+				Nres += last - first;
+				
+				// allocate space
+				NumberType* new_array = alloc_(Nres);
+				
+				// copy original data
+				memcpy(new_array, array, N * sizeof(NumberType));
+				
+				// destroy original array
+				if (array != nullptr)
+					destroy_();
+				
+				// use new array
+				array = new_array;
+			}
+			
 			for (InputIterator it = first; it != last; it++)
-				new_array[N + it - first] = *it;
-			N += last - first;
-			
-			if (array != nullptr)
-				destroy_();
-			
-			array = new_array;
-		}
-		
-		void insert (iterator it, NumberType x)
-		{
-			// create new array (one element longer)
-			NumberType* new_array = alloc_(N + 1);
-			
-			// copy everything to the new location
-			for (int i = 0; i < it - array; i++)
-				new_array[i] = std::move(array[i]);
-			
-			// insert new element
-			*(new_array + (it - array)) = std::move(x);
-			
-			// copy the rest
-			for (int i = it - array; i < (int)N; i++)
-				new_array[i+1] = std::move(array[i]);
-			
-			// change pointers
-			if (array != nullptr)
-				destroy_();
-			N++;
-			array = new_array;
+				array[N++] = *it;
 		}
 		
 		bool empty() const
@@ -879,20 +927,18 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		
 		NumberArray<NumberType>& operator = (NumberArray<NumberType> const &  b)
 		{
-			// if we already have some allocated space, check its size,
-			// so that we do not free it uselessly
-			if (array != nullptr and N != b.N)
+			if (array == nullptr or Nres < b.N)
 			{
+				// delete insufficient storage
 				destroy_();
-				array = nullptr;
+				
+				// allocate new storage
+				Nres = b.N;
+				array = alloc_(Nres);
 			}
 			
 			// set the new dimension
 			N = b.N;
-			
-			// if necessary, reserve space
-			if (array == nullptr)
-				array = alloc_(N);
 			
 			// run over the elements
 			for (size_t i = 0; i < N; i++)
@@ -903,22 +949,9 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		
 		NumberArray<NumberType>& operator = (NumberArray<NumberType> &&  b)
 		{
-			// if we already have some allocated space, check its size,
-			// so that we do not free it uselessly
-			if (array != nullptr)
-			{
-				destroy_();
-				array = nullptr;
-			}
-			
-			// move content
-			N = b.N;
-			array = b.array;
-			
-			// clear rvalue
-			b.N = 0;
-			b.array = nullptr;
-			
+			std::swap(N, b.N);
+			std::swap(Nres, b.Nres);
+			std::swap(array, b.array);
 			return *this;
 		}
 		
@@ -1149,109 +1182,44 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		 * \param compress Whether to apply a trivial compression (contract the repeated zeros).
 		 * \param consec Minimal consecutive occurences for compression.
 		 */
-		bool hdfsave(const char* name, bool compress = false, int consec = 10) const
+		bool hdfsave(const char* name, bool docompress = false, int consec = 10) const
 		{
-			H5::Exception::dontPrint();
-			
-			// compressed array
-			Array<NumberType> carray;
-			
-			// zero blocks
-			Array<int> zero_blocks;
-			
-			// consecutive zeros counter
-			int zero_counter = 0;
-			
-			if (compress)
-			{
-				// analyze: find compressible segments
-				for (size_t i = 0; i < N; i++)
-				{
-					if (array[i] == 0.)
-					{
-						// another consecutive zero
-						zero_counter++;
-					}
-					else if (zero_counter >= consec)
-					{
-						// end of large zero block -> compress
-						zero_blocks.push_back(i-zero_counter);
-						zero_blocks.push_back(i);
-						zero_counter = 0;
-					}
-					else
-					{
-						// end of tiny zero block -> do not bother with compression
-						zero_counter = 0;
-					}
-					
-				}
-				if (zero_counter >= 10)
-				{
-					zero_blocks.push_back(N-zero_counter);
-					zero_blocks.push_back(N);
-				}
-				
-				// invert selection: get non-zero blocks
-				Array<int> nonzero_blocks;
-				nonzero_blocks.push_back(0);
-				nonzero_blocks.append(zero_blocks.begin(), zero_blocks.end());
-				nonzero_blocks.push_back(N);
-				
-				// compress: copy only nonzero elements
-				for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
-				{
-					int start = nonzero_blocks[2*iblock];
-					int end = nonzero_blocks[2*iblock+1];
-					carray.append (
-						array + start,
-						array + end
-					);
-				}
-			}
-			
 			// save to HDF file
-			try
-			{
-				H5::H5File h5file(name, H5F_ACC_TRUNC);
-				
-				// save data as an interleaved array
-				if (zero_blocks.size() > 0)
-				{
-					hsize_t length1 = carray.size() * sizeof(NumberType) / sizeof(double);
-					
-					H5::DataSpace dspc1(/*rank*/1, &length1);
-					H5::IntType dtype1(H5::PredType::NATIVE_DOUBLE);
-					H5::DataSet dset1 = h5file.createDataSet("array", dtype1, dspc1);
-					dset1.write(carray.data(), H5::PredType::NATIVE_DOUBLE);
-					
-					hsize_t length2 = zero_blocks.size();
-					
-					// make zero_blocks index doubles, not elements
-					for (int& z : zero_blocks)
-						z *= sizeof(NumberType)/sizeof(double);
-						
-					H5::DataSpace dspc2(/*rank*/1, &length2);
-					H5::IntType dtype2(H5::PredType::NATIVE_INT);
-					H5::DataSet dset2 = h5file.createDataSet("zero_blocks", dtype2, dspc2);
-					dset2.write(zero_blocks.data(), H5::PredType::NATIVE_INT);
-				}
-				else
-				{
-					hsize_t length = N * sizeof(NumberType) / sizeof(double);
-					
-					H5::DataSpace dspc(/*rank*/1, &length);
-					H5::IntType dtype(H5::PredType::NATIVE_DOUBLE);
-					H5::DataSet dset = h5file.createDataSet("array", dtype, dspc);
-					dset.write(array, H5::PredType::NATIVE_DOUBLE);
-				}
-				
-				return true;
-			}
-			catch (H5::FileIException err)
-			{
+			HDFFile hdf(name, HDFFile::overwrite);
+			
+			if (not hdf.valid())
 				return false;
+			
+			if (docompress)
+			{
+				NumberArray<int> zero_blocks;
+				NumberArray<NumberType> elements;
+				std::tie(zero_blocks,elements) = compress(consec);
+				
+				if (not zero_blocks.empty())
+				{
+					if (not hdf.write (
+						"zero_blocks",
+						&(zero_blocks[0]),
+						zero_blocks.size()
+					)) return false;
+				}
+				if (not elements.empty())
+				{
+					if (not hdf.write (
+						"array",
+						&(elements[0]),
+						elements.size()
+					)) return false;
+				}
 			}
+			else
+			{
+				if (not hdf.write("array", array, N))
+					return false;
+			}
+			
+			return true;
 		}
 		
 		/**
@@ -1260,95 +1228,123 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 		 */
 		bool hdfload(std::string name)
 		{
-			H5::Exception::dontPrint();
+			// open the file
+			HDFFile hdf(name, HDFFile::readonly);
 			
-			// number of nonzero elements
-			int nnz;
-			
-			// array of nonzero elements
-			Array<NumberType> nnz_array;
-			
-			// starting and (one past) ending elements of the elided zero blocks
-			Array<int> zero_blocks;
-			
-			try
-			{
-				// open file
-				H5::H5File h5file(name.c_str(), H5F_ACC_RDONLY);
-				
-				// load data array (non-zero elements)
-				H5::DataSet dset = h5file.openDataSet("array");
-				H5::DataSpace dspc = dset.getSpace();
-				nnz = dspc.getSimpleExtentNpoints() * sizeof(double) / sizeof(NumberType);
-				
-				if (nnz != 0)
-				{
-					nnz_array.resize(nnz);
-					dset.read (
-						reinterpret_cast<double*>(&nnz_array[0]),
-						H5::PredType::NATIVE_DOUBLE,
-						dspc,
-						dspc
-					);
-				}
-				
-				// load compression information (if any)
-				H5::DataSet dsetz;
-				H5::DataSpace dspcz;
-				int n;
-				try {
-					dsetz = h5file.openDataSet("zero_blocks");
-					dspcz = dsetz.getSpace();
-					n = dspcz.getSimpleExtentNpoints();
-				} catch (H5::FileIException err) {
-					n = 0;
-				}
-				
-				if (n == 0)
-				{
-					// no compression data
-					// -> move loaded data to internal storage and return
-					*this = std::move(nnz_array);
-					return true;
-				}
-				else
-				{
-					// there are some compression data
-					// -> load information about the zero blocks
-					zero_blocks.resize(n);
-					dsetz.read (
-						reinterpret_cast<int*>(&zero_blocks[0]),
-						H5::PredType::NATIVE_INT,
-						dspcz,
-						dspcz
-					);
-				}
-			}
-			catch (H5::FileIException err)
-			{
+			if (not hdf.valid())
 				return false;
-			}
 			
-			// make zero_blocks index elements, not doubles
-			for (int& z : zero_blocks)
-				z /= sizeof(NumberType)/sizeof(double);
+			NumberArray<NumberType> elements;
+			NumberArray<int> zero_blocks;
+			
+			// read zero blocks
+			if (zero_blocks.resize(hdf.size("zero_blocks")))
+				if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+					return false;
+			
+			// get data size
+			size_t size = hdf.size("array");
+			
+			// scale size if this is a complex array
+			if (typeid(NumberType) == typeid(Complex))
+				size /= 2;
+			
+			// read packed elements
+			if (elements.resize(size))
+			{
+				if (not hdf.read("array", &(elements[0]), elements.size()))
+					return false;
+			}
 			
 			// remove previous data
 			if (array != nullptr)
 			{
 				destroy_();
 				array = nullptr;
-				N = 0;
+				N = Nres = 0;
 			}
 			
+			// unpack
+			*this = elements.decompress(zero_blocks);
+			
+			return true;
+		}
+		
+		// get compressed array
+		std::tuple<NumberArray<int>,NumberArray<DataType>> compress(int consec) const
+		{
+			// compressed array
+			NumberArray<NumberType> carray;
+			carray.reserve(N);
+			
+			// zero blocks
+			NumberArray<int> zero_blocks;
+			
+			// consecutive zeros counter
+			int zero_counter = 0;
+			
+			// analyze: find compressible segments
+			for (size_t i = 0; i < N; i++)
+			{
+				if (array[i] == 0.)
+				{
+					// another consecutive zero
+					zero_counter++;
+				}
+				else if (zero_counter >= consec)
+				{
+					// end of large zero block -> compress
+					zero_blocks.push_back(i-zero_counter);
+					zero_blocks.push_back(i);
+					zero_counter = 0;
+				}
+				else
+				{
+					// end of tiny zero block -> do not bother with compression
+					zero_counter = 0;
+				}
+				
+			}
+			if (zero_counter >= 10)
+			{
+				zero_blocks.push_back(N-zero_counter);
+				zero_blocks.push_back(N);
+			}
+			
+			// invert selection: get non-zero blocks
+			NumberArray<int> nonzero_blocks;
+			nonzero_blocks.push_back(0);
+			nonzero_blocks.append(zero_blocks.begin(), zero_blocks.end());
+			nonzero_blocks.push_back(N);
+			
+			// compress: copy only nonzero elements
+			for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
+			{
+				int start = nonzero_blocks[2*iblock];
+				int end = nonzero_blocks[2*iblock+1];
+				carray.append (
+					array + start,
+					array + end
+				);
+			}
+			
+			return std::make_tuple(zero_blocks,carray);
+		}
+		
+		// get un-compressed array if compression info is supplied
+		NumberArray<DataType> decompress(NumberArray<int> const & zero_blocks) const
+		{
+			if (zero_blocks.empty())
+				return *this;
+			
 			// compute final size
-			N = nnz;
+			size_t final_size = N;
 			for (size_t i = 0; i < zero_blocks.size()/2; i++)
-				N += zero_blocks[2*i+1] - zero_blocks[2*i];
+				final_size += zero_blocks[2*i+1] - zero_blocks[2*i];
 			
 			// resize and clean internal storage
-			array = alloc_(N);
-			memset(array, 0, N * sizeof(NumberType));
+			NumberArray<DataType> unpack(final_size);
+			memset(&(unpack[0]), 0, final_size * sizeof(NumberType));
 			
 			// copy nonzero chunks
 			int this_end = 0;	// index of last updated element in "this"
@@ -1360,8 +1356,8 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 				
 				// append nonzero data before this zero block
 				memcpy (
-					array + this_end,
-					nnz_array.data() + load_end,
+					&(unpack[0]) + this_end,
+					array + load_end,
 					(zero_start - this_end) * sizeof(NumberType)
 				);
 				
@@ -1372,12 +1368,12 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 			
 			// append remaining data
 			memcpy (
-				array + this_end,
-				nnz_array.data() + load_end,
-				(N - this_end) * sizeof(NumberType)
+				&(unpack[0]) + this_end,
+				array + load_end,
+				(final_size - this_end) * sizeof(NumberType)
 			);
 			
-			return true;
+			return unpack;
 		}
 #endif
 };
@@ -1548,29 +1544,6 @@ template <typename NumberType1, typename NumberType2> auto outer_product (
 	return c;
 }
 
-// other vectorized functions
-template <typename NumberType> NumberArray<NumberType> sqrt (ArrayView<NumberType> const & A)
-{
-	size_t N = A.size();
-	NumberArray<NumberType> B (N);
-
-	for (size_t i = 0; i < N; i++)
-		B[i] = sqrt(A[i]);
-
-	return B;
-}
-
-inline NumberArray<double> sqrabs (NumberArray<Complex> const & A)
-{
-	size_t N = A.size();
-	Array<double> B (N);
-
-	for (size_t i = 0; i < N; i++)
-		B[i] = sqrabs(A[i]);
-
-	return B;
-}
-
 // output to text stream.
 template <typename NumberType> std::ostream & operator << (std::ostream & out, ArrayView<NumberType> const & a)
 {
@@ -1638,13 +1611,6 @@ template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 }
 
 /**
- * Write array to standard output. Array will be written as a single column.
- * \param array The array to write.
- */
-void write_array(ArrayView<Complex> const & array);
-void write_array(ArrayView<double> const & array);
-
-/**
  * Write array to file. Array will be written as a single column into
  * an ASCII file.
  * \param array The array to write.
@@ -1669,52 +1635,6 @@ template <typename NumberType> void write_array(ArrayView<NumberType> const & ar
 		}
 	}
 }
-
-/**
- * Write array to file. There will be two columns in the resulting ASCII file.
- * One contains the elements from first supplied array (\c grid) and other
- * containing elements from the second array (\c array). Useful for named
- * plots.
- * \param grid Data labels (data for first column).
- * \param array The array to write (data for second column).
- * \param filename Name of the file to create/overwrite.
- */
-// template <typename NumberType1, typename NumberType2> void write_array (
-// 	Array<NumberType1> const & grid, Array<NumberType2> const & array, const char* filename
-// )
-// {
-// 	std::ofstream fout(filename);
-// 	for (size_t i = 0; i < grid.size(); i++)
-// 	{
-// 		if (typeid(NumberType1) == typeid (double))
-// 		{
-// 			fout << grid[i] << "\t";
-// 		}
-// 		else if (typeid(NumberType1) == typeid (Complex))
-// 		{
-// 			fout << Complex(grid[i]).real() << "\t" << Complex(grid[i]).imag() << "\t";
-// 		}
-// 		else
-// 		{
-// 			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType1).name() << std::endl;
-// 			return;
-// 		}
-// 		
-// 		if (typeid(NumberType2) == typeid (double))
-// 		{
-// 			fout << array[i] << std::endl;
-// 		}
-// 		else if (typeid(NumberType2) == typeid (Complex))
-// 		{
-// 			fout << Complex(array[i]).real() << "\t" << Complex(array[i]).imag() << std::endl;
-// 		}
-// 		else
-// 		{
-// 			std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType2).name() << std::endl;
-// 			return;
-// 		}
-// 	}
-// }
 
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {
@@ -1763,8 +1683,8 @@ template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* file
 typedef NumberArray<double>       rArray;
 typedef NumberArray<Complex>      cArray;
 typedef NumberArray<long double>  qArray;
-typedef Array<rArray>       rArrays;
-typedef Array<cArray>       cArrays;
+typedef Array<rArray>             rArrays;
+typedef Array<cArray>             cArrays;
 
 typedef ArrayView<double>      rArrayView;
 typedef ArrayView<Complex>     cArrayView;
@@ -1807,14 +1727,12 @@ template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
 }
 
 /**
- * Load / save array from a HDF5 file.
+ * Write array to standard output. Array will be written as a single column.
+ * \param array The array to write.
  */
-#ifndef NO_HDF
-bool load_array(rArray& vec, const char* name, double* pdelta = 0);
-bool load_array(cArray& vec, const char* name);
-bool save_array(rArray const & vec, const char* name, const double * const pdelta = 0);
-bool save_array(cArray const & vec, const char* name);
-#endif
+void write_array(ArrayView<Complex> const & array);
+void write_array(ArrayView<double> const & array);
+
 /**
  * Write array to a text file.
  */
@@ -1826,18 +1744,12 @@ void write_array(rArray const & grid, cArray const & array, const char* filename
 void write_array(qArray const & array, const char* filename);
 
 // return absolute values
-inline rArray abs (cArray const &u)
-{
-	rArray v(u.size());
-	
-	auto iu = u.begin();
-	auto iv = v.begin();
-	
-	while (iu != u.end())
-		*(iv++) = abs(*(iu++));
-	
-	return v;
-}
+rArray abs (cArray const &u);
+rArrays abs (cArrays const &u);
+
+// boolean aggregation
+bool all(Array<bool> v);
+bool any(Array<bool> v);
 
 template <typename NumberType> NumberType min (ArrayView<NumberType> const & a)
 {
@@ -1857,19 +1769,6 @@ template <typename NumberType> NumberType max (ArrayView<NumberType> const & a)
 	return z;
 }
 
-inline rArrays abs (cArrays const &u)
-{
-	rArrays v(u.size());
-	
-	auto iu = u.begin();
-	auto iv = v.begin();
-	
-	while (iu != u.end())
-		*(iv++) = abs(*(iu++));
-	
-	return v;
-}
-
 // return per-element power
 template <typename T> Array<T> pow(ArrayView<T> const & u, double e)
 {
@@ -1884,9 +1783,18 @@ template <typename T> Array<T> pow(ArrayView<T> const & u, double e)
 	return v;
 }
 
-// boolean aggregation
-bool all(Array<bool> v);
-bool any(Array<bool> v);
+template <typename NumberType> NumberArray<NumberType> sqrt (ArrayView<NumberType> const & A)
+{
+	size_t N = A.size();
+	NumberArray<NumberType> B (N);
+
+	for (size_t i = 0; i < N; i++)
+		B[i] = sqrt(A[i]);
+
+	return B;
+}
+
+NumberArray<double> sqrabs (NumberArray<Complex> const & A);
 
 // summation
 template <typename T> T sum(Array<T> v)

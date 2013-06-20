@@ -2,6 +2,7 @@
 
 #include "../../src/arrays.h"
 #include "../../src/arrays.cpp"
+#include "../../src/hdffile.cpp"
 
 int main(int argc, char *argv[])
 {

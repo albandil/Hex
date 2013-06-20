@@ -75,14 +75,14 @@ void parse_command_line (
 					"      4   0.63\n"
 					"\n"
 					"# real knot sequences\n"
-					"0.0  0.1   3   -1\n"
-					"0.0  2.0  60\n"
-					"  4   20  58\n"
+					" 0.0  0.1   3   -1\n"
+					" 0.0  2.0  60\n"
+					"   4   20  58\n"
 					"\n"
 					"# complex knot sequences\n"
-					" 60    -1\n"
-					"100\n"
-					" 41\n"
+					"  60    -1\n"
+					" 100\n"
+					"  41\n"
 					"\n"
 					"# initial atomic states\n"
 					"# ni\n"
@@ -96,16 +96,16 @@ void parse_command_line (
 					"  0\n"
 					"\n"
 					"# angular momenta\n"
-					"# L  S  Π  ℓ\n"
-					"  0  0  0  0\n"
+					"# L  S  limit\n"
+					"  0  0  0\n"
 					"\n"
 					"# initial energies in Rydbergs\n"
-					"0.65   -1\n"
-					"0.95\n"
-					"301\n"
+					" 0.65   -1\n"
+					" 0.95\n"
+					" 301\n"
 					"\n"
 					"# magnetic field\n"
-					"0\n"
+					" 0\n"
 				;
 				
 				out.close();
@@ -291,7 +291,7 @@ void parse_input_file (
 	int& ni,
 	std::vector<std::tuple<int,int,int>>& instates,
 	std::vector<std::tuple<int,int,int>>& outstates,
-	int& L, int& Spin, int& Pi, int& maxell,
+	int& L, int& Spin, int& maxell,
 	rArray& Ei, double& B
 ){
 	double x;
@@ -488,15 +488,14 @@ void parse_input_file (
 		
 		L = read_int(inputfile);
 		Spin = read_int(inputfile);
-		Pi = read_int(inputfile);
 		maxell = read_int(inputfile);
 		
-		if (maxell < maxli)
+		if (L + L%2 + maxell < maxli)
 			throw exception("Input error: ℓ is smaller than some initial angular momenta.\n");
 		
-		if (maxell < maxlf)
+		if (L + L%2 + maxell < maxlf)
 			throw exception("Input error: ℓ is smaller than some final angular momenta.\n");
-			
+		
 	} catch (std::exception e) {
 		
 		std::cerr << e.what() << std::endl;
@@ -509,7 +508,7 @@ void parse_input_file (
 	std::cout << "\n----------  Angular momentum limits  -------------\n";
 	std::cout << "L = " << L << "\n";
 	std::cout << "S = " << Spin << "\n";
-	std::cout << "Π = " << Pi << "\n";
+	std::cout << "Π = " << L % 2 << "\n";
 	std::cout << "ℓ = " << maxell << "\n";
 	
 	std::cout << "\n----------  Initial atomic states  -------------\n";

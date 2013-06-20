@@ -10,10 +10,12 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef _SLATER_H_
-#define _SLATER_H_
+#ifndef HEX_SLATER_H
+#define HEX_SLATER_H
 
 #include <complex>
+
+#include "arrays.h"
 
 /**
  * Compute the two-electron (Slater-type) four-B-spline integral.
@@ -48,9 +50,9 @@ Complex computeR (
 void allSymmetries (
 	int i, int j, int k, int l,
 	Complex Rijkl_tr,
-	std::vector<long> & R_tr_i,
-	std::vector<long> & R_tr_j,
-	std::vector<Complex> & R_tr_v
+	NumberArray<long> & R_tr_i,
+	NumberArray<long> & R_tr_j,
+	NumberArray<Complex> & R_tr_v
 );
 
 #endif

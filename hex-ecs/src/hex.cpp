@@ -53,6 +53,7 @@ int main(int argc, char* argv[])
 	//
 	
 	gsl_set_error_handler_off();
+	H5::Exception::dontPrint();
     
 	// disable buffering of the standard output 
 	// (so that all text messages are immediatelly visible)
@@ -110,7 +111,7 @@ int main(int argc, char* argv[])
 	rArray complex_knots;   // complex knot sequence
 	int ni;                 // atomic state parameters
 	int L, Spin, Pi;        // global conserved variables
-	int maxell;             // angular momentum limits
+	int levels;             // angular momentum levels
 	rArray Ei;              // energies in Rydbergs
 	double B = 0;           // magnetic field in a.u.
 	
@@ -122,7 +123,7 @@ int main(int argc, char* argv[])
 		inputfile, order, ecstheta,
 		real_knots, complex_knots, ni, 
 		instates, outstates,
-		L, Spin, Pi, maxell, Ei, B
+		L, Spin, levels, Ei, B
 	);
 	
 	// is there something to compute?
@@ -171,34 +172,36 @@ int main(int argc, char* argv[])
 	std::vector<std::pair<int,int>> coupled_states;
 	std::vector<int> workers;
 	
-	maxell *= 2;
-	
 	std::cout << "Setting up the coupled angular states...\n";
 	
-	// for given L, Π and maxell list all available (ℓ₁ℓ₂) pairs
-	for (int ell = L + Pi; ell <= L + Pi + maxell; ell++)
+	Pi = L % 2;
+	
+	// for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
+	for (int ell = 0; ell <= levels; ell++)
 	{
-		// skip wrong parity
-		if ((ell + L) % 2 != Pi % 2)
-			continue;
+		std::cout << "\t-> [" << ell << "] ";
 		
-		std::cout << "\t-> [" << ell/2 << "] ";
-		for (int l1 = 0; l1 <= ell; l1++)
+		// get sum of the angular momenta for this angular level
+		int sum = 2 * ell + L;
+		
+		// for all angular momentum pairs that do compose L
+		for (int l1 = ell; l1 <= sum - ell; l1++)
 		{
-			// skip non-L-constituting pairs
-			if (std::abs(2*l1-ell) > L)
-				continue;
-			
-			std::cout << "(" << l1 << "," << ell-l1 << ") ";
-			coupled_states.push_back(std::make_pair(l1,ell-l1));
+			std::cout << "(" << l1 << "," << sum - l1 << ") ";
+			coupled_states.push_back(std::make_pair(l1, sum - l1));
 		}
 		std::cout << "\n";
 	}
 	
 	std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " blocks.\n";
 	
+	// skip if nothing to compute
 	if (coupled_states.empty())
 		exit(0);
+	
+	// store maximal angular momentum
+	int maxell = levels + L;
+	
 	std::cout << "\n";
 	// --------------------------------------------------------------------- //
 	
@@ -317,7 +320,7 @@ int main(int argc, char* argv[])
 	// with respect to exchange of the multi-index [ij] and [kl], with respect
 	// to the interchange of indices in multiindex and it is dense.
 	
-	int maxlambda = maxell + L + Pi;
+	int maxlambda = L + 2 * levels;
 	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
 	
 Stg1:
@@ -387,8 +390,8 @@ Stg1:
 				MPI_Bcast(&datasize, 1, MPI_INT, 0, MPI_COMM_WORLD);
 				
 				// get arrays
-				Array<int>     diag = R_tr_dia[lambda].diag();
-				Array<Complex> data = R_tr_dia[lambda].data();
+				NumberArray<int>     diag = R_tr_dia[lambda].diag();
+				NumberArray<Complex> data = R_tr_dia[lambda].data();
 				diag.resize(diagsize);
 				data.resize(datasize);
 				
@@ -414,8 +417,8 @@ Stg1:
 		cArray Mtr_mLm1 = computeMi(-lambda-1, Nreknot-1);
 		
 		// elements of R_tr
-		std::vector<long> R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
-		std::vector<Complex> R_tr_v, th_R_tr_v;
+		NumberArray<long> R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
+		NumberArray<Complex> R_tr_v, th_R_tr_v;
 		
 		# pragma omp parallel default(none) \
 			private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
@@ -446,15 +449,15 @@ Stg1:
 			# pragma omp critical
 			{
 				// merge the thread local arrays
-				R_tr_i.insert(R_tr_i.end(), th_R_tr_i.begin(), th_R_tr_i.end());
-				R_tr_j.insert(R_tr_j.end(), th_R_tr_j.begin(), th_R_tr_j.end());
-				R_tr_v.insert(R_tr_v.end(), th_R_tr_v.begin(), th_R_tr_v.end());
+				R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end());
+				R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
+				R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
 			}
 		}
 		
 		// create matrices and save them to disk
 		R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia();
-		R_tr_dia[lambda].hdfsave(oss2.str().c_str());
+		R_tr_dia[lambda].hdfsave(oss2.str().c_str(), true, 10);
 		
 		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";
 		
@@ -482,7 +485,6 @@ Stg2:
 	std::cout << "Computing B-spline expansions... ";
 	
 	//  j-overlaps of shape [Nenergy × Nangmom × Nspline]
-	//   where Mangmom = maxell + L + Pi
 	cArray ji_overlaps = overlapj(maxell,ki,weightEdgeDamp());
 	ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
 	
@@ -563,7 +565,7 @@ Stg2:
 			
 			// compose filename of the output file for this solution
 			std::ostringstream oss;
-			oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+			oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 			// check if there is some precomputed solution on the disk
 			if ( not current_solution.hdfload(oss.str().c_str()) )
@@ -671,7 +673,7 @@ Stg2:
 			
 			// we may have already computed solution for this state and energy... is it so?
 			std::ostringstream cur_oss;
-			cur_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+			cur_oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 			if ( current_solution.hdfload(cur_oss.str().c_str()) )
 				continue;
 			
@@ -695,11 +697,11 @@ Stg2:
 				for (int l = abs(li - L); l <= li + L; l++)
 				{
 					// skip wrong parity
-					if ((L + li + l) % 2 != Pi % 2)
+					if ((li + l) % 2 != Pi % 2)
 						continue;
 					
 					// (anti)symmetrization
-					int Sign = ((Spin + Pi) % 2 == 0) ? 1. : -1.;
+					int Sign = (Spin % 2 == 0) ? 1. : -1.;
 					
 					// compute energy- and angular momentum-dependent prefactor
 					Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
@@ -763,7 +765,7 @@ Stg2:
 			if (ie > 0)
 			{
 				std::ostringstream prev_oss;
-				prev_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
+				prev_oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
 				if (previous_solution.hdfload(prev_oss.str().c_str()))
 					current_solution = previous_solution;
 			}
@@ -931,9 +933,9 @@ Stg3:
 	// compose output filename
 	std::ostringstream ossfile;
 	if (parallel)
-		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << "-(" << iproc << ").sql";
+		ossfile << ni << "-" << L << "-" << Spin << "-(" << iproc << ").sql";
 	else
-		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << ".sql";
+		ossfile << ni << "-" << L << "-" << Spin << ".sql";
 	
 	// Create SQL batch file
 	std::ofstream fsql(ossfile.str().c_str());
@@ -1007,7 +1009,7 @@ Stg3:
 				);
 				
 				// compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
+				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
 			}
 			
 			// save the data
@@ -1017,8 +1019,8 @@ Stg3:
 				cArray T_ell(Lambda[mf+lf].size());
 				for (unsigned i = 0; i < T_ell.size(); i++)
 				{
-					int ie  = i / (maxell + L + Pi + 1);
-					int ell = i % (maxell + L + Pi + 1);
+					int ie  = i / (maxell + 1);
+					int ell = i % (maxell + 1);
 					
 					T_ell[i] = Lambda[mf+lf][i] * 4. * M_PI / kf[ie] * pow(Complex(0.,1.), -ell)
 									* ClebschGordan(lf, mf, ell, mi - mf, L, mi) / sqrt(2.);
@@ -1030,8 +1032,8 @@ Stg3:
 				
 				for (unsigned i = 0; i < T_ell.size(); i++)
 				{
-					int ie  = i / (maxell + L + Pi + 1);
-					int ell = i % (maxell + L + Pi + 1);
+					int ie  = i / (maxell + 1);
+					int ell = i % (maxell + 1);
 					
 					if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
 					if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
@@ -1039,7 +1041,7 @@ Stg3:
 						fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
 						     << ni << "," << li << "," << mi << ","
 						     << nf << "," << lf << "," << mf << ","
-							 << L  << "," << Spin << "," << Pi << ","
+							 << L  << "," << Spin << "," 
 							 << Ei[ie] << "," << ell << "," 
 							 << T_ell[i].real() << "," << T_ell[i].imag()
 							 << ");\n";
@@ -1054,7 +1056,7 @@ Stg3:
 				sigmaname << "sigma-" 
 				          << ni << "-" << li << "-" << mi << "-"
 						  << nf << "-" << lf << "-" << mf << "-"
-						  << L << "-" << Spin << "-" << Pi << ".dat";
+						  << L << "-" << Spin << ".dat";
 
 				std::ofstream ftxt(sigmaname.str().c_str());
 				
@@ -1062,10 +1064,10 @@ Stg3:
 				for (unsigned ie = 0; ie < Nenergy; ie++)
 				{
 					double sigma = 0.;
-					for (int ell = 0; ell <= maxell + L + Pi; ell++)
+					for (int ell = 0; ell <= maxell; ell++)
 					{
-						double Re_f_ell = -T_ell[ie * (maxell + L + Pi + 1) + ell].real() / (2 * M_PI);
-						double Im_f_ell = -T_ell[ie * (maxell + L + Pi + 1) + ell].imag() / (2 * M_PI);
+						double Re_f_ell = -T_ell[ie * (maxell + 1) + ell].real() / (2 * M_PI);
+						double Im_f_ell = -T_ell[ie * (maxell + 1) + ell].imag() / (2 * M_PI);
 						sigma += 0.25 * (2*Spin + 1) * kf[ie] / ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
 					}
 					if (finite(sigma))
@@ -1083,7 +1085,7 @@ Stg3:
 			//
 			
 			rArray ics;
-			cArrays data = std::move(computeXi(maxell, L, Spin, Pi, ni, li, mi, Ei, ics, coupled_states));
+			cArrays data = std::move(computeXi(maxell, L, Spin, ni, li, mi, Ei, ics, coupled_states));
 			
 			for (size_t ie = 0; ie < Ei.size(); ie++)
 			for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
@@ -1091,7 +1093,7 @@ Stg3:
 				// save data as BLOBs
 				fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
 					 << ni << "," << li << "," << mi << ","
-					 << L  << "," << Spin << "," << Pi << ","
+					 << L  << "," << Spin << ","
 					 << Ei[ie] << "," << coupled_states[ill].first << ","
 					 << coupled_states[ill].second << ","
 					 << data[ie * coupled_states.size() + ill].toBlob() << ");\n";
@@ -1099,7 +1101,7 @@ Stg3:
 			
 			// print ionization cross section
 			std::ostringstream fname;
-			fname << "isigma-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << ".dat";
+			fname << "isigma-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << ".dat";
 			write_array(Ei, ics, fname.str().c_str());
 		}
 		

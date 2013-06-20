@@ -145,9 +145,9 @@ private:
 	long _n_;
 	
 	// representation
-	std::vector<long> _p_;
-	std::vector<long> _i_;
-	std::vector<Complex> _x_;
+	NumberArray<long> _p_;
+	NumberArray<long> _i_;
+	NumberArray<Complex> _x_;
 	
 };
 
@@ -218,15 +218,6 @@ public:
 	 * \endcode
 	 */
 	void write(const char* filename) const;
-	
-	/**
-	 * Returns a submatrix.
-	 * \param a Starting row.
-	 * \param b Ending row plus one.
-	 * \param c Starting column.
-	 * \param d Ending column plus one.
-	 */
-// 	CsrMatrix submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const;
 	
 #ifdef WITH_PNGPP
 	
@@ -453,9 +444,9 @@ private:
 	long _n_;
 	
 	// representation
-	Array<long> _p_;
-	Array<long> _i_;
-	Array<Complex> _x_;
+	NumberArray<long> _p_;
+	NumberArray<long> _i_;
+	NumberArray<Complex> _x_;
 	
 };
 
@@ -488,7 +479,7 @@ public:
 		: _m_(m), _n_(n), sorted_(true) {}
 	CooMatrix(CooMatrix const & A)
 		: _m_(A._m_), _n_(A._n_), _i_(A._i_), _j_(A._j_), _x_(A._x_), sorted_(false) {}
-	CooMatrix(size_t m, size_t n, std::vector<long> const & i, std::vector<long> const & j, std::vector<Complex> const & x)
+	CooMatrix(size_t m, size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
 		: _m_(m), _n_(n), _i_(i), _j_(j), _x_(x), sorted_(false) {}
 	
 	/**
@@ -551,9 +542,9 @@ public:
 	size_t rows() const { return _m_; }
 	size_t cols() const { return _n_; }
 	size_t size() const { return _i_.size(); }
-	std::vector<long> const & i() const { return _i_; }
-	std::vector<long> const & j() const { return _j_; }
-	std::vector<Complex> const & v() const { return _x_; }
+	NumberArray<long> const & i() const { return _i_; }
+	NumberArray<long> const & j() const { return _j_; }
+	NumberArray<Complex> const & v() const { return _x_; }
 	
 	Complex operator() (size_t ix, size_t iy) const
 	{
@@ -688,9 +679,9 @@ public:
 		assert(_m_ == A._m_);
 		assert(_n_ == A._n_);
 		
-		_i_.insert(_i_.end(), A._i_.begin(), A._i_.end());
-		_j_.insert(_j_.end(), A._j_.begin(), A._j_.end());
-		_x_.insert(_x_.end(), A._x_.begin(), A._x_.end());
+		_i_.append(A._i_.begin(), A._i_.end());
+		_j_.append(A._j_.begin(), A._j_.end());
+		_x_.append(A._x_.begin(), A._x_.end());
 		
 		sorted_ = false;
 		
@@ -705,9 +696,9 @@ public:
 		
 		size_t prev_size = _x_.size();
 		
-		_i_.insert(_i_.end(), A._i_.begin(), A._i_.end());
-		_j_.insert(_j_.end(), A._j_.begin(), A._j_.end());
-		_x_.insert(_x_.end(), A._x_.begin(), A._x_.end());
+		_i_.append(A._i_.begin(), A._i_.end());
+		_j_.append(A._j_.begin(), A._j_.end());
+		_x_.append(A._x_.begin(), A._x_.end());
 		
 		// negate the newly added elements
 		for (size_t i = prev_size; i < _x_.size(); i++)
@@ -836,8 +827,8 @@ private:
 	size_t _m_, _n_;
 
 	// ijv-representation
-	std::vector<long> _i_, _j_;
-	std::vector<Complex> _x_;
+	NumberArray<long> _i_, _j_;
+	NumberArray<Complex> _x_;
 	
 	bool sorted_;
 };
@@ -854,7 +845,7 @@ public:
 	// Constructors
 	//
 
-	SymDiaMatrix() {}
+	SymDiaMatrix();
 	
 	SymDiaMatrix(int n);
 	
@@ -905,8 +896,8 @@ public:
 	// Getters
 	//
 	
-	Array<int>     const & diag() const { return idiag_; }
-	Array<Complex> const & data() const { return elems_; }
+	NumberArray<int>     const & diag() const { return idiag_; }
+	NumberArray<Complex> const & data() const { return elems_; }
 	
 	bool is_compatible (SymDiaMatrix const & B) const;
 	
@@ -947,7 +938,7 @@ public:
 
 	bool hdfload(const char* name);
 
-	bool hdfsave(const char* name) const;
+	bool hdfsave(const char* name, bool docompress = false, int consec = 10) const;
 
 	//
 	// Conversions to other formats
@@ -971,7 +962,7 @@ private:
 	cArray elems_;
 	
 	// diagonal right indices starting from zero
-	Array<int> idiag_;
+	NumberArray<int> idiag_;
 };
 
 // --------------------------------------------------------------------------//

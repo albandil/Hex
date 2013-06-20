@@ -65,6 +65,7 @@ void parse_command_line (
  * \param outstates Final atomic states. Magnetic numbers will not be set as
  *                  all of them will be computed.
  * \param L Total angular momentum (partial wave).
+ * \param S Total spin (partial wave).
  * \param maxell Per-electron angular momentum restriction (determines the block 
  *               size of the matrix).
  * \param Ei Initial projectile energies.
@@ -79,7 +80,7 @@ void parse_input_file (
 	int & ni,
 	std::vector<std::tuple<int,int,int>> & instates,
 	std::vector<std::tuple<int,int,int>> & outstates,
-	int & L, int & S, int & Pi,
+	int & L, int & S,
 	int & maxell,
 	rArray & Ei,
 	double & B

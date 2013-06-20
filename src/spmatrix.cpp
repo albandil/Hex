@@ -21,7 +21,7 @@
 	#include <png++/png.hpp>
 #endif
 
-#include <H5Cpp.h>
+#include "hdffile.h"
 
 // preconditioners
 #define P_NONE			0
@@ -240,49 +240,27 @@ bool CscMatrix::hdfsave(const char* name) const
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_TRUNC);
+		HDFFile file(name, HDFFile::overwrite);
 		
-		// all arrays are rank-1
-		int rank = 1;
+		// write dimensions
+		file.write("m", &_m_, 1);
+		file.write("n", &_n_, 1);
 		
-		// length of array
-		hsize_t length;
+		// write indices
+		if (not _p_.empty())
+			file.write("p", &(_p_[0]), _p_.size());
+		if (not _i_.empty())
+			file.write("i", &(_i_[0]), _i_.size());
 		
-		// save row count
-		length = 1;
-		H5::DataSpace dspc_m(rank, &length);
-		H5::IntType dtype_m(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_m = h5file.createDataSet("m", dtype_m, dspc_m);
-		dset_m.write(&(_m_), H5::PredType::NATIVE_ULONG);
-		
-		// save column count
-		length = 1;
-		H5::DataSpace dspc_n(rank, &length);
-		H5::IntType dtype_n(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_n = h5file.createDataSet("n", dtype_n, dspc_n);
-		dset_n.write(&(_n_), H5::PredType::NATIVE_ULONG);
-		
-		// save column pointers
-		length = _p_.size();
-		H5::DataSpace dspc_p(rank, &length);
-		H5::IntType dtype_p(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_p = h5file.createDataSet("p", dtype_p, dspc_p);
-		dset_p.write(_p_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save row indices
-		length = _i_.size();
-		H5::DataSpace dspc_i(rank, &length);
-		H5::IntType dtype_i(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_i = h5file.createDataSet("i", dtype_i, dspc_i);
-		dset_i.write(_i_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save interleaved data
-		length = 2 * _x_.size();
-		H5::DataSpace dspc_x(rank, &length);
-		H5::FloatType dtype_x(H5::PredType::NATIVE_DOUBLE);
-		H5::DataSet dset_x = h5file.createDataSet("x", dtype_x, dspc_x);
-		dset_x.write(_x_.data(), H5::PredType::NATIVE_DOUBLE);
+		// write complex data as a "double" array
+		if (not _x_.empty())
+		{
+			file.write (
+				"x",
+				reinterpret_cast<double const*>( &(_x_[0]) ),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -300,36 +278,27 @@ bool CscMatrix::hdfload(const char* name)
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_RDONLY);
+		HDFFile hdf(name, HDFFile::readonly);
 		
-		// read row count
-		H5::DataSet dset_m = h5file.openDataSet("m");
-		H5::DataSpace dspc_m = dset_m.getSpace();
-		dset_m.read(&(_m_), H5::PredType::NATIVE_ULONG, dspc_m, dspc_m);
+		// read dimensions
+		hdf.read("m", &_m_, 1);
+		hdf.read("n", &_n_, 1);
 		
-		// read column count
-		H5::DataSet dset_n = h5file.openDataSet("n");
-		H5::DataSpace dspc_n = dset_n.getSpace();
-		dset_m.read(&(_n_), H5::PredType::NATIVE_ULONG, dspc_n, dspc_n);
+		// read indices
+		if (_p_.resize(hdf.size("p")))
+			hdf.read("p", &(_p_[0]), _p_.size());
+		if (_i_.resize(hdf.size("i")))
+			hdf.read("i", &(_i_[0]), _i_.size());
 		
-		// read column pointers
-		H5::DataSet dset_p = h5file.openDataSet("p");
-		H5::DataSpace dspc_p = dset_p.getSpace();
-		_p_.resize( dspc_p.getSimpleExtentNpoints() );
-		dset_p.read(&(_p_[0]), H5::PredType::NATIVE_LONG, dspc_p, dspc_p);
-		
-		// read row indices
-		H5::DataSet dset_i = h5file.openDataSet("i");
-		H5::DataSpace dspc_i = dset_i.getSpace();
-		_i_.resize( dspc_i.getSimpleExtentNpoints() );
-		dset_i.read(&(_i_[0]), H5::PredType::NATIVE_LONG, dspc_i, dspc_i);
-		
-		// read interleaved data
-		H5::DataSet dset_x = h5file.openDataSet("x");
-		H5::DataSpace dspc_x = dset_x.getSpace();
-		_x_.resize( dspc_x.getSimpleExtentNpoints() / 2);
-		dset_x.read(&(_x_[0]), H5::PredType::NATIVE_DOUBLE, dspc_x, dspc_x);
+		// read data
+		if (_x_.resize(hdf.size("x") / 2))
+		{
+			hdf.read (
+				"x",
+				reinterpret_cast<double*>(&(_x_[0])),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -411,60 +380,6 @@ cArray CsrMatrix::dot(const cArrayView& b) const
 	
 	return c;
 }
-
-// CsrMatrix CsrMatrix::submatrix(unsigned a, unsigned b, unsigned c, unsigned d) const
-// {
-// 	// if empty, return empty
-// 	if (b <= a or d <= c)
-// 		return CsrMatrix();
-// 	
-// 	CsrMatrix subm(b-a, d-c);
-// 	subm._p_.push_back(0);
-// 	
-// 	// for all relevant rows
-// 	for (unsigned irow = a; irow < b; irow++)
-// 	{
-// 		// get all columns
-// 		unsigned idx1 = _p_[irow];
-// 		unsigned idx2 = _p_[irow + 1];
-// 		
-// 		// get beginning of relevant row fragment
-// 		Array<long>::const_iterator i_iter_begin = std::lower_bound (
-// 			_i_.begin() + idx1,
-// 			_i_.begin() + idx2,
-// 			c
-// 		);
-// 		
-// 		// get end of relevant row fragment
-// 		Array<long>::const_iterator i_iter_end = std::lower_bound (
-// 			_i_.begin() + idx1,
-// 			_i_.begin() + idx2,
-// 			d
-// 		);
-// 		
-// 		// data length
-// 		size_t n = i_iter_end - i_iter_begin;
-// 		subm._p_.push_back(subm._p_.back() + n);
-// 		
-// 		// copy column indices (shifted by "c")
-// 		subm._i_.resize(subm._i_.size() + n);
-// 		std::transform(
-// 			i_iter_begin,
-// 			i_iter_end,
-// 			subm._i_.end() - n,
-// 			[ c ](long col) -> long { return col - c; }
-// 		);
-// 		
-// 		// copy data
-// 		subm._x_.insert(
-// 			subm._x_.end(),
-// 			_x_.data() + (i_iter_begin - _i_.begin()),
-// 			_x_.data() + (i_iter_end   - _i_.begin())
-// 		);
-// 	}
-// 	
-// 	return subm;
-// }
 
 #ifdef WITHPNG
 CsrMatrix::PngGenerator::PngGenerator(const CsrMatrix* mat, double threshold)
@@ -563,181 +478,6 @@ cArray CsrMatrix::solve(const cArray&  b, size_t eqs) const
 	return solution;
 }
 
-// unsigned CsrMatrix::cg(
-// 	const cArray&  b, cArray&  x,
-// 	double eps,
-// 	unsigned min_iterations, unsigned max_iterations,
-// 	const PreconditionerInfo& pi
-// ) const
-// {
-// 	// check dimensions
-// 	size_t N = b.size();
-// 	assert(rows() == N);
-// 	assert(cols() == N);
-// 	assert(x.size() == N);
-// 
-// 	//
-// 	// 1) Set up desired preconditioner
-// 	//
-// 	
-// 	// if Jacobi preconditioner is to be used, extract inverse diagonal
-// 	cArray Dm1;	// A's inverse diagonal as 1D-array
-// 	if (pi.preconditioner == P_JACOBI)
-// 	{
-// 		Dm1 = this->diag().transform(
-// 			[](Complex z) -> Complex {
-// 				return 1. / z;
-// 			}
-// 		);
-// 	}
-// 	
-// 	// if SSOR preconditioner is to be used, scale diagonals by omega
-// 	CsrMatrix A;		// this matrix with ω-scaled diagonal
-// 	cArray factor_D;		// the scaled diagonal itself as a 1D-array
-// 	Complex factor = (2. - pi.omega) / pi.omega;	// some other scaling factor
-// 	if (pi.preconditioner == P_SSOR)
-// 	{
-// 		A = this->nzTransform(
-// 			[ pi ](size_t i, size_t j, Complex z) -> Complex {
-// 				return (i == j) ? z / pi.omega : z;
-// 			}
-// 		);
-// 		factor_D = factor * A.diag();
-// 	}
-// 
-// 	// if block inversion preconditioner is to be used:
-// 	std::vector<CsrMatrix> blocks(pi.Nblock);
-// 	std::vector<CsrMatrix::LUft> lufts(pi.Nblock);
-// 	if (pi.preconditioner == P_BLOCK_INV)
-// 	{
-// 		// the dimension of a diagonal block
-// 		unsigned blocksize = N / pi.Nblock;
-// 		
-// 		// for all diagonal blocks
-// 		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-// 		{
-// 			// get a copy of iblock-th block
-// 			blocks[iblock] = submatrix(
-// 					iblock * blocksize, (iblock + 1) * blocksize,
-// 					iblock * blocksize, (iblock + 1) * blocksize
-// 			);
-// 			
-// 			// store the block's factorization
-//  			lufts[iblock] = blocks[iblock].factorize();
-// 		}
-// 	}
-// 	
-// 	//
-// 	// 2) Declare/initialize used variables
-// 	//
-// 	
-// 	// some arrays (search directions etc.)
-// 	cArray p(N), q(N), z(N);
-// 	
-// 	// residual; initialized to starting residual using the initial guess
-// 	cArray r = b - this->dot(x);
-// 
-// 	// some other scalar variables
-// 	Complex rho_new;		// contains inner product r_i^T · r_i
-// 	Complex rho_old;		// contains inner product r_{i-1}^T · r_{i-1}
-// 	Complex alpha, beta;	// contains projection ratios
-// 	
-// 	//
-// 	// 3) Iterate
-// 	//
-// 	
-// 	unsigned k;
-// 	for/*ever*/ (k = 0; ; k++)
-// 	{
-// 		// apply desired preconditioner
-// 		if (pi.preconditioner == P_NONE)
-// 		{
-// 			z = r;
-// 		}
-// 		else if (pi.preconditioner == P_JACOBI)
-// 		{
-// 			z = Dm1 * r;
-// 		}
-// 		else if (pi.preconditioner == P_SSOR)
-// 		{
-// 			z = A.upperSolve( factor_D * A.lowerSolve(r) );
-// 		}
-// 		else if (pi.preconditioner == P_BLOCK_INV)
-// 		{
-// 			// solve the preconditioner equation set Mz = r
-// 			# pragma omp parallel for
-// 			for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-// 			{
-// 				size_t chunksize = cols() / pi.Nblock;
-// 				
-// 				// create a copy of a RHS segment
-// 				cArray r_block(chunksize);
-// 				memcpy(
-// 					&r_block[0],				// dest
-// 					&r[0] + iblock * chunksize,	// src
-// 					chunksize * sizeof(Complex)	// n
-// 				);
-// 				
-// 				// multiply by an inverted block
-// 				cArray z_block = lufts[iblock].solve(r_block, 1);
-// 				
-// 				// copy output segment to the whole array
-// 				memcpy(
-// 					&z[0] + iblock * chunksize,	// dest
-// 					&z_block[0],				// src
-// 					chunksize * sizeof(Complex)	// n
-// 				);
-// 			}
-// 		}
-// 		
-// 		// compute projection ρ = r·z
-// 		rho_new = (r|z);
-// 		
-// 		// setup search direction p
-// 		if (k == 0)
-// 		{
-// 			p = z;
-// 		}
-// 		else
-// 		{
-// 			beta = rho_new / rho_old;
-// 			p = z + beta * p;
-// 		}
-// 		
-// 		// move to next Krylov subspace by multiplying A·p
-// 		q = this->dot(p);
-// 		
-// 		// compute projection ratio α
-// 		alpha = rho_new / (p|q);
-// 		
-// 		// update the solution and the residual
-// 		x += alpha * p;
-// 		r -= alpha * q;
-// 		
-// 		// once in a while check convergence but do at least "min_iterations" iterations
-// 		if (k >= min_iterations and k % 4 == 0 and r.norm() / b.norm() < eps)
-// 			break;
-// 		
-// 		// check iteration limit (stop at "max_iterations" iterations)
-// 		if (k >= max_iterations)
-// 		{
-// 			printf("[CsrMatrix::cg] Iteration limit %d reached.\n", max_iterations);
-// 			break;
-// 		}
-// 		
-// 		// move to the next iteration: store previous projection
-// 		rho_old = rho_new;
-// 	}
-// 
-// 	// cleanup
-// 	
-// 	if (pi.preconditioner == P_BLOCK_INV)
-// 		for (unsigned iblock = 0; iblock < pi.Nblock; iblock++)
-// 			lufts[iblock].free();
-// 	
-// 	return k;
-// }
-
 void CsrMatrix::write(const char* filename) const
 {
 	FILE *f = fopen(filename, "w");
@@ -758,49 +498,27 @@ bool CsrMatrix::hdfsave(const char* name) const
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_TRUNC);
+		HDFFile hdf(name, HDFFile::overwrite);
 		
-		// all arrays are rank-1
-		int rank = 1;
+		// write dimensions
+		hdf.write("m", &_m_, 1);
+		hdf.write("n", &_n_, 1);
 		
-		// length of array
-		hsize_t length;
+		// write indices
+		if (not _p_.empty())
+			hdf.write("p", &(_p_[0]), _p_.size());
+		if (not _i_.empty())
+			hdf.write("i", &(_i_[0]), _i_.size());
 		
-		// save row count
-		length = 1;
-		H5::DataSpace dspc_m(rank, &length);
-		H5::IntType dtype_m(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_m = h5file.createDataSet("m", dtype_m, dspc_m);
-		dset_m.write(&_m_, H5::PredType::NATIVE_ULONG);
-		
-		// save column count
-		length = 1;
-		H5::DataSpace dspc_n(rank, &length);
-		H5::IntType dtype_n(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_n = h5file.createDataSet("n", dtype_n, dspc_n);
-		dset_n.write(&_n_, H5::PredType::NATIVE_ULONG);
-		
-		// save row pointers
-		length = _p_.size();
-		H5::DataSpace dspc_p(rank, &length);
-		H5::IntType dtype_p(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_p = h5file.createDataSet("p", dtype_p, dspc_p);
-		dset_p.write(_p_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save column indices
-		length = _i_.size();
-		H5::DataSpace dspc_i(rank, &length);
-		H5::IntType dtype_i(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_i = h5file.createDataSet("i", dtype_i, dspc_i);
-		dset_i.write(_i_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save interleaved data
-		length = 2 * _x_.size();
-		H5::DataSpace dspc_x(rank, &length);
-		H5::FloatType dtype_x(H5::PredType::NATIVE_DOUBLE);
-		H5::DataSet dset_x = h5file.createDataSet("x", dtype_x, dspc_x);
-		dset_x.write(_x_.data(), H5::PredType::NATIVE_DOUBLE);
+		// write data
+		if (not _x_.empty())
+		{
+			hdf.write (
+				"x",
+				reinterpret_cast<double const*>(&(_x_[0])),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -818,36 +536,27 @@ bool CsrMatrix::hdfload(const char* name)
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_RDONLY);
+		HDFFile hdf(name, HDFFile::readonly);
 		
-		// read row count
-		H5::DataSet dset_m = h5file.openDataSet("m");
-		H5::DataSpace dspc_m = dset_m.getSpace();
-		dset_m.read(&_m_, H5::PredType::NATIVE_ULONG, dspc_m, dspc_m);
+		// read dimensions
+		hdf.read("m", &_m_, 1);
+		hdf.read("n", &_n_, 1);
 		
-		// read column count
-		H5::DataSet dset_n = h5file.openDataSet("n");
-		H5::DataSpace dspc_n = dset_n.getSpace();
-		dset_m.read(&_n_, H5::PredType::NATIVE_ULONG, dspc_n, dspc_n);
+		// read indices
+		if (_p_.resize(hdf.size("p")))
+			hdf.read("p", &(_p_[0]), _p_.size());
+		if (_i_.resize(hdf.size("i")))
+			hdf.read("i", &(_i_[0]), _i_.size());
 		
-		// read row pointers
-		H5::DataSet dset_p = h5file.openDataSet("p");
-		H5::DataSpace dspc_p = dset_p.getSpace();
-		_p_.resize( dspc_p.getSimpleExtentNpoints() );
-		dset_p.read(&_p_[0], H5::PredType::NATIVE_LONG, dspc_p, dspc_p);
-		
-		// read colunm indices
-		H5::DataSet dset_i = h5file.openDataSet("i");
-		H5::DataSpace dspc_i = dset_i.getSpace();
-		_i_.resize( dspc_i.getSimpleExtentNpoints() );
-		dset_i.read(&_i_[0], H5::PredType::NATIVE_LONG, dspc_i, dspc_i);
-		
-		// read interleaved data
-		H5::DataSet dset_x = h5file.openDataSet("x");
-		H5::DataSpace dspc_x = dset_x.getSpace();
-		_x_.resize( dspc_x.getSimpleExtentNpoints() / 2);
-		dset_x.read(&_x_[0], H5::PredType::NATIVE_DOUBLE, dspc_x, dspc_x);
+		// read data
+		if (_x_.resize(hdf.size("x") / 2))
+		{
+			hdf.read (
+				"x",
+				reinterpret_cast<double*>(&(_x_[0])),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -1050,7 +759,7 @@ CscMatrix CooMatrix::tocsc() const
 	if (nz != 0)
 	{
 	
-		long status = umfpack_zl_triplet_to_col(
+		long status = umfpack_zl_triplet_to_col (
 			_m_,			// rows
 			_n_,			// cols
 			nz,				// data length
@@ -1309,49 +1018,27 @@ bool CooMatrix::hdfsave(const char* name) const
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_TRUNC);
+		HDFFile hdf(name, HDFFile::overwrite);
 		
-		// all arrays are rank-1
-		int rank = 1;
+		// write dimensions
+		hdf.write("m", &_m_, 1);
+		hdf.write("n", &_n_, 1);
 		
-		// length of array
-		hsize_t length;
+		// write indices
+		if (not _i_.empty())
+			hdf.write("i", &(_i_[0]), _i_.size());
+		if (not _j_.empty())
+			hdf.write("j", &(_j_[0]), _j_.size());
 		
-		// save row count
-		length = 1;
-		H5::DataSpace dspc_m(rank, &length);
-		H5::IntType dtype_m(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_m = h5file.createDataSet("m", dtype_m, dspc_m);
-		dset_m.write(&_m_, H5::PredType::NATIVE_ULONG);
-		
-		// save column count
-		length = 1;
-		H5::DataSpace dspc_n(rank, &length);
-		H5::IntType dtype_n(H5::PredType::NATIVE_ULONG);
-		H5::DataSet dset_n = h5file.createDataSet("n", dtype_n, dspc_n);
-		dset_n.write(&_n_, H5::PredType::NATIVE_ULONG);
-		
-		// save row indices
-		length = _i_.size();
-		H5::DataSpace dspc_i(rank, &length);
-		H5::IntType dtype_i(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_i = h5file.createDataSet("i", dtype_i, dspc_i);
-		dset_i.write(_i_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save column indices
-		length = _j_.size();
-		H5::DataSpace dspc_j(rank, &length);
-		H5::IntType dtype_j(H5::PredType::NATIVE_LONG);
-		H5::DataSet dset_j = h5file.createDataSet("j", dtype_j, dspc_j);
-		dset_j.write(_j_.data(), H5::PredType::NATIVE_LONG);
-		
-		// save interleaved data
-		length = 2 * _x_.size();
-		H5::DataSpace dspc_x(rank, &length);
-		H5::FloatType dtype_x(H5::PredType::NATIVE_DOUBLE);
-		H5::DataSet dset_x = h5file.createDataSet("x", dtype_x, dspc_x);
-		dset_x.write(_x_.data(), H5::PredType::NATIVE_DOUBLE);
+		// write data
+		if (not _x_.empty())
+		{
+			hdf.write (
+				"x",
+				reinterpret_cast<double const*>(&_x_),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -1371,36 +1058,27 @@ bool CooMatrix::hdfload(const char* name)
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_RDONLY);
+		HDFFile hdf(name, HDFFile::readonly);
 		
-		// read row count
-		H5::DataSet dset_m = h5file.openDataSet("m");
-		H5::DataSpace dspc_m = dset_m.getSpace();
-		dset_m.read(&_m_, H5::PredType::NATIVE_ULONG, dspc_m, dspc_m);
+		// read dimensions
+		hdf.read("m", &_m_, 1);
+		hdf.read("n", &_n_, 1);
 		
-		// read column count
-		H5::DataSet dset_n = h5file.openDataSet("n");
-		H5::DataSpace dspc_n = dset_n.getSpace();
-		dset_m.read(&_n_, H5::PredType::NATIVE_ULONG, dspc_n, dspc_n);
+		// read indices
+		if (_i_.resize(hdf.size("i")))
+			hdf.read("i", &(_i_[0]), _i_.size());
+		if (_j_.resize(hdf.size("j")))
+			hdf.read("j", &(_j_[0]), _j_.size());
 		
-		// read row indices
-		H5::DataSet dset_i = h5file.openDataSet("i");
-		H5::DataSpace dspc_i = dset_i.getSpace();
-		_i_.resize( dspc_i.getSimpleExtentNpoints() );
-		dset_i.read(&_i_[0], H5::PredType::NATIVE_LONG, dspc_i, dspc_i);
-		
-		// read colunm indices
-		H5::DataSet dset_j = h5file.openDataSet("j");
-		H5::DataSpace dspc_j = dset_j.getSpace();
-		_j_.resize( dspc_j.getSimpleExtentNpoints() );
-		dset_j.read(&_j_[0], H5::PredType::NATIVE_LONG, dspc_j, dspc_j);
-		
-		// read interleaved data
-		H5::DataSet dset_x = h5file.openDataSet("x");
-		H5::DataSpace dspc_x = dset_x.getSpace();
-		_x_.resize( dspc_x.getSimpleExtentNpoints() / 2);
-		dset_x.read(&_x_[0], H5::PredType::NATIVE_DOUBLE, dspc_x, dspc_x);
+		// read data
+		if (_x_.resize(hdf.size("x") / 2))
+		{
+			hdf.read (
+				"x",
+				reinterpret_cast<double*>(&(_x_[0])),
+				_x_.size() * 2
+			);
+		}
 		
 		return true;
 	}
@@ -1413,7 +1091,9 @@ bool CooMatrix::hdfload(const char* name)
 #endif
 }
 
-SymDiaMatrix::SymDiaMatrix(int n) : n_(n) {}
+SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0) {}
+
+SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(0), idiag_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n, ArrayView<int> const & id, ArrayView<Complex> const & v)
 	: n_(n), elems_(v), idiag_(id)
@@ -1510,26 +1190,34 @@ bool SymDiaMatrix::hdfload(const char* name)
 #ifndef NO_HDF
 	try
 	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_RDONLY);
+		HDFFile hdf(name, HDFFile::readonly);
+		if (not hdf.valid())
+			return false;
 		
-		// read rank
-		H5::DataSet dset_n = h5file.openDataSet("n");
-		H5::DataSpace dspc_n = dset_n.getSpace();
-		dset_n.read(&n_, H5::PredType::NATIVE_INT, dspc_n, dspc_n);
+		// read dimension
+		if (not hdf.read("n", &n_, 1))
+			return false;
 		
-		// read diagonal indices
-		H5::DataSet dset_i = h5file.openDataSet("idiag");
-		H5::DataSpace dspc_i = dset_i.getSpace();
-		idiag_.resize( dspc_i.getSimpleExtentNpoints() );
-		dset_i.read(&idiag_[0], H5::PredType::NATIVE_INT, dspc_i, dspc_i);
+		// read non-zero diagonal identificators
+		if (idiag_.resize(hdf.size("idiag")))
+			if (not hdf.read("idiag", &(idiag_[0]), idiag_.size()))
+				return false;
 		
-		// read interleaved data
-		H5::DataSet dset_x = h5file.openDataSet("x");
-		H5::DataSpace dspc_x = dset_x.getSpace();
-		elems_.resize( dspc_x.getSimpleExtentNpoints() / 2 );
-		dset_x.read(&elems_[0], H5::PredType::NATIVE_DOUBLE, dspc_x, dspc_x);
+		// comperssed array info
+		NumberArray<int> zero_blocks;
+		NumberArray<Complex> elements;
 		
+		if (zero_blocks.resize(hdf.size("zero_blocks")))
+			if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+				return false;
+		
+		// load compressed elements
+		if (elements.resize(hdf.size("x") / 2))
+			if (not hdf.read("x", &(elements[0]), elements.size()))
+				return false;
+		
+		// decompress
+		elems_ = elements.decompress(zero_blocks);
 		return true;
 	}
 	catch (H5::FileIException exc)
@@ -1541,47 +1229,48 @@ bool SymDiaMatrix::hdfload(const char* name)
 #endif
 }
 
-bool SymDiaMatrix::hdfsave(const char* name) const
+bool SymDiaMatrix::hdfsave(const char* name, bool docompress, int consec) const
 {
 #ifndef NO_HDF
-	try
-	{
-		H5::Exception::dontPrint();
-		H5::H5File h5file(name, H5F_ACC_TRUNC);
+	HDFFile hdf(name, HDFFile::overwrite);
 		
-		// all arrays are rank-1
-		int rank = 1;
+	if (not hdf.valid())
+		throw exception ("Unable to save HDF file \"%s\".", name);
 		
-		// length of array
-		hsize_t length;
-		
-		// save rank
-		length = 1;
-		H5::DataSpace dspc_n(rank, &length);
-		H5::IntType dtype_n(H5::PredType::NATIVE_INT);
-		H5::DataSet dset_n = h5file.createDataSet("n", dtype_n, dspc_n);
-		dset_n.write(&n_, H5::PredType::NATIVE_INT);
-		
-		// save diagonal indices
-		length = idiag_.size();
-		H5::DataSpace dspc_i(rank, &length);
-		H5::IntType dtype_i(H5::PredType::NATIVE_INT);
-		H5::DataSet dset_i = h5file.createDataSet("idiag", dtype_i, dspc_i);
-		dset_i.write(idiag_.data(), H5::PredType::NATIVE_INT);
-		
-		// save interleaved data
-		length = 2 * elems_.size();
-		H5::DataSpace dspc_x(rank, &length);
-		H5::FloatType dtype_x(H5::PredType::NATIVE_DOUBLE);
-		H5::DataSet dset_x = h5file.createDataSet("x", dtype_x, dspc_x);
-		dset_x.write(elems_.data(), H5::PredType::NATIVE_DOUBLE);
-		
-		return true;
-	}
-	catch (...)
-	{
+	// write dimension and diagonal info
+	if (not hdf.write("n", &n_, 1))
 		return false;
+	if (not hdf.write("idiag", &(idiag_[0]), idiag_.size()))
+		return false;
+	
+	// compress elements array
+	NumberArray<int> zero_blocks;
+	NumberArray<Complex> elements;
+	
+	if (docompress)
+		std::tie(zero_blocks, elements) = elems_.compress(consec);
+	else
+		elements = elems_;
+	
+	// write compressed elements array
+	if (not zero_blocks.empty())
+	{
+		if (not hdf.write (
+			"zero_blocks",
+			&(zero_blocks[0]),
+			zero_blocks.size()
+		)) return false;
 	}
+	if (not elements.empty())
+	{
+		if (not hdf.write (
+			"x",
+			&(elements[0]),
+			elements.size()
+		)) return false;
+	}
+	
+	return true;
 #else /* NO_HDF */
 	return false;
 #endif
@@ -1684,80 +1373,6 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
 	// FIXME
 	return ::kron (this->tocoo(), B.tocoo()).todia();
-	
-// 	// new diagonals
-// 	Array<int> ids;
-// 	Array<cArray> diagonals;
-// 	
-// 	// elements
-// 	cArray::const_iterator ita, itb;
-// 	
-// 	ita = elems_.begin();
-// 	for (int ida = 0; ida < (int)idiag_.size(); ida++)
-// 	{
-// 		itb = B.elems_.begin();
-// 		for (int idb = 0; idb < (int)B.idiag_.size(); idb++)
-// 		{
-// 			// get data view of the current *this and B matrix
-// 			cArrayView Aview (ita, ita + n_   -   idiag_[ida]);
-// 			cArrayView Bview (itb, itb + B.n_ - B.idiag_[idb]);
-// 			
-// 			std::cout << "Aview = " << Aview << "\n";
-// 			std::cout << "Bview = " << Bview << "\n";
-// 			
-// 			// compute (both right and left) index of the new diagonal
-// 			int idleft = idiag_[ida] * B.n_ - B.idiag_[idb];
-// 			int idrigh = idiag_[ida] * B.n_ + B.idiag_[idb];
-// 			
-// 			// new elements
-// 			cArray new_diagonal_left(n_ * B.n_), new_diagonal_righ(n_ * B.n_);
-// 			cArray::iterator itndl = new_diagonal_left.begin();
-// 			cArray::iterator itndr = new_diagonal_righ.begin();
-// 			
-// 			// for all element pairs
-// 			for (Complex a : Aview)
-// 			{
-// 				// pad the left diagonal with zeros
-// 				for (int i = 0; i < B.idiag_[idb]; i++)
-// 					*(itndl++) = 0.;
-// 				
-// 				// compute elements
-// 				for (Complex b : Bview)
-// 					*(itndl++) = *(itndr++) = a * b;
-// 				
-// 				// pad the right diagonal with zeros
-// 				for (int i = 0; i < B.idiag_[idb]; i++)
-// 					*(itndr++) = 0.;
-// 			}
-// 			
-// 			// find correct place for these new diagonals & insert new diagonals
-// 			if (idleft > 0 and idleft != idrigh)
-// 			{
-// 				int l = std::lower_bound(ids.begin(), ids.end(), idleft)-ids.begin();
-// 				ids.push_back(l);
-// 				new_diagonal_left.resize(n_ * B.n_ - idleft);
-// 				diagonals.insert(diagonals.begin() + l, new_diagonal_left);
-// 				std::cout << "Add [" << l << "]: " << new_diagonal_left << "\n";
-// 			}
-// 			int r = std::lower_bound(ids.begin(), ids.end(), idrigh)-ids.begin();
-// 			ids.push_back(r);
-// 			new_diagonal_righ.resize(n_ * B.n_ - idrigh);
-// 			diagonals.insert(diagonals.begin() + r, new_diagonal_righ);
-// 			std::cout << "Add [" << r << "]: " << new_diagonal_righ << "\n";
-// 			
-// 			// move to next B-diagonal
-// 			itb += B.n_ - B.idiag_[idb];
-// 		}
-// 		
-// 		// move to next A-diagonal
-// 		ita += n_ - idiag_[ida];
-// 	}
-// 	
-// 	std::cout << "ids = " << ids << "\n";
-// 	std::cout << "join(diagonals) = " << join(diagonals) << "\n";
-// 	
-// 	// construct and return a new multi-diagonal matrix
-// 	return SymDiaMatrix(n_ * B.n_, ids, join(diagonals));
 }
 
 std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A)

@@ -29,7 +29,7 @@
 
 cArray computeLambda (
 	rArray const & kf, rArray const & ki,
-	int maxell, int L, int Spin, int Pi,
+	int maxell, int L, int Spin,
 	int ni, int li, int mi,
 	rArray const & Ei, int lf,
 	cArray const & Pf_overlaps,
@@ -43,20 +43,23 @@ cArray computeLambda (
 	int Nknot   = Bspline::ECS().Nknot();               // number of all knots
 	int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
 	
-	cArray rads(Nenergy * (maxell + L + Pi + 1));
+	cArray rads(Nenergy * (maxell + 1));
 	
 	// for all energies, compute the radial factors
 	for (unsigned ie = 0; ie < Nenergy; ie++)
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;
 		
 		#pragma omp critical
-		solution.hdfload(oss.str().c_str());
+		{
+			if (not solution.hdfload(oss.str().c_str()))
+				throw exception ("Failed to load \"%s\"\n", oss.str().c_str());
+		}
 		
 		// The cross section oscillates, so we will do some averaging
 		// As recommended by Bartlett, we will compute several amplitudes
@@ -85,9 +88,9 @@ cArray computeLambda (
 			) - t;
 			
 			// evaluate j and dj at far radius
-			cArray j_R0(maxell + L + Pi + 1);
-			cArray dj_R0(maxell + L + Pi + 1);
-			for (int l = 0; l <= maxell + L + Pi; l++)
+			cArray j_R0(maxell + 1);
+			cArray dj_R0(maxell + 1);
+			for (int l = 0; l <= maxell; l++)
 			{
 				//evaluate the functions
 				j_R0[l] = ric_j(l, kf[ie] * eval_r);
@@ -112,8 +115,8 @@ cArray computeLambda (
 			}
 			
 			// evaluate Wronskians
-			CooMatrix Wj[maxell + L + Pi + 1];
-			for (int l = 0; l <= maxell + L + Pi; l++)
+			CooMatrix Wj[maxell + 1];
+			for (int l = 0; l <= maxell; l++)
 				Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
 				
 			// we need "P_overlaps" to have a 'dot' method
@@ -132,7 +135,7 @@ cArray computeLambda (
 				// get correct solution (for this ang. mom.)
 				cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
 				
-				rads[ie * (maxell + L + Pi + 1) + l2] += Sp.transpose().dot(PsiSc).dot(Wj[l2].todense()).todense()[0] / double(samples);
+				rads[ie * (maxell + 1) + l2] += Sp.transpose().dot(PsiSc).dot(Wj[l2].todense()).todense()[0] / double(samples);
 			}
 		}
 	}
@@ -140,7 +143,7 @@ cArray computeLambda (
 	return rads;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
+cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
 {
 	ics.resize(Ei.size());
 	cArrays results;
@@ -165,12 +168,13 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;
 		#pragma omp critical
-		solution.hdfload(oss.str().c_str());
+		if (not solution.hdfload(oss.str().c_str()))
+			throw exception ("Can't open the solution file \"%s\"!", oss.str().c_str());
 		
 		// for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
 		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
