@@ -1861,16 +1861,16 @@ void eval(TFunctor f, TArray grid, TArray& vals)
  * \param arr2 Merge FROM array.
  */
 template <typename Tidx, typename Tval> void merge (
-	Array<Tidx>       & idx1, Array<Tval>       & arr1,
-	Array<Tidx> const & idx2, Array<Tval> const & arr2
+	NumberArray<Tidx>       & idx1, NumberArray<Tval>       & arr1,
+	NumberArray<Tidx> const & idx2, NumberArray<Tval> const & arr2
 ){
 	// positions in arrays
 	size_t i1 = 0;
 	size_t i2 = 0;
 	
 	// output arrays
-	Array<Tidx> idx;
-	Array<Tval> arr;
+	NumberArray<Tidx> idx;
+	NumberArray<Tval> arr;
 	
 	// while there is anything to merge
 	while (i1 < arr1.size() and i2 < arr2.size())

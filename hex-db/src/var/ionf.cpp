@@ -132,8 +132,6 @@ bool IonizationF::run (
 				sqrt(E - 1./(ni*ni))  // highest energy
 			)
 		);
-		
-// 		std::cout << "E0 = " << E_arr.back() << ", coeffs = " << cheb_arr.back().str() << "\n";
 	}
 	
 	// for all energy shares

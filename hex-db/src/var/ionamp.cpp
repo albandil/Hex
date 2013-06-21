@@ -183,8 +183,6 @@ bool IonizationAmplitude::run (
 		ampls[idir] = interpolate(E_arr, ampls0, { Ei })[0];
 	}
 	
-	std::cout << "b\n";
-	
 	// write out
 	std::cout << this->logo() <<
 		"# Ionization amplitudes in " << unit_name(Lunits) << " for\n" <<

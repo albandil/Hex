@@ -27,7 +27,7 @@
  * \param y0 Discrete samples
  * \param x  Evaluation (interpolation) points.
  */
-template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & y0, rArray const & x)
+template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray<T> const & y0, rArray const & x)
 {
 	if (x0.size() == 0)
 		throw exception ("Nothing to interpolate.\n");
@@ -36,7 +36,7 @@ template <typename T> Array<T> interpolate (rArray const & x0, Array<T> const & 
 		return y0;
 	
 	// output array
-	Array<T> y(x.size());
+	NumberArray<T> y(x.size());
 	
 	for (size_t i = 0; i < x.size(); i++)
 	{
