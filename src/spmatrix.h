@@ -41,7 +41,7 @@
  * - umfpack_zl_free_numeric
  * - umfpack_zl_report_status
  */
-#include <suitesparse/umfpack.h>
+#include <umfpack.h>
 
 #include "arrays.h"
 #include "complex.h"
