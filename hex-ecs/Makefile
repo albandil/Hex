@@ -11,7 +11,7 @@ OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 INCLUDE = $(OPENMPIINCLUDE)
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt \
 	-lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lz -lpthread \
-	-lm -lpng -lfftw3
+	-lm -lpng -lfftw3 -lgfortran
 
 CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE)
 LFLAGS_DEBUG = -g -fopenmp -fPIC $(LIBRARY)
