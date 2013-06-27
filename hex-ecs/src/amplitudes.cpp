@@ -223,7 +223,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					gsl_sf_coulomb_wave_FG_e(-1./k2, k2*r2, l2, 0, &F2, &F2p, &G2, &G2p, &expF2, &expG2);
 					
 					double F1F2 = F1.val * F2.val;
-					double ddrho_F1F2 = F1p.val*cos_alpha*F2.val + F1.val*F2p.val*sin_alpha;
+					double ddrho_F1F2 = k1*F1p.val*cos_alpha*F2.val + k2*F1.val*F2p.val*sin_alpha;
 					
 					// get B-spline knots
 					int iknot1 = Bspline::ECS().knot(r1);
@@ -276,7 +276,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				// integrator
 				ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
 				Q.setEps(1e-6);
-				Complex res = 2. * k1 * k2 * rho * Q.integrate(0., 0.5 * M_PI) / (sqrt(M_PI));
+				Complex res = 2. * rho * Q.integrate(0., 0.5 * M_PI) / (sqrt(M_PI));
 				
 				return res;
 				
