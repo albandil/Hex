@@ -193,7 +193,7 @@ int main(int argc, char* argv[])
 		std::cout << "\n";
 	}
 	
-	std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " blocks.\n";
+	std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " diagonal blocks.\n";
 	
 	// skip if nothing to compute
 	if (coupled_states.empty())

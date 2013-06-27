@@ -65,8 +65,10 @@ cArray computeLambda (
 		// As recommended by Bartlett, we will compute several amplitudes
 		// separated by π/(n*kf[ie]) near the R₀ turning point.
 		double wavelength = M_PI / kf[ie];
-		int samples = 10;
-		double R0 = t[Nreknot - 1].real();
+		char const * HEX_RHO = getenv("HEX_RHO");
+		char const * HEX_SAMPLES = getenv("HEX_SAMPLES");
+		int samples = (HEX_SAMPLES == nullptr) ? 10 : atoi(HEX_SAMPLES);
+		double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : atof(HEX_RHO);
 		
 		// skip impact energies with undefined outgoing momentum
 		if (isnan(kf[ie]))
