@@ -236,30 +236,41 @@ int main(int argc, char* argv[])
 				grid, grid
 			);
 			
-			// setup output filename
-			std::ostringstream outf1, outf2;
-			outf1 << zipfile << "-(" << l1 << "," << l2 << ").re";
-			outf2 << zipfile << "-(" << l1 << "," << l2 << ").im";
+			// write VTK header
+			std::ostringstream ofname;
+			ofname << zipfile << "_(" << l1 << "," << l2 << ").vtk";
+			std::ofstream out(ofname.str().c_str());
+			out << "# vtk DataFile Version 3.0\n";
+			out << "Hex-ecs wave function partial waves\n";
+			out << "ASCII\n";
+			out << "DATASET RECTILINEAR_GRID\n";
+			out << "DIMENSIONS " << zipcount << " " << zipcount << " 1\n";
+			out << "X_COORDINATES " << zipcount << " float\n";
+			out << grid.string() << "\n";
+			out << "Y_COORDINATES " << zipcount << " float\n";
+			out << grid.string() << "\n";
+			out << "Z_COORDINATES 1 float\n";
+			out << "0\n";
+			out << "POINT_DATA " << zipcount * zipcount << "\n";
+			out << "FIELD wavefunction 2\n";
 			
-			// write real part
-			write_2D_data (
-				zipcount,
-				zipcount,
-				outf1.str().c_str(),
-				[&](size_t i, size_t j) -> double {
-					return ev[i * zipcount + j].real();
-				}
-			);
+			// save real part
+			out << "pw_" << l1 << "_" << l2 << "_re 1 " << zipcount * zipcount << " float\n";
+			for (int i = 0; i < zipcount; i++)
+			{
+				for (int j = 0; j < zipcount; j++)
+					out << ev[i * zipcount + j].real() << " ";
+				out << "\n";
+			}
 			
-			// write imaginary part
-			write_2D_data (
-				zipcount,
-				zipcount,
-				outf2.str().c_str(),
-				[&](size_t i, size_t j) -> double {
-					return ev[i * zipcount + j].imag();
-				}
-			);
+			// save imaginary part
+			out << "pw_" << l1 << "_" << l2 << "_im 1 " << zipcount * zipcount << " float\n";
+			for (int i = 0; i < zipcount; i++)
+			{
+				for (int j = 0; j < zipcount; j++)
+					out << ev[i * zipcount + j].imag() << " ";
+				out << "\n";
+			}
 		}
 		
 		exit(0);
