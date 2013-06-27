@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -Ofast -Wall -std=c++0x
+CFLAGS = -Ofast -Wall -std=c++11
 LFLAGS = -lgsl -lgslcblas -lo2scl -lcln
 
 all: bin/pwba
