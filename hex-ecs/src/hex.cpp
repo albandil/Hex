@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 		
 		grid = linspace(0., Rmax, zipcount);
 		
-		for (unsigned ill = 0; ill <= coupled_states.size(); ill++)
+		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 		{
 			int l1 = coupled_states[ill].first;
 			int l2 = coupled_states[ill].second;
