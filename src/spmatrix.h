@@ -1136,7 +1136,7 @@ unsigned cg_callbacks (
 	Preconditioner apply_preconditioner,
 	Multiplier matrix_multiply
 ) {
-	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();;
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	std::chrono::duration<int> sec;
 	
 	// compute norm of the right hand side
@@ -1153,13 +1153,12 @@ unsigned cg_callbacks (
 	
 	// if the (non-zero) initial guess seems horribly wrong,
 	//    use rather the right hand side as the initial guess
-	if (r.norm() > 100000 * b.norm())
+	if (r.norm() / bnorm > 1000)
 	{
 		x.clear();
-		matrix_multiply(x, r);
-		r = b - r;
+		r = b;
 	}
-
+	
 	// some other scalar variables
 	Complex rho_new;		// contains inner product r_i^T · r_i
 	Complex rho_old;		// contains inner product r_{i-1}^T · r_{i-1}
@@ -1173,7 +1172,7 @@ unsigned cg_callbacks (
 		sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
 		
 		std::cout << "\t[cg] Residual relative magnitude after "
-		          << k << " iterations: " << r.norm() / b.norm()
+		          << k << " iterations: " << r.norm() / bnorm
 				  << " (" << sec.count()/60 << " min)\n";
 		
 		// apply desired preconditioner
