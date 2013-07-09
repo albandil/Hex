@@ -148,24 +148,27 @@ cArray Bspline::zip (
 	for (size_t i = 0; i < ygrid.size(); i++)
 		y[i] = rotate(ygrid[i]);
 	
-	// comparator of points' distance from origin along the contour
-	auto precede = [](Complex const & a, Complex const & b) -> bool {
-		return a.real() < b.real();
-	};
-	
 	// evaluate B-splines on x-grid
 	cArrays evBx(Nspline_);
-	cArray::iterator xleft = x.begin(), xright = x.begin();
+	cArray::const_iterator xleft = x.begin(), xright = x.begin();
 	for (int ispline = 0; ispline < Nspline_; ispline++)
 	{
 		// get relevant subset of x[]
-		xleft = xright;
-		xright = std::upper_bound (xright, x.end(), t_[ispline + order_ + 1], precede);
+		xleft = std::upper_bound (
+			x.cbegin(), x.cend(),
+			t_[ispline],
+			Complex_realpart_less
+		);
+		xright = std::lower_bound (
+			xleft, x.cend(),
+			t_[ispline + order_ + 1],
+			Complex_realpart_less
+		);
 		
 		// setup evaluation vector
 		evBx[ispline].resize(xright-xleft);
 		
-		// evaluaion interval
+		// evaluation interval
 		int iknot = ispline;
 		
 		// evaluate at x[]
@@ -183,17 +186,25 @@ cArray Bspline::zip (
 	
 	// evaluate B-splines on y-grid
 	cArrays evBy(Nspline_);
-	cArray::iterator yleft = y.begin(), yright = y.begin();
+	cArray::const_iterator yleft = y.begin(), yright = y.begin();
 	for (int ispline = 0; ispline < Nspline_; ispline++)
 	{
 		// get relevant subset of y[]
-		yleft = yright;
-		yright = std::upper_bound (yright, y.end(), t_[ispline + order_ + 1], precede);
+		yleft = std::upper_bound (
+			y.cbegin(), y.cend(),
+			t_[ispline],
+			Complex_realpart_less
+		);
+		yright = std::lower_bound (
+			yleft, y.cend(),
+			t_[ispline + order_ + 1],
+			Complex_realpart_less
+		);
 		
 		// setup evaluation vector
 		evBy[ispline].resize(yright-yleft);
 		
-		// evaluaion interval
+		// evaluation interval
 		int iknot = ispline;
 		
 		// evaluate at y[]
@@ -214,8 +225,16 @@ cArray Bspline::zip (
 	for (int ixspline = 0; ixspline < Nspline_; ixspline++)
 	{
 		// get relevant subset of x[]
-		xleft = xright;
-		xright = std::upper_bound (xright, x.end(), t_[ixspline + order_ + 1], precede);
+		xleft = std::upper_bound (
+			x.cbegin(), x.cend(),
+			t_[ixspline],
+			Complex_realpart_less
+		);
+		xright = std::lower_bound (
+			xleft, x.cend(),
+			t_[ixspline + order_ + 1],
+			Complex_realpart_less
+		);
 		
 		// get relevant evaluations
 		cArray const & Bx_row = evBx[ixspline];
@@ -224,8 +243,16 @@ cArray Bspline::zip (
 		for (int iyspline = 0; iyspline < Nspline_; iyspline++)
 		{
 			// get relevant subset of y[]
-			yleft = yright;
-			yright = std::upper_bound (yright, y.end(), t_[iyspline + order_ + 1], precede);
+			yleft = std::upper_bound (
+				y.cbegin(), y.cend(),
+				t_[iyspline],
+				Complex_realpart_less
+			);
+			yright = std::lower_bound (
+				yleft, y.cend(),
+				t_[iyspline + order_ + 1],
+				Complex_realpart_less
+			);
 			
 			// get relevant evaluations
 			cArray const & By_row = evBy[iyspline];
