@@ -1376,6 +1376,14 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 			return unpack;
 		}
 #endif
+
+		std::string string() const
+		{
+			std::ostringstream ss;
+			for (NumberType const & x : *this)
+				ss << x << " ";
+			return ss.str();
+		}
 };
 
 // scalar product of two arrays.
