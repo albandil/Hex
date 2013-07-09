@@ -34,4 +34,16 @@ template <typename C1, typename C2> auto operator / (std::complex<C1> a, std::co
 // define squared modulus of a complex number
 inline double sqrabs (Complex z) { return z.real() * z.real() + z.imag() * z.imag(); }
 
+// Complex ordering by real parts
+inline bool Complex_realpart_less (Complex const & a, Complex const & b)
+{
+	return a.real() < b.real();
+}
+
+// Complex ordering by imaginary parts
+inline bool Complex_imagpart_less (Complex const & a, Complex const & b)
+{
+	return a.imag() < b.imag();
+}
+
 #endif
