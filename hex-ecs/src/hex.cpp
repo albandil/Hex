@@ -470,7 +470,7 @@ Stg1:
 		R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia();
 		R_tr_dia[lambda].hdfsave(oss2.str().c_str(), true, 10);
 		
-		std::cout << "\r\t- multipole λ = " << lambda << "... ok            \n";
+		std::cout << "\t- multipole λ = " << lambda << "... ok            \n";
 		
 	}
 	std::cout << "\t- R_tr[λ] has " << R_tr_dia[0].data().size() << " nonzero elements\n";
