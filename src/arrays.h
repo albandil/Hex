@@ -844,9 +844,13 @@ template <typename NumberType> class NumberArray : public Array<NumberType>
 				{ return array; }
 		const_iterator begin() const
 				{ return array; }
+		const_iterator cbegin() const
+				{ return array; }
 		iterator end()
 				{ return array + N; }
 		const_iterator end() const
+				{ return array + N; }
+		const_iterator cend() const
 				{ return array + N; }
 		NumberType & front(int i = 0)
 				{ return *(array + i); }
