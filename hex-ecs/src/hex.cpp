@@ -63,6 +63,7 @@ int main(int argc, char* argv[])
 	std::ifstream inputfile;    // input file
 	std::string zipfile;        // HDF solution expansion file to zip
 	int  zipcount = 0;          // zip sample count
+	double zipmax = -1;         // zip bounding box
 	bool parallel = false;      // whether to use OpenMPI
 	
 	// which stages to run (default: all)
@@ -72,7 +73,7 @@ int main(int argc, char* argv[])
 	parse_command_line (
 		argc, argv,
 		inputfile,
-		zipfile, zipcount,
+		zipfile, zipcount, zipmax,
 		parallel,
 		itinerary
 	);
@@ -208,6 +209,9 @@ int main(int argc, char* argv[])
 	
 	if (zipfile.size() != 0 and I_am_master)
 	{
+		if (zipmax < 0)
+			zipmax = Rmax;
+		
 		cArray sol;     // stored solution expansion
 		cArray ev;      // evaluated solution
 		rArray grid;    // real evaluation grid
@@ -217,7 +221,7 @@ int main(int argc, char* argv[])
 		if (not sol.hdfload(zipfile.c_str()))
 			throw exception("Cannot load file %s.", zipfile.c_str());
 		
-		grid = linspace(0., Rmax, zipcount);
+		grid = linspace(0., zipmax, zipcount);
 		
 		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 		{

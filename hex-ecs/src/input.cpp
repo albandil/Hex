@@ -31,12 +31,12 @@
 void parse_command_line (
 	int argc, char* argv[],
 	std::ifstream & inputfile,
-	std::string & zipfile, int & zipcount,
+	std::string & zipfile, int & zipcount, double & zipmax,
 	bool & parallel,
 	int & itinerary
 ){
 	// set short options
-	const char* const short_options  = "eihznmabc";
+	const char* const short_options  = "eihznRmabc";
 	
 	// set long options
 	const option long_options[] = {
@@ -45,6 +45,7 @@ void parse_command_line (
 		{"help",              0,   0, 'h'},
 		{"zipfile",           1,   0, 'z'},
 		{"zipcount",          1,   0, 'n'},
+		{"zipmax",            1,   0, 'R'},
 #ifndef NO_MPI
 		{"mpi",               0,   0, 'm'},
 #endif
@@ -158,6 +159,12 @@ void parse_command_line (
 			{
 				// zip samples
 				zipcount = atol(optarg);
+				break;
+			}
+			case 'R':
+			{
+				// zip bounding box
+				zipmax = atof(optarg);
 				break;
 			}
 			case 'a':

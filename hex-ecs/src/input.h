@@ -46,8 +46,9 @@ void parse_command_line (
 	int argc, 
 	char* argv[], 
 	std::ifstream & inputfile, 
-	std::string & zipfile, 
+	std::string & zipfile,
 	int & zipcount,
+	double & zipmax,
 	bool & parallel,
 	int & itinerary
 );
