@@ -89,12 +89,6 @@ cArray Bspline::zip (cArrayView const & coeff, rArrayView const & grid) const
 	cArray::iterator left = x.begin();
 	cArray::iterator right = x.begin();
 	
-	// comparator of points' distance from origin along the contour
-	auto comp = [ = ](const Complex& a,
-					  const Complex& b) -> bool {
-						  return a.real() < b.real();
-					};
-	
 	// for all intervals
 	for (int iknot = 0; iknot < Nknot_ - 1; iknot++)
 	{
@@ -104,8 +98,8 @@ cArray Bspline::zip (cArrayView const & coeff, rArrayView const & grid) const
 		
 		// get subset of "x", that belongs to the interval
 		// t[iknot] .. t[iknot + 1]
-		left = std::lower_bound(right, x.end(), t_[iknot], comp);
-		right = std::upper_bound(left, x.end(), t_[iknot + 1], comp);
+		left  = std::lower_bound(right, x.end(), t_[iknot],     Complex_realpart_less);
+		right = std::upper_bound(left,  x.end(), t_[iknot + 1], Complex_realpart_less);
 		
 		// for all points in range
 		for (auto ix = left; ix != right; ix++)
