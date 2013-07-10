@@ -147,7 +147,11 @@ cArray computeLambda (
 
 cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
 {
+	// resize and clear the output storage for integral cross sections
 	ics.resize(Ei.size());
+	ics.clear();
+	
+	// array of Chebyshev expansions for every Ei and angular state
 	cArrays results;
 	
 	// shorthands
@@ -370,10 +374,11 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			fftw_destroy_plan(plan);
 			
 			// sum contributions
-			ics[ie] = 0.;
+			double cs = 0;
 			for (int j = 0; j < N/2; j++)
-				ics[ie] += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
-			ics[ie] *= 0.0625 * M_PI / CB.coeffs().size(); // (FFTW magic) 1/4²
+				cs += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
+			
+			ics[ie] += cs * 0.0625 * M_PI / CB.coeffs().size(); // (FFTW magic) 1/4²
 		}
 	}
 	
