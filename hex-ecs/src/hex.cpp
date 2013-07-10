@@ -360,69 +360,21 @@ Stg1:
 		}
 	}
 	
-	// for all multipoles
+	// for all multipoles : compute / load
 	for (int lambda = 0; lambda <= maxlambda; lambda++)
 	{
+		// this process will only compute a subset of radial integrals
+		if (lambda % Nproc != iproc)
+			continue;
+		
 		// look for precomputed data on disk
 		std::ostringstream oss2;
 		oss2 << "R_tr_dia_" << lambda << ".hdf";
-		
-		int R_integ_exists; // whether there are valid precomputed data
-		
-		// master will load radial integrals...
-		//   We could let all processess load the data on their own, but if the
-		// task is executed on a cluster with remote storage and only symbolic
-		// links to precomputed radial integral HDFs are created, every process
-		// would download its copy of R_tr[*].hdf files from the remote storge.
-		// That would greatly raise the traffic and also delay the start of
-		// computation. If only the master process loads the data and then
-		// distributes them using local network, everything is smoother and
-		// faster ;-)
-#ifndef NO_MPI
-		if (I_am_master)
-		{
-#endif
-			R_integ_exists = R_tr_dia[lambda].hdfload(oss2.str().c_str());
-#ifndef NO_MPI
-		}
-#endif
-		
-#ifndef NO_MPI
-		if (parallel)
-		{
-			// master will broadcast existence information to other processes
-			MPI_Bcast(&R_integ_exists, 1, MPI_INT, 0, MPI_COMM_WORLD);
-			
-			// master will broadcast data to other processes
-			if (R_integ_exists)
-			{
-				// get dimensions
-				int diagsize = R_tr_dia[lambda].diag().size();
-				int datasize = R_tr_dia[lambda].data().size();
-				
-				// master will broadcast dimensions
-				MPI_Bcast(&diagsize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&datasize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				
-				// get arrays
-				NumberArray<int>     diag = R_tr_dia[lambda].diag();
-				NumberArray<Complex> data = R_tr_dia[lambda].data();
-				diag.resize(diagsize);
-				data.resize(datasize);
-				
-				// master will broadcast arrays
-				MPI_Bcast(&diag[0], diag.size(), MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
-				
-				// reconstruct objects
-				R_tr_dia[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
-			}
-		}
-#endif
+		int R_integ_exists = R_tr_dia[lambda].hdfload(oss2.str().c_str());
 		
 		if (R_integ_exists)
 		{
-			std::cout << "\t- integrals for λ = " << lambda << " successfully loaded\n";
+			std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << oss2.str().c_str() << "\"\n";
 			continue; // no need to compute
 		}
 		
@@ -474,9 +426,45 @@ Stg1:
 		R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia();
 		R_tr_dia[lambda].hdfsave(oss2.str().c_str(), true, 10);
 		
-		std::cout << "\t- multipole λ = " << lambda << "... ok            \n";
-		
+		std::cout << "\t- integrals for λ = " << lambda << " computed\n";
 	}
+	
+	// for all multipoles : synchronize
+	#ifndef NO_MPI
+	if (parallel)
+	{
+		for (int lambda = 0; lambda <= maxlambda; lambda++)
+		{
+			// get owner process of this multipole
+			int owner = lambda % Nproc;
+			
+			// get dimensions
+			int diagsize = R_tr_dia[lambda].diag().size();
+			int datasize = R_tr_dia[lambda].data().size();
+			
+			// owner will broadcast dimensions
+			MPI_Bcast(&diagsize, 1, MPI_INT, owner, MPI_COMM_WORLD);
+			MPI_Bcast(&datasize, 1, MPI_INT, owner, MPI_COMM_WORLD);
+			
+			// get arrays
+			NumberArray<int>     diag = R_tr_dia[lambda].diag();
+			NumberArray<Complex> data = R_tr_dia[lambda].data();
+			diag.resize(diagsize);
+			data.resize(datasize);
+			
+			// master will broadcast arrays
+			MPI_Bcast(&diag[0], diag.size(), MPI_INT, owner, MPI_COMM_WORLD);
+			MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
+			
+			// reconstruct objects
+			R_tr_dia[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
+			
+			if (owner != iproc)
+				std::cout << "\t- integrals for λ = " << lambda << " retrieved from process " << owner << "\n";
+		}
+	}
+	#endif
+	
 	std::cout << "\t- R_tr[λ] has " << R_tr_dia[0].data().size() << " nonzero elements\n";
 	// --------------------------------------------------------------------- //
 	
