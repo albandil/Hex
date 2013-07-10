@@ -603,6 +603,7 @@ Stg2:
 		std::vector<CsrMatrix::LUft> lufts(coupled_states.size());
 		
 		// setup preconditioner - the diagonal block LU-factorizations
+		std::cout << "\tSetup preconditioner blocks... " << std::flush;
 		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
 		{
 			// skip computation of unwanted blocks for this process
@@ -631,6 +632,7 @@ Stg2:
 			dia_blocks[ill] = E*S_kron_S - Hdiag;
 			csr_blocks[ill] = dia_blocks[ill].tocoo().tocsr();
 		}
+		std::cout << "ok\n";
 		
 		// compute the LU factorizations
 		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
