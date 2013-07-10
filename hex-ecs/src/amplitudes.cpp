@@ -260,6 +260,17 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					}
 					ddrho_Psi = ddr1_Psi * cos_alpha + ddr2_Psi * sin_alpha;
 					
+					/// DEBUG
+					if (not finite(F1F2))
+						std::cout << "F1F2 = " << F1F2 << "\n";
+					if (not finite(std::abs(ddrho_Psi)))
+						std::cout << "ddrho_Psi = " << ddrho_Psi << "\n";
+					if (not finite(std::abs(Psi)))
+						std::cout << "Psi = " << Psi << "\n";
+					if (not finite(ddrho_F1F2))
+						std::cout << "ddrho_F1F2 = " << ddrho_F1F2 << "\n";
+					///
+					
 					// evaluate the integrand
 					return F1F2*ddrho_Psi - Psi*ddrho_F1F2;
 				};
