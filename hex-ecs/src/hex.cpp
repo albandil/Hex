@@ -770,6 +770,8 @@ Stg2:
 			// Solve the Equations ------------------------------------------------- //
 			//
 			
+			std::cout << "Solve the equations.\n";
+			
 			// we may have already computed the previous solution - it will serve as initial guess
 			current_solution = cArray(chi.size());
 			if (ie > 0)
