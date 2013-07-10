@@ -724,7 +724,7 @@ Stg2:
 					// pick the correct Bessel function expansion
 					cArrayView Ji_expansion (
 						ji_expansion,
-						Nspline * (ie * (maxlambda + 1) + l),
+						Nspline * (ie * (maxell + 1) + l),
 						Nspline
 					);
 					
