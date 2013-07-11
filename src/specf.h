@@ -20,7 +20,7 @@
 #define sqr(x) (gsl_sf_pow_int((x),2))
 
 #include "complex.h"
-#include "arrays.h"
+#include "misc.h"
 
 /// Shifting coefficients for Sturmian T-operators
 #define ALPHA_PLUS(n,l)  (sqrt(((n)-(l))*((n)+(l)+1)))
