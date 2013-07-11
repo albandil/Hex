@@ -22,6 +22,8 @@ LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
+GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+
 all: bin/hex 
 
 docu:
@@ -30,11 +32,11 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o obj/hdffile.o
+bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/special.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o obj/hdffile.o obj/version.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-obj/hex.o: src/hex.cpp src/amplitudes.h src/angs.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/special.h src/input.h src/hdffile.h
+obj/hex.o: src/hex.cpp src/amplitudes.h src/angs.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/special.h src/input.h src/hdffile.h src/version.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
@@ -89,3 +91,8 @@ obj/spmatrix.o: src/spmatrix.cpp src/arrays.h src/spmatrix.h src/hdffile.h
 obj/hdffile.o: src/hdffile.cpp src/hdffile.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
+
+obj/version.o: src/version.cpp src/version.h
+	@mkdir -p $(@D)
+	$(CPP) $(CFLAGS) -c $< -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+	

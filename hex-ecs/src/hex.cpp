@@ -40,6 +40,8 @@
 #include "spmatrix.h"
 #include "special.h"
 
+#include "version.h"
+
 #ifndef SuiteSparse_time
 double SuiteSparse_time()
 {
@@ -49,6 +51,18 @@ double SuiteSparse_time()
 
 int main(int argc, char* argv[])
 {
+	std::cout <<
+		"#\n"
+		"#       / /   / /    __    \\ \\  / /\n"
+		"#      / /__ / /   / _ \\    \\ \\/ /\n"
+		"#     /  ___  /   | |/_/    / /\\ \\\n"
+		"#    / /   / /    \\_\\      / /  \\ \\\n"
+		"#\n"
+		"#             UK MFF (c) 2013\n"
+		"#\n"
+		"#          version hash: " << commit_hash << "\n"
+		"#\n";
+	
 	// Preparations ------------------------------------------------------- //
 	//
 	

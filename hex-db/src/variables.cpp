@@ -14,6 +14,7 @@
 
 #include "variables.h"
 #include "vec3d.h"
+#include "version.h"
 
 VariableList::VariableList() :
 	list ({
@@ -71,6 +72,8 @@ std::string Variable::logo() const
 		"#    / /   / /    \\_\\      / /  \\ \\\n"
 		"#\n"
 		"#             UK MFF (c) 2013\n"
+		"#\n"
+		"#          version hash: " ) + commit_hash + std::string ( "\n"
 		"#\n"
 		
 	);
