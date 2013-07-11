@@ -337,6 +337,12 @@ void parse_input_file (
 	// construct real knot sequence
 	for (unsigned i = 0; i < rknots_begin.size(); i++)
 	{
+		if (rknots_begin[i] > rknots_end[i])
+		{
+			std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
+			throw exception("Inconsistent knot specification!");
+		}
+		
 		auto new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
 		rknots = concatenate(rknots, new_knots);
 	}
