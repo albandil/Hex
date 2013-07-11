@@ -1,3 +1,5 @@
+.PHONY: all docu clean obj/version.o
+
 CPP = g++
 
 SUITESPARSELIBS = /usr/local/lib/libumfpack.a /usr/local/lib/libamd.a \

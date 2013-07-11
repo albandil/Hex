@@ -1,4 +1,4 @@
-.PHONY: all exe lib clean
+.PHONY: all exe lib clean obj/version.o
 
 CPP = g++
 
