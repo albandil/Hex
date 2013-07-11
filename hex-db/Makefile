@@ -76,9 +76,9 @@ obj/vec3d.o: src/vec3d.cpp src/vec3d.h src/misc.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 
-obj/version.o: src/version.cpp src/version.h
+obj/version.o:
 	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+	$(CPP) $(CXXFLAGS) -c src/version.cpp -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 	
 # -----------------------------------------------------------------------------

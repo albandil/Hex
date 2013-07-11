@@ -92,7 +92,7 @@ obj/hdffile.o: src/hdffile.cpp src/hdffile.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
-obj/version.o: src/version.cpp src/version.h
+obj/version.o:
 	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+	$(CPP) $(CFLAGS) -c src/version.cpp -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 	
