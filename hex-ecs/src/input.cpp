@@ -65,6 +65,8 @@ void parse_command_line (
 		{
 			case 'e':
 			{
+				std::cout << "Writing sample input file to \"example.inp\".\n\n";
+				
 				// produce sample input file
 				std::ofstream out("example.inp");
 				if (out.bad())
@@ -124,14 +126,6 @@ void parse_command_line (
 			{
 				// print usage information
 				std::cout <<
-					"                                                       \n"
-					"         __  __                                        \n"
-					"        / /_/ /  ___   __  __                          \n"
-					"       /  _  /  / __\\  \\ \\/ /                       \n"
-					"      /_/ /_/   \\__\\   /_/\\_\\                      \n"
-					"                                                       \n"
-					"    Jakub Benda, MFF UK (c) 2013                       \n"
-					"                                                       \n"
 					"------------------------------------------------       \n"
 					"Available switches (short forms in parentheses):       \n"
 					"------------------------------------------------       \n"
