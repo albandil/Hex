@@ -25,6 +25,17 @@
 
 LComplex ric_j(int n, LComplex z)
 {
+	if (z.imag() == 0.)
+	{
+		// use library routine for pure real arguments
+		gsl_sf_result j;
+		int err = gsl_sf_bessel_jl_e(n, z.real(), &j);
+		if (err != GSL_SUCCESS)
+			throw ("Error %d while evaluating j[%d](%d+%di).", err, n, z.real(), z.imag());
+		z *= j.val;
+		return z;
+	}
+	
 	if (n == 0)
 		return sin(z);
 	else if (n == 1)
