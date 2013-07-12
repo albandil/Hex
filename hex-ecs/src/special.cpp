@@ -31,7 +31,7 @@ LComplex ric_j(int n, LComplex z)
 		gsl_sf_result j;
 		int err = gsl_sf_bessel_jl_e(n, z.real(), &j);
 		if (err != GSL_SUCCESS)
-			throw ("Error %d while evaluating j[%d](%d+%di).", err, n, z.real(), z.imag());
+			throw exception("Error %d while evaluating j[%d](%d+%di).", err, n, z.real(), z.imag());
 		z *= j.val;
 		return z;
 	}
