@@ -480,7 +480,7 @@ Stg1:
 				// save to disk
 				std::ostringstream oss3;
 				oss3 << "R_tr_dia_" << lambda << ".hdf";
-				R_tr_dia[lambda].hdfsave(oss3.str().c_str());
+				R_tr_dia[lambda].hdfsave(oss3.str().c_str(), true, 10);
 			}
 		}
 	}
