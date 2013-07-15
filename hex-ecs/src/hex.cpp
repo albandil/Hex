@@ -843,47 +843,46 @@ Stg2:
 			// CG matrix multiplication callback
 			auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
 			{
+				// clear the output array
+				q.clear();
 				
 				// multiply by the matrix of the system
-				# pragma omp parallel for schedule (dynamic,1)
+				# pragma omp parallel for schedule (dynamic,1) collapse(2)
 				for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+				for (unsigned illp = 0; illp < coupled_states.size(); illp++)
 				{
-					int l1 = coupled_states[ill].first;
-					int l2 = coupled_states[ill].second;
-					
 					// skip computation of unwanted blocks for this process
 					if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
 						continue;
 					
 					// product (copy-to view of "q")
 					cArrayView q_block(q, ill * Nspline * Nspline, Nspline * Nspline);
-					q_block.clear(); // initialize with zeros
 					
-					// multiply block-row of the matrix with "p"
-					# pragma omp parallel for schedule (dynamic,1)
-					for (unsigned illp = 0; illp < coupled_states.size(); illp++)
+					// corresponding (copy-from) fragment of "p"
+					cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
+					
+					// row multi-index
+					int l1 = coupled_states[ill].first;
+					int l2 = coupled_states[ill].second;
+					
+					// column multi-index
+					int l1p = coupled_states[illp].first;
+					int l2p = coupled_states[illp].second;
+						
+					// multiply by hamiltonian terms
+					if (ill == illp)
 					{
-						int l1p = coupled_states[illp].first;
-						int l2p = coupled_states[illp].second;
-						
-						// corresponding (copy-from) fragment of "p"
-						cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
-						
-						// multiply by hamiltonian terms
-						if (ill == illp)
+						// reuse the diagonal block
+						q_block += dia_blocks[ill].dot(p_block);
+					}
+					else
+					{
+						// compute the offdiagonal block
+						for (int lambda = 0; lambda <= maxlambda; lambda++)
 						{
-							// reuse the diagonal block
-							q_block += dia_blocks[ill].dot(p_block);
-						}
-						else
-						{
-							// compute the offdiagonal block
-							for (int lambda = 0; lambda <= maxlambda; lambda++)
-							{
-								Complex f = computef(lambda, l1, l2, l1p, l2p, L);
-								if (f != 0.)
-									q_block -= f * R_tr_dia[lambda].dot(p_block);
-							}
+							Complex f = computef(lambda, l1, l2, l1p, l2p, L);
+							if (f != 0.)
+								q_block -= f * R_tr_dia[lambda].dot(p_block);
 						}
 					}
 				}
