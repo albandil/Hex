@@ -483,6 +483,7 @@ Stg1:
 				R_tr_dia[lambda].hdfsave(oss3.str().c_str(), true, 10);
 			}
 		}
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 	#endif
 	
