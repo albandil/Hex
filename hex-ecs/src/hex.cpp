@@ -860,6 +860,7 @@ Stg2:
 					q_block.clear(); // initialize with zeros
 					
 					// multiply block-row of the matrix with "p"
+					# pragma omp parallel for schedule (dynamic,1)
 					for (unsigned illp = 0; illp < coupled_states.size(); illp++)
 					{
 						int l1p = coupled_states[illp].first;
