@@ -909,25 +909,6 @@ Stg2:
 #endif
 			};
 				
-#ifndef NO_MPI
-				if (parallel)
-				{
-					// synchronize across processes
-					for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-					{
-						// relevant process will broadcast this segment's data
-						MPI_Bcast (
-							&q[0] + ill * Nspline * Nspline,
-							Nspline * Nspline,
-							MPI_DOUBLE_COMPLEX,
-							LUs[ill],
-							MPI_COMM_WORLD
-						);
-					}
-				}
-#endif
-			};
-			
 			if (chi.norm() == 0.)
 			{
 				std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings).\n";
