@@ -16,6 +16,9 @@
 #include <cmath>
 #include <gsl/gsl_sf.h>
 
+/// factorial
+#define fac(n) gsl_sf_fact(n)
+
 /// second power
 #define sqr(x) (gsl_sf_pow_int((x),2))
 
@@ -30,21 +33,72 @@
 #define DELTA(a,b)       ((a) == (b) ? 1 : 0)
 
 //
+// Hydrogen radial orbital
+//
+
+/** Hydrogen radial function (radius-multiplied)
+ * Evaluate hydrogen radial function (radius-multiplied) for complex argument
+ * \param n Principal quantum number.
+ * \param l Orbital quantum number.
+ * \param z Radius: real or complex argument.
+ */
+Complex hydro_P(unsigned n, unsigned l, Complex z);
+
+/** Derivative of Pnl.
+ * \param n
+ * \param l
+ * \param z
+ */
+Complex dhydro_P(unsigned n, unsigned l, Complex z);
+
+//
 // Ricatti-Bessel functions.
 //
+
+/** Riccati-Bessel function
+ * 
+ * Evaluate Riccati-Bessel function for complex argument. Function is not suitable for
+ * large degrees, it uses the most naïve (and least stable) evaluation method.
+ * Starting from the expressions for zeroth and first Riccati-Bessel function
+ * \f[
+ *      j_0(z) = \sin z, \qquad j_1(z) = \frac{\sin z}{z} - \cos z
+ * \f]
+ * the function employs the forward(!) recurrence relation
+ * \f[
+ *      j_{n+1}(z) = \frac{2n+1}{z} j_n(z) - j_{n-1}(z) .
+ * \f]
+ * 
+ * \param n Degree of the Riccati-Bessel function.
+ * \param z Complex argument.
+ */
+LComplex ric_j(int n, LComplex z);
+
+/** Derivative of Riccati-Bessel function
+ * 
+ * \param n Degree of the function.
+ * \param z Complex argument.
+ */
+LComplex dric_j(int n, LComplex z);
 
 /**
  * \brief Ricatti-Bessel function of the first kind, \f$ \hat{j}_n(x) \f$.
  * 
  * \f$ \hat{j}_0(x) = \sin x \f$
  */
-#define ric_j(n,x)			((x)*gsl_sf_bessel_jl(n,x))
+inline double ric_j (int n, double x)
+{
+	return x * gsl_sf_bessel_jl(n,x);
+}
+
 /**
  * \brief Ricatti-Bessel function of the second kind, \f$ \hat{y}_n(x) \f$.
  * 
  * \f$ \hat{n}_0(x) = \cos x \f$
  */
-#define ric_n(n,x)			((x)*gsl_sf_bessel_yl(n,x))
+inline double ric_n (int n, double x)
+{
+	return x * gsl_sf_bessel_yl(n,x);
+}
 
 //
 // Modified Bessel function of the first kind.
@@ -55,25 +109,40 @@
  * 
  * \f$ \mathrm{e}^{-x} i_0(x) = \mathrm{e}^{-x} \frac{1}{x} \sinh x \f$
  */
-#define sph_i_scaled(n,x)	(gsl_sf_bessel_il_scaled(n,x))
+inline double sph_i_scaled (int n, double x)
+{
+	return gsl_sf_bessel_il_scaled(n,x);
+}
+
 /**
  * \brief Scaled modified Ricatti-Bessel function of the first kind, \f$ \mathrm{e}^{-x} \hat{i}_n(x) \f$.
  * 
  * \f$ \mathrm{e}^{-x} \hat{i}_0(x) = \mathrm{e}^{-x} \sinh x \f$
  */
-#define ric_i_scaled(n,x)	((x)*gsl_sf_bessel_il_scaled(n,x))
+inline double ric_i_scaled (int n, double x)
+{
+	return x * gsl_sf_bessel_il_scaled(n,x);
+}
+
 /**
  * \brief Modified spherical Bessel function of the first kind, \f$ i_n(x) \f$.
  * 
  * \f$ i_0(x) = \frac{1}{x} \sinh x \f$
  */
-#define sph_i(n,x)	        (exp(x)*sph_i_scaled(n,x))
+inline double sph_i (int n, double x)
+{
+	return exp(x) * sph_i_scaled(n,x);
+}
+
 /**
  * \brief Modified Ricatti-Bessel function of the first kind, \f$ \hat{i}_n(x) \f$.
  * 
  * \f$ \hat{i}_0(x) = \sinh x \f$
  */
-#define ric_i(n,x)			(exp(x)*ric_i_scaled(n,x))
+inline double ric_i (int n, double x)
+{
+	return exp(x)*ric_i_scaled(n,x);
+}
 
 
 //
@@ -85,25 +154,40 @@
  * 
  * \f$ \mathrm{e}^{x} k_0(x) = \frac{1}{x} \f$.
  */
-#define sph_k_scaled(n,x)	(gsl_sf_bessel_kl_scaled(n,x)*M_2_PI)
+inline double sph_k_scaled (int n, double x)
+{
+	return gsl_sf_bessel_kl_scaled(n,x) * M_2_PI;
+}
+
 /**
  * \brief Scaled modified Ricatti-Bessel function of the second kind, \f$ \mathrm{e}^x \hat{k}_n(x) \f$.
  * 
  * \f$ \mathrm{e}^{x} \hat{k}_0(x) = 1 \f$.
  */
-#define ric_k_scaled(n,x)	((x)*sph_k_scaled(n,x))
+inline double ric_k_scaled (int n, double x)
+{
+	return x * sph_k_scaled(n,x);
+}
+
 /**
  * \brief Modified spherical Bessel function of the second kind, \f$ k_n(x) \f$.
  * 
  * \f$ k_0(x) = \frac{1}{x} \mathrm{e}^{-x} \f$.
  */
-#define sph_k(n,x)	        (exp(-x)*sph_k_scaled(n,x))
+inline double sph_k (int n, double x)
+{
+	return exp(-x) * sph_k_scaled(n,x);
+}
+
 /**
  * \brief Modified Ricatti-Bessel function of the second kind, \f$ \hat{k}_n(x) \f$.
  * 
  * \f$ \hat{k}_0(x) = \mathrm{e}^{-x} \f$.
  */
-#define ric_k(n,x)			(exp(-x) * ric_k_scaled(n,x))
+inline double ric_k (int n, double x)
+{
+	return exp(-x) * ric_k_scaled(n,x);
+}
 
 //
 // Ricatti-Hankel functions.
@@ -114,11 +198,10 @@
  * 
  * \f$ \hat{h}_0^{(+)}(x) = -\mathrm{i} \exp (\mathrm{i}x) \f$.
  */
-#define ric_h_plus(n,x) 	Complex(ric_j(n,x), ric_n(n,x))
-/**
- * \brief Derivative of Ricatti-Hankel function of the first kind, \f$ {\hat{h}_n^{(+)}}'(x) \f$.
- */
-#define dric_h_plus(n,x)	Complex(dric_j(n,x),dric_n(n,x))
+inline Complex ric_h_plus (int n, double x)
+{
+	return Complex(ric_j(n,x), ric_n(n,x));
+}
 
 //
 // Other special functions.
@@ -207,20 +290,38 @@ inline double dric_k_scaled(int n, double x)
 }
 
 /**
+ * \brief Derivative of Ricatti-Hankel function of the first kind, \f$ {\hat{h}_n^{(+)}}'(x) \f$.
+ */
+inline Complex dric_h_plus (int n, double x)
+{
+	return Complex(dric_j(n,x),dric_n(n,x));
+}
+
+/**
+ * \brief Evaluate Coulomb wave function (and its derivative.
+ * \param l Angular momentum.
+ * \param k Wavenumber.
+ * \param r Radial coordinate.
+ * \param F Output reference for resulting value.
+ * \param Fp Output reference for resulting derivative.
+ */
+void coul_F (int l, double k, double r, double & F, double & Fp) throw (exception);
+
+/**
  * \brief Asymptotic form of the regular Coulomb wave.
  * \param l Angular momentum.
  * \param k Wavenumber.
  * \param r Radial coordinate.
  * \param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double F_asy(int l, double k, double r, double sigma = Nan);
+double coul_F_asy(int l, double k, double r, double sigma = Nan);
 
 /**
  * \brief Coulomb phase shift.
  * \param l Angular momentum.
  * \param k Wavenumber.
  */
-double F_sigma(int l, double k);
+double coul_F_sigma(int l, double k);
 
 /**
  * \brief Complex upper incomplete Gamma function \f$ \Gamma(a,z) \f$.

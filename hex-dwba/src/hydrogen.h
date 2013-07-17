@@ -131,7 +131,7 @@ public:
 	
 	/// Constructor for free state
 	HydrogenFunction(double k, int l)
-		: Coulomb_wave_functions(true,l,-1./k), n(0), k(k), l(l), Sigma(F_sigma(l,k)), Verbose(false), Far(far()) {}
+		: Coulomb_wave_functions(true,l,-1./k), n(0), k(k), l(l), Sigma(coul_F_sigma(l,k)), Verbose(false), Far(far()) {}
 	
 	/**
 	 * \brief Get far radius.

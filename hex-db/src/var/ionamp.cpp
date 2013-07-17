@@ -168,8 +168,8 @@ bool IonizationAmplitude::run (
 				}
 				
 				// evaluate Coulomb phaseshifts
-				Complex sig1 = F_sigma(l1,k1[ie]);
-				Complex sig2 = F_sigma(l2,k2[ie]);
+				Complex sig1 = coul_F_sigma(l1,k1[ie]);
+				Complex sig2 = coul_F_sigma(l2,k2[ie]);
 				
 				// compute angular factors
 				Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(0.,1.)*(sig1+sig2)) * YY;

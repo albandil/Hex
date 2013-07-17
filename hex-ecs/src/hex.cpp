@@ -38,8 +38,6 @@
 #include "moments.h"
 #include "slater.h"
 #include "spmatrix.h"
-#include "special.h"
-
 #include "version.h"
 
 #ifndef SuiteSparse_time

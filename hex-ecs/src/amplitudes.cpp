@@ -24,7 +24,8 @@
 #include "bspline.h"
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
-#include "special.h"
+#include "moments.h"
+#include "specf.h"
 #include "spmatrix.h"
 
 cArray computeLambda (
@@ -166,9 +167,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 	
 	// auxiliary variables
 	cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
-	gsl_sf_result F1, F1p, G1, G1p, F2, F2p, G2, G2p;
-	double expF1, expG1, expF2, expG2, cos_alpha, sin_alpha;
-	
+		
 	// for all energies
 	for (size_t ie = 0; ie < Ei.size(); ie++)
 	{
@@ -217,19 +216,20 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				auto integrand = [&](double alpha) -> Complex {
 					
 					// precompute projectors
-					cos_alpha = cos(alpha);
-					sin_alpha = sin(alpha);
+					double cos_alpha = cos(alpha);
+					double sin_alpha = sin(alpha);
 					
 					// precompute coordinates
 					double r1 = rho * cos_alpha;
 					double r2 = rho * sin_alpha;
 					
-					// evaluate Coulomb wave functions
-					gsl_sf_coulomb_wave_FG_e(-1./k1, k1*r1, l1, 0, &F1, &F1p, &G1, &G1p, &expF1, &expG1);
-					gsl_sf_coulomb_wave_FG_e(-1./k2, k2*r2, l2, 0, &F2, &F2p, &G2, &G2p, &expF2, &expG2);
+					// evaluate Coulomb wave functions and derivatives
+					double F1, F2, F1p, F2p;
+					coul_F(l1,k1,r1, F1,F1p);
+					coul_F(l2,k2,r2, F2,F2p);
 					
-					double F1F2 = F1.val * F2.val;
-					double ddrho_F1F2 = k1*F1p.val*cos_alpha*F2.val + k2*F1.val*F2p.val*sin_alpha;
+					double F1F2 = F1 * F2;
+					double ddrho_F1F2 = k1*F1p*cos_alpha*F2 + k2*F1*F2p*sin_alpha;
 					
 					// get B-spline knots
 					int iknot1 = Bspline::ECS().knot(r1);

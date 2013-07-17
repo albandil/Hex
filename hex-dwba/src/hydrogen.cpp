@@ -175,7 +175,7 @@ double evalFreeState(double k, int l, double r, double sigma)
 		if (k * r > 1)
 		{
 			// probably due to "iteration process out of control" for large radii
-			return F_asy(l, k, r, (finite(sigma) ? sigma : F_sigma(l,k)));
+			return coul_F_asy(l, k, r, (finite(sigma) ? sigma : coul_F_sigma(l,k)));
 		}
 		else
 		{
@@ -188,7 +188,7 @@ double evalFreeState(double k, int l, double r, double sigma)
 
 double evalFreeStatePhase(double k, int l, double sigma)
 {
-	return l * 0.5 * M_PI + (finite(sigma) ? sigma : F_sigma(l,k));
+	return l * 0.5 * M_PI + (finite(sigma) ? sigma : coul_F_sigma(l,k));
 }
 
 double evalSturmian(int n, int l, double r, double lambda)
@@ -212,7 +212,7 @@ double evalSturmian(int n, int l, double r, double lambda)
 
 double evalFreeState_asy(double k, int l, double r, double sigma)
 {
-	return F_asy(l,k,r,sigma);
+	return coul_F_asy(l,k,r,sigma);
 }
 
 double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero)
@@ -250,7 +250,7 @@ double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, i
 double getFreeFar(double k, int l, double Sigma, double eps, int max_steps)
 {
 	// precompute Coulomb shift
-	Sigma = finite(Sigma) ? Sigma : F_sigma(l,k);
+	Sigma = finite(Sigma) ? Sigma : coul_F_sigma(l,k);
 	
 	//
 	// hunt phase
