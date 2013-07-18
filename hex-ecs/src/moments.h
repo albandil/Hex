@@ -17,7 +17,10 @@
 #include <vector>
 #include <complex>
 
+#include "arrays.h"
 #include "bspline.h"
+#include "gauss.h"
+#include "specf.h"
 
 class weightEdgeDamp
 {
@@ -95,5 +98,136 @@ Complex computeM(int a, int i, int j, int maxknot = 0);
  * \param a Moment degree.
  */
 cArray computeMi(int a, int iknotmax = 0);
+
+/** Compute P-overlaps
+ * Compute overlap vector of B-splines vs. hydrogen Pnl function.
+ * \param n Principal quantum number.
+ * \param l Orbital quantum number.
+ * \param weightf Weight function to multiply every value of the hydrogenic function.
+ *                It is expected to have the "double operator() (Complex z)" interface,
+ *                where the sent value is the complex coordinate.
+ */
+template <class Functor> cArray overlapP(int n, int l, Functor weightf)
+{
+	cArray res(Bspline::ECS().Nspline());
+	
+	// per interval
+	int points = 20;
+	
+	// evaluated B-spline and hydrogenic functions (auxiliary variables)
+	cArray evalB(points);
+	cArray evalP(points);
+	
+	// for all knots
+	for (int iknot = 0; iknot < Bspline::ECS().Nknot() - 1; iknot++)
+	{
+		// skip zero length intervals
+		if (Bspline::ECS().t(iknot) == Bspline::ECS().t(iknot+1))
+			continue;
+		
+		// which points are to be used here?
+		cArray xs = p_points(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		cArray ws = p_weights(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		
+		// evaluate the hydrogenic function
+		std::transform(
+			xs.begin(), xs.end(), evalP.begin(),
+			[ = ](Complex x) -> Complex {
+				gsl_sf_result R;
+				if (gsl_sf_hydrogenicR_e(n, l, 1., x.real(), &R) == GSL_EUNDRFLW)
+					return 0.;
+				else
+					return weightf(x) * x * R.val;
+			}
+		);
+		
+		// for all relevant B-splines
+		for (int ispline = std::max(iknot-Bspline::ECS().order(),0); ispline < Bspline::ECS().Nspline() and ispline <= iknot; ispline++)
+		{
+			// evaluate the B-spline
+			Bspline::ECS().B(ispline, iknot, points, xs.data(), evalB.data());
+			
+			// sum with weights
+			Complex sum = 0.;
+			for (int ipoint = 0; ipoint < points; ipoint++)
+				sum += ws[ipoint] * evalP[ipoint] * evalB[ipoint];
+			
+			// store the overlap
+			res[ispline] += sum;
+		}
+	}
+	
+	return res;
+}
+
+/** Compute j-overlaps
+ * Compute overlap integrals for Riccati-Bessel function.
+ * \param maxL2 Maximal degree of the Riccati-Bessel function.
+ * \param vk Array containing linear momenta.
+ * \param weightf Weight function to multiply every value of the Bessel function.
+ *                It is expected to have the "double operator() (Complex z)" interface,
+ *                where the sent value is the complex coordinate.
+ * \return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
+ */
+template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Functor weightf)
+{
+	// shorthand for energy count
+	int Nenergy = vk.size();
+	
+	// reserve space for the output array
+	size_t size = Bspline::ECS().Nspline() * Nenergy * (maxell + 1);
+	cArray res(size);
+	
+	// per interval
+	int points = 20;
+		
+	// for all knots
+	# pragma omp parallel for
+	for (int iknot = 0; iknot < Bspline::ECS().Nknot() - 1; iknot++)
+	{
+		// skip zero length intervals
+		if (Bspline::ECS().t(iknot) == Bspline::ECS().t(iknot+1))
+			continue;
+		
+		// which points are to be used here?
+		cArray xs = p_points(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		cArray ws = p_weights(points, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
+		
+		// for all linear momenta (= energies)
+		for (int ie = 0; ie < Nenergy; ie++)
+		{
+			// for all angular momenta
+			for (int l = 0; l <= maxell; l++)
+			{
+				// evaluate the Riccati-Bessel function
+				std::vector<LComplex> evalj(points);
+				std::transform(
+					xs.begin(), xs.end(), evalj.begin(),
+					[ = ](Complex x) -> LComplex {
+						return LComplex(weightf(x)) * ric_j(l, vk[ie] * x);
+					}
+				);
+				
+				// for all relevant B-splines
+				for (int ispline = std::max(iknot-Bspline::ECS().order(),0); ispline < Bspline::ECS().Nspline() and ispline <= iknot; ispline++)
+				{
+					// evaluate the B-spline
+					cArray evalB(points);
+					Bspline::ECS().B(ispline, iknot, points, xs.data(), evalB.data());
+					
+					// sum with weights
+					LComplex sum = 0.;
+					for (int ipoint = 0; ipoint < points; ipoint++)
+						sum += LComplex(ws[ipoint]) * evalj[ipoint] * LComplex(evalB[ipoint]);
+					
+					// store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
+					res[(ie * (maxell + 1) + l) * Bspline::ECS().Nspline() + ispline] += Complex(sum);
+				}
+			}
+		}
+	}
+	
+	return res;
+}
 
 #endif
