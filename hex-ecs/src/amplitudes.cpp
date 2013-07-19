@@ -225,8 +225,18 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					
 					// evaluate Coulomb wave functions and derivatives
 					double F1, F2, F1p, F2p;
-					coul_F(l1,k1,r1, F1,F1p);
-					coul_F(l2,k2,r2, F2,F2p);
+					int err1 = coul_F(l1,k1,r1, F1,F1p);
+					int err2 = coul_F(l2,k2,r2, F2,F2p);
+					
+					/// DEBUG
+					if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
+					{
+						std::cerr << "Errors while evaluating Coulomb function:\n";
+						std::cerr << "\terr1 = " << err1 << "\n";
+						std::cerr << "\terr2 = " << err2 << "\n";
+						exit(-1);
+					}
+					///
 					
 					double F1F2 = F1 * F2;
 					double ddrho_F1F2 = 0.;

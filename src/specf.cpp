@@ -236,7 +236,7 @@ Complex gamma(Complex z)
 	return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
 }
 
-int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (exception)
+int coul_F_michel(int l, double k, double r, double& F, double& Fp)
 {
 	// initialize parameters
 	double eta = -1/k;
@@ -281,25 +281,47 @@ int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (excep
 	return GSL_ERROR_SELECT_2(err, errp);
 }
 
-void coul_F(int l, double k, double r, double& F, double& Fp) throw (exception)
+int coul_F(int l, double k, double r, double& F, double& Fp)
 {
+	if (r < 0.)
+		return GSL_EDOM;
+	
 	gsl_sf_result f,g,fp,gp;
 	double ef,eg;
 	double eta = -1/k;
+ 	int err;
 	
-	int err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &g, &fp, &gp, &ef, &eg);
+	// evaluate non-S wave in origin (= zero)
+	if (r == 0. and l != 0)
+	{
+		F = Fp = 0.;
+		return GSL_SUCCESS;
+	}
+	
+	// evaluate S wave in origin (Abramovitz & Stegun 14.6.2)
+	if (r == 0. and l == 0)
+	{
+		gsl_sf_result C0;
+		err = gsl_sf_coulomb_CL_e(l, eta, &C0);
+		
+		F = 0.;
+		Fp = C0.val;
+		
+		return err;
+	}
+	
+	err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &g, &fp, &gp, &ef, &eg);
 	
 	if (err == GSL_SUCCESS)
 	{
 		F = f.val;
 		Fp = fp.val;
-		return;
+		return GSL_SUCCESS;
 	}
 	
 	err = coul_F_michel(l, k, r, F, Fp);
 	
-	if (err != GSL_SUCCESS)
-		throw exception ("Evaluation of Coulomb function failed (unable to compute Airy functions).");
+	return err;
 }
 
 double coul_F_sigma(int l, double k)

@@ -311,7 +311,7 @@ inline Complex dric_h_plus (int n, double x)
  * \param F Output reference for resulting value.
  * \param Fp Output reference for resulting derivative.
  */
-int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (exception);
+int coul_F_michel(int l, double k, double r, double& F, double& Fp);
 
 /**
  * \brief Evaluate Coulomb wave function (and its derivative).
@@ -321,7 +321,7 @@ int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (excep
  * \param F Output reference for resulting value.
  * \param Fp Output reference for resulting derivative.
  */
-void coul_F (int l, double k, double r, double & F, double & Fp) throw (exception);
+int coul_F (int l, double k, double r, double & F, double & Fp);
 
 /**
  * \brief Asymptotic form of the regular Coulomb wave.
