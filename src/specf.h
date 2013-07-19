@@ -36,6 +36,11 @@
 // Hydrogen radial orbital
 //
 
+inline double hydro_P(unsigned n, unsigned l, double z)
+{
+	return gsl_sf_hydrogenicR(n, l, 1, z);
+}
+
 /** Hydrogen radial function (radius-multiplied)
  * Evaluate hydrogen radial function (radius-multiplied) for complex argument
  * \param n Principal quantum number.
