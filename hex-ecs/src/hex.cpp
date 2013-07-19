@@ -218,7 +218,12 @@ int main(int argc, char* argv[])
 	std::cout << "\n";
 	// --------------------------------------------------------------------- //
 	
+	// initialioze matrices so that GCC stops complaining about "goto" crossing the initialization
+	int maxlambda = L + 2 * levels;
+	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
+	SymDiaMatrix S(Nspline), Mm1(Nspline), Mm1_tr(Nspline), Mm2(Nspline), D(Nspline);
 	
+	// zip file if told so
 	if (zipfile.size() != 0 and I_am_master)
 	{
 		if (zipmax < 0)
@@ -289,15 +294,13 @@ int main(int argc, char* argv[])
 			}
 		}
 		
-		exit(0);
+		goto End;
 	}
 	
 	std::cout << "Loading/precomputing derivative overlaps... ";
 	
 	
 	// Precompute matrix of derivative overlaps ---------------------------- //
-	//
-	SymDiaMatrix D(Nspline);
 	//
 	D.hdfload("D.hdf") or D.populate (
 		order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); }
@@ -309,10 +312,6 @@ int main(int argc, char* argv[])
 	
 	
 	// Precompute useful integral moments ---------------------------------- //
-	//
-	SymDiaMatrix S(Nspline);
-	SymDiaMatrix Mm1(Nspline), Mm1_tr(Nspline);
-	SymDiaMatrix Mm2(Nspline);
 	//
 	S.hdfload("S.hdf") or S.populate (
 		order, [=](int m, int n) -> Complex { return computeM(0, m, n); }
@@ -334,24 +333,10 @@ int main(int argc, char* argv[])
 	
 	std::cout << "ok\n\n";
 	
-	
-	// Precompute two-electron integrals ----------------------------------- //
-	//
-	// R-type integral of a given multipole moment may be stored in
-	// Nspline × Nspline × Nspline × Nspline four-dimensional field.
-	// Only Nspline × (2*order+1) × Nspline × (2*order+1) of these elements
-	// are nonzero. This four-dimensional array can be compacted
-	// to two-dimensional by grouping pairs of indices to two multi-indices,
-	// (i,j,k,l) -> ([ij], [kl]), each of these multi-indices having values
-	// from the range [0 .. Nspline × (2*order+1)]. The matrix is then symmetric
-	// with respect to exchange of the multi-index [ij] and [kl], with respect
-	// to the interchange of indices in multiindex and it is dense.
-	
-	int maxlambda = L + 2 * levels;
-	std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
-	
 Stg1:
 {
+	// Precompute two-electron integrals ----------------------------------- //
+	//
 	
 	// skip two-electron integration if told so
 	if (not (itinerary & StgRadial))
