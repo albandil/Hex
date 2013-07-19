@@ -236,6 +236,51 @@ Complex gamma(Complex z)
 	return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
 }
 
+int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (exception)
+{
+	// initialize parameters
+	double eta = -1/k;
+	double rho_t = eta + sqrt(eta*eta + l*(l+1));
+	double x = (k*r-rho_t)/rho_t;
+	double a = 1 - 2*eta/rho_t;
+	double phi, phip;
+	
+	// evaluate phi-function
+	if (x < 0)
+		phi = -pow(1.5*(-sqrt(-x*(1+a+x)) + (1-a)/2*acos(1+2*x/(1+a)) + 2*sqrt(a)*atanh(sqrt(-a*x/(1+a+x)))),2./3);
+	else
+		phi = pow(1.5*((1-a)*(log(sqrt(1+a)/(sqrt(x)+sqrt(1+x+a)))) + sqrt(x*(1+a+x)) -2*sqrt(a)*atan(sqrt(a*x/(1+a+x)))), 2./3);
+	
+	// evaluate derivative of the phi-function
+	phip = sqrt((x/(1+x) + a*x/pow(x+1,2))/phi);
+	
+	// check the result and use asymptotics if the full turned unstable
+	#define ASYEPS 1e-5 // TODO tune?
+//	if (std::abs(x) < ASYEPS and ( not finite(phi) or not finite(phip) ))
+	if (std::abs(x) < ASYEPS or not finite(phi) or not finite(phip))
+	{
+		// use x ⟶ 0 asymptotic formulas
+		phip = pow(1 + a, 1./3);
+		phi = phip * x;
+	}
+	
+	// evaluate the second derivative
+	double phipp = ((x+a+1-a*x)/gsl_sf_pow_int(x+1,3) - gsl_sf_pow_int(phip,3)) / (2*phi*phip);
+	
+	// evaluate Airy function and its derivative
+	gsl_sf_result ai, aip;
+	double ai_arg = -pow(rho_t,2./3) * phi;
+	int err = gsl_sf_airy_Ai_e(ai_arg, GSL_PREC_DOUBLE, &ai);
+	int errp = gsl_sf_airy_Ai_deriv_e(ai_arg, GSL_PREC_DOUBLE, &aip);
+	
+	// evaluate the Coulomb wave function and its derivative
+	F = sqrt(M_PI)*pow(rho_t,1./6)/sqrt(phip) * ai.val;
+	Fp = sqrt(M_PI)*pow(rho_t,-5./6)*(0.5*pow(phip,-1.5)*phipp * ai.val - sqrt(phip)*aip.val*pow(rho_t,2./3));
+	
+	// return corresponding GSL error
+	return GSL_ERROR_SELECT_2(err, errp);
+}
+
 void coul_F(int l, double k, double r, double& F, double& Fp) throw (exception)
 {
 	gsl_sf_result f,g,fp,gp;
@@ -244,24 +289,17 @@ void coul_F(int l, double k, double r, double& F, double& Fp) throw (exception)
 	
 	int err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &g, &fp, &gp, &ef, &eg);
 	
-	switch (err)
+	if (err == GSL_SUCCESS)
 	{
-		case GSL_ELOSS:
-		{
-			throw exception("[coul_F] NOT IMPLEMENTED (yet).\n");
-			// TODO: test whether the WKB will be all right and if yes, compute
-		}
-		case GSL_SUCCESS:
-		{
-			F = f.val;
-			Fp = fp.val;
-			return;
-		}
-		default:
-		{
-			throw exception ("Coulomb wave couldn't be evaluated due to the GSL error %d.", err);
-		}
-	};
+		F = f.val;
+		Fp = fp.val;
+		return;
+	}
+	
+	err = coul_F_michel(l, k, r, F, Fp);
+	
+	if (err != GSL_SUCCESS)
+		throw exception ("Evaluation of Coulomb function failed (unable to compute Airy functions).");
 }
 
 double coul_F_sigma(int l, double k)

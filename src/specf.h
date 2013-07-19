@@ -298,7 +298,23 @@ inline Complex dric_h_plus (int n, double x)
 }
 
 /**
- * \brief Evaluate Coulomb wave function (and its derivative.
+ * \brief Uniform approximation to the Coulomb wave function.
+ * 
+ * This routine uses algorithm from the following article:
+ *    Michel N, Uniform WKB approximation of Coulomb wave functions for arbitrary partial wave, EPL, 83 (2008) 10002.
+ * 
+ * The method is asymptotically valid for high energies and partial waves.
+ * 
+ * \param l Angular momentum.
+ * \param k Wavenumber.
+ * \param r Radial coordinate.
+ * \param F Output reference for resulting value.
+ * \param Fp Output reference for resulting derivative.
+ */
+int coul_F_michel(int l, double k, double r, double& F, double& Fp) throw (exception);
+
+/**
+ * \brief Evaluate Coulomb wave function (and its derivative).
  * \param l Angular momentum.
  * \param k Wavenumber.
  * \param r Radial coordinate.
