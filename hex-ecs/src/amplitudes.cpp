@@ -216,7 +216,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				auto integrand = [&](double alpha) -> Complex {
 					
 					// precompute projectors
-					double cos_alpha = cos(alpha);
+					double cos_alpha = (alpha == 0.5 * M_PI) ? 0. : cos(alpha);
 					double sin_alpha = sin(alpha);
 					
 					// precompute coordinates
@@ -229,7 +229,12 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					coul_F(l2,k2,r2, F2,F2p);
 					
 					double F1F2 = F1 * F2;
-					double ddrho_F1F2 = k1*F1p*cos_alpha*F2 + k2*F1*F2p*sin_alpha;
+					double ddrho_F1F2 = 0.;
+					
+					if (cos_alpha != 0.)
+						ddrho_F1F2 += k1*F1p*cos_alpha*F2;
+					if (sin_alpha != 0.)
+						ddrho_F1F2 += k2*F1*F2p*sin_alpha;
 					
 					// get B-spline knots
 					int iknot1 = Bspline::ECS().knot(r1);
@@ -258,7 +263,11 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 						ddr1_Psi += PsiSc[idx] * dB1[ispline1] *  B2[ispline2];
 						ddr2_Psi += PsiSc[idx] *  B1[ispline1] * dB2[ispline2];
 					}
-					ddrho_Psi = ddr1_Psi * cos_alpha + ddr2_Psi * sin_alpha;
+					
+					if (cos_alpha != 0.)
+						ddrho_Psi += ddr1_Psi * cos_alpha;
+					if (sin_alpha != 0.)
+						ddrho_Psi += ddr2_Psi * sin_alpha;
 					
 					/// DEBUG
 					if (not finite(F1F2))
