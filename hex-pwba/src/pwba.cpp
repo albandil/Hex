@@ -18,44 +18,12 @@
 
 #include <gsl/gsl_sf.h>
 
+#include "angs.h"
+#include "complex.h"
 #include "integrate.h"
+#include "misc.h"
+#include "specf.h"
 #include "symbolic.h"
-
-// Riccati-Bessel functions.
-#define ric_j(n,x)		(x*gsl_sf_bessel_jl(n,x))
-#define ric_y(n,x)		(x*gsl_sf_bessel_yl(n,x))
-#define ric_h_plus(n,x) Complex(ric_j(n,x),ric_y(n,x))
-
-// Coupling coefficients.
-#define Wigner3j(a,b,c,d,e,f) gsl_sf_coupling_3j(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
-#define Wigner6j(a,b,c,d,e,f) gsl_sf_coupling_6j(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
-
-// Hydrogen radial function.
-#define hydro_P(n,l,r)  (r*gsl_sf_hydrogenicR(n,l,1,r))
-
-typedef std::complex<double> Complex;
-
-/**
- * Clebsch-Gordan coefficient. In present implementation valid only for
- * integer (not half-integer) angular momenta. [One needs to correct the signs!]
- */
-double ClebschGordan(unsigned l1, int m1, unsigned l2, int m2, unsigned L, int M)
-{
-	return pow(-1, l1 - l2 + M) * sqrt(2.*L + 1) * Wigner3j(l1, l2, L, m1, m2, -M);
-}
-
-/**
- * Gaunt's integral.
- * \f[
- * \int_{4\pi} Y_{l_1m_1} Y_{l_2m_2} Y^{\ast}_{lm} \mathrm{d}\Omega \ .
- * \f]
- */
-double Gaunt(unsigned l1, int m1, unsigned l2, int m2, unsigned l, int m)
-{
-	return sqrt((2*l1+1)*(2*l2+1) / (4*M_PI*(2*l+1))) *
-		ClebschGordan(l1, m1, l2, m2, l, m) *
-		ClebschGordan(l1,  0, l2,  0, l, 0);
-}
 
 double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, int Lf, double kf)
 {
@@ -72,7 +40,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 			};
 			
 			Integrator<decltype(inner_integrand)> Q(inner_integrand);
-			Q.integrate(x, std::numeric_limits<double>::infinity());
+			Q.integrate(x, Inf);
 			
 			try {
 				return ric_j(li,ki*x) * ric_j(lf,kf*x) * Q.result();
@@ -83,7 +51,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		};
 		
 		Integrator<decltype(outer_integrand)> Q(outer_integrand);
-		Q.integrate(0, std::numeric_limits<double>::infinity());
+		Q.integrate(0, Inf);
 		return Q.result();
 	}
 	else
@@ -116,7 +84,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		
 		// outer integrate
 		Integrator<decltype(outer_integrand)> Q(outer_integrand);
-		Q.integrate(0., std::numeric_limits<double>::infinity());
+		Q.integrate(0., Inf);
 		return Q.result();
 	}
 }
@@ -173,7 +141,7 @@ double compute_Iexc(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		};
 		
 		Integrator<decltype(outer_integrand)> Q(outer_integrand);
-		Q.integrate(0, std::numeric_limits<double>::infinity());
+		Q.integrate(0, Inf);
 		
 // 		printf("%g\n", Q.result());
 		
@@ -212,7 +180,7 @@ double compute_Iexc(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		
 		// outer integrate
 		Integrator<decltype(outer_integrand)> Q(outer_integrand);
-		Q.integrate(0., std::numeric_limits<double>::infinity());
+		Q.integrate(0., Inf);
 		
 		return Q.result();
 	}
