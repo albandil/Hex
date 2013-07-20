@@ -310,7 +310,7 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 		return err;
 	}
 	
-	err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &g, &fp, &gp, &ef, &eg);
+	err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
 	
 	if (err == GSL_SUCCESS)
 	{
