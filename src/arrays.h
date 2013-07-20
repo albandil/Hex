@@ -1428,11 +1428,12 @@ template <typename T1, typename T2> auto operator + (
 	Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) + T2(0))>
 {
-	Array<decltype(T1(0) + T2(0))> c;
-	c.resize(std::min(a.size(),b.size()));
+	size_t size = std::min(a.size(),b.size());
 	
-	for (size_t i = 0; i < c.size(); i++)
-		c.push_back(a[i] + b[i]);
+	Array<decltype(T1(0) + T2(0))> c(size);
+	
+	for (size_t i = 0; i < size; i++)
+		c[i] = a[i] + b[i];
 	
 	return c;
 }
@@ -1449,11 +1450,12 @@ template <typename T1, typename T2> auto operator - (
 	Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) - T2(0))>
 {
-	Array<decltype(T1(0) - T2(0))> c;
-	c.resize(std::min(a.size(),b.size()));
+	size_t size = std::min(a.size(),b.size());
 	
-	for (size_t i = 0; i < c.size(); i++)
-		c.push_back(a[i] - b[i]);
+	Array<decltype(T1(0) - T2(0))> c(size);
+	
+	for (size_t i = 0; i < size; i++)
+		c[i] = a[i] - b[i];
 	
 	return c;
 }
@@ -1470,11 +1472,12 @@ template <typename T1, typename T2> auto operator * (
 	Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) * T2(0))>
 {
-	Array<decltype(T1(0) * T2(0))> c;
-	c.resize(std::min(a.size(),b.size()));
+	size_t size = std::min(a.size(),b.size());
 	
-	for (size_t i = 0; i < c.size(); i++)
-		c.push_back(a[i] * b[i]);
+	Array<decltype(T1(0) * T2(0))> c(size);
+	
+	for (size_t i = 0; i < size; i++)
+		c[i] = a[i] * b[i];
 	
 	return c;
 }
@@ -1491,11 +1494,12 @@ template <typename T1, typename T2> auto operator / (
 	Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) * T2(0))>
 {
-	Array<decltype(T1(0) * T2(0))> c;
-	c.resize(std::min(a.size(),b.size()));
+	size_t size = std::min(a.size(),b.size());
 	
-	for (size_t i = 0; i < c.size(); i++)
-		c.push_back(a[i] / b[i]);
+	Array<decltype(T1(0) * T2(0))> c(size);
+	
+	for (size_t i = 0; i < size; i++)
+		c[i] = a[i] / b[i];
 	
 	return c;
 }
