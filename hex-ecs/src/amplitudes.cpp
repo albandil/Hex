@@ -28,6 +28,8 @@
 #include "specf.h"
 #include "spmatrix.h"
 
+bool debug = false;
+
 cArray computeLambda (
 	rArray const & kf, rArray const & ki,
 	int maxell, int L, int Spin,
@@ -167,7 +169,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 	
 	// auxiliary variables
 	cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
-		
+	
 	// for all energies
 	for (size_t ie = 0; ie < Ei.size(); ie++)
 	{
@@ -238,8 +240,31 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					}
 					///
 					
+					/// DEBUG
+// 					double expF, expG;
+// 					gsl_sf_result f1, g1, f1p, g1p, f2, g2, f2p, g2p;
+// 					int gslerr1, gslerr2;
+// 					gslerr1 = gsl_sf_coulomb_wave_FG_e(-1/k1, k1*r1, l1, 0, &f1, &f1p, &g1, &g1p, &expF, &expG);
+// 					F1 = F.val; F1p = Fp.val;
+// 					if (F1 != f1.val)
+// 					{
+// 						std::cerr << "coul_F: " << F1 << "," << F1p << "\n";
+// 						std::cerr << "GSL: " << f1.val << "," << f1p.val << "\n";
+// 					}
+// 					gslerr2 = gsl_sf_coulomb_wave_FG_e(-1/k2, k2*r2, l2, 0, &f2, &f2p, &g2, &g2p, &expF, &expG);
+// 					F2 = F.val; F2p = Fp.val;
+// 					if (F2 != f2.val)
+// 					{
+// 						std::cerr << "coul_F: " << F2 << "," << F2p << "\n";
+// 						std::cerr << "GSL: " << f2.val << "," << f2p.val << "\n";
+// 					}
+					///
+					
 					double F1F2 = F1 * F2;
 					double ddrho_F1F2 = 0.;
+					
+// 					std::cerr << "F1p[" << l1 << "," << -1/k1 << "](" << k1*r1 << ") = " << F1p << " (" << f1p.val << ", err " << gslerr1 << ")\n";
+// 					std::cerr << "F2p[" << l2 << "," << -1/k2 << "](" << k2*r2 << ") = " << F2p << " (" << f2p.val << ", err " << gslerr2 << ")\n";
 					
 					if (cos_alpha != 0.)
 						ddrho_F1F2 += k1*F1p*cos_alpha*F2;
@@ -281,18 +306,26 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					
 					/// DEBUG
 					if (not finite(F1F2))
-						std::cout << "F1F2 = " << F1F2 << "\n";
+						std::cerr << "F1F2 = " << F1F2 << "\n";
 					if (not finite(std::abs(ddrho_Psi)))
-						std::cout << "ddrho_Psi = " << ddrho_Psi << "\n";
+						std::cerr << "ddrho_Psi = " << ddrho_Psi << "\n";
 					if (not finite(std::abs(Psi)))
-						std::cout << "Psi = " << Psi << "\n";
+						std::cerr << "Psi = " << Psi << "\n";
 					if (not finite(ddrho_F1F2))
-						std::cout << "ddrho_F1F2 = " << ddrho_F1F2 << "\n";
+						std::cerr << "ddrho_F1F2 = " << ddrho_F1F2 << "\n";
 					///
 					
 					// evaluate the integrand
 					return F1F2*ddrho_Psi - Psi*ddrho_F1F2;
 				};
+				
+// 				std::cout << integrand(2.45436e-05) << "\n";
+// 				exit(0);
+				
+				// integrator
+				ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
+				Q.setEps(1e-6);
+				Complex res = 2. * rho * Q.integrate(0., 0.5 * M_PI) / sqrt(M_PI);
 				
 				/// DEBUG
 // 				if (debug)
@@ -300,36 +333,45 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 // 					std::ofstream ofs("integrand.dat");
 // 					for (int ia = 0; ia < 1000; ia++)
 // 					{
-// 						double alpha = 0.5 * M_PI * ia / 1000;
+// 						double alpha = 0.0122718 /* 0.5 * M_PI */ * ia / 1000;
 // 						Complex v = integrand(alpha);
 // 						ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
 // 					}
 // 					ofs.close();
+// 					Q.setVerbose(true);
+// 					Q.setStack(10);
+// 					Complex inte = Q.integrate(0.,0.0122718);
+// 					std::cerr << "Integrated value: " << inte << "\n";
 // 					exit(0);
 // 				}
 				///
-				
-				// integrator
-				ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
-				Q.setEps(1e-6);
-				Complex res = 2. * rho * Q.integrate(0., 0.5 * M_PI) / (sqrt(M_PI));
 				
 				return res;
 				
 			};
 			
 			/// DEBUG
+// 			debug = true;
 // 			fLSl1l2k1k2(sqrt(0.5*(Ei[ie]-1./(ni*ni))));
-// 			debug = false;
 			///
 			
 			/// DEBUG
-// 			std::ofstream ofs("fLSl1l2k1k2.dat");
+// 			std::ostringstream name;
+// 			name << "f_" << l1 << "_" << l2 << ".dat";
+// 			std::ofstream ofs(name.str().c_str());
 // 			double kmax = sqrt(Ei[ie] - 1./(ni*ni));
 // 			for (int ik = 0; ik < 1000; ik++)
 // 			{
 // 				double k = kmax * ik / 1000.;
 // 				Complex f = fLSl1l2k1k2(k);
+// 				
+// 				if (std::abs(f) > 1e+5)
+// 				{
+// 					debug = true;
+// 					fLSl1l2k1k2(k);
+// 					abort();
+// 				}
+// 				
 // 				ofs << k/kmax << "\t" << k*sqrt(kmax*kmax-k*k) << "\t" << f.real() << "\t" << f.imag() << "\n";
 // 			}
 // 			ofs.close();
@@ -347,7 +389,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				
 				/// DEBUG
 // 				std::ostringstream os;
-// 				os << "cb" << N << ".hdf";
+// 				os << "cb_" << l1 << "_" << l2 << "_" << N << ".hdf";
 // 				CB.coeffs().hdfsave(os.str().c_str());
 				///
 				
@@ -406,9 +448,11 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			// sum contributions
 			double cs = 0;
 			for (int j = 0; j < N/2; j++)
-				cs += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
+				cs += sqrabs(evalf[2*j+1]);            // (FFTW magic) odd elements only
+			cs *= 0.0625 * M_PI / CB.coeffs().size();  // (FFTW magic) 1/4²
 			
-			ics[ie] += cs * 0.0625 * M_PI / CB.coeffs().size(); // (FFTW magic) 1/4²
+			std::cout << "\t\t- contrib to ics: " << cs << "\n";
+			ics[ie] += cs;
 		}
 	}
 	

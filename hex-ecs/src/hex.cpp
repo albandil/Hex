@@ -965,7 +965,7 @@ Stg3:
 	// Extract the cross sections ------------------------------------------ //
 	//
 	
-	std::cout << "Extracting T-matrices...";
+	std::cout << "\nExtracting T-matrices...\n";
 	
 	std::vector<std::tuple<int,int,int,int,int>> transitions;
 	for (auto instate  : instates)
@@ -1126,7 +1126,6 @@ Stg3:
 		          << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
 				  << " %        ";
 	}
-	std::cout << "\rExtracting T-matrices... ok       \n";
 	// --------------------------------------------------------------------- //
 	
 	fsql << "COMMIT;\n";
