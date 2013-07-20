@@ -1235,7 +1235,10 @@ bool SymDiaMatrix::hdfsave(const char* name, bool docompress, int consec) const
 	HDFFile hdf(name, HDFFile::overwrite);
 		
 	if (not hdf.valid())
-		throw exception ("Unable to save HDF file \"%s\".", name);
+	{
+		return false;
+// 		throw exception ("Unable to save HDF file \"%s\".", name);
+	}
 		
 	// write dimension and diagonal info
 	if (not hdf.write("n", &n_, 1))
