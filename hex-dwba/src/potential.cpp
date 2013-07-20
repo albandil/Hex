@@ -40,6 +40,9 @@ double DistortingPotential::operator() (double x) const
 	if (n == 1)
 		return -(1.+1./x)*exp(-2.*x);
 	
+	if (n == 2)
+		return -(0.125*x*x+0.25*x+0.75+1./x)*exp(-x);
+	
 	printf("U not implemented for n = %d\n", n);	// FIXME
 	abort();
 }
