@@ -11,7 +11,7 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <cmath>
-
+#include <iostream>
 #include <gsl/gsl_sf.h>
 
 #include "specf.h"
@@ -312,15 +312,53 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 	
 	err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
 	
-	if (err == GSL_SUCCESS)
+	// if the results are reliable, use them
+// 	if (err == GSL_SUCCESS)
+	if (finite(f.val) and finite(fp.val))
 	{
 		F = f.val;
 		Fp = fp.val;
 		return GSL_SUCCESS;
 	}
 	
-	err = coul_F_michel(l, k, r, F, Fp);
+	// if the kr-argument is small, we might use the Taylor expansion
+/*	if (err == GSL_ERUNAWAY)
+	{
+		gsl_sf_result Cl;
+		gsl_sf_coulomb_CL_e(l, eta, &Cl);
+		
+		double kr = k*r;
+		double y = 1/k;
+		
+		double a0 = 1.;
+		double a1 = y/(l+1);
+		double a2 = (2*y*y - l - 1) / (2*(l+1)*(2*l+3));
+		double a3 = y*(2*y*y-3*l-4)/(6*(l+1)*(2*l+3)*(l+2));
+		double a4 = (4*y*y*y*y-12*l*y*y-20*y*y+3*l*l+9*l+6)/(24*(l+1)*(2*l+3)*(l+2)*(2*l+5));
+		
+		double series = a0 + kr * (a1 + kr * (a2 + kr * (a3 + kr * a4)));
+		F = Cl.val * gsl_sf_pow_int(kr, l+1) * series;
+		
+		a0 =     k * a1;
+		a1 = 2 * k * a2;
+		a2 = 3 * k * a3;
+		a3 = 4 * k * a4;
+		
+		double dseries = a0 + kr * (a1 + kr * (a2 + kr * a3));
+		Fp = Cl.val * (gsl_sf_pow_int(kr, l+1) * dseries + (l+1)*k*gsl_sf_pow_int(kr,l));
+		
+		return GSL_SUCCESS;
+	}*/
 	
+	// if the precision is insufficent, use uniform approximation
+// 	if (err == GSL_ELOSS)
+	{
+		std::cout << "Using apx. for F[" << l << "," << k << "](" << r << "), err " << err << ".\n";
+		err = coul_F_michel(l, k, r, F, Fp);
+		return err;
+	}
+	
+	// otherwise pass the error up
 	return err;
 }
 
