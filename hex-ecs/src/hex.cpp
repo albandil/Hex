@@ -460,10 +460,11 @@ Stg1:
 			{
 				std::cout << "\t- integrals for λ = " << lambda << " retrieved from process " << owner << "\n";
 				
-				// save to disk
+				// save to disk (if the file doesn't already exist)
 				std::ostringstream oss3;
 				oss3 << "R_tr_dia_" << lambda << ".hdf";
-				R_tr_dia[lambda].hdfsave(oss3.str().c_str(), true, 10);
+				if (not HDFFile(oss3.str().c_str(), HDFFile::readonly).valid())
+					R_tr_dia[lambda].hdfsave(oss3.str().c_str(), true, 10);
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
