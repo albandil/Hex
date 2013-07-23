@@ -322,7 +322,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			int n;
 			auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
 			ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-			double cs = 2. * integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
+			double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
 			std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
 			ics[ie] += cs;
 		}
