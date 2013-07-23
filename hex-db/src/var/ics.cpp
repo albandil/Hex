@@ -14,9 +14,10 @@
 #include <string>
 #include <vector>
 
-#include <fftw3.h>
 #include <sqlite3.h>
 
+#include "../chebyshev.h"
+#include "../clenshawcurtis.h"
 #include "../interpolate.h"
 #include "../variables.h"
 
@@ -32,11 +33,11 @@ void db_sqrt(sqlite3_context* pdb, int n, sqlite3_value** val)
 }
 
 //
-// custom function for evaluation of Gauss-Chebyshev integration of a
-// squared Chebyshev expansion
+// custom function for integration of BLOB-represented Chebyshev
+// expansion of the ionization amplitude
 //
 
-void db_gausschebsqr(sqlite3_context* pdb, int n, sqlite3_value** val)
+void db_ioncs(sqlite3_context* pdb, int n, sqlite3_value** val)
 {
 	// get blob data as text; reinterpret_cast is save as we are using
 	// the low ASCII only
@@ -45,49 +46,24 @@ void db_gausschebsqr(sqlite3_context* pdb, int n, sqlite3_value** val)
 	// convert text data to binary array
 	cArray coeffs;
 	coeffs.fromBlob(blob);
-	int N = coeffs.size();
 	
-	// setup FFTW
-	cArray mirror_coeffs(4*N+1), evalf(4*N);
-	fftw_plan plan = fftw_plan_dft_1d (
-		4*N,
-		reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
-		reinterpret_cast<fftw_complex*>(&evalf[0]),
-		FFTW_FORWARD,
-		0
-	);
-	
-	// mirror oddly around N (3N), evenly around 2N (0,4N)
-	for (int k = 0; k < N; k++)
-	{
-		mirror_coeffs[4*N-k] = mirror_coeffs[k] = coeffs[k];
-		mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -coeffs[k];
-	}
+	// construct Chebyshev approximation object from the data
+	Chebyshev<double,Complex> CB(coeffs, 0, 1);
 	
 	// integrate
-	//    ₁                       n/2-1                
-	//   ⌠              dx     2π ===  |       2j+1     |²
-	// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
-	//   ⌡           √(1-x²)   n  ===  |        2n      |
-	//  ⁰                         j=0
-	// where
-	//                        N-1
-	//        2j+1       c₀   ===         j+½
-	//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
-	//         2n        2    ===          n
-	//                        k=1
-	// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
-	// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
-	
-	// evaluate the function using the FFT
-	fftw_execute(plan);
-	fftw_destroy_plan(plan);
-	
-	// sum contributions
-	double result = 0;
-	for (int j = 0; j < N/2; j++)
-		result += sqrabs(evalf[2*j+1]);      // (FFTW magic) odd elements only
-	result *= 0.0625 * M_PI / coeffs.size(); // (FFTW magic) 1/4²
+	//
+	// 1/√2                π/4
+	//  ⌠                   ⌠
+	//  ⎮            dκ     ⎮
+	//  ⎮ |f(κ)|² ------- = ⎮ |f(sin β)|² dβ
+	//  ⎮         √(1-κ²)   ⎮
+	//  ⌡                   ⌡
+	//  0                   0
+	//
+	int tail = CB.tail(1e-10);
+	auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(sin(beta), tail)); };
+	ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
+	double result = integrator.integrate(0, 0.25 * M_PI);
 	
 	// use result of the integration
 	sqlite3_result_double(pdb, result);
@@ -128,11 +104,11 @@ bool IntegralCrossSection::initialize(sqlitepp::session & db) const
 	
 	sqlite3_create_function (
 		db.impl(),
-		"gausschebsqr",
+		"ioncs",
 		1,              // pass single argument
 		SQLITE_UTF8,
 		nullptr,
-		&db_gausschebsqr,
+		&db_ioncs,
 		nullptr,
 		nullptr
 	);
@@ -178,7 +154,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
 		
 		"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
 			"SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
-				"SUM(0.25*(2*S+1)*gausschebsqr(QUOTE(cheb))) "
+				"SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
 			"FROM " + IonizationF::Id + " "
 			"GROUP BY ni, li, mi, L, S, Ei"
 	};
