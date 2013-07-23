@@ -84,9 +84,8 @@ int main(int argc, char *argv[])
 	{
 		cArray Tdir_lf(MM), Texc_lf(MM), DD_lf(MM), DE_lf(MM), ED_lf(MM), EE_lf(MM);
 		
-		std::cout << "---------------------------------------\n";
+		std::cout << "\n--------------------------------------------------------\n";
 		std::cout << "lf = " << lf << "\n";
-		std::cout << "---------------------------------------\n";
 		
 		DistortedWave chif = Ui.getDistortedWave(kf,lf);
 		
@@ -95,7 +94,7 @@ int main(int argc, char *argv[])
 		{
 			Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
 			
-			std::cout << "Direct 1e = " << tmat << "\n";
+			std::cout << "\tdirect 1e = " << tmat << "\n";
 			
 			for (int Mi = -Li; Mi <= Li; Mi++)
 				for (int Mf = -Lf; Mf <= Lf; Mf++)
@@ -104,9 +103,7 @@ int main(int argc, char *argv[])
 		
 		for (int li = 0; ; li++)
 		{
-			std::cout << "---------------------------------------\n";
-			std::cout << "li = " << li << "\n";
-			std::cout << "---------------------------------------\n";
+			std::cout << "\tli = " << li << "\n";
 			
 			// conserve angular momentum
 			if (li < lf - Li - Lf)
@@ -128,7 +125,7 @@ int main(int argc, char *argv[])
 			{
 				Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
 				
-				std::cout << "Exchange 1e = " << tmat << "\n";
+				std::cout << "\t\texchange 1e = " << tmat << "\n";
 				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 					for (int Mf = -Lf; Mf <= Lf; Mf++)
@@ -140,7 +137,7 @@ int main(int argc, char *argv[])
 			{
 				Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
 				
-				std::cout << "Direct 2e = " << tmat << "\n";
+				std::cout << "\t\tdirect 2e = " << tmat << "\n";
 				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 				{
@@ -157,7 +154,7 @@ int main(int argc, char *argv[])
 			{
 				Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
 				
-				std::cout << "Exchange 2e = " << tmat << "\n";
+				std::cout << "\t\texchange 2e = " << tmat << "\n";
 				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 				{
@@ -176,9 +173,7 @@ int main(int argc, char *argv[])
 			for (int Ln = 2; ; Ln++)
 			{
 				cArray DD_lf_li_Ln(MM), DE_lf_li_Ln(MM), ED_lf_li_Ln(MM), EE_lf_li_Ln(MM);
-				std::cout << "---------------------------------------\n";
-				std::cout << "Ln = " << Ln << "\n";
-				std::cout << "---------------------------------------\n";
+				std::cout << "\t\tLn = " << Ln << "\n";
 				
 				DWBA2_Ln (
 					Ei, li, lf, ki, kf, Ni, Nf, Li, Lf,
@@ -198,9 +193,7 @@ int main(int argc, char *argv[])
 				cArray relchng_singlet = (DD_lf_li_Ln + DE_lf_li_Ln + ED_lf_li_Ln + EE_lf_li_Ln) / (DD_lf_li + DE_lf_li + ED_lf_li + EE_lf_li);
 				cArray relchng_triplet = (DD_lf_li_Ln - DE_lf_li_Ln - ED_lf_li_Ln + EE_lf_li_Ln) / (DD_lf_li - DE_lf_li - ED_lf_li + EE_lf_li);
 				
-				std::cout << "---------------------------------------\n";
-				std::cout << "δ " << abs(relchng_singlet[0]) << " " << abs(relchng_triplet[0]) << "\n";
-				std::cout << "---------------------------------------\n";
+				std::cout << "\t\t\tδ " << abs(relchng_singlet[0]) << " " << abs(relchng_triplet[0]) << "\n";
 					
 				if (std::max(max(abs(relchng_singlet)), max(abs(relchng_triplet))) <= sigmaeps)
 					break; // OK, converged
@@ -223,6 +216,8 @@ int main(int argc, char *argv[])
 		rArray sigma_triplet = sums(pow(abs(Tdir + DD - DE - ED + EE - Texc), 2));
 		rArray relcng_singlet = sigma_singlet_lf/sigma_singlet;
 		rArray relcng_triplet = sigma_triplet_lf/sigma_triplet;
+		std::cout << "\tδ (singlet) = " << relcng_singlet << "\n";
+		std::cout << "\tδ (triplet) = " << relcng_triplet << "\n";
 		if (std::max(max(relcng_singlet), max(relcng_triplet)) < sigmaeps)
 			break;
 		
@@ -234,22 +229,22 @@ int main(int argc, char *argv[])
 		if (compute_DD and DD_contrib < accelerator_eps)
 		{
 			compute_DD = false;
-			std::cout << "Abandoning DD part of DWBA-2\n";
+			std::cout << "\tAbandoning DD part of DWBA-2\n";
 		}
 		if (compute_DE and DE_contrib < accelerator_eps)
 		{
 			compute_DE = false;
-			std::cout << "Abandoning DE part of DWBA-2\n";
+			std::cout << "\tAbandoning DE part of DWBA-2\n";
 		}
 		if (compute_ED and ED_contrib < accelerator_eps)
 		{
 			compute_ED = false;
-			std::cout << "Abandoning ED part of DWBA-2\n";
+			std::cout << "\tAbandoning ED part of DWBA-2\n";
 		}
 		if (compute_EE and EE_contrib < accelerator_eps)
 		{
 			compute_EE = false;
-			std::cout << "Abandoning EE part of DWBA-2\n";
+			std::cout << "\tAbandoning EE part of DWBA-2\n";
 		}
 	}
 	
