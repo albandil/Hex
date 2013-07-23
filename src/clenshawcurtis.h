@@ -178,7 +178,7 @@ public:
 		std::vector<Complex> fvals_prev, fvals, ftraf;
 		
 		// integral approximation
-		FType sum, sum_prev = Nan;
+		FType sum = 0, sum_prev = Nan;
 		
 		// get nesting limit
 		int maxN = gsl_sf_pow_int(2,NNest);
