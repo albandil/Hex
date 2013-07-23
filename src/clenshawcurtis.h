@@ -162,9 +162,15 @@ public:
 	{
 		// check interval bounds
 		if (x1 == x2)
+		{
+			if (n != nullptr)
+				*n = 0;
 			return FType(0);
+		}
 		if (x1 > x2)
+		{
 			return -integrate_ff(x2, x1, n);
+		}
 		
 		// scaled F
 		auto f = [&](double x) -> FType {
@@ -186,6 +192,9 @@ public:
 		// convergence loop
 		for (int N = 4; N <= maxN /*or not Recurrence*/; N *= 2)
 		{
+			if (n != nullptr)
+				*n = N;
+			
 			// reserve memory
 			fvals.resize(2*N + 1);
 			ftraf.resize(2*N);
@@ -269,9 +278,6 @@ public:
 			// check for convergence
 			if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
 			{
-				if (n != nullptr)
-					*n = N;
-				
 				if (Verbose)
 					std::cout << "[" << vName << "] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
 				
@@ -283,6 +289,7 @@ public:
 			{
 				if (Verbose)
 					std::cout << "[" << vName << "] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
+				
 				return FType(0.);
 			}
 			else
