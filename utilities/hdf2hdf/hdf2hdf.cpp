@@ -8,6 +8,8 @@
 
 int main(int argc, char *argv[])
 {
+	H5::Exception::dontPrint();
+	
 	std::vector<std::string> files;
 	bool compress = false;
 	

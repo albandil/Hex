@@ -6,6 +6,8 @@
 
 int main(int argc, char *argv[])
 {
+	H5::Exception::dontPrint();
+	
 	bool cpx = false;	// whether to write complex expansion
 	std::string hdf;
 	
