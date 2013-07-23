@@ -10,8 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_INTEGRATE
-#define HEX_INTEGRATE
+#ifndef HEX_GAUSSKRONROD
+#define HEX_GAUSSKRONROD
 
 #include <cmath>
 #include <limits>
@@ -34,10 +34,10 @@
  * 
  * For the initialization you will mostly want to use the structure
  * \code
- *     Integrator<decltype(integrand)> Q(integrand);
+ *     GaussKronrod<decltype(integrand)> Q(integrand);
  * \endcode
  */
-template <typename Functor> class Integrator
+template <typename Functor> class GaussKronrod
 {
 	private:
 		Functor F;
@@ -47,8 +47,8 @@ template <typename Functor> class Integrator
 		double eval(double x) { return F(x); }
 
 	public:
-		Integrator(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
-		~Integrator() {}
+		GaussKronrod(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
+		~GaussKronrod() {}
 		
 		/** \brief Compute the integral.
 		 *
@@ -100,18 +100,18 @@ template <typename Functor> class Integrator
 			
 			// EvalPtr je ukazatel na členskou funkci Integrator::eval, kterou budeme posílat
 			// do knihovních funkcí.
-			o2scl::funct_mfptr<Integrator<Functor>> EvalPtr(const_cast<Integrator<Functor>*>(this), &Integrator<Functor>::eval);
-			o2scl::inte<o2scl::funct_mfptr<Integrator<Functor>>> *R = 0;
+			o2scl::funct_mfptr<GaussKronrod<Functor>> EvalPtr(const_cast<GaussKronrod<Functor>*>(this), &GaussKronrod<Functor>::eval);
+			o2scl::inte<o2scl::funct_mfptr<GaussKronrod<Functor>>> *R = 0;
 			
 			// podle konečnosti mezí vybere správný integrátor
 			if (finite(a) && finite(b))          /* -∞ < a < b < +∞ */
-				R = new o2scl::gsl_inte_qag<o2scl::funct_mfptr<Integrator<Functor>>>;
+				R = new o2scl::gsl_inte_qag<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
 			else if (finite(a) && !finite(b))    /* -∞ < a < b = +∞ */
-				R = new o2scl::gsl_inte_qagiu<o2scl::funct_mfptr<Integrator<Functor>>>;
+				R = new o2scl::gsl_inte_qagiu<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
 			else if (!finite(a) && finite(b))    /* -∞ = a < b < +∞ */
-				R = new o2scl::gsl_inte_qagil<o2scl::funct_mfptr<Integrator<Functor>>>;
+				R = new o2scl::gsl_inte_qagil<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
 			else                                 /* -∞ = a < b = +∞ */
-				R = new o2scl::gsl_inte_qagi<o2scl::funct_mfptr<Integrator<Functor>>>;
+				R = new o2scl::gsl_inte_qagi<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
 			
 			// pozor! o2scl kope!
 			try

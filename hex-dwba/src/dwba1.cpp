@@ -15,7 +15,7 @@
 #include "potential.h"
 #include "dwba1.h"
 #include "hydrogen.h"
-#include "integrate.h"
+#include "gausskronrod.h"
 #include "specf.h"
 
 namespace DWBA1
@@ -35,8 +35,8 @@ Complex computeDirect1e(DistortingPotential const& U, int l, double k)
 	};
 	
 	// integrate
-	Integrator<decltype(integrand1)> Q1(integrand1);
-	Integrator<decltype(integrand2)> Q2(integrand2);
+	GaussKronrod<decltype(integrand1)> Q1(integrand1);
+	GaussKronrod<decltype(integrand2)> Q2(integrand2);
 	Q1.integrate(0., Inf);
 	Q2.integrate(0., Inf);
 	
@@ -64,8 +64,8 @@ Complex computeExchange1e(
 	};
 	
 	// integrate
-	Integrator<decltype(integrand1)> Q1(integrand1);
-	Integrator<decltype(integrand2)> Q2(integrand2);
+	GaussKronrod<decltype(integrand1)> Q1(integrand1);
+	GaussKronrod<decltype(integrand2)> Q2(integrand2);
 	Q1.integrate(0., Inf);
 	Q2.integrate(0., Inf);
 	
@@ -113,8 +113,8 @@ Complex computeDirect2e(
 		};
 		
 		// integrate
-		Integrator<decltype(inner_integrand_1)> Q1(inner_integrand_1);
-		Integrator<decltype(inner_integrand_2)> Q2(inner_integrand_2);
+		GaussKronrod<decltype(inner_integrand_1)> Q1(inner_integrand_1);
+		GaussKronrod<decltype(inner_integrand_2)> Q2(inner_integrand_2);
 		Q1.integrate(r2, Inf);
 		Q2.integrate(0, r2);
 		
@@ -127,7 +127,7 @@ Complex computeDirect2e(
 	};
 	
 	// integrate
-	Integrator<decltype(outer_integrand)> Q(outer_integrand);
+	GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 	Q.integrate(0., Inf);
 	
 	// compute phase factor
@@ -174,8 +174,8 @@ Complex computeExchange2e(
 		};
 		
 		// integrate
-		Integrator<decltype(inner_integrand_1)> Q1(inner_integrand_1);
-		Integrator<decltype(inner_integrand_2)> Q2(inner_integrand_2);
+		GaussKronrod<decltype(inner_integrand_1)> Q1(inner_integrand_1);
+		GaussKronrod<decltype(inner_integrand_2)> Q2(inner_integrand_2);
 		Q1.integrate(r2, Inf);
 		Q2.integrate(0, r2);
 		
@@ -188,7 +188,7 @@ Complex computeExchange2e(
 	};
 	
 	// integrate
-	Integrator<decltype(outer_integrand)> Q(outer_integrand);
+	GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 	Q.integrate(0., Inf);
 	
 	// compute phase factor

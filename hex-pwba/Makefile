@@ -8,7 +8,7 @@ bin/pwba: obj/pwba.o obj/symbolic.o obj/angs.o obj/specf.o
 	@mkdir -p $(@D)
 	$(CXX) $(LFLAGS) $^ -o $@
 
-obj/pwba.o: src/pwba.cpp src/integrate.h src/symbolic.h
+obj/pwba.o: src/pwba.cpp src/gausskronrod.h src/symbolic.h
 	@mkdir -p $(@D)
 	$(CXX) $(CFLAGS) -c $< -o $@
 

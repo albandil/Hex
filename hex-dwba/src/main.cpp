@@ -94,6 +94,9 @@ int main(int argc, char *argv[])
 		if (Ni == Nf and Li == Lf)
 		{
 			Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
+			
+			std::cout << "Direct 1e = " << tmat << "\n";
+			
 			for (int Mi = -Li; Mi <= Li; Mi++)
 				for (int Mf = -Lf; Mf <= Lf; Mf++)
 					Tdir_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat;
@@ -124,6 +127,9 @@ int main(int argc, char *argv[])
 			if (Li == lf and Lf == li)
 			{
 				Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
+				
+				std::cout << "Exchange 1e = " << tmat << "\n";
+				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 					for (int Mf = -Lf; Mf <= Lf; Mf++)
 						Texc_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += (Mf == 0) ? tmat : 0.;
@@ -133,6 +139,8 @@ int main(int argc, char *argv[])
 			for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); lambda <= std::min(Li+Lf,li+lf); lambda++)
 			{
 				Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
+				
+				std::cout << "Direct 2e = " << tmat << "\n";
 				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 				{
@@ -148,6 +156,9 @@ int main(int argc, char *argv[])
 			for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
 			{
 				Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
+				
+				std::cout << "Exchange 2e = " << tmat << "\n";
+				
 				for (int Mi = -Li; Mi <= Li; Mi++)
 				{
 					for (int Mf = -Lf; Mf <= Lf; Mf++)

@@ -19,7 +19,7 @@
 #include "complex.h"
 #include "dwba2.h"
 #include "hydrogen.h"
-#include "integrate.h"
+#include "gausskronrod.h"
 #include "multi.h"
 #include "oscint.h"
 #include "potential.h"
@@ -27,7 +27,6 @@
 #include "wave_irreg.h"
 #include "wave_forbid.h"
 #include "wave_hyperb.h"
-#include "../../hex-ecs/src/bspline.h"
 
 #define EPS_CONTRIB 1e-8
 

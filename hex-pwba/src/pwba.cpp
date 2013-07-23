@@ -20,7 +20,7 @@
 
 #include "angs.h"
 #include "complex.h"
-#include "integrate.h"
+#include "gausskronrod.h"
 #include "misc.h"
 #include "specf.h"
 #include "symbolic.h"
@@ -39,7 +39,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 				}
 			};
 			
-			Integrator<decltype(inner_integrand)> Q(inner_integrand);
+			GaussKronrod<decltype(inner_integrand)> Q(inner_integrand);
 			Q.integrate(x, Inf);
 			
 			try {
@@ -50,7 +50,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 			
 		};
 		
-		Integrator<decltype(outer_integrand)> Q(outer_integrand);
+		GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 		Q.integrate(0, Inf);
 		return Q.result();
 	}
@@ -83,7 +83,7 @@ double compute_Idir(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		};
 		
 		// outer integrate
-		Integrator<decltype(outer_integrand)> Q(outer_integrand);
+		GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 		Q.integrate(0., Inf);
 		return Q.result();
 	}
@@ -129,7 +129,7 @@ double compute_Iexc(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 				}
 			};
 			
-			Integrator<decltype(inner_integrand)> Q(inner_integrand);
+			GaussKronrod<decltype(inner_integrand)> Q(inner_integrand);
 			Q.integrate(0, x);
 			
 			try {
@@ -140,7 +140,7 @@ double compute_Iexc(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 			
 		};
 		
-		Integrator<decltype(outer_integrand)> Q(outer_integrand);
+		GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 		Q.integrate(0, Inf);
 		
 // 		printf("%g\n", Q.result());
@@ -179,7 +179,7 @@ double compute_Iexc(int li, int lf, int lam, int Ni, int Li, double ki, int Nf, 
 		};
 		
 		// outer integrate
-		Integrator<decltype(outer_integrand)> Q(outer_integrand);
+		GaussKronrod<decltype(outer_integrand)> Q(outer_integrand);
 		Q.integrate(0., Inf);
 		
 		return Q.result();
