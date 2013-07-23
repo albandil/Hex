@@ -381,16 +381,19 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			// Chebyshev approximation
 			Chebyshev<double,Complex> CB;
 			
+			// maximal available momentum
+			double kmax = sqrt(Ei[ie] - 1./(ni*ni));
+			
 			// convergence loop
 			for (int N = 4; ; N *= 2)
 			{
 				// build the approximation
-				CB.generate(fLSl1l2k1k2, N, 0., sqrt(Ei[ie] - 1./(ni*ni)));
+				CB.generate(fLSl1l2k1k2, N, 0., kmax);
 				
 				/// DEBUG
-// 				std::ostringstream os;
-// 				os << "cb_" << l1 << "_" << l2 << "_" << N << ".hdf";
-// 				CB.coeffs().hdfsave(os.str().c_str());
+				std::ostringstream os;
+				os << "cb_" << l1 << "_" << l2 << "_" << N << ".hdf";
+				CB.coeffs().hdfsave(os.str().c_str());
 				///
 				
 				// check tail
@@ -408,51 +411,83 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			// integrate the expansion
 			//
 			
-			// setup FFTW
-			int N = CB.coeffs().size();
-			cArray mirror_coeffs(4*N+1), evalf(4*N);
-			fftw_plan plan = fftw_plan_dft_1d (
-				4*N,
-				reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
-				reinterpret_cast<fftw_complex*>(&evalf[0]),
-				FFTW_FORWARD,
-				0
-			);
+			// setup integrator
+			int tail = CB.tail(1e-10), n;
+			auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
+			ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
 			
-			// mirror oddly around N (3N), evenly around 2N (0,4N)
-			for (int k = 0; k < N; k++)
-			{
-				mirror_coeffs[4*N-k] = mirror_coeffs[k] = CB.coeffs()[k];
-				mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -CB.coeffs()[k];
-			}
+			/// DEBUG
+// 			std::ostringstream oss1, oss2;
+// 			oss1 << "f-" << l1 << "-" << l2 << ".out";
+// 			oss2 << "fsqr-" << l1 << "-" << l2 << ".out";
+// 			
+// 			std::ofstream ofs;
+// 			
+// 			ofs.open(oss1.str().c_str());
+// 			for (double beta = 0; beta <= M_PI/4; beta += 0.01)
+// 				ofs << beta << "\t" << kmax*sin(beta) << "\t" << CB.clenshaw(kmax*sin(beta),tail) << "\n";
+// 			ofs << std::flush;
+// 			ofs.close();
+// 			
+// 			ofs.open(oss2.str().c_str());
+// 			for (double beta = 0; beta <= M_PI/4; beta += 0.01)
+// 				ofs << beta << "\t" << kmax*sin(beta) << "\t" << fsqr(beta) << "\n";
+// 			ofs << std::flush;
+// 			ofs.close();
+			///
 			
-			// integrate
-			//    ₁                       n/2-1                
-			//   ⌠              dx     2π ===  |       2j+1     |²
-			// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
-			//   ⌡           √(1-x²)   n  ===  |        2n      |
-			//  ⁰                         j=0
-			// where
-			//                        N-1
-			//        2j+1       c₀   ===         j+½
-			//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
-			//         2n        2    ===          n
-			//                        k=1
-			// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
-			// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
+// 			integrator.setVerbose(true);
+			double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
 			
-			// evaluate the function using the FFT
-			fftw_execute(plan);
-			fftw_destroy_plan(plan);
+// 			// setup FFTW
+// 			int N = CB.coeffs().size();
+// 			cArray mirror_coeffs(4*N+1), evalf(4*N);
+// 			fftw_plan plan = fftw_plan_dft_1d (
+// 				4*N,
+// 				reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
+// 				reinterpret_cast<fftw_complex*>(&evalf[0]),
+// 				FFTW_FORWARD,
+// 				0
+// 			);
+// 			
+// 			// mirror oddly around N (3N), evenly around 2N (0,4N)
+// 			for (int k = 0; k < N; k++)
+// 			{
+// 				mirror_coeffs[4*N-k] = mirror_coeffs[k] = CB.coeffs()[k];
+// 				mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -CB.coeffs()[k];
+// 			}
+// 			
+// 			// integrate
+// 			//    ₁                       n/2-1                
+// 			//   ⌠              dx     2π ===  |       2j+1     |²
+// 			// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
+// 			//   ⌡           √(1-x²)   n  ===  |        2n      |
+// 			//  ⁰                         j=0
+// 			// where
+// 			//                        N-1
+// 			//        2j+1       c₀   ===         j+½
+// 			//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
+// 			//         2n        2    ===          n
+// 			//                        k=1
+// 			// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
+// 			// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
+// 			
+// 			// evaluate the function using the FFT
+// 			fftw_execute(plan);
+// 			fftw_destroy_plan(plan);
+// 			
+// 			// sum contributions
+// 			double cs = 0;
+// 			for (int j = 0; j < N/2; j++)
+// 				cs += sqrabs(evalf[2*j+1]);            // (FFTW magic) odd elements only
+// 			cs *= 0.0625 * M_PI / CB.coeffs().size();  // (FFTW magic) 1/4²
 			
-			// sum contributions
-			double cs = 0;
-			for (int j = 0; j < N/2; j++)
-				cs += sqrabs(evalf[2*j+1]);            // (FFTW magic) odd elements only
-			cs *= 0.0625 * M_PI / CB.coeffs().size();  // (FFTW magic) 1/4²
-			
-			std::cout << "\t\t- contrib to ics: " << cs << "\n";
+			std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
 			ics[ie] += cs;
+			
+// 			// TODO Missing factors:
+// 			//  -> 0.25 (for broader integration than necessary due to symmetry in k₁,₂)
+// 			//  -> 1/ki (for normalization of the cross section)
 		}
 	}
 	
