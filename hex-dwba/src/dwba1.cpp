@@ -108,7 +108,7 @@ Complex computeDirect2e(
 			if (lambda == 0)
 				return 0;
 			else
-				return pow(r1/r2,lambda)/r2;
+				multipole = pow(r1/r2,lambda)/r2;
 			return psi_f * multipole * psi_i;
 		};
 		
