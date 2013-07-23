@@ -238,14 +238,12 @@ void write_array(qArray const & array, const char* filename)
 
 void write_array(ArrayView<Complex> const & array)
 {
-	std::cout << "void write_array(ArrayView<Complex> const & array)\n";
 	for (Complex const & elem : array)
 		std::cout << elem.real() << "\t" << elem.imag() << "\n";
 }
 
 void write_array(ArrayView<double> const & array)
 {
-	std::cout << "void write_array(ArrayView<double> const & array)\n";
 	for (double const & elem : array)
 		std::cout << elem << "\n";
 }
