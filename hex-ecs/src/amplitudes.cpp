@@ -194,17 +194,6 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			// create subset of the solution
 			cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
 			
-			/// DEBUG
-// 			write_2D_data (
-// 				Nspline, Nspline,
-// 				"psi.dat",
-// 				[&](int i, int j) -> double {
-// 					return PsiSc[i*Nspline+j].real();
-// 				}
-// 			);
-// 			bool debug = true;
-			///
-			
 			// we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
 			auto fLSl1l2k1k2 = [&](double k1) -> Complex {
 				
@@ -240,31 +229,8 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					}
 					///
 					
-					/// DEBUG
-// 					double expF, expG;
-// 					gsl_sf_result f1, g1, f1p, g1p, f2, g2, f2p, g2p;
-// 					int gslerr1, gslerr2;
-// 					gslerr1 = gsl_sf_coulomb_wave_FG_e(-1/k1, k1*r1, l1, 0, &f1, &f1p, &g1, &g1p, &expF, &expG);
-// 					F1 = F.val; F1p = Fp.val;
-// 					if (F1 != f1.val)
-// 					{
-// 						std::cerr << "coul_F: " << F1 << "," << F1p << "\n";
-// 						std::cerr << "GSL: " << f1.val << "," << f1p.val << "\n";
-// 					}
-// 					gslerr2 = gsl_sf_coulomb_wave_FG_e(-1/k2, k2*r2, l2, 0, &f2, &f2p, &g2, &g2p, &expF, &expG);
-// 					F2 = F.val; F2p = Fp.val;
-// 					if (F2 != f2.val)
-// 					{
-// 						std::cerr << "coul_F: " << F2 << "," << F2p << "\n";
-// 						std::cerr << "GSL: " << f2.val << "," << f2p.val << "\n";
-// 					}
-					///
-					
 					double F1F2 = F1 * F2;
 					double ddrho_F1F2 = 0.;
-					
-// 					std::cerr << "F1p[" << l1 << "," << -1/k1 << "](" << k1*r1 << ") = " << F1p << " (" << f1p.val << ", err " << gslerr1 << ")\n";
-// 					std::cerr << "F2p[" << l2 << "," << -1/k2 << "](" << k2*r2 << ") = " << F2p << " (" << f2p.val << ", err " << gslerr2 << ")\n";
 					
 					if (cos_alpha != 0.)
 						ddrho_F1F2 += k1*F1p*cos_alpha*F2;
@@ -319,64 +285,14 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 					return F1F2*ddrho_Psi - Psi*ddrho_F1F2;
 				};
 				
-// 				std::cout << integrand(2.45436e-05) << "\n";
-// 				exit(0);
-				
 				// integrator
 				ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
 				Q.setEps(1e-6);
 				Complex res = 2. * rho * Q.integrate(0., 0.5 * M_PI) / sqrt(M_PI);
 				
-				/// DEBUG
-// 				if (debug)
-// 				{
-// 					std::ofstream ofs("integrand.dat");
-// 					for (int ia = 0; ia < 1000; ia++)
-// 					{
-// 						double alpha = 0.0122718 /* 0.5 * M_PI */ * ia / 1000;
-// 						Complex v = integrand(alpha);
-// 						ofs << alpha << "\t" << v.real() << "\t" << v.imag() << "\n";
-// 					}
-// 					ofs.close();
-// 					Q.setVerbose(true);
-// 					Q.setStack(10);
-// 					Complex inte = Q.integrate(0.,0.0122718);
-// 					std::cerr << "Integrated value: " << inte << "\n";
-// 					exit(0);
-// 				}
-				///
-				
 				return res;
 				
 			};
-			
-			/// DEBUG
-// 			debug = true;
-// 			fLSl1l2k1k2(sqrt(0.5*(Ei[ie]-1./(ni*ni))));
-			///
-			
-			/// DEBUG
-// 			std::ostringstream name;
-// 			name << "f_" << l1 << "_" << l2 << ".dat";
-// 			std::ofstream ofs(name.str().c_str());
-// 			double kmax = sqrt(Ei[ie] - 1./(ni*ni));
-// 			for (int ik = 0; ik < 1000; ik++)
-// 			{
-// 				double k = kmax * ik / 1000.;
-// 				Complex f = fLSl1l2k1k2(k);
-// 				
-// 				if (std::abs(f) > 1e+5)
-// 				{
-// 					debug = true;
-// 					fLSl1l2k1k2(k);
-// 					abort();
-// 				}
-// 				
-// 				ofs << k/kmax << "\t" << k*sqrt(kmax*kmax-k*k) << "\t" << f.real() << "\t" << f.imag() << "\n";
-// 			}
-// 			ofs.close();
-// 			exit(0);
-			///
 			
 			// Chebyshev approximation
 			Chebyshev<double,Complex> CB;
@@ -390,12 +306,6 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 				// build the approximation
 				CB.generate(fLSl1l2k1k2, N, 0., kmax);
 				
-				/// DEBUG
-				std::ostringstream os;
-				os << "cb_" << l1 << "_" << l2 << "_" << N << ".hdf";
-				CB.coeffs().hdfsave(os.str().c_str());
-				///
-				
 				// check tail
 				if (CB.tail(1e-5) != N)
 					break;
@@ -407,87 +317,14 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 			
 			results.push_back(CB.coeffs());
 			
-			//
 			// integrate the expansion
-			//
-			
-			// setup integrator
-			int tail = CB.tail(1e-10), n;
+			int tail = CB.tail(1e-10);
+			int n;
 			auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
 			ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-			
-			/// DEBUG
-// 			std::ostringstream oss1, oss2;
-// 			oss1 << "f-" << l1 << "-" << l2 << ".out";
-// 			oss2 << "fsqr-" << l1 << "-" << l2 << ".out";
-// 			
-// 			std::ofstream ofs;
-// 			
-// 			ofs.open(oss1.str().c_str());
-// 			for (double beta = 0; beta <= M_PI/4; beta += 0.01)
-// 				ofs << beta << "\t" << kmax*sin(beta) << "\t" << CB.clenshaw(kmax*sin(beta),tail) << "\n";
-// 			ofs << std::flush;
-// 			ofs.close();
-// 			
-// 			ofs.open(oss2.str().c_str());
-// 			for (double beta = 0; beta <= M_PI/4; beta += 0.01)
-// 				ofs << beta << "\t" << kmax*sin(beta) << "\t" << fsqr(beta) << "\n";
-// 			ofs << std::flush;
-// 			ofs.close();
-			///
-			
-// 			integrator.setVerbose(true);
-			double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
-			
-// 			// setup FFTW
-// 			int N = CB.coeffs().size();
-// 			cArray mirror_coeffs(4*N+1), evalf(4*N);
-// 			fftw_plan plan = fftw_plan_dft_1d (
-// 				4*N,
-// 				reinterpret_cast<fftw_complex*>(&mirror_coeffs[0]),
-// 				reinterpret_cast<fftw_complex*>(&evalf[0]),
-// 				FFTW_FORWARD,
-// 				0
-// 			);
-// 			
-// 			// mirror oddly around N (3N), evenly around 2N (0,4N)
-// 			for (int k = 0; k < N; k++)
-// 			{
-// 				mirror_coeffs[4*N-k] = mirror_coeffs[k] = CB.coeffs()[k];
-// 				mirror_coeffs[2*N+k] = mirror_coeffs[2*N-k] = -CB.coeffs()[k];
-// 			}
-// 			
-// 			// integrate
-// 			//    ₁                       n/2-1                
-// 			//   ⌠              dx     2π ===  |       2j+1     |²
-// 			// 2 ⎮ |f(|x|)|² ——————— = —— >    | f(cos(———— π)) |  
-// 			//   ⌡           √(1-x²)   n  ===  |        2n      |
-// 			//  ⁰                         j=0
-// 			// where
-// 			//                        N-1
-// 			//        2j+1       c₀   ===         j+½
-// 			//  f(cos(———— π)) = —— + >   ck cos( ——— kπ )
-// 			//         2n        2    ===          n
-// 			//                        k=1
-// 			// can be evaluated by DCT-III (inverse DCT-II) if full precision is used,
-// 			// i.e. n = N; the result will be stored in odd elements (multiplied by 4)
-// 			
-// 			// evaluate the function using the FFT
-// 			fftw_execute(plan);
-// 			fftw_destroy_plan(plan);
-// 			
-// 			// sum contributions
-// 			double cs = 0;
-// 			for (int j = 0; j < N/2; j++)
-// 				cs += sqrabs(evalf[2*j+1]);            // (FFTW magic) odd elements only
-// 			cs *= 0.0625 * M_PI / CB.coeffs().size();  // (FFTW magic) 1/4²
-			
+			double cs = 2. * integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
 			std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
 			ics[ie] += cs;
-			
-// 			// TODO Missing factors:
-// 			//  -> 0.25 (for broader integration than necessary due to symmetry in k₁,₂)
-// 			//  -> 1/ki (for normalization of the cross section)
 		}
 	}
 	
