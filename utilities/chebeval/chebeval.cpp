@@ -35,6 +35,8 @@ template<typename T> void load_and_write(const char* hdf, int samples)
 
 int main(int argc, char *argv[])
 {
+	H5::Exception::dontPrint();
+	
 	bool cpx = false;	// whether to zip complex expansion
 	std::string hdf;
 	int samples = -1;
