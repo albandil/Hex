@@ -220,22 +220,6 @@ static const double p[g+2] = {
         1.5056327351493116e-7
 };
 
-Complex gamma(Complex z)
-{
-	if (real(z) < 0.5)
-	{
-		return pi / (sin(pi*z) * gamma(1. - z));
-	}
-	z -= 1.;
-	Complex x = p[0];
-	for (int i = 1; i < g + 2; i++)
-	{
-			x += p[i] / (z + Complex(i,0));
-	}
-	Complex t = z + (g + 0.5);
-	return sqrt(2*pi) * pow(t,z+0.5) * exp(-t) * x;
-}
-
 int coul_F_michel(int l, double k, double r, double& F, double& Fp)
 {
 	// initialize parameters
@@ -364,7 +348,15 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 
 double coul_F_sigma(int l, double k)
 {
-	return arg(gamma(Complex(l+1,-1./k)));
+// 	return arg(gamma(Complex(l+1,-1./k)));
+	
+	gsl_sf_result lnr, arg;
+	int err = gsl_sf_lngamma_complex_e(l+1, -1/k, &lnr, &arg);
+	
+	if (err != GSL_SUCCESS)
+		throw exception ("Error while evaluating Coulomb phaseshift.");
+	
+	return arg.val;
 }
 
 double coul_F_asy(int l, double k, double r, double sigma)
@@ -373,80 +365,4 @@ double coul_F_asy(int l, double k, double r, double sigma)
 		return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + sigma);
 	else
 		return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + coul_F_sigma(l,k));
-}
-
-Complex cgamma_cfrac (double a, Complex z, int max_iter, int* iter, double eps)
-{
-	Complex CF = 0, cf;
-	int n;
-	
-	// for all continued fraction depths
-	for (n = 0; n <= max_iter; n++)
-	{
-		// evaluate the continued fraction
-		cf = 0.;
-		for (int m = n; m > 0; m--)
-			cf = m * (m - a) / (z + 2.*m + 1. - a - cf);
-		cf = 1. / (z + 1. - a - cf);
-		
-		// check convergence
-		if (n > 0 and abs(cf-CF) / abs(cf) < eps)
-		{
-			CF = cf;
-			break;
-		}
-		
-		// store this iteration
-		CF = cf;
-	}
-	
-	// store iteration count
-	if (iter != 0)
-		*iter = n;
-	
-	return CF * pow(z,a) * exp(-z);
-}
-
-Complex cgamma_series (double a, Complex z, int max_iter, int* iter, double eps)
-{
-	// return zero in origin
-	if (z == 0.)
-		return 0.;
-	
-	// auxiliary variables
-	Complex sum = 1./a, term = 1./a;
-	int n;
-	
-	// for all terms of the series
-	for (n = 1; n <= max_iter; n++)
-	{
-		// evaluate new term using previous term
-		term *= z / (a + n);
-		
-		// update sum
-		sum += term;
-		
-		// check convergence
-		if (n > 0 and abs(term) / abs(sum) < eps)
-			break;
-	}
-	
-	// store iteration count
-	if (iter != 0)
-		*iter = n;
-	
-	return sum * pow(z,a) * exp(-z);
-}
-
-Complex cgamma (double a, Complex z, int max_iter, int* iter, double eps)
-{
-	// choose evaluation method
-	
-	if (abs(z) <= a + 1)
-		// use infinite series
-		return tgamma(a) - cgamma_series(a,z,max_iter,iter,eps);
-	
-	else
-		// use infinite continued fraction
-		return cgamma_cfrac(a,z,max_iter,iter,eps);
 }

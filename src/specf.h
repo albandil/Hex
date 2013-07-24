@@ -344,44 +344,4 @@ double coul_F_asy(int l, double k, double r, double sigma = Nan);
  */
 double coul_F_sigma(int l, double k);
 
-/**
- * \brief Complex upper incomplete Gamma function \f$ \Gamma(a,z) \f$.
- * 
- * Computes the analytically extended upper incomplete Gamma function
- * \f[
- *     \Gamma(a,x) = \int_z^\infty t^{a-1} \mathrm{e}^{-t} \mathrm{d}t \ ,
- * \f]
- * \f[
- *     \Gamma(a,x) \ [x \in \mathbb{R}] \rightarrow \Gamma(a,z) \ [z \in \mathbb{C}] \ .
- * \f]
- * 
- */
-Complex cgamma (double a, Complex z, int max_iter = 1000, int* iter = 0, double eps = 1e-10);
-
-/**
- * \brief Complex upper incomplete Gamma function (continued fraction).
- * 
- * Uses the method of continued fraction to compute the function value.
- * The formula is
- * \f[
- *     \Gamma(a,x) = \mathrm{e}^{-x} x^a \left( \frac{1}{x+1-a-{}}
- *         \frac{1\cdot(1-a)}{x+3-a-{}} \frac{2\cdot(2-a)}{x+5-a-{}} \dots \right) \ ,
- * \f]
- * which converges well for \f$ x > a + 1 \f$ .
- */
-Complex cgamma_cfrac (double a, Complex z, int max_iter = 1000, int* iter = 0, double eps = 1e-10);
-
-/**
- * \brief Complex upper incomplete Gamma function (infinite series).
- * 
- * Uses the method of infinite sries to compute the function value.
- * The formula is
- * \f[
- *     \gamma(a,x) = \Gamma(a) - \Gamma(a,x) = \mathrm{e}^{-x} x^a
- *         \sum_{n=0}^\infty \frac{\Gamma(a)}{\Gamma(a+1+n)} x^n \ ,
- * \f]
- * which converges well for \f$ x < a + 1 \f$.
- */
-Complex cgamma_series (double a, Complex z, int max_iter = 1000, int* iter = 0, double eps = 1e-10);
-
 #endif
