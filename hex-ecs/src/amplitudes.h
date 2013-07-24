@@ -95,6 +95,11 @@ cArrays computeXi (
 /**
  * Compute triple differential cross section.
  */
-void TDCS (std::string solutionfile, std::vector<std::pair<int,int>> const & coupled_states, double kmax);
+void TDCS (
+	std::string solutionfile,
+	std::vector<std::pair<int,int>> const & coupled_states,
+	double kmax,
+	int ni, int L, int S
+);
 
 #endif

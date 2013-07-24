@@ -342,20 +342,21 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 	return results;
 }
 
-void TDCS(std::string solutionfile, std::vector<std::pair<int,int>> const & coupled_states, double kmax)
-{
+void TDCS (
+	std::string solutionfile, std::vector<std::pair<int,int>> const & coupled_states,
+	double kmax, int ni, int L, int S
+) {
 	std::cout << "\nEvaluating ionization amplitudes for use in TDCS.\n";
 	std::cout << "\tusing file \"" << solutionfile << "\"\n";
 	std::cout << "\tusing total energy " << kmax*kmax << " Ry\n";
 	
 	// state information... C++11 regex doesn't work in GCC < 4.9
-	int ni = 0, li = 0, mi = 0, L = 0, S = 0;
+	int li = 0, mi = 0;
 	double Ei = 0;
 	
 #if __GNUC__ > 4 && __GNUC_MINOR__ > 8
 	// try to match the solution file to Hex-ecs naming scheme
 	std::regex e("psi-(+\\d)-(+\\d)-(+\\d)-(+\\d)-(+\\d)-(+[\\.\\d])\\.hdf");
-	exit(0);
 	
 	std::smatch sm;
 	std::regex_match(solutionfile, sm, e);

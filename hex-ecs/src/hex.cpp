@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
 		if (tdcsEtot < 0)
 			throw exception ("You need to specify the total energy of the electrons, --tdcsEtot!");
 		
-		TDCS(tdcsfile, coupled_states, sqrt(tdcsEtot));
+		TDCS(tdcsfile, coupled_states, sqrt(tdcsEtot), ni, L, Spin);
 		
 		goto End;
 	}
