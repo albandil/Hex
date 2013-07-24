@@ -408,6 +408,7 @@ void TDCS(std::string solutionfile, std::vector<std::pair<int,int>> const & coup
 				<< coeffs.toBlob() << ");\n";
 	}
 	
+	fsql << std::flush;
 	fsql.close();
 	
 	// print some info
