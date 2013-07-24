@@ -56,6 +56,7 @@ bool IonizationAmplitude::run (
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
 	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);
@@ -65,6 +66,9 @@ bool IonizationAmplitude::run (
 	double Ei = As<double>(sdata, "Ei", Id) * efactor;
 	
 	// read directions
+	//  dirs.first  = ( theta1, phi1, E1frac )
+	//  dirs.second = ( theta2, phi2, E2frac )
+	// NOTE: energy fractions will be normalized to become on-shell
 	std::vector<std::pair<vec3d,vec3d>> dirs;
 	try {
 		dirs.push_back(As<std::pair<vec3d,vec3d>>(sdata, "dirs", Id));
@@ -163,8 +167,8 @@ bool IonizationAmplitude::run (
 				for (int m = -l1; m <= l1; m++)
 				{
 					YY += ClebschGordan(l1,m,l2,mi-m,L,mi)
-					      * sphY(l1,m,dirs[idir].first.x,dirs[idir].first.y)
-						  * sphY(l1,m,dirs[idir].second.x,dirs[idir].second.y);
+					      * sphY(l1,m,dirs[idir].first.x*afactor,dirs[idir].first.y*afactor)
+						  * sphY(l1,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
 				}
 				
 				// evaluate Coulomb phaseshifts
@@ -188,7 +192,7 @@ bool IonizationAmplitude::run (
 		"# Ionization amplitudes in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
-	    "# ordered by direcion triplets" << "\n" <<
+	    "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
 	    "# \n" <<
 	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tRe F\tIm F\n";
 	for (size_t i = 0; i < dirs.size(); i++)

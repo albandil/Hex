@@ -53,6 +53,7 @@ bool StokesParameters::run (
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
 	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);

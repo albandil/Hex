@@ -66,8 +66,9 @@ bool TripleDifferentialCrossSection::run (
 	double Ei = As<double>(sdata, "Ei", Id) * efactor;
 	
 	// read directions
-	//  dirs.first  = ( theta1, phi1, E1 )
-	//  dirs.second = ( theta2, phi2, E2 )
+	//  dirs.first  = ( theta1, phi1, E1frac )
+	//  dirs.second = ( theta2, phi2, E2frac )
+	// NOTE: energy fractions will be normalized to become on-shell
 	std::vector<std::pair<vec3d,vec3d>> dirs;
 	try {
 		dirs.push_back(As<std::pair<vec3d,vec3d>>(sdata, "dirs", Id));
@@ -135,9 +136,14 @@ bool TripleDifferentialCrossSection::run (
 	rArray tdcs(dirs.size());
 	for (size_t idir = 0; idir < dirs.size(); idir++)
 	{
-		// compute outgoing momenta
-		double k1 = sqrt(dirs[idir].first.z * efactor);
-		double k2 = sqrt(dirs[idir].second.z * efactor);
+		// compute energy sharing factor
+		double Eshare = 1. / (1 + dirs[idir].second.z / dirs[idir].first.z);
+		
+		// compute outgoing momenta so that
+		//   1) (k₁)² + (k₂)² = Ei
+		//   2) (k₂)² / (k₁)² = Eshare / (1 - Eshare)
+		rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare);
+		rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare));
 		
 		// evaluated amplitudes for all precomputed energies
 		cArray ampls0(E_arr.size());
@@ -154,7 +160,7 @@ bool TripleDifferentialCrossSection::run (
 				int l2 = std::get<2>(Lll_arr[ie][il]);
 				
 				// evaluate the radial part for this angular & linear momenta
-				Complex f = cheb_arr[ie][il].clenshaw(k1,cheb_arr[ie][il].tail(1e-8)) / (k1 * k2);
+				Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / (k1[ie] * k2[ie]);
 				
 				// evaluate bispherical function (evaluating sphY is the bottleneck)
 				Complex YY = 0;
@@ -166,8 +172,8 @@ bool TripleDifferentialCrossSection::run (
 				}
 				
 				// evaluate Coulomb phaseshifts
-				double sig1 = coul_F_sigma(l1,k1);
-				double sig2 = coul_F_sigma(l2,k2);
+				double sig1 = coul_F_sigma(l1,k1[ie]);
+				double sig2 = coul_F_sigma(l2,k2[ie]);
 				
 				// compute angular factors
 				Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(cos(sig1+sig2),sin(sig1+sig2))) * YY;

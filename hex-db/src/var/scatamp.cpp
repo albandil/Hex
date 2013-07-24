@@ -53,6 +53,7 @@ bool ScatteringAmplitude::run (
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
 	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -159,7 +160,7 @@ bool ScatteringAmplitude::run (
 			Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E})[0];
 			
 			for (size_t i = 0; i < angles.size(); i++)
-				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i], 0.);
+				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i]*afactor, 0.);
 		}
 	}
 	
@@ -169,7 +170,7 @@ bool ScatteringAmplitude::run (
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
 	    "#     S = " << S << ", E = " << E/efactor << unit_name(Eunits) << "\n"
-	    "# ordered by angle in radians\n"
+	    "# ordered by angle in " << unit_name(Aunits) << "\n"
 		"# \n"
 	    "# θ\t Re f\t Im f\n";
 	for (size_t i = 0; i < angles.size(); i++)

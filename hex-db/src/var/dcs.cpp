@@ -55,6 +55,7 @@ bool DifferentialCrossSection::run (
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
 	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
 	
 	// scattering event parameters
 	int ni = As<int>(sdata, "ni", Id);
@@ -142,7 +143,7 @@ bool DifferentialCrossSection::run (
 			
 			// accumulate spherical functions
 			for (int m = -l; m <= l; m++)
-				sumY += sphY(l,m,angles[i],0);
+				sumY += sphY(l,m,angles[i]*afactor,0);
 			
 			// sum arrays
 			merge (e, f, E_ell[l], TE_ell[l] * sumY);
@@ -161,7 +162,7 @@ bool DifferentialCrossSection::run (
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
 	    "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits)
-		             << " ordered by angle in radians\n" <<
+		             << " ordered by angle in " << unit_name(Aunits) << "\n" <<
 	    "# θ\t dσ\n";
 	for (size_t i = 0; i < angles.size(); i++)
 		std::cout << angles[i] << "\t" << dcs[i]*lfactor*lfactor << "\n";
