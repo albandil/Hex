@@ -376,6 +376,7 @@ void TDCS (
 	// output file
 	std::string fsqlname = solutionfile + ".sql";
 	std::ofstream fsql(fsqlname.c_str());
+	fsql << "BEGIN TRANSACTION;\n";
 	
 	// B-spline count
 	int Nspline = Bspline::ECS().Nspline();
@@ -409,6 +410,7 @@ void TDCS (
 				<< coeffs.toBlob() << ");\n";
 	}
 	
+	fsql << "COMMIT;\n";
 	fsql << std::flush;
 	fsql.close();
 	
