@@ -408,6 +408,8 @@ void TDCS(std::string solutionfile, std::vector<std::pair<int,int>> const & coup
 				<< coeffs.toBlob() << ");\n";
 	}
 	
+	fsql.close();
+	
 	// print some info
 	std::cout << "Triple-differential cross section data written to the file \"" << fsqlname << "\"\n";
 
