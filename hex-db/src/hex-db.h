@@ -219,11 +219,17 @@ enum lUnit {
 	lUnit_cgs	// centimeters (1 cm = (1cm/a₀) a₀)
 };
 
+// Angular units
+enum aUnit {
+	aUnit_deg,	// degrees
+	aUnit_rad	// radians
+};
+
 /**
  * Run the computations.
  */
 int run (
-	eUnit Eunits, lUnit lUnits,
+	eUnit Eunits, lUnit lUnits, aUnit aUnits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata
 );

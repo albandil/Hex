@@ -120,6 +120,25 @@ double change_units(lUnit A, lUnit B)
 	return ufactor;
 }
 
+double change_units(aUnit A, aUnit B)
+{
+	// no change
+	if (A == B)
+		return 1.;
+	
+	double ufactor = 1.;
+	
+	// transform to radians
+	if (A == aUnit_deg)
+		ufactor *= M_PI / 180;
+	
+	// transform from radians
+	if (B == aUnit_deg)
+		ufactor *= 180 / M_PI;
+	
+	return ufactor;
+}
+
 std::string unit_name(eUnit u)
 {
 	switch (u)
@@ -143,6 +162,19 @@ std::string unit_name(lUnit u)
 			return std::string("a.u.");
 		case lUnit_cgs:
 			return std::string("CGS");
+		default:
+			return std::string("");
+	}
+}
+
+std::string unit_name(aUnit u)
+{
+	switch (u)
+	{
+		case aUnit_deg:
+			return std::string("deg");
+		case aUnit_rad:
+			return std::string("rad");
 		default:
 			return std::string("");
 	}

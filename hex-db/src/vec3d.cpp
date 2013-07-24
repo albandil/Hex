@@ -121,3 +121,51 @@ std::istream & operator >> (std::istream & is, vec3d & v)
 	
 	return is;
 }
+
+double dot (vec3d const & u, vec3d const & v)
+{
+	return u.x*v.x + u.y*v.y + u.z*v.z;
+}
+
+vec3d cross (vec3d const & u, vec3d const & v)
+{
+	return vec3d (
+		{
+			u.y * v.z - u.z * v.y,
+			u.z * v.x - u.x * v.z,
+			u.x * v.y - u.y * v.x
+		}
+	);
+}
+
+vec3d operator - (vec3d const & u, vec3d const & v)
+{
+	return vec3d (
+		{
+			u.x - v.x,
+			u.y - v.y,
+			u.z - v.z
+		}
+	);
+}
+
+vec3d operator * (vec3d const & u, double a)
+{
+	return vec3d (
+		{
+			a * u.x,
+			a * u.y,
+			a * u.z
+		}
+	);
+}
+
+double norm (vec3d const & v)
+{
+	return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
+vec3d normalize(vec3d const & v)
+{
+	return v * (1/norm(v));
+}

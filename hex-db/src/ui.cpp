@@ -34,6 +34,7 @@ std::string HelpText =
 	"  --params=<var>    Display all available scattering parameters for variable <var>.\n"
 	"  --Eunits=<Eunits> Set units for energy: Ry, a.u. or eV.\n"
 	"  --Tunits=<Tunits> Set units for output: a.u. or cgs.\n"
+	"  --Aunits=<Aunits> Set units for angles: deg or rad.\n"
 	"\n"
 	"Usage examples:\n"
 	"\n"
@@ -128,6 +129,7 @@ int main(int argc, char* argv[])
 	// units
 	eUnit Eunits = eUnit_Ry;
 	lUnit Lunits = lUnit_au;
+	aUnit Aunits = aUnit_deg;
 	
 	// for all argv-s
 	for (int i = 1; i < argc; i++)
@@ -216,6 +218,17 @@ int main(int argc, char* argv[])
 					abort();
 				}
 			},
+			"Aunits",   1, [ & ](std::string opt) -> void {
+				if (opt == std::string("deg"))
+					Aunits = aUnit_deg;
+				else if (opt == std::string("rad"))
+					Aunits = aUnit_rad;
+				else
+				{
+					std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+					abort();
+				}
+			},
 			/* default*/ [ & ](std::string arg, std::string par) -> bool {
 				// try to find it in the variable ids
 				for (const Variable* var : vlist)
@@ -289,5 +302,5 @@ int main(int argc, char* argv[])
 		return 0;
 	
 	// retrieve all requested data
-	return run (Eunits, Lunits, vars, sdata);
+	return run (Eunits, Lunits, Aunits, vars, sdata);
 }

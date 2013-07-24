@@ -48,7 +48,7 @@ std::vector<std::string> const & TripleDifferentialCrossSection::SQL_Update() co
 }
 
 bool TripleDifferentialCrossSection::run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {
@@ -56,6 +56,7 @@ bool TripleDifferentialCrossSection::run (
 	// manage units
 	double efactor = change_units(Eunits, eUnit_Ry);
 	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
 	
 	// atomic and projectile data
 	int ni = As<int>(sdata, "ni", Id);
@@ -65,6 +66,8 @@ bool TripleDifferentialCrossSection::run (
 	double Ei = As<double>(sdata, "Ei", Id) * efactor;
 	
 	// read directions
+	//  dirs.first  = ( theta1, phi1, E1 )
+	//  dirs.second = ( theta2, phi2, E2 )
 	std::vector<std::pair<vec3d,vec3d>> dirs;
 	try {
 		dirs.push_back(As<std::pair<vec3d,vec3d>>(sdata, "dirs", Id));
@@ -132,14 +135,9 @@ bool TripleDifferentialCrossSection::run (
 	rArray tdcs(dirs.size());
 	for (size_t idir = 0; idir < dirs.size(); idir++)
 	{
-		// compute energy sharing factor
-		double Eshare = 1. / (1 + dirs[idir].second.z / dirs[idir].first.z);
-		
-		// compute outgoing momenta so that
-		//   1) (k₁)² + (k₂)² = Ei
-		//   2) (k₂)² / (k₁)² = Eshare / (1 - Eshare)
-		rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare);
-		rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare));
+		// compute outgoing momenta
+		double k1 = sqrt(dirs[idir].first.z * efactor);
+		double k2 = sqrt(dirs[idir].second.z * efactor);
 		
 		// evaluated amplitudes for all precomputed energies
 		cArray ampls0(E_arr.size());
@@ -156,23 +154,23 @@ bool TripleDifferentialCrossSection::run (
 				int l2 = std::get<2>(Lll_arr[ie][il]);
 				
 				// evaluate the radial part for this angular & linear momenta
-				Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
+				Complex f = cheb_arr[ie][il].clenshaw(k1,cheb_arr[ie][il].tail(1e-8)) / (k1 * k2);
 				
-				// evaluate bispherical function
+				// evaluate bispherical function (evaluating sphY is the bottleneck)
 				Complex YY = 0;
 				for (int m = -l1; m <= l1; m++)
 				{
 					YY += ClebschGordan(l1,m,l2,mi-m,L,mi)
-					      * sphY(l1,m,dirs[idir].first.x,dirs[idir].first.y)
-						  * sphY(l1,m,dirs[idir].second.x,dirs[idir].second.y);
+					      * sphY(l1,m,dirs[idir].first.x * afactor,dirs[idir].first.y * afactor)
+						  * sphY(l1,m,dirs[idir].second.x * afactor,dirs[idir].second.y * afactor);
 				}
 				
 				// evaluate Coulomb phaseshifts
-				Complex sig1 = coul_F_sigma(l1,k1[ie]);
-				Complex sig2 = coul_F_sigma(l2,k2[ie]);
+				double sig1 = coul_F_sigma(l1,k1);
+				double sig2 = coul_F_sigma(l2,k2);
 				
 				// compute angular factors
-				Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(0.,1.)*(sig1+sig2)) * YY;
+				Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(cos(sig1+sig2),sin(sig1+sig2))) * YY;
 				
 				// sum the contribution
 				ampls0[ie] += angfact * f;
@@ -192,15 +190,40 @@ bool TripleDifferentialCrossSection::run (
 		"# Triple differential cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
-	    "# ordered by direcion triplets" << "\n" <<
+	    "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
 	    "# \n" <<
-	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\n";
+	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ (w.r.t. first)\tφ (w.r.t. first)\n";
 	for (size_t i = 0; i < dirs.size(); i++)
 	{
+		vec3d ei = { 0., 0., 1. };
+		vec3d e1 = {
+			sin(dirs[i].first.x * afactor) * cos(dirs[i].first.y * afactor),
+			sin(dirs[i].first.x * afactor) * sin(dirs[i].first.y * afactor),
+			cos(dirs[i].first.x * afactor)
+		};
+		vec3d e2 = {
+			sin(dirs[i].second.x * afactor) * cos(dirs[i].second.y * afactor),
+			sin(dirs[i].second.x * afactor) * sin(dirs[i].second.y * afactor),
+			cos(dirs[i].second.x * afactor)
+		};
+		
+		vec3d eq = normalize(cross(e1,ei));
+		vec3d ep = normalize(cross(e1,eq));
+		
+		vec3d e2_ortho1 = normalize(e2 - e1 * dot(e1,e2));
+		
+		double theta = acos(dot(e1,e2));
+		double phi = atan2(-dot(e2_ortho1,eq),dot(e2_ortho1,ep));
+		
+		if (not finite(phi))
+			phi = 0;
+		
 		std::cout << 
 			dirs[i].first << "\t" << 
-			dirs[i].second<< "\t" << 
-			tdcs[i]*lfactor*lfactor << "\n";
+			dirs[i].second << "\t" << 
+			tdcs[i]*lfactor*lfactor << "\t" <<
+			theta/afactor << "\t" <<
+			phi/afactor << "\n";
 	}
 	
 	return true;

@@ -45,7 +45,7 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable() const
 }
 
 bool ScatteringAmplitude::run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

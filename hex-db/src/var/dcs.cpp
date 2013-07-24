@@ -47,7 +47,7 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update() const
 }
 
 bool DifferentialCrossSection::run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

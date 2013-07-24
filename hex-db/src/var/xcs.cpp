@@ -45,7 +45,7 @@ std::vector<std::string> const & ExtrapolatedCrossSection::SQL_Update() const
 }
 
 bool ExtrapolatedCrossSection::run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

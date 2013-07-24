@@ -297,7 +297,7 @@ void dump (const char* dumpfile)
 }
 
 int run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata
 )
@@ -317,7 +317,7 @@ int run (
 		}
 		
 		// try to compute the results
-		if (not var->run(Eunits, Lunits, db, sdata))
+		if (not var->run(Eunits, Lunits, Aunits, db, sdata))
 		{
 			// this can easily happen
 			std::cerr << "Computation of \"" << varname << "\" failed." << std::endl;

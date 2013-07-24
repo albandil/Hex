@@ -40,6 +40,14 @@ double change_units(eUnit A, eUnit B);
 double change_units(lUnit A, lUnit B);
 
 /**
+ * \brief Angular units change.
+ * 
+ * Returns factor that can be used to transform from the unit system A
+ * to the unit system B.
+ */
+double change_units(aUnit A, aUnit B);
+
+/**
  * \brief Energy unit name.
  * 
  * Return energy unit name as string.
@@ -52,6 +60,13 @@ std::string unit_name(eUnit u);
  * Return length unit name as string.
  */
 std::string unit_name(lUnit u);
+
+/**
+ * \brief Length unit name.
+ * 
+ * Return length unit name as string.
+ */
+std::string unit_name(aUnit u);
 
 /**
  * Write out std::pair.
@@ -82,7 +97,9 @@ template<typename T> std::vector<T> readStandardInput()
 	T x;
 	while (not std::cin.eof())
 	{
+		std::cin >> std::ws;
 		std::cin >> x;
+		std::cin >> std::ws;
 		data.push_back(x);
 	}
 	
@@ -158,7 +175,7 @@ public:
 	
 	/// write out requested data
 	virtual bool run (
-		eUnit Eunits, lUnit Lunits,
+		eUnit Eunits, lUnit Lunits, aUnit aUnits,
 		sqlitepp::session & db,
 		std::map<std::string,std::string> const & params
 	) const = 0;
@@ -238,7 +255,7 @@ private:
 		std::vector<std::string> const & SQL_Update() const; \
 \
 		bool run ( \
-			eUnit Eunits, lUnit Lunits, \
+			eUnit Eunits, lUnit Lunits, aUnit AUnits, \
 			sqlitepp::session & db, \
 			std::map<std::string,std::string> const & params \
 		) const; \

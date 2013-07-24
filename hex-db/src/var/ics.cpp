@@ -162,7 +162,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
 }
 
 bool IntegralCrossSection::run (
-	eUnit Eunits, lUnit Lunits,
+	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {
