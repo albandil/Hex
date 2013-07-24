@@ -76,6 +76,8 @@ int main(int argc, char* argv[])
 	std::string zipfile;        // HDF solution expansion file to zip
 	int  zipcount = 0;          // zip sample count
 	double zipmax = -1;         // zip bounding box
+	std::string tdcsfile;       // HDF solution expansion file for TDCS evaluation
+	double tdcsEtot = -1;       // sum of energies of the ejected electrons
 	bool parallel = false;      // whether to use OpenMPI
 	
 	// which stages to run (default: all)
@@ -86,6 +88,7 @@ int main(int argc, char* argv[])
 		argc, argv,
 		inputfile,
 		zipfile, zipcount, zipmax,
+		tdcsfile, tdcsEtot,
 		parallel,
 		itinerary
 	);
@@ -293,6 +296,17 @@ int main(int argc, char* argv[])
 				out << "\n";
 			}
 		}
+		
+		goto End;
+	}
+	
+	// compute TDCS if told so
+	if (tdcsfile.size() > 0 and I_am_master)
+	{
+		if (tdcsEtot < 0)
+			throw exception ("You need to specify the total energy of the electrons, --tdcsEtot!");
+		
+		TDCS(tdcsfile, coupled_states, sqrt(tdcsEtot));
 		
 		goto End;
 	}

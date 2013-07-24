@@ -32,6 +32,7 @@ void parse_command_line (
 	int argc, char* argv[],
 	std::ifstream & inputfile,
 	std::string & zipfile, int & zipcount, double & zipmax,
+	std::string & tdcsfile, double & tdcsEtot,
 	bool & parallel,
 	int & itinerary
 ){
@@ -46,6 +47,8 @@ void parse_command_line (
 		{"zipfile",           1,   0, 'z'},
 		{"zipcount",          1,   0, 'n'},
 		{"zipmax",            1,   0, 'R'},
+		{"tdcsfile",          1,   0, 't'},
+		{"tdcsEtot",          1,   0, 'E'},
 #ifndef NO_MPI
 		{"mpi",               0,   0, 'm'},
 #endif
@@ -159,6 +162,18 @@ void parse_command_line (
 			{
 				// zip bounding box
 				zipmax = atof(optarg);
+				break;
+			}
+			case 't':
+			{
+				// TDCS file
+				tdcsfile = std::string(optarg);
+				break;
+			}
+			case 'E':
+			{
+				// TDCS total energy
+				tdcsEtot = atof(optarg);
 				break;
 			}
 			case 'a':

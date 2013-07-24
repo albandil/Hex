@@ -46,9 +46,8 @@ void parse_command_line (
 	int argc, 
 	char* argv[], 
 	std::ifstream & inputfile, 
-	std::string & zipfile,
-	int & zipcount,
-	double & zipmax,
+	std::string & zipfile, int & zipcount, double & zipmax,
+	std::string & tdcsfile, double & tdcsEtot,
 	bool & parallel,
 	int & itinerary
 );
