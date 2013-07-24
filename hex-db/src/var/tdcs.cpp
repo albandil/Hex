@@ -87,10 +87,10 @@ bool TripleDifferentialCrossSection::run (
 	sqlitepp::statement st(db);
 	st << "SELECT L, l1, l2, Ei, QUOTE(cheb) FROM " + IonizationF::Id + " "
 	      "WHERE ni = :ni "
-		  "  AND li = :li "
-		  "  AND mi = :mi "
-		  "  AND  S = :S  "
-		  "ORDER BY Ei ASC",
+	      "  AND li = :li "
+	      "  AND mi = :mi "
+	      "  AND  S = :S  "
+	      "ORDER BY Ei ASC",
 	   sqlitepp::into(L), sqlitepp::into(l1), sqlitepp::into(l2),
 	   sqlitepp::into(E), sqlitepp::into(blob),
 	   sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
@@ -123,13 +123,7 @@ bool TripleDifferentialCrossSection::run (
 		cb.fromBlob(blob); 
 		
 		// save Chebyshev expansion
-		cheb_arr.back().push_back (
-			Chebyshev<double,Complex> (
-				cb,                   // expansion coefficients
-				0.,                   // lowest energy
-				sqrt(E - 1./(ni*ni))  // highest energy
-			)
-		);
+		cheb_arr.back().push_back(Chebyshev<double,Complex>(cb, 0., 1.));
 	}
 	
 	// for all directions and energy shares evaluate the amplitude
@@ -140,10 +134,10 @@ bool TripleDifferentialCrossSection::run (
 		double Eshare = 1. / (1 + dirs[idir].second.z / dirs[idir].first.z);
 		
 		// compute outgoing momenta so that
-		//   1) (k₁)² + (k₂)² = Ei
+		//   1) (k₁)² + (k₂)² = Ef
 		//   2) (k₂)² / (k₁)² = Eshare / (1 - Eshare)
-		rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare);
-		rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare));
+		double k1 = sqrt((Ei - 1/(ni*ni)) * Eshare);
+		double k2 = sqrt((Ei - 1/(ni*ni)) * (1 - Eshare));
 		
 		// evaluated amplitudes for all precomputed energies
 		cArray ampls0(E_arr.size());
@@ -160,26 +154,24 @@ bool TripleDifferentialCrossSection::run (
 				int l2 = std::get<2>(Lll_arr[ie][il]);
 				
 				// evaluate the radial part for this angular & linear momenta
-				Complex f = cheb_arr[ie][il].clenshaw(k1[ie],cheb_arr[ie][il].tail(1e-8)) / (k1[ie] * k2[ie]);
+				Complex f = cheb_arr[ie][il].clenshaw(sqrt(Eshare),cheb_arr[ie][il].tail(1e-8)) / (k1 * k2);
 				
 				// evaluate bispherical function (evaluating sphY is the bottleneck)
 				Complex YY = 0;
 				for (int m = -l1; m <= l1; m++)
 				{
 					YY += ClebschGordan(l1,m,l2,mi-m,L,mi)
-					      * sphY(l1,m,dirs[idir].first.x * afactor,dirs[idir].first.y * afactor)
-						  * sphY(l1,m,dirs[idir].second.x * afactor,dirs[idir].second.y * afactor);
+					      * sphY(l1,    m, dirs[idir].first.x  * afactor, dirs[idir].first.y  * afactor)
+					      * sphY(l2, mi-m, dirs[idir].second.x * afactor, dirs[idir].second.y * afactor);
 				}
 				
 				// evaluate Coulomb phaseshifts
-				double sig1 = coul_F_sigma(l1,k1[ie]);
-				double sig2 = coul_F_sigma(l2,k2[ie]);
-				
-				// compute angular factors
-				Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(cos(sig1+sig2),sin(sig1+sig2))) * YY;
+				double sig1 = coul_F_sigma(l1,k1);
+				double sig2 = coul_F_sigma(l2,k2);
+				Complex phase = pow(Complex(0.,1.),-l1-l2) * exp(Complex(cos(sig1+sig2),sin(sig1+sig2)));
 				
 				// sum the contribution
-				ampls0[ie] += angfact * f;
+				ampls0[ie] += phase * YY * f;
 			}
 		}
 		
@@ -201,7 +193,10 @@ bool TripleDifferentialCrossSection::run (
 	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ (w.r.t. first)\tφ (w.r.t. first)\n";
 	for (size_t i = 0; i < dirs.size(); i++)
 	{
+		// projectile direction
 		vec3d ei = { 0., 0., 1. };
+		
+		// outgoing electrons' directions
 		vec3d e1 = {
 			sin(dirs[i].first.x * afactor) * cos(dirs[i].first.y * afactor),
 			sin(dirs[i].first.x * afactor) * sin(dirs[i].first.y * afactor),
@@ -213,16 +208,14 @@ bool TripleDifferentialCrossSection::run (
 			cos(dirs[i].second.x * afactor)
 		};
 		
-		vec3d eq = normalize(cross(e1,ei));
-		vec3d ep = normalize(cross(e1,eq));
+		// new axes:
+		vec3d ez = e1; // along the first outgoing electron
+		vec3d ey = normalize(cross(ez,ei)); // perpendicular to the scattering plane of the first electron
+		vec3d ex = normalize(cross(ey,ez)); // third axis
 		
-		vec3d e2_ortho1 = normalize(e2 - e1 * dot(e1,e2));
-		
-		double theta = acos(dot(e1,e2));
-		double phi = atan2(-dot(e2_ortho1,eq),dot(e2_ortho1,ep));
-		
-		if (not finite(phi))
-			phi = 0;
+		// polar angles of the second electron's scattering direction in the new coordinate system
+		double theta = acos(dot(e2,ez));
+		double phi = atan2(dot(e2,ey),dot(e2,ex));
 		
 		std::cout << 
 			dirs[i].first << "\t" << 
