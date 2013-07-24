@@ -412,6 +412,7 @@ void TDCS(std::string solutionfile, std::vector<std::pair<int,int>> const & coup
 	std::cout << "Triple-differential cross section data written to the file \"" << fsqlname << "\"\n";
 
 #if __GNUC__ > 4 && __GNUC_MINOR__ > 8	
+#else
 	if (sm.size() != 7)
 		std::cout << "Please be aware that it does not contain state data (ni,li,mi,L,S,Ei) and these must be added manually!\n";
 #endif
