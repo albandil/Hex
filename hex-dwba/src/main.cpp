@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 
 #include <gsl/gsl_sf.h>
 
@@ -247,6 +248,33 @@ int main(int argc, char *argv[])
 			std::cout << "\tAbandoning EE part of DWBA-2\n";
 		}
 	}
+	
+	// write SQL
+	std::ostringstream oss;
+	oss << Ni << "_" << Li << "-" << Nf << "_" << Lf << "-" << Ei << ".sql";
+	std::ofstream fsql(oss.str().c_str());
+	for (int Mi = -Li; Mi <= Li; Mi++)
+	for (int Mf = -Lf; Mf <= Lf; Mf++)
+	for (int ell = 0; ell < (int)Tdir.size(); ell++)
+	{
+		Complex tdir = Tdir[ell][(Mi+Li)*(2*Lf+1)+Mf+Lf];
+		Complex texc = Texc[ell][(Mi+Li)*(2*Lf+1)+Mf+Lf];
+		
+		int L = 0; // ???
+		
+		for (int S = 0; S <= 1; S++)
+		{
+			Complex T_ell = (S == 0) ? tdir + texc : tdir - texc;
+			
+			fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+				<< Ni << "," << Li << "," << Mi << ","
+				<< Nf << "," << Lf << "," << Mf << ","
+				<< L << "," << S << "," << Ei << "," << ell << ","
+				<< T_ell.real() << "," << T_ell.imag()
+				<< ");\n";
+		}
+	}
+	fsql.close();
 	
 	// extract integral cross section for all transitions
 	double sumsumsigma = 0;
