@@ -337,7 +337,7 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 	// if the precision is insufficent, use uniform approximation
 // 	if (err == GSL_ELOSS)
 	{
-		std::cout << "Using apx. for F[" << l << "," << k << "](" << r << "), err " << err << ".\n";
+// 		std::cout << "Using apx. for F[" << l << "," << k << "](" << r << "), err " << err << ".\n";
 		err = coul_F_michel(l, k, r, F, Fp);
 		return err;
 	}

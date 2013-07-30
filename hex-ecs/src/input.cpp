@@ -121,7 +121,7 @@ void parse_command_line (
 			{
 				// set custom input file
 				inputfile.open(optarg);
-				if (inputfile.bad())
+				if (not inputfile.good())
 					throw exception("Error: Input file \"%s\" not found.\n", optarg);
 				break;
 			}
@@ -185,7 +185,7 @@ void parse_command_line (
 			case 'b':
 			{
 				// run only the first two parts (computation of radial integrals and solution of the equations)
-				itinerary = StgRadial & StgSolve;
+				itinerary = StgRadial | StgSolve;
 				break;
 			}
 			case 'c':
