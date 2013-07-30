@@ -121,7 +121,7 @@ void parse_command_line (
 			{
 				// set custom input file
 				inputfile.open(optarg);
-				if (inputfile.bad())
+				if (not inputfile.good())
 					throw exception("Error: Input file \"%s\" not found.\n", optarg);
 				break;
 			}
