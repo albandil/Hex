@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include <sqlitepp/sqlitepp.hpp>
+
 #include "../interpolate.h"
 #include "../specf.h"
 #include "../variables.h"
@@ -95,7 +97,7 @@ bool DifferentialCrossSection::run (
 	int ell;
 	double Ei, sum_Re_T_ell, sum_Im_T_ell;
 	rArrays E_ell;
-	cArrays TE_ell;
+	cArrays T_E_ell;
 	rArray dcs(angles.size());
 	
 	// sum over L
@@ -123,31 +125,22 @@ bool DifferentialCrossSection::run (
 		while ((int)E_ell.size() <= ell)
 		{
 			E_ell.push_back(rArray());
-			TE_ell.push_back(cArray());
+			T_E_ell.push_back(cArray());
 		}
 		
 		E_ell[ell].push_back(Ei);
-		TE_ell[ell].push_back(Complex(sum_Re_T_ell, sum_Im_T_ell));
+		T_E_ell[ell].push_back(Complex(sum_Re_T_ell,sum_Im_T_ell));
 	}
 	
 	// for all angles
 	for (int i = 0; i < (int)angles.size(); i++)
 	{
 		rArray e;	// energies
-		cArray f;	// scattering amplitudes
+		cArray f;	// cross sections
 		
-		// for all projectile angular momenta
+		// for all projectile angular momenta sum arrays
 		for (int l = 0; l < (int)E_ell.size(); l++)
-		{
-			Complex sumY = 0.;
-			
-			// accumulate spherical functions
-			for (int m = -l; m <= l; m++)
-				sumY += sphY(l,m,angles[i]*afactor,0);
-			
-			// sum arrays
-			merge (e, f, E_ell[l], TE_ell[l] * sumY);
-		}
+			merge (e, f, E_ell[l], T_E_ell[l] * sphY(l,mi-mf,angles[i]*afactor,0));
 		
 		// intepolate energies for unnormalized differential cross section
 		dcs[i] = interpolate(e, sqrabs(f), {E})[0];
