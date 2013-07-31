@@ -67,6 +67,8 @@ int main(int argc, char *argv[])
 	// accelerators: if a per-lf contribution decays under "accelerator_eps",
 	// such term will not be computed anymore for higher lf-contributions
 	double accelerator_eps = 1e-8;
+	bool compute_Tdir = true;
+	bool compute_Texc = true;
 	bool compute_DD = true;
 	bool compute_DE = true;
 	bool compute_ED = true;
@@ -91,7 +93,7 @@ int main(int argc, char *argv[])
 		DistortedWave chif = Ui.getDistortedWave(kf,lf);
 		
 		// direct 1e
-		if (Ni == Nf and Li == Lf)
+		if (Ni == Nf and Li == Lf and compute_Tdir)
 		{
 			Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
 			
@@ -104,8 +106,6 @@ int main(int argc, char *argv[])
 		
 		for (int li = 0; ; li++)
 		{
-			std::cout << "\tli = " << li << "\n";
-			
 			// conserve angular momentum
 			if (li < lf - Li - Lf)
 				continue;
@@ -118,11 +118,13 @@ int main(int argc, char *argv[])
 			if ((li + Li) % 2 != (lf + Lf) % 2)
 				continue;
 			
+			std::cout << "\tli = " << li << "\n";
+			
 			cArray DD_lf_li(MM), DE_lf_li(MM), ED_lf_li(MM), EE_lf_li(MM);
 			DistortedWave chii = Ui.getDistortedWave(ki,li);
 			
 			// exchange 1e
-			if (Li == lf and Lf == li)
+			if (Li == lf and Lf == li and compute_Texc)
 			{
 				Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
 				
@@ -134,6 +136,7 @@ int main(int argc, char *argv[])
 			}
 			
 			// direct 2e
+			if (compute_Tdir)
 			for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); lambda <= std::min(Li+Lf,li+lf); lambda++)
 			{
 				Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
@@ -151,6 +154,7 @@ int main(int argc, char *argv[])
 			}
 			
 			// exchange 2e
+			if (compute_Texc)
 			for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
 			{
 				Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
@@ -223,10 +227,22 @@ int main(int argc, char *argv[])
 			break;
 		
 		// update regulators ("do not unnecessarily refine epsilons")
+		double Td_contrib = std::max(max(abs(Tdir_lf)/sigma_singlet), max(abs(Tdir_lf)/sigma_triplet));
+		double Te_contrib = std::max(max(abs(Texc_lf)/sigma_singlet), max(abs(Texc_lf)/sigma_triplet));
 		double DD_contrib = std::max(max(abs(DD_lf)/sigma_singlet), max(abs(DD_lf)/sigma_triplet));
 		double DE_contrib = std::max(max(abs(DE_lf)/sigma_singlet), max(abs(DE_lf)/sigma_triplet));
 		double ED_contrib = std::max(max(abs(ED_lf)/sigma_singlet), max(abs(ED_lf)/sigma_triplet));
 		double EE_contrib = std::max(max(abs(EE_lf)/sigma_singlet), max(abs(EE_lf)/sigma_triplet));
+		if (compute_Tdir and Td_contrib < accelerator_eps)
+		{
+			compute_Tdir = false;
+			std::cout << "\tAbandoning Tdir part of DWBA-1\n";
+		}
+		if (compute_Texc and Te_contrib < accelerator_eps)
+		{
+			compute_Texc = false;
+			std::cout << "\tAbandoning Texc part of DWBA-1\n";
+		}
 		if (compute_DD and DD_contrib < accelerator_eps)
 		{
 			compute_DD = false;
