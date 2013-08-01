@@ -22,10 +22,10 @@
 //  Special functions                                                      //
 // ----------------------------------------------------------------------- //
 
-NumberArray<LComplex> ric_jv(int lmax, LComplex z)
+cArray ric_jv(int lmax, Complex z)
 {
 	// results
-	NumberArray<LComplex> eval(lmax+1);
+	cArray eval(lmax+1);
 	
 	// use library routine for pure real arguments
 	if (z.imag() == 0.)
@@ -38,13 +38,13 @@ NumberArray<LComplex> ric_jv(int lmax, LComplex z)
 		
 		// Bessel -> Riccati-Bessel function
 		for (int i = 0; i <= lmax; i++)
-			eval[i] = z * LComplex(ev[i]);
+			eval[i] = z * Complex(ev[i]);
 		
 		return eval;
 	}
 	
 	// shorthand
-	LComplex inv_z = LComplex(1.)/z;
+	Complex inv_z = Complex(1.)/z;
 	
 	// evaluate all angular momenta up to lmax
 	for (int l = 0; l <= lmax; l++)
@@ -54,46 +54,45 @@ NumberArray<LComplex> ric_jv(int lmax, LComplex z)
 		else if (l == 1)
 			eval[l] = sin(z) * inv_z - cos(z);
 		else
-			eval[l] = LComplex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
+			eval[l] = Complex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
 	}
 	
 	return eval;
 }
 
-LComplex ric_j(int l, LComplex z)
+Complex ric_j(int l, Complex z)
 {
 	return ric_jv(l, z).back();
 }
 
-LComplex dric_j(int n, LComplex z)
+cArray dric_jv(int lmax, Complex z)
 {
+	// evaluate first the Riccati-Bessel functions themselves
+	cArray eval = ric_jv(lmax, z);
+	
 	// results
-	LComplex eval[n+1], deval[n+1];
+	cArray deval(lmax+1);
 	
 	// shorthand
-	LComplex inv_z = LComplex(1.)/z;
+	Complex inv_z = Complex(1.)/z;
 	
 	// evaluate all angular momenta up to lmax
-	for (int l = 0; l <= n; l++)
+	for (int l = 0; l <= lmax; l++)
 	{
 		if (l == 0)
-		{
-			eval[l] = sin(z);
 			deval[l] = cos(z);
-		}
 		else if (l == 1)
-		{
-			eval[l] = sin(z) * inv_z - cos(z);
 			deval[l] = inv_z * ( cos(z) - sin(z) * inv_z ) + sin(z);
-		}
 		else
-		{
-			eval[l] = LComplex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
-			deval[l] = -LComplex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1] ) * inv_z - deval[l-2];
-		}
+			deval[l] = -Complex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1] ) * inv_z - deval[l-2];
 	}
 	
-	return deval[n];
+	return deval;
+}
+
+Complex dric_j(int l, Complex z)
+{
+	return dric_jv(l, z).back();
 }
 
 // Slater-type-orbital data for hydrogen

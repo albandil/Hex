@@ -93,15 +93,9 @@ cArray computeLambda (
 				}
 			) - t;
 			
-			// evaluate j and dj at far radius
-			cArray j_R0(maxell + 1);
-			cArray dj_R0(maxell + 1);
-			for (int l = 0; l <= maxell; l++)
-			{
-				//evaluate the functions
-				j_R0[l] = ric_j(l, kf[ie] * eval_r);
-				dj_R0[l] = kf[ie] * Complex(dric_j(l, kf[ie] * eval_r));
-			}
+			// evaluate j and dj at far radius for all angular momenta up to maxell
+			cArray j_R0 = ric_jv(maxell, kf[ie] * eval_r);
+			cArray dj_R0 = dric_jv(maxell, kf[ie] * eval_r) * kf[ie];
 			
 			// evaluate B-splines and their derivatives at evaluation radius
 			CooMatrix Bspline_R0(Nspline, 1), Dspline_R0(Nspline, 1);

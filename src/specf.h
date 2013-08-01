@@ -81,7 +81,7 @@ Complex dhydro_P(unsigned n, unsigned l, Complex z);
  * \param n Degree of the Riccati-Bessel function.
  * \param z Complex argument.
  */
-LComplex ric_j(int n, LComplex z);
+Complex ric_j(int n, Complex z);
 
 /**
  * Vectorized interface for \ref ric_j.
@@ -91,14 +91,24 @@ LComplex ric_j(int n, LComplex z);
  * \param lmax Angular momentum limit.
  * \param z Complex argument.
  */
-NumberArray<LComplex> ric_jv(int lmax, LComplex z);
+cArray ric_jv(int lmax, Complex z);
 
 /** Derivative of Riccati-Bessel function
  * 
  * \param n Degree of the function.
  * \param z Complex argument.
  */
-LComplex dric_j(int n, LComplex z);
+Complex dric_j(int n, Complex z);
+
+/**
+ * Vectorized interface for \ref dric_j.
+ * 
+ * Returns values of all derivatives of Riccati-Bessel functions of order less than or equal to lmax.
+ * 
+ * \param lmax Angular momentum limit.
+ * \param z Complex argument.
+ */
+cArray dric_jv(int lmax, Complex z);
 
 /**
  * \brief Ricatti-Bessel function of the first kind, \f$ \hat{j}_n(x) \f$.
