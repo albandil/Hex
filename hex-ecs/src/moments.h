@@ -178,7 +178,7 @@ template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Fun
 	int order = Bspline::ECS().order();
 	
 	// reserve space for the output array
-	size_t size = Bspline::ECS().Nspline() * Nenergy * (maxell + 1);
+	size_t size = Nspline * Nenergy * (maxell + 1);
 	cArray res(size);
 	
 	// per interval
@@ -207,25 +207,21 @@ template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Fun
 		// for all linear momenta (= energies)
 		for (int ie = 0; ie < Nenergy; ie++)
 		{
+			// evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
+			Array<NumberArray<LComplex>> evalj(points);
+			for (int ipoint = 0; ipoint < points; ipoint++)
+				evalj[ipoint] = LComplex(weightf(xs[ipoint])) * ric_jv(maxell, vk[ie] * xs[ipoint]);
+			
 			// for all angular momenta
 			for (int l = 0; l <= maxell; l++)
 			{
-				// evaluate the Riccati-Bessel function
-				std::vector<LComplex> evalj(points);
-				std::transform(
-					xs.begin(), xs.end(), evalj.begin(),
-					[ = ](Complex x) -> LComplex {
-						return LComplex(weightf(x)) * ric_j(l, vk[ie] * x);
-					}
-				);
-				
 				// for all relevant B-splines
 				for (int ispline = std::max(iknot-order,0); ispline < Nspline and ispline <= iknot; ispline++)
 				{
 					// sum with weights
 					LComplex sum = 0.;
 					for (int ipoint = 0; ipoint < points; ipoint++)
-						sum += LComplex(ws[ipoint]) * evalj[ipoint] * LComplex(evalB[ispline][ipoint]);
+						sum += LComplex(ws[ipoint]) * evalj[ipoint][l] * LComplex(evalB[ispline][ipoint]);
 					
 					// store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
 					res[(ie * (maxell + 1) + l) * Nspline + ispline] += Complex(sum);

@@ -14,6 +14,7 @@
 #include <iostream>
 #include <gsl/gsl_sf.h>
 
+#include "arrays.h"
 #include "specf.h"
 #include "complex.h"
 
@@ -21,35 +22,78 @@
 //  Special functions                                                      //
 // ----------------------------------------------------------------------- //
 
-LComplex ric_j(int n, LComplex z)
+NumberArray<LComplex> ric_jv(int lmax, LComplex z)
 {
+	// results
+	NumberArray<LComplex> eval(lmax+1);
+	
+	// use library routine for pure real arguments
 	if (z.imag() == 0.)
 	{
-		// use library routine for pure real arguments
-		gsl_sf_result j;
-		int err = gsl_sf_bessel_jl_e(n, z.real(), &j);
+		double ev[lmax+1];
+		int err = gsl_sf_bessel_jl_array(lmax, z.real(), &ev[0]);
+		
 		if (err != GSL_SUCCESS)
-			throw exception("Error %d while evaluating j[%d](%d+%di).", err, n, z.real(), z.imag());
-		z *= j.val;
-		return z;
+			throw exception("Error %d while evaluating j[l≤%d](%d+%di).", err, lmax, z.real(), z.imag());
+		
+		// Bessel -> Riccati-Bessel function
+		for (int i = 0; i <= lmax; i++)
+			eval[i] = z * LComplex(ev[i]);
+		
+		return eval;
 	}
 	
-	if (n == 0)
-		return sin(z);
-	else if (n == 1)
-		return sin(z)/z - cos(z);
-	else
-		return LComplex(2.*n - 1.) * ric_j(n-1,z) / z - ric_j(n-2,z);
+	// shorthand
+	LComplex inv_z = LComplex(1.)/z;
+	
+	// evaluate all angular momenta up to lmax
+	for (int l = 0; l <= lmax; l++)
+	{
+		if (l == 0)
+			eval[l] = sin(z);
+		else if (l == 1)
+			eval[l] = sin(z) * inv_z - cos(z);
+		else
+			eval[l] = LComplex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
+	}
+	
+	return eval;
+}
+
+LComplex ric_j(int l, LComplex z)
+{
+	return ric_jv(l, z).back();
 }
 
 LComplex dric_j(int n, LComplex z)
 {
-	if (n == 0)
-		return cos(z);
-	else if (n == 1)
-		return cos(z)/z - sin(z)/(z*z) + sin(z);
-	else
-		return -LComplex(2.*n - 1) * ric_j(n-1,z) / (z*z) + LComplex(2.*n - 1.) * dric_j(n-1,z) / z - dric_j(n-2,z);
+	// results
+	LComplex eval[n+1], deval[n+1];
+	
+	// shorthand
+	LComplex inv_z = LComplex(1.)/z;
+	
+	// evaluate all angular momenta up to lmax
+	for (int l = 0; l <= n; l++)
+	{
+		if (l == 0)
+		{
+			eval[l] = sin(z);
+			deval[l] = cos(z);
+		}
+		else if (l == 1)
+		{
+			eval[l] = sin(z) * inv_z - cos(z);
+			deval[l] = inv_z * ( cos(z) - sin(z) * inv_z ) + sin(z);
+		}
+		else
+		{
+			eval[l] = LComplex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
+			deval[l] = -LComplex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1] ) * inv_z - deval[l-2];
+		}
+	}
+	
+	return deval[n];
 }
 
 // Slater-type-orbital data for hydrogen

@@ -22,6 +22,7 @@
 /// second power
 #define sqr(x) (gsl_sf_pow_int((x),2))
 
+#include "arrays.h"
 #include "complex.h"
 #include "misc.h"
 
@@ -73,10 +74,24 @@ Complex dhydro_P(unsigned n, unsigned l, Complex z);
  *      j_{n+1}(z) = \frac{2n+1}{z} j_n(z) - j_{n-1}(z) .
  * \f]
  * 
+ * \note Forward recurrence is unstable for small arguments. In the present
+ *       implementation those are expected to be real. For real arguments the
+ *       GSL routine is called, which doesn't suffer from this instability.
+ * 
  * \param n Degree of the Riccati-Bessel function.
  * \param z Complex argument.
  */
 LComplex ric_j(int n, LComplex z);
+
+/**
+ * Vectorized interface for \ref ric_j.
+ * 
+ * Returns values of all Riccati-Bessel functions of order less than or equal to lmax.
+ * 
+ * \param lmax Angular momentum limit.
+ * \param z Complex argument.
+ */
+NumberArray<LComplex> ric_jv(int lmax, LComplex z);
 
 /** Derivative of Riccati-Bessel function
  * 
