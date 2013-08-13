@@ -254,28 +254,10 @@ Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double 
 	Complex YY = 0;
 	
 	for (int m = -l1; m <= l1; m++)
-	{
-		YY += ClebschGordan(l1,m,l2,M-m,L,M)
-				* sphY(l1,    m, theta1, phi1)
-				* sphY(l2, M-m, theta2, phi2);
-	}
+		YY += ClebschGordan(l1,m,l2,M-m,L,M) * sphY(l1, m, theta1, phi1) * sphY(l2, M-m, theta2, phi2);
 	
 	return YY;
 }
-
-static const int g = 7; 
-static const double pi = 3.1415926535897932384626433832795028841972;
-static const double p[g+2] = {
-        0.99999999999980993,
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7
-};
 
 int coul_F_michel(int l, double k, double r, double& F, double& Fp)
 {
@@ -354,7 +336,6 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 	err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
 	
 	// if the results are reliable, use them
-// 	if (err == GSL_SUCCESS)
 	if (finite(f.val) and finite(fp.val))
 	{
 		F = f.val;
@@ -362,39 +343,9 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
 		return GSL_SUCCESS;
 	}
 	
-	// if the kr-argument is small, we might use the Taylor expansion
-/*	if (err == GSL_ERUNAWAY)
-	{
-		gsl_sf_result Cl;
-		gsl_sf_coulomb_CL_e(l, eta, &Cl);
-		
-		double kr = k*r;
-		double y = 1/k;
-		
-		double a0 = 1.;
-		double a1 = y/(l+1);
-		double a2 = (2*y*y - l - 1) / (2*(l+1)*(2*l+3));
-		double a3 = y*(2*y*y-3*l-4)/(6*(l+1)*(2*l+3)*(l+2));
-		double a4 = (4*y*y*y*y-12*l*y*y-20*y*y+3*l*l+9*l+6)/(24*(l+1)*(2*l+3)*(l+2)*(2*l+5));
-		
-		double series = a0 + kr * (a1 + kr * (a2 + kr * (a3 + kr * a4)));
-		F = Cl.val * gsl_sf_pow_int(kr, l+1) * series;
-		
-		a0 =     k * a1;
-		a1 = 2 * k * a2;
-		a2 = 3 * k * a3;
-		a3 = 4 * k * a4;
-		
-		double dseries = a0 + kr * (a1 + kr * (a2 + kr * a3));
-		Fp = Cl.val * (gsl_sf_pow_int(kr, l+1) * dseries + (l+1)*k*gsl_sf_pow_int(kr,l));
-		
-		return GSL_SUCCESS;
-	}*/
-	
 	// if the precision is insufficent, use uniform approximation
 // 	if (err == GSL_ELOSS)
 	{
-// 		std::cout << "Using apx. for F[" << l << "," << k << "](" << r << "), err " << err << ".\n";
 		err = coul_F_michel(l, k, r, F, Fp);
 		return err;
 	}
@@ -435,31 +386,20 @@ double computef(int lambda, int l1, int l2, int l1p, int l2p, int L)
 				* Wigner3j(l2, lambda, l2p, 0, 0, 0);
 }
 
-std::map<long double, long double> wdfact;
-
-// inline long double dfact(long double __x)
-// {
-// 	if (wdfact.find(__x) == wdfact.end())
-// 	{
-// 		if((__x < 0.00001) && (__x >= 0.0)) return 1.;
-// 		if(__x < 0) return 0.;
-// 		return wdfact[__x] = __x*dfact(__x - 1.);
-// 	}
-// 	else
-// 	{
-// 		return wdfact[__x];
-// 	}
-// }
-
 inline long double dfact(long double x)
 {
-	if(x < 0)
+	if (x < 0)
 		return 0.;
 	
-	if(x < 0.00001)	// x == 0 (+ rounding errors)
-		return 1.;
+	long double prod = 1.;
 	
-	return x * dfact(x - 1.);
+	while (x >= 0.0001) // = 0 + rounding errors
+	{
+		prod *= x;
+		x -= 1.;
+	}
+	
+	return prod;
 }
 
 double ClebschGordan(int __j1, int __m1, int __j2, int __m2, int __J, int __M)
