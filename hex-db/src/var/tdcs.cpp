@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "../angs.h"
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../chebyshev.h"
@@ -161,14 +160,14 @@ bool TripleDifferentialCrossSection::run (
 				//      for every idir and il
 				Complex YY = sphBiY (
 					l1, l2, L, mi,
-					dirs[idir].first.x * afactor,dirs[idir].first.y * afactor,
+					dirs[idir].first.x * afactor, dirs[idir].first.y * afactor,
 					dirs[idir].second.x * afactor,dirs[idir].second.y * afactor
 				);
 				
 				// evaluate Coulomb phaseshifts
 				double sig1 = coul_F_sigma(l1,k1);
 				double sig2 = coul_F_sigma(l2,k2);
-				Complex phase = pow(Complex(0.,1.),-l1-l2) * exp(Complex(cos(sig1+sig2),sin(sig1+sig2)));
+				Complex phase = pow(Complex(0.,1.),-l1-l2) * Complex(cos(sig1+sig2),sin(sig1+sig2));
 				
 				// sum the contribution
 				ampls0[ie] += phase * YY * f;
