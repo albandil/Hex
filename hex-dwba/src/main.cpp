@@ -16,7 +16,6 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "angs.h"
 #include "arrays.h"
 #include "dwba1.h"
 #include "dwba2.h"

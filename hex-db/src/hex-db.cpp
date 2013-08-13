@@ -21,7 +21,6 @@
 
 #include <sqlitepp/sqlitepp.hpp>
 
-#include "angs.h"
 #include "arrays.h"
 #include "complex.h"
 #include "hex-db.h"

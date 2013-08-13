@@ -14,7 +14,6 @@
 #include <cstdio>
 #include <cmath>
 
-#include "angs.h"
 #include "clenshawcurtis.h"
 #include "complex.h"
 #include "dwba2.h"

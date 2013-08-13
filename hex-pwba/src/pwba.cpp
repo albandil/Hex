@@ -18,7 +18,6 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "angs.h"
 #include "complex.h"
 #include "gausskronrod.h"
 #include "misc.h"
