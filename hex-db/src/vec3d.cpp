@@ -25,99 +25,41 @@ std::ostream & operator << (std::ostream & os, vec3d const & v)
 
 std::istream & operator >> (std::istream & is, vec3d & v)
 {
-	// allowed characters in a number
-	std::string numc = ".0123456789e+-";
-	
 	// read buffer
 	char c;
 	
-	// component strings
-	std::string xs, ys, zs;
+	// whole string
+	std::string vec;
 	
-	// read components
+	// read characters
 	while (true)
 	{
-		// read a character
+		// read white characters as well
 		is >> std::noskipws >> c;
 		
-		// skip left parenthesis and quotation marks
-		if (c == '(' or c == '"')
+		// throw away leading spaces and the opening bracket
+		if (vec.empty() and isspace(c))
 			continue;
 		
-		if (isspace(c))
-		{
-			// skip leading white spaces
-			if (xs.empty())
-				continue;
-			
-			// break on trailing white spaces
-			else
-				break;
-		}
+		// check that we start with the opening parenthesis
+		if (vec.empty() and c != '(')
+			throw exception("A specification of a vector has to start with '('!");
 		
-		// terminate on non-numerical characters
-		if (numc.find(c) == std::string::npos)
-			throw exception ("ERROR: Unexpected character '%c'.", c);
+		// add character to the whole string
+		vec.push_back(c);
 		
-		// add character to string
-		xs.push_back(c);
-	}
-	while (true)
-	{
-		// read a character
-		is >> std::noskipws >> c;
-		
-		if (isspace(c))
-		{
-			// skip leading white spaces
-			if (xs.empty())
-				continue;
-			
-			// break on trailing white spaces
-			else
-				break;
-		}
-		
-		// terminate on non-numerical characters
-		if (numc.find(c) == std::string::npos)
-			throw exception ("ERROR: Unexpected character '%c'.", c);
-		
-		// add character to string
-		ys.push_back(c);
-	}
-	while (true)
-	{
-		// read a character
-		is >> std::noskipws >> c;
-		
-		// break on right parenthesis or quotation marks
-		if (c == ')' or c == '"')
+		// exit on right parenthesis
+		if (c == ')')
 			break;
-		
-		if (isspace(c))
-		{
-			// skip leading white spaces
-			if (xs.empty())
-				continue;
-			
-			// break on trailing white spaces
-			else
-				break;
-		}
-		
-		// terminate on other non-numerical characters
-		if (numc.find(c) == std::string::npos)
-			throw exception ("ERROR: Unexpected character '%c'.", c);
-		
-		// add character to string
-		zs.push_back(c);
 	}
 	
-	// convert components
-	std::istringstream ixs(xs), iys(ys), izs(zs);
-	ixs >> v.x;
-	iys >> v.y;
-	izs >> v.z;
+	// strip parentheses
+	vec.erase(vec.begin());
+	vec.erase(vec.end()-1);
+	
+	// read components
+	std::istringstream iss(vec);
+	iss >> v.x >> v.y >> v.z;
 	
 	return is;
 }
