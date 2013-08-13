@@ -34,22 +34,18 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/angs.o obj/spmatrix.o obj/specf.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o obj/hdffile.o obj/version.o
+bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o obj/hdffile.o obj/version.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-obj/hex.o: src/hex.cpp src/amplitudes.h src/angs.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/specf.h src/input.h src/hdffile.h src/version.h
+obj/hex.o: src/hex.cpp src/amplitudes.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/specf.h src/input.h src/hdffile.h src/version.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
-obj/amplitudes.o: src/amplitudes.cpp src/amplitudes.h src/angs.h src/arrays.h src/bspline.h src/specf.h src/spmatrix.h src/hdffile.h src/moments.h src/clenshawcurtis.h src/chebyshev.h
+obj/amplitudes.o: src/amplitudes.cpp src/amplitudes.h src/arrays.h src/bspline.h src/specf.h src/spmatrix.h src/hdffile.h src/moments.h src/clenshawcurtis.h src/chebyshev.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 	
-obj/angs.o: src/angs.cpp
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
 obj/arrays.o: src/arrays.cpp src/complex.h src/arrays.h src/hdffile.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@

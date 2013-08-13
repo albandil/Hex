@@ -10,8 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include "../../src/angs.h"
-#include "../../src/angs.cpp"
+#include "../../src/specf.h"
+#include "../../src/specf.cpp"
 
 #include <iostream>
 

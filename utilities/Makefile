@@ -1,7 +1,6 @@
 all:
 	make -C stack
 	make -C f
-	make -C triangle
 	make -C hdf2txt
 	make -C hdf2hdf
 	make -C chebeval
@@ -10,7 +9,6 @@ all:
 clean:
 	make -C stack clean
 	make -C f clean
-	make -C triangle clean
 	make -C hdf2txt clean
 	make -C hdf2hdf clean
 	make -C chebeval clean

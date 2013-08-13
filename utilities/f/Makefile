@@ -5,5 +5,5 @@ all: f
 clean:
 	rm -rf f
 
-f: f.cpp ../../src/angs.cpp ../../src/angs.h
+f: f.cpp ../../src/specf.cpp ../../src/specf.h
 	g++ $< -o f -lgsl -lgslcblas -std=c++11

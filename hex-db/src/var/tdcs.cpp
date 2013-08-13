@@ -156,14 +156,14 @@ bool TripleDifferentialCrossSection::run (
 				// evaluate the radial part for this angular & linear momenta
 				Complex f = cheb_arr[ie][il].clenshaw(sqrt(Eshare),cheb_arr[ie][il].tail(1e-8)) / (k1 * k2);
 				
-				// evaluate bispherical function (evaluating sphY is the bottleneck)
-				Complex YY = 0;
-				for (int m = -l1; m <= l1; m++)
-				{
-					YY += ClebschGordan(l1,m,l2,mi-m,L,mi)
-					      * sphY(l1,    m, dirs[idir].first.x  * afactor, dirs[idir].first.y  * afactor)
-					      * sphY(l2, mi-m, dirs[idir].second.x * afactor, dirs[idir].second.y * afactor);
-				}
+				// evaluate bispherical function
+				// NOTE evaluating sphY is the bottleneck; unfortunately, we need to compute this
+				//      for every idir and il
+				Complex YY = sphBiY (
+					l1, l2, L, mi,
+					dirs[idir].first.x * afactor,dirs[idir].first.y * afactor,
+					dirs[idir].second.x * afactor,dirs[idir].second.y * afactor
+				);
 				
 				// evaluate Coulomb phaseshifts
 				double sig1 = coul_F_sigma(l1,k1);

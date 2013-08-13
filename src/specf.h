@@ -243,6 +243,11 @@ inline Complex ric_h_plus (int n, double x)
 Complex sphY(int l, int m, double theta, double phi);
 
 /**
+ * \brief Bi-polar spherical harmonic function.
+ */
+Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2);
+
+/**
  * \brief Base class for real functions.
  */
 template <typename T> class RadialFunction
@@ -368,5 +373,30 @@ double coul_F_asy(int l, double k, double r, double sigma = Nan);
  * \param k Wavenumber.
  */
 double coul_F_sigma(int l, double k);
+
+/**
+ * \return Value of \f$ f(\lambda,l_1,l_2,l_1',l_2',L) \f$.
+ */
+double computef(int lambda, int l1, int l2, int l1p, int l2p, int L);
+
+/**
+ * Clebsch-Gordan coefficient. In present implementation valid only for
+ * integer (not half-integer) angular momenta. [One needs to correct the signs!]
+ */
+double ClebschGordan(int l1, int m1, int l2, int m2, int L, int M);
+
+/**
+ * Gaunt's integral.
+ * \f[
+ * \int_{4\pi} Y_{l_1m_1} Y_{l_2m_2} Y^{\ast}_{lm} \mathrm{d}\Omega \ .
+ * \f]
+ */
+double Gaunt(int l1, int m1, int l2, int m2, int l, int m);
+
+/**
+ * Compute number of angular momenta pairs \f$ \ell_1 \f$ and \f$ \ell_2 \f$ that
+ * are less than or equal to "maxell" and compose the total angular momentum \f$ L \f$.
+ */
+int triangle_count(int L, int maxell);
 
 #endif

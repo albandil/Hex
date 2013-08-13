@@ -33,18 +33,18 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 # -----------------------------------------------------------------------------
 # Main targets
 
-bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-bin/hex-db.so: obj/hex-db.o obj/specf.o obj/angs.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db.so: obj/hex-db.o obj/specf.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -fPIC -shared -o $@
 
 # -----------------------------------------------------------------------------
 # Release
 
-$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h
+$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h src/chebyshev.h src/vec3d.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 
@@ -52,15 +52,11 @@ obj/ui.o: src/ui.cpp src/hex-db.h src/interfaces.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
-obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/angs.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
+obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
 obj/specf.o: src/specf.cpp src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/angs.o: src/angs.cpp
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	

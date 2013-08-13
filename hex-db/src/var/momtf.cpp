@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "../angs.h"
+#include "../specf.h"
 #include "../interpolate.h"
 #include "../variables.h"
 
