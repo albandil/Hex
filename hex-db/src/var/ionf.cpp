@@ -64,7 +64,6 @@ std::vector<std::string> const & IonizationF::SQL_Update() const
 }
 
 bool IonizationF::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

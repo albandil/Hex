@@ -47,7 +47,6 @@ std::vector<std::string> const & IonizationAmplitude::SQL_Update() const
 }
 
 bool IonizationAmplitude::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

@@ -225,11 +225,15 @@ enum aUnit {
 	aUnit_rad	// radians
 };
 
+// global unit settings
+extern eUnit Eunits;
+extern lUnit Lunits;
+extern aUnit Aunits;
+
 /**
  * Run the computations.
  */
 int run (
-	eUnit Eunits, lUnit lUnits, aUnit aUnits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata
 );

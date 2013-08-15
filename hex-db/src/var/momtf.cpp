@@ -45,7 +45,6 @@ std::vector<std::string> const & MomentumTransfer::SQL_Update() const
 }
 
 bool MomentumTransfer::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

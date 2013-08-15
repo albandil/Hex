@@ -48,57 +48,22 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update() const
 	return cmd;
 }
 
-bool DifferentialCrossSection::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
-	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata
-) const {
+rArray differential_cross_section(sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
+{
+	// the scattering amplitudes
+	rArray dcs(angles.size());
 	
-	// manage units
-	double efactor = change_units(Eunits, eUnit_Ry);
-	double lfactor = change_units(lUnit_au, Lunits);
-	double afactor = change_units(Aunits, aUnit_rad);
-	
-	// scattering event parameters
-	int ni = As<int>(sdata, "ni", Id);
-	int li = As<int>(sdata, "li", Id);
-	int mi = As<int>(sdata, "mi", Id);
-	int nf = As<int>(sdata, "nf", Id);
-	int lf = As<int>(sdata, "lf", Id);
-	int mf = As<int>(sdata, "mf", Id);
-	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "Ei", Id) * efactor;
 	double ki = sqrt(E);
 	double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
 	
 	// check if this is an allowed transition
 	if (not finite(ki) or not finite(kf))
-		return true;
-	
-	// angles
-	rArray angles;
-	
-	// get angle / angles
-	try {
-		
-		// is there a single angle specified using command line ?
-		angles.push_back(As<double>(sdata, "theta", Id));
-		
-	} catch (std::exception e) {
-		
-		// are there more angles specified using the STDIN ?
-		angles = readStandardInput<double>();
-	}
-	
-	// the scattering amplitudes
-	rArrays energies(angles.size());
-	cArrays amplitudes(angles.size());
+		return dcs;
 	
 	int ell;
 	double Ei, sum_Re_T_ell, sum_Im_T_ell;
 	rArrays E_ell;
 	cArrays T_E_ell;
-	rArray dcs(angles.size());
 	
 	// sum over L
 	sqlitepp::statement st(db);
@@ -140,14 +105,53 @@ bool DifferentialCrossSection::run (
 		
 		// for all projectile angular momenta sum arrays
 		for (int l = 0; l < (int)E_ell.size(); l++)
-			merge (e, f, E_ell[l], T_E_ell[l] * sphY(l,mi-mf,angles[i]*afactor,0));
+			merge (e, f, E_ell[l], T_E_ell[l] * sphY(l,mi-mf,angles[i],0));
 		
 		// intepolate energies for unnormalized differential cross section
 		dcs[i] = interpolate(e, sqrabs(f), {E})[0];
 	}
 	
 	// normalize
-	dcs *= kf * (2.*S + 1.) / (16 * M_PI * M_PI * ki);
+	return dcs * kf * (2.*S + 1.) / (16 * M_PI * M_PI * ki);
+}
+
+bool DifferentialCrossSection::run (
+	sqlitepp::session & db,
+	std::map<std::string,std::string> const & sdata
+) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
+	
+	// scattering event parameters
+	int ni = As<int>(sdata, "ni", Id);
+	int li = As<int>(sdata, "li", Id);
+	int mi = As<int>(sdata, "mi", Id);
+	int nf = As<int>(sdata, "nf", Id);
+	int lf = As<int>(sdata, "lf", Id);
+	int mf = As<int>(sdata, "mf", Id);
+	int  S = As<int>(sdata, "S", Id);
+	double E = As<double>(sdata, "Ei", Id) * efactor;
+	
+	// angles
+	rArray angles;
+	
+	// get angle / angles
+	try {
+		
+		// is there a single angle specified using command line ?
+		angles.push_back(As<double>(sdata, "theta", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more angles specified using the STDIN ?
+		angles = readStandardInput<double>();
+	}
+	
+	// compute cross section
+	rArray dcs = differential_cross_section(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
 	
 	// write out
 	std::cout << this->logo() <<

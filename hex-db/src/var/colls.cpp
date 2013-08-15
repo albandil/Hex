@@ -46,7 +46,6 @@ std::vector<std::string> const & CollisionStrength::SQL_Update() const
 }
 
 bool CollisionStrength::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

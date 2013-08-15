@@ -31,6 +31,11 @@
 sqlitepp::session db;	// database handle
 VariableList vlist;		// list of scattering variables
 
+// units
+eUnit Eunits = eUnit_Ry;
+lUnit Lunits = lUnit_au;
+aUnit Aunits = aUnit_deg;
+
 void initialize(const char* dbname)
 {
 	// open database
@@ -296,7 +301,6 @@ void dump (const char* dumpfile)
 }
 
 int run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	std::vector<std::string> const & vars,
 	std::map<std::string,std::string> const & sdata
 )
@@ -311,16 +315,14 @@ int run (
 		if ((var = vlist.get(varname)) == nullptr)
 		{
 			// this should never happen
-			fprintf(stderr, "[run] Runtime error.\n");
-			return EXIT_FAILURE;
+			throw exception ("Runtime error.");
 		}
 		
 		// try to compute the results
-		if (not var->run(Eunits, Lunits, Aunits, db, sdata))
+		if (not var->run(db, sdata))
 		{
 			// this can easily happen
-			std::cerr << "Computation of \"" << varname << "\" failed." << std::endl;
-			return EXIT_FAILURE;
+			throw exception ("Computation of \"%s\" failed.", varname.c_str());
 		}
 	}
 	

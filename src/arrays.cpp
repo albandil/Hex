@@ -62,6 +62,36 @@ rArrays abs (cArrays const &u)
 	return v;
 }
 
+NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B)
+{
+	size_t N = A.size();
+	size_t M = B.size();
+	
+	assert(N = M);
+	
+	Array<double> C (N);
+
+	for (size_t i = 0; i < N; i++)
+		C[i] = hypot(A[i], B[i]);
+
+	return C;
+}
+
+NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B)
+{
+	size_t N = A.size();
+	size_t M = B.size();
+	
+	assert(N = M);
+	
+	Array<double> C (N);
+
+	for (size_t i = 0; i < N; i++)
+		C[i] = atan2(A[i], B[i]);
+
+	return C;
+}
+
 NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 {
 	size_t N = A.size();
@@ -69,6 +99,28 @@ NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 
 	for (size_t i = 0; i < N; i++)
 		B[i] = sqrabs(A[i]);
+
+	return B;
+}
+
+NumberArray<double> realpart (NumberArray<Complex> const & A)
+{
+	size_t N = A.size();
+	Array<double> B (N);
+
+	for (size_t i = 0; i < N; i++)
+		B[i] = A[i].real();
+
+	return B;
+}
+
+NumberArray<double> imagpart (NumberArray<Complex> const & A)
+{
+	size_t N = A.size();
+	Array<double> B (N);
+
+	for (size_t i = 0; i < N; i++)
+		B[i] = A[i].imag();
 
 	return B;
 }

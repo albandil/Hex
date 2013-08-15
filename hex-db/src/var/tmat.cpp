@@ -62,7 +62,6 @@ std::vector<std::string> const & TMatrix::SQL_Update() const
 }
 
 bool TMatrix::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

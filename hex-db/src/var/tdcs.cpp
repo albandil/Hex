@@ -47,7 +47,6 @@ std::vector<std::string> const & TripleDifferentialCrossSection::SQL_Update() co
 }
 
 bool TripleDifferentialCrossSection::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
 	sqlitepp::session & db,
 	std::map<std::string,std::string> const & sdata
 ) const {

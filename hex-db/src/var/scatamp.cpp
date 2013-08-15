@@ -23,9 +23,9 @@ const std::string ScatteringAmplitude::Description = "Scattering amplitude.";
 const std::vector<std::string> ScatteringAmplitude::Dependencies = {
 	"ni", "li", "mi", 
 	"nf", "lf", "mf",
-	"S", "Ei"
+	"S", "Ei", "theta"
 };
-const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "Ei" };
+const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "theta" };
 
 bool ScatteringAmplitude::initialize(sqlitepp::session & db) const
 {
@@ -44,43 +44,8 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable() const
 	return cmd;
 }
 
-bool ScatteringAmplitude::run (
-	eUnit Eunits, lUnit Lunits, aUnit Aunits,
-	sqlitepp::session & db,
-	std::map<std::string,std::string> const & sdata
-) const {
-	
-	// manage units
-	double efactor = change_units(Eunits, eUnit_Ry);
-	double lfactor = change_units(lUnit_au, Lunits);
-	double afactor = change_units(Aunits, aUnit_rad);
-	
-	// scattering event parameters
-	int ni = As<int>(sdata, "ni", Id);
-	int li = As<int>(sdata, "li", Id);
-	int mi = As<int>(sdata, "mi", Id);
-	int nf = As<int>(sdata, "nf", Id);
-	int lf = As<int>(sdata, "lf", Id);
-	int mf = As<int>(sdata, "mf", Id);
-	int  S = As<int>(sdata, "S", Id);
-	double E = As<double>(sdata, "Ei", Id) * efactor;
-	
-	// angles
-	rArray angles;
-	
-	// get angle / angles
-	try {
-		
-		// is there a single angle specified using command line ?
-		angles.push_back(As<double>(sdata, "theta", Id));
-		
-	} catch (std::exception e) {
-		
-		// are there more angles specified using the STDIN ?
-		angles = readStandardInput<double>();
-	}
-	
-	// the scattering amplitudes
+cArray scattering_amplitude(sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
+{
 	cArray amplitudes(angles.size());
 	
 	// total angular momentum projection (given by axis orientation)
@@ -160,9 +125,50 @@ bool ScatteringAmplitude::run (
 			Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E})[0];
 			
 			for (size_t i = 0; i < angles.size(); i++)
-				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i]*afactor, 0.);
+				amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i], 0.);
 		}
 	}
+	
+	return amplitudes;
+}
+
+bool ScatteringAmplitude::run (
+	sqlitepp::session & db,
+	std::map<std::string,std::string> const & sdata
+) const {
+	
+	// manage units
+	double efactor = change_units(Eunits, eUnit_Ry);
+	double lfactor = change_units(lUnit_au, Lunits);
+	double afactor = change_units(Aunits, aUnit_rad);
+	
+	// scattering event parameters
+	int ni = As<int>(sdata, "ni", Id);
+	int li = As<int>(sdata, "li", Id);
+	int mi = As<int>(sdata, "mi", Id);
+	int nf = As<int>(sdata, "nf", Id);
+	int lf = As<int>(sdata, "lf", Id);
+	int mf = As<int>(sdata, "mf", Id);
+	int  S = As<int>(sdata, "S", Id);
+	double E = As<double>(sdata, "Ei", Id) * efactor;
+	
+	// angles
+	rArray angles;
+	
+	// get angle / angles
+	try {
+		
+		// is there a single angle specified using command line ?
+		angles.push_back(As<double>(sdata, "theta", Id));
+		
+	} catch (std::exception e) {
+		
+		// are there more angles specified using the STDIN ?
+		angles = readStandardInput<double>();
+	}
+	
+	// the scattering amplitudes
+	cArray amplitudes = scattering_amplitude(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
 	
 	// write out
 	std::cout << this->logo() <<

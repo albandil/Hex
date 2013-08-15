@@ -126,11 +126,6 @@ int main(int argc, char* argv[])
 	// used scattering event data
 	std::map<std::string,std::string> sdata;
 	
-	// units
-	eUnit Eunits = eUnit_Ry;
-	lUnit Lunits = lUnit_au;
-	aUnit Aunits = aUnit_deg;
-	
 	// for all argv-s
 	for (int i = 1; i < argc; i++)
 	{
@@ -302,5 +297,5 @@ int main(int argc, char* argv[])
 		return 0;
 	
 	// retrieve all requested data
-	return run (Eunits, Lunits, Aunits, vars, sdata);
+	return run (vars, sdata);
 }

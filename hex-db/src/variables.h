@@ -175,7 +175,6 @@ public:
 	
 	/// write out requested data
 	virtual bool run (
-		eUnit Eunits, lUnit Lunits, aUnit aUnits,
 		sqlitepp::session & db,
 		std::map<std::string,std::string> const & params
 	) const = 0;
@@ -255,7 +254,6 @@ private:
 		std::vector<std::string> const & SQL_Update() const; \
 \
 		bool run ( \
-			eUnit Eunits, lUnit Lunits, aUnit AUnits, \
 			sqlitepp::session & db, \
 			std::map<std::string,std::string> const & params \
 		) const; \

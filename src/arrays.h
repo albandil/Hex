@@ -1810,7 +1810,11 @@ template <typename NumberType> NumberArray<NumberType> sqrt (ArrayView<NumberTyp
 	return B;
 }
 
+NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
+NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B);
 NumberArray<double> sqrabs (NumberArray<Complex> const & A);
+NumberArray<double> realpart (NumberArray<Complex> const & A);
+NumberArray<double> imagpart (NumberArray<Complex> const & A);
 
 // summation
 template <typename T> T sum(Array<T> v)
