@@ -249,13 +249,47 @@ Complex sphY(int l, int m, double theta, double phi)
 	return gsl_sf_legendre_sphPlm(l,abs(m),cos(theta)) * Complex(cos(m*phi),sin(m*phi));
 }
 
+void clipang (double & theta, double & phi)
+{
+	// clip theta to (0,inf)
+	if (theta < 0.)
+	{
+		// rotate plane
+		phi += M_PI;
+		theta = -theta;
+	}
+	
+	// clip theta to (0,2π)
+	theta = fmod(theta, 2 * M_PI);
+	
+	// clip theta to (0,π)
+	if (theta > M_PI)
+	{
+		// rotate plane
+		phi += M_PI;
+		theta = 2 * M_PI - theta;
+	}
+	
+	// clip phi to (0,2π) FIXME (won't work for phi < 0)
+	phi = fmod(phi, 2*M_PI);
+}
+
 Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
 {
+	// NOTE This is very strange... To get the expected results one has to clip the
+	//      angles to the 0..π and 0..2π intervals, respectively, and to include
+	//      a bogus (-1)^m phase factor in the summation. Why the hell is that?
+	
+	// clip angles to the definition domain (to avoid possible uncontrolled phase factors)
+	// theta = 0 .. π
+	// phi = 0 .. 2π
+	clipang(theta1,phi1);
+	clipang(theta2,phi2);
+	
+	// evaluate the bi-polar spherical harmonic function
 	Complex YY = 0;
-	
 	for (int m = -l1; m <= l1; m++)
-		YY += ClebschGordan(l1,m,l2,M-m,L,M) * sphY(l1, m, theta1, phi1) * sphY(l2, M-m, theta2, phi2);
-	
+		YY += gsl_sf_pow_int(-1,m) * ClebschGordan(l1,m,l2,M-m,L,M) * sphY(l1, m, theta1, phi1) * sphY(l2, M-m, theta2, phi2);
 	return YY;
 }
 
