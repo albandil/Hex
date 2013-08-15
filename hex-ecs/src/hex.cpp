@@ -29,7 +29,6 @@
 #endif
 
 #include "amplitudes.h"
-#include "angs.h"
 #include "arrays.h"
 #include "bspline.h"
 #include "complex.h"

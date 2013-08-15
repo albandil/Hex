@@ -4,7 +4,7 @@ LFLAGS = -lgsl -lgslcblas -lo2scl -lcln -lhdf5 -lhdf5_cpp
 
 all: bin/pwba
 
-bin/pwba: obj/pwba.o obj/symbolic.o obj/angs.o obj/specf.o obj/arrays.o obj/hdffile.o
+bin/pwba: obj/pwba.o obj/symbolic.o obj/specf.o obj/arrays.o obj/hdffile.o
 	@mkdir -p $(@D)
 	$(CXX) $(LFLAGS) $^ -o $@
 

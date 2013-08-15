@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "../angs.h"
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../chebyshev.h"

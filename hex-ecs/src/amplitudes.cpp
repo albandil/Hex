@@ -20,7 +20,6 @@
 
 #include <fftw3.h>
 
-#include "angs.h"
 #include "arrays.h"
 #include "bspline.h"
 #include "chebyshev.h"
