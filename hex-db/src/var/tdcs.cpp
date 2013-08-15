@@ -186,10 +186,10 @@ bool TripleDifferentialCrossSection::run (
 	std::cout << this->logo() <<
 		"# Triple differential cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-	    "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
+	    "#     S = " << S << ", Ei = " << Ei / efactor << " " << unit_name(Eunits) << "\n" <<
 	    "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
 	    "# \n" <<
-	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ (w.r.t. first)\tφ (w.r.t. first)\n";
+	    "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ\tφ\n";
 	for (size_t i = 0; i < dirs.size(); i++)
 	{
 		// projectile direction
