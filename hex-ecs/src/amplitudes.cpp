@@ -32,7 +32,7 @@ bool debug = false;
 
 cArray computeLambda (
 	rArray const & kf, rArray const & ki,
-	int maxell, int L, int Spin,
+	int maxell, int L, int Spin, int Pi,
 	int ni, int li, int mi,
 	rArray const & Ei, int lf,
 	cArray const & Pf_overlaps,
@@ -53,7 +53,7 @@ cArray computeLambda (
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;
@@ -278,7 +278,7 @@ Chebyshev<double,Complex> fcheb(cArrayView const & PsiSc, double kmax, int l1, i
 	return CB;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
+cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
 {
 	// resize and clear the output storage for integral cross sections
 	ics.resize(Ei.size());
@@ -295,7 +295,7 @@ cArrays computeXi(int maxell, int L, int Spin, int ni, int li, int mi, rArray co
 	{
 		// compose filename of the data file for this solution
 		std::ostringstream oss;
-		oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+		oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 		
 		// load the solution
 		cArray solution;

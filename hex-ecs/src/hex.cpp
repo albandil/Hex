@@ -581,12 +581,15 @@ Stg2:
 			for (int l = abs(li - L); l <= li + L; l++)
 				allowed = allowed or ClebschGordan(li,mi,l,0,L,mi);
 			if (not allowed)
+			{
+				std::cout << "\tThe initial state li=" << li << ", mi=" << mi << " is not allowed within the total angular variables.\n";
 				continue;
+			}
 			
 			// compose filename of the output file for this solution
 			std::ostringstream oss;
-			oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
-		
+			oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+			
 			// check if there is some precomputed solution on the disk
 			if ( not current_solution.hdfload(oss.str().c_str()) )
 				all_done = false;
@@ -695,7 +698,7 @@ Stg2:
 			
 			// we may have already computed solution for this state and energy... is it so?
 			std::ostringstream cur_oss;
-			cur_oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+			cur_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
 			if ( current_solution.hdfload(cur_oss.str().c_str()) )
 				continue;
 			
@@ -1036,7 +1039,7 @@ Stg3:
 				);
 				
 				// compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
+				Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
 			}
 			
 			// save the data
@@ -1112,7 +1115,7 @@ Stg3:
 			//
 			
 			rArray ics;
-			cArrays data = std::move(computeXi(maxell, L, Spin, ni, li, mi, Ei, ics, coupled_states));
+			cArrays data = std::move(computeXi(maxell, L, Spin, Pi, ni, li, mi, Ei, ics, coupled_states));
 			
 			for (size_t ie = 0; ie < Ei.size(); ie++)
 			for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
