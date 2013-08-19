@@ -80,7 +80,7 @@ void parse_input_file (
 	int & ni,
 	std::vector<std::tuple<int,int,int>> & instates,
 	std::vector<std::tuple<int,int,int>> & outstates,
-	int & L, int & S,
+	int & L, int & S, int & Pi,
 	int & maxell,
 	rArray & Ei,
 	double & B

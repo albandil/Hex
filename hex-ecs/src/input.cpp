@@ -307,7 +307,7 @@ void parse_input_file (
 	int& ni,
 	std::vector<std::tuple<int,int,int>>& instates,
 	std::vector<std::tuple<int,int,int>>& outstates,
-	int& L, int& Spin, int& maxell,
+	int& L, int& Spin, int& Pi, int& maxell,
 	rArray& Ei, double& B
 ){
 	double x;
@@ -509,7 +509,8 @@ void parse_input_file (
 	try {
 		
 		L = read_int(inputfile);
-		Spin = read_int(inputfile);
+		Spin = read_int(inputfile) % 2;
+		Pi = read_int(inputfile) % 2;
 		maxell = read_int(inputfile);
 		
 		if (L + L%2 + maxell < maxli)
@@ -530,7 +531,7 @@ void parse_input_file (
 	std::cout << "\n----------  Angular momentum limits  -------------\n";
 	std::cout << "L = " << L << "\n";
 	std::cout << "S = " << Spin << "\n";
-	std::cout << "Π = " << L % 2 << "\n";
+	std::cout << "Π = " << Pi << "\n";
 	std::cout << "ℓ = " << maxell << "\n";
 	
 	std::cout << "\n----------  Initial atomic states  -------------\n";

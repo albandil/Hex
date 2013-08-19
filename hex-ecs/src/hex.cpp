@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 		inputfile, order, ecstheta,
 		real_knots, complex_knots, ni, 
 		instates, outstates,
-		L, Spin, levels, Ei, B
+		L, Spin, Pi, levels, Ei, B
 	);
 	
 	// is there something to compute?
@@ -189,15 +189,13 @@ int main(int argc, char* argv[])
 	
 	std::cout << "Setting up the coupled angular states...\n";
 	
-	Pi = L % 2;
-	
 	// for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
 	for (int ell = 0; ell <= levels; ell++)
 	{
 		std::cout << "\t-> [" << ell << "] ";
 		
 		// get sum of the angular momenta for this angular level
-		int sum = 2 * ell + L;
+		int sum = 2 * ell + L + Pi;
 		
 		// for all angular momentum pairs that do compose L
 		for (int l1 = ell; l1 <= sum - ell; l1++)
@@ -721,11 +719,11 @@ Stg2:
 				for (int l = abs(li - L); l <= li + L; l++)
 				{
 					// skip wrong parity
-					if ((li + l) % 2 != Pi % 2)
+					if ((L + li + l) % 2 != Pi)
 						continue;
 					
 					// (anti)symmetrization
-					int Sign = (Spin % 2 == 0) ? 1. : -1.;
+					int Sign = ((Spin + Pi) % 2 == 0) ? 1. : -1.;
 					
 					// compute energy- and angular momentum-dependent prefactor
 					Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(ki[ie]); 
@@ -791,7 +789,7 @@ Stg2:
 			if (ie > 0)
 			{
 				std::ostringstream prev_oss;
-				prev_oss << "psi-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
+				prev_oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie-1] << ".hdf";
 				if (previous_solution.hdfload(prev_oss.str().c_str()))
 					current_solution = previous_solution;
 			}
@@ -962,9 +960,9 @@ Stg3:
 	// compose output filename
 	std::ostringstream ossfile;
 	if (parallel)
-		ossfile << ni << "-" << L << "-" << Spin << "-(" << iproc << ").sql";
+		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << "-(" << iproc << ").sql";
 	else
-		ossfile << ni << "-" << L << "-" << Spin << ".sql";
+		ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << ".sql";
 	
 	// Create SQL batch file
 	std::ofstream fsql(ossfile.str().c_str());
@@ -1070,7 +1068,7 @@ Stg3:
 						fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
 						     << ni << "," << li << "," << mi << ","
 						     << nf << "," << lf << "," << mf << ","
-							 << L  << "," << Spin << "," 
+							 << L  << "," << Spin << ","
 							 << Ei[ie] << "," << ell << "," 
 							 << T_ell[i].real() << "," << T_ell[i].imag()
 							 << ");\n";
@@ -1085,7 +1083,7 @@ Stg3:
 				sigmaname << "sigma-" 
 				          << ni << "-" << li << "-" << mi << "-"
 						  << nf << "-" << lf << "-" << mf << "-"
-						  << L << "-" << Spin << ".dat";
+						  << L << "-" << Spin << "-" << Pi << ".dat";
 
 				std::ofstream ftxt(sigmaname.str().c_str());
 				
@@ -1130,7 +1128,7 @@ Stg3:
 			
 			// print ionization cross section
 			std::ostringstream fname;
-			fname << "isigma-" << L << "-" << Spin << "-" << ni << "-" << li << "-" << mi << ".dat";
+			fname << "isigma-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << ".dat";
 			write_array(Ei, ics, fname.str().c_str());
 		}
 		
