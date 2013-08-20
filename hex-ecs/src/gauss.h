@@ -20,7 +20,7 @@
  * \param vx     On return, the Gauss-Legendre nodes (nonnegative half of them).
  * \param vw     On return, the corresponding Gauss-Legendre weights.
  */
-int p_roots(int points, const double* &vx, const double* &vw);
+int gauss_nodes_and_weights(int points, const double* &vx, const double* &vw);
 
 /**
  * Get Gauss-Legendre points in complex interval.

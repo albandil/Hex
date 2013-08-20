@@ -34,7 +34,7 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/gauss_weights.o obj/gauss_roots.o obj/arrays.o obj/hdffile.o obj/version.o
+bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
@@ -58,14 +58,6 @@ obj/gauss.o: src/gauss.cpp src/arrays.h src/bspline.h src/hdffile.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 	
-obj/gauss_weights.o: src/gauss_weights.cpp src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-	
-obj/gauss_roots.o: src/gauss_roots.cpp src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
 obj/input.o: src/input.cpp src/arrays.h src/hdffile.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@

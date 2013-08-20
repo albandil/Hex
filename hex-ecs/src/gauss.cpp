@@ -15,43 +15,60 @@
 #include <complex>
 #include <numeric>
 
+#include <gsl/gsl_integration.h>
+
 #include "arrays.h"
 #include "bspline.h"
 
-extern rArrays GaussLegendreRoots, GaussLegendreWeights;
-bool GaussLegendreRoots_init();
-bool GaussLegendreWeights_init();
+std::vector<std::pair<double*,double*>> gauss_data = {
+	std::make_pair(nullptr, nullptr),  // n = 0
+	std::make_pair(nullptr, nullptr)   // n = 1
+};
 
-int p_roots(int points, const double* &vx, const double* &vw)
+int gauss_nodes_and_weights(int points, const double* & vx, const double* & vw)
 {
-	static bool init1 = GaussLegendreRoots_init();
-	static bool init2 = GaussLegendreWeights_init();
-	
-	// available Gauss-Legendre data
-	int N = std::min(GaussLegendreRoots.size(), GaussLegendreWeights.size());
-	if (points < 3)
+	// first of all generate any missing data
+	if (points >= gauss_data.size())
 	{
-		points = 3;
-	}
-	if (points >= N)
-	{
-		std::cerr << "[quad] Warning: insufficent Gauss-Legendre points, using " << N - 1 << std::endl;
-		points = N - 1;
+		for (int n = gauss_data.size(); n <= points; n++)
+		{
+			double* nodes = new double [n];
+			double* weights = new double [n];
+			
+			gsl_integration_glfixed_table *t = gsl_integration_glfixed_table_alloc(n);
+			
+			// add anti/symmetrically the nodes and weights
+			for (int i = 0; i < n/2; i++)
+			{
+				nodes[n/2-i-1] = -t->x[i+n%2];
+				nodes[n/2+i+n%2] = t->x[i+n%2];
+				
+				weights[n/2-i-1] = t->w[i+n%2];
+				weights[n/2+i+n%2] = t->w[i+n%2];
+			}
+			
+			// for odd 'n' add also the node and weight in zero
+			if (n % 2 != 0)
+			{
+				nodes[n/2] = 0.;
+				weights[n/2] = t->w[0];
+			}
+			
+			gauss_data.push_back(std::make_pair(nodes,weights));
+		}
 	}
 	
-	// get correct pointer
-	vx = GaussLegendreRoots[points].data();
-	vw = GaussLegendreWeights[points].data();
-	
+	// return the arrays
+	vx = gauss_data[points].first;
+	vw = gauss_data[points].second;
 	return points;
 }
-
 
 cArray p_points(int& points, Complex x1, Complex x2)
 {
 	// get the Gauss-Legendre nodes and weights
 	const double *vx, *vw;
-	points = p_roots(points, vx, vw);
+	points = gauss_nodes_and_weights(points, vx, vw);
 	
 	// prepare centre and half-width of the interval
 	Complex hw = 0.5 * (x2 - x1);
@@ -73,7 +90,7 @@ cArray p_weights(int& points, Complex x1, Complex x2)
 {
 	// get the Gauss-Legendre nodes and weights
 	const double *vx, *vw;
-	points = p_roots(points, vx, vw);
+	points = gauss_nodes_and_weights(points, vx, vw);
 	
 	// prepare halfwidth of the interval
 	Complex hw = 0.5 * (x2 - x1);
@@ -89,7 +106,6 @@ cArray p_weights(int& points, Complex x1, Complex x2)
 	return ws;
 }
 
-
 Complex quad (
 	void (*f)(int, Complex*, Complex*, void*), void *data,
 	int points, int iknot, Complex x1, Complex x2
@@ -98,8 +114,7 @@ Complex quad (
 	if (x1.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x1.real() or
 		x2.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x2.real())
 	{
-		std::fprintf(stderr, "[quad] Error: boundaries not for this iknot!\n");
-		exit(1);
+		throw exception ("[quad] Error: boundaries not for this iknot!");
 	}
 	
 	// get evaluation points and weights
