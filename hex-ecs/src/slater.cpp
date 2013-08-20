@@ -100,8 +100,12 @@ Complex computeRtri(int L, int k, int l, int m, int n, int iknot, int iknotmax)
 {
 	// data for the outer integral
 	int data[7] = {k, l, m, n, L, iknot, iknotmax};
-	int points = 20; //15; // raise point count - this is not a poly! TODO ???
 	
+	// raise point count - this is not a poly!
+	// TODO Estimate the order.
+	int points = Bspline::ECS().order() + L + 10; 
+	
+	// integrate
 	return quad(&R_outer_integrand, data, points, iknot, Bspline::ECS().t(iknot), Bspline::ECS().t(iknot+1));
 }
 
