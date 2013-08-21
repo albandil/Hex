@@ -28,6 +28,7 @@ std::vector<std::pair<double*,double*>> gauss_data = {
 int gauss_nodes_and_weights(int points, const double* & vx, const double* & vw)
 {
 	// first of all generate any missing data
+	# pragma omp critical
 	if (points >= gauss_data.size())
 	{
 		for (int n = gauss_data.size(); n <= points; n++)
