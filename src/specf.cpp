@@ -31,7 +31,7 @@ cArray ric_jv(int lmax, Complex z)
 	if (z.imag() == 0.)
 	{
 		double ev[lmax+1];
-		int err = gsl_sf_bessel_jl_array(lmax, z.real(), &ev[0]);
+		int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
 		
 		if (err != GSL_SUCCESS)
 			throw exception("Error %d while evaluating j[l≤%d](%d+%di).", err, lmax, z.real(), z.imag());
