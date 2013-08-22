@@ -30,10 +30,11 @@ cArray ric_jv(int lmax, Complex z)
 	// use library routine for pure real arguments
 	if (z.imag() == 0.)
 	{
-		double ev[lmax+1];
+		rArray ev(lmax+1);
 		int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
 		
-		if (err != GSL_SUCCESS)
+		// stop at failure
+		if (err != GSL_SUCCESS or not std::all_of(ev.begin(), ev.end(), finite))
 			throw exception("Error %d while evaluating j[l≤%d](%d+%di).", err, lmax, z.real(), z.imag());
 		
 		// Bessel -> Riccati-Bessel function
