@@ -45,7 +45,7 @@ Complex computeDirect1e(DistortingPotential const& U, int l, double k)
 		(Q1.result() - Q2.result() * chi_kl.getPhasef()) * chi_kl.getPhasef();
 }
 
-Complex computeExchange1e(
+Complex computeExchange1e (
 	DistortingPotential const& U,
 	int Ni, int Li, double ki,
 	int Nf, int Lf, double kf
@@ -78,7 +78,7 @@ Complex computeExchange1e(
 		sqrt((2*Lf+1)/(4*M_PI)) * Q1.result() * Q2.result() / (ki*kf);
 }
 
-Complex computeDirect2e(
+Complex computeDirect2e (
 	const DistortingPotential& U, int lambda,
 	int Nf, int Lf, double kf, int lf,
 	int Ni, int Li, double ki, int li
@@ -139,7 +139,7 @@ Complex computeDirect2e(
 		sqrt((2*li+1)/(4*M_PI)) / (2.*lambda+1.) * Q.result() / (ki*kf);
 }
 
-Complex computeExchange2e(
+Complex computeExchange2e (
 	const DistortingPotential& U, int lambda,
 	int Nf, int Lf, double kf, int lf,
 	int Ni, int Li, double ki, int li

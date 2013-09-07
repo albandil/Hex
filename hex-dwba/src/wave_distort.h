@@ -13,6 +13,8 @@
 #ifndef HEX_DISTORTED_WAVE
 #define HEX_DISTORTED_WAVE
 
+#include <gsl/gsl_interp.h>
+
 #include "complex.h"
 #include "potential.h"
 #include "specf.h"
@@ -58,6 +60,9 @@ public:
 	DistortedWave(double _kn, int _ln, DistortingPotential const & _U);
 	DistortedWave(DistortedWave const& W) { *this = W; }
 	// @}
+	
+	// destructor
+	~DistortedWave();
 	
 	// assignment
 	DistortedWave operator= (DistortedWave const& W);
@@ -122,7 +127,7 @@ private:
 	DistortingPotential U;
 	
 	// interpolator
-	o2scl::interp_cspline<rArray> interpolator;
+	gsl_interp* interpolator;
 	
 	// distorted wave input parameters
 	double kn;		// wavenumber of the distorted wave

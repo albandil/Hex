@@ -24,6 +24,7 @@ PhiFunctionDir::PhiFunctionDir (
 	int lam, 
 	DistortingPotential const & U, 
 	HydrogenFunction const & psi,
+	DistortedWave const & chi,
 	int cblimit
 ) : psin(psin), psi(psi), Lam(lam), U(U), Diag(psin == psi), 
 	Zero(lam == 0 and Diag and (DistortingPotential(psi) == U)),
@@ -54,7 +55,7 @@ PhiFunctionDir::PhiFunctionDir (
 		bool Cheb_L_conv = false, Cheb_mLm1_conv = false;
 		
 		// try to find the expansions using the real functions
-		if (psin.getK() < 1.)
+// 		if (psin.getK() < 1.)
 		{
 			// for low energies this is the only way, so we disable the limit
 			tryFullRealChebyshev(cblimit, Cheb_L_conv, Cheb_mLm1_conv);
@@ -71,26 +72,26 @@ PhiFunctionDir::PhiFunctionDir (
 				throw exception("[PhiFunctionDir] cblimit (%d) too low.", cblimit);
 			}
 		}
-		else
-		{
-			// for high energies we may back away after finite cblimit
-			tryFullRealChebyshev(cblimit, Cheb_L_conv, Cheb_mLm1_conv);
-			
-			// check success
-			if (Cheb_L_conv and Cheb_mLm1_conv)
-			{
-				// store precomputed expansions to disk
-				Cheb_L.coeffs().hdfsave(name1.c_str());
-				Cheb_mLm1.coeffs().hdfsave(name2.c_str());
-				return;
-			}
-			
-			// will approximate the function only on the beginning by the
-			// direct Chebyshev expansion, and the rest by approximating
-			// the modulation and phase dependences
-			tryFrontRealChebyshev(cblimit, Cheb_L_conv, Cheb_mLm1_conv);
-			UseFront = true;
-		}
+// 		else
+// 		{
+// 			// for high energies we may back away after finite cblimit
+// 			tryFullRealChebyshev(cblimit, Cheb_L_conv, Cheb_mLm1_conv);
+// 			
+// 			// check success
+// 			if (Cheb_L_conv and Cheb_mLm1_conv)
+// 			{
+// 				// store precomputed expansions to disk
+// 				Cheb_L.coeffs().hdfsave(name1.c_str());
+// 				Cheb_mLm1.coeffs().hdfsave(name2.c_str());
+// 				return;
+// 			}
+// 			
+// 			// will approximate the function only on the beginning by the
+// 			// direct Chebyshev expansion, and the rest by approximating
+// 			// the modulation and phase dependences
+// 			tryFrontRealChebyshev(cblimit, Cheb_L_conv, Cheb_mLm1_conv);
+// 			UseFront = true;
+// 		}
 	}
 }
 

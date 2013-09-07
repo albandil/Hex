@@ -199,7 +199,7 @@ void DWBA2_energy_driver (
 	};
 	
 
-#if 1
+#if 0
 	
 	// compactification of the previous function
 // 	CompactificationR<decltype(ContinuumContribution),Complex>
@@ -320,7 +320,7 @@ void DWBA2_En (
 	//
 	
 	std::cout << "\tcomputing phii... " << std::flush;
-	PhiFunctionDir phii(psin, lami, Ui, psii);
+	PhiFunctionDir phii(psin, lami, Ui, psii, chii);
 	std::cout << "ok\n";
 	
 	if (phii.isZero())
@@ -330,7 +330,7 @@ void DWBA2_En (
 	}
 	
 	std::cout << "\tcomputing phif... " << std::flush;
-	PhiFunctionDir phif(psin, lamf, Uf, psif);
+	PhiFunctionDir phif(psin, lamf, Uf, psif, chii);
 	std::cout << "ok\n";
 	
 	if (phif.isZero())
@@ -391,13 +391,30 @@ Complex GreensFunctionIntegralAllowed (
 	double fari = 5. * psii.far(1e-7);
 	double farf = 5. * psif.far(1e-7);
 	
+	/// DEBUG
+	std::ofstream off("out.dat");
+	for (double x = 0; x < fari; x += 0.001)
+	{
+		off << x << "\t"
+			<< gphi(x) * phii(x) * chii(x) << "\t"
+			<< geta(x).real() * phii(x) * chii(x) << "\t"
+			<< chii(x) << "\t"
+			<< psii(x) << "\t"
+			<< phii(x) << "\t"
+			<< gphi(x) << "\t"
+			<< geta(x).real() << "\t"
+			<< geta(x).imag() << "\n";
+	}
+	off.close();
+	exit(0);
+	
 	// Green's function integrand
 	auto integrand = [&](double r1) -> Complex {
 		
 		// inner integrand variations
 		
 		auto integrand1 = [&](double r2) -> Complex { return gphi(r2) * phii(r2) * chii(r2); };
-		auto integrand2 = [&](double r2) -> Complex { return finite(r2) ? geta(r2) * phii(r2) * chii(r2) * exp(r1 - r2) : 0.; };
+		auto integrand2 = [&](double r2) -> Complex { return finite(r2) ? geta(r2) * phii(r2) * chii(r2) : 0.; };
 		
 		// integration systems
 		
@@ -405,7 +422,7 @@ Complex GreensFunctionIntegralAllowed (
 		ClenshawCurtis<decltype(inte1),Complex> Q1(inte1);
 		Q1.setLim(false);
 		Q1.setRec(false);
-		Q1.setSubdiv(15);
+		Q1.setSubdiv(16);
 		Q1.setEps(1e-6);
 		Q1.setTol(1e-6);
  		Q1.setVerbose(false, "Green 1");
@@ -415,7 +432,7 @@ Complex GreensFunctionIntegralAllowed (
 		ClenshawCurtis<decltype(inte2),Complex> Q2(inte2);
 		Q2.setLim(false);
 		Q2.setRec(false);
-		Q2.setSubdiv(15);
+		Q2.setSubdiv(16);
 		Q2.setEps(1e-6);
 		Q2.setTol(1e-6);
  		Q2.setVerbose(false, "Green 2");

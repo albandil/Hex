@@ -41,7 +41,9 @@ DistortedWave DistortedWave::operator= (DistortedWave const& W)
 	phase = W.phase;
 	array = W.array;
 	
-	interpolator.set(W.grid, W.array, W.array.size());
+	gsl_interp_free(interpolator);
+	interpolator = gsl_interp_alloc(gsl_interp_cspline, array.size());
+	gsl_interp_init(interpolator, grid.data(), array.data(), array.size());
 	
 	return *this;
 }
@@ -133,7 +135,13 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
 	}
 	
 	// setup the interpolator
-	interpolator.set(grid, array, array.size());
+	interpolator = gsl_interp_alloc(gsl_interp_cspline, array.size());
+	gsl_interp_init(interpolator, grid.data(), array.data(), array.size());
+}
+
+DistortedWave::~DistortedWave()
+{
+	gsl_interp_free(interpolator);
 }
 
 double DistortedWave::operator() (double x) const
@@ -146,7 +154,7 @@ double DistortedWave::operator() (double x) const
 	
 	// otherwise interpolate using cspline interpolator
 	else
-		return interpolator.interp(x);
+		return gsl_interp_eval(interpolator, grid.data(), array.data(), x, nullptr);
 }
 
 double DistortedWave::farRadius() const
