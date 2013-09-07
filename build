@@ -1,0 +1,9 @@
+#!/bin/bash
+
+PROCESS=$(cat /proc/cpuinfo | grep processor | wc -l)
+
+echo
+echo "Building HEX package using $PROCESS threads."
+echo
+
+make -j $PROCESSS
