@@ -673,7 +673,7 @@ Stg2:
 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
 			std::cout << "\t[" << iproc << "] LU factorization " 
 			          << ill << " of (" << l1 << "," << l2 << ") block done after " 
-					  << sec.count() << " s\n";
+			          << sec.count() << " s (" << lufts[ill].size() / 1048576 << " MiB)\n";
 		}
 		
 		// For all initial states ------------------------------------------- //
@@ -815,8 +815,8 @@ Stg2:
 					// create copy-from view of "r"
 					cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
 					
-					// copy the correcponding slice of "r" multiplied by a correct block inversion
-					zview = lufts[ill].solve(rview);
+					// copy the corresponding slice of "r" multiplied by a correct block inversion
+ 					zview = lufts[ill].solve(rview);
 				}
 				
 #ifndef NO_MPI

@@ -14,7 +14,6 @@
 #define HEX_ARRAYS_H
 
 #include <complex>
-#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -85,7 +84,7 @@ template <typename NumberType> class ArrayView
 		// assignments
 		//
 		
-		virtual ArrayView<NumberType> & operator= (Array<NumberType> const & v)
+		virtual ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
 		{
 			if (v.size() != N)
 				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
@@ -1610,7 +1609,7 @@ template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 {
 	if (x0 <= 0 or x1 <= 0 or x1 < x0)
 	{
-		fprintf(stderr, "[logspace] It must be 0 < x1 <= x2 !\n");
+		std::cerr << "[logspace] It must be 0 < x1 <= x2 !\n";
 		abort();
 	}
 	

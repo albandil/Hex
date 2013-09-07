@@ -207,7 +207,7 @@ CooMatrix CscMatrix::tocoo() const
 		// check success
 		if (status != 0)
 		{
-			fprintf(stderr, "\n[CscMatrix::tocoo] %ld ", status);
+			std::cerr << "\n[CscMatrix::tocoo] Exit code " << status << "\n";
 			umfpack_zl_report_status(0, status);
 		}
 		
@@ -431,7 +431,7 @@ CsrMatrix::LUft CsrMatrix::factorize() const
 	long status;
 	
 	// analyze the sparse structure
-	status = umfpack_zl_symbolic(
+	status = umfpack_zl_symbolic (
 		_m_, _n_,					// matrix dimensions
 		_p_.data(), _i_.data(),		// column and row indices
 		reinterpret_cast<const double*>(_x_.data()), 0,	// matrix data
@@ -439,20 +439,20 @@ CsrMatrix::LUft CsrMatrix::factorize() const
 	);
 	if (status != 0)
 	{
-		fprintf(stderr, "\n[CscMatrix::factorize] %ld ", status);
+		std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
 		umfpack_zl_report_status(0, status);
 		abort();
 	}
 	
 	// do some factorizations
-	status = umfpack_zl_numeric(
+	status = umfpack_zl_numeric (
 		_p_.data(), _i_.data(),	// column and row indices
 		reinterpret_cast<const double*>(_x_.data()), 0,	// matrix data
 		Symbolic, &Numeric, 0, 0	// UMFPACK internals
 	);
 	if (status != 0)
 	{
-		fprintf(stderr, "\n[CscMatrix::factorize] %ld ", status);
+		std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
 		umfpack_zl_report_status(0, status);
 		abort();
 	}
@@ -775,7 +775,7 @@ CscMatrix CooMatrix::tocsc() const
 		// check success
 		if (status != 0)
 		{
-			fprintf(stderr, "\n[CooMatrix::tocsc] %ld ", status);
+			std::cerr << "\n[CooMatrix::tocsc] Exit code " << status << "\n";
 			umfpack_zl_report_status(0, status);
 		}
 		
@@ -817,7 +817,7 @@ CsrMatrix CooMatrix::tocsr() const
 		// check success
 		if (status != 0)
 		{
-			fprintf(stderr, "\n[CooMatrix::tocsr] %ld ", status);
+			std::cerr << "\n[CooMatrix::tocsr] Exit code " << status << "\n";
 			umfpack_zl_report_status(0, status);
 		}
 		
@@ -1374,7 +1374,7 @@ cArray SymDiaMatrix::dot(cArrayView const & B) const
 
 SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
-	// FIXME
+	// FIXME this is ugly and inefficient
 	return ::kron (this->tocoo(), B.tocoo()).todia();
 }
 

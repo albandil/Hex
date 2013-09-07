@@ -40,6 +40,7 @@
  * - umfpack_zl_free_symbolic
  * - umfpack_zl_free_numeric
  * - umfpack_zl_report_status
+ * - umfpack_zl_get_lunz
  */
 #include <umfpack.h>
 
@@ -278,6 +279,15 @@ public:
 			}
 		}
 		
+		size_t size() const
+		{
+			long lnz, unz, m, n, nz_udiag;
+			long status = umfpack_zl_get_lunz (
+				&lnz, &unz, &m, &n, &nz_udiag, __Numeric__
+			);
+			return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
+		}
+		
 		cArray solve(cArrayView const & b, unsigned eqs = 1)
 		{
 			// reserve space for the solution
@@ -312,7 +322,7 @@ public:
 				// check output
 				if (status != 0)
 				{
-					fprintf(stderr, "\n[CsrMatrix::LUft::solve] %ld ", status);
+					std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << "\n";
 					umfpack_zl_report_status(0, status);
 				}
 			}
@@ -899,6 +909,8 @@ public:
 	NumberArray<int>     const & diag() const { return idiag_; }
 	NumberArray<Complex> const & data() const { return elems_; }
 	
+	cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
+	
 	bool is_compatible (SymDiaMatrix const & B) const;
 	
 	//
@@ -1260,7 +1272,7 @@ unsigned bicgstab_callbacks(
 		rho_im1 = (rt | r_im1);
 		if (rho_im1 == 0.)
 		{
-			fprintf(stderr, "BiCG failed, ρ = 0\n");
+			std::cerr << "BiCG failed, ρ = 0\n";
 			return i-1;
 		}
 		
@@ -1279,7 +1291,7 @@ unsigned bicgstab_callbacks(
 		alpha_i = rho_im1 / (rt|v_i);
 		s = r_im1 - alpha_i * v_i;
 		
-		fprintf(stdout, "\t[bcg] s-residual relative magnitude after %d iterations: %g\n", i, s.norm() / b.norm()); fflush(stdout);
+		std::cout << "\t[bcg] s-residual relative magnitude after " << i << " iterations: " << s.norm() / b.norm() << "\n";
 		
 		if (s.norm() < eps * b.norm())
 		{
@@ -1293,7 +1305,7 @@ unsigned bicgstab_callbacks(
 		x_i = x_im1 + alpha_i * phat + omega_i * shat;
 		r_i = s - omega_i * t;
 		
-		fprintf(stdout, "\t[bcg] r-residual relative magnitude after %d iterations: %g\n", i, r_i.norm() / b.norm()); fflush(stdout);
+		std::cout << "\t[bcg] r-residual relative magnitude after " << i << " iterations: " << r_i.norm() / b.norm() << "\n";
 		
 		if (r_i.norm() < eps * b.norm())
 		{
@@ -1303,7 +1315,7 @@ unsigned bicgstab_callbacks(
 		
 		if (omega_i == 0.)
 		{
-			fprintf(stderr, "BiCG failed, ω = 0\n");
+			std::cerr << "BiCG failed, ω = 0\n";
 			return i;
 		}
 		
