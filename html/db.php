@@ -65,6 +65,12 @@
 				document.getElementById("context-more-1").style.display = "none";
 			}
 		}
+		function jsEallClick()
+		{
+			document.getElementById("iEmin").disabled = !document.getElementById("iEmin").disabled;
+			document.getElementById("iEmax").disabled = !document.getElementById("iEmax").disabled;
+			document.getElementById("idE").disabled   = !document.getElementById("idE").disabled;
+		}
 	</script>
 
 	<script type="text/x-mathjax-config">
@@ -96,14 +102,17 @@
 	</table>
 	</center>
 
+	<!-- body -->
+
 	<table width = "100%" style = "table-layout:fixed;"><tr><td valign = "top" width = "50%">
 
 	<div class = "sekce">Input:</div>
 
+	<!-- scattering variable -->
 	<form name = "data" action = "db.php" method = "post" style = "margin: 10px">
 		<div class = "text">Choose what to compute:</div>
 		<center>
-			<select name = "qty" onchange="this.form.submit()">
+			<select name = "qty" title = "scattering quantity to compute" onchange = "this.form.submit()">
 				<option value = "ccs" <?php
 					if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs")
 						echo "selected = \"selected\"";
@@ -139,9 +148,10 @@
 			</select>
 		</center>
 
+		<!-- units -->
 		<div class = "text">Choose units:</div>
 		<center>
-			<span class = "text">Energy: <select name = "Eunits">
+			<span class = "text">Energy: <select name = "Eunits" title = "energy units for energy input">
 				<option value = "Ry" <?php
 					if (!isset($_POST["Eunits"]) or $_POST["Eunits"] == "Ry")
 						echo "selected = \"selected\"";
@@ -154,7 +164,7 @@
 					if (isset($_POST["Eunits"]) and $_POST["Eunits"] == "eV")
 						echo "selected = \"selected\"";
 					?> >eV</option>
-			</select> ,  Output: <select name = "Tunits">
+			</select> ,  Output: <select name = "Tunits" title = "length units for (dimensioned) output">
 				<option value = "a.u." <?php
 					if (!isset($_POST["Tunits"]) or $_POST["Tunits"] == "a.u.")
 						echo "selected = \"selected\"";
@@ -166,32 +176,35 @@
 			</select></span>
 		</center>
 
+		<!-- initial atomic state -->
 		<div class = "text">Set initial atomic state(s):</div>
 		<center>
-			\(n_i\) = <input type = "text" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
-			\(l_i\) = <input type = "text" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
-			\(m_i\) = <input type = "text" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
+			\(n_i\) = <input type = "text" title = "initial principal quantum number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
+			\(l_i\) = <input type = "text" title = "initial orbital quantum number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
+			\(m_i\) = <input type = "text" title = "initial magnetic quantum number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
 		</center>
 		
-		<?php
+		<!-- final tomic state -->
+<?php
 			if (!isset($_POST["qty"]) or $_POST["qty"] != "tcs")
 			{
 				printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(n_f\\) = <input type = \"text\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
-				printf("\t\t\t\\(l_f\\) = <input type = \"text\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
-				printf("\t\t\t\\(m_f\\) = <input type = \"text\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
+				printf("\t\t\t\\(n_f\\) = <input type = \"text\" title = \"final principal quantum number\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+				printf("\t\t\t\\(l_f\\) = <input type = \"text\" title = \"final orbital quantum number\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+				printf("\t\t\t\\(m_f\\) = <input type = \"text\" title = \"final magnetic quantum number\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
 				printf("\t\t</center>\n");
 			}
-		?>
+?>
 		
-		<?php
+		<!-- total quantum numbers -->
+<?php
 			if (isset($_POST["qty"]) and $_POST["qty"] == "scatamp") //~ scatamp
 			{
-				printf("\t\t<div class = \"text\">Set global quantum numbers:</div>\n");
+				printf("\t\t<div class = \"text\">Set total quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(E\\) = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-				printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+				printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+				printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
 			else if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
@@ -206,72 +219,71 @@
 				{
 					case "scatamp":
 					case "dcs":
-						printf("\t\t\t\\(E\\) = <input type = \"text\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "momtf":
-						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "ics":
 					case "colls":
-						printf("\t\t\t\\(L\\) = <input type = \"text\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
-						printf("\t\t\t\\(S\\) = <input type = \"text\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(L\\) = <input type = \"text\" title = \"total orbital momentum of the two electrons\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 				}
 				printf("\t\t</center>\n");
 			}
-		?>
+?>
 
-		<?php
+		<!-- scattering angles -->
+<?php
 			if ($_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
 			{
 				printf("\t\t<div class = \"text\">Set angular range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" name = \"thmin\" size = \"5\" value = \"%s\"/>\n", $_POST["thmin"]);
-				printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" name = \"thmax\" size = \"5\" value = \"%s\"/>\n", $_POST["thmax"]);
-				printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" name = \"dth\" size = \"5\" value = \"%s\"/>\n", $_POST["dth"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" title = \"smallest scattering angle\" name = \"thmin\" size = \"5\" value = \"%s\"/>\n", $_POST["thmin"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" title = \"largest scattering angle\" name = \"thmax\" size = \"5\" value = \"%s\"/>\n", $_POST["thmax"]);
+				printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" title = \"spacing between the scattering angles\" name = \"dth\" size = \"5\" value = \"%s\"/>\n", $_POST["dth"]);
 				printf("\t\t</center>\n");
 			}
-		?>
+?>
 
-		<?php
+		<!-- impact energies -->
+<?php
 			if (!isset($_POST["qty"]) or $_POST["qty"] == "ics" or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "colls"
 				or $_POST["qty"] == "momtf" or $_POST["qty"] == "tcs")
 			{
-// 				// unit transform
-// 				$Eunits = 1.;
-// 				if (isset($_POST["Eunits"]))
-// 				{
-// 					switch ($_POST["Eunits"])
-// 					{
-// 						case "au":
-// 							$Eunits = 0.5;
-// 							break;
-// 						case "eV":
-// 							$Eunits = 13.605692;
-// 							break;
-// 						default:
-// 							break;
-// 					}
-// 				}
-				
-				// default energies in Rydberg units
-				$Emin_def = -1;
-				$Emax_def = 0;
-				$DE_def = 1;
+				// get checkbox status
+				if (isset($_POST["Eall"]) or !isset($_POST["qty"]))
+				{
+					$editstatus = " disabled = \"disabled\"";
+					$chckstatus = " checked = \"checked\"";
+				}
+				else
+				{
+					$editstatus = "";
+					$chckstatus = "";
+				}
 				
 				printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" name = \"Emin\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : $Emin_def);
-				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" name = \"Emax\" size = \"5\" value = \"%s\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : $Emax_def);
-				printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" name = \"dE\" size = \"5\" value = \"%s\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : $DE_def);
+				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
+				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
+				printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
+				printf("\t\t</center>\n");
+				
+				
+				printf("\t\t<div class = \"text\">or</div>\n");
+				printf("\t\t<center>\n");
+				printf("\t\t\t<input type = \"checkbox\" name = \"Eall\" onclick = \"jsEallClick()\" value = \"1\"$chckstatus> retrieve all available energies.\n");
 				printf("\t\t</center>\n");
 			}
-		?>
+?>
 		
 		<br/>
 		
-		<?php
+		<!-- hidden element containing the output from hex-db -->
+<?php
 			include "hexdbexe.inc";	// defines $hexdbexe
 			include "hexdbdat.inc";	// defines $hexdbdat
 			
@@ -299,6 +311,13 @@
 				
 				$hexcmdline = $hexcmdline . " --Eunits=" . $strEunits;
 				$hexcmdline = $hexcmdline . " --Tunits=" . $strTunits;
+				
+				if (isset($_POST["Eall"]))
+				{
+					$_POST["Emin"] = -1;
+					$_POST["Emax"] =  0;
+					$_POST["dE"]    = 1;
+				}
 				
 				// compute standard input for Hex-db (energies or angles)
 				if ($_POST["qty"] == "scatamp" or $_POST["qty"] == "dcs")
@@ -335,8 +354,9 @@
 				// store output data to hidden form element
 				echo "<input type=\"hidden\" name=\"hexoutput\" value='$hexoutput' />";
 			}
-		?>
+?>
 
+		<!-- view/download buttons -->
 		<center>
 			<input type = "submit" value = "View data" name = "view"/>
 			&nbsp;&nbsp;&nbsp;
@@ -353,7 +373,7 @@
 	<div class = "sekce">Output:</div>
 	<div class = "text">This section contains a graphical preview of selected data.</div>
 
-	<?php
+<?php
 		if (isset($_POST["qty"]) and (isset($_POST["view"]) or isset($_POST["download"])))
 		{
 			// generate image
@@ -376,9 +396,6 @@
 			if (isset($_POST["Tunits"]) and $_POST["Tunits"] == "cgs")
 				fwrite($pipes2[0], "set format y '%g'\n");
 				
-// 			if ($nums[0] >= 1)
-// 				fwrite($pipes2[0], "set logscale\n");
-			
 			if ($_POST["qty"] == "scatamp")
 			{
 				fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
@@ -415,7 +432,7 @@
 			// write text data
 // 			echo "\t<div class = \"output\"><pre>$hexoutput</pre></div>\n";
 		}
-	?>
+?>
 
 	</td></tr><tr><td colspan="2" width = "100%">
 
