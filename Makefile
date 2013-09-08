@@ -1,6 +1,6 @@
 SUBDIRS = hex-db hex-ecs hex-pwba hex-dwba utilities
 
-.PHONY: subdirs $(SUBDIRS)
+.PHONY: $(SUBDIRS)
 
 default : all
 
