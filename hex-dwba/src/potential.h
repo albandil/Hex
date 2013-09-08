@@ -97,6 +97,24 @@ public:
 	 */
 	double operator() (double x) const;
 	
+    /**
+     * @brief Classical turning point.
+     * 
+     * This is only a compulsory pure-virtual function of the base class;
+     * it has no physical meaning in DistortingPotential.
+     */
+    double getTurningPoint () const { return 0.; }
+    
+    /**
+     * @brief Near-zero asymptotic behaviour.
+     * @param r Evaluation radius.
+     * @return Pair (y,k) that can be used to reconstruct the value of the potential,
+     * @[
+     *     U(x) = y \cdot r^k\ .
+     * @]
+     */
+    std::pair<double,int> getZeroAsymptotic (double x) const { return std::make_pair(-1,-1); }
+    
 	/**
 	 * \brief Add multipole field potential to the distorting potential.
 	 * 

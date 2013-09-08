@@ -28,6 +28,8 @@ public:
     IrregularWave(double _kn, int _ln, DistortingPotential const & _U);
     IrregularWave(IrregularWave const& W) { *this = W; }
     
+    ~IrregularWave();
+    
     IrregularWave operator= (IrregularWave const& W);
     
     /**
@@ -36,6 +38,12 @@ public:
      * \return Real distorted wave.
      */
     Complex operator()(double x) const;
+    
+    /// Classical turning point.
+    double getTurningPoint () const { return r0; }
+    
+    /// Near-zero asymptotic behaviour.
+    std::pair<Complex,int> getZeroAsymptotic (double x) const;
     
     /**
      * Return derivatives from the distorted wave equation.
@@ -53,7 +61,7 @@ private:
     DistortingPotential U;
     
     // interpolators
-    o2scl::interp_cspline<rArray> interpolator_re, interpolator_im, interpolator0_re, interpolator0_im;
+    gsl_interp *interpolator_re, *interpolator_im, *interpolator0_re, *interpolator0_im;
     
     // distorted wave input parameters
     double kn;      // wavenumber of the distorted wave

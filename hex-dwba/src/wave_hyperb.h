@@ -44,6 +44,8 @@ public:
 	HyperbolicWave(double _kn, int _ln, DistortingPotential const & _U);
 	HyperbolicWave(HyperbolicWave const& W) { *this = W; }
 	
+	~HyperbolicWave();
+	
 	HyperbolicWave operator= (HyperbolicWave const& W);
 	
 	/**
@@ -53,6 +55,12 @@ public:
 	 */
 	double operator()(double x) const;
 	
+    /// Classical turning point.
+    double getTurningPoint () const { return r0; }
+    
+    /// Near-zero asymptotic behaviour.
+    std::pair<double,int> getZeroAsymptotic (double x) const;
+    
 	/**
 	 * \brief Return derivatives from the distorted wave equation.
 	 * 
@@ -70,6 +78,7 @@ public:
 	 * coordinate \f$ x \f$.
 	 */
 	int derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
+    int derivs0(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
 	
 	void toFile(const char * filename) const;
 	
@@ -83,7 +92,7 @@ private:
 	DistortingPotential U;
 	
 	/// interpolator
-	o2scl::interp_cspline<rArray> interpolator;
+	gsl_interp *interpolator, *interpolator0;
 	
 	/// wavenumber of the distorted wave
 	double kn;
@@ -92,18 +101,21 @@ private:
 	int ln;
 	
 	/// sample count
-	int samples;
+	int samples, samples0;
 	
 	/// discretization step
-	double h;
+	double h, h0;
 	
 	/// grid
-	rArray grid;
+	rArray grid, grid0;
 	
 	/// samples
-	rArray array;
+	rArray array, array0;
 	
 	bool Scaled;
+    
+    /// classical turning point, far radius
+    double r0, rf;
 };
 
 #endif

@@ -8,7 +8,7 @@
  *                         Jakub Benda (c) 2013                              *
  *                     Charles University in Prague                          *
  *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ * \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #ifndef HEX_ARRAYS_H
 #define HEX_ARRAYS_H
@@ -41,208 +41,208 @@ template <typename NumberType> class NumberArray;
  */
 template <typename NumberType> class ArrayView
 {
-	protected:
-		
-		size_t N;
-		NumberType * array;
-		
-	public:
-		
-		// alias
-		typedef NumberType DataType;
-		typedef NumberType * iterator;
-		typedef NumberType const * const_iterator;
-		
-		// empty constructor
-		ArrayView() : N(0), array(nullptr) {}
-		
-		// construct view from Array non-const lvalue reference
-		ArrayView(Array<NumberType> & a, size_t i = 0, size_t n = 0)
-		{
-			N = (n > 0) ? n : a.size();
-			array = a.data() + i;
-		}
-		
-		// construct view from Array const lvalue reference
-		ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
-		{
-			N = (n > 0) ? n : a.size();
-			array = const_cast<NumberType*>(a.data()) + i;
-		}
-		
-		// construct from consecutive memory segment
-		ArrayView(NumberType const * i, NumberType const * j)
-		{
-			N = j - i;
-			array = const_cast<NumberType*>(&(*i));
-		}
-		
-		// destructor
-		~ArrayView() {}
-		
-		//
-		// assignments
-		//
-		
-		virtual ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
-		{
-			if (v.size() != N)
-				throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
-			
-			for (size_t i = 0; i < N; i++)
-				array[i] = v[i];
-			
-			return *this;
-		}
-		
-		//
-		// element-wise access (non-const)
-		//
-		
-		virtual NumberType& operator[] (size_t i)
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			// bounds check
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		//
-		// element-wise access (const)
-		//
-		
-		virtual NumberType const & operator[] (size_t i) const
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		// getters
-		virtual size_t size() const { return N; }
-		
-		//
-		// data pointer
-		//
-		
-		virtual NumberType* data() { return array; }
-		virtual const NumberType* data() const { return array; }
-		
-		//
-		// STL-like iterator interface
-		//
-		
-		virtual iterator begin ()
-				{ return array; }
-		virtual const_iterator begin () const
-				{ return array; }
-		virtual iterator end ()
-				{ return array + N; }
-		virtual const_iterator end () const
-				{ return array + N; }
-		virtual NumberType & front (int i = 0)
-				{ return *(array + i); }
-		virtual NumberType const & front (int i = 0) const
-				{ return *(array + i); }
-		virtual NumberType & back (int i = 0)
-				{ return *(array + N - 1 - i); }
-		virtual NumberType const & back (int i = 0) const
-				{ return *(array + N - 1 - i); }
-		
-		//
-		// reduced arithmetic operators with other arrays
-		//
-		
-		virtual ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.size());
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] += b[i];
-			
-			return *this;
-		}
-		
-		virtual ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] += b.array[i];
-			
-			return *this;
-		}
-		
-		virtual ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.size());
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] -= b[i];
-			
-			return *this;
-		}
-		
-		virtual ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] -= b.array[i];
-			
-			return *this;
-		}
-		
-		virtual ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.size());
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] /= b[i];
-			
-			return *this;
-		}
-		
-		virtual ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
-		{
-			// check if sizes match
- 			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] /= b.array[i];
-			
-			return *this;
-		}
-		
-		// some other functions
-		virtual void clear()
-		{
-			for (size_t i = 0; i < N; i++)
-				array[i] = NumberType(0);
-		}
-		
-		bool empty() const { return N == 0; }
+protected:
+    
+    size_t N;
+    NumberType * array;
+    
+public:
+    
+    // alias
+    typedef NumberType DataType;
+    typedef NumberType * iterator;
+    typedef NumberType const * const_iterator;
+    
+    // empty constructor
+    ArrayView() : N(0), array(nullptr) {}
+    
+    // construct view from Array non-const lvalue reference
+    ArrayView(Array<NumberType> & a, size_t i = 0, size_t n = 0)
+    {
+        N = (n > 0) ? n : a.size();
+        array = a.data() + i;
+    }
+    
+    // construct view from Array const lvalue reference
+    ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
+    {
+        N = (n > 0) ? n : a.size();
+        array = const_cast<NumberType*>(a.data()) + i;
+    }
+    
+    // construct from consecutive memory segment
+    ArrayView(NumberType const * i, NumberType const * j)
+    {
+        N = j - i;
+        array = const_cast<NumberType*>(&(*i));
+    }
+    
+    // destructor
+    ~ArrayView() {}
+    
+    //
+    // assignments
+    //
+    
+    virtual ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
+    {
+        if (v.size() != N)
+            throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
+        
+        for (size_t i = 0; i < N; i++)
+            array[i] = v[i];
+        
+        return *this;
+    }
+    
+    //
+    // element-wise access (non-const)
+    //
+    
+    virtual NumberType& operator[] (size_t i)
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        // bounds check
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    //
+    // element-wise access (const)
+    //
+    
+    virtual NumberType const & operator[] (size_t i) const
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    // getters
+    virtual size_t size() const { return N; }
+    
+    //
+    // data pointer
+    //
+    
+    virtual NumberType* data() { return array; }
+    virtual const NumberType* data() const { return array; }
+    
+    //
+    // STL-like iterator interface
+    //
+    
+    virtual iterator begin ()
+    { return array; }
+    virtual const_iterator begin () const
+    { return array; }
+    virtual iterator end ()
+    { return array + N; }
+    virtual const_iterator end () const
+    { return array + N; }
+    virtual NumberType & front (int i = 0)
+    { return *(array + i); }
+    virtual NumberType const & front (int i = 0) const
+    { return *(array + i); }
+    virtual NumberType & back (int i = 0)
+    { return *(array + N - 1 - i); }
+    virtual NumberType const & back (int i = 0) const
+    { return *(array + N - 1 - i); }
+    
+    //
+    // reduced arithmetic operators with other arrays
+    //
+    
+    virtual ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.size());
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] += b[i];
+        
+        return *this;
+    }
+    
+    virtual ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] += b.array[i];
+        
+        return *this;
+    }
+    
+    virtual ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.size());
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] -= b[i];
+        
+        return *this;
+    }
+    
+    virtual ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] -= b.array[i];
+        
+        return *this;
+    }
+    
+    virtual ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.size());
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] /= b[i];
+        
+        return *this;
+    }
+    
+    virtual ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] /= b.array[i];
+        
+        return *this;
+    }
+    
+    // some other functions
+    virtual void clear()
+    {
+        for (size_t i = 0; i < N; i++)
+            array[i] = NumberType(0);
+    }
+    
+    bool empty() const { return N == 0; }
 };
 
 /**
@@ -254,322 +254,325 @@ template <typename NumberType> class ArrayView
  */
 template <typename DataType> class Array : public ArrayView<DataType>
 {
-	
-	private:
-		
-		size_t N;
-		DataType * array;
-		
-	public:
-		
-		// default constructor, creates an empty array
-		Array() : N(0), array(nullptr) {}
-		
-		// constructor, creates a length-n "x"-filled array
-		Array(size_t n, DataType x = 0) : N(n)
-		{
-			// reserve space
-			array = new DataType [N]();
-					
-			// set to zero
-			for (size_t i = 0; i < N; i++)
-				array[i] = x;
-		}
-		
-		// constructor, copies a length-n "array
-		Array(size_t n, DataType* x) : N(n)
-		{
-			// reserve space
-			array = new DataType [N]();
-					
-			// set to zero
-			for (size_t i = 0; i < N; i++)
-				array[i] = x[i];
-		}
-		
-		// copy constructor from Array const lvalue reference
-		Array(Array<DataType> const & a)
-		{
-			// reserve space
-			N = a.N;
-			array = new DataType [N]();
-	
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a.array[i];
-		}
-		
-		// copy constructor from ArrayView const lvalue reference
-		Array(ArrayView<DataType> const & a)
-		{
-			// reserve space
-			N = a.size();
-			array = new DataType [N]();
-	
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a.data()[i];
-		}
-		
-		// copy constructor from Array rvalue reference
-		Array(Array<DataType> && a)
-		{
-			// copy content
-			N = a.N;
-			array = a.array;
-			
-			// clear rvalue
-			a.N = 0;
-			a.array = nullptr;
-		}
-		
-		// copy constructor from std::vector
-		Array(std::vector<DataType> const & a)
-		{
-			// reserve space
-			N = a.size();
-			array = new DataType [N]();
-			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a[i];
-		}
-		
-		// copy constructor from initializer list
-		Array(std::initializer_list<DataType> a)
-		{
-			// reserve space
-			N = a.end() - a.begin();
-			array = new DataType [N]();
-			
-			// run over the elements
-			size_t i = 0;
-			for (auto it = a.begin(); it != a.end(); it++)
-				array[i++] = *it;
-		}
-		
-		// copy constructor from two forward iterators
-		template <typename ForwardIterator> Array(ForwardIterator i, ForwardIterator j)
-		{
-			// compute size
-			N = 0;
-			for (ForwardIterator k = i; k != j; k++)
-				N++;
-			
-			// reserve space
-			array = new DataType [N]();
-			
-			// run over the elements
-			size_t n = 0;
-			for (ForwardIterator k = i; k != j; k++)
-				array[n++] = *k;
-		}
-		
-		// destructor
-		~Array()
-		{
-			if (array != nullptr)
-				delete [] array;
-		}
-		
-		//
-		// storage size
-		//
-		
-		size_t size() const { return N; }
-		size_t resize (size_t n)
-		{
-			if (n == 0)
-			{
-				if (array != nullptr)
-				{
-					delete [] array;
-					N = 0;
-				}
-				return 0;
-			}
-			
-			DataType * new_array = new DataType [n]();
-			for (size_t i = 0; i < n; i++)
-				new_array[i] = (i < N) ? array[i] : DataType(0);
-			delete [] array;
-			N = n;
-			array = new_array;
-			return N;
-		}
-		
-		//
-		// element-wise access (non-const)
-		//
-		
-		inline DataType& operator[] (size_t i)
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			// bounds check
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		//
-		// element-wise access (const)
-		//
-		
-		inline DataType const & operator[] (size_t i) const
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		//
-		// data pointer
-		//
-		
-		DataType* data() { return array; }
-		const DataType* data() const { return array; }
-		
-		//
-		// STL-like iterator interface
-		//
-		
-		typedef DataType* iterator;
-		typedef const DataType* const_iterator;
-		iterator begin()
-				{ return array; }
-		const_iterator begin() const
-				{ return array; }
-		iterator end()
-				{ return array + N; }
-		const_iterator end() const
-				{ return array + N; }
-		DataType & front(int i = 0)
-				{ return *(array + i); }
-		DataType const & front(int i = 0) const
-				{ return *(array + i); }
-		DataType & back(int i = 0)
-				{ return *(array + N - 1 - i); }
-		DataType const & back(int i = 0) const
-				{ return *(array + N - 1 - i); }
-		
-		void push_back(DataType const & a)
-		{
-			// not very efficient... FIXME
-			
-			DataType* new_array = new DataType [N + 1]();
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = std::move(array[i]);
-			new_array[N] = a;
-			N++;
-			delete [] array;
-			array = new_array;
-		}
-		
-		DataType pop_back()
-		{
-			if (N > 0)
-				return *(array + (--N));
-			else
-				throw exception ("Array has no element to pop!");
-		}
-		
-		template <class InputIterator> void append (
-			InputIterator first, InputIterator last
-		) {
-			DataType* new_array = new DataType [N + last - first]();
-			for (size_t i = 0; i < N; i++)
-				new_array[i] = array[i];
-			for (InputIterator it = first; it != last; it++)
-				new_array[N + it - first] = *it;
-			N += last - first;
-			delete [] array;
-			array = new_array;
-		}
-		
-		void insert (iterator it, DataType x)
-		{
-			// create new array (one element longer)
-			DataType* new_array = new DataType [N + 1];
-			
-			// copy everything to the new location
-			for (int i = 0; i < it - array; i++)
-				new_array[i] = std::move(array[i]);
-			
-			// insert new element
-			*(new_array + (it - array)) = std::move(x);
-			
-			// copy the rest
-			for (int i = it - array; i < (int)N; i++)
-				new_array[i+1] = std::move(array[i]);
-			
-			// change pointers
-			delete [] array;
-			N++;
-			array = new_array;
-		}
-		
-		bool empty() const
-		{
-			return N == 0;
-		}
-		
-		//
-		// assignment operators
-		//
-		
-		Array<DataType>& operator = (Array<DataType> const &  b)
-		{
-			// if we already have some allocated space, check its size,
-			// so that we do not free it uselessly
-			if (array != nullptr and N != b.N)
-			{
-				delete [] array;
-				array = nullptr;
-			}
-			
-			// set the new dimension
-			N = b.N;
-			
-			// if necessary, reserve space
-			if (array == nullptr)
-				array = new DataType [N]();
-			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = b.array[i];
-			
-			return *this;
-		}
-		
-		Array<DataType>& operator = (Array<DataType> &&  b)
-		{
-			// if we already have some allocated space, check its size,
-			// so that we do not free it uselessly
-			if (array != nullptr)
-			{
-				delete [] array;
-				array = nullptr;
-			}
-			
-			// move content
-			N = b.N;
-			array = b.array;
-			
-			// clear rvalue
-			b.N = 0;
-			b.array = nullptr;
-			
-			return *this;
-		}
+    
+private:
+    
+    size_t N;
+    DataType * array;
+    
+public:
+    
+    // default constructor, creates an empty array
+    Array() : N(0), array(nullptr) {}
+    
+    // constructor, creates a length-n "x"-filled array
+    Array(size_t n, DataType x = 0) : N(n)
+    {
+        // reserve space
+        array = new DataType [N]();
+        
+        // set to zero
+        for (size_t i = 0; i < N; i++)
+            array[i] = x;
+    }
+    
+    // constructor, copies a length-n "array
+    Array(size_t n, DataType* x) : N(n)
+    {
+        // reserve space
+        array = new DataType [N]();
+        
+        // set to zero
+        for (size_t i = 0; i < N; i++)
+            array[i] = x[i];
+    }
+    
+    // copy constructor from Array const lvalue reference
+    Array(Array<DataType> const & a)
+    {
+        // reserve space
+        N = a.N;
+        array = new DataType [N]();
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a.array[i];
+    }
+    
+    // copy constructor from ArrayView const lvalue reference
+    Array(ArrayView<DataType> const & a)
+    {
+        // reserve space
+        N = a.size();
+        array = new DataType [N]();
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a.data()[i];
+    }
+    
+    // copy constructor from Array rvalue reference
+    Array(Array<DataType> && a)
+    {
+        // copy content
+        N = a.N;
+        array = a.array;
+        
+        // clear rvalue
+        a.N = 0;
+        a.array = nullptr;
+    }
+    
+    // copy constructor from std::vector
+    Array(std::vector<DataType> const & a)
+    {
+        // reserve space
+        N = a.size();
+        array = new DataType [N]();
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a[i];
+    }
+    
+    // copy constructor from initializer list
+    Array(std::initializer_list<DataType> a)
+    {
+        // reserve space
+        N = a.end() - a.begin();
+        array = new DataType [N]();
+        
+        // run over the elements
+        size_t i = 0;
+        for (auto it = a.begin(); it != a.end(); it++)
+            array[i++] = *it;
+    }
+    
+    // copy constructor from two forward iterators
+    template <typename ForwardIterator> Array(ForwardIterator i, ForwardIterator j)
+    {
+        // compute size
+        N = 0;
+        for (ForwardIterator k = i; k != j; k++)
+            N++;
+        
+        // reserve space
+        array = new DataType [N]();
+        
+        // run over the elements
+        size_t n = 0;
+        for (ForwardIterator k = i; k != j; k++)
+            array[n++] = *k;
+    }
+    
+    // destructor
+    ~Array()
+    {
+        if (array != nullptr)
+        {
+            delete [] array;
+            array = nullptr;
+        }
+    }
+    
+    //
+    // storage size
+    //
+    
+    size_t size() const { return N; }
+    size_t resize (size_t n)
+    {
+        if (n == 0)
+        {
+            if (array != nullptr)
+            {
+                delete [] array;
+                N = 0;
+            }
+            return 0;
+        }
+        
+        DataType * new_array = new DataType [n]();
+        for (size_t i = 0; i < n; i++)
+            new_array[i] = (i < N) ? array[i] : DataType(0);
+        delete [] array;
+        N = n;
+        array = new_array;
+        return N;
+    }
+    
+    //
+    // element-wise access (non-const)
+    //
+    
+    inline DataType& operator[] (size_t i)
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        // bounds check
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    //
+    // element-wise access (const)
+    //
+    
+    inline DataType const & operator[] (size_t i) const
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    //
+    // data pointer
+    //
+    
+    DataType* data() { return array; }
+    const DataType* data() const { return array; }
+    
+    //
+    // STL-like iterator interface
+    //
+    
+    typedef DataType* iterator;
+    typedef const DataType* const_iterator;
+    iterator begin()
+    { return array; }
+    const_iterator begin() const
+    { return array; }
+    iterator end()
+    { return array + N; }
+    const_iterator end() const
+    { return array + N; }
+    DataType & front(int i = 0)
+    { return *(array + i); }
+    DataType const & front(int i = 0) const
+    { return *(array + i); }
+    DataType & back(int i = 0)
+    { return *(array + N - 1 - i); }
+    DataType const & back(int i = 0) const
+    { return *(array + N - 1 - i); }
+    
+    void push_back(DataType const & a)
+    {
+        // not very efficient... FIXME
+        
+        DataType* new_array = new DataType [N + 1]();
+        for (size_t i = 0; i < N; i++)
+            new_array[i] = std::move(array[i]);
+        new_array[N] = a;
+        N++;
+        delete [] array;
+        array = new_array;
+    }
+    
+    DataType pop_back()
+    {
+        if (N > 0)
+            return *(array + (--N));
+        else
+            throw exception ("Array has no element to pop!");
+    }
+    
+    template <class InputIterator> void append (
+        InputIterator first, InputIterator last
+    ) {
+        DataType* new_array = new DataType [N + last - first]();
+        for (size_t i = 0; i < N; i++)
+            new_array[i] = array[i];
+        for (InputIterator it = first; it != last; it++)
+            new_array[N + it - first] = *it;
+        N += last - first;
+        delete [] array;
+        array = new_array;
+    }
+    
+    void insert (iterator it, DataType x)
+    {
+        // create new array (one element longer)
+        DataType* new_array = new DataType [N + 1];
+        
+        // copy everything to the new location
+        for (int i = 0; i < it - array; i++)
+            new_array[i] = std::move(array[i]);
+        
+        // insert new element
+        *(new_array + (it - array)) = std::move(x);
+        
+        // copy the rest
+        for (int i = it - array; i < (int)N; i++)
+            new_array[i+1] = std::move(array[i]);
+        
+        // change pointers
+        delete [] array;
+        N++;
+        array = new_array;
+    }
+    
+    bool empty() const
+    {
+        return N == 0;
+    }
+    
+    //
+    // assignment operators
+    //
+    
+    Array<DataType>& operator = (Array<DataType> const &  b)
+    {
+        // if we already have some allocated space, check its size,
+        // so that we do not free it uselessly
+        if (array != nullptr and N != b.N)
+        {
+            delete [] array;
+            array = nullptr;
+        }
+        
+        // set the new dimension
+        N = b.N;
+        
+        // if necessary, reserve space
+        if (array == nullptr)
+            array = new DataType [N]();
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = b.array[i];
+        
+        return *this;
+    }
+    
+    Array<DataType>& operator = (Array<DataType> &&  b)
+    {
+        // if we already have some allocated space, check its size,
+        // so that we do not free it uselessly
+        if (array != nullptr)
+        {
+            delete [] array;
+            array = nullptr;
+        }
+        
+        // move content
+        N = b.N;
+        array = b.array;
+        
+        // clear rvalue
+        b.N = 0;
+        b.array = nullptr;
+        
+        return *this;
+    }
 };
 
 /**
@@ -586,993 +589,994 @@ template <typename DataType> class Array : public ArrayView<DataType>
  */
 template <typename NumberType> class NumberArray : public Array<NumberType>
 {
-	public:
-		
-		size_t N, Nres;
-		NumberType * array;
-		
-		// allocate aligned memory
-		NumberType* alloc_(size_t n)
-		{
-			// is there anything to allocate?
-			if (n < 1)
-				return nullptr;
-			
-			// allocate the aligned memory; make sure there will be even number of elements
-			// so that we can always use pairs
-			void* aligned_ptr;
-			posix_memalign (
-				&aligned_ptr,
-				std::max(__alignof(NumberType), sizeof(void*)),
-				(n + (n % 2)) * sizeof(NumberType)
-			);
-			
-			// get the number pointer
-			NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
-			
-			// clear the last element so that we may disregard it during multiplication
-			*(ptr + n + (n % 2) - 1) = 0;
-			
-			// return the pointer
-			return ptr;
-		}
-		
-		// deallocate the memory
-		void destroy_()
-		{
-			if (array != nullptr)
-				free(array);
-			array = nullptr;
-		}
-		
-	public:
-		
-		// alias
-		typedef NumberType DataType;
-		
-		// inner product of two arrays
-		template <typename NumberType1, typename NumberType2> friend auto operator | (
-			NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-		) -> decltype(NumberType1(0)*NumberType2(0));
-				
-		// default constructor, creates an empty array
-		NumberArray() : N(0), Nres(0), array(nullptr) {}
-		
-		// constructor, creates a length-n "x"-filled array
-		NumberArray(size_t n, NumberType x = 0) : N(n), Nres(n)
-		{
-			// reserve space
-			array = alloc_(Nres);
-			
-			// set to zero
-			for (size_t i = 0; i < N; i++)
-				array[i] = x;
-		}
-		
-		// constructor, copies a length-n "array
-		NumberArray(size_t n, NumberType* x) : N(n), Nres(n)
-		{
-			// reserve space
-			array = alloc_(Nres);
-					
-			// set to zero
-			for (size_t i = 0; i < N; i++)
-				array[i] = x[i];
-		}
-		
-		// copy constructor from Array const lvalue reference
-		NumberArray(NumberArray<NumberType> const & a)
-		{
-			// reserve space
-			N = Nres = a.N;
-			array = alloc_(Nres);
-	
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a.array[i];
-		}
-		
-		// copy constructor from ArrayView const lvalue reference
-		NumberArray(ArrayView<NumberType> const & a)
-		{
-			// reserve space
-			N = Nres = a.size();
-			array = alloc_(Nres);
-	
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a.data()[i];
-		}
-		
-		// copy constructor from Array rvalue reference
-		NumberArray(NumberArray<NumberType> && a)
-		{
-			// copy content
-			N = a.N;
-			Nres = a.Nres;
-			array = a.array;
-			
-			// clear rvalue
-			a.N = 0;
-			a.Nres = 0;
-			a.array = nullptr;
-		}
-		
-		// copy constructor from std::vector
-		NumberArray(std::vector<NumberType> const & a)
-		{
-			// reserve space
-			N = Nres = a.size();
-			array = alloc_(Nres);
-			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = a[i];
-		}
-		
-		// copy constructor from initializer list
-		NumberArray(std::initializer_list<NumberType> a)
-		{
-			// reserve space
-			N = Nres = a.end() - a.begin();
-			array = alloc_(Nres);
-			
-			// run over the elements
-			size_t i = 0;
-			for (auto it = a.begin(); it != a.end(); it++)
-				array[i++] = *it;
-		}
-		
-		// copy constructor from two forward iterators
-		template <typename ForwardIterator> NumberArray(ForwardIterator i, ForwardIterator j)
-		{
-			// compute size
-			N = 0;
-			for (ForwardIterator k = i; k != j; k++)
-				N++;
-			
-			// reserve space
-			Nres = N;
-			array = alloc_(Nres);
-			
-			// run over the elements
-			size_t n = 0;
-			for (ForwardIterator k = i; k != j; k++)
-				array[n++] = *k;
-		}
-		
-		// destructor
-		~NumberArray()
-		{
-			if (array != nullptr)
-				destroy_();
-		}
-		
-		//
-		// storage size
-		//
-		
-		size_t size() const { return N; }
-		size_t resize (size_t n)
-		{
-			if (n <= Nres)
-			{
-				N = n;
-				return N;
-			}
-			
-			Nres = n;
-			NumberType * new_array = alloc_(Nres);
-			
-			for (size_t i = 0; i < n; i++)
-				new_array[i] = (i < N) ? array[i] : NumberType(0);
-			
-			destroy_();
-			N = n;
-			
-			array = new_array;
-			
-			return N;
-		}
-		size_t reserve (size_t n)
-		{
-			if (n > Nres)
-			{
-				Nres = n;
-				NumberType* new_array = alloc_(Nres);
-				
-				if (N > 0)
-				{
-					memcpy(new_array, array, N * sizeof(NumberType));
-					destroy_();
-				}
-				
-				array = new_array;
-			}
-			
-			return Nres;
-		}
-		
-		//
-		// element-wise access (non-const)
-		//
-		
-		inline NumberType& operator[] (size_t i)
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			// bounds check
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		//
-		// element-wise access (const)
-		//
-		
-		inline NumberType const & operator[] (size_t i) const
-		{
-		#ifdef NDEBUG
-			return array[i];
-		#else
-			if (i < N)
-				return array[i];
-			else
-				throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-		#endif
-		}
-		
-		//
-		// data pointer
-		//
-		
-		NumberType* data() { return array; }
-		const NumberType* data() const { return array; }
-		
-		//
-		// STL-like iterator interface
-		//
-		
-		typedef NumberType* iterator;
-		typedef const NumberType* const_iterator;
-		iterator begin()
-				{ return array; }
-		const_iterator begin() const
-				{ return array; }
-		const_iterator cbegin() const
-				{ return array; }
-		iterator end()
-				{ return array + N; }
-		const_iterator end() const
-				{ return array + N; }
-		const_iterator cend() const
-				{ return array + N; }
-		NumberType & front(int i = 0)
-				{ return *(array + i); }
-		NumberType const & front(int i = 0) const
-				{ return *(array + i); }
-		NumberType & back(int i = 0)
-				{ return *(array + N - 1 - i); }
-		NumberType const & back(int i = 0) const
-				{ return *(array + N - 1 - i); }
-		
-		void push_back(NumberType const & a)
-		{
-			if (N + 1 > Nres)
-			{
-				// double the capacity
-				Nres = 2 * Nres + 1;
-				
-				// allocate space
-				NumberType* new_array = alloc_(Nres);
-				
-				// copy original data
-				memcpy(new_array, array, N * sizeof(NumberType));
-				
-				// destroy original array
-				if (array != nullptr)
-					destroy_();
-				
-				// use new array
-				array = new_array;
-			}
-			
-			// copy new element
-			array[N++] = a;
-		}
-		
-		NumberType pop_back()
-		{
-			if (N > 0)
-				return *(array + (--N));
-			else
-				throw exception ("Array has no element to pop!");
-		}
-		
-		template <class InputIterator> void append (
-			InputIterator first, InputIterator last
-		) {
-			if (N + last - first > (int)Nres)
-			{
-				// raise the capacity
-				Nres += last - first;
-				
-				// allocate space
-				NumberType* new_array = alloc_(Nres);
-				
-				// copy original data
-				memcpy(new_array, array, N * sizeof(NumberType));
-				
-				// destroy original array
-				if (array != nullptr)
-					destroy_();
-				
-				// use new array
-				array = new_array;
-			}
-			
-			for (InputIterator it = first; it != last; it++)
-				array[N++] = *it;
-		}
-		
-		bool empty() const
-		{
-			return N == 0;
-		}
-		
-		//
-		// assignment operators
-		//
-		
-		NumberArray<NumberType>& operator = (NumberArray<NumberType> const &  b)
-		{
-			if (array == nullptr or Nres < b.N)
-			{
-				// delete insufficient storage
-				destroy_();
-				
-				// allocate new storage
-				Nres = b.N;
-				array = alloc_(Nres);
-			}
-			
-			// set the new dimension
-			N = b.N;
-			
-			// run over the elements
-			for (size_t i = 0; i < N; i++)
-				array[i] = b.array[i];
-			
-			return *this;
-		}
-		
-		NumberArray<NumberType>& operator = (NumberArray<NumberType> &&  b)
-		{
-			std::swap(N, b.N);
-			std::swap(Nres, b.Nres);
-			std::swap(array, b.array);
-			return *this;
-		}
-		
-		//
-		// reduced arithmetic operators with other arrays
-		//
-		
-		NumberArray<NumberType>& operator += (NumberArray<NumberType> const &  b)
-		{
-			// check if sizes match
-			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] += b.array[i];
-
-			return *this;
-		}
-		
-		NumberArray<NumberType>& operator -= (NumberArray<NumberType> const &  b)
-		{
-			// check if sizes match
-			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] -= b.array[i];
-			
-			// return
-			return *this;
-		}
-		
-		NumberArray<NumberType>& operator *= (NumberArray<NumberType> const &  b)
-		{
-			// check if sizes match
-			assert(N == b.N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] *= b.array[i];
-			
-			// return
-			return *this;
-		}
-		
-		NumberArray<NumberType>& operator /= (NumberArray<NumberType> const &  b)
-		{
-			// check size
-			assert(b.size() == N);
-			
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] /= b[i];
-			
-			// return
-			return *this;
-		}
-		
-		//
-		// reduced arithmetic operators with complex numbers
-		//
-		
-		template <typename NumberType2> NumberArray<NumberType>& operator += (NumberType2 z)
-		{
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] += NumberType(z);
-
-			return *this;
-		}
-		
-		template <typename NumberType2> NumberArray<NumberType>& operator -= (NumberType2 z)
-		{
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] -= NumberType(z);
-			
-			// return
-			return *this;
-		}
-		
-		template <typename NumberType2> NumberArray<NumberType>& operator *= (NumberType2 z)
-		{
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] *= NumberType(z);
-			
-			// return
-			return *this;
-		}
-		
-		template <typename NumberType2> NumberArray<NumberType>& operator /= (NumberType2 z)
-		{
-			// run over elements
-			for (size_t i = 0; i < N; i++)
-				array[i] /= NumberType(z);
-			
-			// return
-			return *this;
-		}
-		
-		/**
-		 * Complex conjugate.
-		 */
-		NumberArray<NumberType> conj() const
-		{
-			NumberArray<NumberType> c = *this;
-			for (size_t i = 0; i < N; i++)
-			{
-				Complex z = c.array[i];
-				c.array[i] = Complex(z.real(), -z.imag());
-			}
-			return c;
-		}
-		
-		/**
-		 * Computes usual 2-norm.
-		 */
-		double norm() const
-		{
-			double ret = 0.;
-			for (size_t i = 0; i < N; i++)
-			{
-				Complex z = array[i];
-				ret += z.real() * z.real() + z.imag() * z.imag();
-			}
-			return sqrt(ret);
-		}
-		
-		/** 
-		 * Applies a user transformation.
-		 */
-		template <class Functor> auto transform(Functor f) -> Array<decltype(f(NumberType(0)))>
-		{
-			Array<decltype(f(NumberType(0)))> c(N);
-			for (size_t i = 0; i < N; i++)
-				c[i] = f(array[i]);
-			return c;
-		}
-		
-		/**
-		 * Returns a subarray.
-		 * \note Obsolete. Use ArrayView instead.
-		 */
-		Array<NumberType> slice(size_t left, size_t right) const
-		{
-			Array<NumberType> c(right - left);
-			NumberType * ptr_c = &c[0];
-			
-			for (size_t i = left; i < right; i++)
-				*ptr_c++ = array[i];
-			
-			return c;
-		}
-		
-		/**
-		 * Converts contents to SQL-readable BLOB (hexadecimal text format)
-		 * 
-		 * \warning The data are stored in the endianness of the current machine.
-		 */
-		virtual std::string toBlob() const
-		{
-			// get byte pointer
-			unsigned char const * dataptr = reinterpret_cast<unsigned char const*>(array);
-			
-			// get byte count
-			size_t count = N * sizeof(NumberType);
-			
-			// resulting string
-			std::ostringstream hexa;
-			hexa << "x'" << std::hex << std::setfill('0');
-			
-			// for all bytes
-			for (size_t i = 0; i < count; i++)
-				hexa << std::setw(2) << static_cast<unsigned>(dataptr[i]);
-			
-			hexa << "'";
-			return hexa.str();
-		}
-		
-		/**
-		 * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
-		 * 
-		 * \warning The data are assumed to posess the endianness of the current machine.
-		 */
-		virtual void fromBlob(std::string const & s)
-		{
-			if (array != nullptr and N != 0)
-				destroy_();
-			
-			// the first character outght to be "x" or "X"
-			// the second character outght to be "'"
-			// the last character ought to be "'" as well
-			if ((s[0] != 'x' and s[0] != 'X') or s[1] != '\'' or s.back() != '\'')
-				throw exception ("[Array::fromBlob] Blob has wrong format, %s.", s.c_str());
-			
-			// create substring
-			std::string ss(s.begin() + 2, s.end() - 1);
-			
-			// compute size
-			size_t bytes = ss.size() / 2;
-			N = bytes / sizeof(NumberType);
-			
-			// allocate space
-			array = alloc_(N);
-			
-			// for all bytes
-			for (size_t i = 0; i < bytes; i++)
-			{
-				unsigned byte;
-				std::stringstream sst;
-				
-				// put two hexa digits from "ss" to "sst"
-				sst << std::hex << ss.substr(2*i, 2);
-				
-				// read those two digits as a single byte
-				sst >> byte;
-				
-				// store this byte
-				reinterpret_cast<char*>(array)[i] = byte;
-			}
-		}
-		
-#ifndef NO_HDF
-		/**
-		 * Save array to HDF file.
-		 * \param name Filename.
-		 * \param compress Whether to apply a trivial compression (contract the repeated zeros).
-		 * \param consec Minimal consecutive occurences for compression.
-		 */
-		bool hdfsave(const char* name, bool docompress = false, int consec = 10) const
-		{
-			// save to HDF file
-			HDFFile hdf(name, HDFFile::overwrite);
-			
-			if (not hdf.valid())
-				return false;
-			
-			if (docompress)
-			{
-				NumberArray<int> zero_blocks;
-				NumberArray<NumberType> elements;
-				std::tie(zero_blocks,elements) = compress(consec);
-				
-				if (not zero_blocks.empty())
-				{
-					if (not hdf.write (
-						"zero_blocks",
-						&(zero_blocks[0]),
-						zero_blocks.size()
-					)) return false;
-				}
-				if (not elements.empty())
-				{
-					if (not hdf.write (
-						"array",
-						&(elements[0]),
-						elements.size()
-					)) return false;
-				}
-			}
-			else
-			{
-				if (not hdf.write("array", array, N))
-					return false;
-			}
-			
-			return true;
-		}
-		
-		/**
-		 * Load array from HDF file.
-		 * \param name Filename.
-		 */
-		bool hdfload(std::string name)
-		{
-			// open the file
-			HDFFile hdf(name, HDFFile::readonly);
-			
-			if (not hdf.valid())
-				return false;
-			
-			NumberArray<NumberType> elements;
-			NumberArray<int> zero_blocks;
-			
-			// read zero blocks
-			if (zero_blocks.resize(hdf.size("zero_blocks")))
-				if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
-					return false;
-			
-			// get data size
-			size_t size = hdf.size("array");
-			
-			// scale size if this is a complex array
-			if (typeid(NumberType) == typeid(Complex))
-				size /= 2;
-			
-			// read packed elements
-			if (elements.resize(size))
-			{
-				if (not hdf.read("array", &(elements[0]), elements.size()))
-					return false;
-			}
-			
-			// remove previous data
-			if (array != nullptr)
-			{
-				destroy_();
-				array = nullptr;
-				N = Nres = 0;
-			}
-			
-			// unpack
-			*this = elements.decompress(zero_blocks);
-			
-			return true;
-		}
-		
-		// get compressed array
-		std::tuple<NumberArray<int>,NumberArray<DataType>> compress(int consec) const
-		{
-			// compressed array
-			NumberArray<NumberType> carray;
-			carray.reserve(N);
-			
-			// zero blocks
-			NumberArray<int> zero_blocks;
-			
-			// consecutive zeros counter
-			int zero_counter = 0;
-			
-			// analyze: find compressible segments
-			for (size_t i = 0; i < N; i++)
-			{
-				if (array[i] == 0.)
-				{
-					// another consecutive zero
-					zero_counter++;
-				}
-				else if (zero_counter >= consec)
-				{
-					// end of large zero block -> compress
-					zero_blocks.push_back(i-zero_counter);
-					zero_blocks.push_back(i);
-					zero_counter = 0;
-				}
-				else
-				{
-					// end of tiny zero block -> do not bother with compression
-					zero_counter = 0;
-				}
-				
-			}
-			if (zero_counter >= 10)
-			{
-				zero_blocks.push_back(N-zero_counter);
-				zero_blocks.push_back(N);
-			}
-			
-			// invert selection: get non-zero blocks
-			NumberArray<int> nonzero_blocks;
-			nonzero_blocks.push_back(0);
-			nonzero_blocks.append(zero_blocks.begin(), zero_blocks.end());
-			nonzero_blocks.push_back(N);
-			
-			// compress: copy only nonzero elements
-			for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
-			{
-				int start = nonzero_blocks[2*iblock];
-				int end = nonzero_blocks[2*iblock+1];
-				carray.append (
-					array + start,
-					array + end
-				);
-			}
-			
-			return std::make_tuple(zero_blocks,carray);
-		}
-		
-		// get un-compressed array if compression info is supplied
-		NumberArray<DataType> decompress(NumberArray<int> const & zero_blocks) const
-		{
-			if (zero_blocks.empty())
-				return *this;
-			
-			// compute final size
-			size_t final_size = N;
-			for (size_t i = 0; i < zero_blocks.size()/2; i++)
-				final_size += zero_blocks[2*i+1] - zero_blocks[2*i];
-			
-			// resize and clean internal storage
-			NumberArray<DataType> unpack(final_size);
-			memset(&(unpack[0]), 0, final_size * sizeof(NumberType));
-			
-			// copy nonzero chunks
-			int this_end = 0;	// index of last updated element in "this"
-			int load_end = 0;	// index of last used element in "nnz_array"
-			for (size_t i = 0; i < zero_blocks.size()/2; i++)
-			{
-				int zero_start = zero_blocks[2*i];
-				int zero_end = zero_blocks[2*i+1];
-				
-				// append nonzero data before this zero block
-				memcpy (
-					&(unpack[0]) + this_end,
-					array + load_end,
-					(zero_start - this_end) * sizeof(NumberType)
-				);
-				
-				// move cursors
-				load_end += zero_start - this_end;
-				this_end  = zero_end;
-			}
-			
-			// append remaining data
-			memcpy (
-				&(unpack[0]) + this_end,
-				array + load_end,
-				(final_size - this_end) * sizeof(NumberType)
-			);
-			
-			return unpack;
-		}
-#endif
-
-		std::string string() const
-		{
-			std::ostringstream ss;
-			for (NumberType const & x : *this)
-				ss << x << " ";
-			return ss.str();
-		}
+public:
+    
+    size_t N, Nres;
+    NumberType * array;
+    
+    // allocate aligned memory
+    NumberType* alloc_(size_t n)
+    {
+        // is there anything to allocate?
+        if (n < 1)
+            return nullptr;
+        
+        // allocate the aligned memory; make sure there will be even number of elements
+        // so that we can always use pairs
+        void* aligned_ptr;
+        posix_memalign (
+            &aligned_ptr,
+            std::max(__alignof(NumberType), sizeof(void*)),
+                        (n + (n % 2)) * sizeof(NumberType)
+        );
+        
+        // get the number pointer
+        NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
+        
+        // clear the last element so that we may disregard it during multiplication
+        *(ptr + n + (n % 2) - 1) = 0;
+        
+        // return the pointer
+        return ptr;
+    }
+    
+    // deallocate the memory
+    void destroy_()
+    {
+        if (array != nullptr)
+        {
+            free(array);
+            array = nullptr;
+        }
+    }
+    
+public:
+    
+    // alias
+    typedef NumberType DataType;
+    
+    // inner product of two arrays
+    template <typename NumberType1, typename NumberType2> friend auto operator | (
+        NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    ) -> decltype(NumberType1(0)*NumberType2(0));
+    
+    // default constructor, creates an empty array
+    NumberArray() : N(0), Nres(0), array(nullptr) {}
+    
+    // constructor, creates a length-n "x"-filled array
+    NumberArray(size_t n, NumberType x = 0) : N(n), Nres(n)
+    {
+        // reserve space
+        array = alloc_(Nres);
+        
+        // set to zero
+        for (size_t i = 0; i < N; i++)
+            array[i] = x;
+    }
+    
+    // constructor, copies a length-n "array
+    NumberArray(size_t n, NumberType* x) : N(n), Nres(n)
+    {
+        // reserve space
+        array = alloc_(Nres);
+        
+        // set to zero
+        for (size_t i = 0; i < N; i++)
+            array[i] = x[i];
+    }
+    
+    // copy constructor from Array const lvalue reference
+    NumberArray(NumberArray<NumberType> const & a)
+    {
+        // reserve space
+        N = Nres = a.N;
+        array = alloc_(Nres);
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a.array[i];
+    }
+    
+    // copy constructor from ArrayView const lvalue reference
+    NumberArray(ArrayView<NumberType> const & a)
+    {
+        // reserve space
+        N = Nres = a.size();
+        array = alloc_(Nres);
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a.data()[i];
+    }
+    
+    // copy constructor from Array rvalue reference
+    NumberArray(NumberArray<NumberType> && a)
+    {
+        // copy content
+        N = a.N;
+        Nres = a.Nres;
+        array = a.array;
+        
+        // clear rvalue
+        a.N = 0;
+        a.Nres = 0;
+        a.array = nullptr;
+    }
+    
+    // copy constructor from std::vector
+    NumberArray(std::vector<NumberType> const & a)
+    {
+        // reserve space
+        N = Nres = a.size();
+        array = alloc_(Nres);
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = a[i];
+    }
+    
+    // copy constructor from initializer list
+    NumberArray(std::initializer_list<NumberType> a)
+    {
+        // reserve space
+        N = Nres = a.end() - a.begin();
+        array = alloc_(Nres);
+        
+        // run over the elements
+        size_t i = 0;
+        for (auto it = a.begin(); it != a.end(); it++)
+            array[i++] = *it;
+    }
+    
+    // copy constructor from two forward iterators
+    template <typename ForwardIterator> NumberArray(ForwardIterator i, ForwardIterator j)
+    {
+        // compute size
+        N = 0;
+        for (ForwardIterator k = i; k != j; k++)
+            N++;
+        
+        // reserve space
+        Nres = N;
+        array = alloc_(Nres);
+        
+        // run over the elements
+        size_t n = 0;
+        for (ForwardIterator k = i; k != j; k++)
+            array[n++] = *k;
+    }
+    
+    // destructor
+    ~NumberArray()
+    {
+        destroy_();
+    }
+    
+    //
+    // storage size
+    //
+    
+    size_t size() const { return N; }
+    size_t resize (size_t n)
+    {
+        if (n <= Nres)
+        {
+            N = n;
+            return N;
+        }
+        
+        Nres = n;
+        NumberType * new_array = alloc_(Nres);
+        
+        for (size_t i = 0; i < n; i++)
+            new_array[i] = (i < N) ? array[i] : NumberType(0);
+        
+        destroy_();
+        N = n;
+        
+        array = new_array;
+        
+        return N;
+    }
+    size_t reserve (size_t n)
+    {
+        if (n > Nres)
+        {
+            Nres = n;
+            NumberType* new_array = alloc_(Nres);
+            
+            if (N > 0)
+            {
+                memcpy(new_array, array, N * sizeof(NumberType));
+                destroy_();
+            }
+            
+            array = new_array;
+        }
+        
+        return Nres;
+    }
+    
+    //
+    // element-wise access (non-const)
+    //
+    
+    inline NumberType& operator[] (size_t i)
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        // bounds check
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    //
+    // element-wise access (const)
+    //
+    
+    inline NumberType const & operator[] (size_t i) const
+    {
+        #ifdef NDEBUG
+        return array[i];
+        #else
+        if (i < N)
+            return array[i];
+        else
+            throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
+        #endif
+    }
+    
+    //
+    // data pointer
+    //
+    
+    NumberType* data() { return array; }
+    const NumberType* data() const { return array; }
+    
+    //
+    // STL-like iterator interface
+    //
+    
+    typedef NumberType* iterator;
+    typedef const NumberType* const_iterator;
+    iterator begin()
+    { return array; }
+    const_iterator begin() const
+    { return array; }
+    const_iterator cbegin() const
+    { return array; }
+    iterator end()
+    { return array + N; }
+    const_iterator end() const
+    { return array + N; }
+    const_iterator cend() const
+    { return array + N; }
+    NumberType & front(int i = 0)
+    { return *(array + i); }
+    NumberType const & front(int i = 0) const
+    { return *(array + i); }
+    NumberType & back(int i = 0)
+    { return *(array + N - 1 - i); }
+    NumberType const & back(int i = 0) const
+    { return *(array + N - 1 - i); }
+    
+    void push_back(NumberType const & a)
+    {
+        if (N + 1 > Nres)
+        {
+            // double the capacity
+            Nres = 2 * Nres + 1;
+            
+            // allocate space
+            NumberType* new_array = alloc_(Nres);
+            
+            // copy original data
+            memcpy(new_array, array, N * sizeof(NumberType));
+            
+            // destroy original array
+            if (array != nullptr)
+                destroy_();
+            
+            // use new array
+            array = new_array;
+        }
+        
+        // copy new element
+        array[N++] = a;
+    }
+    
+    NumberType pop_back()
+    {
+        if (N > 0)
+            return *(array + (--N));
+        else
+            throw exception ("Array has no element to pop!");
+    }
+    
+    template <class InputIterator> void append (
+        InputIterator first, InputIterator last
+    ) {
+        if (N + last - first > (int)Nres)
+        {
+            // raise the capacity
+            Nres += last - first;
+            
+            // allocate space
+            NumberType* new_array = alloc_(Nres);
+            
+            // copy original data
+            memcpy(new_array, array, N * sizeof(NumberType));
+            
+            // destroy original array
+            if (array != nullptr)
+                destroy_();
+            
+            // use new array
+            array = new_array;
+        }
+        
+        for (InputIterator it = first; it != last; it++)
+            array[N++] = *it;
+    }
+    
+    bool empty() const
+    {
+        return N == 0;
+    }
+    
+    //
+    // assignment operators
+    //
+    
+    NumberArray<NumberType>& operator = (NumberArray<NumberType> const &  b)
+    {
+        if (array == nullptr or Nres < b.N)
+        {
+            // delete insufficient storage
+            destroy_();
+            
+            // allocate new storage
+            Nres = b.N;
+            array = alloc_(Nres);
+        }
+        
+        // set the new dimension
+        N = b.N;
+        
+        // run over the elements
+        for (size_t i = 0; i < N; i++)
+            array[i] = b.array[i];
+        
+        return *this;
+    }
+    
+    NumberArray<NumberType>& operator = (NumberArray<NumberType> &&  b)
+    {
+        std::swap(N, b.N);
+        std::swap(Nres, b.Nres);
+        std::swap(array, b.array);
+        return *this;
+    }
+    
+    //
+    // reduced arithmetic operators with other arrays
+    //
+    
+    NumberArray<NumberType>& operator += (NumberArray<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] += b.array[i];
+        
+        return *this;
+    }
+    
+    NumberArray<NumberType>& operator -= (NumberArray<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] -= b.array[i];
+        
+        // return
+        return *this;
+    }
+    
+    NumberArray<NumberType>& operator *= (NumberArray<NumberType> const &  b)
+    {
+        // check if sizes match
+        assert(N == b.N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] *= b.array[i];
+        
+        // return
+        return *this;
+    }
+    
+    NumberArray<NumberType>& operator /= (NumberArray<NumberType> const &  b)
+    {
+        // check size
+        assert(b.size() == N);
+        
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] /= b[i];
+        
+        // return
+        return *this;
+    }
+    
+    //
+    // reduced arithmetic operators with complex numbers
+    //
+    
+    template <typename NumberType2> NumberArray<NumberType>& operator += (NumberType2 z)
+    {
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] += NumberType(z);
+        
+        return *this;
+    }
+    
+    template <typename NumberType2> NumberArray<NumberType>& operator -= (NumberType2 z)
+    {
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] -= NumberType(z);
+        
+        // return
+        return *this;
+    }
+    
+    template <typename NumberType2> NumberArray<NumberType>& operator *= (NumberType2 z)
+    {
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] *= NumberType(z);
+        
+        // return
+        return *this;
+    }
+    
+    template <typename NumberType2> NumberArray<NumberType>& operator /= (NumberType2 z)
+    {
+        // run over elements
+        for (size_t i = 0; i < N; i++)
+            array[i] /= NumberType(z);
+        
+        // return
+        return *this;
+    }
+    
+    /**
+     * Complex conjugate.
+     */
+    NumberArray<NumberType> conj() const
+    {
+        NumberArray<NumberType> c = *this;
+        for (size_t i = 0; i < N; i++)
+        {
+            Complex z = c.array[i];
+            c.array[i] = Complex(z.real(), -z.imag());
+        }
+        return c;
+    }
+    
+    /**
+     * Computes usual 2-norm.
+     */
+    double norm() const
+    {
+        double ret = 0.;
+        for (size_t i = 0; i < N; i++)
+        {
+            Complex z = array[i];
+            ret += z.real() * z.real() + z.imag() * z.imag();
+        }
+        return sqrt(ret);
+    }
+    
+    /** 
+     * Applies a user transformation.
+     */
+    template <class Functor> auto transform(Functor f) -> Array<decltype(f(NumberType(0)))>
+    {
+        Array<decltype(f(NumberType(0)))> c(N);
+        for (size_t i = 0; i < N; i++)
+            c[i] = f(array[i]);
+        return c;
+    }
+    
+    /**
+     * Returns a subarray.
+     * \note Obsolete. Use ArrayView instead.
+     */
+    Array<NumberType> slice(size_t left, size_t right) const
+    {
+        Array<NumberType> c(right - left);
+        NumberType * ptr_c = &c[0];
+        
+        for (size_t i = left; i < right; i++)
+            *ptr_c++ = array[i];
+        
+        return c;
+    }
+    
+    /**
+     * Converts contents to SQL-readable BLOB (hexadecimal text format)
+     * 
+     * \warning The data are stored in the endianness of the current machine.
+     */
+    virtual std::string toBlob() const
+    {
+        // get byte pointer
+        unsigned char const * dataptr = reinterpret_cast<unsigned char const*>(array);
+        
+        // get byte count
+        size_t count = N * sizeof(NumberType);
+        
+        // resulting string
+        std::ostringstream hexa;
+        hexa << "x'" << std::hex << std::setfill('0');
+        
+        // for all bytes
+        for (size_t i = 0; i < count; i++)
+            hexa << std::setw(2) << static_cast<unsigned>(dataptr[i]);
+        
+        hexa << "'";
+        return hexa.str();
+    }
+    
+    /**
+     * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
+     * 
+     * \warning The data are assumed to posess the endianness of the current machine.
+     */
+    virtual void fromBlob(std::string const & s)
+    {
+        if (array != nullptr and N != 0)
+            destroy_();
+        
+        // the first character outght to be "x" or "X"
+        // the second character outght to be "'"
+        // the last character ought to be "'" as well
+        if ((s[0] != 'x' and s[0] != 'X') or s[1] != '\'' or s.back() != '\'')
+            throw exception ("[Array::fromBlob] Blob has wrong format, %s.", s.c_str());
+        
+        // create substring
+        std::string ss(s.begin() + 2, s.end() - 1);
+        
+        // compute size
+        size_t bytes = ss.size() / 2;
+        N = bytes / sizeof(NumberType);
+        
+        // allocate space
+        array = alloc_(N);
+        
+        // for all bytes
+        for (size_t i = 0; i < bytes; i++)
+        {
+            unsigned byte;
+            std::stringstream sst;
+            
+            // put two hexa digits from "ss" to "sst"
+            sst << std::hex << ss.substr(2*i, 2);
+            
+            // read those two digits as a single byte
+            sst >> byte;
+            
+            // store this byte
+            reinterpret_cast<char*>(array)[i] = byte;
+        }
+    }
+    
+    #ifndef NO_HDF
+    /**
+     * Save array to HDF file.
+     * \param name Filename.
+     * \param compress Whether to apply a trivial compression (contract the repeated zeros).
+     * \param consec Minimal consecutive occurences for compression.
+     */
+    bool hdfsave(const char* name, bool docompress = false, int consec = 10) const
+    {
+        // save to HDF file
+        HDFFile hdf(name, HDFFile::overwrite);
+        
+        if (not hdf.valid())
+            return false;
+        
+        if (docompress)
+        {
+            NumberArray<int> zero_blocks;
+            NumberArray<NumberType> elements;
+            std::tie(zero_blocks,elements) = compress(consec);
+            
+            if (not zero_blocks.empty())
+            {
+                if (not hdf.write (
+                    "zero_blocks",
+                    &(zero_blocks[0]),
+                                   zero_blocks.size()
+                )) return false;
+            }
+            if (not elements.empty())
+            {
+                if (not hdf.write (
+                    "array",
+                    &(elements[0]),
+                                   elements.size()
+                )) return false;
+            }
+        }
+        else
+        {
+            if (not hdf.write("array", array, N))
+                return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Load array from HDF file.
+     * \param name Filename.
+     */
+    bool hdfload(std::string name)
+    {
+        // open the file
+        HDFFile hdf(name, HDFFile::readonly);
+        
+        if (not hdf.valid())
+            return false;
+        
+        NumberArray<NumberType> elements;
+        NumberArray<int> zero_blocks;
+        
+        // read zero blocks
+        if (zero_blocks.resize(hdf.size("zero_blocks")))
+            if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+                return false;
+            
+            // get data size
+            size_t size = hdf.size("array");
+        
+        // scale size if this is a complex array
+        if (typeid(NumberType) == typeid(Complex))
+            size /= 2;
+        
+        // read packed elements
+        if (elements.resize(size))
+        {
+            if (not hdf.read("array", &(elements[0]), elements.size()))
+                return false;
+        }
+        
+        // remove previous data
+        if (array != nullptr)
+        {
+            destroy_();
+            array = nullptr;
+            N = Nres = 0;
+        }
+        
+        // unpack
+        *this = elements.decompress(zero_blocks);
+        
+        return true;
+    }
+    
+    // get compressed array
+    std::tuple<NumberArray<int>,NumberArray<DataType>> compress(int consec) const
+    {
+        // compressed array
+        NumberArray<NumberType> carray;
+        carray.reserve(N);
+        
+        // zero blocks
+        NumberArray<int> zero_blocks;
+        
+        // consecutive zeros counter
+        int zero_counter = 0;
+        
+        // analyze: find compressible segments
+        for (size_t i = 0; i < N; i++)
+        {
+            if (array[i] == 0.)
+            {
+                // another consecutive zero
+                zero_counter++;
+            }
+            else if (zero_counter >= consec)
+            {
+                // end of large zero block -> compress
+                zero_blocks.push_back(i-zero_counter);
+                zero_blocks.push_back(i);
+                zero_counter = 0;
+            }
+            else
+            {
+                // end of tiny zero block -> do not bother with compression
+                zero_counter = 0;
+            }
+            
+        }
+        if (zero_counter >= 10)
+        {
+            zero_blocks.push_back(N-zero_counter);
+            zero_blocks.push_back(N);
+        }
+        
+        // invert selection: get non-zero blocks
+        NumberArray<int> nonzero_blocks;
+        nonzero_blocks.push_back(0);
+        nonzero_blocks.append(zero_blocks.begin(), zero_blocks.end());
+        nonzero_blocks.push_back(N);
+        
+        // compress: copy only nonzero elements
+        for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
+        {
+            int start = nonzero_blocks[2*iblock];
+            int end = nonzero_blocks[2*iblock+1];
+            carray.append (
+                array + start,
+                array + end
+            );
+        }
+        
+        return std::make_tuple(zero_blocks,carray);
+    }
+    
+    // get un-compressed array if compression info is supplied
+    NumberArray<DataType> decompress(NumberArray<int> const & zero_blocks) const
+    {
+        if (zero_blocks.empty())
+            return *this;
+        
+        // compute final size
+        size_t final_size = N;
+        for (size_t i = 0; i < zero_blocks.size()/2; i++)
+            final_size += zero_blocks[2*i+1] - zero_blocks[2*i];
+        
+        // resize and clean internal storage
+        NumberArray<DataType> unpack(final_size);
+        memset(&(unpack[0]), 0, final_size * sizeof(NumberType));
+        
+        // copy nonzero chunks
+        int this_end = 0;	// index of last updated element in "this"
+        int load_end = 0;	// index of last used element in "nnz_array"
+        for (size_t i = 0; i < zero_blocks.size()/2; i++)
+        {
+            int zero_start = zero_blocks[2*i];
+            int zero_end = zero_blocks[2*i+1];
+            
+            // append nonzero data before this zero block
+            memcpy (
+                &(unpack[0]) + this_end,
+                    array + load_end,
+                    (zero_start - this_end) * sizeof(NumberType)
+            );
+            
+            // move cursors
+            load_end += zero_start - this_end;
+            this_end  = zero_end;
+        }
+        
+        // append remaining data
+        memcpy (
+            &(unpack[0]) + this_end,
+                array + load_end,
+                (final_size - this_end) * sizeof(NumberType)
+        );
+        
+        return unpack;
+    }
+    #endif
+    
+    std::string string() const
+    {
+        std::ostringstream ss;
+        for (NumberType const & x : *this)
+            ss << x << " ";
+        return ss.str();
+    }
 };
 
 // scalar product of two arrays.
 template <typename NumberType1, typename NumberType2> auto operator | (
-	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> decltype(NumberType1(0)*NumberType2(0))
 {
-	// store size
-	size_t N = a.N;
-	
-	// check if sizes match
-	assert(N == b.N);
-	
-	// the scalar product
-	decltype(NumberType1(0)*NumberType2(0)) result = 0;
-	
-	// iterators
-	NumberType1 const * const __restrict pa = &a[0];
-	NumberType2 const * const __restrict pb = &b[0];
-	
-	// sum the products
-	for (size_t i = 0; i < N; i++)
-		result += pa[i] * pb[i];
-	
-	return result;
+    // store size
+    size_t N = a.N;
+    
+    // check if sizes match
+    assert(N == b.N);
+    
+    // the scalar product
+    decltype(NumberType1(0)*NumberType2(0)) result = 0;
+    
+    // iterators
+    NumberType1 const * const __restrict pa = &a[0];
+    NumberType2 const * const __restrict pb = &b[0];
+    
+    // sum the products
+    for (size_t i = 0; i < N; i++)
+        result += pa[i] * pb[i];
+    
+    return result;
 }
 
 // arithmetic operators Array & Array
 template <typename NumberType1, typename NumberType2> auto operator + (
-	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
-	return c += b;
+    NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
+    return c += b;
 }
 
 template <typename T1, typename T2> auto operator + (
-	Array<T1> const & a, Array<T2> const & b
+    Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) + T2(0))>
 {
-	size_t size = std::min(a.size(),b.size());
-	
-	Array<decltype(T1(0) + T2(0))> c(size);
-	
-	for (size_t i = 0; i < size; i++)
-		c[i] = a[i] + b[i];
-	
-	return c;
+    size_t size = std::min(a.size(),b.size());
+    
+    Array<decltype(T1(0) + T2(0))> c(size);
+    
+    for (size_t i = 0; i < size; i++)
+        c[i] = a[i] + b[i];
+    
+    return c;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator - (
-	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
-	return c -= b;
+    NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
+    return c -= b;
 }
 
 template <typename T1, typename T2> auto operator - (
-	Array<T1> const & a, Array<T2> const & b
+    Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) - T2(0))>
 {
-	size_t size = std::min(a.size(),b.size());
-	
-	Array<decltype(T1(0) - T2(0))> c(size);
-	
-	for (size_t i = 0; i < size; i++)
-		c[i] = a[i] - b[i];
-	
-	return c;
+    size_t size = std::min(a.size(),b.size());
+    
+    Array<decltype(T1(0) - T2(0))> c(size);
+    
+    for (size_t i = 0; i < size; i++)
+        c[i] = a[i] - b[i];
+    
+    return c;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
-	return c *= b;
+    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
+    return c *= b;
 }
 
 template <typename T1, typename T2> auto operator * (
-	Array<T1> const & a, Array<T2> const & b
+    Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) * T2(0))>
 {
-	size_t size = std::min(a.size(),b.size());
-	
-	Array<decltype(T1(0) * T2(0))> c(size);
-	
-	for (size_t i = 0; i < size; i++)
-		c[i] = a[i] * b[i];
-	
-	return c;
+    size_t size = std::min(a.size(),b.size());
+    
+    Array<decltype(T1(0) * T2(0))> c(size);
+    
+    for (size_t i = 0; i < size; i++)
+        c[i] = a[i] * b[i];
+    
+    return c;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator / (
-	NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
+    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
 {
-	NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
-	return c /= b;
+    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
+    return c /= b;
 }
 
 template <typename T1, typename T2> auto operator / (
-	Array<T1> const & a, Array<T2> const & b
+    Array<T1> const & a, Array<T2> const & b
 ) -> Array<decltype(T1(0) * T2(0))>
 {
-	size_t size = std::min(a.size(),b.size());
-	
-	Array<decltype(T1(0) * T2(0))> c(size);
-	
-	for (size_t i = 0; i < size; i++)
-		c[i] = a[i] / b[i];
-	
-	return c;
+    size_t size = std::min(a.size(),b.size());
+    
+    Array<decltype(T1(0) * T2(0))> c(size);
+    
+    for (size_t i = 0; i < size; i++)
+        c[i] = a[i] / b[i];
+    
+    return c;
 }
 
 // arithmetic operators Array & Number
 template <typename NumberType1, typename NumberType2> auto operator + (
-	NumberArray<NumberType1> const & a, NumberType2 z
+    NumberArray<NumberType1> const & a, NumberType2 z
 ) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
-	return c += z;
+    NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
+    return c += z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator - (
-	NumberArray<NumberType1> const & a, NumberType2 z
+    NumberArray<NumberType1> const & a, NumberType2 z
 ) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
-	return c -= z;
+    NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
+    return c -= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	NumberArray<NumberType1> const & a, NumberType2 z
+    NumberArray<NumberType1> const & a, NumberType2 z
 ) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
-	return c *= z;
+    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
+    return c *= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
-	NumberType1 z, NumberArray<NumberType2> const & b
+    NumberType1 z, NumberArray<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = b;
-	return c *= z;
+    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = b;
+    return c *= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator / (
-	NumberArray<NumberType1> const & a, NumberType2 z
+    NumberArray<NumberType1> const & a, NumberType2 z
 ) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
 {
-	NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
-	return c /= z;
+    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
+    return c /= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto outer_product (
-	ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
+    ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
 ) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
 {
-	NumberArray<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
-	
-	auto ic = c.begin();
-	
-	for (auto a_ : a)
-	for (auto b_ : b)
-		*(ic++) = a_ * b_;
-	
-	return c;
+    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
+    
+    auto ic = c.begin();
+    
+    for (auto a_ : a)
+        for (auto b_ : b)
+            *(ic++) = a_ * b_;
+        
+        return c;
 }
 
 // output to text stream.
 template <typename NumberType> std::ostream & operator << (std::ostream & out, ArrayView<NumberType> const & a)
 {
-	out << "[";
-	for (size_t i = 0; i < a.size(); i++)
-	{
-		if (i == 0)
-			out << a[i];
-		else
-			out << "," << a[i];
-	}
-	out << "]";
-	
-	return out;
+    out << "[";
+    for (size_t i = 0; i < a.size(); i++)
+    {
+        if (i == 0)
+            out << a[i];
+        else
+            out << "," << a[i];
+    }
+    out << "]";
+    
+    return out;
 }
 
 /**
@@ -1583,20 +1587,20 @@ template <typename NumberType> std::ostream & operator << (std::ostream & out, A
  */
 template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
 {
-	NumberArray<T> space(samples);
-	
-	if (samples == 0)
-		return space;
-	
-	if (samples == 1)
-	{
-		space[0] = start;
-		return space;
-	}
-	
-	for (unsigned i = 0; i < samples; i++)
-		space[i] = start + (end - start) * T(i) / T(samples - 1);
-	return space;
+    NumberArray<T> space(samples);
+    
+    if (samples == 0)
+        return space;
+    
+    if (samples == 1)
+    {
+        space[0] = start;
+        return space;
+    }
+    
+    for (unsigned i = 0; i < samples; i++)
+        space[i] = start + (end - start) * T(i) / T(samples - 1);
+    return space;
 }
 
 /**
@@ -1607,22 +1611,22 @@ template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
  */
 template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 {
-	if (x0 <= 0 or x1 <= 0 or x1 < x0)
-	{
-		std::cerr << "[logspace] It must be 0 < x1 <= x2 !\n";
-		abort();
-	}
-	
-	NumberArray<T> grid(N);
-	
-	if (N == 1)
-		grid[0] = x0;
-	
-	if (N > 1)
-		for (unsigned i = 0; i < N; i++)
-			grid[i] = x0 * pow(x1 / x0, i / T(N - 1));
-	
-	return grid;
+    if (x0 <= 0 or x1 <= 0 or x1 < x0)
+    {
+        std::cerr << "[logspace] It must be 0 < x1 <= x2 !\n";
+        abort();
+    }
+    
+    NumberArray<T> grid(N);
+    
+    if (N == 1)
+        grid[0] = x0;
+    
+    if (N > 1)
+        for (unsigned i = 0; i < N; i++)
+            grid[i] = x0 * pow(x1 / x0, i / T(N - 1));
+        
+        return grid;
 }
 
 /**
@@ -1633,35 +1637,35 @@ template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
  */
 template <typename NumberType> void write_array(ArrayView<NumberType> const & array, const char* filename)
 {
-	std::ofstream fout(filename);
-	for (size_t i = 0; i < array.size(); i++) 
-	{
-		switch (typeid(NumberType))
-		{
-			case typeid (double):
-				fout << array[i] << std::endl;
-				break;
-			case typeid (Complex):
-				fout << array[i].real() << "\t" << array[i].imag() << std::endl;
-				break;
-			default:
-				std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType).name() << std::endl;
-				return;
-		}
-	}
+    std::ofstream fout(filename);
+    for (size_t i = 0; i < array.size(); i++) 
+    {
+        switch (typeid(NumberType))
+        {
+            case typeid (double):
+                fout << array[i] << std::endl;
+                break;
+            case typeid (Complex):
+                fout << array[i].real() << "\t" << array[i].imag() << std::endl;
+                break;
+            default:
+                std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType).name() << std::endl;
+                return;
+        }
+    }
 }
 
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {
-	std::ofstream f(filename);
-	
-	if (f.bad())
-		return false;
-	
-	for (size_t i = 0; i < m; i++)
-		f << fetch(i) << "\n";
-	
-	return true;
+    std::ofstream f(filename);
+    
+    if (f.bad())
+        return false;
+    
+    for (size_t i = 0; i < m; i++)
+        f << fetch(i) << "\n";
+    
+    return true;
 }
 
 /**
@@ -1679,19 +1683,19 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
  */
 template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* filename, Fetcher fetch)
 {
-	std::ofstream f(filename);
-	
-	if (f.bad())
-		return false;
-	
-	for (size_t i = 0; i < m; i++)
-	{
-		for (size_t j = 0; j < n; j++)
-			f << fetch(i,j) << " ";
-		f << "\n";
-	}
-	
-	return true;
+    std::ofstream f(filename);
+    
+    if (f.bad())
+        return false;
+    
+    for (size_t i = 0; i < m; i++)
+    {
+        for (size_t j = 0; j < n; j++)
+            f << fetch(i,j) << " ";
+        f << "\n";
+    }
+    
+    return true;
 }
 
 // aliases
@@ -1711,7 +1715,7 @@ typedef ArrayView<long double> qArrayView;
  */
 inline rArray concatenate()
 {
-	return rArray (0);
+    return rArray (0);
 }
 
 /**
@@ -1725,20 +1729,20 @@ inline rArray concatenate()
  */
 template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
 {
-	if (sizeof...(p) == 0)
-	{
-		return v1;
-	}
-	else
-	{
-		rArray v2 = concatenate(p...);
-		rArray v (v1.size() + v2.size());
-		for (size_t i = 0; i < v1.size(); i++)
-			v[i] = v1[i];
-		for (size_t i = 0; i < v2.size(); i++)
-			v[i + v1.size()] = v2[i];
-		return v;
-	}	
+    if (sizeof...(p) == 0)
+    {
+        return v1;
+    }
+    else
+    {
+        rArray v2 = concatenate(p...);
+        rArray v (v1.size() + v2.size());
+        for (size_t i = 0; i < v1.size(); i++)
+            v[i] = v1[i];
+        for (size_t i = 0; i < v2.size(); i++)
+            v[i + v1.size()] = v2[i];
+        return v;
+    }	
 }
 
 /**
@@ -1768,45 +1772,45 @@ bool any(Array<bool> v);
 
 template <typename NumberType> NumberType min (ArrayView<NumberType> const & a)
 {
-	NumberType z = a.front();
-	for (NumberType const * it = a.begin(); it != a.end(); it++)
-		if (*it < z)
-			z = *it;
-	return z;
+    NumberType z = a.front();
+    for (NumberType const * it = a.begin(); it != a.end(); it++)
+        if (*it < z)
+            z = *it;
+        return z;
 }
 
 template <typename NumberType> NumberType max (ArrayView<NumberType> const & a)
 {
-	NumberType z = a.front();
-	for (NumberType const * it = a.begin(); it != a.end(); it++)
-		if (*it > z)
-			z = *it;
-	return z;
+    NumberType z = a.front();
+    for (NumberType const * it = a.begin(); it != a.end(); it++)
+        if (*it > z)
+            z = *it;
+        return z;
 }
 
 // return per-element power
 template <typename T> Array<T> pow(ArrayView<T> const & u, double e)
 {
-	Array<T> v(u.size());
-	
-	auto iu = u.begin();
-	auto iv = v.begin();
-	
-	while (iu != u.end())
-		*(iv++) = pow(*(iu++), e);
-	
-	return v;
+    Array<T> v(u.size());
+    
+    auto iu = u.begin();
+    auto iv = v.begin();
+    
+    while (iu != u.end())
+        *(iv++) = pow(*(iu++), e);
+    
+    return v;
 }
 
 template <typename NumberType> NumberArray<NumberType> sqrt (ArrayView<NumberType> const & A)
 {
-	size_t N = A.size();
-	NumberArray<NumberType> B (N);
-
-	for (size_t i = 0; i < N; i++)
-		B[i] = sqrt(A[i]);
-
-	return B;
+    size_t N = A.size();
+    NumberArray<NumberType> B (N);
+    
+    for (size_t i = 0; i < N; i++)
+        B[i] = sqrt(A[i]);
+    
+    return B;
 }
 
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
@@ -1818,23 +1822,23 @@ NumberArray<double> imagpart (NumberArray<Complex> const & A);
 // summation
 template <typename T> T sum(Array<T> v)
 {
-	return std::accumulate(v.begin(), v.end(), T(0));
+    return std::accumulate(v.begin(), v.end(), T(0));
 }
 
 // summation of nested arrays
 template <typename T> NumberArray<T> sums(Array<NumberArray<T>> v)
 {
-	if (v.size() == 0)
-		return NumberArray<T>();	// empty array
-	
-	return std::accumulate (
-		v.begin(),
-		v.end(),
-		NumberArray<T> (v[0].size()),
-		[](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
-			return a + b;
-		}
-	);
+    if (v.size() == 0)
+        return NumberArray<T>();	// empty array
+        
+        return std::accumulate (
+            v.begin(),
+                                v.end(),
+                                NumberArray<T> (v[0].size()),
+                                [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
+                                    return a + b;
+                                }
+        );
 }
 
 /**
@@ -1846,10 +1850,10 @@ template <typename T> NumberArray<T> sums(Array<NumberArray<T>> v)
 template <typename T>
 Array<bool> operator == (ArrayView<T> u, T x)
 {
-	Array<bool> v(u.size());
-	for (size_t i  = 0; i < u.size(); i++)
-		v[i] = (u[i] == x);
-	return v;
+    Array<bool> v(u.size());
+    for (size_t i  = 0; i < u.size(); i++)
+        v[i] = (u[i] == x);
+    return v;
 }
 
 /**
@@ -1862,11 +1866,11 @@ Array<bool> operator == (ArrayView<T> u, T x)
 template <typename TFunctor, typename TArray>
 void eval(TFunctor f, TArray grid, TArray& vals)
 {
-	size_t N = grid.size();
-	assert(N == vals.size());
-	
-	for (size_t i = 0; i < N; i++)
-		vals[i] = f(grid[i]);
+    size_t N = grid.size();
+    assert(N == vals.size());
+    
+    for (size_t i = 0; i < N; i++)
+        vals[i] = f(grid[i]);
 }
 
 /**
@@ -1880,51 +1884,51 @@ void eval(TFunctor f, TArray grid, TArray& vals)
  * \param arr2 Merge FROM array.
  */
 template <typename Tidx, typename Tval> void merge (
-	NumberArray<Tidx>       & idx1, NumberArray<Tval>       & arr1,
-	NumberArray<Tidx> const & idx2, NumberArray<Tval> const & arr2
+    NumberArray<Tidx>       & idx1, NumberArray<Tval>       & arr1,
+    NumberArray<Tidx> const & idx2, NumberArray<Tval> const & arr2
 ){
-	// positions in arrays
-	size_t i1 = 0;
-	size_t i2 = 0;
-	
-	// output arrays
-	NumberArray<Tidx> idx;
-	NumberArray<Tval> arr;
-	
-	// while there is anything to merge
-	while (i1 < arr1.size() and i2 < arr2.size())
-	{
-		if (idx1[i1] == idx2[i2])
-		{
-			idx.push_back(idx1[i1]);
-			arr.push_back(arr1[i1] + arr2[i2]);
-			i1++;
-			i2++;
-		}
-		else if (idx1[i1] < idx2[i2])
-		{
-			idx.push_back(idx1[i1]);
-			arr.push_back(arr1[i1]);
-			i1++;
-		}
-		else /* idx1[i2] > idx2[i2] */
-		{
-			idx.push_back(idx2[i2]);
-			arr.push_back(arr2[i2]);
-			i2++;
-		}
-	}
-	
-	// the rest will be done by a single copy
-	if (i1 == arr1.size() and i2 < arr2.size())
-	{
-		idx.append(idx2.begin() + i2, idx2.end());
-		arr.append(arr2.begin() + i2, arr2.end());
-	}
-	
-	// copy to the first pair
-	idx1 = idx;
-	arr1 = arr;
+    // positions in arrays
+    size_t i1 = 0;
+    size_t i2 = 0;
+    
+    // output arrays
+    NumberArray<Tidx> idx;
+    NumberArray<Tval> arr;
+    
+    // while there is anything to merge
+    while (i1 < arr1.size() and i2 < arr2.size())
+    {
+        if (idx1[i1] == idx2[i2])
+        {
+            idx.push_back(idx1[i1]);
+            arr.push_back(arr1[i1] + arr2[i2]);
+            i1++;
+            i2++;
+        }
+        else if (idx1[i1] < idx2[i2])
+        {
+            idx.push_back(idx1[i1]);
+            arr.push_back(arr1[i1]);
+            i1++;
+        }
+        else /* idx1[i2] > idx2[i2] */
+        {
+            idx.push_back(idx2[i2]);
+            arr.push_back(arr2[i2]);
+            i2++;
+        }
+    }
+    
+    // the rest will be done by a single copy
+    if (i1 == arr1.size() and i2 < arr2.size())
+    {
+        idx.append(idx2.begin() + i2, idx2.end());
+        arr.append(arr2.begin() + i2, arr2.end());
+    }
+    
+    // copy to the first pair
+    idx1 = idx;
+    arr1 = arr;
 }
 
 /**
@@ -1932,24 +1936,24 @@ template <typename Tidx, typename Tval> void merge (
  */
 template <typename T> NumberArray<T> join (Array<NumberArray<T>> const & arrays)
 {
-	NumberArray<size_t> partial_sizes(arrays.size() + 1);
-	
-	// get partial sizes
-	partial_sizes[0] = 0;
-	for (size_t i = 0; i < arrays.size(); i++)
-		partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
-	
-	// result array
-	NumberArray<T> res(partial_sizes.back());
-	
-	// concatenate arrays
-	for (size_t i = 0; i < arrays.size(); i++)
-	{
-		if (arrays[i].size() > 0)
-			ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
-	}
-	
-	return res;
+    NumberArray<size_t> partial_sizes(arrays.size() + 1);
+    
+    // get partial sizes
+    partial_sizes[0] = 0;
+    for (size_t i = 0; i < arrays.size(); i++)
+        partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
+    
+    // result array
+    NumberArray<T> res(partial_sizes.back());
+    
+    // concatenate arrays
+    for (size_t i = 0; i < arrays.size(); i++)
+    {
+        if (arrays[i].size() > 0)
+            ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
+    }
+    
+    return res;
 }
 
 #endif

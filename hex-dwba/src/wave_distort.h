@@ -8,7 +8,7 @@
  *                         Jakub Benda (c) 2013                              *
  *                     Charles University in Prague                          *
  *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ * \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #ifndef HEX_DISTORTED_WAVE
 #define HEX_DISTORTED_WAVE
@@ -46,7 +46,7 @@
  * solution is real and using the standard formula
  * \f[
  *     \tan \delta_{l_n} = \frac{k_n \cos(k_n R - l_n\pi/2) - D \sin(k_n R - l_n\pi/2)}
-                                {k_n \sin(k_n R - l_n\pi/2) + D \cos(k_n R - l_n\pi/2)}
+ *                                {k_n \sin(k_n R - l_n\pi/2) + D \cos(k_n R - l_n\pi/2)}
  * \f]
  * the phase shift is determined. This number sets the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$
  * of the whole wave.
@@ -54,93 +54,101 @@
 class DistortedWave : public RadialFunction<double>
 {
 public:
-	
-	// constructors
-	// @{
-	DistortedWave(double _kn, int _ln, DistortingPotential const & _U);
-	DistortedWave(DistortedWave const& W) { *this = W; }
-	// @}
-	
-	// destructor
-	~DistortedWave();
-	
-	// assignment
-	DistortedWave operator= (DistortedWave const& W);
-	
-	/**
-	 * Evaluate distorted wave.
-	 */
-	double operator() (double x) const;
-	
-	/**
-	 * Return the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$.
-	 */
-	Complex getPhasef() const;
-	
-	/**
-	 * Return the phase \f$ \delta_{l_n} \f$.
-	 */
-	double getPhase() const;
-	
-	/// Wavenumber.
-	double k() const { return kn; }
-	
-	/// Angular momentum.
-	int l() const { return ln; }
-	
-	/**
-	 * \brief Return derivatives from the distorted wave equation.
-	 * 
-	 * The defining differential equation can be recast into a set of two linear
-	 * differential euqations of first order:
-	 * \f[
-	 *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}(k_n,r) = \phi_{l_n}'(k_n,r) \ ,
-	 * \f]
-	 * \f[
-	 *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}'(k_n,r) = \left( \frac{l_n(l_n+1)}{r^2}
-	 *     + 2U(r) - k^2 \right) \phi_{l_n}(k_n,r) \ .
-	 * \f]
-	 * This function computes vector \f$ ( \phi_{l_n}'(k_n, r), \phi_{l_n}''(k_n, r) ) \f$
-	 * from the vector \f$ ( \phi_{l_n}(k_n, r), \phi_{l_n}'(k_n, r) ) \f$ and the independent
-	 * coordinate \f$ x \f$.
-	 */
-	int derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
-	
-	/**
-	 * Export data to file using \ref write_array.
-	 */
-	void toFile(const char * filename) const;
-	
-	/**
-	 * Return radius from which the asymptotic form is used.
-	 */
-    double farRadius() const;
-	
-	size_t sampleCount() const;
-	
-	/// (debuging parameter) number of evaluations
-	mutable unsigned Evaluations;
-	
+    
+    // constructors
+    // @{
+    DistortedWave(double _kn, int _ln, DistortingPotential const & _U);
+    DistortedWave(DistortedWave const& W) { *this = W; }
+    // @}
+    
+    // destructor
+    ~DistortedWave();
+    
+    // assignment
+    DistortedWave operator= (DistortedWave const& W);
+    
+    /**
+     * Evaluate distorted wave.
+     */
+    double operator() (double x) const;
+    
+    /**
+     * Return the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$.
+     */
+    Complex getPhasef() const { return Complex(cos(phase),sin(phase)); }
+    
+    /**
+     * Return the phase \f$ \delta_{l_n} \f$.
+     */
+    double getPhase() const { return phase; }
+    
+    /// Wavenumber.
+    double k() const { return kn; }
+    
+    /// Angular momentum.
+    int l() const { return ln; }
+    
+    /// Classical turning point.
+    double getTurningPoint () const { return r0; }
+    
+    /// Near-zero asymptotic behaviour.
+    std::pair<double,int> getZeroAsymptotic (double x) const;
+    
+    /**
+     * \brief Return derivatives from the distorted wave equation.
+     * 
+     * The defining differential equation can be recast into a set of two linear
+     * differential euqations of first order:
+     * \f[
+     *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}(k_n,r) = \phi_{l_n}'(k_n,r) \ ,
+     * \f]
+     * \f[
+     *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}'(k_n,r) = \left( \frac{l_n(l_n+1)}{r^2}
+     *     + 2U(r) - k^2 \right) \phi_{l_n}(k_n,r) \ .
+     * \f]
+     * This function computes vector \f$ ( \phi_{l_n}'(k_n, r), \phi_{l_n}''(k_n, r) ) \f$
+     * from the vector \f$ ( \phi_{l_n}(k_n, r), \phi_{l_n}'(k_n, r) ) \f$ and the independent
+     * coordinate \f$ x \f$.
+     */
+    int derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
+    int derivs0(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
+    
+    /// Export data to file using \ref write_array.
+    void toFile(const char * filename) const { write_array(grid, array, filename); }
+    
+    /**
+     * Return radius from which the asymptotic form is used.
+     */
+    double farRadius() const { return rf; }
+    
+    size_t sampleCount() const { return grid.size(); }
+    
+    /// (debuging parameter) number of evaluations
+    mutable unsigned Evaluations;
+    
 private:
-	
-	// distorting potential
-	DistortingPotential U;
-	
-	// interpolator
-	gsl_interp* interpolator;
-	
-	// distorted wave input parameters
-	double kn;		// wavenumber of the distorted wave
-	int ln;			// angular momentum of the distorted wave
-	
-	// distorted wave computed attributes
-	int samples;	// sample count
-	double h;		// discretization step
-	
-	// distorted wave data
-	double phase;	// phase shift
-	rArray grid;	// grid
-	rArray array;	// samples
+    
+    // distorting potential
+    DistortingPotential U;
+    
+    // interpolator
+    gsl_interp *interpolator, *interpolator0;
+    
+    // distorted wave input parameters
+    double kn;      // wavenumber of the distorted wave
+    int ln;         // angular momentum of the distorted wave
+    
+    // classical turning point and far radius
+    double r0, rf;
+    
+    // distorted wave computed attributes
+    int samples, samples0;  // sample count
+    double h, h0;           // discretization step
+    
+    // distorted wave data
+    double phase;           // phase shift
+    rArray grid, grid0;     // grid
+    rArray array, array0;   // samples
 };
 
 #endif

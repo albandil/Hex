@@ -48,6 +48,17 @@ static inline std::string &trim(std::string &s)
 	return ltrim(rtrim(s));
 }
 
+/// Many-argument "min".
+template <typename T> T min (T x)
+{
+    return x;
+}
+template <typename T, class ...Params> T min (T x, Params ...p)
+{
+    T y = min(p...);
+    return std::min(x, y);
+}
+
 /**
  * Custom exception class with easy printf-like constructor.
  * 

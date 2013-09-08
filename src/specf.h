@@ -248,7 +248,7 @@ Complex sphY(int l, int m, double theta, double phi);
 Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2);
 
 /**
- * \brief Base class for real functions.
+ * \brief Base class for radial functions.
  */
 template <typename T> class RadialFunction
 {
@@ -256,6 +256,21 @@ public:
 	
 	/// Evaluate the function.
 	virtual T operator() (double x) const = 0;
+    
+    /**
+     * @brief Evaluate asymptotic form near to zero.
+     * @param x Evaluation radius.
+     * @return Pair (Complex y, int k) that can be used to reconstruct the value using
+     * @[
+     *     f(x) = y \cdot x^k
+     * @]
+     */
+    virtual std::pair<T,int> getZeroAsymptotic (double x) const = 0;
+    
+    /**
+     * @brief Classical turning point.
+     */
+    virtual double getTurningPoint () const = 0;
 };
 
 /**
