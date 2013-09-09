@@ -46,8 +46,10 @@ cArray ric_jv(int lmax, Complex z)
                 for (int n = 1; n <= lmax; n++)
                     ev[n] = ev[n-1] * z.real() / (2*n+1);
             }
-            
-            throw exception("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
+            else
+            {
+                throw exception("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
+            }
         }
         
         // Bessel -> Riccati-Bessel function
