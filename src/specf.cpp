@@ -35,7 +35,7 @@ cArray ric_jv(int lmax, Complex z)
 		
 		// stop at failure
 		if (err != GSL_SUCCESS or not std::all_of(ev.begin(), ev.end(), finite))
-			throw exception("Error %d while evaluating j[l≤%d](%d+%di).", err, lmax, z.real(), z.imag());
+			throw exception("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
 		
 		// Bessel -> Riccati-Bessel function
 		for (int i = 0; i <= lmax; i++)
