@@ -909,6 +909,8 @@ public:
 	NumberArray<int>     const & diag() const { return idiag_; }
 	NumberArray<Complex> const & data() const { return elems_; }
 	
+	size_t size() const { return n_; }
+	
 	cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
 	
 	bool is_compatible (SymDiaMatrix const & B) const;
@@ -1142,16 +1144,23 @@ CooMatrix stairs(size_t N);
  */
 template <typename Preconditioner, typename Multiplier>
 unsigned cg_callbacks (
-	cArray const & b, cArray & x,
+	cArrayView const & bview, cArrayView & xview,
 	double eps,
 	unsigned min_iterations, unsigned max_iterations,
 	Preconditioner apply_preconditioner,
-	Multiplier matrix_multiply
+	Multiplier matrix_multiply,
+    bool verbose = true
 ) {
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	std::chrono::duration<int> sec;
 	
-	// compute norm of the right hand side
+    cArray b = bview;
+    cArray x = xview;
+    
+    std::cout << "1) xview.size() = " << xview.size() << "\n";
+    std::cout << "1) x.size() = " << x.size() << "\n";
+    
+    // compute norm of the right hand side
 	double bnorm = b.norm();
 	
 	// some arrays (search directions etc.)
@@ -1183,9 +1192,12 @@ unsigned cg_callbacks (
 	{
 		sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
 		
-		std::cout << "\t[cg] Residual relative magnitude after "
-		          << k << " iterations: " << r.norm() / bnorm
-				  << " (" << sec.count()/60 << " min)\n";
+        if (verbose)
+        {
+            std::cout << "\t[cg] Residual relative magnitude after "
+                    << k << " iterations: " << r.norm() / bnorm
+                    << " (" << sec.count()/60 << " min)\n";
+        }
 		
 		// apply desired preconditioner
 		apply_preconditioner(r, z);
@@ -1234,6 +1246,9 @@ unsigned cg_callbacks (
 		rho_old = rho_new;
 	}
 	
+	std::cout << "2) xview.size() = " << xview.size() << "\n";
+    std::cout << "2) x.size() = " << x.size() << "\n";
+	xview = x;
 	return k;
 }
 

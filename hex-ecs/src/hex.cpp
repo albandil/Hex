@@ -648,33 +648,33 @@ Stg2:
 		std::cout << "ok\n";
 		
 		// compute the LU factorizations
-		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-		{
-			int l1 = coupled_states[ill].first;
-			int l2 = coupled_states[ill].second;
-			
-			// skip computation of unwanted blocks for this process
-			if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
-				continue;
-			
-			// timer info
-			std::chrono::steady_clock::time_point start;
-			std::chrono::duration<int> sec;
-			
-			// log output
-			std::cout << "\t[" << iproc << "] LU factorization " 
-			          << ill << " of (" << l1 << "," << l2 << ") block started\n";
-			start = std::chrono::steady_clock::now();
-			
-			// factorize
-			lufts[ill] = csr_blocks[ill].factorize();
-			
-			// log output
-			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-			std::cout << "\t[" << iproc << "] LU factorization " 
-			          << ill << " of (" << l1 << "," << l2 << ") block done after " 
-			          << sec.count() << " s (" << lufts[ill].size() / 1048576 << " MiB)\n";
-		}
+// 		for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+// 		{
+// 			int l1 = coupled_states[ill].first;
+// 			int l2 = coupled_states[ill].second;
+// 			
+// 			// skip computation of unwanted blocks for this process
+// 			if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+// 				continue;
+// 			
+// 			// timer info
+// 			std::chrono::steady_clock::time_point start;
+// 			std::chrono::duration<int> sec;
+// 			
+// 			// log output
+// 			std::cout << "\t[" << iproc << "] LU factorization " 
+// 			          << ill << " of (" << l1 << "," << l2 << ") block started\n";
+// 			start = std::chrono::steady_clock::now();
+// 			
+// 			// factorize
+// 			lufts[ill] = csr_blocks[ill].factorize();
+// 			
+// 			// log output
+// 			sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+// 			std::cout << "\t[" << iproc << "] LU factorization " 
+// 			          << ill << " of (" << l1 << "," << l2 << ") block done after " 
+// 			          << sec.count() << " s (" << lufts[ill].size() / 1048576 << " MiB)\n";
+// 		}
 		
 		// For all initial states ------------------------------------------- //
 		//
@@ -797,28 +797,53 @@ Stg2:
 					current_solution = previous_solution;
 			}
 			
-			// CG preconditioner callback
-			auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
-			{
-				
-				// apply a block inversion preconditioner
-				# pragma omp parallel for schedule (dynamic,1)
-				for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-				{
-					// skip computation of unwanted blocks for this process
-					if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
-						continue;
-					
-					// create copy-to view of "z"
-					cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
-					
-					// create copy-from view of "r"
-					cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
-					
-					// copy the corresponding slice of "r" multiplied by a correct block inversion
- 					zview = lufts[ill].solve(rview);
-				}
-				
+            // CG preconditioner callback
+            auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+            {
+                // apply a block inversion preconditioner
+                # pragma omp parallel for schedule (dynamic,1)
+                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+                {
+                    // skip computation of unwanted blocks for this process
+                    if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+                        continue;
+                    
+                    cArray inv_diagonal(Nspline*Nspline);
+                    for (size_t i = 0; i < Nspline*Nspline; i++)
+                        inv_diagonal[i] = 1./dia_blocks[ill].main_diagonal()[i];
+                    
+                    // no preconditioner in the inner region
+                    auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+                    {
+                        z = r * inv_diagonal;
+                    };
+                    
+                    // multiply by the correct block
+                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+                    {
+                        q = dia_blocks[ill].dot(p);
+                    };
+                    
+                    // create copy-to view of "z"
+                    cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
+                    
+                    // create copy-from view of "r"
+                    cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
+                    
+                    // solve using the CG solver
+                    int n = cg_callbacks
+                    (
+                        rview,      // rhs
+                        zview,      // solution
+                        1e-10,      // tolerance
+                        0,          // min. iterations
+                        Nspline*Nspline,    // max. iteration
+                        apply_inner_preconditioner,
+                        inner_matrix_multiply,
+                        false       // verbose
+                    );
+                }
+                
 #ifndef NO_MPI
 				if (parallel)
 				{
