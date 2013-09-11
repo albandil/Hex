@@ -101,15 +101,15 @@ public:
     
     virtual NumberType& operator[] (size_t i)
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         // bounds check
         if (i < N)
             return array[i];
         else
             throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     //
@@ -118,14 +118,14 @@ public:
     
     virtual NumberType const & operator[] (size_t i) const
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         if (i < N)
             return array[i];
         else
             throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     // getters
@@ -407,15 +407,15 @@ public:
     
     inline DataType& operator[] (size_t i)
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         // bounds check
         if (i < N)
             return array[i];
         else
             throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     //
@@ -424,14 +424,14 @@ public:
     
     inline DataType const & operator[] (size_t i) const
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         if (i < N)
             return array[i];
         else
             throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     //
@@ -803,15 +803,15 @@ public:
     
     inline NumberType& operator[] (size_t i)
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         // bounds check
         if (i < N)
             return array[i];
         else
             throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     //
@@ -820,14 +820,14 @@ public:
     
     inline NumberType const & operator[] (size_t i) const
     {
-        #ifdef NDEBUG
+#ifdef NDEBUG
         return array[i];
-        #else
+#else
         if (i < N)
             return array[i];
         else
             throw exception("[Array::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
-        #endif
+#endif
     }
     
     //
@@ -1182,7 +1182,7 @@ public:
         }
     }
     
-    #ifndef NO_HDF
+#ifndef NO_HDF
     /**
      * Save array to HDF file.
      * \param name Filename.
@@ -1382,7 +1382,7 @@ public:
         
         return unpack;
     }
-    #endif
+#endif
     
     std::string string() const
     {
@@ -1698,16 +1698,27 @@ template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* file
     return true;
 }
 
+//
 // aliases
-typedef NumberArray<double>       rArray;
-typedef NumberArray<Complex>      cArray;
-typedef NumberArray<long double>  qArray;
-typedef Array<rArray>             rArrays;
-typedef Array<cArray>             cArrays;
+//
 
+typedef NumberArray<int>          iArray;
+typedef NumberArray<long>         lArray;
+typedef NumberArray<double>       rArray;
+typedef NumberArray<long double>  qArray;
+typedef NumberArray<Complex>      cArray;
+
+typedef ArrayView<int>         iArrayView;
+typedef ArrayView<long>        lArrayView;
 typedef ArrayView<double>      rArrayView;
-typedef ArrayView<Complex>     cArrayView;
 typedef ArrayView<long double> qArrayView;
+typedef ArrayView<Complex>     cArrayView;
+
+typedef Array<iArray>             iArrays;
+typedef Array<lArray>             lArrays;
+typedef Array<rArray>             rArrays;
+typedef Array<qArray>             qArrays;
+typedef Array<cArray>             cArrays;
 
 /**
  * Variadic template recurrence starter. For documentation of the function

@@ -21,8 +21,8 @@ LFLAGS_DEBUG = -g -fopenmp -fPIC $(LIBRARY)
 CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG
 LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
-CFLAGS = $(CFLAGS_RELEASE)
-LFLAGS = $(LFLAGS_RELEASE)
+CFLAGS = $(CFLAGS_DEBUG)
+LFLAGS = $(LFLAGS_DEBUG)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -38,7 +38,7 @@ bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/mo
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-obj/hex.o: src/hex.cpp src/amplitudes.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/specf.h src/input.h src/hdffile.h src/version.h
+obj/hex.o: src/hex.cpp src/amplitudes.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/specf.h src/input.h src/hdffile.h src/version.h src/itersolve.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 
