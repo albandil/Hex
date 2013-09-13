@@ -17,11 +17,13 @@
 #include <set>
 #include <vector>
 
-#ifdef WITH_PNGPP
+#ifndef NO_PNG
     #include <png++/png.hpp>
 #endif
 
-#include <umfpack.h>
+#ifndef NO_UMFPACK
+    #include <umfpack.h>
+#endif
 
 #include "arrays.h"
 #include "hdffile.h"
@@ -30,39 +32,39 @@
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
 {
     // shorthands
-    size_t Csize = A._i_.size() * B._i_.size();
-    size_t Brows = B._m_;
-    size_t Bcols = B._n_;
+    size_t Csize = A.i_.size() * B.i_.size();
+    size_t Brows = B.m_;
+    size_t Bcols = B.n_;
     
     // create temporary matrix to hold the Kronecker product
     CooMatrix C;
     
     // set correct dimensions, pre-allocate space
-    C._m_ = A._m_ * B._m_;
-    C._n_ = A._n_ * B._n_;
-    C._i_ = lArray(Csize);
-    C._j_ = lArray(Csize);
-    C._x_ = cArray(Csize);
+    C.m_ = A.m_ * B.m_;
+    C.n_ = A.n_ * B.n_;
+    C.i_ = lArray(Csize);
+    C.j_ = lArray(Csize);
+    C.x_ = cArray(Csize);
     
     // get iterators
     size_t ic = 0;
     
     // loop over A data
-    size_t Asize = A._i_.size();
+    size_t Asize = A.i_.size();
     for (size_t ia = 0; ia < Asize; ia++)
     {
         // loop over B data
-        size_t Bsize = B._i_.size();
+        size_t Bsize = B.i_.size();
         for (size_t ib = 0; ib < Bsize; ib++)
         {
             // compute new row index
-            C._i_[ic] = A._i_[ia] * Brows + B._i_[ib];
+            C.i_[ic] = A.i_[ia] * Brows + B.i_[ib];
             
             // compute new column index
-            C._j_[ic] = A._j_[ia] * Bcols + B._j_[ib];
+            C.j_[ic] = A.j_[ia] * Bcols + B.j_[ib];
             
             // compute product of the two elements
-            C._x_[ic] = A._x_[ia] * B._x_[ib];
+            C.x_[ic] = A.x_[ia] * B.x_[ib];
             
             // move to next value of C
             ic++;
@@ -102,27 +104,27 @@ CooMatrix stairs(size_t N)
 
 CscMatrix & CscMatrix::operator *= (double r)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
     for (size_t i = 0; i < N; i++)
-        _x_[i] *= r;
+        x_[i] *= r;
     
     return *this;
 }
 
 CscMatrix & CscMatrix::operator &= (const CscMatrix&  B)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
-    assert(N == B._i_.size());
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
+    assert(N == B.i_.size());
     
     for (size_t i = 0; i < N; i++)
     {
-        assert(_i_[i] == B._i_[i]);
+        assert(i_[i] == B.i_[i]);
         
-        _x_[i] += B._x_[i];
+        x_[i] += B.x_[i];
     }
     
     return *this;
@@ -130,17 +132,17 @@ CscMatrix & CscMatrix::operator &= (const CscMatrix&  B)
 
 CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
-    assert(N == B._i_.size());
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
+    assert(N == B.i_.size());
     
     for (size_t i = 0; i < N; i++)
     {
-        assert(_i_[i] == B._i_[i]);
+        assert(i_[i] == B.i_[i]);
         
-        _x_[i] -= B._x_[i];
+        x_[i] -= B.x_[i];
     }
     
     return *this;
@@ -149,32 +151,33 @@ CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
 cArray CscMatrix::dotT(const cArrayView&  b) const
 {
     // create output array
-    cArray c (_n_);
+    cArray c (n_);
     
     // the matrix "*this" is actually transposed
-    for (unsigned icol = 0; icol < _n_; icol++)
+    for (unsigned icol = 0; icol < n_; icol++)
     {
-        size_t idx1 = _p_[icol];
-        size_t idx2 = _p_[icol+1];
+        size_t idx1 = p_[icol];
+        size_t idx2 = p_[icol+1];
         
         // for all nonzero elements in this column
         for (size_t idx = idx1; idx < idx2; idx++)
         {
             // get row number
-            unsigned irow = _i_[idx];
+            unsigned irow = i_[idx];
             
             // store product
-            c[icol] += _x_[idx] * b[irow];
+            c[icol] += x_[idx] * b[irow];
         }
     }
     
     return c;
 }
 
+#ifndef NO_UMFPACK
 CooMatrix CscMatrix::tocoo() const
 {
     // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
-    size_t N = _x_.size();
+    size_t N = x_.size();
     std::vector<long> Ti(N), Tj(N), __j(N);
     std::vector<Complex> Tx(N);
     
@@ -183,7 +186,7 @@ CooMatrix CscMatrix::tocoo() const
     {
     
         // do the conversion
-        long status = umfpack_zl_col_to_triplet(_n_, _p_.data(), __j.data());
+        long status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
         
         // check success
         if (status != 0)
@@ -196,11 +199,11 @@ CooMatrix CscMatrix::tocoo() const
         size_t nz = 0;
         for (size_t i = 0; i < N; i++)
         {
-            if (_x_[i] != 0.)
+            if (x_[i] != 0.)
             {
-                Ti[nz] = _i_[i];
+                Ti[nz] = i_[i];
                 Tj[nz] = __j[i];
-                Tx[nz] = _x_[i];
+                Tx[nz] = x_[i];
                 nz++;
             }
         }
@@ -213,8 +216,9 @@ CooMatrix CscMatrix::tocoo() const
     }
     
     // return new CooMatrix
-    return CooMatrix (_m_, _n_, Ti, Tj, Tx);
+    return CooMatrix (m_, n_, Ti, Tj, Tx);
 }
+#endif
 
 bool CscMatrix::hdfsave(const char* name) const
 {
@@ -224,22 +228,22 @@ bool CscMatrix::hdfsave(const char* name) const
         HDFFile file(name, HDFFile::overwrite);
         
         // write dimensions
-        file.write("m", &_m_, 1);
-        file.write("n", &_n_, 1);
+        file.write("m", &m_, 1);
+        file.write("n", &n_, 1);
         
         // write indices
-        if (not _p_.empty())
-            file.write("p", &(_p_[0]), _p_.size());
-        if (not _i_.empty())
-            file.write("i", &(_i_[0]), _i_.size());
+        if (not p_.empty())
+            file.write("p", &(p_[0]), p_.size());
+        if (not i_.empty())
+            file.write("i", &(i_[0]), i_.size());
         
         // write complex data as a "double" array
-        if (not _x_.empty())
+        if (not x_.empty())
         {
             file.write (
                 "x",
-                reinterpret_cast<double const*>( &(_x_[0]) ),
-                _x_.size() * 2
+                reinterpret_cast<double const*>( &(x_[0]) ),
+                x_.size() * 2
             );
         }
         
@@ -262,22 +266,22 @@ bool CscMatrix::hdfload(const char* name)
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
-        hdf.read("m", &_m_, 1);
-        hdf.read("n", &_n_, 1);
+        hdf.read("m", &m_, 1);
+        hdf.read("n", &n_, 1);
         
         // read indices
-        if (_p_.resize(hdf.size("p")))
-            hdf.read("p", &(_p_[0]), _p_.size());
-        if (_i_.resize(hdf.size("i")))
-            hdf.read("i", &(_i_[0]), _i_.size());
+        if (p_.resize(hdf.size("p")))
+            hdf.read("p", &(p_[0]), p_.size());
+        if (i_.resize(hdf.size("i")))
+            hdf.read("i", &(i_[0]), i_.size());
         
         // read data
-        if (_x_.resize(hdf.size("x") / 2))
+        if (x_.resize(hdf.size("x") / 2))
         {
             hdf.read (
                 "x",
-                reinterpret_cast<double*>(&(_x_[0])),
-                _x_.size() * 2
+                reinterpret_cast<double*>(&(x_[0])),
+                x_.size() * 2
             );
         }
         
@@ -301,39 +305,39 @@ bool CscMatrix::hdfload(const char* name)
 
 CsrMatrix & CsrMatrix::operator *= (Complex r)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
     for (size_t i = 0; i < N; i++)
-        _x_[i] *= r;
+        x_[i] *= r;
     
     return *this;
 }
 
 CsrMatrix & CsrMatrix::operator &= (CsrMatrix const &  B)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
     // check at least dimensions and non-zero element count
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
-    assert(N == B._i_.size());
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
+    assert(N == B.i_.size());
     
     for (size_t i = 0; i < N; i++)
-        _x_[i] += B._x_[i];
+        x_[i] += B.x_[i];
     
     return *this;
 }
 
 CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
-    assert(N == B._i_.size());
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
+    assert(N == B.i_.size());
     
     for (size_t i = 0; i < N; i++)
-        _x_[i] -= B._x_[i];
+        x_[i] -= B.x_[i];
     
     return *this;
 }
@@ -341,28 +345,28 @@ CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
 cArray CsrMatrix::dot(const cArrayView& b) const
 {
     // create output array
-    cArray c(_m_);
+    cArray c(m_);
     
-    for (unsigned irow = 0; irow < _m_; irow++)
+    for (unsigned irow = 0; irow < m_; irow++)
     {
-        size_t idx1 = _p_[irow];
-        size_t idx2 = _p_[irow+1];
+        size_t idx1 = p_[irow];
+        size_t idx2 = p_[irow+1];
         
         // for all nonzero elements in this row
         for (size_t idx = idx1; idx < idx2; idx++)
         {
             // get column number
-            unsigned icol = _i_[idx];
+            unsigned icol = i_[idx];
             
             // store product
-            c[irow] += _x_[idx] * b[icol];
+            c[irow] += x_[idx] * b[icol];
         }
     }
     
     return c;
 }
 
-#ifdef WITHPNG
+#ifndef NO_PNG
 CsrMatrix::PngGenerator::PngGenerator(const CsrMatrix* mat, double threshold)
     : base_t(mat->cols(), mat->rows()), Mat(mat), buffer(mat->cols()), Threshold(threshold)
 {
@@ -375,8 +379,8 @@ CsrMatrix::PngGenerator::~PngGenerator()
 png::byte* CsrMatrix::PngGenerator::get_next_row(size_t irow)
 {
     // get column indices
-    int idx_min = Mat->_p_[irow];
-    int idx_max = Mat->_p_[irow + 1];
+    int idx_min = Mat->p_[irow];
+    int idx_max = Mat->p_[irow + 1];
     
     // clear memory
     for (int icol = 0; icol < (int)Mat->cols(); icol++)
@@ -384,8 +388,8 @@ png::byte* CsrMatrix::PngGenerator::get_next_row(size_t irow)
     
     // for all nonzero columns
     for (int idx = idx_min; idx < idx_max; idx++)
-        if (abs(Mat->_x_[idx]) > Threshold)
-            buffer[Mat->_i_[idx]] = 0;
+        if (std::abs(Mat->x_[idx]) > Threshold)
+            buffer[Mat->i_[idx]] = 0;
         
     // pass the buffer
     return reinterpret_cast<png::byte*>(row_traits::get_data(buffer));
@@ -405,18 +409,27 @@ void CsrMatrix::plot(const char* filename, double threshold) const
 }
 #endif
 
-CsrMatrix::LUft CsrMatrix::factorize() const
+#ifndef NO_UMFPACK
+CsrMatrix::LUft CsrMatrix::factorize(double droptol) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
     long status;
     
+    // get default setting
+    double Control[UMFPACK_CONTROL];
+    umfpack_zl_defaults(Control);
+    
+    // modify the drop tolerance
+    Control[UMFPACK_STRATEGY] = UMFPACK_STRATEGY_SYMMETRIC;
+    Control[UMFPACK_DROPTOL] = droptol;
+    
     // analyze the sparse structure
     status = umfpack_zl_symbolic (
-        _m_, _n_,					// matrix dimensions
-        _p_.data(), _i_.data(),		// column and row indices
-        reinterpret_cast<const double*>(_x_.data()), 0,	// matrix data
-        &Symbolic, 0, 0				// UMFPACK internals
+        m_, n_,                    // matrix dimensions
+        p_.data(), i_.data(),        // column and row indices
+        reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
+        &Symbolic, Control, nullptr                // UMFPACK internals
     );
     if (status != 0)
     {
@@ -427,9 +440,9 @@ CsrMatrix::LUft CsrMatrix::factorize() const
     
     // do some factorizations
     status = umfpack_zl_numeric (
-        _p_.data(), _i_.data(),	// column and row indices
-        reinterpret_cast<const double*>(_x_.data()), 0,	// matrix data
-        Symbolic, &Numeric, 0, 0	// UMFPACK internals
+        p_.data(), i_.data(),    // column and row indices
+        reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
+        Symbolic, &Numeric, Control, nullptr    // UMFPACK internals
     );
     if (status != 0)
     {
@@ -442,11 +455,13 @@ CsrMatrix::LUft CsrMatrix::factorize() const
     umfpack_zl_free_symbolic(&Symbolic);
     return LUft(this, Numeric);
 }
+#endif
 
+#ifndef NO_UMFPACK
 cArray CsrMatrix::solve(const cArray&  b, size_t eqs) const
 {
     // only square matrices are allowed
-    assert(_m_ == _n_);
+    assert(m_ == n_);
     
     // compute the LU factorization
     LUft luft = factorize();
@@ -458,18 +473,19 @@ cArray CsrMatrix::solve(const cArray&  b, size_t eqs) const
     luft.free();
     return solution;
 }
+#endif
 
 void CsrMatrix::write(const char* filename) const
 {
     FILE *f = fopen(filename, "w");
-    fprintf(f, "# Matrix %ld × %ld with %ld nonzero elements:\n\n", _m_, _n_, _x_.size());
-    for (unsigned irow = 0; irow < _m_; irow++)
+    fprintf(f, "# Matrix %ld × %ld with %ld nonzero elements:\n\n", m_, n_, x_.size());
+    for (unsigned irow = 0; irow < m_; irow++)
     {
-        size_t idx1 = _p_[irow];
-        size_t idx2 = _p_[irow + 1];
+        size_t idx1 = p_[irow];
+        size_t idx2 = p_[irow + 1];
         
         for (size_t idx = idx1; idx < idx2; idx++)
-            fprintf(f, "%d\t%ld\t%g\t%g\n", irow, _i_[idx], _x_[idx].real(), _x_[idx].imag());
+            fprintf(f, "%d\t%ld\t%g\t%g\n", irow, i_[idx], x_[idx].real(), x_[idx].imag());
     }
     fclose(f);
 }
@@ -482,22 +498,22 @@ bool CsrMatrix::hdfsave(const char* name) const
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
-        hdf.write("m", &_m_, 1);
-        hdf.write("n", &_n_, 1);
+        hdf.write("m", &m_, 1);
+        hdf.write("n", &n_, 1);
         
         // write indices
-        if (not _p_.empty())
-            hdf.write("p", &(_p_[0]), _p_.size());
-        if (not _i_.empty())
-            hdf.write("i", &(_i_[0]), _i_.size());
+        if (not p_.empty())
+            hdf.write("p", &(p_[0]), p_.size());
+        if (not i_.empty())
+            hdf.write("i", &(i_[0]), i_.size());
         
         // write data
-        if (not _x_.empty())
+        if (not x_.empty())
         {
             hdf.write (
                 "x",
-                reinterpret_cast<double const*>(&(_x_[0])),
-                _x_.size() * 2
+                reinterpret_cast<double const*>(&(x_[0])),
+                x_.size() * 2
             );
         }
         
@@ -520,22 +536,22 @@ bool CsrMatrix::hdfload(const char* name)
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
-        hdf.read("m", &_m_, 1);
-        hdf.read("n", &_n_, 1);
+        hdf.read("m", &m_, 1);
+        hdf.read("n", &n_, 1);
         
         // read indices
-        if (_p_.resize(hdf.size("p")))
-            hdf.read("p", &(_p_[0]), _p_.size());
-        if (_i_.resize(hdf.size("i")))
-            hdf.read("i", &(_i_[0]), _i_.size());
+        if (p_.resize(hdf.size("p")))
+            hdf.read("p", &(p_[0]), p_.size());
+        if (i_.resize(hdf.size("i")))
+            hdf.read("i", &(i_[0]), i_.size());
         
         // read data
-        if (_x_.resize(hdf.size("x") / 2))
+        if (x_.resize(hdf.size("x") / 2))
         {
             hdf.read (
                 "x",
-                reinterpret_cast<double*>(&(_x_[0])),
-                _x_.size() * 2
+                reinterpret_cast<double*>(&(x_[0])),
+                x_.size() * 2
             );
         }
         
@@ -552,14 +568,14 @@ bool CsrMatrix::hdfload(const char* name)
 
 double CsrMatrix::norm() const
 {
-    size_t N = _i_.size();
+    size_t N = i_.size();
     double res = 0.;
     
     // return the abs(largest element)
     for (size_t i = 0; i < N; i++)
     {
         // compute the absolute value
-        double val = abs(_x_[i]);
+        double val = abs(x_[i]);
         
         // update the winner
         if (val > res)
@@ -573,8 +589,8 @@ cArray CsrMatrix::upperSolve(cArrayView const &  b) const
 {
     // check size
     size_t N = b.size();
-    assert((size_t)_m_ == N);
-    assert((size_t)_n_ == N);
+    assert((size_t)m_ == N);
+    assert((size_t)n_ == N);
 
     // create output array
     cArray x(N);
@@ -586,8 +602,8 @@ cArray CsrMatrix::upperSolve(cArrayView const &  b) const
         Complex accum = 0.;
         
         // get relevant columns of the sparse matrix
-        size_t idx1 = _p_[row];
-        size_t idx2 = _p_[row + 1];
+        size_t idx1 = p_[row];
+        size_t idx2 = p_[row + 1];
         
         // diagonal element of the matrix
         Complex a = 0.;
@@ -596,15 +612,15 @@ cArray CsrMatrix::upperSolve(cArrayView const &  b) const
         for (size_t idx = idx1; idx < idx2; idx++)
         {
             // which column is this?
-            size_t col = _i_[idx];
+            size_t col = i_[idx];
             
             // diagonal element will be useful in a moment, store it
             if (col == row)
-                a = _x_[idx];
+                a = x_[idx];
             
             // backsubstitute
             else if (col > row)
-                accum += _x_[idx] * x[col];
+                accum += x_[idx] * x[col];
         }
         
         // triangular matrix, in order to be regular, needs nonzero diagonal elements
@@ -621,8 +637,8 @@ cArray CsrMatrix::lowerSolve(cArrayView const & b) const
 {
     // check size
     size_t N = b.size();
-    assert((size_t)_m_ == N);
-    assert((size_t)_n_ == N);
+    assert((size_t)m_ == N);
+    assert((size_t)n_ == N);
     
     // create output array
     cArray x(N);
@@ -633,8 +649,8 @@ cArray CsrMatrix::lowerSolve(cArrayView const & b) const
         Complex accum = 0.;
         
         // get relevant columns of the sparse matrix
-        size_t idx1 = _p_[row];
-        size_t idx2 = _p_[row + 1];
+        size_t idx1 = p_[row];
+        size_t idx2 = p_[row + 1];
         
         // diagonal element of the matrix
         Complex a = 0.;
@@ -643,15 +659,15 @@ cArray CsrMatrix::lowerSolve(cArrayView const & b) const
         for (size_t idx = idx1; idx < idx2; idx++)
         {
             // which column is this?
-            size_t col = _i_[idx];
+            size_t col = i_[idx];
             
             // diagonal element will be useful in a moment, store it
             if (col == row)
-                a = _x_[idx];
+                a = x_[idx];
             
             // backsubstitute
             else if (col < row)
-                accum += _x_[idx] * x[col];
+                accum += x_[idx] * x[col];
         }
         
         // triangular matrix, in order to be regular, needs nonzero diagonal elements
@@ -666,29 +682,30 @@ cArray CsrMatrix::lowerSolve(cArrayView const & b) const
 
 cArray CsrMatrix::diag() const
 {
-    cArray D ( std::min(_m_, _n_) );
+    cArray D ( std::min(m_, n_) );
     
-    for (size_t irow = 0; irow < (size_t)_m_; irow++)
-        for (size_t idx = _p_[irow]; idx < (size_t)_p_[irow+1]; idx++)
-            if ((size_t)_i_[idx] == irow)
-                D[irow] = _x_[idx];
+    for (size_t irow = 0; irow < (size_t)m_; irow++)
+        for (size_t idx = p_[irow]; idx < (size_t)p_[irow+1]; idx++)
+            if ((size_t)i_[idx] == irow)
+                D[irow] = x_[idx];
     
     return D;
 }
 
+#ifndef NO_UMFPACK
 CooMatrix CsrMatrix::tocoo() const
 {
     // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
-    size_t N = _x_.size();
-    std::vector<long> Ti(N), Tj(N), __j(N);
-    std::vector<Complex> Tx(N);
+    size_t N = x_.size();
+    lArray Ti(N), Tj(N), __j(N);
+    cArray Tx(N);
     
     // do we have any elements at all?
     if (N != 0)
     {
     
         // do the conversion
-        long status = umfpack_zl_col_to_triplet(_n_, _p_.data(), __j.data());
+        long status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
         
         // check success
         if (status != 0)
@@ -701,11 +718,11 @@ CooMatrix CsrMatrix::tocoo() const
         size_t nz = 0;
         for (size_t i = 0; i < N; i++)
         {
-            if (_x_[i] != 0.)
+            if (x_[i] != 0.)
             {
-                Ti[nz] = _i_[i];
+                Ti[nz] = i_[i];
                 Tj[nz] = __j[i];
-                Tx[nz] = _x_[i];
+                Tx[nz] = x_[i];
                 nz++;
             }
         }
@@ -714,33 +731,33 @@ CooMatrix CsrMatrix::tocoo() const
         Ti.resize(nz);
         Tj.resize(nz);
         Tx.resize(nz);
-        
     }
     
     // return new CooMatrix
-    return CooMatrix (_m_, _n_, Tj, Ti, Tx);
+    return CooMatrix (m_, n_, Tj, Ti, Tx);
 }
+#endif
 
 CsrMatrix CsrMatrix::sparse_like(const CsrMatrix& B) const
 {
     // check dimensions
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
     
     // prepare zero matrix with the same storage pattern the matrix B has
     CsrMatrix A = B;
-    memset(A._x_.data(), 0, A._x_.size() * sizeof(Complex));
+    memset(A.x_.data(), 0, A.x_.size() * sizeof(Complex));
     
     // copy all nonzero elements of "this" matrix
-    for (unsigned row = 0; row < _m_; row++)
+    for (unsigned row = 0; row < m_; row++)
     {
-        size_t idx1 = A._p_[row];
-        size_t idx2 = A._p_[row+1];
+        size_t idx1 = A.p_[row];
+        size_t idx2 = A.p_[row+1];
         
         for (size_t idx = idx1; idx < idx2; idx++)
         {
-            unsigned col = A._i_[idx];
-            A._x_[idx] = (*this)(row,col);
+            unsigned col = A.i_[idx];
+            A.x_[idx] = (*this)(row,col);
         }
     }
     
@@ -751,17 +768,17 @@ CsrMatrix CsrMatrix::sparse_like(const CsrMatrix& B) const
 Complex CsrMatrix::operator() (unsigned i, unsigned j) const
 {
     // get all column indices, which have nonzero element in row "i"
-    size_t idx1 = _p_[i];
-    size_t idx2 = _p_[i + 1];
+    size_t idx1 = p_[i];
+    size_t idx2 = p_[i + 1];
     
     // find the correct column ("j")
-    auto it = std::lower_bound(_i_.begin() + idx1, _i_.begin() + idx2, j);
+    auto it = std::lower_bound(i_.begin() + idx1, i_.begin() + idx2, j);
 
-    if (it == _i_.end() or *it != j)
+    if (it == i_.end() or *it != j)
         return 0.;
     
     // return the value
-    return _x_[it - _i_.begin()];
+    return x_[it - i_.begin()];
 }
 
 
@@ -772,13 +789,13 @@ Complex CsrMatrix::operator() (unsigned i, unsigned j) const
 // ------------------------------------------------------------------------- //
 
 
-
+#ifndef NO_UMFPACK
 CscMatrix CooMatrix::tocsc() const
 {
-    size_t nz = _x_.size();
+    size_t nz = x_.size();
     
     // CSC matrix data
-    lArray Ap(_n_ + 1), Ai(nz);
+    lArray Ap(n_ + 1), Ai(nz);
     cArray Ax(nz);
     
     // do we have any elements at all?
@@ -786,15 +803,15 @@ CscMatrix CooMatrix::tocsc() const
     {
     
         long status = umfpack_zl_triplet_to_col (
-            _m_,			// rows
-            _n_,			// cols
-            nz,				// data length
-            _i_.data(),		// row indices
-            _j_.data(), 	// column indices
-            reinterpret_cast<const double *>(_x_.data()), 0, 	// interleaved data
-            Ap.data(),		// column pointers
-            Ai.data(),		// row pointers
-            reinterpret_cast<double *>(Ax.data()), 0,	// interleaved data
+            m_,            // rows
+            n_,            // cols
+            nz,                // data length
+            i_.data(),        // row indices
+            j_.data(),     // column indices
+            reinterpret_cast<const double *>(x_.data()), 0,     // interleaved data
+            Ap.data(),        // column pointers
+            Ai.data(),        // row pointers
+            reinterpret_cast<double *>(Ax.data()), 0,    // interleaved data
             0
         );
         
@@ -806,38 +823,49 @@ CscMatrix CooMatrix::tocsc() const
         }
         
         // crop storage
-        size_t N = Ap[_n_];
+        size_t N = Ap[n_];
         Ai.resize(N);
         Ax.resize(N);
     }
     
-    return CscMatrix(_m_, _n_, Ap, Ai, Ax);
+    return CscMatrix(m_, n_, Ap, Ai, Ax);
 }
+#endif
 
-
+#ifndef NO_UMFPACK
 CsrMatrix CooMatrix::tocsr() const
 {
-    size_t nz = _x_.size();
+    size_t nz = x_.size();
     
     // CSC matrix data
-    lArray Ap(_n_ + 1), Ai(nz);
+    lArray Ap(n_ + 1), Ai(nz);
     cArray Ax(nz);
     
     // do we have any elements at all?
     if (nz != 0)
     {
     
-        long status = umfpack_zl_triplet_to_col (
-            _n_,			// cols (rows of transposed matrix)
-            _m_,			// rows (cols of transposed matrix)
-            nz,				// data length
-            _j_.data(), 	// column indices (rows of transposed matrix)
-            _i_.data(),		// row indices (cols of transposed matrix)
-            reinterpret_cast<const double *>(_x_.data()), 0,	// interleaved data
-            Ap.data(),		// row pointers
-            Ai.data(),		// column indices
-            reinterpret_cast<double *>(Ax.data()), 0,	// interleaved data
-            0
+        long status = umfpack_zl_triplet_to_col
+        (
+            n_,            // cols (rows of transposed matrix)
+            m_,            // rows (cols of transposed matrix)
+            nz,             // data length
+            j_.data(),     // column indices (rows of transposed matrix)
+            i_.data(),     // row indices (cols of transposed matrix)
+            
+            // interleaved data
+            reinterpret_cast<const double *>(x_.data()),
+            nullptr,
+            
+            Ap.data(),      // row pointers
+            Ai.data(),      // column indices
+            
+            // interleaved data
+            reinterpret_cast<double *>(Ax.data()),
+            nullptr,
+         
+            // map
+            nullptr
         );
         
         // check success
@@ -848,13 +876,14 @@ CsrMatrix CooMatrix::tocsr() const
         }
         
         // crop storage
-        size_t N = Ap[_m_];
+        size_t N = Ap[m_];
         Ai.resize(N);
         Ax.resize(N);
     }
     
-    return CsrMatrix(_m_, _n_, Ap, Ai, Ax);
+    return CsrMatrix(m_, n_, Ap, Ai, Ax);
 }
+#endif
 
 SymDiaMatrix CooMatrix::todia(MatrixTriangle triangle) const
 {
@@ -862,46 +891,51 @@ SymDiaMatrix CooMatrix::todia(MatrixTriangle triangle) const
     std::set<int> diags;
     
     // elements per diagonal
-    cArrays elems(_m_);
+    cArrays elems(m_);
     
     // for all nonzero elements
-    for (size_t i = 0; i < _x_.size(); i++)
+    for (size_t i = 0; i < x_.size(); i++)
     {
         // get row and column index
-        int irow = _i_[i];
-        int icol = _j_[i];
+        int irow = i_[i];
+        int icol = j_[i];
         
         // get diagonal
-        int diagonal = icol - irow;
+        int d = icol - irow;
         
-        // if we only want to store the upper triangle...
-        if ((triangle & upper) and (diagonal < 0))
+        // do we want the lower triangle?
+        if ((d < 0) and not (triangle & strict_lower))
             continue;
         
-        // if we only want to store the lower triangle...
-        if ((triangle & lower) and (diagonal > 0))
+        // do we want the upper triangle?
+        if ((d > 0) and not (triangle & strict_upper))
             continue;
         
-        // from now on the "diagonal" needs to be positive number
-        diagonal = std::abs(diagonal);
+        // do we want the diagonal?
+        if ((d == 0) and not (triangle & diagonal))
+            continue;
+        
+        // separate sign and value of the diagonal index
+        MatrixTriangle dtri = (d > 0 ? upper : lower);
+        d = std::abs(d);
         
         // add this diagonal (if not already added)
-        diags.insert(diagonal);
+        diags.insert(d);
         
         // reserve space for this diagonal if not already done
-        if (elems[diagonal].size() == 0)
-            elems[diagonal].resize(_m_ - diagonal);
+        if (elems[d].size() == 0)
+            elems[d].resize(m_ - d);
         
-        // add element
-        if (triangle & upper)
-            elems[diagonal][irow] = _x_[i];
-        if (triangle & lower)
-            elems[diagonal][icol] = _x_[i];
+        // add element numbered by the correct index (row/column)
+        if (dtri == upper)
+            elems[d][irow] = x_[i];
+        else // dtri == lower
+            elems[d][icol] = x_[i];
     }
     
     // concatenate the diagonals, construct matrix object
     return SymDiaMatrix (
-        _m_,
+        m_,
         Array<int>(diags.cbegin(), diags.cend()),
         join(elems)
     );
@@ -911,10 +945,10 @@ void CooMatrix::write(const char* filename) const
 {
     std::ofstream f(filename);
     
-    f << "# Matrix " << _m_ << " × " << _n_ << " with " << _x_.size() << " nonzero elements:\n\n";
+    f << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
     
-    for (size_t i = 0; i < _i_.size(); i++)
-        f << _i_[i] << "\t" << _j_[i] << "\t" << _x_[i].real() << "\t" << _x_[i].imag() << "\n";
+    for (size_t i = 0; i < i_.size(); i++)
+        f << i_[i] << "\t" << j_[i] << "\t" << x_[i].real() << "\t" << x_[i].imag() << "\n";
 }
 
 
@@ -923,78 +957,81 @@ CooMatrix CooMatrix::reshape(size_t m, size_t n) const
     CooMatrix C = *this;
     
     // conserved dimensions
-    size_t N = C._i_.size();
-    size_t H = C._m_;
+    size_t N = C.i_.size();
+    size_t H = C.m_;
     
     // check dimensions
-    assert(m * n == C._m_ * C._n_);
+    assert(m * n == C.m_ * C.n_);
     
     // reshape
     for (size_t i = 0; i < N; i++)
     {
         // conserved position in column-ordered array
-        size_t idx = C._i_[i] + C._j_[i] * H;
+        size_t idx = C.i_[i] + C.j_[i] * H;
         
         // new coordinates
         size_t row = idx % m;
         size_t col = idx / m;
         
         // update values
-        C._i_[i] = row;
-        C._j_[i] = col;
+        C.i_[i] = row;
+        C.j_[i] = col;
     }
     
-    C._m_ = m;
-    C._n_ = n;
+    C.m_ = m;
+    C.n_ = n;
     return C;
 }
 
 cArray CooMatrix::todense() const
 {
     // return column-major dense representations
-    cArray v (_m_ * _n_);
+    cArray v (m_ * n_);
     
-    size_t N = _i_.size();
+    size_t N = i_.size();
     for (size_t i = 0; i < N; i++)
-        v[_i_[i] + _j_[i] * _m_] += _x_[i];
+        v[i_[i] + j_[i] * m_] += x_[i];
     
     return v;
 }
 
+#ifndef NO_UMFPACK
 CooMatrix& CooMatrix::operator *= (cArray const &  B)
 {
     return *this = this->dot(B);
 }
+#endif
 
+#ifndef NO_UMFPACK
 CooMatrix CooMatrix::dot(cArrayView const & B) const
 {
     // FIXME: This is a memory INEFFICIENT method.
     // NOTE: Row-major storage assumed for B.
     
     // volumes
-    size_t A_vol = _x_.size();
+    size_t A_vol = x_.size();
     size_t B_vol = B.size();
     
     // check B shape
-    assert(B_vol % _n_ == 0);
+    assert(B_vol % n_ == 0);
     
     // create output matrix
-    unsigned C_rows = _m_;
-    unsigned C_cols = B_vol / _n_;
+    unsigned C_rows = m_;
+    unsigned C_cols = B_vol / n_;
     CooMatrix C(C_rows, C_cols);
     
     // for all elements of A
     for (size_t i = 0; i < A_vol; i++)
     {
-        unsigned row = _i_[i];
-        unsigned col = _j_[i];
+        unsigned row = i_[i];
+        unsigned col = j_[i];
         
         // for all columns of B
         for (unsigned icol = 0; icol < C_cols; icol++)
         {
             C.add (
                 row, icol,
-                _x_[i] * B[col*C_cols + icol]
+                x_[i] * B[col*C_cols + icol]
             );
         }
     }
@@ -1002,27 +1039,28 @@ CooMatrix CooMatrix::dot(cArrayView const & B) const
     // summation is done by shaking
     return C.shake();
 }
+#endif
 
 Complex CooMatrix::ddot(CooMatrix const & B) const
 {
-    assert(_m_ == B._m_);
-    assert(_n_ == B._n_);
+    assert(m_ == B.m_);
+    assert(n_ == B.n_);
     
-    // sort by _i_ and _j_
+    // sort by i_ and j_
     if (not sorted() or not B.sorted())
         throw exception("[CooMatrix] Sort matrices before ddot!");
         
     Complex result = 0;
     
-    auto Ai = _i_.begin();
-    auto Aj = _j_.begin();
-    auto Av = _x_.begin();
+    auto Ai = i_.begin();
+    auto Aj = j_.begin();
+    auto Av = x_.begin();
     
-    auto Bi = B._i_.begin();
-    auto Bj = B._j_.begin();
-    auto Bv = _x_.begin();
+    auto Bi = B.i_.begin();
+    auto Bj = B.j_.begin();
+    auto Bv = x_.begin();
     
-    while (Av != _x_.end() and Bv != B._x_.end())
+    while (Av != x_.end() and Bv != B.x_.end())
     {
         if (*Ai < *Bi or (*Ai == *Bi and *Aj < *Bj))
         {
@@ -1043,11 +1081,13 @@ Complex CooMatrix::ddot(CooMatrix const & B) const
     return result;
 }
 
+#ifndef NO_UMFPACK
 CooMatrix CooMatrix::shake() const
 {
     // ugly and memory inefficient method... FIXME
     return tocsc().tocoo();
 }
+#endif
 
 bool CooMatrix::hdfsave(const char* name) const
 {
@@ -1057,22 +1097,22 @@ bool CooMatrix::hdfsave(const char* name) const
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
-        hdf.write("m", &_m_, 1);
-        hdf.write("n", &_n_, 1);
+        hdf.write("m", &m_, 1);
+        hdf.write("n", &n_, 1);
         
         // write indices
-        if (not _i_.empty())
-            hdf.write("i", &(_i_[0]), _i_.size());
-        if (not _j_.empty())
-            hdf.write("j", &(_j_[0]), _j_.size());
+        if (not i_.empty())
+            hdf.write("i", &(i_[0]), i_.size());
+        if (not j_.empty())
+            hdf.write("j", &(j_[0]), j_.size());
         
         // write data
-        if (not _x_.empty())
+        if (not x_.empty())
         {
             hdf.write (
                 "x",
-                reinterpret_cast<double const*>(&_x_),
-                _x_.size() * 2
+                reinterpret_cast<double const*>(&x_),
+                x_.size() * 2
             );
         }
         
@@ -1097,22 +1137,22 @@ bool CooMatrix::hdfload(const char* name)
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
-        hdf.read("m", &_m_, 1);
-        hdf.read("n", &_n_, 1);
+        hdf.read("m", &m_, 1);
+        hdf.read("n", &n_, 1);
         
         // read indices
-        if (_i_.resize(hdf.size("i")))
-            hdf.read("i", &(_i_[0]), _i_.size());
-        if (_j_.resize(hdf.size("j")))
-            hdf.read("j", &(_j_[0]), _j_.size());
+        if (i_.resize(hdf.size("i")))
+            hdf.read("i", &(i_[0]), i_.size());
+        if (j_.resize(hdf.size("j")))
+            hdf.read("j", &(j_[0]), j_.size());
         
         // read data
-        if (_x_.resize(hdf.size("x") / 2))
+        if (x_.resize(hdf.size("x") / 2))
         {
             hdf.read (
                 "x",
-                reinterpret_cast<double*>(&(_x_[0])),
-                _x_.size() * 2
+                reinterpret_cast<double*>(&(x_[0])),
+                x_.size() * 2
             );
         }
         
@@ -1296,7 +1336,7 @@ bool SymDiaMatrix::hdfsave(const char* name, bool docompress, int consec) const
 #endif
 }
 
-CooMatrix SymDiaMatrix::tocoo(MatrixTriangle triangle) const
+CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
 {
     lArray i, j;
     cArray v;
@@ -1317,7 +1357,7 @@ CooMatrix SymDiaMatrix::tocoo(MatrixTriangle triangle) const
             }
             
             // add this element to COO (upper triangle)
-            if (triangle & upper)
+            if ((id > 0) and (triangle & strict_upper))
             {
                 i.push_back(iel);
                 j.push_back(iel+id);
@@ -1325,19 +1365,19 @@ CooMatrix SymDiaMatrix::tocoo(MatrixTriangle triangle) const
             }
             
             // add this element to COO (upper triangle)
-            if (triangle & lower)
+            if ((id > 0) and (triangle & strict_lower))
             {
                 i.push_back(iel+id);
                 j.push_back(iel);
                 v.push_back(*el);
             }
             
-            // main diagonal needs to be added only once!
-            if ((id == 0) and (triangle & both))
+            // main diagonal
+            if ((id == 0) and (triangle & diagonal))
             {
-                i.pop_back();
-                j.pop_back();
-                v.pop_back();
+                i.push_back(iel);
+                j.push_back(iel);
+                v.push_back(*el);
             }
             
             // move on to the next element
@@ -1367,8 +1407,11 @@ cArray SymDiaMatrix::dot(cArrayView const & B, MatrixTriangle triangle) const
     Complex const * const __restrict rp_B      = (Complex*)__builtin_assume_aligned(&B[0],      sizeof(Complex));
     
     // for all elements in the main diagonal
-    for (int ielem = 0; ielem < n_; ielem++)
-        rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
+    if (triangle & diagonal)
+    {
+        for (int ielem = 0; ielem < n_; ielem++)
+            rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
+    }
     
     // beginning of the current diagonal
     size_t beg = n_;
@@ -1385,11 +1428,11 @@ cArray SymDiaMatrix::dot(cArrayView const & B, MatrixTriangle triangle) const
         // for all elements of the current diagonal
         for (int ielem = 0; ielem < Nelem; ielem++)
         {
-            if (triangle & upper)
+            if (triangle & strict_upper)
             {
                 rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
             }
-            if (triangle & lower)
+            if (triangle & strict_lower)
             {
                 rp_res[ielem + idiag] += rp_elems_[beg + ielem] * rp_B[ielem];
             }
@@ -1406,6 +1449,68 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
     // FIXME this is ugly and inefficient
     return ::kron (this->tocoo(), B.tocoo()).todia();
+}
+
+cArray SymDiaMatrix::lowerSolve(cArrayView const & b) const
+{
+    assert(size() == b.size());
+    
+    // the solution; handle the unit diagonal by using "b" right away
+    cArray x = b;
+    
+    // for all matrix rows (or solution elements) starting from the top
+    for (size_t irow = 0; irow < b.size(); irow++)
+    {
+        // pointer to the beginning of the diagonal data
+        size_t dptr = size();
+        
+        // for all diagonals (except the main diagonal, which has been already taken care of)
+        for (size_t id = 1; id < idiag_.size(); id++)
+        {
+            // skip diagonals that are not relevant for this matrix row
+            if (idiag_[id] > (int)irow)
+                break;
+            
+            // pick the correct element on this diagonal corresponding to row "irow"
+            x[irow] -= x[irow - idiag_[id]] * elems_[dptr + irow - idiag_[id]];
+            
+            // shift the pointer to the beginning of the next diagonal
+            dptr += size() - idiag_[id];
+        }
+    }
+    
+    return x;
+}
+
+cArray SymDiaMatrix::upperSolve(cArrayView const & b) const
+{
+    assert(size() == b.size());
+    
+    // the solution; handle the unit diagonal by using "b" right away
+    cArray x = b;
+    
+    // for all matrix rows (or solution elements) starting from the bottom
+    for (size_t irow = 0; irow < b.size(); irow++) // "irow" numbered from bottom!
+    {
+        // pointer to the beginning of the diagonal data
+        size_t dptr = size();
+        
+        // for all diagonals (except the main diagonal, which has been already taken care of)
+        for (size_t id = 1; id < idiag_.size(); id++)
+        {
+            // skip diagonals that are not relevant for this matrix row
+            if (idiag_[id] > (int)irow)
+                break;
+            
+            // pick the correct element on this diagonal corresponding to row "irow"
+            x[size() - 1 - irow] -= x[size() - 1 - irow + idiag_[id]] * elems_[dptr + size() - 1 - irow];
+            
+            // shift the pointer to the beginning of the next diagonal
+            dptr += size() - idiag_[id];
+        }
+    }
+    
+    return x;
 }
 
 std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A)
@@ -1430,14 +1535,14 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P)
     cArray LD(A.size());
     
     // check lengths
-    assert(A.size() == P.back());
-    assert(I.size() == P.back());
+    assert(A.size() == (size_t)P.back());
+    assert(I.size() == (size_t)P.back());
     
     // current row
     int irow = 0;
     
     // for all elements of the output array
-    for (int pos = 0; pos < LD.size(); pos++)
+    for (int pos = 0; pos < (int)LD.size(); pos++)
     {
         // get column index of this element
         int icol = I[pos];
@@ -1465,7 +1570,7 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P)
             // - continue by subtracting all existing contributions
             //   (loop over COLUMNS)
             int pos1 = P[irow], pos2 = P[icol];
-            while (I[pos1] < icol and I[pos2] < icol)
+            while (pos1 < P[irow+1] and I[pos1] < icol and pos2 < P[icol+1] and I[pos2] < icol)
             {
                 if (I[pos1] < I[pos2])
                 {

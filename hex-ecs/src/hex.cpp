@@ -76,9 +76,8 @@ int main(int argc, char* argv[])
     std::string zipfile;        // HDF solution expansion file to zip
     int  zipcount = 0;          // zip sample count
     double zipmax = -1;         // zip bounding box
-    std::string tdcsfile;       // HDF solution expansion file for TDCS evaluation
-    double tdcsEtot = -1;       // sum of energies of the ejected electrons
     bool parallel = false;      // whether to use OpenMPI
+    double droptol = 0;         // LU decomposition drop tolerance
     
     // which stages to run (default: all)
     int itinerary = StgNone;
@@ -88,8 +87,7 @@ int main(int argc, char* argv[])
         argc, argv,
         inputfile,
         zipfile, zipcount, zipmax,
-        tdcsfile, tdcsEtot,
-        parallel,
+        parallel, droptol,
         itinerary
     );
     
@@ -298,17 +296,6 @@ int main(int argc, char* argv[])
         goto End;
     }
     
-    // compute TDCS if told so
-    if (tdcsfile.size() > 0 and I_am_master)
-    {
-        if (tdcsEtot < 0)
-            throw exception ("You need to specify the total energy of the electrons, --tdcsEtot!");
-        
-        TDCS(tdcsfile, coupled_states, sqrt(tdcsEtot), ni, L, Spin);
-        
-        goto End;
-    }
-    
     std::cout << "Loading/precomputing derivative overlaps... ";
     
     
@@ -393,8 +380,8 @@ Stg1:
         cArray Mtr_mLm1 = computeMi(-lambda-1, Nreknot-1);
         
         // elements of R_tr
-        NumberArray<long> R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
-        NumberArray<Complex> R_tr_v, th_R_tr_v;
+        lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
+        cArray R_tr_v, th_R_tr_v;
         
         # pragma omp parallel default(none) \
             private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
@@ -410,7 +397,7 @@ Stg1:
                 for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
                 for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
                 {
-                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits
+                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
                     if (i > j and k > l)
                         continue;
                     
@@ -431,7 +418,7 @@ Stg1:
             }
         }
         
-        // create matrices and save them to disk
+        // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
         R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
         R_tr_dia[lambda].hdfsave(oss2.str().c_str(), true, 10);
         
@@ -609,10 +596,14 @@ Stg2:
         std::vector<SymDiaMatrix> dia_blocks(coupled_states.size());
         
         // incomplete Choleski factorization of the diagonal blocks
-        // - strictly lower triangle
-        std::vector<SymDiaMatrix> ichol(coupled_states.size());
-        // - inverted diagonal
-        std::vector<cArray> ichold(coupled_states.size());
+        //   L + Lt - I
+//         std::vector<SymDiaMatrix> icholL(coupled_states.size());
+        //   D⁻¹
+//         std::vector<cArray> icholD(coupled_states.size());
+        
+        // incomplete LU factorizations of the diagonal blocks
+        std::vector<CsrMatrix> csr_blocks(coupled_states.size());        
+        std::vector<CsrMatrix::LUft> iLU(coupled_states.size());
         
         // setup the preconditioner - the diagonal block iChol-factorizations
         std::cout << "\tSetup preconditioner blocks... " << std::flush;
@@ -642,11 +633,12 @@ Stg2:
             
             // finalize the matrix
             dia_blocks[ill] = E*S_kron_S - Hdiag;
+            csr_blocks[ill] = dia_blocks[ill].tocoo().tocsr();
         }
         std::cout << "ok\n";
         
-        // compute the iChol factorizations
-        # pragma omp parallel for schedule (dynamic,1)
+        // compute the iLU factorizations
+//         # pragma omp parallel for schedule (dynamic,1)
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             int l1 = coupled_states[ill].first;
@@ -662,32 +654,35 @@ Stg2:
             
             // log output
             # pragma omp critical
-            std::cout << "\t[" << iproc << "] iChol factorization " 
+            std::cout << "\t[" << iproc << "] iLU factorization " 
                       << ill << " of (" << l1 << "," << l2 << ") block started\n";
             start = std::chrono::steady_clock::now();
             
-            // prepare lower triangle matrix in the CSR format
-            CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
+            // convert lower triangular part of "dia_blocks[ill]" to CSR format
+//             CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
             
-            // factorize
-            cArray LD = iChol(csr.x(), csr.i(), csr.p());
+            // factorize the half-matrix to get the decomposition LDLt
+//             cArray LD = iChol(csr.x(), csr.i(), csr.p());
             
             // store inverted diagonal
-            ichold[ill] = cArrayView(LD, 0, csr.rows());
-            for (Complex & d : ichold[ill]) d = 1./d;
+//             icholD[ill] = cArrayView(LD, 0, csr.rows());
+//             std::cout << "D = " << icholD[ill].slice(0,15) << "\n";
+//             for (Complex & d : icholD[ill])
+//                 d = 1./d;
             
-            // clear diagonal
-            cArrayView(LD, 0, csr.rows()).clear();
+            // create a CSR matrix and set diagonal to identity; then convert it to a SymDiaMatrix
+//             icholL[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).nzTransform (
+//                 [](size_t i, size_t j, Complex x) -> Complex { return i == j ? 1. : x; }
+//             ).tocoo().todia(lower);
             
-            // create full SymDiaMatrix from the factorization
-            ichol[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).tocoo().todia(lower);
+            iLU[ill] = csr_blocks[ill].factorize(droptol);
             
             // log output
             sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
             # pragma omp critical
-            std::cout << "\t[" << iproc << "] iChol factorization " 
+            std::cout << "\t[" << iproc << "] iLU factorization " 
                       << ill << " of (" << l1 << "," << l2 << ") block done after " 
-                      << sec.count() << " s\n";
+                      << sec.count() << " s (size = " << iLU[ill].size()/1048576 << " MiB)\n";
         }
         
         // For all initial states ------------------------------------------- //
@@ -822,34 +817,17 @@ Stg2:
                     if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
                         continue;
                     
-//                     cArray inv_diagonal(Nspline * Nspline);
-//                     for (int i = 0; i < Nspline * Nspline; i++)
-//                         inv_diagonal[i] = 1./dia_blocks[ill].main_diagonal()[i];
-                    
                     // no preconditioner in the inner region
                     auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
                     {
-//                         z = r * inv_diagonal;
-                        cArray dz;
+                        // invert the LDLt decomposition
+//                         z = icholL[ill].upperSolve(icholD[ill] * icholL[ill].lowerSolve(r));
                         
-                        // store initial value
-                        z = r;
-                        
-                        // multiply by L
-                        do { z += ( dz = ichol[ill].dot(z,lower) ); } while (dz.norm() < 1e-8 * z.norm());
-                        
-                        // divide by diagonal
-                        z *= ichold[ill];
-                        
-                        // multiply by LT
-                        do { z += ( dz = ichol[ill].dot(z,upper) ); } while (dz.norm() < 1e-8 * z.norm());
+                        z = iLU[ill].solve(r);
                     };
                     
                     // multiply by the correct block
-                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
-                    {
-                        q = dia_blocks[ill].dot(p);
-                    };
+                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { q = dia_blocks[ill].dot(p); };
                     
                     // create copy-to view of "z"
                     cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
@@ -857,18 +835,20 @@ Stg2:
                     // create copy-from view of "r"
                     cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
                     
+                    zview = iLU[ill].solve(rview);
+                    
                     // solve using the CG solver
-                    cg_callbacks
-                    (
-                        rview,      // rhs
-                        zview,      // solution
-                        1e-10,      // tolerance
-                        0,          // min. iterations
-                        Nspline*Nspline,    // max. iteration
-                        apply_inner_preconditioner,
-                        inner_matrix_multiply,
-                        false       // verbose
-                    );
+//                     cg_callbacks
+//                     (
+//                         rview,      // rhs
+//                         zview,      // solution
+//                         1e-10,      // tolerance
+//                         0,          // min. iterations
+//                         Nspline*Nspline,    // max. iteration
+//                         apply_inner_preconditioner,
+//                         inner_matrix_multiply,
+//                         true       // verbose
+//                     );
                 }
                 
 #ifndef NO_MPI

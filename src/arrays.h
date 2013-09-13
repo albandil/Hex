@@ -37,11 +37,11 @@ template <typename DataType> class Array;
 template <typename NumberType> class NumberArray;
 
 /**
- * \brief Array shallow copy.
+ * @brief Array shallow copy.
  */
 template <typename NumberType> class ArrayView
 {
-protected:
+private:
     
     size_t N;
     NumberType * array;
@@ -86,7 +86,7 @@ public:
     
     virtual ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
     {
-        if (v.size() != N)
+        if (v.size() != size())
             throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
         
         for (size_t i = 0; i < N; i++)
@@ -246,7 +246,7 @@ public:
 };
 
 /**
- * \brief A comfortable data array class.
+ * @brief A comfortable data array class.
  * 
  * Class Array is intended as a Hex's replacement for std::vector\<NumberType\>.
  * Properties:
@@ -576,7 +576,7 @@ public:
 };
 
 /**
- * \brief A comfortable number array class.
+ * @brief A comfortable number array class.
  * 
  * Class NumberArray is intended as a Hex's replacement for std::vector\<NumberType\>.
  * Properties:
@@ -589,7 +589,7 @@ public:
  */
 template <typename NumberType> class NumberArray : public Array<NumberType>
 {
-public:
+private:
     
     size_t N, Nres;
     NumberType * array;
@@ -607,7 +607,7 @@ public:
         posix_memalign (
             &aligned_ptr,
             std::max(__alignof(NumberType), sizeof(void*)),
-                        (n + (n % 2)) * sizeof(NumberType)
+            (n + (n % 2)) * sizeof(NumberType)
         );
         
         // get the number pointer
@@ -1101,23 +1101,18 @@ public:
     
     /**
      * Returns a subarray.
-     * \note Obsolete. Use ArrayView instead.
      */
-    Array<NumberType> slice(size_t left, size_t right) const
+    ArrayView<NumberType> slice(size_t left, size_t right) const
     {
-        Array<NumberType> c(right - left);
-        NumberType * ptr_c = &c[0];
+        assert (right >= left);
         
-        for (size_t i = left; i < right; i++)
-            *ptr_c++ = array[i];
-        
-        return c;
+        return ArrayView<NumberType>(array + left, array + right);
     }
     
     /**
      * Converts contents to SQL-readable BLOB (hexadecimal text format)
      * 
-     * \warning The data are stored in the endianness of the current machine.
+     * @warning The data are stored in the endianness of the current machine.
      */
     virtual std::string toBlob() const
     {
@@ -1142,7 +1137,7 @@ public:
     /**
      * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
      * 
-     * \warning The data are assumed to posess the endianness of the current machine.
+     * @warning The data are assumed to posess the endianness of the current machine.
      */
     virtual void fromBlob(std::string const & s)
     {
@@ -1185,9 +1180,9 @@ public:
 #ifndef NO_HDF
     /**
      * Save array to HDF file.
-     * \param name Filename.
-     * \param compress Whether to apply a trivial compression (contract the repeated zeros).
-     * \param consec Minimal consecutive occurences for compression.
+     * @param name Filename.
+     * @param compress Whether to apply a trivial compression (contract the repeated zeros).
+     * @param consec Minimal consecutive occurences for compression.
      */
     bool hdfsave(const char* name, bool docompress = false, int consec = 10) const
     {
@@ -1231,7 +1226,7 @@ public:
     
     /**
      * Load array from HDF file.
-     * \param name Filename.
+     * @param name Filename.
      */
     bool hdfload(std::string name)
     {
@@ -1354,8 +1349,8 @@ public:
         memset(&(unpack[0]), 0, final_size * sizeof(NumberType));
         
         // copy nonzero chunks
-        int this_end = 0;	// index of last updated element in "this"
-        int load_end = 0;	// index of last used element in "nnz_array"
+        int this_end = 0;   // index of last updated element in "this"
+        int load_end = 0;   // index of last used element in "nnz_array"
         for (size_t i = 0; i < zero_blocks.size()/2; i++)
         {
             int zero_start = zero_blocks[2*i];
@@ -1461,6 +1456,17 @@ template <typename T1, typename T2> auto operator - (
         c[i] = a[i] - b[i];
     
     return c;
+}
+
+// unary minus
+template <typename T> Array<T> operator - (ArrayView<T> const & v)
+{
+    Array<T> w(v.size());
+    
+    for (T & u : w)
+        u = -u;
+    
+    return w;
 }
 
 template <typename NumberType1, typename NumberType2> auto operator * (
@@ -1581,9 +1587,9 @@ template <typename NumberType> std::ostream & operator << (std::ostream & out, A
 
 /**
  * Generate uniform grid
- * \param start Left boundary and first sample for "samples" > 0.
- * \param end Right boundary and last sample for "samples" > 1.
- * \param samples Sample count.
+ * @param start Left boundary and first sample for "samples" > 0.
+ * @param end Right boundary and last sample for "samples" > 1.
+ * @param samples Sample count.
  */
 template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
 {
@@ -1605,9 +1611,9 @@ template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
 
 /**
  * Generate logarithmic grid
- * \param x0 Left boundary and first sample for "samples" > 0.
- * \param x1 Right boundary and last sample for "samples" > 1.
- * \param N Sample count.
+ * @param x0 Left boundary and first sample for "samples" > 0.
+ * @param x1 Right boundary and last sample for "samples" > 1.
+ * @param N Sample count.
  */
 template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 {
@@ -1632,8 +1638,8 @@ template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
 /**
  * Write array to file. Array will be written as a single column into
  * an ASCII file.
- * \param array The array to write.
- * \param filename Name of the file to create/overwrite.
+ * @param array The array to write.
+ * @param filename Name of the file to create/overwrite.
  */
 template <typename NumberType> void write_array(ArrayView<NumberType> const & array, const char* filename)
 {
@@ -1672,14 +1678,14 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
  * Write 2D data to file. To allow maximum flexibility, only extensions
  * of the data are passed to the function and a functor that will be
  * repeatedly called with coordinate pair for new data element.
- * \param m Row count.
- * \param n Column count.
- * \param filename Filename of the file to create/overwrite.
- * \param fetch Functor with interface
- *        \code
+ * @param m Row count.
+ * @param n Column count.
+ * @param filename Filename of the file to create/overwrite.
+ * @param fetch Functor with interface
+ *        @code
  *             double operator() (size_t, size_t);
- *        \endcode
- * \return Write success indicator (\c false for failure).
+ *        @endcode
+ * @return Write success indicator (@c false for failure).
  */
 template <class Fetcher> bool write_2D_data(size_t m, size_t n, const char* filename, Fetcher fetch)
 {
@@ -1735,8 +1741,8 @@ inline rArray concatenate()
  * arbitrary. It should be noted, though, that long concatenation list may
  * slow down the template instantiation during compilation and hence the
  * overall compilation time.
- * \param v1 First array.
- * \param ...p All other arrays.
+ * @param v1 First array.
+ * @param ...p All other arrays.
  */
 template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
 {
@@ -1758,7 +1764,7 @@ template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
 
 /**
  * Write array to standard output. Array will be written as a single column.
- * \param array The array to write.
+ * @param array The array to write.
  */
 void write_array(ArrayView<Complex> const & array);
 void write_array(ArrayView<double> const & array);
@@ -1854,9 +1860,9 @@ template <typename T> NumberArray<T> sums(Array<NumberArray<T>> v)
 
 /**
  * Comparison of an array and a number.
- * \param u Array.
- * \param x Number.
- * \return Vector of bools for element-wise comparisons.
+ * @param u Array.
+ * @param x Number.
+ * @return Vector of bools for element-wise comparisons.
  */
 template <typename T>
 Array<bool> operator == (ArrayView<T> u, T x)
@@ -1869,9 +1875,9 @@ Array<bool> operator == (ArrayView<T> u, T x)
 
 /**
  * Evaluation of a function over a grid.
- * \param f Functor to be evaluated using the operator() (double) interface.
- * \param grid Array-like type containing the evaluation points.
- * \param vals Array-like type to hold evaluated function on return. It is
+ * @param f Functor to be evaluated using the operator() (double) interface.
+ * @param grid Array-like type containing the evaluation points.
+ * @param vals Array-like type to hold evaluated function on return. It is
  *             required that enough space is reserved, at least grid.size().
  */
 template <typename TFunctor, typename TArray>
@@ -1889,10 +1895,10 @@ void eval(TFunctor f, TArray grid, TArray& vals)
  * Or, generally, create output array with elements that are sum of corresponding
  * elements of both arrays or equal to a single element in one array, if
  * that its index doesn't have a counterpart in the other array.
- * \param idx1 Sorted (!) indices of the first array.
- * \param arr1 Merge TO array.
- * \param idx2 Sorted (!) indices of the second array.
- * \param arr2 Merge FROM array.
+ * @param idx1 Sorted (!) indices of the first array.
+ * @param arr1 Merge TO array.
+ * @param idx2 Sorted (!) indices of the second array.
+ * @param arr2 Merge FROM array.
  */
 template <typename Tidx, typename Tval> void merge (
     NumberArray<Tidx>       & idx1, NumberArray<Tval>       & arr1,

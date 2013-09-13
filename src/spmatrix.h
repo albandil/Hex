@@ -19,6 +19,7 @@
 #include <iostream>
 #include <vector>
 
+#define WITH_PNGPP
 #ifdef WITH_PNGPP
 #include <png++/png.hpp>
 #endif
@@ -36,11 +37,16 @@ class CscMatrix;
 class CsrMatrix;
 class SymDiaMatrix;
 
+// matrix parts
 typedef enum {
-    none  = 0,  // b00
-    lower = 1,  // b01
-    upper = 2,  // b10
-    both  = 3   // b11
+    none         = 0,  // b000
+    strict_lower = 1,  // b001
+    strict_upper = 2,  // b010
+    strict_both  = 3,  // b011
+    diagonal     = 4,  // b100
+    lower        = 5,  // b101
+    upper        = 6,  // b110
+    both         = 7   // b111
 } MatrixTriangle;
 
 /**
@@ -66,13 +72,13 @@ public:
     // Constructors
     
     CscMatrix()
-        : _m_(0), _n_(0) {}
+        : m_(0), n_(0) {}
     CscMatrix(size_t m, size_t n)
-        : _m_(m), _n_(n) {}
+        : m_(m), n_(n) {}
     CscMatrix(const CscMatrix& A)
-        : _m_(A._m_), _n_(A._n_), _p_(A._p_), _i_(A._i_), _x_(A._x_) {}
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
     CscMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : _m_(m), _n_(n), _p_(p), _i_(i), _x_(x) {}
+        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
     
     // Destructor
     
@@ -93,9 +99,9 @@ public:
     
     // Getters
     
-    size_t size() const { return _i_.size(); }
-    size_t rows() const { return _m_; }
-    size_t cols() const { return _n_; }
+    size_t size() const { return i_.size(); }
+    size_t rows() const { return m_; }
+    size_t cols() const { return n_; }
     
     /**
      * Multiplication by a real number.
@@ -131,13 +137,13 @@ public:
 private:
     
     // dimensions
-    long _m_;
-    long _n_;
+    long m_;
+    long n_;
     
     // representation
-    lArray _p_;
-    lArray _i_;
-    cArray _x_;
+    lArray p_;
+    lArray i_;
+    cArray x_;
     
 };
 
@@ -167,13 +173,13 @@ public:
     // Constructors
     
     CsrMatrix()
-        : _m_(0), _n_(0) {}
+        : m_(0), n_(0) {}
     CsrMatrix(size_t m, size_t n)
-        : _m_(m), _n_(n) {}
+        : m_(m), n_(n) {}
     CsrMatrix(CsrMatrix const & A)
-        : _m_(A._m_), _n_(A._n_), _p_(A._p_), _i_(A._i_), _x_(A._x_) {}
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
     CsrMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : _m_(m), _n_(n), _p_(p), _i_(i), _x_(x) {}
+        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
     
     // Destructor
     
@@ -187,12 +193,12 @@ public:
     
     // Getters
     
-    size_t size() const { return _i_.size(); }
-    size_t rows() const { return _m_; }
-    size_t cols() const { return _n_; }
-    lArray const & p() const { return _p_; }
-    lArray const & i() const { return _i_; }
-    cArray const & x() const { return _x_; }
+    size_t size() const { return i_.size(); }
+    size_t rows() const { return m_; }
+    size_t cols() const { return n_; }
+    lArray const & p() const { return p_; }
+    lArray const & i() const { return i_; }
+    cArray const & x() const { return x_; }
     
     // return absolute value of the (in absolute value) largest element
     double norm() const;
@@ -210,7 +216,6 @@ public:
     void write(const char* filename) const;
     
 #ifdef WITH_PNGPP
-    
     /**
      * PNG row data generator for use in \ref plot function.
      */
@@ -240,9 +245,9 @@ public:
      * @param threshold Largest absolute value represented by white colour.
      */
     void plot(const char* filename, double threshold = 0.) const;
-    
 #endif
     
+#ifndef NO_UMFPACK
     /**
      * LU factorization
      */
@@ -250,21 +255,24 @@ public:
     {
     public:
         
+        /// Default constructor.
         LUft() :
-            __Numeric__(0), __matrix__(0), filename(0) {}
+            numeric_(0), matrix_(0), filename_(0), info_(UMFPACK_INFO) {}
         
+        /// Copy constructor.
         LUft(const LUft& lu) :
-            __Numeric__(lu.__Numeric__), __matrix__(lu.__matrix__), filename(lu.filename) {}
+            numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
         
-        LUft(const CsrMatrix* matrix, void* Numeric) : 
-            __Numeric__(Numeric), __matrix__(matrix) {}
+        /// Initialize the structure using the matrix and its numeric decomposition.
+        LUft(const CsrMatrix* matrix, void* numeric) : 
+            numeric_(numeric), matrix_(matrix), filename_(0), info_(UMFPACK_INFO) {}
         
         void free()
         { 
-            if (__Numeric__ != 0)
+            if (numeric_ != 0)
             {
-                umfpack_zl_free_numeric(&__Numeric__);
-                __Numeric__ = 0;
+                umfpack_zl_free_numeric(&numeric_);
+                numeric_ = 0;
             }
         }
         
@@ -272,7 +280,7 @@ public:
         {
             long lnz, unz, m, n, nz_udiag;
             long status = umfpack_zl_get_lunz (
-                &lnz, &unz, &m, &n, &nz_udiag, __Numeric__
+                &lnz, &unz, &m, &n, &nz_udiag, numeric_
             );
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
@@ -295,17 +303,17 @@ public:
             for (size_t eq = 0; eq < eqs; eq++)
             {
                 // is there enough RHSs?
-                if ((eq + 1) * __matrix__->_n_ > b.size())
+                if ((eq + 1) * matrix_->n_ > b.size())
                     break;
                 
                 // solve for current RHS
                 long status = umfpack_zl_solve (
                     UMFPACK_Aat,
-                    __matrix__->_p_.data(), __matrix__->_i_.data(),
-                    reinterpret_cast<const double*>(__matrix__->_x_.data()), 0,
-                    reinterpret_cast<double*>(&x[0] + eq * __matrix__->_n_), 0,
-                    reinterpret_cast<const double*>(&b[0] + eq * __matrix__->_n_), 0,
-                    __Numeric__, 0, 0
+                    matrix_->p_.data(), matrix_->i_.data(),
+                    reinterpret_cast<const double*>(matrix_->x_.data()), 0,
+                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), 0,
+                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), 0,
+                    numeric_, nullptr, &info_[0]
                 );
                 
                 // check output
@@ -317,16 +325,38 @@ public:
             }
         }
         
+        rArray const & info() const { return info_; }
+        
     private:
-        void* __Numeric__;
-        const CsrMatrix* __matrix__;
-        char* filename;
+        
+        /// Numeric decomposition as produced by UMFPACK.
+        void* numeric_;
+        
+        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
+        const CsrMatrix* matrix_;
+        
+        /// (not used at the moment)
+        char* filename_;
+        
+        /// Set of status flags produced by UMFPACK.
+        rArray info_;
     };
-    
+
     /**
-     * Compute LU factorization. Uses UMFPACK.
+     * @brief Compute (incomplete) LU factorization.
+     * 
+     * This function computes the LU factorization of the matrix. It uses
+     * the free UMFPACK library.
+     * 
+     * @param droptol Drop tolerance. If an element of the factorization matrices
+     *                should be in absolute value smaller than "droptol" the
+     *                library will omit it completely effectively making the result
+     *                more sparse.
+     * @return Special structure of the LUft type, holding opaque information about
+     *         the factorization.
      */
-    LUft factorize() const;
+    LUft factorize(double droptol = 0) const;
+#endif
     
     /**
      * Solve the Ax = b problem, where "b" can be a matrix. Uses UMFPACK.
@@ -424,17 +454,17 @@ public:
         for (size_t row = 0; row < rows(); row++)
         {
             // get relevant columns
-            size_t idx1 = _p_[row];
-            size_t idx2 = _p_[row + 1];
+            size_t idx1 = p_[row];
+            size_t idx2 = p_[row + 1];
             
             // loop over columns
             for (size_t idx = idx1; idx < idx2; idx++)
             {
                 // which column is this?
-                size_t col = _i_[idx];
+                size_t col = i_[idx];
                 
                 // transform the output matrix
-                A._x_[idx] = f(row, col, _x_[idx]);
+                A.x_[idx] = f(row, col, x_[idx]);
             }
         }
         
@@ -444,13 +474,13 @@ public:
 private:
     
     // dimensions
-    long _m_;
-    long _n_;
+    long m_;
+    long n_;
     
     // representation
-    lArray _p_;
-    lArray _i_;
-    cArray _x_;
+    lArray p_;
+    lArray i_;
+    cArray x_;
     
 };
 
@@ -478,13 +508,13 @@ public:
     // Empty constructors
     
     CooMatrix()
-        : _m_(0), _n_(0), sorted_(true) {}
+        : m_(0), n_(0), sorted_(true) {}
     CooMatrix(size_t m, size_t n)
-        : _m_(m), _n_(n), sorted_(true) {}
+        : m_(m), n_(n), sorted_(true) {}
     CooMatrix(CooMatrix const & A)
-        : _m_(A._m_), _n_(A._n_), _i_(A._i_), _j_(A._j_), _x_(A._x_), sorted_(false) {}
+        : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
     CooMatrix(size_t m, size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
-        : _m_(m), _n_(n), _i_(i), _j_(j), _x_(x), sorted_(false) {}
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**
      * Copy constructor initialized from dense array.
@@ -493,7 +523,7 @@ public:
      * @param a Column-major ordered dense array with matrix elements.
      *          Only nonzero elements are copied into internal storage.
      */
-    template <class T> CooMatrix(size_t m, size_t n, T a) : _m_(m), _n_(n), sorted_(false)
+    template <class T> CooMatrix(size_t m, size_t n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
         size_t i = 0;
@@ -507,9 +537,9 @@ public:
                 // if nonzero, store
                 if (val != 0.)
                 {
-                    _i_.push_back(row);
-                    _j_.push_back(col);
-                    _x_.push_back(val);
+                    i_.push_back(row);
+                    j_.push_back(col);
+                    x_.push_back(val);
                 }
                 
                 // move to next element
@@ -526,14 +556,14 @@ public:
     
     operator Complex () const
     {
-        if (_m_ == 1 and _n_ == 1)
+        if (m_ == 1 and n_ == 1)
         {
             // get number of nonzero matrix elements
-            size_t elems = this->shake()._x_.size();
+            size_t elems = this->shake().x_.size();
             if (elems > 1)
                 throw "[CooMatrix::operator Complex] more elements than nominal volume!\n";
             else if (elems == 1)
-                return this->shake()._x_[0];
+                return this->shake().x_[0];
             else
                 return 0.;
         }
@@ -543,18 +573,18 @@ public:
     
     // Getters
     
-    size_t rows() const { return _m_; }
-    size_t cols() const { return _n_; }
-    size_t size() const { return _i_.size(); }
-    lArray const & i() const { return _i_; }
-    lArray const & j() const { return _j_; }
-    cArray const & v() const { return _x_; }
+    size_t rows() const { return m_; }
+    size_t cols() const { return n_; }
+    size_t size() const { return i_.size(); }
+    lArray const & i() const { return i_; }
+    lArray const & j() const { return j_; }
+    cArray const & v() const { return x_; }
     
     Complex operator() (size_t ix, size_t iy) const
     {
-        for (size_t n = 0; n < _i_.size(); n++)
-             if ((size_t)_i_[n] == ix and (size_t)_j_[n] == iy)
-                return _x_[n];
+        for (size_t n = 0; n < i_.size(); n++)
+             if ((size_t)i_[n] == ix and (size_t)j_[n] == iy)
+                return x_[n];
         return 0.;
     }
     
@@ -574,23 +604,23 @@ public:
     {
         Complex val;
         
-        for (size_t row = 0; row < _m_; row++)
+        for (size_t row = 0; row < m_; row++)
         {
-            for (size_t col = row; col < _n_ and col - row <= d; col++)
+            for (size_t col = row; col < n_ and col - row <= d; col++)
             {
                 val = f(row,col);
                 
                 if (val != 0.)
                 {
-                    _i_.push_back(row);
-                    _j_.push_back(col);
-                    _x_.push_back(val);
+                    i_.push_back(row);
+                    j_.push_back(col);
+                    x_.push_back(val);
                     
                     if (row != col)
                     {
-                        _i_.push_back(col);
-                        _j_.push_back(row);
-                        _x_.push_back(val);
+                        i_.push_back(col);
+                        j_.push_back(row);
+                        x_.push_back(val);
                     }
                 }
             }
@@ -614,17 +644,17 @@ public:
     {
         Complex val;
         
-        for (size_t row = 0; row < _m_; row++)
+        for (size_t row = 0; row < m_; row++)
         {
-            for (size_t col = 0; col < _n_; col++)
+            for (size_t col = 0; col < n_; col++)
             {
                 val = f(row,col);
                 
                 if (val != 0.)
                 {
-                    _i_.push_back(row);
-                    _j_.push_back(col);
-                    _x_.push_back(val);
+                    i_.push_back(row);
+                    j_.push_back(col);
+                    x_.push_back(val);
                 }
             }
         }
@@ -637,11 +667,11 @@ public:
     // Assignment
     CooMatrix & operator = (CooMatrix const & A)
     {
-        _m_ = A._m_;
-        _n_ = A._n_;
-        _i_ = A._i_;
-        _j_ = A._j_;
-        _x_ = A._x_;
+        m_ = A.m_;
+        n_ = A.n_;
+        i_ = A.i_;
+        j_ = A.j_;
+        x_ = A.x_;
         
         sorted_ = A.sorted_;
         
@@ -654,9 +684,9 @@ public:
      */
     void add(long i, long j, Complex v)
     {
-        _i_.push_back(i);
-        _j_.push_back(j);
-        _x_.push_back(v);
+        i_.push_back(i);
+        j_.push_back(j);
+        x_.push_back(v);
         
         sorted_ = false;
     }
@@ -666,11 +696,11 @@ public:
     {
         CooMatrix tr;
         
-        tr._m_ = _n_;
-        tr._n_ = _m_;
-        tr._i_ = _j_;
-        tr._j_ = _i_;
-        tr._x_ = _x_;
+        tr.m_ = n_;
+        tr.n_ = m_;
+        tr.i_ = j_;
+        tr.j_ = i_;
+        tr.x_ = x_;
         
         tr.sorted_ = false;
         
@@ -680,12 +710,12 @@ public:
     // Addition.
     CooMatrix& operator += (const CooMatrix& A)
     {
-        assert(_m_ == A._m_);
-        assert(_n_ == A._n_);
+        assert(m_ == A.m_);
+        assert(n_ == A.n_);
         
-        _i_.append(A._i_.begin(), A._i_.end());
-        _j_.append(A._j_.begin(), A._j_.end());
-        _x_.append(A._x_.begin(), A._x_.end());
+        i_.append(A.i_.begin(), A.i_.end());
+        j_.append(A.j_.begin(), A.j_.end());
+        x_.append(A.x_.begin(), A.x_.end());
         
         sorted_ = false;
         
@@ -695,18 +725,18 @@ public:
     // Subtraction.
     CooMatrix& operator -= (const CooMatrix& A)
     {
-        assert(_m_ == A._m_);
-        assert(_n_ == A._n_);
+        assert(m_ == A.m_);
+        assert(n_ == A.n_);
         
-        size_t prev_size = _x_.size();
+        size_t prev_size = x_.size();
         
-        _i_.append(A._i_.begin(), A._i_.end());
-        _j_.append(A._j_.begin(), A._j_.end());
-        _x_.append(A._x_.begin(), A._x_.end());
+        i_.append(A.i_.begin(), A.i_.end());
+        j_.append(A.j_.begin(), A.j_.end());
+        x_.append(A.x_.begin(), A.x_.end());
         
         // negate the newly added elements
-        for (size_t i = prev_size; i < _x_.size(); i++)
-            _x_[i] = -_x_[i];
+        for (size_t i = prev_size; i < x_.size(); i++)
+            x_[i] = -x_[i];
         
         sorted_ = false;
         
@@ -716,9 +746,9 @@ public:
     // Element-wise multiplication by complex number.
     CooMatrix& operator *= (Complex c)
     {
-        long nz = _i_.size();
+        long nz = i_.size();
         for (long i = 0; i < nz; i++)
-            _x_[i] *= c;
+            x_[i] *= c;
         
         return *this;
     }
@@ -755,8 +785,8 @@ public:
      */
     void resize(size_t m, size_t n)
     {
-        _m_ = m;
-        _n_ = n;
+        m_ = m;
+        n_ = n;
     }
     
     /**
@@ -772,7 +802,7 @@ public:
     // Convert matrix to dense column-major ordered 1D-array.
     cArray todense() const;
     
-    // sort indices (by _i_, then by _j_)
+    // sort indices (by i_, then by j_)
     void sort();
     bool sorted() const { return sorted_; }
     
@@ -834,11 +864,11 @@ public:
 private:
 
     // dimensions
-    size_t _m_, _n_;
+    size_t m_, n_;
 
     // ijv-representation
-    lArray _i_, _j_;
-    cArray _x_;
+    lArray i_, j_;
+    cArray x_;
     
     bool sorted_;
 };
@@ -952,7 +982,27 @@ public:
      *                 of the othwerwise symmetric matrix.
      */
     cArray dot (cArrayView const & B, MatrixTriangle triangle = both) const;
-
+    
+    /**
+     * @brief Back-substitution (lower).
+     * 
+     * Assume the matrix is lower-triangular (ignore the strict upper triangle)
+     * and do the triangular solve.
+     * 
+     * @param b Right hand side of the triangular system.
+     */
+    cArray lowerSolve (cArrayView const & b) const;
+    
+    /**
+     * @brief Back-substitution (upper).
+     * 
+     * Assume the matrix is upper-triangular (ignore the strict lower triangle)
+     * and do the triangular solve.
+     * 
+     * @param b Right hand side of the triangular system.
+     */
+    cArray upperSolve (cArrayView const & b) const;
+    
     /**
      * @brief Kronecker product.
      *
@@ -962,9 +1012,27 @@ public:
     //
     // HDF interface
     //
-
+    
+    /**
+     * @brief Load from file.
+     * 
+     * Load the matrix from a HDF5 file created by the routine @ref hdfsave.
+     * 
+     * @return True on successful read, false otherwise (mostly when doesn't exist).
+     */
     bool hdfload(const char* name);
-
+    
+    /**
+     * @brief Save data to file.
+     * 
+     * Save the matrix to the HDF5 file as a set of four datasets:
+     * - idiag - identifiers of (positive) diagonals that contain nonzeros,
+     * - n - single number containing size of the matrix (rows or columns)
+     * - x - concatenated diagonal elements (interleaved complex values)
+     * - zero_blocks - information on the compression of the "x" array, see @ref compress.
+     * 
+     * @return True on successful write, false otherwise.
+     */
     bool hdfsave(const char* name, bool docompress = false, int consec = 10) const;
 
     //

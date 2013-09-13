@@ -21,9 +21,9 @@
 
 /**
  * Limit
- * \f[
+ * @f[
  *     \lim_{t \rightarrow x} F(t)
- * \f]
+ * @f]
  *
  * The bisection count will be written into *n if non-null.
  */
@@ -79,20 +79,20 @@ public:
 
 /**
  * Transform arbitrary function so that its definition range will
- * be \f$ t \in [-1,1] \f$, for original interval \f$ x \in [a,b] \f$. The
+ * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formula is used:
  *
- * \f[
+ * @f[
  *     x = \frac{a+b}{2} + t \frac{b-a}{2}
  *     \Leftrightarrow
  *     t = \frac{x - (a+b)/2}{(b-a)/2} \ .
- * \f]
+ * @f]
  */
 template <class Functor, typename FType> class CompactificationF : public ICompactification<FType>
 {
 public:
     /**
-     * \brief Constructor of the class.
+     * @brief Constructor of the class.
      * The parameters "a" and "b" specify original definition interval [a,b].
      * It must be a < b.
      */
@@ -129,7 +129,7 @@ public:
 
     /**
      * Evaluate the compactified function.
-     * \param t Value from the compactified interval [-1,1].
+     * @param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
     {
@@ -143,14 +143,14 @@ private:
 
 /**
  * Transform arbitrary function so that its definition range will
- * be \f$ t \in [-1,1] \f$, for original interval \f$ x \in [a,b] \f$. The
+ * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
  *
- * \f[
+ * @f[
  *     x = b - L \frac{1+t}{1-t}
  *     \Leftrightarrow
  *     t = \frac{x - b + L}{x - b + L} \ .
- * \f]
+ * @f]
  *   Note that in this case the monotonic character is reverse.
  */
 template <class Functor, typename FType> class CompactificationL : public ICompactification<FType>
@@ -191,7 +191,7 @@ public:
 
     /**
      * Evaluate the compactified function.
-     * \param t Value from the compactified interval [-1,1].
+     * @param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
     {
@@ -216,14 +216,14 @@ private:
 
 /**
  * Transform arbitrary function so that its definition range will
- * be \f$ t \in [-1,1] \f$, for original interval \f$ x \in [a,b] \f$. The
+ * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
  *
- * \f[
+ * @f[
  *     x = a + L \frac{1+t}{1-t}
  *     \Leftrightarrow
  *     t = \frac{x - a - L}{x - a - L} \ .
- * \f]
+ * @f]
  *
  * - Compactification of a double-unbounded interval is not implemented yet.
  */
@@ -233,7 +233,7 @@ public:
 
     /**
      * Constructor of the class
-     * The parameter "a" specifies original definition interval \f$ [a,+\infty) \f$.
+     * The parameter "a" specifies original definition interval @f$ [a,+\infty) @f$.
      */
     CompactificationR (
         Functor f,
@@ -265,7 +265,7 @@ public:
 
     /**
      * Evaluate the compactified function.
-     * \param t Value from the compactified interval [-1,1].
+     * @param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
     {
@@ -329,7 +329,7 @@ public:
      * Get the function multiplied by the Jacobian of the transform for the
      * purpose of integrating the original function.
      *
-     * \note Whenever the function value is zero, the Jacobian is not evaluated
+     * @note Whenever the function value is zero, the Jacobian is not evaluated
      *       and a clean zero is returned.
      */
     inline FType operator() (double t) const

@@ -34,7 +34,7 @@
  */
 template <typename Preconditioner, typename Multiplier>
 unsigned cg_callbacks (
-    cArrayView const & bview, cArrayView & xview,
+    cArray const & b, cArray & x,
     double eps,
     unsigned min_iterations, unsigned max_iterations,
     Preconditioner apply_preconditioner,
@@ -43,12 +43,6 @@ unsigned cg_callbacks (
 ) {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
-    
-    cArray b = bview;
-    cArray x = xview;
-    
-//     std::cout << "1) xview.size() = " << xview.size() << "\n";
-//     std::cout << "1) x.size() = " << x.size() << "\n";
     
     // compute norm of the right hand side
     double bnorm = b.norm();
@@ -136,9 +130,6 @@ unsigned cg_callbacks (
         rho_old = rho_new;
     }
     
-//     std::cout << "2) xview.size() = " << xview.size() << "\n";
-//     std::cout << "2) x.size() = " << x.size() << "\n";
-    xview = x;
     return k;
 }
 

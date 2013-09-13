@@ -24,16 +24,16 @@
 #include "misc.h"
 
 /**
- * \brief Chebyshev approximation.
+ * @brief Chebyshev approximation.
  * 
  * This class manages a Chebyshev approximation
- * \f[
+ * @f[
  *     F(x) = \frac{c_0}{2} + \sum_{k=1}^N c_k T_k(x)
- * \f]
+ * @f]
  * of a function F with signature
- * \code
+ * @code
  * Tout F(double Tin)
- * \endcode
+ * @endcode
  */
 template <typename Tin, typename Tout> class Chebyshev
 {
@@ -43,12 +43,12 @@ public:
     Chebyshev (Chebyshev const & cb) : N(cb.N), C(cb.C), xt(cb.xt), m(cb.m) {}
     
     /**
-     * \brief Constructor.
+     * @brief Constructor.
      * 
-     * \param Function to approximate.
-     * \param n How many Chebyshev nodes to use.
-     * \param a Left boundary of the approximation interval.
-     * \param b Right boundary of the approximation interval.
+     * @param Function to approximate.
+     * @param n How many Chebyshev nodes to use.
+     * @param a Left boundary of the approximation interval.
+     * @param b Right boundary of the approximation interval.
      */
     template <class Functor> Chebyshev (Functor const & f, int n, Tin a, Tin b)
     {
@@ -56,11 +56,11 @@ public:
     }
     
     /**
-     * \brief Constructor from reference to array.
+     * @brief Constructor from reference to array.
      * 
-     * \param array Array of precomputed Chebyshev coefficients.
-     * \param a Left boundary of the approximation interval.
-     * \param b Right boundary of the approximation interval.
+     * @param array Array of precomputed Chebyshev coefficients.
+     * @param a Left boundary of the approximation interval.
+     * @param b Right boundary of the approximation interval.
      */
     Chebyshev (ArrayView<Tout> const & array, Tin a, Tin b)
     {
@@ -73,13 +73,13 @@ public:
     }
     
     /**
-     * \brief Compute the transformation.
+     * @brief Compute the transformation.
      * 
      * Generate and store the Chebyshev coefficients.
-     * \param f Function of the signature Tout(*)(Tin) to be approximated.
-     * \param n Number of the coefficients to compute.
-     * \param a Left boundary of the approximation inerval.
-     * \param b Right boundary of the approximation inerval.
+     * @param f Function of the signature Tout(*)(Tin) to be approximated.
+     * @param n Number of the coefficients to compute.
+     * @param a Left boundary of the approximation inerval.
+     * @param b Right boundary of the approximation inerval.
      */
     template <class Functor>
     void generate (Functor const & f, int n, Tin a, Tin b);
@@ -195,18 +195,18 @@ public:
      * Return Chebyshev aproximation of the function primitive to the
      * stored Chebyshev approximation.
      * 
-     * \param itype Whether to return general indefinite integral expansion
-     * \f[
+     * @param itype Whether to return general indefinite integral expansion
+     * @f[
      *     \int_a^x f(x) \mathrm{d}x \ ,
-     * \f]
+     * @f]
      * (corresponds to "indef") or definite low
-     * \f[
+     * @f[
      *     \int_0^x f(x) \mathrm{d}x \ ,
-     * \f]
+     * @f]
      * (corresponds to "def_low") or definite high
-     * \f[
+     * @f[
      *     \int_x^\infty f(x) \mathrm{d}x \ .
-     * \f]
+     * @f]
      */
     Chebyshev integrate (Integration itype = Integ_Indef) const
     {
@@ -259,10 +259,10 @@ public:
     
     /**
      * Get Chebyshev root in the interval (x1,x2).
-     * \param N Order of the polynomial.
-     * \param k index of the root.
-     * \param x1 Left bound of the interval.
-     * \param x2 Right bound of the interval.
+     * @param N Order of the polynomial.
+     * @param k index of the root.
+     * @param x1 Left bound of the interval.
+     * @param x2 Right bound of the interval.
      */
     static Tin root (int N, int k, Tin x1 = 0., Tin x2 = 1.)
     {
@@ -331,7 +331,7 @@ private:
 //
 
 /**
- * \brief Chebyshev approximation of a given real function.
+ * @brief Chebyshev approximation of a given real function.
  */
 template<> template <class Functor> 
 void Chebyshev<double,double>::generate (Functor const & f, int n, double a, double b)
@@ -366,7 +366,7 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
 }
 
 /**
- * \brief Chebyshev approximation of a given complex function.
+ * @brief Chebyshev approximation of a given complex function.
  */
 template<> template <class Functor>
 void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, double b)
