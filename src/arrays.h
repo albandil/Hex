@@ -84,12 +84,12 @@ public:
     // assignments
     //
     
-    virtual ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
+    ArrayView<NumberType> & operator= (ArrayView<NumberType> const & v)
     {
         if (v.size() != size())
             throw exception("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N);
         
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] = v[i];
         
         return *this;
@@ -105,7 +105,7 @@ public:
         return array[i];
 #else
         // bounds check
-        if (i < N)
+        if (i < size())
             return array[i];
         else
             throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
@@ -121,7 +121,7 @@ public:
 #ifdef NDEBUG
         return array[i];
 #else
-        if (i < N)
+        if (i < size())
             return array[i];
         else
             throw exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N);
@@ -147,17 +147,17 @@ public:
     virtual const_iterator begin () const
     { return array; }
     virtual iterator end ()
-    { return array + N; }
+    { return array + size(); }
     virtual const_iterator end () const
-    { return array + N; }
+    { return array + size(); }
     virtual NumberType & front (int i = 0)
     { return *(array + i); }
     virtual NumberType const & front (int i = 0) const
     { return *(array + i); }
     virtual NumberType & back (int i = 0)
-    { return *(array + N - 1 - i); }
+    { return *(array + size() - 1 - i); }
     virtual NumberType const & back (int i = 0) const
-    { return *(array + N - 1 - i); }
+    { return *(array + size() - 1 - i); }
     
     //
     // reduced arithmetic operators with other arrays
@@ -166,10 +166,10 @@ public:
     virtual ArrayView<NumberType>& operator += (Array<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.size());
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] += b[i];
         
         return *this;
@@ -178,10 +178,10 @@ public:
     virtual ArrayView<NumberType>& operator += (ArrayView<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.N);
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] += b.array[i];
         
         return *this;
@@ -190,10 +190,10 @@ public:
     virtual ArrayView<NumberType>& operator -= (Array<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.size());
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] -= b[i];
         
         return *this;
@@ -202,10 +202,10 @@ public:
     virtual ArrayView<NumberType>& operator -= (ArrayView<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.N);
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] -= b.array[i];
         
         return *this;
@@ -214,10 +214,10 @@ public:
     virtual ArrayView<NumberType>& operator /= (Array<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.size());
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] /= b[i];
         
         return *this;
@@ -226,10 +226,10 @@ public:
     virtual ArrayView<NumberType>& operator /= (ArrayView<NumberType> const &  b)
     {
         // check if sizes match
-        assert(N == b.N);
+        assert(size() == b.size());
         
         // run over elements
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] /= b.array[i];
         
         return *this;
@@ -238,11 +238,11 @@ public:
     // some other functions
     virtual void clear()
     {
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < size(); i++)
             array[i] = NumberType(0);
     }
     
-    bool empty() const { return N == 0; }
+    bool empty() const { return size() == 0; }
 };
 
 /**

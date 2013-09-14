@@ -835,20 +835,20 @@ Stg2:
                     // create copy-from view of "r"
                     cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
                     
-                    zview = iLU[ill].solve(rview);
+//                     zview = iLU[ill].solve(rview);
                     
                     // solve using the CG solver
-//                     cg_callbacks
-//                     (
-//                         rview,      // rhs
-//                         zview,      // solution
-//                         1e-10,      // tolerance
-//                         0,          // min. iterations
-//                         Nspline*Nspline,    // max. iteration
-//                         apply_inner_preconditioner,
-//                         inner_matrix_multiply,
-//                         true       // verbose
-//                     );
+                    cg_callbacks
+                    (
+                        rview,      // rhs
+                        zview,      // solution
+                        1e-10,      // tolerance
+                        0,          // min. iterations
+                        Nspline*Nspline,    // max. iteration
+                        apply_inner_preconditioner,
+                        inner_matrix_multiply,
+                        true       // verbose
+                    );
                 }
                 
 #ifndef NO_MPI
