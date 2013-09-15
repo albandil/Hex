@@ -49,14 +49,14 @@ class SymDiaMatrix;
  * will multiply vector @c x as if the diagonal of @c A were zero.
  */
 typedef enum {
-    none         = 0,  // b000
-    strict_lower = 1,  // b001
-    strict_upper = 2,  // b010
-    strict_both  = 3,  // b011
-    diagonal     = 4,  // b100
-    lower        = 5,  // b101
-    upper        = 6,  // b110
-    both         = 7   // b111
+    none         = 0,  // b000,
+    strict_lower = 1,  // b001, strict_lower
+    strict_upper = 2,  // b010,                           strict_upper
+    strict_both  = 3,  // b011, strict_lower |            strict_upper
+    diagonal     = 4,  // b100,                diagonal
+    lower        = 5,  // b101, strict_lower | diagonal
+    upper        = 6,  // b110,                diagonal | strict_upper
+    both         = 7   // b111, strict_lower | diagonal | strict_upper
 } MatrixTriangle;
 
 /**
@@ -967,10 +967,13 @@ public:
     
     iArray const & diag() const { return idiag_; }
     cArray const & data() const { return elems_; }
+    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
+    
+    iArray & diag() { return idiag_; }
+    cArray & data() { return elems_; }
+    cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
     
     size_t size() const { return n_; }
-    
-    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
     
     bool is_compatible (SymDiaMatrix const & B) const;
     
@@ -999,27 +1002,27 @@ public:
      * @param triangle Whether to use only the upper or only the lower or both triangles
      *                 of the othwerwise symmetric matrix.
      */
-    cArray dot (cArrayView const & B, MatrixTriangle triangle = both) const;
+    cArray dot (cArrayView B, MatrixTriangle triangle = both) const;
     
     /**
      * @brief Back-substitution (lower).
      * 
-     * Assume the matrix is lower-triangular (ignore the strict upper triangle)
-     * and do the triangular solve.
+     * Assume the matrix is normalized lower-triangular (i.e. has unit main diagonal
+     * and zero upper triangle) and do the triangular solve.
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray lowerSolve (cArrayView const & b) const;
+    cArray lowerSolve (cArrayView b) const;
     
     /**
      * @brief Back-substitution (upper).
      * 
-     * Assume the matrix is upper-triangular (ignore the strict lower triangle)
-     * and do the triangular solve.
+     * Assume the matrix is normalized upper-triangular (i.e. has unit main diagonal
+     * and zero lower triangle) and do the triangular solve.
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray upperSolve (cArrayView const & b) const;
+    cArray upperSolve (cArrayView b) const;
     
     /**
      * @brief Kronecker product.
@@ -1276,9 +1279,13 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
 /**
  * @brief DIC preconditioner.
  * 
- * Setup the diagonal incomplete Cholesky preconditioner. The preconditioner is a single
- * array of numbers (diagonal matrix) and is being used together with the strict lower
- * and upper triangle of the original matrix:
+ * Setup the diagonal incomplete Cholesky preconditioner. It is a essentially the original
+ * matrix with a preconditioned diagonal and the strict upper and lower triangles normalized
+ * by the preconditioned diagonal, i.e. a matrix
+ * @f[
+ *     \matfbf{P} = \mathbf{\tilde{L}}_\mathbf{A} + \mathbf{D}^{-1} + \mathbf{\tilde{L}}_\mathbf{A}
+ * @f]
+ * for the preconditioner
  * @f[
  *     \mathbf{M} = (\mathbf{D} + \mathbf{L}_\mathbf{A})
  *                  \mathbf{D}^{-1}
@@ -1311,8 +1318,10 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
  *       symmetrically (as the input is symmetrical by definition of the type).
  * 
  * @param A Matrix in SymDiaMatrix format that is to be preconditioned.
- * @return The diagonal preconditioner of the symmetric matrix.
+ * @return The DIC preconditioner of the symmetric matrix.
  */
-cArray DIC_preconditioner(SymDiaMatrix const & A);
+SymDiaMatrix DIC_preconditioner(SymDiaMatrix const & A);
+
+SymDiaMatrix SSOR_preconditioner(SymDiaMatrix const & A);
 
 #endif

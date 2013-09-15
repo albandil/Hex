@@ -1388,7 +1388,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
     return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot(cArrayView const & B, MatrixTriangle triangle) const
+cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
 {
     // check dimensions
     if ((int)B.size() != n_)
@@ -1402,9 +1402,9 @@ cArray SymDiaMatrix::dot(cArrayView const & B, MatrixTriangle triangle) const
     // - "aligned" to convince the auto-vectorizer that vectorization is worth
     // NOTE: cArray (= NumberArray<Complex>) is aligned on sizeof(Complex) boundary
     // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
-    Complex       *       __restrict rp_res    = (Complex*)__builtin_assume_aligned(&res[0],    sizeof(Complex));
-    Complex const * const __restrict rp_elems_ = (Complex*)__builtin_assume_aligned(&elems_[0], sizeof(Complex));
-    Complex const * const __restrict rp_B      = (Complex*)__builtin_assume_aligned(&B[0],      sizeof(Complex));
+    Complex       *       __restrict rp_res    = (Complex*)aligned(&res[0],    sizeof(Complex));
+    Complex const * const __restrict rp_elems_ = (Complex*)aligned(&elems_[0], sizeof(Complex));
+    Complex const * const __restrict rp_B      = (Complex*)aligned(&B[0],      sizeof(Complex));
     
     // for all elements in the main diagonal
     if (triangle & diagonal)
@@ -1451,62 +1451,82 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
     return ::kron (this->tocoo(), B.tocoo()).todia();
 }
 
-cArray SymDiaMatrix::lowerSolve(cArrayView const & b) const
+cArray SymDiaMatrix::lowerSolve(cArrayView b) const
 {
     assert(size() == b.size());
     
     // the solution; handle the unit diagonal by using "b" right away
     cArray x = b;
     
+    // pointer to the solution
+    Complex * const px = x.data();
+    
+    // diagonal count and row count
+    register int Nrows = size();
+    register int Ndiag = diag().size();
+    
+    // pointer to the matrix diagonal labels
+    int const * const pAd = idiag_.data();
+    
     // for all matrix rows (or solution elements) starting from the top
-    for (size_t irow = 0; irow < b.size(); irow++)
+    for (register int irow = 0; irow < Nrows; irow++)
     {
-        // pointer to the beginning of the diagonal data
-        size_t dptr = size();
+        // pointer to the matrix elements
+        Complex const * pA = elems_.data() + Nrows;
         
         // for all diagonals (except the main diagonal, which has been already taken care of)
-        for (size_t id = 1; id < idiag_.size(); id++)
+        for (register int id = 1; id < Ndiag; id++)
         {
             // skip diagonals that are not relevant for this matrix row
-            if (idiag_[id] > (int)irow)
+            if (pAd[id] > irow)
                 break;
             
             // pick the correct element on this diagonal corresponding to row "irow"
-            x[irow] -= x[irow - idiag_[id]] * elems_[dptr + irow - idiag_[id]];
+            px[irow] -= px[irow - pAd[id]] * pA[irow - pAd[id]];
             
             // shift the pointer to the beginning of the next diagonal
-            dptr += size() - idiag_[id];
+            pA += Nrows - pAd[id];
         }
     }
     
     return x;
 }
 
-cArray SymDiaMatrix::upperSolve(cArrayView const & b) const
+cArray SymDiaMatrix::upperSolve(cArrayView b) const
 {
     assert(size() == b.size());
     
     // the solution; handle the unit diagonal by using "b" right away
     cArray x = b;
     
+    // pointer to the solution
+    Complex * const px = x.data();
+    
+    // diagonal count and row count
+    register int Nrows = size();
+    register int Ndiag = diag().size();
+    
+    // pointer to the matrix diagonal labels
+    int const * const pAd = idiag_.data();
+    
     // for all matrix rows (or solution elements) starting from the bottom
-    for (size_t irow = 0; irow < b.size(); irow++) // "irow" numbered from bottom!
+    for (register int irow = 0; irow < Nrows; irow++) // "irow" numbered from bottom!
     {
-        // pointer to the beginning of the diagonal data
-        size_t dptr = size();
+        // pointer to the matrix elements
+        Complex const * pA = elems_.data() + Nrows;
         
         // for all diagonals (except the main diagonal, which has been already taken care of)
-        for (size_t id = 1; id < idiag_.size(); id++)
+        for (register int id = 1; id < Ndiag; id++)
         {
             // skip diagonals that are not relevant for this matrix row
-            if (idiag_[id] > (int)irow)
+            if (pAd[id] > irow)
                 break;
             
             // pick the correct element on this diagonal corresponding to row "irow"
-            x[size() - 1 - irow] -= x[size() - 1 - irow + idiag_[id]] * elems_[dptr + size() - 1 - irow];
+            px[Nrows - 1 - irow] -= px[Nrows - 1 - irow + pAd[id]] * pA[Nrows - 1 - irow];
             
             // shift the pointer to the beginning of the next diagonal
-            dptr += size() - idiag_[id];
+            pA += Nrows - pAd[id];
         }
     }
     
@@ -1595,10 +1615,117 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P)
     return LD;
 }
 
-cArray DIC_preconditioner(SymDiaMatrix const & A)
+SymDiaMatrix DIC_preconditioner(SymDiaMatrix const & A)
 {
+    //
+    // compute the preconditioned diagonal
+    //
+    
     // the preconditioned diagonal
     cArray D = A.main_diagonal();
     
-    // for all elements
+    // pointer to the preconditioned diagonal data
+    Complex * const restrict pD = D.data();
+    
+    // pointer to the A's diagonal labels
+    int const * restrict pAd = A.diag().data();
+    
+    // array sizes
+    register int Nrows = D.size();
+    register int Ndiag = A.diag().size();
+    
+    // for all elements of the diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+    {
+        // pointer to the A's raw concatenated diagonal data
+        Complex const * restrict pA = A.data().data() + Nrows;
+        
+        // for all diagonals (except the main diagonal) constributing to DIC
+        for (register int idiag = 1; idiag < Ndiag and pAd[idiag] <= irow; idiag++)
+        {
+            // update pivot
+            pD[irow] -= pA[irow - pAd[idiag]] * pA[irow - pAd[idiag]] / pD[irow - pAd[idiag]];
+            
+            // move pA to the beginning of the next diagonal
+            pA += Nrows - pAd[idiag];
+        }
+    }
+    
+    //
+    // construct matrix of the preconditioner
+    //
+    
+    // the preconditioner matrix, initialized to A
+    SymDiaMatrix DIC(A);
+    
+    // pointer to DIC's data
+    Complex * restrict pDIC = DIC.data().data();
+    
+    // pointer to DIC's diagonal labels (same as A.diag())
+    int const * restrict pDICd = DIC.diag().data();
+    
+    // set the diagonal to the inverse of the DIC diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+        pDIC[irow] = 1. / pD[irow];
+    
+    // move on to the first non-main diagonal
+    pDIC += Nrows;
+    
+    // for all non-main diagonals
+    for (register int idiag = 1; idiag < Ndiag; idiag++)
+    {
+        // for all elements in the diagonal
+        for (register int irow = 0; irow < Nrows - pDICd[idiag]; irow++)
+        {
+            // divide the off-diagonal element by the correct diagonal element
+            pDIC[irow] *= pD[irow];
+        }
+        
+        // move to next diagonal
+        pDIC +=  Nrows - pDICd[idiag];
+    }
+    
+    return DIC;
+}
+
+SymDiaMatrix SSOR_preconditioner(SymDiaMatrix const & A)
+{
+    // array sizes
+    register int Nrows = A.size();
+    register int Ndiag = A.diag().size();
+    
+    // the preconditioner matrix, initialized to A
+    SymDiaMatrix SSOR(A);
+    
+    // pointer to SSOR's concatenated diagonal data
+    Complex * restrict pSSOR = SSOR.data().data();
+    
+    // pointer to SSOR's main diagonal
+    Complex const * const restrict pD = pSSOR;
+    
+    // pointer to SSOR's diagonal labels (same as A.diag())
+    int const * restrict pSSORd = SSOR.diag().data();
+    
+    // set the diagonal to the inverse of the A's diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+        pSSOR[irow] = 1. / pSSOR[irow];
+    
+    // move on to the first non-main diagonal
+    pSSOR += Nrows;
+    
+    // for all non-main diagonals
+    for (register int idiag = 1; idiag < Ndiag; idiag++)
+    {
+        // for all elements in the diagonal
+        for (register int irow = 0; irow < Nrows - pSSORd[idiag]; irow++)
+        {
+            // divide the off-diagonal element by the correct diagonal element
+            pSSOR[irow] *= pD[irow];
+        }
+        
+        // move to next diagonal
+        pSSOR +=  Nrows - pSSORd[idiag];
+    }
+    
+    return SSOR;
 }

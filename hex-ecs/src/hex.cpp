@@ -602,7 +602,10 @@ Stg2:
         std::vector<cArray> icholD(coupled_states.size());
         
         // diagonal incomplete Cholesky (DIC) preconditioner
-        cArray DIC(coupled_states.size());
+        std::vector<SymDiaMatrix> DIC(coupled_states.size());
+        
+        // SSOR preconditioner
+        std::vector<SymDiaMatrix> SSOR(coupled_states.size());
         
         // incomplete LU factorizations of the diagonal blocks
         std::vector<CsrMatrix> csr_blocks(coupled_states.size());        
@@ -657,7 +660,7 @@ Stg2:
             
             // log output
             # pragma omp critical
-            std::cout << "\t[" << iproc << "] iLU factorization " 
+            std::cout << "\t[" << iproc << "] DIC factorization " 
                       << ill << " of (" << l1 << "," << l2 << ") block started\n";
             start = std::chrono::steady_clock::now();
             
@@ -693,14 +696,15 @@ Stg2:
             // DIC preconditioner
             //
             
-            DIC = DIC_preconditioner(dia_blocks[ill]);
+            SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
+            DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
             
             // log output
             sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
             # pragma omp critical
-            std::cout << "\t[" << iproc << "] iLU factorization " 
+            std::cout << "\t[" << iproc << "] DIC factorization " 
                       << ill << " of (" << l1 << "," << l2 << ") block done after " 
-                      << sec.count() << " s (size = " << iLU[ill].size()/1048576 << " MiB)\n";
+                      << sec.count() << " s\n";
         }
         
         // For all initial states ------------------------------------------- //
@@ -835,37 +839,49 @@ Stg2:
                     if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
                         continue;
                     
-                    // no preconditioner in the inner region
-                    auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
-                    {
-                        // invert the LDLt decomposition
-//                         z = icholL[ill].upperSolve(icholD[ill] * icholL[ill].lowerSolve(r));
-                        
-                        z = iLU[ill].solve(r);
-                    };
-                    
-                    // multiply by the correct block
-                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { q = dia_blocks[ill].dot(p); };
-                    
                     // create copy-to view of "z"
                     cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
                     
                     // create copy-from view of "r"
                     cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
                     
-//                     zview = iLU[ill].solve(rview);
+                    // preconditioner of the nested CG
+                    auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+                    {
+                        // Diagonal Incomplete Cholesky factorization
+                        // TODO Needs pivoting to work!
+//                         z = DIC[ill].upperSolve( DIC[ill].dot( DIC[ill].lowerSolve(r), diagonal ) );
+                        
+                        // Symmetric Successive Over-Relaxation
+                        // NOTE seems slower than Jacobi
+//                         z = SSOR[ill].upperSolve( SSOR[ill].dot( SSOR[ill].lowerSolve(r), diagonal ) );
+                        
+                        // Jacobi preconditioning
+                        // NOTE seems the fastest
+                        z = SSOR[ill].dot(r,diagonal);
+                        
+                        // no preconditioning
+                        // NOTE seems slower than Jacobi
+//                         z = r;
+                    };
+                    
+                    // multiply by matrix block
+                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+                    {
+                        q = dia_blocks[ill].dot(p);
+                    };
                     
                     // solve using the CG solver
                     cg_callbacks
                     (
                         rview,      // rhs
                         zview,      // solution
-                        1e-10,      // tolerance
+                        1e-11,      // tolerance
                         0,          // min. iterations
                         Nspline*Nspline,    // max. iteration
                         apply_inner_preconditioner,
                         inner_matrix_multiply,
-                        true       // verbose
+                        false       // verbose
                     );
                 }
                 

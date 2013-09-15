@@ -21,8 +21,10 @@ LFLAGS_DEBUG = -g -fopenmp -fPIC $(LIBRARY)
 CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG
 LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
-CFLAGS = $(CFLAGS_DEBUG)
-LFLAGS = $(LFLAGS_DEBUG)
+# CFLAGS = $(CFLAGS_DEBUG)
+# LFLAGS = $(LFLAGS_DEBUG)
+CFLAGS = $(CFLAGS_RELEASE)
+LFLAGS = $(LFLAGS_RELEASE)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

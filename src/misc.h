@@ -28,6 +28,28 @@
 #include <cctype>
 #include <locale>
 
+// restricted pointers
+#ifndef restrict
+#ifdef __GNUC__
+    #define restrict __restrict
+#else
+    #define restrict
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code will be slow."
+#endif
+#endif
+
+// memory alignment
+#ifndef alignof
+#ifdef __GNUC__
+    #define alignof(x)   (__alignof(x))
+    #define aligned(x,y) (__builtin_assume_aligned((x),(y)))
+#else
+    #define alignof(x)   (sizeof(void*))
+    #define aligned(x,y) (x)
+    #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
+#endif
+#endif
+
 /// Trim from start.
 static inline std::string &ltrim(std::string &s)
 {

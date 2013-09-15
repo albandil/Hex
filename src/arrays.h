@@ -136,7 +136,7 @@ public:
     //
     
     virtual NumberType* data() { return array; }
-    virtual const NumberType* data() const { return array; }
+    virtual NumberType const * data() const { return array; }
     
     //
     // STL-like iterator interface
@@ -439,7 +439,7 @@ public:
     //
     
     DataType* data() { return array; }
-    const DataType* data() const { return array; }
+    DataType const * data() const { return array; }
     
     //
     // STL-like iterator interface
@@ -831,11 +831,17 @@ public:
     }
     
     //
-    // data pointer
+    // data pointer to the aligned memory
     //
     
-    NumberType* data() { return array; }
-    const NumberType* data() const { return array; }
+    NumberType* data()
+    {
+        return (NumberType *)aligned(array, std::max(alignof(NumberType),sizeof(Complex)));
+    }
+    NumberType const * data() const
+    {
+        return (NumberType * const)aligned(array, std::max(alignof(NumberType),sizeof(Complex)));
+    }
     
     //
     // STL-like iterator interface
@@ -926,6 +932,11 @@ public:
     bool empty() const
     {
         return N == 0;
+    }
+    
+    void clear()
+    {
+        memset(array, 0, N * sizeof(NumberType));
     }
     
     //
@@ -1505,6 +1516,20 @@ template <typename NumberType1, typename NumberType2> auto operator / (
 {
     NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
     return c /= b;
+}
+
+template <typename NumberType1, typename NumberType2> auto operator / (
+    ArrayView<NumberType1> a, ArrayView<NumberType2> b
+) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
+{
+    assert(a.size() == b.size());
+    size_t N = a.size();
+    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c(N);
+    
+    for (size_t i = 0; i < N; i++)
+        c[i] = a[i] / b[i];
+    
+    return c;
 }
 
 template <typename T1, typename T2> auto operator / (

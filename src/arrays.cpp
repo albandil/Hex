@@ -64,11 +64,9 @@ rArrays abs (cArrays const &u)
 
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B)
 {
+    assert(A.size() == B.size());
+    
     size_t N = A.size();
-    size_t M = B.size();
-    
-    assert(N = M);
-    
     Array<double> C (N);
 
     for (size_t i = 0; i < N; i++)
@@ -79,11 +77,9 @@ NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> co
 
 NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B)
 {
+    assert(A.size() == B.size());
+    
     size_t N = A.size();
-    size_t M = B.size();
-    
-    assert(N = M);
-    
     Array<double> C (N);
 
     for (size_t i = 0; i < N; i++)
