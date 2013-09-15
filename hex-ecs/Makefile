@@ -26,7 +26,7 @@ LFLAGS = $(LFLAGS_DEBUG)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-all: bin/hex 
+all: bin/hex-ecs
 
 docu:
 	doxygen
@@ -34,7 +34,7 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o
+bin/hex-ecs: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
