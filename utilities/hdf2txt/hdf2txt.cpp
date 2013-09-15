@@ -38,7 +38,8 @@ int main(int argc, char *argv[])
 		a.hdfload(hdf);
 	
 		// write raw data
-		write_array(a);
+		for (int i = 0; i < a.size(); i++)
+			std::cout << a[i] << "\n";
 	}
 	else
 	{
@@ -47,7 +48,8 @@ int main(int argc, char *argv[])
 		a.hdfload(hdf);
 	
 		// write raw data
-		write_array(a);
+		for (int i = 0; i < a.size(); i++)
+			std::cout << a[i] << "\n";
 	}
 	
 	return 0;
