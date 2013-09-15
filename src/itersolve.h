@@ -21,8 +21,8 @@
 
 /**
  * Callback-based Conjugate gradients.
- * @param b Right hand side.
- * @param x Output vector. An initial guess may be present at beginning.
+ * @param bview Right hand side.
+ * @param xview Output vector. An initial guess may be present at beginning.
  * @param eps Relative tolerance.
  * @param min_iterations Minimal iterations count.
  * @param max_iterations Maximal iterations count.
@@ -30,6 +30,7 @@
  *                             Should apply a custom preconditioner to a given vector.
  * @param matrix_multiply Functor compatible with void(*)(const Array&, Array&) prototype.
  *                        Should multiply the given vector by the matrix of the equation set.
+ * @param verbose Whether to display progress information.
  * @return Iteration count.
  */
 template <typename Preconditioner, typename Multiplier>

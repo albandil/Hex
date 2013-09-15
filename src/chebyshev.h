@@ -45,7 +45,7 @@ public:
     /**
      * @brief Constructor.
      * 
-     * @param Function to approximate.
+     * @param f Function to approximate.
      * @param n How many Chebyshev nodes to use.
      * @param a Left boundary of the approximation interval.
      * @param b Right boundary of the approximation interval.

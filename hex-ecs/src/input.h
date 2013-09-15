@@ -38,7 +38,10 @@ typedef enum {
  *                  Default is "hex.inp".
  * @param zipfile A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
  * @param zipcount How many equidistant samples on each axis to use.
+ * @param zipmax Radial cutoff for solution zipping useful if one is interested
+ *               only in the near-origin behaviour.
  * @param parallel Whether to use OpenMPI.
+ * @param droptol Drop tolerance for the iLU preconditioner.
  * @param itinerary Run only first stage (computation of the radial integrals).
  */
 void parse_command_line (
@@ -63,6 +66,7 @@ void parse_command_line (
  *                  all of them will be computed.
  * @param L Total angular momentum (partial wave).
  * @param S Total spin (partial wave).
+ * @param Pi Total parity (partial wave).
  * @param maxell Per-electron angular momentum restriction (determines the block 
  *               size of the matrix).
  * @param Ei Initial projectile energies.

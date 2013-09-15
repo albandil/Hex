@@ -595,11 +595,14 @@ Stg2:
         // - these will be used in matrix multiplication
         std::vector<SymDiaMatrix> dia_blocks(coupled_states.size());
         
-        // incomplete Choleski factorization of the diagonal blocks
+        // incomplete Cholesky factorization of the diagonal blocks
         //   L + Lt - I
-//         std::vector<SymDiaMatrix> icholL(coupled_states.size());
+        std::vector<SymDiaMatrix> icholL(coupled_states.size());
         //   D⁻¹
-//         std::vector<cArray> icholD(coupled_states.size());
+        std::vector<cArray> icholD(coupled_states.size());
+        
+        // diagonal incomplete Cholesky (DIC) preconditioner
+        cArray DIC(coupled_states.size());
         
         // incomplete LU factorizations of the diagonal blocks
         std::vector<CsrMatrix> csr_blocks(coupled_states.size());        
@@ -637,7 +640,7 @@ Stg2:
         }
         std::cout << "ok\n";
         
-        // compute the iLU factorizations
+        // setup the preconditioner
 //         # pragma omp parallel for schedule (dynamic,1)
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
@@ -658,24 +661,39 @@ Stg2:
                       << ill << " of (" << l1 << "," << l2 << ") block started\n";
             start = std::chrono::steady_clock::now();
             
+            //
+            // structurally incomplete Cholesky factorization
+            //
+/*
             // convert lower triangular part of "dia_blocks[ill]" to CSR format
-//             CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
+            CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
             
             // factorize the half-matrix to get the decomposition LDLt
-//             cArray LD = iChol(csr.x(), csr.i(), csr.p());
+            cArray LD = iChol(csr.x(), csr.i(), csr.p());
             
             // store inverted diagonal
-//             icholD[ill] = cArrayView(LD, 0, csr.rows());
-//             std::cout << "D = " << icholD[ill].slice(0,15) << "\n";
-//             for (Complex & d : icholD[ill])
-//                 d = 1./d;
+            icholD[ill] = cArrayView(LD, 0, csr.rows());
+            std::cout << "D = " << icholD[ill].slice(0,15) << "\n";
+            for (Complex & d : icholD[ill])
+                d = 1./d;
             
             // create a CSR matrix and set diagonal to identity; then convert it to a SymDiaMatrix
-//             icholL[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).nzTransform (
-//                 [](size_t i, size_t j, Complex x) -> Complex { return i == j ? 1. : x; }
-//             ).tocoo().todia(lower);
-            
+            icholL[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).nzTransform (
+                [](size_t i, size_t j, Complex x) -> Complex { return i == j ? 1. : x; }
+            ).tocoo().todia(lower);
+*/
+            //
+            // drop-tolerance incomplete LU factorization
+            //
+/*
             iLU[ill] = csr_blocks[ill].factorize(droptol);
+*/
+            
+            //
+            // DIC preconditioner
+            //
+            
+            DIC = DIC_preconditioner(dia_blocks[ill]);
             
             // log output
             sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);

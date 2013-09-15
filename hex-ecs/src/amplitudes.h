@@ -34,13 +34,15 @@
  * @param ki incoming projectile momenta.
  * @param maxell Maximal angular momentum of the projectile.
  * @param L Total angular momentum (partial wave).
- * @param Spin Conserved total spin.
+ * @param Spin Conserved total spin (partial wave).
+ * @param Pi Total parity (partial wave).
  * @param ni Initial atomic state - principal quantum number.
  * @param li Initial atomic state - orbital quantum number.
  * @param mi Initial atomic state - magnetic quantum number.
  * @param Ei Initial projectile energies.
  * @param lf Final atomic orbital momentum.
  * @param Pf_overlaps Hydrogenic function B-spline overlap integrals.
+ * @param coupled_states List of all coupled-state angular momenta pairs.
  * @return Vector of radial integrals.
  */
 cArray computeLambda (
@@ -75,12 +77,14 @@ cArray computeLambda (
  * 
  * @param maxell Maximal angular momentum of the free electrons.
  * @param L Total angular momentum (partial wave).
- * @param Spin Conserved total spin.
+ * @param Spin Conserved total spin (partial wave).
+ * @param Pi Total parity (partial wave).
  * @param ni Initial atomic state - principal quantum number.
  * @param li Initial atomic state - orbital quantum number.
  * @param mi Initial atomic state - magnetic quantum number.
  * @param Ei Initial projectile energies.
  * @param ics Ionization cross section (on return).
+ * @param coupled_states List of all coupled-state angular momenta pairs.
  * @return Vector of radial integrals.
  */
 cArrays computeXi (

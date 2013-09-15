@@ -1179,9 +1179,17 @@ public:
     
 #ifndef NO_HDF
     /**
-     * Save array to HDF file.
+     * @brief Save array to HDF file.
+     * 
+     * This function will save the array data into a HDF5 file.
+     * The file will then contain two datasets:
+     * - "array" - the data itself, with large block of zeros omitted (if requested by
+     *    the @c docompress flag
+     * - "zero_blocks" - the compression information containing starting and ending
+     *   positions of the zero blocks (hence the length of this dataset os always even)
+     * 
      * @param name Filename.
-     * @param compress Whether to apply a trivial compression (contract the repeated zeros).
+     * @param docompress Whether to apply a trivial compression (contract the repeated zeros).
      * @param consec Minimal consecutive occurences for compression.
      */
     bool hdfsave(const char* name, bool docompress = false, int consec = 10) const
@@ -1203,7 +1211,7 @@ public:
                 if (not hdf.write (
                     "zero_blocks",
                     &(zero_blocks[0]),
-                                   zero_blocks.size()
+                    zero_blocks.size()
                 )) return false;
             }
             if (not elements.empty())
@@ -1211,7 +1219,7 @@ public:
                 if (not hdf.write (
                     "array",
                     &(elements[0]),
-                                   elements.size()
+                    elements.size()
                 )) return false;
             }
         }
@@ -1641,25 +1649,24 @@ template <typename T> NumberArray<T> logspace(T x0, T x1, size_t N)
  * @param array The array to write.
  * @param filename Name of the file to create/overwrite.
  */
-template <typename NumberType> void write_array(ArrayView<NumberType> const & array, const char* filename)
-{
-    std::ofstream fout(filename);
-    for (size_t i = 0; i < array.size(); i++) 
-    {
-        switch (typeid(NumberType))
-        {
-            case typeid (double):
-                fout << array[i] << std::endl;
-                break;
-            case typeid (Complex):
-                fout << array[i].real() << "\t" << array[i].imag() << std::endl;
-                break;
-            default:
-                std::cerr << "Don't know how to write datatype with typeid " << typeid(NumberType).name() << std::endl;
-                return;
-        }
-    }
-}
+template <typename NumberType> void write_array (
+    ArrayView<NumberType> array,
+    const char* filename
+);
+
+/**
+ * Write array to file. Array will be written as a two columns into
+ * an ASCII file, first column contains grid information.
+ * @param grid The 1D grid labels for the data.
+ * @param array The array to write.
+ * @param filename Name of the file to create/overwrite.
+ */
+template <typename NumberType> void write_array (
+    ArrayView<double> grid,
+    ArrayView<NumberType> array,
+    const char* filename
+);
+
 
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {
@@ -1762,23 +1769,6 @@ template <typename ...Params> rArray concatenate(rArray v1, Params ...p)
     }	
 }
 
-/**
- * Write array to standard output. Array will be written as a single column.
- * @param array The array to write.
- */
-void write_array(ArrayView<Complex> const & array);
-void write_array(ArrayView<double> const & array);
-
-/**
- * Write array to a text file.
- */
-void write_array(const std::map<unsigned long long, Complex>& m, const char* filename);
-void write_array(rArray const & grid, rArray const & array, const char* filename);
-void write_array(rArray const & array, const char* filename);
-void write_array(cArray const & array, const char* filename);
-void write_array(rArray const & grid, cArray const & array, const char* filename);
-void write_array(qArray const & array, const char* filename);
-
 // return absolute values
 rArray abs (cArray const &u);
 rArrays abs (cArrays const &u);
@@ -1787,6 +1777,7 @@ rArrays abs (cArrays const &u);
 bool all(Array<bool> v);
 bool any(Array<bool> v);
 
+// minimal element
 template <typename NumberType> NumberType min (ArrayView<NumberType> const & a)
 {
     NumberType z = a.front();
@@ -1796,6 +1787,7 @@ template <typename NumberType> NumberType min (ArrayView<NumberType> const & a)
         return z;
 }
 
+// maximal element
 template <typename NumberType> NumberType max (ArrayView<NumberType> const & a)
 {
     NumberType z = a.front();
@@ -1850,11 +1842,11 @@ template <typename T> NumberArray<T> sums(Array<NumberArray<T>> v)
         
         return std::accumulate (
             v.begin(),
-                                v.end(),
-                                NumberArray<T> (v[0].size()),
-                                [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
-                                    return a + b;
-                                }
+            v.end(),
+            NumberArray<T> (v[0].size()),
+            [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
+                return a + b;
+            }
         );
 }
 

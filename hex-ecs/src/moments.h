@@ -160,9 +160,12 @@ template <class Functor> cArray overlapP(int n, int l, Functor weightf)
     return res;
 }
 
-/** Compute j-overlaps
- * Compute overlap integrals for Riccati-Bessel function.
- * @param maxL2 Maximal degree of the Riccati-Bessel function.
+/**
+ * @brief Compute j-overlaps
+ * 
+ * Compute B-spline overlap integrals for Riccati-Bessel function.
+ * 
+ * @param maxell Maximal degree of the Riccati-Bessel function.
  * @param vk Array containing linear momenta.
  * @param weightf Weight function to multiply every value of the Bessel function.
  *                It is expected to have the "double operator() (Complex z)" interface,

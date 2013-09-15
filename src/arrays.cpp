@@ -14,7 +14,7 @@
 #include <vector>
 
 #ifndef NO_HDF
-    #include <H5Cpp.h>
+#include <H5Cpp.h>
 #endif
 
 #include "arrays.h"
@@ -235,67 +235,34 @@ bool load_array(cArray & vec, const char* name)
 }
 #endif
 
-void write_array(const std::map<unsigned long long, Complex>& m, const char* filename)
+template<> void write_array(ArrayView<double> array, const char* filename)
 {
-    FILE* f = fopen(filename, "w");
-    for (auto it = m.begin(); it != m.end(); it++)
-    {
-        unsigned short lam = it->first % 65536L;
-        unsigned short l2 = (it->first/65536L) % 65536L;
-        unsigned short l1 = (it->first/(65536L*65536L)) % 65536L;
-        fprintf(f, "%d %d %d %g %g\n", l1, l2, lam, it->second.real(), it->second.imag());
-    }
-    fclose(f);
-}
-
-void write_array(rArray const & array, const char* filename)
-{
-    FILE* f = fopen(filename, "w");
+    std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
-        fprintf(f, "%ld %g\n", i, array[i]);
-    fclose(f);
+        fout << array[i] << "\n";
+    fout.close();
 }
 
-void write_array(rArray const & grid, rArray const & array, const char* filename)
+template<> void write_array(ArrayView<double> grid, ArrayView<double> array, const char* filename)
 {
-    FILE* f = fopen(filename, "w");
+    std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
-        fprintf(f, "%ld %g %g\n", i, grid[i], array[i]);
-    fclose(f);
+        fout << grid[i] << "\t" << array[i] << "\n";
+    fout.close();
 }
 
-void write_array(cArray const & array, const char* filename)
+template<> void write_array(ArrayView<Complex> array, const char* filename)
 {
-    FILE* f = fopen(filename, "w");
+    std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
-        fprintf(f, "%ld %g %g\n", i, array[i].real(), array[i].imag());
-    fclose(f);
+        fout << array[i].real() << "\t" << array[i].imag() << "\n";
+    fout.close();
 }
 
-void write_array(rArray const & grid, cArray const & array, const char* filename)
+template<> void write_array(ArrayView<double> grid, ArrayView<Complex> array, const char* filename)
 {
-    FILE* f = fopen(filename, "w");
+    std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
-        fprintf(f, "%ld %g %g %g\n", i, grid[i], array[i].real(), array[i].imag());
-    fclose(f);
-}
-
-void write_array(qArray const & array, const char* filename)
-{
-    FILE* f = fopen(filename, "w");
-    for (size_t i = 0; i < array.size(); i++)
-        fprintf(f, "%ld %Lg\n", i, array[i]);
-    fclose(f);
-}
-
-void write_array(ArrayView<Complex> const & array)
-{
-    for (Complex const & elem : array)
-        std::cout << elem.real() << "\t" << elem.imag() << "\n";
-}
-
-void write_array(ArrayView<double> const & array)
-{
-    for (double const & elem : array)
-        std::cout << elem << "\n";
+        fout << grid[i] << "\t" << array[i].real() << "\t" << array[i].imag() << "\n";
+    fout.close();
 }

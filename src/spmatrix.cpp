@@ -1171,7 +1171,7 @@ SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(0), idiag_(0) {}
 
-SymDiaMatrix::SymDiaMatrix(int n, ArrayView<int> const & id, ArrayView<Complex> const & v)
+SymDiaMatrix::SymDiaMatrix(int n, iArrayView const & id, cArrayView const & v)
     : n_(n), elems_(v), idiag_(id) {}
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
@@ -1593,4 +1593,12 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P)
     }
     
     return LD;
+}
+
+cArray DIC_preconditioner(SymDiaMatrix const & A)
+{
+    // the preconditioned diagonal
+    cArray D = A.main_diagonal();
+    
+    // for all elements
 }

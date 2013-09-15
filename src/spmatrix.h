@@ -19,8 +19,7 @@
 #include <iostream>
 #include <vector>
 
-#define WITH_PNGPP
-#ifdef WITH_PNGPP
+#ifndef NO_PNG
 #include <png++/png.hpp>
 #endif
 
@@ -37,7 +36,18 @@ class CscMatrix;
 class CsrMatrix;
 class SymDiaMatrix;
 
-// matrix parts
+/**
+ * @brief Matrix parts.
+ * 
+ * This enumeration contains some matrix part identificators
+ * that can be used e.g. together with matrix-vector multiplication
+ * routines (if implemented). The multiplication is done, then, as if
+ * the other parts were zero. For example
+ * @code
+ *     y = A.dot(x, strict_upper | strict_lower)
+ * @endcode
+ * will multiply vector @c x as if the diagonal of @c A were zero.
+ */
 typedef enum {
     none         = 0,  // b000
     strict_lower = 1,  // b001
@@ -215,7 +225,7 @@ public:
      */
     void write(const char* filename) const;
     
-#ifdef WITH_PNGPP
+#ifndef NO_PNG
     /**
      * PNG row data generator for use in \ref plot function.
      */
@@ -909,8 +919,16 @@ public:
     /**
      * @brief Plain symmetrical populator.
      *
+     * Given a functor of the signature
+     * @code
+     *     Complex (*) (int, int);
+     * @endcode
+     * the function will call the functor with row and column number of every
+     * element that is to be set.
+     * 
      * @param d How many upper diagonals to populate. The main diagonal will
      *          be populated always.
+     * @param f The functor that will compute the matrix elements.
      */
     template <class Functor> SymDiaMatrix & populate(unsigned d, Functor f)
     {
@@ -1029,7 +1047,7 @@ public:
      * - idiag - identifiers of (positive) diagonals that contain nonzeros,
      * - n - single number containing size of the matrix (rows or columns)
      * - x - concatenated diagonal elements (interleaved complex values)
-     * - zero_blocks - information on the compression of the "x" array, see @ref compress.
+     * - zero_blocks - information on the compression of the "x" array, see @ref NumberArray::compress.
      * 
      * @return True on successful write, false otherwise.
      */
@@ -1211,7 +1229,7 @@ inline CooMatrix operator * (const CooMatrix& A, const Complex& z)
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B);
 
 /**
- * Identity
+ * Identity matrix.
  * @param N Dimension.
  */
 CooMatrix eye(size_t N);
@@ -1254,5 +1272,47 @@ CooMatrix stairs(size_t N);
  *         exact sparse pattern as the input array A, i.e. specified by I and P arrays.
  */
 cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
+
+/**
+ * @brief DIC preconditioner.
+ * 
+ * Setup the diagonal incomplete Cholesky preconditioner. The preconditioner is a single
+ * array of numbers (diagonal matrix) and is being used together with the strict lower
+ * and upper triangle of the original matrix:
+ * @f[
+ *     \mathbf{M} = (\mathbf{D} + \mathbf{L}_\mathbf{A})
+ *                  \mathbf{D}^{-1}
+ *                  (\mathbf{D} + \mathbf{U}_\mathbf{A})
+ *                =  (1 + \mathbf{\tilde{L}}_\mathbf{A})
+ *                  \mathbf{D}
+ *                  (1 + \mathbf{\tilde{U}}_\mathbf{A})
+ * @f]
+ * The formula for the elements of @f$ \mathbf{D} @f$ is
+ * @f[
+ *     d_i = a_{ii} - \sum_{k < i} a_{ik} d_{kk}^{-1} a_{ki} \ ,
+ * @f]
+ * and is to be evaluated along the diagonal, re-using the just computed values @f$ d_i @f$.
+ * Hence, the access pattern in dense matrix would be
+ * @f[
+ *     \pmatrix {
+ *        \ast &      &      & \ast &     &     \cr
+ *             & \ast &      & \ast &     &     \cr
+ *             &      & \ast & \ast &     &     \cr
+ *        \ast & \ast & \ast &    ? &     &     \cr
+ *             &      &      &      &     &     \cr
+ *             &      &      &      &     &     \cr
+ *     }
+ * @f]
+ * In the case of the sparse SymDiaMatrix, the asterisks will occur only on the nonzero
+ * diagonals.
+ * 
+ * @note The same preconditioner can be used for unsymmetric matrix. Then it is called
+ *       DILU (diagonal incomplete LU factorization). This function, though, is implemented
+ *       symmetrically (as the input is symmetrical by definition of the type).
+ * 
+ * @param A Matrix in SymDiaMatrix format that is to be preconditioned.
+ * @return The diagonal preconditioner of the symmetric matrix.
+ */
+cArray DIC_preconditioner(SymDiaMatrix const & A);
 
 #endif
