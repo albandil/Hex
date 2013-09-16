@@ -689,7 +689,10 @@ Stg2:
                 // log output
                 std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
                 # pragma omp critical
-                std::cout << "\t\t   [" << iproc << "] time " << sec.count() << " s, mem " << iLU[ill].size() / 1048576 << " MiB";
+                std::cout << "\t\t   [" << iproc << "] "
+                          << "droptol " << droptol << ", "
+                          << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", "
+                          << "mem " << iLU[ill].size() / 1048576 << " MiB";
             }
             
             // diagonal incomplete Cholesky factorization
