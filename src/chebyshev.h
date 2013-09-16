@@ -8,7 +8,7 @@
  *                         Jakub Benda (c) 2013                              *
  *                     Charles University in Prague                          *
  *                                                                           *
- * \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #ifndef HEX_CHEBYSHEV
 #define HEX_CHEBYSHEV

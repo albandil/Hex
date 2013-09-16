@@ -20,8 +20,9 @@
 #include <getopt.h>
 
 #include "arrays.h"
-#include "spmatrix.h"
 #include "input.h"
+#include "itersolve.h"
+#include "spmatrix.h"
 
 /*
  * Load data from input file. Default filename is "hex.inp", but different
@@ -32,11 +33,11 @@ void parse_command_line (
     int argc, char* argv[],
     std::ifstream & inputfile,
     std::string & zipfile, int & zipcount, double & zipmax,
-    bool & parallel, double & droptol,
+    bool & parallel, int & preconditioner, double & droptol,
     int & itinerary
 ){
     // set short options
-    const char* const short_options  = "eihznRmabc";
+    char const * const short_options  = "ei:hz:n:R:mabcd:p:";
     
     // set long options
     const option long_options[] = {
@@ -53,6 +54,7 @@ void parse_command_line (
         {"stg-integ-solve",   0,   0, 'b'},
         {"stg-extract",       0,   0, 'c'},
         {"drop-tolerance",    1,   0, 'd'},
+        {"preconditioner",    1,   0, 'p'},
         {0,                   0,   0,   0}
     };
     
@@ -127,20 +129,23 @@ void parse_command_line (
             {
                 // print usage information
                 std::cout <<
-                    "------------------------------------------------       \n"
-                    "Available switches (short forms in parentheses):       \n"
-                    "------------------------------------------------       \n"
-                    "\nGeneral:                                             \n"
-                    "\t--example            (-e)  create sample input file  \n"
-                    "\t--help               (-h)  display this help         \n"
-                    "\t--input <filename>   (-i)  use custom input file     \n"
-                    "\t--zipfile <filename> (-z)  solution file to zip      \n"
-                    "\t--zipcount <number>  (-n)  zip samples               \n"
-                    "\t--mpi                (-m)  use MPI                   \n"
-                    "\t--stg-integ          (-a)  only do radial integrals  \n"
-                    "\t--stg-integ-solve    (-b)  only do integrals & solve \n"
-                    "\t--stg-extract        (-c)  only extract amplitudes   \n"
-                    "                                                       \n"
+                    "------------------------------------------------                                                         \n"
+                    "Available switches (short forms in parentheses):                                                         \n"
+                    "------------------------------------------------                                                         \n"
+                    "\nGeneral:                                                                                               \n"
+                    "\t--example            (-e)  create sample input file                                                    \n"
+                    "\t--help               (-h)  display this help                                                           \n"
+                    "\t--input <filename>   (-i)  use custom input file                                                       \n"
+                    "\t--zipfile <filename> (-z)  solution file to zip                                                        \n"
+                    "\t--zipcount <number>  (-n)  zip samples                                                                 \n"
+                    "\t--zipmax <number>    (-R)  maximal radius to use for solution zipping                                  \n"
+                    "\t--mpi                (-m)  use MPI                                                                     \n"
+                    "\t--stg-integ          (-a)  only do radial integrals                                                    \n"
+                    "\t--stg-integ-solve    (-b)  only do integrals & solve                                                   \n"
+                    "\t--stg-extract        (-c)  only extract amplitudes                                                     \n"
+                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, DIC, ILU} (default: ILU) \n"
+                    "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                  \n"
+                    "                                                                                                         \n"
                 ;
                 exit(0);
             }
@@ -182,8 +187,21 @@ void parse_command_line (
             }
             case 'd':
             {
-                // drop tolerance for LU-factorization
+                // drop tolerance for iLU-factorization
                 droptol = atof(optarg);
+                break;
+            }
+            case 'p':
+            {
+                // preconditioner
+                std::cout << "a\n";
+                if (strcmp(optarg,"none") == 0) preconditioner = no_prec;
+                else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobi_prec;
+                else if (strcmp(optarg,"SSOR")   == 0) preconditioner = ssor_prec;
+                else if (strcmp(optarg,"DIC")    == 0) preconditioner = dic_prec;
+                else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
+                std::cout << "b\n";
+                break;
             }
 #ifndef NO_MPI
             case 'm':
@@ -201,7 +219,6 @@ void parse_command_line (
             default:
             {
                 // unknown option
-                std::cout << "Unknown option." << std::endl;
                 abort();
             }
         }; // switch opetion

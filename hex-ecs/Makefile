@@ -36,7 +36,7 @@ docu:
 clean:
 	rm -f bin/hex obj/*.o
 
-bin/hex-ecs: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o
+bin/hex-ecs: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o obj/itersolve.o
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
@@ -61,6 +61,10 @@ obj/gauss.o: src/gauss.cpp src/arrays.h src/bspline.h src/hdffile.h
 	$(CPP) $(CFLAGS) -c $< -o $@
 	
 obj/input.o: src/input.cpp src/arrays.h src/hdffile.h
+	@mkdir -p $(@D)
+	$(CPP) $(CFLAGS) -c $< -o $@
+
+obj/itersolve.o: src/itersolve.cpp src/itersolve.h src/arrays.h src/complex.h src/misc.h src/spmatrix.h
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@
 

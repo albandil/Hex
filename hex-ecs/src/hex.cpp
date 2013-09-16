@@ -77,7 +77,8 @@ int main(int argc, char* argv[])
     int  zipcount = 0;          // zip sample count
     double zipmax = -1;         // zip bounding box
     bool parallel = false;      // whether to use OpenMPI
-    double droptol = 0;         // LU decomposition drop tolerance
+    double droptol = 1e-15;        // LU decomposition drop tolerance
+    int preconditioner = ilu_prec; // preconditioner
     
     // which stages to run (default: all)
     int itinerary = StgNone;
@@ -87,7 +88,7 @@ int main(int argc, char* argv[])
         argc, argv,
         inputfile,
         zipfile, zipcount, zipmax,
-        parallel, droptol,
+        parallel, preconditioner, droptol,
         itinerary
     );
     
@@ -661,67 +662,49 @@ Stg2:
         std::cout << "ok\n";
         
         // setup the preconditioner
-        std::cout << "\tCompose preconditioner matrix..." << std::flush;
-//         # pragma omp parallel for schedule (dynamic,1)
+        std::cout << "\tCompose preconditioner matrices..." << std::flush;
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
             if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
                 continue;
-/*
+            
             // timer info
-            std::chrono::steady_clock::time_point start;
-            std::chrono::duration<int> sec;
+            std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
             
             int l1 = coupled_states[ill].first;
             int l2 = coupled_states[ill].second;
             
-            // log output
-            # pragma omp critical
-            std::cout << "\t[" << iproc << "] DIC factorization " 
-                      << ill << " of (" << l1 << "," << l2 << ") block started\n";
-            start = std::chrono::steady_clock::now();
+            // drop-tolerance-incomplete LU factorization
+            if (preconditioner == ilu_prec)
+            {
+                // log output
+                # pragma omp critical
+                std::cout << "\n\t\t-> [" << iproc << "] iLU factorization " 
+                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
+                
+                // drop-tolerance incomplete LU factorization
+                iLU[ill] = csr_blocks[ill].factorize(droptol);
+                
+                // log output
+                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+                # pragma omp critical
+                std::cout << "\t\t   [" << iproc << "] time " << sec.count() << " s, mem " << iLU[ill].size() / 1048576 << " MiB";
+            }
             
-            //
-            // structurally incomplete Cholesky factorization
-            //
-
-            // convert lower triangular part of "dia_blocks[ill]" to CSR format
-            CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
+            // diagonal incomplete Cholesky factorization
+            if (preconditioner == dic_prec)
+            {
+                DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
+            }
             
-            // factorize the half-matrix to get the decomposition LDLt
-            cArray LD = iChol(csr.x(), csr.i(), csr.p());
-            
-            // store inverted diagonal
-            icholD[ill] = cArrayView(LD, 0, csr.rows());
-            std::cout << "D = " << icholD[ill].slice(0,15) << "\n";
-            for (Complex & d : icholD[ill])
-                d = 1./d;
-            
-            // create a CSR matrix and set diagonal to identity; then convert it to a SymDiaMatrix
-            icholL[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).nzTransform (
-                [](size_t i, size_t j, Complex x) -> Complex { return i == j ? 1. : x; }
-            ).tocoo().todia(lower);
-            
-            // drop-tolerance incomplete LU factorization
-            iLU[ill] = csr_blocks[ill].factorize(droptol);
-            
-            // DIC preconditioner
-            DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
-*/
-            // SSOR preconditioner
-            SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
-
-/*            
-            // log output
-            sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-            # pragma omp critical
-            std::cout << "\t[" << iproc << "] DIC factorization " 
-                      << ill << " of (" << l1 << "," << l2 << ") block done after " 
-                      << sec.count() << " s\n";
-*/
+            // Jacobi or SSOR preconditioner (Jacobi will use only the diagonal)
+            if (preconditioner == jacobi_prec or preconditioner == ssor_prec)
+            {
+                SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
+            }
         }
-        std::cout << "ok\n";
+        std::cout << ((preconditioner != ilu_prec) ? "ok\n" : "\n");
         
         // For all initial states ------------------------------------------- //
         //
@@ -847,7 +830,8 @@ Stg2:
             // CG preconditioner callback
             auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
             {
-                // apply a block inversion preconditioner
+                // apply a block inversion preconditioner (parallelize if not doing matrix multiplications)
+                # pragma omp parallel for if (preconditioner == ilu_prec)
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
                     // skip computation of unwanted blocks for this process
@@ -863,21 +847,29 @@ Stg2:
                     // preconditioner of the nested CG
                     auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
                     {
+                        // Incomplete LU factorization
+                        if (preconditioner == ilu_prec)
+                            z = iLU[ill].solve(r);
+                        
                         // Diagonal Incomplete Cholesky factorization
-                        // TODO Needs pivoting to work!
-//                         z = DIC[ill].upperSolve( DIC[ill].dot( DIC[ill].lowerSolve(r), diagonal ) );
+                        // TODO Needs to implement pivoting to work!
+                        if (preconditioner == dic_prec)
+                            z = DIC[ill].upperSolve( DIC[ill].dot( DIC[ill].lowerSolve(r), diagonal ) );
                         
                         // Symmetric Successive Over-Relaxation
                         // NOTE seems slower than Jacobi
-//                         z = SSOR[ill].upperSolve( SSOR[ill].dot( SSOR[ill].lowerSolve(r), diagonal ) );
+                        if (preconditioner == ssor_prec)
+                            z = SSOR[ill].upperSolve( SSOR[ill].dot( SSOR[ill].lowerSolve(r), diagonal ) );
                         
                         // Jacobi preconditioning
                         // NOTE seems the fastest
-                        z = SSOR[ill].dot(r,diagonal);
+                        if (preconditioner == jacobi_prec)
+                            z = SSOR[ill].dot(r,diagonal);
                         
                         // no preconditioning
                         // NOTE seems slower than Jacobi
-//                         z = r;
+                        if (preconditioner == no_prec)
+                            z = r;
                     };
                     
                     // multiply by matrix block

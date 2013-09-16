@@ -41,6 +41,7 @@ typedef enum {
  * @param zipmax Radial cutoff for solution zipping useful if one is interested
  *               only in the near-origin behaviour.
  * @param parallel Whether to use OpenMPI.
+ * @param preconditioner %Preconditioner to use. See \ref Preconditioner for available types.
  * @param droptol Drop tolerance for the iLU preconditioner.
  * @param itinerary Run only first stage (computation of the radial integrals).
  */
@@ -48,7 +49,7 @@ void parse_command_line (
     int argc, char* argv[],
     std::ifstream& inputfile,
     std::string& zipfile, int& zipcount, double& zipmax,
-    bool& parallel, double& droptol,
+    bool& parallel, int& preconditioner, double& droptol,
     int& itinerary
 );
 
