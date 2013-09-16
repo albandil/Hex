@@ -661,19 +661,20 @@ Stg2:
         std::cout << "ok\n";
         
         // setup the preconditioner
+        std::cout << "\tCompose preconditioner matrix..." << std::flush;
 //         # pragma omp parallel for schedule (dynamic,1)
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
-            int l1 = coupled_states[ill].first;
-            int l2 = coupled_states[ill].second;
-            
             // skip computation of unwanted blocks for this process
             if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
                 continue;
-            
+/*
             // timer info
             std::chrono::steady_clock::time_point start;
             std::chrono::duration<int> sec;
+            
+            int l1 = coupled_states[ill].first;
+            int l2 = coupled_states[ill].second;
             
             // log output
             # pragma omp critical
@@ -684,7 +685,7 @@ Stg2:
             //
             // structurally incomplete Cholesky factorization
             //
-/*
+
             // convert lower triangular part of "dia_blocks[ill]" to CSR format
             CsrMatrix csr = dia_blocks[ill].tocoo(lower).tocsr();
             
@@ -701,28 +702,26 @@ Stg2:
             icholL[ill] = CsrMatrix(csr.rows(), csr.cols(), csr.p(), csr.i(), LD).nzTransform (
                 [](size_t i, size_t j, Complex x) -> Complex { return i == j ? 1. : x; }
             ).tocoo().todia(lower);
-*/
-            //
+            
             // drop-tolerance incomplete LU factorization
-            //
-/*
             iLU[ill] = csr_blocks[ill].factorize(droptol);
-*/
             
-            //
             // DIC preconditioner
-            //
-            
+            DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
+*/
+            // SSOR preconditioner
             SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
-//             DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
-            
+
+/*            
             // log output
             sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
             # pragma omp critical
             std::cout << "\t[" << iproc << "] DIC factorization " 
                       << ill << " of (" << l1 << "," << l2 << ") block done after " 
                       << sec.count() << " s\n";
+*/
         }
+        std::cout << "ok\n";
         
         // For all initial states ------------------------------------------- //
         //
@@ -849,7 +848,6 @@ Stg2:
             auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
             {
                 // apply a block inversion preconditioner
-                # pragma omp parallel for schedule (dynamic,1)
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
                     // skip computation of unwanted blocks for this process

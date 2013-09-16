@@ -1407,24 +1407,24 @@ cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
     // NOTE: cArray (= NumberArray<Complex>) is aligned on sizeof(Complex) boundary
     // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
     Complex       *       restrict rp_res    = (Complex*)aligned(&res[0],    sizeof(Complex));
-    Complex const * const restrict rp_elems_ = (Complex*)aligned(&elems_[0], sizeof(Complex));
+    Complex const *       restrict rp_elems_ = (Complex*)aligned(&elems_[0], sizeof(Complex));
     Complex const * const restrict rp_B      = (Complex*)aligned(&B[0],      sizeof(Complex));
     
     // for all elements in the main diagonal
     if (triangle & diagonal)
     {
-        # pragma omp parallel for default (none) firstprivate(Nrpws,rp_res,rp_elems_,rp_B)
+        # pragma omp parallel for default (none) firstprivate(Nrows,rp_res,rp_elems_,rp_B)
         for (int ielem = 0; ielem < Nrows; ielem++)
             rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     }
     
-	// if only diagonal multiplication has been requested, return the result
-	if (not (triangle & strict_upper) and not (triangle & strict_lower))
-		return res;
+    // if only diagonal multiplication has been requested, return the result
+    if (not (triangle & strict_upper) and not (triangle & strict_lower))
+        return res;
+
+    // beginning of the first non-main diagonal
+    rp_elems_ += Nrows;
     
-    // beginning of the current diagonal
-    int beg = Nrows;
-	
     // for all other diagonals
     for (int id = 1; id < Ndiag; id++)
     {
@@ -1439,17 +1439,17 @@ cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
         {
             # pragma omp parallel for default (none) firstprivate(Nelem,rp_res,rp_elems_,rp_B,idiag)
             for (int ielem = 0; ielem < Nelem; ielem++)
-                rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
+                rp_res[ielem]         += rp_elems_[ielem] * rp_B[ielem + idiag];
         }
         if (triangle & strict_lower)
         {
             # pragma omp parallel for default (none) firstprivate(Nelem,rp_res,rp_elems_,rp_B,idiag)
             for (int ielem = 0; ielem < Nelem; ielem++)
-                rp_res[ielem + idiag] += rp_elems_[beg + ielem] * rp_B[ielem];
+                rp_res[ielem + idiag] += rp_elems_[ielem] * rp_B[ielem];
         }
         
         // move to the beginning of the next diagonal
-        beg += Nelem;
+        rp_elems_ += Nelem;
     }
     
     return res;
