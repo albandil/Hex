@@ -1394,48 +1394,58 @@ cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
     if ((int)B.size() != n_)
         throw exception ("[SymDiaMatrix::dot] Incompatible dimensions.");
     
+    // size of the matrix
+    int Nrows = n_;
+    int Ndiag = idiag_.size();
+    
     // the result
-    cArray res(n_);
+    cArray res(Nrows);
     
     // data pointers
     // - "restricted" and "aligned" for maximization of the cache usage
     // - "aligned" to convince the auto-vectorizer that vectorization is worth
     // NOTE: cArray (= NumberArray<Complex>) is aligned on sizeof(Complex) boundary
     // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
-    Complex       *       __restrict rp_res    = (Complex*)aligned(&res[0],    sizeof(Complex));
-    Complex const * const __restrict rp_elems_ = (Complex*)aligned(&elems_[0], sizeof(Complex));
-    Complex const * const __restrict rp_B      = (Complex*)aligned(&B[0],      sizeof(Complex));
+    Complex       *       restrict rp_res    = (Complex*)aligned(&res[0],    sizeof(Complex));
+    Complex const * const restrict rp_elems_ = (Complex*)aligned(&elems_[0], sizeof(Complex));
+    Complex const * const restrict rp_B      = (Complex*)aligned(&B[0],      sizeof(Complex));
     
     // for all elements in the main diagonal
     if (triangle & diagonal)
     {
-        for (int ielem = 0; ielem < n_; ielem++)
+        # pragma omp parallel for default (none) firstprivate(Nrpws,rp_res,rp_elems_,rp_B)
+        for (int ielem = 0; ielem < Nrows; ielem++)
             rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     }
     
-    // beginning of the current diagonal
-    size_t beg = n_;
+	// if only diagonal multiplication has been requested, return the result
+	if (not (triangle & strict_upper) and not (triangle & strict_lower))
+		return res;
     
+    // beginning of the current diagonal
+    int beg = Nrows;
+	
     // for all other diagonals
-    for (unsigned id = 1; id < idiag_.size(); id++)
+    for (int id = 1; id < Ndiag; id++)
     {
         // index of this diagonal
         int idiag = idiag_[id];
         
         // number of elements in the current diagonal
-        int Nelem = n_ - idiag;
+        int Nelem = Nrows - idiag;
         
         // for all elements of the current diagonal
-        for (int ielem = 0; ielem < Nelem; ielem++)
+        if (triangle & strict_upper)
         {
-            if (triangle & strict_upper)
-            {
+            # pragma omp parallel for default (none) firstprivate(Nelem,rp_res,rp_elems_,rp_B,idiag)
+            for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem]         += rp_elems_[beg + ielem] * rp_B[ielem + idiag];
-            }
-            if (triangle & strict_lower)
-            {
+        }
+        if (triangle & strict_lower)
+        {
+            # pragma omp parallel for default (none) firstprivate(Nelem,rp_res,rp_elems_,rp_B,idiag)
+            for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem + idiag] += rp_elems_[beg + ielem] * rp_B[ielem];
-            }
         }
         
         // move to the beginning of the next diagonal

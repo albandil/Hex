@@ -510,14 +510,31 @@ Stg2:
     //
     // Kronecker producs
     std::cout << "Creating Kronecker products... ";
-    SymDiaMatrix S_kron_S   = S.kron(S);
-    SymDiaMatrix S_kron_Mm1_tr = S.kron(Mm1_tr);
-    SymDiaMatrix S_kron_Mm2 = S.kron(Mm2);
-    SymDiaMatrix Mm1_tr_kron_S = Mm1_tr.kron(S);
-    SymDiaMatrix Mm2_kron_S = Mm2.kron(S);
-    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
-    SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
-    SymDiaMatrix S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
+    SymDiaMatrix S_kron_S, S_kron_Mm1_tr, S_kron_Mm2, Mm1_tr_kron_S,
+                 Mm2_kron_S, half_D_minus_Mm1_tr, half_D_minus_Mm1_tr_kron_S,
+                 S_kron_half_D_minus_Mm1_tr;
+    # pragma omp parallel sections
+    {
+        # pragma omp section
+        S_kron_S   = S.kron(S);
+        # pragma omp section
+        S_kron_Mm1_tr = S.kron(Mm1_tr);
+        # pragma omp section
+        S_kron_Mm2 = S.kron(Mm2);
+        # pragma omp section
+        Mm1_tr_kron_S = Mm1_tr.kron(S);
+        # pragma omp section
+        Mm2_kron_S = Mm2.kron(S);
+        # pragma omp section
+        half_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
+    }
+    # pragma omp parallel sections
+    {
+        # pragma omp section
+        half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
+        # pragma omp section
+        S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
+    }
     std::cout << "ok\n\n";
     // --------------------------------------------------------------------- //
     
@@ -625,7 +642,7 @@ Stg2:
             // one-electron parts
             SymDiaMatrix Hdiag =
                 half_D_minus_Mm1_tr_kron_S
-                + ((0.5*l1*(l1+1)) * Mm2_kron_S)
+                + (0.5*l1*(l1+1)) * Mm2_kron_S
                 + S_kron_half_D_minus_Mm1_tr
                 + (0.5*l2*(l2+1)) * S_kron_Mm2;
             
@@ -697,7 +714,7 @@ Stg2:
             //
             
             SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
-            DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
+//             DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
             
             // log output
             sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
