@@ -629,7 +629,7 @@ Stg2:
         std::vector<CsrMatrix> csr_blocks(coupled_states.size());        
         std::vector<CsrMatrix::LUft> iLU(coupled_states.size());
         std::vector<std::vector<CsrMatrix>> scsr_blocks(coupled_states.size());
-        std::vector<std::vector<CsrMatrix::LUft>> ciLU(coupled_states.size());
+        std::vector<std::vector<CsrMatrix::LUft>> siLU(coupled_states.size());
         
         // setup the preconditioner - the diagonal block iChol-factorizations
         std::cout << "\tSetup preconditioner blocks... " << std::flush;
@@ -714,13 +714,13 @@ Stg2:
                     // setup the single-electron block
                     scsr_blocks[ill][iblock] = (
                         E * S.main_diagonal()[iblock] * S
-                      - D.main_diagonal()[iblock] * S
-                      - S.main_diagonal()[iblock] * D
-                      - l1 * (l1+1) * Mm2.main_diagonal()[iblock] * S
-                      - l2 * (l2+1) * S.main_diagonal()[iblock] * Mm2
+                      - 0.5 * D.main_diagonal()[iblock] * S
+                      - 0.5 * S.main_diagonal()[iblock] * D
+                      - 0.5 * l1 * (l1+1.) * Mm2.main_diagonal()[iblock] * S
+                      - 0.5 * l2 * (l2+1.) * S.main_diagonal()[iblock] * Mm2
                       + Mm1_tr.main_diagonal()[iblock] * S
                       + S.main_diagonal()[iblock] * Mm1_tr
-                    ).tocsr();
+                    ).tocoo().tocsr();
                     
                     // factorize the block
                     siLU[ill][iblock] = scsr_blocks[ill][iblock].factorize(droptol);
@@ -732,7 +732,7 @@ Stg2:
                 std::cout << "\t\t   [" << iproc << "] ";
                 std::cout << "droptol " << droptol << ", ";
                 std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
-                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.cout() / Nspline) % 60 << ", ";
+                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
                 std::cout << "mem " << mib << " MiB";
             }
             
@@ -748,7 +748,7 @@ Stg2:
                 SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
             }
         }
-        std::cout << ((preconditioner != ilu_prec) ? "ok\n" : "\n");
+        std::cout << ((preconditioner != ilu_prec and preconditioner != silu_prec) ? "ok\n" : "\n");
         
         // For all initial states ------------------------------------------- //
         //
@@ -896,10 +896,11 @@ Stg2:
                             z = iLU[ill].solve(r);
                         
                         // single-electron Incomplete LU factorization
+                        // TODO Needs some modification to work!
                         if (preconditioner == silu_prec)
                         {
                             // for all single-electron blocks
-                            # pragma omp parallel for schedule
+                            # pragma omp parallel for
                             for (int iblock = 0; iblock < Nspline; iblock++)
                             {
                                 // precondition by inverting a single diagonal block
@@ -946,7 +947,7 @@ Stg2:
                         Nspline*Nspline,    // max. iteration
                         apply_inner_preconditioner,
                         inner_matrix_multiply,
-                        false       // verbose
+                        true       // verbose
                     );
                 }
                 

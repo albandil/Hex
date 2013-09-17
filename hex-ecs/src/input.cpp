@@ -200,6 +200,7 @@ void parse_command_line (
                 else if (strcmp(optarg,"SSOR")   == 0) preconditioner = ssor_prec;
                 else if (strcmp(optarg,"DIC")    == 0) preconditioner = dic_prec;
                 else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
+                else if (strcmp(optarg,"sILU")    == 0) preconditioner = silu_prec;
                 std::cout << "b\n";
                 break;
             }
