@@ -628,6 +628,8 @@ Stg2:
         // incomplete LU factorizations of the diagonal blocks
         std::vector<CsrMatrix> csr_blocks(coupled_states.size());        
         std::vector<CsrMatrix::LUft> iLU(coupled_states.size());
+        std::vector<std::vector<CsrMatrix>> scsr_blocks(coupled_states.size());
+        std::vector<std::vector<CsrMatrix::LUft>> ciLU(coupled_states.size());
         
         // setup the preconditioner - the diagonal block iChol-factorizations
         std::cout << "\tSetup preconditioner blocks... " << std::flush;
@@ -679,7 +681,6 @@ Stg2:
             if (preconditioner == ilu_prec)
             {
                 // log output
-                # pragma omp critical
                 std::cout << "\n\t\t-> [" << iproc << "] iLU factorization " 
                           << ill << " of (" << l1 << "," << l2 << ") block started\n";
                 
@@ -688,11 +689,51 @@ Stg2:
                 
                 // log output
                 std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                # pragma omp critical
                 std::cout << "\t\t   [" << iproc << "] "
                           << "droptol " << droptol << ", "
                           << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", "
                           << "mem " << iLU[ill].size() / 1048576 << " MiB";
+            }
+            
+            // drop-tolerance-incomplete single-electron LU factorization
+            if (preconditioner == silu_prec)
+            {
+                // log output
+                std::cout << "\n\t\t-> [" << iproc << "] s-iLU factorization "
+                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
+                
+                // allocate space
+                scsr_blocks[ill].resize(Nspline);
+                siLU[ill].resize(Nspline);
+                
+                unsigned mib = 0;
+                
+                // for all single-electron blocks
+                for (int iblock = 0; iblock < Nspline; iblock++)
+                {
+                    // setup the single-electron block
+                    scsr_blocks[ill][iblock] = (
+                        E * S.main_diagonal()[iblock] * S
+                      - D.main_diagonal()[iblock] * S
+                      - S.main_diagonal()[iblock] * D
+                      - l1 * (l1+1) * Mm2.main_diagonal()[iblock] * S
+                      - l2 * (l2+1) * S.main_diagonal()[iblock] * Mm2
+                      + Mm1_tr.main_diagonal()[iblock] * S
+                      + S.main_diagonal()[iblock] * Mm1_tr
+                    ).tocsr();
+                    
+                    // factorize the block
+                    siLU[ill][iblock] = scsr_blocks[ill][iblock].factorize(droptol);
+                    mib += siLU[ill][iblock].size() / 1048576;
+                }
+                
+                // log output
+                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "droptol " << droptol << ", ";
+                std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
+                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.cout() / Nspline) % 60 << ", ";
+                std::cout << "mem " << mib << " MiB";
             }
             
             // diagonal incomplete Cholesky factorization
@@ -833,7 +874,7 @@ Stg2:
             // CG preconditioner callback
             auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
             {
-                // apply a block inversion preconditioner (parallelize if not doing matrix multiplications)
+                // apply a block inversion preconditioner (parallel for ILU)
                 # pragma omp parallel for if (preconditioner == ilu_prec)
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
@@ -853,6 +894,20 @@ Stg2:
                         // Incomplete LU factorization
                         if (preconditioner == ilu_prec)
                             z = iLU[ill].solve(r);
+                        
+                        // single-electron Incomplete LU factorization
+                        if (preconditioner == silu_prec)
+                        {
+                            // for all single-electron blocks
+                            # pragma omp parallel for schedule
+                            for (int iblock = 0; iblock < Nspline; iblock++)
+                            {
+                                // precondition by inverting a single diagonal block
+                                cArrayView rview (r, iblock * Nspline, Nspline);
+                                cArrayView zview (z, iblock * Nspline, Nspline);
+                                zview = siLU[ill][iblock].solve(rview);
+                            }
+                        }
                         
                         // Diagonal Incomplete Cholesky factorization
                         // TODO Needs to implement pivoting to work!
