@@ -82,12 +82,28 @@ template <typename T, class ...Params> T min (T x, Params ...p)
 }
 
 /**
+ * @brief printf-like formatting.
+ * 
+ * @note Hard limit 1024 characters.
+ */
+template <class ...Params> char const * format (Params ...p)
+{
+    static char text[1024];
+    snprintf(text, sizeof(text), p...);
+    return text;
+}
+
+/**
+ * @brief Exception class.
+ * 
  * Custom exception class with easy printf-like constructor.
  * 
  * Use something like:
  * @code
  * throw exception("[Error %d] Pointed has the value 0x%x!", id, ptr);
  * @endcode
+ * 
+ * @note Hard limit 256 charasters.
  */
 class exception : public std::exception
 {
