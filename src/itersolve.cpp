@@ -82,6 +82,8 @@ cArray IC_preconditioner(cArrayView const & A, lArrayView const & I, lArrayView 
 
 SymDiaMatrix DIC_preconditioner(SymDiaMatrix const & A)
 {
+    #define THRESHOLD 1e-3
+    
     //
     // compute the preconditioned diagonal
     //
@@ -110,6 +112,10 @@ SymDiaMatrix DIC_preconditioner(SymDiaMatrix const & A)
         {
             // update pivot
             pD[irow] -= pA[irow - pAd[idiag]] * pA[irow - pAd[idiag]] / pD[irow - pAd[idiag]];
+            
+            // if the pivod is too small, set it to one
+            if (std::abs(pD[irow]) < THRESHOLD)
+                pD[irow] = THRESHOLD;
             
             // move pA to the beginning of the next diagonal
             pA += Nrows - pAd[idiag];

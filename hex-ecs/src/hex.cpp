@@ -631,6 +631,11 @@ Stg2:
         std::vector<std::vector<CsrMatrix>> scsr_blocks(coupled_states.size());
         std::vector<std::vector<CsrMatrix::LUft>> siLU(coupled_states.size());
         
+        // block incomplete D-ILU
+        std::vector<std::vector<SymDiaMatrix>> bcks(coupled_states.size());
+        std::vector<std::vector<CsrMatrix>> bcks_csr(coupled_states.size());
+        std::vector<std::vector<CsrMatrix::LUft>> bcks_lufts(coupled_states.size());
+        
         // setup the preconditioner - the diagonal block iChol-factorizations
         std::cout << "\tSetup preconditioner blocks... " << std::flush;
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
@@ -660,6 +665,9 @@ Stg2:
             // finalize the matrix
             dia_blocks[ill] = E*S_kron_S - Hdiag;
             csr_blocks[ill] = dia_blocks[ill].tocoo().tocsr();
+            
+            dia_blocks[ill].hdfsave(format("dia-%d-%d.hdf",l1,l2));
+//             csr_blocks[ill].plot(format("csr-%d-%d.png",l1,l2));
         }
         std::cout << "ok\n";
         
@@ -695,6 +703,92 @@ Stg2:
                           << "mem " << iLU[ill].size() / 1048576 << " MiB";
             }
             
+            // block-diagonal iLU
+            if (preconditioner == bilu_prec)
+            {
+                // log output
+                std::cout << "\n\t\t-> [" << iproc << "] block D-ILU factorization "
+                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
+                
+                // allocate space
+                std::vector<SymDiaMatrix> ibcks(Nspline);
+                bcks[ill].resize(Nspline);
+                bcks_csr[ill].resize(Nspline);
+                bcks_lufts[ill].resize(Nspline);
+                
+                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "computing blocks and SPAIs\n";
+                
+                // for all diagonal blocks
+                for (int iblock = 0; iblock < Nspline; iblock++)
+                {
+                    // compute the block
+                    bcks[ill][iblock] = E * S.main_diagonal()[iblock] * S
+                            - 0.5 * D.main_diagonal()[iblock] * S
+                            - 0.5 * S.main_diagonal()[iblock] * D
+                            - 0.5 * l1 * (l1 + 1.) * Mm2.main_diagonal()[iblock] * S
+                            - 0.5 * l2 * (l2 + 1.) * S.main_diagonal()[iblock] * Mm2
+                            + Mm1_tr.main_diagonal()[iblock] * S
+                            + S.main_diagonal()[iblock] * Mm1_tr;
+                    
+                    // invert using the SPAI
+                    ibcks[iblock] = SymDiaMatrix (
+                        Nspline,
+                        iArray(1), // = (int[]){ 0 }
+                        cArray(Nspline,1.)/bcks[ill][iblock].main_diagonal()
+                    );
+//                     std::cout << "ibcks[iblock].diag().size() = " << ibcks[iblock].diag().size() << "\n";
+                }
+                
+                // start form the first non-main diagonal
+                int diagptr = Nspline;
+                
+                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "preconditioning the diagonal\n";
+                
+                // for all diagonals of overlap matrix
+                for (int idiag = 1; idiag < 1 + order; idiag++)
+                {
+                    // for all elements of this diagonal
+                    for (int irow = 0; irow < Nspline - idiag; irow++)
+                    {
+                        // - construct corresponding block of Kronecker product
+                        SymDiaMatrix bck = E * S.data()[diagptr+irow] * S
+                                - 0.5 * D.data()[diagptr+irow] * S
+                                - 0.5 * S.data()[diagptr+irow] * D
+                                - 0.5 * l1 * (l1 + 1.) * Mm2.data()[diagptr+irow] * S
+                                - 0.5 * l2 * (l2 + 1.) * S.data()[diagptr+irow] * Mm2
+                                + Mm1_tr.data()[diagptr+irow] * S
+                                + S.data()[diagptr+irow] * Mm1_tr;
+                        
+                        // - update pivot
+                        bcks[ill][irow+idiag] -= bck * (ibcks[irow] * bck);
+                    }
+                    // move on to the next diagonal
+                    diagptr += Nspline - idiag;
+                }
+                
+                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "factorization of the pivots\n";
+                
+                // convert and factorize the pivots
+                size_t size = 0;
+                for (int iblock = 0; iblock < Nspline; iblock++)
+                {
+                    bcks_csr[ill][iblock] = bcks[ill][iblock].tocoo().tocsr();
+                    bcks_lufts[ill][iblock] = bcks_csr[ill][iblock].factorize(droptol);
+                    size += bcks_lufts[ill][iblock].size();
+                }
+                
+                // log output
+                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "droptol " << droptol << ", ";
+                std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
+                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
+                std::cout << "mem " << size/1048576 << " MiB";
+            }
+            
             // drop-tolerance-incomplete single-electron LU factorization
             if (preconditioner == silu_prec)
             {
@@ -706,7 +800,7 @@ Stg2:
                 scsr_blocks[ill].resize(Nspline);
                 siLU[ill].resize(Nspline);
                 
-                unsigned mib = 0;
+                unsigned size = 0;
                 
                 // for all single-electron blocks
                 for (int iblock = 0; iblock < Nspline; iblock++)
@@ -716,15 +810,18 @@ Stg2:
                         E * S.main_diagonal()[iblock] * S
                       - 0.5 * D.main_diagonal()[iblock] * S
                       - 0.5 * S.main_diagonal()[iblock] * D
-                      - 0.5 * l1 * (l1+1.) * Mm2.main_diagonal()[iblock] * S
-                      - 0.5 * l2 * (l2+1.) * S.main_diagonal()[iblock] * Mm2
+                      - 0.5 * l1 * (l1 + 1.) * Mm2.main_diagonal()[iblock] * S
+                      - 0.5 * l2 * (l2 + 1.) * S.main_diagonal()[iblock] * Mm2
                       + Mm1_tr.main_diagonal()[iblock] * S
                       + S.main_diagonal()[iblock] * Mm1_tr
                     ).tocoo().tocsr();
                     
+                    scsr_blocks[ill][iblock].plot(format("scsr-%d-%.03d.png", ill, iblock), 1.);
+                    scsr_blocks[ill][iblock].hdfsave(format("scsr-%d-%.03d.hdf", ill, iblock));
+                    
                     // factorize the block
                     siLU[ill][iblock] = scsr_blocks[ill][iblock].factorize(droptol);
-                    mib += siLU[ill][iblock].size() / 1048576;
+                    size += siLU[ill][iblock].size();
                 }
                 
                 // log output
@@ -733,13 +830,14 @@ Stg2:
                 std::cout << "droptol " << droptol << ", ";
                 std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
                 std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
-                std::cout << "mem " << mib << " MiB";
+                std::cout << "mem " << size/1048576 << " MiB";
             }
             
             // diagonal incomplete Cholesky factorization
             if (preconditioner == dic_prec)
             {
                 DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
+                cArray(DIC[ill].main_diagonal()).hdfsave(format("DIC-%d.hdf",ill));
             }
             
             // Jacobi or SSOR preconditioner (Jacobi will use only the diagonal)
@@ -910,10 +1008,28 @@ Stg2:
                             }
                         }
                         
+                        // block D-ILU
+                        if (preconditioner == bilu_prec)
+                        {
+                            // for all single-electron blocks
+                            # pragma omp parallel for
+                            for (int iblock = 0; iblock < Nspline; iblock++)
+                            {
+                                // precondition by inverting a single diagonal block
+                                cArrayView rview (r, iblock * Nspline, Nspline);
+                                cArrayView zview (z, iblock * Nspline, Nspline);
+                                zview = bcks_lufts[ill][iblock].solve(rview);
+                            }
+                        }
+                        
                         // Diagonal Incomplete Cholesky factorization
                         // TODO Needs to implement pivoting to work!
                         if (preconditioner == dic_prec)
+                        {
                             z = DIC[ill].upperSolve( DIC[ill].dot( DIC[ill].lowerSolve(r), diagonal ) );
+                            std::cout << z.norm()/r.norm() << "\n";
+                            std::cout << cArray(DIC[ill].main_diagonal()).norm() << "\n";
+                        }
                         
                         // Symmetric Successive Over-Relaxation
                         // NOTE seems slower than Jacobi

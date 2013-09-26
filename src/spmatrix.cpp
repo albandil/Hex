@@ -781,6 +781,86 @@ Complex CsrMatrix::operator() (unsigned i, unsigned j) const
     return x_[it - i_.begin()];
 }
 
+Complex sparse_row_scalar_product (
+  int n1, Complex const * const restrict x1, long const * const restrict i1,
+  int n2, Complex const * const restrict x2, long const * const restrict i2
+) {
+    Complex ssp = 0.;
+    if (n1 < 1 or n2 < 1)
+        return ssp;
+    
+//     std::cout << "SSP:\n\t" << ArrayView<Complex>(x1, x1 + n1)
+//               <<     "\n\t" << ArrayView<Complex>(x2, x2 + n2) << "\n";
+    
+    for (int pos1 = 0, pos2 = 0; pos1 < n1 and pos2 < n2;)
+    {
+        if (i1[pos1] < i2[pos2])
+        {
+            pos1++;
+        }
+        else if (i1[pos1] > i2[pos2])
+        {
+            pos2++;
+        }
+        else
+        {
+            ssp += x1[pos1] * x2[pos2];
+            pos1++;
+            pos2++;
+        }
+    }
+    
+    return ssp;
+}
+
+CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
+{
+    // check compatibility
+    if (A.cols() != B.rows())
+        throw exception ("Wrong sizes for matrix multiplication: %d %d, %d %d.", A.rows(), A.cols(), B.rows(), B.cols());
+    
+    // result arrays
+    lArray Cp = { 0 }, Ci;
+    cArray Cx;
+    
+//     std::cout << "A.rows() = " << A.rows() << ", B.cols() = " << B.cols() << "\n";
+//     std::cout << "A.p() = " << A.p() << "\n";
+//     std::cout << "B.p() = " << B.p() << "\n";
+    
+    // for all rows of the resulting matrix
+    for (int irow = 0; irow < (int)A.rows(); irow++)
+    {
+        // for all columns of the resulting matrix 
+        for (int icol = 0; icol < (int)B.cols(); icol++)
+        {
+            // compute scalar product of the rows
+            Complex ssp = sparse_row_scalar_product (
+                A.p()[irow+1] - A.p()[irow],   // nnz count
+                A.x().data() + A.p()[irow],    // elements
+                A.i().data() + A.p()[irow],    // column indices
+                B.p()[icol+1] - B.p()[icol],   // nnz count
+                B.x().data() + B.p()[icol],    // elements
+                B.i().data() + B.p()[icol]     // row indices
+            );
+            
+            // continue if zero
+            if (ssp == 0.)
+                continue;
+            
+            // otherwise store the value (and column index)
+            Cx.push_back(ssp);
+            Ci.push_back(icol);
+        }
+        
+        // move to the next row
+        Cp.push_back(Cx.size());
+    }
+    
+//     std::cout << "Cx.size() = " << Cx.size() << "\n";
+    
+    return CsrMatrix(A.rows(), B.cols(), Cp, Ci, Cx);
+}
+
 
 // ------------------------------------------------------------------------- //
 
@@ -1169,7 +1249,7 @@ bool CooMatrix::hdfload(const char* name)
 
 SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0) {}
 
-SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(0), idiag_(0) {}
+SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n, iArrayView const & id, cArrayView const & v)
     : n_(n), elems_(v), idiag_(id) {}
@@ -1182,21 +1262,105 @@ SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
 
 SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
-    if (is_compatible(B))
+    // check sizes
+    if (size() != B.size())
+        throw exception ("[SymDiaMatrix::operator+=] Unequal sizes!");
+    
+    // check diagonals
+    if (all(diag() == B.diag()))
     {
+        // fast version
         for (size_t i = 0; i < elems_.size(); i++)
             elems_[i] += B.elems_[i];
     }
+    else
+    {
+        // general version
+        cArrays diags;
+        std::set<int> idiags;
+        
+        // add all A's diagonals
+        int dataptr = 0;
+        for (auto id : diag())
+        {
+            idiags.insert(id);
+            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            dataptr += size() - id;
+        }
+        
+        // add all B's diagonals
+        dataptr = 0;
+        for (auto id : B.diag())
+        {
+            idiags.insert(id);
+            
+            if (diags[id].size() == 0)
+                diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            else
+                diags[id] += cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            
+            dataptr += size() - id;
+        }
+        
+        // use new diagonals
+        idiag_ = iArray(idiags.begin(), idiags.end());
+        
+        // use new data
+        elems_ = join(diags);
+    }
+    
     return *this;
 }
 
 SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
-    if (is_compatible(B))
+    // check sizes
+    if (size() != B.size())
+        throw exception ("[SymDiaMatrix::operator-=] Unequal sizes!");
+    
+    // check diagonals
+    if (all(diag() == B.diag()))
     {
+        // fast version
         for (size_t i = 0; i < elems_.size(); i++)
             elems_[i] -= B.elems_[i];
     }
+    else
+    {
+        // general version
+        cArrays diags;
+        std::set<int> idiags;
+        
+        // add all A's diagonals
+        int dataptr = 0;
+        for (auto id : diag())
+        {
+            idiags.insert(id);
+            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            dataptr += size() - id;
+        }
+        
+        // add all B's diagonals
+        dataptr = 0;
+        for (auto id : B.diag())
+        {
+            idiags.insert(id);
+            
+            if (diags[id].size() == 0)
+                diags[id] = -cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            else
+                diags[id] -= cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+            
+            dataptr += size() - id;
+        }
+        
+        // use new diagonals
+        idiag_ = iArray(idiags.begin(), idiags.end());
+        
+        // use new data
+        elems_ = join(diags);
+    }
+    
     return *this;
 }
 
@@ -1228,20 +1392,37 @@ SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B)
     return SymDiaMatrix(A.n_, A.idiag_, A.elems_ - B.elems_);
 }
 
+SymDiaMatrix operator * (double z, SymDiaMatrix const & A)
+{
+    return SymDiaMatrix(A.n_, A.idiag_, z * A.elems_);
+}
+
 SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A)
 {
     return SymDiaMatrix(A.n_, A.idiag_, z * A.elems_);
 }
 
+SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
+{
+    // FIXME : write an optimized routine
+    
+//     std::cout << "A.main_diagonal() = " << A.main_diagonal() << "\n";
+//     std::cout << "B.main_diagonal() = " << B.main_diagonal() << "\n";
+//     std::cout << "A.tocoo().tocsr().x() = " << A.tocoo().v() << "\n";
+//     std::cout << "B.tocoo().tocsr().x() = " << B.tocoo().v() << "\n";
+    
+    return (A.tocoo().tocsr() * B.tocoo().tocsc()).tocoo().todia();
+}
+
 bool SymDiaMatrix::is_compatible(const SymDiaMatrix& B) const
 {
     if (n_ != B.n_)
-        throw exception ("[SymDiaMatrix::operator+=] Unequal ranks.");
+        throw exception ("[SymDiaMatrix] Unequal ranks.");
     if (idiag_.size() != B.idiag_.size())
-        throw exception ("[SymDiaMatrix::operator+=] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
+        throw exception ("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
     for (size_t i = 0; i < idiag_.size(); i++)
         if (idiag_[i] != B.idiag_[i])
-            throw exception ("[SymDiaMatrix::operator+=] Unequal distribution of diagonals.");
+            throw exception ("[SymDiaMatrix] Unequal distribution of diagonals.");
     return true;
 }
 
@@ -1357,7 +1538,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
             }
             
             // add this element to COO (upper triangle)
-            if ((id > 0) and (triangle & strict_upper))
+            if ((id != 0) and (triangle & strict_upper))
             {
                 i.push_back(iel);
                 j.push_back(iel+id);
@@ -1365,7 +1546,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
             }
             
             // add this element to COO (upper triangle)
-            if ((id > 0) and (triangle & strict_lower))
+            if ((id != 0) and (triangle & strict_lower))
             {
                 i.push_back(iel+id);
                 j.push_back(iel);

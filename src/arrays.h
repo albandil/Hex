@@ -1638,7 +1638,8 @@ template <typename T> NumberArray<T> linspace(T start, T end, unsigned samples)
     }
     
     for (unsigned i = 0; i < samples; i++)
-        space[i] = start + (end - start) * T(i) / T(samples - 1);
+        space[i] = start + ((end - start) * T(i)) / T(samples - 1);
+    
     return space;
 }
 
@@ -1888,6 +1889,33 @@ Array<bool> operator == (ArrayView<T> u, T x)
     for (size_t i  = 0; i < u.size(); i++)
         v[i] = (u[i] == x);
     return v;
+}
+
+template <typename T>
+Array<bool> operator == (ArrayView<T> u, ArrayView<T> v)
+{
+    assert(u.size() == v.size());
+    
+    Array<bool> w(u.size());
+    for (size_t i  = 0; i < u.size(); i++)
+        w[i] = (u[i] == v[i]);
+    return w;
+}
+
+inline bool all(Array<bool> B)
+{
+    bool ok = true;
+    for (bool b : B)
+        ok = ok and b;
+    return ok;
+}
+
+inline bool any(Array<bool> B)
+{
+    bool ok = false;
+    for (bool b : B)
+        ok = ok or b;
+    return ok;
 }
 
 /**

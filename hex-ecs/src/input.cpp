@@ -194,14 +194,14 @@ void parse_command_line (
             case 'p':
             {
                 // preconditioner
-                std::cout << "a\n";
                 if (strcmp(optarg,"none") == 0) preconditioner = no_prec;
                 else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobi_prec;
                 else if (strcmp(optarg,"SSOR")   == 0) preconditioner = ssor_prec;
                 else if (strcmp(optarg,"DIC")    == 0) preconditioner = dic_prec;
                 else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
-                else if (strcmp(optarg,"sILU")    == 0) preconditioner = silu_prec;
-                std::cout << "b\n";
+                else if (strcmp(optarg,"sILU")   == 0) preconditioner = silu_prec;
+                else if (strcmp(optarg,"bILU")   == 0) preconditioner = bilu_prec;
+                else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }
 #ifndef NO_MPI

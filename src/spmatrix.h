@@ -112,6 +112,9 @@ public:
     size_t size() const { return i_.size(); }
     size_t rows() const { return m_; }
     size_t cols() const { return n_; }
+    lArray const & p() const { return p_; }
+    lArray const & i() const { return i_; }
+    cArray const & x() const { return x_; }
     
     /**
      * Multiplication by a real number.
@@ -973,6 +976,8 @@ public:
     cArray & data() { return elems_; }
     cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
     
+    int bandwidth() const { return 1 + 2 * idiag_.back(); }
+    
     size_t size() const { return n_; }
     
     bool is_compatible (SymDiaMatrix const & B) const;
@@ -986,6 +991,8 @@ public:
     
     friend SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
     friend SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
+    friend SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B);
+    friend SymDiaMatrix operator * (double z, SymDiaMatrix const & A);
     friend SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
 
     SymDiaMatrix const & operator += (SymDiaMatrix const & B);
@@ -1211,6 +1218,12 @@ inline CooMatrix operator * (const CooMatrix& A, const Complex& z)
     CooMatrix C = A;
     return C *= z;
 }
+
+SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
+SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
+SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B);
+SymDiaMatrix operator * (double z, SymDiaMatrix const & A);
+SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
 
 /**
  * @brief Kronecker product.

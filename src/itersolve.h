@@ -25,7 +25,9 @@ typedef enum {
     jacobi_prec,
     ssor_prec,
     dic_prec, // diagonal incomplete Choleski
-    ilu_prec  // droptol-incomplete LU
+    ilu_prec , // droptol-incomplete LU
+    silu_prec,
+    bilu_prec
 } Preconditioner;
 
 /**
@@ -173,7 +175,7 @@ unsigned cg_callbacks (
     // Iterate
     
     unsigned k;
-    for/*ever*/ (k = 0; ; k++)
+    for (k = 0; k < max_iterations; k++)
     {
         sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
         
@@ -223,10 +225,6 @@ unsigned cg_callbacks (
         if (k >= min_iterations and rnorm / bnorm < eps)
             break;
         
-        // check iteration limit (stop at "max_iterations" iterations)
-        if (k >= max_iterations)
-            break;
-        
         // move to the next iteration: store previous projection
         rho_old = rho_new;
     }
@@ -237,7 +235,10 @@ unsigned cg_callbacks (
 }
 
 /**
- * Callback-based BiCG-STAB.
+ * Callback-based BiCGSTAB.
+ * 
+ * Bi-Conjugate gradients stabilized method.
+ * 
  * @param b Right hand side.
  * @param x Output vector. An initial guess may be present at beginning.
  * @param eps Relative tolerance.
@@ -247,33 +248,48 @@ unsigned cg_callbacks (
  *                             Should apply a custom preconditioner to a given vector.
  * @param matrix_multiply Functor compatible with void(*)(const Array&, Array&) prototype.
  *                        Should multiply the given vector by the matrix of the equation set.
+ * @param verbose Whether to comment the progress to stdout.
  * @return Iteration count.
  */
 template <typename TFunctor1, typename TFunctor2>
-unsigned bicgstab_callbacks(
-    cArray const & b, cArray & x,
+int bicgstab_callbacks (
+    cArrayView bview, cArrayView xview,
     double eps,
-    unsigned min_iterations, unsigned max_iterations,
+    int min_iterations, int max_iterations,
     TFunctor1 apply_preconditioner,
-    TFunctor2 matrix_multiply
+    TFunctor2 matrix_multiply,
+    bool verbose = false
 ) {
-    int N = b.size();
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::chrono::duration<int> sec;
     
-    cArray r_im1(N), rt(N), p_i(N), p_im1(N), v_i(N), v_im1(N), phat(N), s(N), shat(N), t(N), x_im1(N), x_i(N), r_i(N);
-    Complex rho_im1, rho_im2, alpha_i, alpha_im1, omega_i, omega_im1;
+    cArray b(bview), x(xview);
+    
+    int N = b.size();
+    double bnorm = b.norm();
+    
+    cArray x_im1(N), r_im1(N), rt(N), p_i(N), p_im1(N), v_im1(N), phat(N), v_i(N), s(N), shat(N), t(N), x_i(N), r_i(N);
+    Complex rho_im1, rho_im2, beta, alpha_i, alpha_im1, omega_i, omega_im1;
     
     x_im1 = x;
     matrix_multiply(x_im1,r_im1);
     rt = r_im1 = b - r_im1;
     
-    for/*ever*/ (int i = 1; ; i++)
+    int i;
+    for (i = 1; i < max_iterations; i++)
     {
-        rho_im1 = (rt | r_im1);
-        if (rho_im1 == 0.)
+        sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+        
+        if (verbose)
         {
-            std::cerr << "BiCG failed, ρ = 0\n";
-            return i-1;
+            std::cout << "\t[Bi-CGSTAB] Residual relative magnitude after "
+                    << i << " iterations: " << r_im1.norm() / bnorm
+                    << " (" << sec.count()/60 << " min)\n";
         }
+        
+        rho_im1 = (rt | r_im1);
+        if (std::abs(rho_im1) == 0.)
+            throw exception ("[Bi-CGSTAB] Failed, rho = 0.");
         
         if (i == 1)
         {
@@ -281,52 +297,147 @@ unsigned bicgstab_callbacks(
         }
         else
         {
-            Complex beta_im1 = (rho_im1 / rho_im2) * (alpha_im1 / omega_im1);
-            p_i = r_im1 + beta_im1 * (p_im1 - omega_im1 * v_im1);
+            beta = (rho_im1 / rho_im2) * (alpha_im1 / omega_im1);
+            p_i = r_im1 + beta * (p_im1 - omega_im1 * v_im1);
         }
         
         apply_preconditioner(p_i, phat);
         matrix_multiply(phat, v_i);
-        alpha_i = rho_im1 / (rt|v_i);
+        alpha_i = rho_im1 / (rt | v_i);
         s = r_im1 - alpha_i * v_i;
         
-        std::cout << "\t[bcg] s-residual relative magnitude after " << i << " iterations: " << s.norm() / b.norm() << "\n";
-        
-        if (s.norm() < eps * b.norm())
+        if (s.norm() < eps * bnorm)
         {
             x = x_im1 + alpha_i * phat;
-            return i-1;
+            break;
         }
         
         apply_preconditioner(s, shat);
         matrix_multiply(shat, t);
         omega_i = (t|s) / (t|t);
-        x_i = x_im1 + alpha_i * phat + omega_i * shat;
+        
+        x_i = x_im1 + alpha_i * phat + omega_i * s;
         r_i = s - omega_i * t;
         
-        std::cout << "\t[bcg] r-residual relative magnitude after " << i << " iterations: " << r_i.norm() / b.norm() << "\n";
-        
-        if (r_i.norm() < eps * b.norm())
+        if (r_i.norm() < eps * bnorm)
         {
             x = x_i;
-            return i;
+            break;
         }
         
         if (omega_i == 0.)
-        {
-            std::cerr << "BiCG failed, ω = 0\n";
-            return i;
-        }
+            throw exception ("[Bi-CGSTAB] Solver failed, ω = 0.");
         
-        // update
-        x_im1 = x_i;
-        r_im1 = r_i;
+        // shift vectors
+        x_im1 = std::move(x_i);
+        r_im1 = std::move(r_i);
+        p_im1 = std::move(p_i);
+        v_im1 = std::move(v_i);
+        
+        // shift 
         rho_im2 = rho_im1;
-        p_im1 = p_i;
-        v_im1 = v_i;
         alpha_im1 = alpha_i;
         omega_im1 = omega_i;
     }
+    
+    xview = x;
+    return i;
+}
+
+/**
+ *  @brief CGS solver.
+ * 
+ * Conjugate gradients squared,
+ * 
+ * @param b Right hand side.
+ * @param x Output vector. An initial guess may be present at beginning.
+ * @param eps Relative tolerance.
+ * @param min_iterations Minimal iterations count.
+ * @param max_iterations Maximal iterations count.
+ * @param apply_preconditioner Functor compatible with void(*)(const Array&, Array&) prototype.
+ *                             Should apply a custom preconditioner to a given vector.
+ * @param matrix_multiply Functor compatible with void(*)(const Array&, Array&) prototype.
+ *                        Should multiply the given vector by the matrix of the equation set.
+ * @param verbose Whether to comment the progress to stdout.
+ * @return Iteration count.
+ */
+template <typename TFunctor1, typename TFunctor2>
+int cgs_callbacks (
+    cArrayView bview, cArrayView xview,
+    double eps,
+    int min_iterations, int max_iterations,
+    TFunctor1 apply_preconditioner,
+    TFunctor2 matrix_multiply,
+    bool verbose = false
+) {
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::chrono::duration<int> sec;
+    
+    cArray x(xview), b(bview);
+    int N = b.size();
+    double bnorm = b.norm();
+    
+    Complex resid, alpha, beta, rho_1, rho_2;
+    cArray r(N), rt(N), p(N), phat(N), q(N), qhat(N), vhat(N), u(N), uhat(N);
+    
+    matrix_multiply(x,r);
+    rt = r = b - r;
+    
+    if (bnorm == 0.)
+        bnorm = 1;
+    
+    if (r.norm() < eps * bnorm)
+        return 0;
+    
+    int i;
+    for (i = 1; i < max_iterations; i++)
+    {
+        sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+        
+        if (verbose)
+        {
+            std::cout << "\t[cgs] Residual relative magnitude after "
+                    << i << " iterations: " << r.norm() / bnorm
+                    << " (" << sec.count()/60 << " min)\n";
+        }
+        
+        rho_1 = (rt | r);
+        
+        if (rho_1 == 0.)
+        {
+            throw exception ("[cgs] Solver failes, ρ = 0.");
+        }
+        if (i == 1)
+        {
+            u = r;
+            p = u;
+        }
+        else
+        {
+            beta = rho_1 / rho_2;
+            u = r + beta * q;
+            p = u + beta * (q + beta * p);
+        }
+        
+        apply_preconditioner(p, phat);
+        matrix_multiply(phat, vhat);
+        
+        alpha = rho_1 / (rt | vhat);
+        q = u - alpha * vhat;
+        
+        apply_preconditioner(u + q, uhat);
+        matrix_multiply(uhat, qhat);
+        
+        x += alpha * uhat;
+        r -= alpha * qhat;
+        rho_2 = rho_1;
+        
+        if (r.norm() < eps * bnorm)
+            break;
+    }
+    
+    xview = x;
+    return i;
 }
 
 #endif
