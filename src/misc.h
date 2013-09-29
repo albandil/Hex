@@ -15,7 +15,7 @@
 
 #include <exception>
 #include <cstdio>
-
+#include <complex>
 #include <limits>
 
 /// Infinity
@@ -27,6 +27,7 @@
 #include <functional> 
 #include <cctype>
 #include <locale>
+#include <type_traits>
 
 // restricted pointers
 #ifndef restrict
@@ -41,14 +42,48 @@
 // memory alignment
 #ifndef alignof
 #ifdef __GNUC__
-    #define alignof(x)   (__alignof(x))
     #define aligned(x,y) (__builtin_assume_aligned((x),(y)))
 #else
-    #define alignof(x)   (sizeof(void*))
     #define aligned(x,y) (x)
     #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
 #endif
 #endif
+
+//
+// list all complex types
+//
+
+template <class T>
+struct is_complex { static const bool value = false; };
+template<> template <class T>
+struct is_complex<std::complex<T>> { static const bool value = true; };
+
+//
+// list all scalar types variables
+//
+
+#define declareTypeAsScalar(T)                                                \
+                                                                              \
+template <> struct is_scalar<T>                                               \
+{                                                                             \
+    static const bool value = true;                                           \
+};                                                                            \
+
+// declare general type as non-scalar (if not complex)
+template <class T> struct is_scalar
+{
+    static const bool value = is_complex<T>::value;
+};
+
+// explicitly list all basic scalar types
+declareTypeAsScalar(int);
+declareTypeAsScalar(long);
+declareTypeAsScalar(float);
+declareTypeAsScalar(double);
+
+//
+// Trimming
+//
 
 /// Trim from start.
 static inline std::string &ltrim(std::string &s)

@@ -151,7 +151,7 @@ CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
     return *this;
 }
 
-cArray CscMatrix::dotT(const cArrayView&  b) const
+cArray CscMatrix::dotT(cCArrayView  b) const
 {
     // create output array
     cArray c (n_);
@@ -1075,14 +1075,14 @@ cArray CooMatrix::todense() const
 }
 
 #ifndef NO_UMFPACK
-CooMatrix& CooMatrix::operator *= (cArray const &  B)
+CooMatrix& CooMatrix::operator *= (cCArrayView B)
 {
     return *this = this->dot(B);
 }
 #endif
 
 #ifndef NO_UMFPACK
-CooMatrix CooMatrix::dot(cArrayView const & B) const
+CooMatrix CooMatrix::dot(cCArrayView B) const
 {
     // FIXME: This is a memory INEFFICIENT method.
     // NOTE: Row-major storage assumed for B.
@@ -1296,7 +1296,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
         for (auto id : idiag_)
         {
             idiags.insert(id);
-            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+            diags[id] = cCArrayView(elems_, dataptr, n_ - id);
             dataptr += n_ - id;
         }
         
@@ -1307,9 +1307,9 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
             idiags.insert(id);
             
             if (diags[id].size() == 0)
-                diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+                diags[id] = cCArrayView(elems_, dataptr, n_ - id);
             else
-                diags[id] += cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+                diags[id] += cCArrayView(elems_, dataptr, n_ - id);
             
             dataptr += n_ - id;
         }
@@ -1665,7 +1665,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
     return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
+cArray SymDiaMatrix::dot(cCArrayView B, MatrixTriangle triangle) const
 {
     // check dimensions
     if ((int)B.size() != n_)
@@ -1738,7 +1738,7 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
     return ::kron (this->tocoo(), B.tocoo()).todia();
 }
 
-cArray SymDiaMatrix::lowerSolve(cArrayView b) const
+cArray SymDiaMatrix::lowerSolve(cCArrayView b) const
 {
     assert(size() == b.size());
     
@@ -1779,7 +1779,7 @@ cArray SymDiaMatrix::lowerSolve(cArrayView b) const
     return x;
 }
 
-cArray SymDiaMatrix::upperSolve(cArrayView b) const
+cArray SymDiaMatrix::upperSolve(cCArrayView b) const
 {
     assert(size() == b.size());
     

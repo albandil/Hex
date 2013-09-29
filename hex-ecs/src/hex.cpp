@@ -735,7 +735,7 @@ Stg2:
                     ibcks[iblock] = SymDiaMatrix (
                         Nspline,
                         iArray(1), // = (int[]){ 0 }
-                        cArray(Nspline,1.)/bcks[ill][iblock].main_diagonal()
+                        Complex(1.)/bcks[ill][iblock].main_diagonal()
                     );
 //                     std::cout << "ibcks[iblock].diag().size() = " << ibcks[iblock].diag().size() << "\n";
                 }
@@ -984,7 +984,7 @@ Stg2:
                     cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
                     
                     // create copy-from view of "r"
-                    cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
+                    ConstArrayView<Complex> rview(r, ill * Nspline * Nspline, Nspline * Nspline);
                     
                     // preconditioner of the nested CG
                     auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
@@ -1002,7 +1002,7 @@ Stg2:
                             for (int iblock = 0; iblock < Nspline; iblock++)
                             {
                                 // precondition by inverting a single diagonal block
-                                cArrayView rview (r, iblock * Nspline, Nspline);
+                                ConstArrayView<Complex> rview (r, iblock * Nspline, Nspline);
                                 cArrayView zview (z, iblock * Nspline, Nspline);
                                 zview = siLU[ill][iblock].solve(rview);
                             }
@@ -1016,8 +1016,8 @@ Stg2:
                             for (int iblock = 0; iblock < Nspline; iblock++)
                             {
                                 // precondition by inverting a single diagonal block
-                                cArrayView rview (r, iblock * Nspline, Nspline);
-                                cArrayView zview (z, iblock * Nspline, Nspline);
+                                cCArrayView rview (r, iblock * Nspline, Nspline);
+                                cArrayView  zview (z, iblock * Nspline, Nspline);
                                 zview = bcks_lufts[ill][iblock].solve(rview);
                             }
                         }
@@ -1112,7 +1112,7 @@ Stg2:
                     cArray q_contrib (Nspline * Nspline);
                     
                     // copy-from segment of "p"
-                    cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
+                    cCArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
                     
                     // multiply by hamiltonian terms
                     if (ill == illp)

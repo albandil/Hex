@@ -20,22 +20,6 @@
 #include "arrays.h"
 #include "complex.h"
 
-bool all(std::vector<bool> v)
-{
-    for (auto it = v.begin(); it != v.end(); it++)
-        if (not *it)
-            return false;
-    return true;
-}
-
-bool any(std::vector<bool> v)
-{
-    for (auto it = v.begin(); it != v.end(); it++)
-        if (*it)
-            return true;
-    return false;
-}
-
 rArray abs (cArray const &u)
 {
     rArray v(u.size());

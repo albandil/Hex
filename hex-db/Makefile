@@ -44,7 +44,7 @@ bin/hex-db.so: obj/hex-db.o obj/specf.o obj/arrays.o obj/variables.o obj/vec3d.o
 # -----------------------------------------------------------------------------
 # Release
 
-$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h src/chebyshev.h src/vec3d.h
+$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrithm.h src/arrays.h src/complex.h src/specf.h src/chebyshev.h src/vec3d.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 
@@ -52,7 +52,7 @@ obj/ui.o: src/ui.cpp src/hex-db.h src/interfaces.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
-obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
+obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/specf.h src/complex.h src/arrithm.h src/arrays.h src/interpolate.h src/variables.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
@@ -60,11 +60,11 @@ obj/specf.o: src/specf.cpp src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
-obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
+obj/arrays.o: src/arrays.cpp src/arrithm.h src/arrays.h src/complex.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	
-obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h src/version.h
+obj/variables.o: src/variables.cpp src/variables.h src/arrithm.h src/arrays.h src/complex.h src/version.h
 	@mkdir -p $(@D)
 	$(CPP) $(CXXFLAGS) -c $< -o $@
 	

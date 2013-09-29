@@ -148,13 +148,13 @@ cArray Bspline::zip (
     for (int ispline = 0; ispline < Nspline_; ispline++)
     {
         // get relevant subset of x[]
-        xleft = std::upper_bound (
-            x.cbegin(), x.cend(),
+        xleft = std::upper_bound<Complex const*> (
+            x.begin(), x.end(),
             t_[ispline],
             Complex_realpart_less
         );
-        xright = std::lower_bound (
-            xleft, x.cend(),
+        xright = std::lower_bound<Complex const*> (
+            xleft, x.end(),
             t_[ispline + order_ + 1],
             Complex_realpart_less
         );
@@ -184,13 +184,13 @@ cArray Bspline::zip (
     for (int ispline = 0; ispline < Nspline_; ispline++)
     {
         // get relevant subset of y[]
-        yleft = std::upper_bound (
-            y.cbegin(), y.cend(),
+        yleft = std::upper_bound<Complex const*>(
+            y.begin(), y.end(),
             t_[ispline],
             Complex_realpart_less
         );
-        yright = std::lower_bound (
-            yleft, y.cend(),
+        yright = std::lower_bound<Complex const*> (
+            yleft, y.end(),
             t_[ispline + order_ + 1],
             Complex_realpart_less
         );
@@ -219,13 +219,13 @@ cArray Bspline::zip (
     for (int ixspline = 0; ixspline < Nspline_; ixspline++)
     {
         // get relevant subset of x[]
-        xleft = std::upper_bound (
-            x.cbegin(), x.cend(),
+        xleft = std::upper_bound<Complex const*> (
+            x.begin(), x.end(),
             t_[ixspline],
             Complex_realpart_less
         );
-        xright = std::lower_bound (
-            xleft, x.cend(),
+        xright = std::lower_bound<Complex const*> (
+            xleft, x.end(),
             t_[ixspline + order_ + 1],
             Complex_realpart_less
         );
@@ -237,13 +237,13 @@ cArray Bspline::zip (
         for (int iyspline = 0; iyspline < Nspline_; iyspline++)
         {
             // get relevant subset of y[]
-            yleft = std::upper_bound (
-                y.cbegin(), y.cend(),
+            yleft = std::upper_bound<Complex const*> (
+                y.begin(), y.end(),
                 t_[iyspline],
                 Complex_realpart_less
             );
-            yright = std::lower_bound (
-                yleft, y.cend(),
+            yright = std::lower_bound<Complex const*> (
+                yleft, y.end(),
                 t_[iyspline + order_ + 1],
                 Complex_realpart_less
             );

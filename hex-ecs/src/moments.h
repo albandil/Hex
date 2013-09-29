@@ -213,7 +213,7 @@ template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Fun
             // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
             cArrays evalj(points);
             for (int ipoint = 0; ipoint < points; ipoint++)
-                evalj[ipoint] = weightf(xs[ipoint]) * ric_jv(maxell, vk[ie] * xs[ipoint]);
+                evalj[ipoint] = Complex(weightf(xs[ipoint])) * ric_jv(maxell, vk[ie] * xs[ipoint]);
             
             // for all angular momenta
             for (int l = 0; l <= maxell; l++)

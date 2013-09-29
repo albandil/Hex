@@ -135,7 +135,7 @@ SymDiaMatrix SSOR_preconditioner(SymDiaMatrix const & A);
  */
 template <typename Preconditioner, typename Multiplier>
 unsigned cg_callbacks (
-    cArrayView const bview, cArrayView xview,
+    cCArrayView bview, cArrayView xview,
     double eps,
     unsigned min_iterations, unsigned max_iterations,
     Preconditioner apply_preconditioner,

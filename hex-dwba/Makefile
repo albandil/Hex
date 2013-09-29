@@ -21,47 +21,47 @@ obj/coulomb.o: src/coulomb.cpp src/coulomb.h src/complex.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/main.o: src/main.cpp src/dwba1.h src/complex.h src/arrays.h src/dwba1.h src/dwba2.h src/potential.h src/hydrogen.h src/clenshawcurtis.h src/hdffile.h
+obj/main.o: src/main.cpp src/dwba1.h src/complex.h src/arrithm.h src/arrays.h src/dwba1.h src/dwba2.h src/potential.h src/hydrogen.h src/clenshawcurtis.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/potential.o: src/potential.cpp src/potential.h src/arrays.h src/wave_distort.h src/wave_forbid.h src/wave_hyperb.h src/wave_irreg.h src/hdffile.h
+obj/potential.o: src/potential.cpp src/potential.h src/arrithm.h src/arrays.h src/wave_distort.h src/wave_forbid.h src/wave_hyperb.h src/wave_irreg.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h src/hdffile.h
+obj/arrays.o: src/arrays.cpp src/arrithm.h src/arrays.h src/complex.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/spmatrix.o: src/spmatrix.cpp src/spmatrix.h src/arrays.h src/complex.h src/hdffile.h
+obj/spmatrix.o: src/spmatrix.cpp src/spmatrix.h src/arrithm.h src/arrays.h src/complex.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_distort.o: src/wave_distort.cpp src/wave_distort.h src/arrays.h src/complex.h src/potential.h src/ode.h src/specf.h src/misc.h src/hdffile.h
+obj/wave_distort.o: src/wave_distort.cpp src/wave_distort.h src/arrithm.h src/arrays.h src/complex.h src/potential.h src/ode.h src/specf.h src/misc.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 	
-obj/wave_irreg.o: src/wave_irreg.cpp src/wave_irreg.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
+obj/wave_irreg.o: src/wave_irreg.cpp src/wave_irreg.h src/arrithm.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_forbid.o: src/wave_forbid.cpp src/wave_forbid.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
+obj/wave_forbid.o: src/wave_forbid.cpp src/wave_forbid.h src/arrithm.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
+obj/wave_hyperb.o: src/wave_hyperb.cpp src/wave_hyperb.h src/arrithm.h src/arrays.h src/complex.h src/ode.h src/specf.h src/misc.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/arrays.h src/gausskronrod.h src/specf.h src/potential.h src/hydrogen.h src/hdffile.h
+obj/dwba1.o: src/dwba1.cpp src/dwba1.h src/complex.h src/arrithm.h src/arrays.h src/gausskronrod.h src/specf.h src/potential.h src/hydrogen.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/arrays.h src/gausskronrod.h src/specf.h src/potential.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h src/clenshawcurtis.h src/oscint.h src/hdffile.h
+obj/dwba2.o: src/dwba2.cpp src/dwba2.h src/complex.h src/arrithm.h src/arrays.h src/gausskronrod.h src/specf.h src/potential.h src/hydrogen.h src/chebyshev.h src/compact.h src/misc.h src/multi.h src/clenshawcurtis.h src/oscint.h src/hdffile.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-obj/multi.o: src/multi.cpp src/multi.h src/chebyshev.h src/compact.h src/specf.h src/hydrogen.h src/clenshawcurtis.h
+obj/multi.o: src/multi.cpp src/multi.h src/arrithm.h src/arrays.h src/chebyshev.h src/compact.h src/specf.h src/hydrogen.h src/clenshawcurtis.h
 	@mkdir -p $(@D)
 	g++ -c $(CXXFLAGS) $< -o $@
 
