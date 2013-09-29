@@ -969,16 +969,18 @@ public:
     //
     
     iArray const & diag() const { return idiag_; }
+    int diag(int i) const { return idiag_[i]; }
     cArray const & data() const { return elems_; }
     cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
+    Complex const * dptr(int i) const { return dptrs_[i]; }
     
     iArray & diag() { return idiag_; }
     cArray & data() { return elems_; }
     cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
-    
-    int bandwidth() const { return 1 + 2 * idiag_.back(); }
+    Complex * dptr(int i) { return dptrs_[i]; }
     
     size_t size() const { return n_; }
+    int bandwidth() const { return 1 + 2 * idiag_.back(); }
     
     bool is_compatible (SymDiaMatrix const & B) const;
     
@@ -1084,8 +1086,26 @@ private:
     // to the shortest (i.e. with rising right index)
     cArray elems_;
     
-    // diagonal right indices starting from zero
+    // upper diagonal indices starting from zero
     iArray idiag_;
+    
+    // diagonal data pointers
+    std::vector<Complex*> dptrs_;
+    
+    /** 
+     * @brief Setup diagonal data pointers
+     * 
+     * Make the pointer list dptrs_ point to the beginnings of the diagonal
+     * data. If there are 2d+1 diagonals in the martix, the pointers are
+     * assigned in the following way:
+     * @verbatim
+     * dptrs_[0] ... main diagonal
+     * dptrs_[1] ... first upper diagonal (identical to 1st lower diagonal)
+     * ...
+     * dptrs_[d] ... d-th upper diagonal (identical to d-th lower diagonal)
+     * @endverbatim
+     */
+    void setup_dptrs_();
 };
 
 // --------------------------------------------------------------------------//

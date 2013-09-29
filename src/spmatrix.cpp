@@ -18,15 +18,18 @@
 #include <vector>
 
 #ifndef NO_PNG
-    #include <png++/png.hpp>
+#include <png++/png.hpp>
 #endif
 
 #ifndef NO_UMFPACK
-    #include <umfpack.h>
+#include <umfpack.h>
 #endif
 
-#include "arrays.h"
+#ifndef NO_HDF
 #include "hdffile.h"
+#endif
+    
+#include "arrays.h"
 #include "spmatrix.h"
 
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
@@ -823,10 +826,6 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
     lArray Cp = { 0 }, Ci;
     cArray Cx;
     
-//     std::cout << "A.rows() = " << A.rows() << ", B.cols() = " << B.cols() << "\n";
-//     std::cout << "A.p() = " << A.p() << "\n";
-//     std::cout << "B.p() = " << B.p() << "\n";
-    
     // for all rows of the resulting matrix
     for (int irow = 0; irow < (int)A.rows(); irow++)
     {
@@ -1247,27 +1246,40 @@ bool CooMatrix::hdfload(const char* name)
 #endif
 }
 
-SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0) {}
+SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0), dptrs_(0) {}
 
-SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0) {}
+SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0), dptrs_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n, iArrayView const & id, cArrayView const & v)
-    : n_(n), elems_(v), idiag_(id) {}
+    : n_(n), elems_(v), idiag_(id) { setup_dptrs_(); }
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
-    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_) {}
+    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_) { setup_dptrs_(); }
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
-    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)) {}
+    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)) { setup_dptrs_(); }
+
+void SymDiaMatrix::setup_dptrs_()
+{
+    // set data pointers for all (upper and lower) diagonals
+    int d = idiag_.size() - 1;
+    dptrs_.resize(d + 1);
+    Complex * ptr = elems_.data();
+    for (int i = 0; i <= d; i++)
+    {
+        dptrs_[i] = ptr;
+        ptr += n_ - i;
+    }
+}
 
 SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
     // check sizes
-    if (size() != B.size())
+    if (n_ != B.n_)
         throw exception ("[SymDiaMatrix::operator+=] Unequal sizes!");
     
     // check diagonals
-    if (all(diag() == B.diag()))
+    if (all(idiag_ == B.idiag_))
     {
         // fast version
         for (size_t i = 0; i < elems_.size(); i++)
@@ -1281,25 +1293,25 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
         
         // add all A's diagonals
         int dataptr = 0;
-        for (auto id : diag())
+        for (auto id : idiag_)
         {
             idiags.insert(id);
-            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
-            dataptr += size() - id;
+            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+            dataptr += n_ - id;
         }
         
         // add all B's diagonals
         dataptr = 0;
-        for (auto id : B.diag())
+        for (auto id : B.idiag_)
         {
             idiags.insert(id);
             
             if (diags[id].size() == 0)
-                diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+                diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
             else
-                diags[id] += cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+                diags[id] += cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
             
-            dataptr += size() - id;
+            dataptr += n_ - id;
         }
         
         // use new diagonals
@@ -1307,6 +1319,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
         
         // use new data
         elems_ = join(diags);
+        setup_dptrs_();
     }
     
     return *this;
@@ -1315,11 +1328,11 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
     // check sizes
-    if (size() != B.size())
+    if (n_ != B.n_)
         throw exception ("[SymDiaMatrix::operator-=] Unequal sizes!");
     
     // check diagonals
-    if (all(diag() == B.diag()))
+    if (all(idiag_ == B.idiag_))
     {
         // fast version
         for (size_t i = 0; i < elems_.size(); i++)
@@ -1333,25 +1346,25 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
         
         // add all A's diagonals
         int dataptr = 0;
-        for (auto id : diag())
+        for (auto id : idiag_)
         {
             idiags.insert(id);
-            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
-            dataptr += size() - id;
+            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+            dataptr += n_ - id;
         }
         
         // add all B's diagonals
         dataptr = 0;
-        for (auto id : B.diag())
+        for (auto id : B.idiag_)
         {
             idiags.insert(id);
             
             if (diags[id].size() == 0)
-                diags[id] = -cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+                diags[id] = -cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
             else
-                diags[id] -= cArray(elems_.data() + dataptr, elems_.begin() + dataptr + size() - id);
+                diags[id] -= cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
             
-            dataptr += size() - id;
+            dataptr += n_ - id;
         }
         
         // use new diagonals
@@ -1359,6 +1372,7 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
         
         // use new data
         elems_ = join(diags);
+        setup_dptrs_();
     }
     
     return *this;
@@ -1369,6 +1383,7 @@ SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix&& A)
     n_ = std::move(A.n_);
     elems_ = std::move(A.elems_);
     idiag_ = std::move(A.idiag_);
+    setup_dptrs_();
     return *this;
 }
 
@@ -1377,6 +1392,7 @@ SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix const & A)
     n_ = A.n_;
     elems_ = A.elems_;
     idiag_ = A.idiag_;
+    setup_dptrs_();
     return *this;
 }
 
@@ -1405,16 +1421,95 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A)
 SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     // FIXME : write an optimized routine
+//     return (A.tocoo().tocsr() * B.tocoo().tocsc()).tocoo().todia();
     
-//     std::cout << "A.main_diagonal() = " << A.main_diagonal() << "\n";
-//     std::cout << "B.main_diagonal() = " << B.main_diagonal() << "\n";
-//     std::cout << "A.tocoo().tocsr().x() = " << A.tocoo().v() << "\n";
-//     std::cout << "B.tocoo().tocsr().x() = " << B.tocoo().v() << "\n";
+    // check dimensions
+    if (A.size() != B.size())
+        throw exception ("Cannot multiply matrices: A's column count != B's row count.");
     
-    return (A.tocoo().tocsr() * B.tocoo().tocsc()).tocoo().todia();
+    // compute bandwidth, half-bandwidth and other parameters of the matrices
+    int C_size = A.size();
+    int C_bw = std::min(A.bandwidth() + B.bandwidth() - 1, 2 * C_size - 1);
+    int C_hbw = C_bw / 2;
+    int C_nnz = (C_hbw + 1) * (C_size + C_size - C_hbw) / 2;
+    int A_Ndiag = A.diag().size();
+    
+//     std::cout << "A_Ndiag = " << A_Ndiag << "\n";
+//     std::cout << "C bandwidth: " << C_bw << "\n";
+//     std::cout << "C half-bandwidth: " << C_hbw << "\n";
+//     std::cout << "C size: " << C_size << "\n";
+//     std::cout << "C nnz: " << C_nnz << "\n";
+    
+    // create the output matrix
+    SymDiaMatrix C (
+        A.size(),
+        linspace<int>(0, C_hbw, C_hbw + 1),
+        cArray(C_nnz)
+    );
+    
+    // for all (main or upper) output diagonals
+    for (int d = 0; d <= C_hbw; d++)
+    {
+        // for all A's diagonals
+        for (int idA = -(A_Ndiag - 1); idA <= A_Ndiag - 1; idA++)
+        {
+            // get diagonal label
+            int dA = A.diag(std::abs(idA)) * signum(idA);
+            
+//             std::cout << "\nd = " << d << "\n";
+//             std::cout << "dA = " << dA << "\n";
+//             std::cout << "idA = " << idA << "\n";
+            
+            // determine corresponding B's diagonal (shifted from A's by 'd'), and its label
+            int dB = dA - d;
+            int const * bptr = std::find(B.idiag_.begin(), B.idiag_.end(), std::abs(dB));
+            if (bptr == B.idiag_.end())
+                continue;
+            int idB = signum(dB) * (bptr - B.idiag_.begin());
+            
+//             std::cout << "dB = " << dB << "\n";
+//             std::cout << "idB = " << idB << "\n";
+            
+            // get starting/ending columns of the diagonals
+            int start_column = std::max (
+                (dA > 0 ? dA : 0),
+                (dB > 0 ? dB : 0)
+            );
+            int end_column = std::min (
+                (dA > 0 ? A.size() - 1 : A.size() - 1 + dA),
+                (dB > 0 ? B.size() - 1 : B.size() - 1 + dB)
+            );
+            int Nelems = end_column - start_column + 1;
+            if (Nelems <= 0)
+                continue;
+            
+//             std::cout << "start_column = " << start_column << "\n";
+//             std::cout << "end_column = " << end_column << "\n";
+            
+            // get pointers
+            Complex const * restrict pdA = A.dptr(std::abs(idA)) + (dA > 0 ? start_column - dA : start_column);
+            Complex const * restrict pdB = B.dptr(std::abs(idB)) + (dB > 0 ? start_column - dB : start_column);
+            Complex * restrict pdC = C.dptr(d) + start_column - dA;
+            
+//             std::cout << "pdA = " << pdA << "\n";
+//             std::cout << "pdB = " << pdB << "\n";
+//             std::cout << "pdC = " << pdC << "\n";
+            
+            // add multiple
+            for (int i = 0; i < Nelems; i++)
+            {
+                pdC[i] += pdA[i] * pdB[i];
+//                 std::cout << "pdA[" << i << "] = " << pdA[i] << "\n";
+//                 std::cout << "pdB[" << i << "] = " << pdB[i] << "\n";
+//                 std::cout << "pdC[" << i << "] = " << pdC[i] << "\n";
+            }
+        }
+    }
+    
+    return C;
 }
 
-bool SymDiaMatrix::is_compatible(const SymDiaMatrix& B) const
+bool SymDiaMatrix::is_compatible(SymDiaMatrix const & B) const
 {
     if (n_ != B.n_)
         throw exception ("[SymDiaMatrix] Unequal ranks.");
@@ -1426,7 +1521,7 @@ bool SymDiaMatrix::is_compatible(const SymDiaMatrix& B) const
     return true;
 }
 
-bool SymDiaMatrix::hdfload(const char* name)
+bool SymDiaMatrix::hdfload(char const * name)
 {
 #ifndef NO_HDF
     try
@@ -1459,6 +1554,7 @@ bool SymDiaMatrix::hdfload(const char* name)
         
         // decompress
         elems_ = elements.decompress(zero_blocks);
+        setup_dptrs_();
         return true;
     }
     catch (H5::FileIException exc)

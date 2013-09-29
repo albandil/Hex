@@ -666,7 +666,7 @@ public:
     }
     
     // copy constructor from Array const lvalue reference
-    NumberArray(NumberArray<NumberType> const & a)
+    NumberArray(NumberArray<NumberType> const & a) : Array<NumberType>()
     {
         // reserve space
         N = Nres = a.N;

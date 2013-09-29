@@ -70,6 +70,14 @@ static inline std::string &trim(std::string &s)
     return ltrim(rtrim(s));
 }
 
+/// Signum function.
+template <class T> int signum (T x)
+{
+    if (x < T(0)) return -1;
+    else if (x == T(0)) return 0;
+    else return 1;
+}
+
 /// Many-argument "min".
 template <typename T> T min (T x)
 {
