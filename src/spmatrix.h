@@ -935,8 +935,8 @@ public:
      */
     template <class Functor> SymDiaMatrix & populate(unsigned d, Functor f)
     {
-        // empty
-        elems_.clear();
+        // throw away old data
+        elems_.resize(0);
         
         // for all diagonals
         for (size_t id = 0; id <= d; id++)
