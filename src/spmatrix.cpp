@@ -1275,11 +1275,11 @@ void SymDiaMatrix::setup_dptrs_()
 SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
     // check sizes
-    if (n_ != B.n_)
+    if (size() != B.size())
         throw exception ("[SymDiaMatrix::operator+=] Unequal sizes!");
     
     // check diagonals
-    if (all(idiag_ == B.idiag_))
+    if (diag().size() == B.diag().size() and all(diag() == B.diag()))
     {
         // fast version
         for (size_t i = 0; i < elems_.size(); i++)
@@ -1288,7 +1288,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
     else
     {
         // general version
-        cArrays diags;
+        cArrays diags (std::max(diag().size(), B.diag().size()));
         std::set<int> idiags;
         
         // add all A's diagonals
@@ -1328,11 +1328,11 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
     // check sizes
-    if (n_ != B.n_)
+    if (size() != B.size())
         throw exception ("[SymDiaMatrix::operator-=] Unequal sizes!");
     
     // check diagonals
-    if (all(idiag_ == B.idiag_))
+    if (diag().size() == B.diag().size() and all(diag() == B.diag()))
     {
         // fast version
         for (size_t i = 0; i < elems_.size(); i++)
@@ -1341,7 +1341,7 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
     else
     {
         // general version
-        cArrays diags;
+        cArrays diags(std::max(diag().size(), B.diag().size()));
         std::set<int> idiags;
         
         // add all A's diagonals
@@ -1349,7 +1349,9 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
         for (auto id : idiag_)
         {
             idiags.insert(id);
+            
             diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+            
             dataptr += n_ - id;
         }
         
