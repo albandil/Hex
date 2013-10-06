@@ -973,104 +973,6 @@ public:
         return *this;
     }
     
-    //
-    // reduced arithmetic operators with other arrays
-    //
-    
-    NumberArray<NumberType>& operator += (NumberArray<NumberType> const &  b)
-    {
-        // check if sizes match
-        assert(N == b.N);
-        
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] += b.array[i];
-        
-        return *this;
-    }
-    
-    NumberArray<NumberType>& operator -= (NumberArray<NumberType> const &  b)
-    {
-        // check if sizes match
-        assert(N == b.N);
-        
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] -= b.array[i];
-        
-        // return
-        return *this;
-    }
-    
-    NumberArray<NumberType>& operator *= (NumberArray<NumberType> const &  b)
-    {
-        // check if sizes match
-        assert(N == b.N);
-        
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] *= b.array[i];
-        
-        // return
-        return *this;
-    }
-    
-    NumberArray<NumberType>& operator /= (NumberArray<NumberType> const &  b)
-    {
-        // check size
-        assert(b.size() == N);
-        
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] /= b[i];
-        
-        // return
-        return *this;
-    }
-    
-    //
-    // reduced arithmetic operators with complex numbers
-    //
-    
-    template <typename NumberType2> NumberArray<NumberType>& operator += (NumberType2 z)
-    {
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] += NumberType(z);
-        
-        return *this;
-    }
-    
-    template <typename NumberType2> NumberArray<NumberType>& operator -= (NumberType2 z)
-    {
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] -= NumberType(z);
-        
-        // return
-        return *this;
-    }
-    
-    template <typename NumberType2> NumberArray<NumberType>& operator *= (NumberType2 z)
-    {
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] *= NumberType(z);
-        
-        // return
-        return *this;
-    }
-    
-    template <typename NumberType2> NumberArray<NumberType>& operator /= (NumberType2 z)
-    {
-        // run over elements
-        for (size_t i = 0; i < N; i++)
-            array[i] /= NumberType(z);
-        
-        // return
-        return *this;
-    }
-    
     /**
      * Complex conjugate.
      */
@@ -1407,6 +1309,8 @@ public:
     }
 };
 
+#include "arrithm.h"
+
 // scalar product of two arrays.
 template <typename NumberType1, typename NumberType2> auto operator | (
     NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
@@ -1422,169 +1326,14 @@ template <typename NumberType1, typename NumberType2> auto operator | (
     decltype(NumberType1(0)*NumberType2(0)) result = 0;
     
     // iterators
-    NumberType1 const * const __restrict pa = &a[0];
-    NumberType2 const * const __restrict pb = &b[0];
+    NumberType1 const * const restrict pa = &a[0];
+    NumberType2 const * const restrict pb = &b[0];
     
     // sum the products
     for (size_t i = 0; i < N; i++)
         result += pa[i] * pb[i];
     
     return result;
-}
-
-// arithmetic operators Array & Array
-template <typename NumberType1, typename NumberType2> auto operator + (
-    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
-    return c += b;
-}
-
-template <typename T1, typename T2> auto operator + (
-    Array<T1> const & a, Array<T2> const & b
-) -> Array<decltype(T1(0) + T2(0))>
-{
-    size_t size = std::min(a.size(),b.size());
-    
-    Array<decltype(T1(0) + T2(0))> c(size);
-    
-    for (size_t i = 0; i < size; i++)
-        c[i] = a[i] + b[i];
-    
-    return c;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator - (
-    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
-    return c -= b;
-}
-
-template <typename T1, typename T2> auto operator - (
-    Array<T1> const & a, Array<T2> const & b
-) -> Array<decltype(T1(0) - T2(0))>
-{
-    size_t size = std::min(a.size(),b.size());
-    
-    Array<decltype(T1(0) - T2(0))> c(size);
-    
-    for (size_t i = 0; i < size; i++)
-        c[i] = a[i] - b[i];
-    
-    return c;
-}
-
-// unary minus
-template <typename T> Array<T> operator - (ArrayView<T> const & v)
-{
-    Array<T> w(v.size());
-    
-    for (T & u : w)
-        u = -u;
-    
-    return w;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator * (
-    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
-    return c *= b;
-}
-
-template <typename T1, typename T2> auto operator * (
-    Array<T1> const & a, Array<T2> const & b
-) -> Array<decltype(T1(0) * T2(0))>
-{
-    size_t size = std::min(a.size(),b.size());
-    
-    Array<decltype(T1(0) * T2(0))> c(size);
-    
-    for (size_t i = 0; i < size; i++)
-        c[i] = a[i] * b[i];
-    
-    return c;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator / (
-    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
-{
-    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
-    return c /= b;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator / (
-    ArrayView<NumberType1> a, ArrayView<NumberType2> b
-) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
-{
-    assert(a.size() == b.size());
-    size_t N = a.size();
-    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c(N);
-    
-    for (size_t i = 0; i < N; i++)
-        c[i] = a[i] / b[i];
-    
-    return c;
-}
-
-template <typename T1, typename T2> auto operator / (
-    Array<T1> const & a, Array<T2> const & b
-) -> Array<decltype(T1(0) * T2(0))>
-{
-    size_t size = std::min(a.size(),b.size());
-    
-    Array<decltype(T1(0) * T2(0))> c(size);
-    
-    for (size_t i = 0; i < size; i++)
-        c[i] = a[i] / b[i];
-    
-    return c;
-}
-
-// arithmetic operators Array & Number
-template <typename NumberType1, typename NumberType2> auto operator + (
-    NumberArray<NumberType1> const & a, NumberType2 z
-) -> NumberArray<decltype(NumberType1(0) + NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) + NumberType2(0))> c = a;
-    return c += z;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator - (
-    NumberArray<NumberType1> const & a, NumberType2 z
-) -> NumberArray<decltype(NumberType1(0) - NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) - NumberType2(0))> c = a;
-    return c -= z;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator * (
-    NumberArray<NumberType1> const & a, NumberType2 z
-) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = a;
-    return c *= z;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator * (
-    NumberType1 z, NumberArray<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
-{
-    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c = b;
-    return c *= z;
-}
-
-template <typename NumberType1, typename NumberType2> auto operator / (
-    NumberArray<NumberType1> const & a, NumberType2 z
-) -> NumberArray<decltype(NumberType1(0) / NumberType2(1))>
-{
-    NumberArray<decltype(NumberType1(0) / NumberType2(1))> c = a;
-    return c /= z;
 }
 
 template <typename NumberType1, typename NumberType2> auto outer_product (

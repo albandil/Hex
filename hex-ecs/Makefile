@@ -1,4 +1,4 @@
-.PHONY: all docu clean obj/version.o
+.PHONY: all docu clean pollversion
 
 CPP = g++
 
@@ -15,10 +15,12 @@ LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt \
 	-lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
 	-lm -lfftw3 -lgfortran -lpng
 
-CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) #-DWITH_PNGPP
+GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+
+CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 LFLAGS_DEBUG = -g -fopenmp -fPIC $(LIBRARY)
 
-CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG
+CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
 # CFLAGS = $(CFLAGS_DEBUG)
@@ -26,69 +28,30 @@ LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
-GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+FILES = amplitudes arrays gauss bspline hdffile hex input itersolve \
+	moments slater specf spmatrix version
 
-all: bin/hex-ecs
+SOURCES = $(patsubst %,src/%.cpp,$(FILES))
+OBJECTS = $(patsubst %,obj/%.o,$(FILES))
+DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+
+all: pollversion bin/hex-ecs
+
+pollversion:
+	@touch src/version.cpp
 
 docu:
 	doxygen
 
 clean:
-	rm -f bin/hex obj/*.o
+	rm -f bin/hex $(OBJECTS) $(DEPENDENCIES)
 
-bin/hex-ecs: obj/hex.o obj/amplitudes.o obj/gauss.o obj/bspline.o obj/input.o obj/moments.o obj/slater.o obj/spmatrix.o obj/specf.o obj/arrays.o obj/hdffile.o obj/version.o obj/itersolve.o
+bin/hex-ecs: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-obj/hex.o: src/hex.cpp src/amplitudes.h src/arrays.h src/bspline.h src/moments.h src/slater.h src/spmatrix.h src/specf.h src/input.h src/hdffile.h src/version.h src/itersolve.h
+obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
+	$(CPP) $(CFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
-obj/amplitudes.o: src/amplitudes.cpp src/amplitudes.h src/arrays.h src/bspline.h src/specf.h src/spmatrix.h src/hdffile.h src/moments.h src/clenshawcurtis.h src/chebyshev.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-	
-obj/arrays.o: src/arrays.cpp src/complex.h src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/bspline.o: src/bspline.cpp src/arrays.h src/bspline.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/gauss.o: src/gauss.cpp src/arrays.h src/bspline.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-	
-obj/input.o: src/input.cpp src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/itersolve.o: src/itersolve.cpp src/itersolve.h src/arrays.h src/complex.h src/misc.h src/spmatrix.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/moments.o: src/moments.cpp src/arrays.h src/bspline.h src/gauss.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/slater.o: src/slater.cpp src/arrays.h src/bspline.h src/moments.h src/gauss.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/specf.o: src/specf.cpp src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/spmatrix.o: src/spmatrix.cpp src/arrays.h src/spmatrix.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@ #-ftree-vectorizer-verbose=5
-
-obj/hdffile.o: src/hdffile.cpp src/hdffile.h src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c $< -o $@
-
-obj/version.o:
-	@mkdir -p $(@D)
-	$(CPP) $(CFLAGS) -c src/version.cpp -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-	
+-include $(wildcard obj/*.dep)

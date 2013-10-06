@@ -1,12 +1,14 @@
-.PHONY: all exe lib clean obj/version.o
+.PHONY: all exe lib clean
 
 CPP = g++
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/include -fPIC
 LFLAGS = -L $(shell pwd)/lib -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2
-CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2
+GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 CXXFLAGS = $(CXXRILIS)
 
@@ -15,68 +17,44 @@ SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,lib/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
-all: exe lib
+FILES = arrays hex-db specf variables vec3d version
+FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
+FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
+FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes
+VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
+VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
+VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
+
+all: pollversion exe lib
+
+pollversion:
+	@touch src/version.cpp
 
 clean:
-	rm -f obj/*.o bin/hex-db*
+	rm -f obj/*.o obj/*.dep bin/hex-db*
 
 exe: bin/hex-db
 
 lib: bin/hex-db.so
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes
-VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
-VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
-
-GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
-
-# -----------------------------------------------------------------------------
-# Main targets
-
-bin/hex-db: obj/ui.o obj/hex-db.o obj/specf.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db: obj/ui.o $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -o $@
 
-bin/hex-db.so: obj/hex-db.o obj/specf.o obj/arrays.o obj/variables.o obj/vec3d.o obj/version.o $(VARS_OBJECTS) $(SQLITEPP)
+bin/hex-db.so: $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CPP) $^ $(LFLAGS) -fPIC -shared -o $@
 
-# -----------------------------------------------------------------------------
-# Release
+obj/%.o: src/%.cpp
+	@mkdir -p $(@D)
+	$(CPP) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
-$(VARS_OBJECTS):obj/%.o: src/var/%.cpp src/variables.h src/interpolate.h src/arrays.h src/complex.h src/specf.h src/chebyshev.h src/vec3d.h
+obj/%.o: src/var/%.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
+	$(CPP) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
-obj/ui.o: src/ui.cpp src/hex-db.h src/interfaces.h src/variables.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/hex-db.o: src/hex-db.cpp src/hex-db.h src/specf.h src/complex.h src/arrays.h src/interpolate.h src/variables.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/specf.o: src/specf.cpp src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/variables.o: src/variables.cpp src/variables.h src/arrays.h src/complex.h src/version.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-	
-obj/vec3d.o: src/vec3d.cpp src/vec3d.h src/misc.h
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@
-
-obj/version.o:
-	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c src/version.cpp -o $@ -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-
-	
 # -----------------------------------------------------------------------------
 # SQLite++ library
 

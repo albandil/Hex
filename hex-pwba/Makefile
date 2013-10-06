@@ -2,32 +2,20 @@ CXX = g++
 CFLAGS = -Ofast -Wall -std=c++11
 LFLAGS = -lgsl -lgslcblas -lo2scl -lcln -lhdf5 -lhdf5_cpp
 
+FILES = pwba symbolic specf arrays hdffile
+SOURCES = $(patsubst %,src/%.cpp,$(FILES))
+OBJECTS = $(patsubst %,obj/%.o,$(FILES))
+DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+
 all: bin/pwba
 
-bin/pwba: obj/pwba.o obj/symbolic.o obj/specf.o obj/arrays.o obj/hdffile.o
+bin/pwba: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(LFLAGS) $^ -o $@
 
-obj/pwba.o: src/pwba.cpp src/gausskronrod.h src/symbolic.h src/arrays.h src/complex.h src/misc.h src/hdffile.h
+obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@
-
-obj/arrays.o: src/arrays.cpp src/arrays.h src/complex.h src/misc.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@
-
-obj/symbolic.o: src/symbolic.cpp src/symbolic.h
-	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@
-
-obj/specf.o: src/specf.cpp src/specf.h src/complex.h src/misc.h src/arrays.h src/hdffile.h
-	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@
-
-obj/hdffile.o: src/hdffile.cpp src/complex.h src/misc.h
-	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
-	rm -f obj/*.o bin/pwba
-
+	rm -f $(OBJECTS) $(DEPENDENCIES) bin/pwba

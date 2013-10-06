@@ -14,92 +14,9 @@
 #define HEX_MISC
 
 #include <exception>
+#include <complex>
 #include <cstdio>
-
 #include <limits>
-
-/// Infinity
-#define Inf (std::numeric_limits<double>::infinity())
-/// Not-a-number
-#define Nan (std::numeric_limits<double>::quiet_NaN())
-
-#include <algorithm> 
-#include <functional> 
-#include <cctype>
-#include <locale>
-
-// restricted pointers
-#ifndef restrict
-#ifdef __GNUC__
-    #define restrict __restrict
-#else
-    #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code will be slow."
-#endif
-#endif
-
-// memory alignment
-#ifndef alignof
-#ifdef __GNUC__
-    #define alignof(x)   (__alignof(x))
-    #define aligned(x,y) (__builtin_assume_aligned((x),(y)))
-#else
-    #define alignof(x)   (sizeof(void*))
-    #define aligned(x,y) (x)
-    #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
-#endif
-#endif
-
-/// Trim from start.
-static inline std::string &ltrim(std::string &s)
-{
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    return s;
-}
-
-/// Trim from end.
-static inline std::string &rtrim(std::string &s)
-{
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-    return s;
-}
-
-/// Trim from both ends.
-static inline std::string &trim(std::string &s)
-{
-    return ltrim(rtrim(s));
-}
-
-/// Signum function.
-template <class T> int signum (T x)
-{
-    if (x < T(0)) return -1;
-    else if (x == T(0)) return 0;
-    else return 1;
-}
-
-/// Many-argument "min".
-template <typename T> T min (T x)
-{
-    return x;
-}
-template <typename T, class ...Params> T min (T x, Params ...p)
-{
-    T y = min(p...);
-    return std::min(x, y);
-}
-
-/**
- * @brief printf-like formatting.
- * 
- * @note Hard limit 1024 characters.
- */
-template <class ...Params> char const * format (Params ...p)
-{
-    static char text[1024];
-    snprintf(text, sizeof(text), p...);
-    return text;
-}
 
 /**
  * @brief Exception class.
@@ -134,5 +51,163 @@ private:
     /// Text of the exception.
     char message[256];
 };
+
+//
+// Special numbers.
+//
+
+/// Infinity
+#define Inf (std::numeric_limits<double>::infinity())
+/// Not-a-number
+#define Nan (std::numeric_limits<double>::quiet_NaN())
+
+#include <algorithm> 
+#include <functional> 
+#include <cctype>
+#include <locale>
+
+//
+// Restricted and aligned pointers.
+//
+
+// restricted pointers
+#ifndef restrict
+#ifdef __GNUC__
+    #define restrict __restrict
+#else
+    #define restrict
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code will be slow."
+#endif
+#endif
+
+// memory alignment
+#ifndef alignof
+#ifdef __GNUC__
+    #define alignof(x)   (__alignof(x))
+    #define aligned(x,y) (__builtin_assume_aligned((x),(y)))
+#else
+    #define alignof(x)   (sizeof(void*))
+    #define aligned(x,y) (x)
+    #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
+#endif
+#endif
+
+//
+// List all complex types.
+//
+
+template <class T>
+struct is_complex { static const bool value = false; };
+template<> template <class T>
+struct is_complex<std::complex<T>> { static const bool value = true; };
+
+//
+// List all scalar types variables.
+//
+
+#define declareTypeAsScalar(T)                                                \
+                                                                              \
+template <> struct is_scalar<T>                                               \
+{                                                                             \
+    static const bool value = true;                                           \
+};
+
+// declare general type as non-scalar (if not complex)
+template <class T> struct is_scalar
+{
+    static const bool value = is_complex<T>::value;
+};
+
+// explicitly list all basic scalar types
+declareTypeAsScalar(int);
+declareTypeAsScalar(long);
+declareTypeAsScalar(float);
+declareTypeAsScalar(double); 
+
+//
+// Trimming.
+//
+
+/// Trim from start.
+static inline std::string & ltrim (std::string & s)
+{
+    s.erase (
+        s.begin(),
+        std::find_if (
+            s.begin(),
+            s.end(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))
+        )
+    );
+    return s;
+}
+
+/// Trim from end.
+static inline std::string & rtrim (std::string & s)
+{
+    s.erase (
+        std::find_if (
+            s.rbegin(),
+            s.rend(),
+            std::not1(std::ptr_fun<int, int>(std::isspace))
+        ).base(), s.end()
+    );
+    return s;
+}
+
+/// Trim from both ends.
+static inline std::string & trim (std::string & s)
+{
+    return ltrim(rtrim(s));
+}
+
+//
+// Miscellaneous functions.
+//
+
+/// Signum function.
+template <class T> int signum (T x)
+{
+    if (x < T(0))
+        return -1;
+    else if (x == T(0))
+        return 0;
+    else
+        return 1;
+}
+
+/// Many-argument "min" function.
+template <typename T> T mmin (T x)
+{
+    return x;
+}
+template <typename T, class ...Params> T mmin (T x, Params ...p)
+{
+    T y = mmin(p...);
+    return std::min(x, y);
+}
+
+/// Many-argument "max" function.
+template <typename T> T mmax (T x)
+{
+    return x;
+}
+template <typename T, class ...Params> T mmax (T x, Params ...p)
+{
+    T y = mmax(p...);
+    return std::max(x, y);
+}
+
+/**
+ * @brief printf-like formatting.
+ * 
+ * @note Hard limit 1024 characters.
+ */
+template <class ...Params> char const * format (Params ...p)
+{
+    static char text[1024];
+    snprintf(text, sizeof(text), p...);
+    return text;
+}
 
 #endif
