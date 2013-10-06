@@ -21,6 +21,7 @@
 #include <map>
 #include <numeric>
 #include <typeinfo>
+#include <type_traits>
 #include <vector>
 
 #include <assert.h>
@@ -167,6 +168,15 @@ public:
     }
     
     bool empty() const { return size() == 0; }
+    
+    // 2-norm, defined only for scalar NumberType
+    template <class = typename std::enable_if<is_scalar<NumberType>::value>> double norm() const
+    {
+        double sqrnorm = 0.;
+        for (NumberType const & x : *this)
+            sqrnorm += sqrabs(x);
+        return sqrt(sqrnorm);
+    }
 };
 
 /**
