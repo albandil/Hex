@@ -19,19 +19,20 @@
 
 #include "arrays.h"
 #include "bspline.h"
+#include "gauss.h"
 
-std::vector<std::pair<double*,double*>> gauss_data = {
+std::vector<std::pair<double*,double*>> GaussLegendre::data_ = {
     std::make_pair(nullptr, nullptr),  // n = 0
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
-int gauss_nodes_and_weights(int points, const double* & vx, const double* & vw)
+int GaussLegendre::gauss_nodes_and_weights(int points, const double* & vx, const double* & vw) const
 {
     // first of all generate any missing data
     # pragma omp critical
-    if (points >= gauss_data.size())
+    if (points >= (int)data_.size())
     {
-        for (int n = gauss_data.size(); n <= points; n++)
+        for (int n = data_.size(); n <= points; n++)
         {
             double* nodes = new double [n];
             double* weights = new double [n];
@@ -55,17 +56,17 @@ int gauss_nodes_and_weights(int points, const double* & vx, const double* & vw)
                 weights[n/2] = t->w[0];
             }
             
-            gauss_data.push_back(std::make_pair(nodes,weights));
+            data_.push_back(std::make_pair(nodes,weights));
         }
     }
     
     // return the arrays
-    vx = gauss_data[points].first;
-    vw = gauss_data[points].second;
+    vx = data_[points].first;
+    vw = data_[points].second;
     return points;
 }
 
-cArray p_points(int& points, Complex x1, Complex x2)
+cArray GaussLegendre::p_points(int& points, Complex x1, Complex x2) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
@@ -87,7 +88,7 @@ cArray p_points(int& points, Complex x1, Complex x2)
 }
 
 
-cArray p_weights(int& points, Complex x1, Complex x2)
+cArray GaussLegendre::p_weights(int& points, Complex x1, Complex x2) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
@@ -105,33 +106,4 @@ cArray p_weights(int& points, Complex x1, Complex x2)
     }
     
     return ws;
-}
-
-Complex quad (
-    void (*f)(int, Complex*, Complex*, void*), void *data,
-    int points, int iknot, Complex x1, Complex x2
-){
-    // check boundaries
-    if (x1.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x1.real() or
-        x2.real() < Bspline::ECS().t(iknot).real() or Bspline::ECS().t(iknot+1).real() < x2.real())
-    {
-        throw exception ("[quad] Error: boundaries not for this iknot!");
-    }
-    
-    // get evaluation points and weights
-    cArray xs = p_points(points, x1, x2);
-    cArray ws = p_weights(points, x1, x2);
-    
-    // evaluate the function
-    Complex values[points];
-    f(points, xs.data(), values, data);
-    
-    // sum the results
-    Complex result = std::inner_product (
-        values, values + points,
-        ws.begin(),
-        Complex(0.)
-    );
-    
-    return result;
 }

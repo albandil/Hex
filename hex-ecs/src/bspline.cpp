@@ -11,11 +11,11 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <algorithm>
-#include <complex>
 #include <vector>
 
 #include "arrays.h"
 #include "bspline.h"
+#include "complex.h"
 
 // ----------------------------------------------------------------------- //
 //  Recursive single-point B-spline evaluation                             //
@@ -56,13 +56,13 @@ Complex Bspline::dspline(int i, int iknot, int k, Complex r) const
 // ----------------------------------------------------------------------- //
 
 
-void Bspline::B(int i, int iknot, int n, const Complex* x, Complex* y) const
+void Bspline::B (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
 {
     for (int j = 0; j < n; j++)
         y[j] = bspline(i, iknot, order_, x[j]);
 }
 
-void Bspline::dB(int i, int iknot, int n, const Complex* x, Complex* y) const
+void Bspline::dB(int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
 {
     for (int j = 0; j < n; j++)
         y[j] = dspline(i, iknot, order_, x[j]);
@@ -275,7 +275,7 @@ cArray Bspline::zip (
 // ----------------------------------------------------------------------- //
 
 
-void Bspline::init (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
+Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
 {
     // globalize
     order_ = order;

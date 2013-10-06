@@ -31,6 +31,7 @@
 bool debug = false;
 
 cArray computeLambda (
+    Bspline const & bspline,
     rArray const & kf, rArray const & ki,
     int maxell, int L, int Spin, int Pi,
     int ni, int li, int mi,
@@ -39,12 +40,12 @@ cArray computeLambda (
     std::vector<std::pair<int,int>> const & coupled_states
 ) {
     // shorthands
-    unsigned Nenergy = kf.size();                       // energy count
-    Complex const * const t = &(Bspline::ECS().t(0));   // B-spline knots
-    int order   = Bspline::ECS().order();               // B-spline order
-    int Nspline = Bspline::ECS().Nspline();             // B-spline count
-    int Nknot   = Bspline::ECS().Nknot();               // number of all knots
-    int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
+    unsigned Nenergy = kf.size();                // energy count
+    Complex const * const t = &(bspline.t(0));   // B-spline knots
+    int order   = bspline.order();               // B-spline order
+    int Nspline = bspline.Nspline();             // B-spline count
+    int Nknot   = bspline.Nknot();               // number of all knots
+    int Nreknot = bspline.Nreknot();             // number of real knots
     
     cArray rads(Nenergy * (maxell + 1));
     
@@ -103,12 +104,12 @@ cArray computeLambda (
                 Complex val;
                 
                 // evaluate B-spline
-                val = Bspline::ECS().bspline(ispline, eval_knot-1, order, eval_r);
+                val = bspline.bspline(ispline, eval_knot-1, order, eval_r);
                 if (val != 0.)
                     Bspline_R0.add(ispline, 0, val);
                 
                 // evaluate B-spline derivative
-                val = Bspline::ECS().dspline(ispline, eval_knot-1, order, eval_r);
+                val = bspline.dspline(ispline, eval_knot-1, order, eval_r);
                 if (val != 0.)
                     Dspline_R0.add(ispline, 0, val);
             }
@@ -142,13 +143,13 @@ cArray computeLambda (
     return rads;
 }
 
-Chebyshev<double,Complex> fcheb(cArrayView const & PsiSc, double kmax, int l1, int l2)
+Chebyshev<double,Complex> fcheb(Bspline const & bspline, cArrayView const & PsiSc, double kmax, int l1, int l2)
 {
     // shorthands
-    Complex const * const t = &(Bspline::ECS().t(0));   // B-spline knots
-    int Nspline = Bspline::ECS().Nspline();             // number of real knots
-    int Nreknot = Bspline::ECS().Nreknot();             // number of real knots
-    int order   = Bspline::ECS().order();               // B-spline order
+    Complex const * const t = &(bspline.t(0));   // B-spline knots
+    int Nspline = bspline.Nspline();             // number of real knots
+    int Nreknot = bspline.Nreknot();             // number of real knots
+    int order   = bspline.order();               // B-spline order
     
     // determine evaluation radius
     char const * HEX_RHO = getenv("HEX_RHO");
@@ -198,8 +199,8 @@ Chebyshev<double,Complex> fcheb(cArrayView const & PsiSc, double kmax, int l1, i
                 ddrho_F1F2 += k2*F1*F2p*sin_alpha;
             
             // get B-spline knots
-            int iknot1 = Bspline::ECS().knot(r1);
-            int iknot2 = Bspline::ECS().knot(r2);
+            int iknot1 = bspline.knot(r1);
+            int iknot2 = bspline.knot(r2);
             
             // auxiliary variables
             cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
@@ -207,13 +208,13 @@ Chebyshev<double,Complex> fcheb(cArrayView const & PsiSc, double kmax, int l1, i
             // evaluate the B-splines
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             {
-                B1[ispline1]  = Bspline::ECS().bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1] = Bspline::ECS().dspline(ispline1,iknot1,order,r1);
+                B1[ispline1]  = bspline.bspline(ispline1,iknot1,order,r1);
+                dB1[ispline1] = bspline.dspline(ispline1,iknot1,order,r1);
             }
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = Bspline::ECS().bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = Bspline::ECS().dspline(ispline2,iknot2,order,r2);
+                B2[ispline2]  = bspline.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2] = bspline.dspline(ispline2,iknot2,order,r2);
             }
             
             // evaluate the solution
@@ -278,8 +279,10 @@ Chebyshev<double,Complex> fcheb(cArrayView const & PsiSc, double kmax, int l1, i
     return CB;
 }
 
-cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states)
-{
+cArrays computeXi (
+    Bspline const & bspline, int maxell, int L, int Spin, int Pi, int ni, int li, int mi, 
+    rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states
+){
     // resize and clear the output storage for integral cross sections
     ics.resize(Ei.size());
     ics.clear();
@@ -288,7 +291,7 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
     cArrays results;
     
     // B-spline count
-    int Nspline = Bspline::ECS().Nspline();
+    int Nspline = bspline.Nspline();
     
     // for all energies
     for (size_t ie = 0; ie < Ei.size(); ie++)
@@ -318,7 +321,7 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
             cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
             
             // compute new ionization amplitude
-            Chebyshev<double,Complex> CB = fcheb(PsiSc, kmax, l1, l2);
+            Chebyshev<double,Complex> CB = fcheb(bspline, PsiSc, kmax, l1, l2);
             results.push_back(CB.coeffs());
             
             // integrate the expansion
@@ -336,6 +339,7 @@ cArrays computeXi(int maxell, int L, int Spin, int Pi, int ni, int li, int mi, r
 }
 
 void TDCS (
+    Bspline const & bspline,
     std::string solutionfile, std::vector<std::pair<int,int>> const & coupled_states,
     double kmax, int ni, int L, int S
 ) {
@@ -372,7 +376,7 @@ void TDCS (
     fsql << "BEGIN TRANSACTION;\n";
     
     // B-spline count
-    int Nspline = Bspline::ECS().Nspline();
+    int Nspline = bspline.Nspline();
     
     // load the solution
     cArray solution;
@@ -392,7 +396,7 @@ void TDCS (
         cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
         
         // compute new ionization amplitude
-        cArray coeffs = fcheb(PsiSc, kmax, l1, l2).coeffs();
+        cArray coeffs = fcheb(bspline, PsiSc, kmax, l1, l2).coeffs();
         
         // save data as BLOBs
         fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("

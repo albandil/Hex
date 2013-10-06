@@ -24,10 +24,6 @@
 #include <omp.h>
 #include <H5Cpp.h>
 
-#ifndef NO_MPI
-    #include <mpi.h>
-#endif
-
 #include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
@@ -36,7 +32,7 @@
 #include "itersolve.h"
 #include "misc.h"
 #include "moments.h"
-#include "slater.h"
+#include "parallel.h"
 #include "spmatrix.h"
 #include "version.h"
 
@@ -97,19 +93,7 @@ int main(int argc, char* argv[])
         itinerary = StgRadial | StgSolve | StgExtract;
     
     // setup MPI
-    int Nproc = 1, iproc = 0;
-    if (parallel)
-    {
-#ifndef NO_MPI
-        MPI_Init(&argc, &argv);
-        MPI_Comm_size(MPI_COMM_WORLD, &Nproc);
-        MPI_Comm_rank(MPI_COMM_WORLD, &iproc);
-#else
-        std::cout << "WARNING: --mpi has no effect, as the program was build without the MPI support!\n";
-        parallel = false;
-#endif
-    }
-    bool I_am_master = (iproc == 0);
+    Parallel par(parallel);
     
     // check input file
     if (not inputfile.is_open())
@@ -169,12 +153,10 @@ int main(int argc, char* argv[])
     if (R0 >= Rmax)
         throw exception("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
 
-    Bspline::ECS().init(order, real_knots, ecstheta, complex_knots);
+    Bspline bspline(order, real_knots, ecstheta, complex_knots);
     
     // shortcuts
-    int Nspline = Bspline::ECS().Nspline();
-    int Nknot   = Bspline::ECS().Nknot();
-    int Nreknot = Bspline::ECS().Nreknot();
+    int Nspline = bspline.Nspline();
     
     // info
     std::cout << "B-spline total count: " << Nspline << "\n\n";
@@ -218,13 +200,14 @@ int main(int argc, char* argv[])
     std::cout << "\n";
     // --------------------------------------------------------------------- //
     
-    // initialioze matrices so that GCC stops complaining about "goto" crossing the initialization
-    int maxlambda = L + 2 * levels;
-    std::vector<SymDiaMatrix> R_tr_dia(maxlambda + 1);
-    SymDiaMatrix S(Nspline), Mm1(Nspline), Mm1_tr(Nspline), Mm2(Nspline), D(Nspline);
+    
+    // --------------------------------------------------------------------- //
+    // initialize radial integrals
+    
+    RadialIntegrals rad(bspline);
     
     // zip file if told so
-    if (zipfile.size() != 0 and I_am_master)
+    if (zipfile.size() != 0 and par.IamMaster())
     {
         if (zipmax < 0)
             zipmax = Rmax;
@@ -248,7 +231,7 @@ int main(int argc, char* argv[])
             std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
             
             // zip this partial wave
-            ev = Bspline::ECS().zip (
+            ev = bspline.zip (
                 cArrayView (
                     sol,
                     ill * Nspline * Nspline,
@@ -297,187 +280,18 @@ int main(int argc, char* argv[])
         goto End;
     }
     
-    std::cout << "Loading/precomputing derivative overlaps... ";
-    
-    
-    // Precompute matrix of derivative overlaps ---------------------------- //
-    //
-    D.hdfload("D.hdf") or D.populate (
-        order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); }
-    ).hdfsave("D.hdf");
-    // --------------------------------------------------------------------- //
-    
-    
-    std::cout << "ok\n\nLoading/precomputing integral moments... ";
-    
-    
-    // Precompute useful integral moments ---------------------------------- //
-    //
-    S.hdfload("S.hdf") or S.populate (
-        order, [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave("S.hdf");
-    //
-    Mm1.hdfload("Mm1.hdf") or Mm1.populate (
-        order, [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave("Mm1.hdf");
-    //
-    Mm1_tr.hdfload("Mm1_tr.hdf") or Mm1_tr.populate (
-        order,    [=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);}
-    ).hdfsave("Mm1_tr.hdf");
-    //
-    Mm2.hdfload("Mm2.hdf") or Mm2.populate (
-        order, [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave("Mm2.hdf");
-    // --------------------------------------------------------------------- //
-    
-    
-    std::cout << "ok\n\n";
-    
-Stg1:
+// Stg1:
 {
-    // Precompute two-electron integrals ----------------------------------- //
-    //
+    // precompute one-electron integrals
+    rad.setupOneElectronIntegrals();
     
-    // skip two-electron integration if told so
+    // precompute two-electron integrals
     if (not (itinerary & StgRadial))
     {
         std::cout << "Skipped computation of two-electron integrals.\n";
         goto Stg2;
     }
-    
-    #pragma omp parallel
-    {
-        #pragma omp master
-        {
-            std::cout << "Precomputing multipole integrals (λ = 0 .. " 
-                      << maxlambda 
-                      << ") using " 
-                      << omp_get_num_threads() 
-                      << " threads.\n";
-        }
-    }
-    
-    // for all multipoles : compute / load
-    for (int lambda = 0; lambda <= maxlambda; lambda++)
-    {
-        // this process will only compute a subset of radial integrals
-        if (lambda % Nproc != iproc)
-            continue;
-        
-        // look for precomputed data on disk
-        std::ostringstream oss2;
-        oss2 << "R_tr_dia_" << lambda << ".hdf";
-        int R_integ_exists = R_tr_dia[lambda].hdfload(oss2.str().c_str());
-        
-        if (R_integ_exists)
-        {
-            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << oss2.str().c_str() << "\"\n";
-            continue; // no need to compute
-        }
-        
-        // precompute necessary partial integral moments
-        // - truncated moments λ and -λ-1
-        cArray Mtr_L    = computeMi( lambda,   Nreknot-1);
-        cArray Mtr_mLm1 = computeMi(-lambda-1, Nreknot-1);
-        
-        // elements of R_tr
-        lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
-        cArray R_tr_v, th_R_tr_v;
-        
-        # pragma omp parallel default(none) \
-            private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
-            firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
-            shared (R_tr_i, R_tr_j, R_tr_v)
-        {
-            // for all B-spline pairs
-            # pragma omp for schedule(dynamic,1)
-            for (int i = 0; i < Nspline; i++)
-            for (int j = 0; j < Nspline; j++)
-            {
-                // for all nonzero, nonsymmetry R-integrals
-                for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
-                for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
-                {
-                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
-                    if (i > j and k > l)
-                        continue;
-                    
-                    // evaluate B-spline integral
-                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-                    
-                    // store all symmetries
-                    allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
-                }
-            }
-            
-            # pragma omp critical
-            {
-                // merge the thread local arrays
-                R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end());
-                R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
-                R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
-            }
-        }
-        
-        // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
-        R_tr_dia[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
-        R_tr_dia[lambda].hdfsave(oss2.str().c_str(), true, 10);
-        
-        std::cout << "\t- integrals for λ = " << lambda << " computed\n";
-    }
-    
-    // for all multipoles : synchronize
-    #ifndef NO_MPI
-    if (parallel)
-    {
-        for (int lambda = 0; lambda <= maxlambda; lambda++)
-        {
-            // get owner process of this multipole
-            int owner = lambda % Nproc;
-            
-            // get dimensions
-            int diagsize = R_tr_dia[lambda].diag().size();
-            int datasize = R_tr_dia[lambda].data().size();
-            
-            // owner will broadcast dimensions
-            MPI_Bcast(&diagsize, 1, MPI_INT, owner, MPI_COMM_WORLD);
-            MPI_Bcast(&datasize, 1, MPI_INT, owner, MPI_COMM_WORLD);
-            
-            // get arrays
-            iArray diag = R_tr_dia[lambda].diag();
-            cArray data = R_tr_dia[lambda].data();
-            diag.resize(diagsize);
-            data.resize(datasize);
-            
-            // master will broadcast arrays
-            MPI_Bcast(&diag[0], diag.size(), MPI_INT, owner, MPI_COMM_WORLD);
-            MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
-            
-            // reconstruct objects
-            R_tr_dia[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
-            
-            if (owner != iproc)
-            {
-                std::cout << "\t- integrals for λ = " << lambda << " retrieved from process " << owner << "\n";
-                
-                // save to disk (if the file doesn't already exist)
-                std::ostringstream oss3;
-                oss3 << "R_tr_dia_" << lambda << ".hdf";
-                if (not HDFFile(oss3.str().c_str(), HDFFile::readonly).valid())
-                    R_tr_dia[lambda].hdfsave(oss3.str().c_str(), true, 10);
-            }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
-    #endif
-    
-    std::cout << "\t- R_tr[λ] has " << R_tr_dia[0].data().size() << " nonzero elements\n";
-    // --------------------------------------------------------------------- //
-    
-    
-    std::cout << "Hamiltonian properties:\n";
-    std::cout << "\t-> hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n\n";
-    
+    rad.setupTwoElectronIntegrals(par, L + 2 * levels);
 }
 Stg2:
 {
@@ -488,19 +302,18 @@ Stg2:
         goto Stg3;
     }
     
-    
     // Prepare B-spline overlaps and expansions of Ric-Bess functions ------ //
     //
     std::cout << "Computing B-spline expansions... ";
     
     //  j-overlaps of shape [Nenergy × Nangmom × Nspline]
-    cArray ji_overlaps = overlapj(maxell,ki,weightEdgeDamp());
+    cArray ji_overlaps = rad.overlapj(maxell,ki,weightEdgeDamp(bspline));
     ji_overlaps.hdfsave("ji_overlaps_damp.hdf"); // just for debugging
     
     //  compute expansions; solve the system
     //      S * B_spline_expansion = B_spline_overlap
     unsigned ji_expansion_count = ji_overlaps.size()/Nspline;
-    cArray ji_expansion = S.tocoo().tocsr().solve(ji_overlaps, ji_expansion_count);
+    cArray ji_expansion = rad.S().tocoo().tocsr().solve(ji_overlaps, ji_expansion_count);
     ji_expansion.hdfsave("ji_expansion.hdf"); // just for debugging
     
     std::cout << "ok\n\n";
@@ -517,24 +330,24 @@ Stg2:
     # pragma omp parallel sections
     {
         # pragma omp section
-        S_kron_S   = S.kron(S);
+        S_kron_S   = rad.S().kron(rad.S());
         # pragma omp section
-        S_kron_Mm1_tr = S.kron(Mm1_tr);
+        S_kron_Mm1_tr = rad.S().kron(rad.Mm1_tr());
         # pragma omp section
-        S_kron_Mm2 = S.kron(Mm2);
+        S_kron_Mm2 = rad.S().kron(rad.Mm2());
         # pragma omp section
-        Mm1_tr_kron_S = Mm1_tr.kron(S);
+        Mm1_tr_kron_S = rad.Mm1_tr().kron(rad.S());
         # pragma omp section
-        Mm2_kron_S = Mm2.kron(S);
+        Mm2_kron_S = rad.Mm2().kron(rad.S());
         # pragma omp section
-        half_D_minus_Mm1_tr = 0.5 * D - Mm1_tr;
+        half_D_minus_Mm1_tr = 0.5 * rad.D() - rad.Mm1_tr();
     }
     # pragma omp parallel sections
     {
         # pragma omp section
-        half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(S);
+        half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(rad.S());
         # pragma omp section
-        S_kron_half_D_minus_Mm1_tr = S.kron(half_D_minus_Mm1_tr);
+        S_kron_half_D_minus_Mm1_tr = rad.S().kron(half_D_minus_Mm1_tr);
     }
     std::cout << "ok\n\n";
     // --------------------------------------------------------------------- //
@@ -543,20 +356,20 @@ Stg2:
     // Distribute LU factorizations among processes ------------------------ //
     //
     std::map<int,int> LUs;
-    std::vector<int> info(Nproc);
+    std::vector<int> info(par.Nproc());
     int worker = 0;
     std::cout << "Balancing " << coupled_states.size()
-              << " diagonal blocks among " << Nproc 
+              << " diagonal blocks among " << par.Nproc() 
               << " worker processes...\n";
     for (unsigned ill = 0; ill < coupled_states.size(); ill++)
     {
         info[worker]++;                       // add work to the process 'worker'
         
         LUs[ill] = worker;                  // assign this block to worker
-        worker = (worker + 1) % Nproc;        // move to next worker
+        worker = (worker + 1) % par.Nproc();        // move to next worker
     }
     // print statistics
-    std::cout << "\t-> average " << coupled_states.size()/double(Nproc) << " blocks/process\n";
+    std::cout << "\t-> average " << coupled_states.size()/double(par.Nproc()) << " blocks/process\n";
     std::cout << "\t-> min " << *std::min_element(info.begin(), info.end()) << " blocks/process\n";
     std::cout << "\t-> max " << *std::max_element(info.begin(), info.end()) << " blocks/process\n";
     // --------------------------------------------------------------------- //
@@ -564,6 +377,8 @@ Stg2:
     
     // For all right hand sides -------------------------------------------- //
     //
+    std::cout << "Hamiltonian properties:\n";
+    std::cout << "\t-> hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n\n";
     int iterations_done = 0, computations_done = 0;
     for (unsigned ie = 0; ie < Nenergy; ie++)
     {
@@ -636,12 +451,15 @@ Stg2:
         std::vector<std::vector<CsrMatrix>> bcks_csr(coupled_states.size());
         std::vector<std::vector<CsrMatrix::LUft>> bcks_lufts(coupled_states.size());
         
+        // sparse approximate inverse
+        std::vector<SymDiaMatrix> spai(coupled_states.size());
+        
         // setup the preconditioner - the diagonal block iChol-factorizations
         std::cout << "\tSetup preconditioner blocks... " << std::flush;
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
-            if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+            if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
                 continue;
             
             int l1 = coupled_states[ill].first;
@@ -655,11 +473,11 @@ Stg2:
                 + (0.5*l2*(l2+1)) * S_kron_Mm2;
             
             // two-electron part
-            for (int lambda = 0; lambda <= maxlambda; lambda++)
+            for (unsigned lambda = 0; lambda <= rad.maxlambda(); lambda++)
             {
                 Complex f = computef(lambda,l1,l2,l1,l2,L);
                 if (f != 0.)
-                    Hdiag += f * R_tr_dia[lambda];
+                    Hdiag += f * rad.R_tr_dia(lambda);
             }
             
             // finalize the matrix
@@ -676,7 +494,7 @@ Stg2:
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
-            if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+            if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
                 continue;
             
             // timer info
@@ -689,7 +507,7 @@ Stg2:
             if (preconditioner == ilu_prec)
             {
                 // log output
-                std::cout << "\n\t\t-> [" << iproc << "] iLU factorization " 
+                std::cout << "\n\t\t-> [" << par.iproc() << "] iLU factorization " 
                           << ill << " of (" << l1 << "," << l2 << ") block started\n";
                 
                 // drop-tolerance incomplete LU factorization
@@ -697,7 +515,7 @@ Stg2:
                 
                 // log output
                 std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << iproc << "] "
+                std::cout << "\t\t   [" << par.iproc() << "] "
                           << "droptol " << droptol << ", "
                           << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", "
                           << "mem " << iLU[ill].size() / 1048576 << " MiB";
@@ -707,7 +525,7 @@ Stg2:
             if (preconditioner == bilu_prec)
             {
                 // log output
-                std::cout << "\n\t\t-> [" << iproc << "] block D-ILU factorization "
+                std::cout << "\n\t\t-> [" << par.iproc() << "] block D-ILU factorization "
                           << ill << " of (" << l1 << "," << l2 << ") block started\n";
                 
                 // allocate space
@@ -716,65 +534,74 @@ Stg2:
                 bcks_csr[ill].resize(Nspline);
                 bcks_lufts[ill].resize(Nspline);
                 
-                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "\t\t   [" << par.iproc() << "] ";
                 std::cout << "computing blocks and SPAIs\n";
                 
                 // for all diagonal blocks
                 for (int iblock = 0; iblock < Nspline; iblock++)
                 {
-                    // compute the block
-                    bcks[ill][iblock] = E * S.main_diagonal()[iblock] * S
-                            - 0.5 * D.main_diagonal()[iblock] * S
-                            - 0.5 * S.main_diagonal()[iblock] * D
-                            - 0.5 * l1 * (l1 + 1.) * Mm2.main_diagonal()[iblock] * S
-                            - 0.5 * l2 * (l2 + 1.) * S.main_diagonal()[iblock] * Mm2
-                            + Mm1_tr.main_diagonal()[iblock] * S
-                            + S.main_diagonal()[iblock] * Mm1_tr;
+                    // - compute the block
+                    bcks[ill][iblock] = E * rad.S().main_diagonal()[iblock] * rad.S()
+                            - 0.5 * rad.D().main_diagonal()[iblock] * rad.S()
+                            - 0.5 * rad.S().main_diagonal()[iblock] * rad.D()
+                            - 0.5 * l1 * (l1 + 1.) * rad.Mm2().main_diagonal()[iblock] * rad.S()
+                            - 0.5 * l2 * (l2 + 1.) * rad.S().main_diagonal()[iblock] * rad.Mm2()
+                            + rad.Mm1_tr().main_diagonal()[iblock] * rad.S()
+                            + rad.S().main_diagonal()[iblock] * rad.Mm1_tr();
                     
-                    // invert using the SPAI
+                    // - invert using the SPAI
                     ibcks[iblock] = SymDiaMatrix (
                         Nspline,
                         iArray(1), // = (int[]){ 0 }
                         cArray(Nspline,1.)/bcks[ill][iblock].main_diagonal()
                     );
-//                     std::cout << "ibcks[iblock].diag().size() = " << ibcks[iblock].diag().size() << "\n";
                 }
                 
-                // start form the first non-main diagonal
-                int diagptr = Nspline;
-                
-                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "\t\t   [" << par.iproc() << "] ";
                 std::cout << "preconditioning the diagonal\n";
                 
                 // for all diagonals of overlap matrix
-                for (int idiag = 1; idiag < 1 + order; idiag++)
+                for (int idiag = 1; idiag <= order; idiag++)
                 {
                     // for all elements of this diagonal
                     for (int irow = 0; irow < Nspline - idiag; irow++)
                     {
                         // - construct corresponding block of Kronecker product
-                        SymDiaMatrix bck = E * S.data()[diagptr+irow] * S
-                                - 0.5 * D.data()[diagptr+irow] * S
-                                - 0.5 * S.data()[diagptr+irow] * D
-                                - 0.5 * l1 * (l1 + 1.) * Mm2.data()[diagptr+irow] * S
-                                - 0.5 * l2 * (l2 + 1.) * S.data()[diagptr+irow] * Mm2
-                                + Mm1_tr.data()[diagptr+irow] * S
-                                + S.data()[diagptr+irow] * Mm1_tr;
+                        SymDiaMatrix bck = E * rad.S().dptr(idiag)[irow] * rad.S()
+                                - 0.5 * rad.D().dptr(idiag)[irow] * rad.S()
+                                - 0.5 * rad.S().dptr(idiag)[irow] * rad.D()
+                                - 0.5 * l1 * (l1 + 1.) * rad.Mm2().dptr(idiag)[irow] * rad.S()
+                                - 0.5 * l2 * (l2 + 1.) * rad.S().dptr(idiag)[irow] * rad.Mm2()
+                                + rad.Mm1_tr().dptr(idiag)[irow] * rad.S()
+                                + rad.S().dptr(idiag)[irow] * rad.Mm1_tr();
                         
+                        /*if (irow + idiag == 1)
+                        {
+                            std::cout << "idiag = " << idiag << ", irow = " << irow << "\n";
+                            std::cout << "\tPřed: bcks[ill][irow+idiag].diag().size() = " << bcks[ill][irow+idiag].diag().size() << "\n";
+                            std::cout << "\t      bck.diag().size() = " << bck.diag().size() << "\n";
+                            std::cout << "bcks[ill][irow+idiag]\n" << bcks[ill][irow+idiag] << "\n";
+                            std::cout << "bck * (ibcks[irow] * bck)\n" << bck * (ibcks[irow] * bck) << "\n";
+                        }*/
                         // - update pivot
                         bcks[ill][irow+idiag] -= bck * (ibcks[irow] * bck);
+                        /*if (irow + idiag == 1)
+                        {
+                            std::cout << "\tPo: bcks[ill][irow+idiag].diag().size() = " << bcks[ill][irow+idiag].diag().size() << "\n";
+                            std::cout << bcks[ill][irow+idiag] << "\n";
+                        }*/
                     }
-                    // move on to the next diagonal
-                    diagptr += Nspline - idiag;
                 }
                 
-                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "\t\t   [" << par.iproc() << "] ";
                 std::cout << "factorization of the pivots\n";
                 
                 // convert and factorize the pivots
                 size_t size = 0;
                 for (int iblock = 0; iblock < Nspline; iblock++)
                 {
+                    /*std::cout << bcks[ill][iblock] << "\n";*/
+                    
                     bcks_csr[ill][iblock] = bcks[ill][iblock].tocoo().tocsr();
                     bcks_lufts[ill][iblock] = bcks_csr[ill][iblock].factorize(droptol);
                     size += bcks_lufts[ill][iblock].size();
@@ -782,7 +609,7 @@ Stg2:
                 
                 // log output
                 std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "\t\t   [" << par.iproc() << "] ";
                 std::cout << "droptol " << droptol << ", ";
                 std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
                 std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
@@ -793,7 +620,7 @@ Stg2:
             if (preconditioner == silu_prec)
             {
                 // log output
-                std::cout << "\n\t\t-> [" << iproc << "] s-iLU factorization "
+                std::cout << "\n\t\t-> [" << par.iproc() << "] s-iLU factorization "
                           << ill << " of (" << l1 << "," << l2 << ") block started\n";
                 
                 // allocate space
@@ -807,17 +634,17 @@ Stg2:
                 {
                     // setup the single-electron block
                     scsr_blocks[ill][iblock] = (
-                        E * S.main_diagonal()[iblock] * S
-                      - 0.5 * D.main_diagonal()[iblock] * S
-                      - 0.5 * S.main_diagonal()[iblock] * D
-                      - 0.5 * l1 * (l1 + 1.) * Mm2.main_diagonal()[iblock] * S
-                      - 0.5 * l2 * (l2 + 1.) * S.main_diagonal()[iblock] * Mm2
-                      + Mm1_tr.main_diagonal()[iblock] * S
-                      + S.main_diagonal()[iblock] * Mm1_tr
+                        E * rad.S().main_diagonal()[iblock] * rad.S()
+                      - 0.5 * rad.D().main_diagonal()[iblock] * rad.S()
+                      - 0.5 * rad.S().main_diagonal()[iblock] * rad.D()
+                      - 0.5 * l1 * (l1 + 1.) * rad.Mm2().main_diagonal()[iblock] * rad.S()
+                      - 0.5 * l2 * (l2 + 1.) * rad.S().main_diagonal()[iblock] * rad.Mm2()
+                      + rad.Mm1_tr().main_diagonal()[iblock] * rad.S()
+                      + rad.S().main_diagonal()[iblock] * rad.Mm1_tr()
                     ).tocoo().tocsr();
                     
-                    scsr_blocks[ill][iblock].plot(format("scsr-%d-%.03d.png", ill, iblock), 1.);
-                    scsr_blocks[ill][iblock].hdfsave(format("scsr-%d-%.03d.hdf", ill, iblock));
+//                     scsr_blocks[ill][iblock].plot(format("scsr-%d-%.03d.png", ill, iblock), 1.);
+//                     scsr_blocks[ill][iblock].hdfsave(format("scsr-%d-%.03d.hdf", ill, iblock));
                     
                     // factorize the block
                     siLU[ill][iblock] = scsr_blocks[ill][iblock].factorize(droptol);
@@ -826,11 +653,28 @@ Stg2:
                 
                 // log output
                 std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << iproc << "] ";
+                std::cout << "\t\t   [" << par.iproc() << "] ";
                 std::cout << "droptol " << droptol << ", ";
                 std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
                 std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
                 std::cout << "mem " << size/1048576 << " MiB";
+            }
+            
+            // sparse approximate inverse preconditioner
+            if (preconditioner == spai_prec)
+            {
+                // use diagonal preconditioner
+                spai[ill] = SymDiaMatrix (
+                    Nspline * Nspline,
+                    iArray(1),
+                    cArray(Nspline * Nspline, 1.) / dia_blocks[ill].main_diagonal()
+                );
+            }
+            
+            // multi-resolution preconditioner
+            if (preconditioner == res_prec)
+            {
+                
             }
             
             // diagonal incomplete Cholesky factorization
@@ -865,8 +709,8 @@ Stg2:
             
             // compute P-overlaps and P-expansion
             cArray Pi_overlaps, Pi_expansion;
-            Pi_overlaps = overlapP(ni,li,weightEndDamp());
-            Pi_expansion = S.tocoo().tocsr().solve(Pi_overlaps);
+            Pi_overlaps = rad.overlapP(ni,li,weightEndDamp(bspline));
+            Pi_expansion = rad.S().tocoo().tocsr().solve(Pi_overlaps);
             
             // we may have already computed solution for this state and energy... is it so?
             std::ostringstream cur_oss;
@@ -918,22 +762,22 @@ Stg2:
                     cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
                     
                     // skip angular forbidden right hand sides
-                    for (int lambda = 0; lambda <= maxlambda; lambda++)
+                    for (unsigned lambda = 0; lambda <= rad.maxlambda(); lambda++)
                     {
                         Complex f1 = computef(lambda, l1, l2, li, l, L);
                         Complex f2 = computef(lambda, l1, l2, l, li, L);
                         
                         if (f1 != 0.)
                         {
-                            chi_block += (prefactor * f1) * R_tr_dia[lambda].dot(Pj1);
+                            chi_block += (prefactor * f1) * rad.R_tr_dia(lambda).dot(Pj1);
                         }
                         
                         if (f2 != 0.)
                         {
                             if (Sign > 0)
-                                chi_block += (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
+                                chi_block += (prefactor * f2) * rad.R_tr_dia(lambda).dot(Pj2);
                             else
-                                chi_block -= (prefactor * f2) * R_tr_dia[lambda].dot(Pj2);
+                                chi_block -= (prefactor * f2) * rad.R_tr_dia(lambda).dot(Pj2);
                         }
                     }
                     
@@ -977,7 +821,7 @@ Stg2:
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
                     // skip computation of unwanted blocks for this process
-                    if (LUs.find(ill) == LUs.end() or LUs[ill] != iproc)
+                    if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
                         continue;
                     
                     // create copy-to view of "z"
@@ -1030,6 +874,10 @@ Stg2:
                             std::cout << z.norm()/r.norm() << "\n";
                             std::cout << cArray(DIC[ill].main_diagonal()).norm() << "\n";
                         }
+                        
+                        // Sparse Approximate Inverse preconditioner
+                        if (preconditioner == spai_prec)
+                            z = spai[ill].dot(r);
                         
                         // Symmetric Successive Over-Relaxation
                         // NOTE seems slower than Jacobi
@@ -1091,14 +939,14 @@ Stg2:
             {
                 // clear all output segments that are going to be referenced by this process
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-                    if (LUs.find(ill) != LUs.end() and LUs[ill] == iproc)
+                    if (LUs.find(ill) != LUs.end() and LUs[ill] == par.iproc())
                         cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).clear();
                 
                 // multiply "q" by the matrix of the system
                 # pragma omp parallel for schedule (dynamic,1) collapse(2)
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 for (unsigned illp = 0; illp < coupled_states.size(); illp++)
-                if (LUs.find(ill) != LUs.end() and LUs[ill] == iproc)
+                if (LUs.find(ill) != LUs.end() and LUs[ill] == par.iproc())
                 {
                     // row multi-index
                     int l1 = coupled_states[ill].first;
@@ -1123,11 +971,11 @@ Stg2:
                     else
                     {
                         // compute the offdiagonal block
-                        for (int lambda = 0; lambda <= maxlambda; lambda++)
+                        for (unsigned lambda = 0; lambda <= rad.maxlambda(); lambda++)
                         {
                             Complex f = computef(lambda, l1, l2, l1p, l2p, L);
                             if (f != 0.)
-                                q_contrib -= f * R_tr_dia[lambda].dot(p_block);
+                                q_contrib -= f * rad.R_tr_dia(lambda).dot(p_block);
                         }
                     }
                     
@@ -1207,7 +1055,7 @@ Stg3:
     // compose output filename
     std::ostringstream ossfile;
     if (parallel)
-        ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << "-(" << iproc << ").sql";
+        ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << "-(" << par.iproc() << ").sql";
     else
         ossfile << ni << "-" << L << "-" << Spin << "-" << Pi << ".sql";
     
@@ -1245,7 +1093,7 @@ Stg3:
     {
 #ifndef NO_MPI
         // if MPI is active, compute only a subset of the transitions, corresponding to iproc
-        if (parallel and i % Nproc != iproc)
+        if (parallel and i % par.Nproc() != par.iproc())
             continue;
 #endif
         
@@ -1269,7 +1117,7 @@ Stg3:
             //
             
             // precompute hydrogen function overlaps
-            cArray Pf_overlaps = overlapP(nf,lf,weightEndDamp());
+            cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
             
             // compute radial integrals
             cArrays Lambda(2 * lf + 1);
@@ -1283,7 +1131,9 @@ Stg3:
                 );
                 
                 // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-                Lambda[mf+lf] = std::move(computeLambda(kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states));
+                Lambda[mf+lf] = std::move (
+                    computeLambda (bspline, kf, ki, maxell, L, Spin, Pi, ni, li, mi, Ei, lf, Pf_overlaps, coupled_states)
+                );
             }
             
             // save the data
@@ -1359,7 +1209,9 @@ Stg3:
             //
             
             rArray ics;
-            cArrays data = std::move(computeXi(maxell, L, Spin, Pi, ni, li, mi, Ei, ics, coupled_states));
+            cArrays data = std::move (
+                computeXi(bspline, maxell, L, Spin, Pi, ni, li, mi, Ei, ics, coupled_states)
+            );
             
             for (size_t ie = 0; ie < Ei.size(); ie++)
             for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular

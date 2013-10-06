@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "arrays.h"
+#include "bspline.h"
 
 /**
  * Compute radial integrals for evaluation of the discrete T-matrices,
@@ -46,6 +47,7 @@
  * @return Vector of radial integrals.
  */
 cArray computeLambda (
+    Bspline const & bspline,
     rArray const & kf,
     rArray const & ki,
     int maxell,
@@ -88,7 +90,7 @@ cArray computeLambda (
  * @return Vector of radial integrals.
  */
 cArrays computeXi (
-    int maxell,
+    Bspline const & bspline, int maxell,
     int L, int Spin, int Pi,
     int ni, int li, int mi,
     rArray const & Ei,

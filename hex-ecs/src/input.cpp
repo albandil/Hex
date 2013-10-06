@@ -201,6 +201,7 @@ void parse_command_line (
                 else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
                 else if (strcmp(optarg,"sILU")   == 0) preconditioner = silu_prec;
                 else if (strcmp(optarg,"bILU")   == 0) preconditioner = bilu_prec;
+                else if (strcmp(optarg,"SPAI")   == 0) preconditioner = spai_prec;
                 else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }
