@@ -732,7 +732,7 @@ Stg2:
                 
                 // setup storage
                 cArrayView chi_block(chi, ill * Nspline * Nspline, Nspline * Nspline);
-                chi_block.clear();
+                chi_block.fill(0);
                 
                 // for all allowed angular momenta (by momentum composition) of the projectile
                 for (int l = abs(li - L); l <= li + L; l++)
@@ -940,7 +940,7 @@ Stg2:
                 // clear all output segments that are going to be referenced by this process
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                     if (LUs.find(ill) != LUs.end() and LUs[ill] == par.iproc())
-                        cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).clear();
+                        cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
                 
                 // multiply "q" by the matrix of the system
                 # pragma omp parallel for schedule (dynamic,1) collapse(2)

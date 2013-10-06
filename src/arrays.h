@@ -161,10 +161,10 @@ public:
     { return *(array + size() - 1 - i); }
     
     // some other functions
-    virtual void clear()
+    virtual void fill(NumberType x)
     {
-        for (size_t i = 0; i < size(); i++)
-            array[i] = NumberType(0);
+        for (NumberType & y : *this)
+            y = x;
     }
     
     bool empty() const { return size() == 0; }
