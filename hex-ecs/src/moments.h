@@ -77,7 +77,9 @@ class RadialIntegrals
     public:
         
         // constructor
-        RadialIntegrals(Bspline const & bspline) : bspline_(bspline), g_(bspline) {}
+        RadialIntegrals(Bspline const & bspline)
+            : bspline_(bspline), g_(bspline), D_(bspline.Nspline()), S_(bspline.Nspline()),
+              Mm1_(bspline.Nspline()), Mm1_tr_(bspline.Nspline()), Mm2_(bspline.Nspline()) {}
         
         // public callable members
         void setupOneElectronIntegrals();
