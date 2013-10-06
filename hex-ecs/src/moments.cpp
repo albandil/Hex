@@ -105,7 +105,7 @@ cArray computeMi(int a, int iknotmax)
                     continue;
                 
                 // compute the moment
-                int points = 20;//order + abs(a) + 1;
+                int points = order + abs(a) + 1;
                 int data[5] = {i, j, a, iknot, iknotmax};
                 Complex integral = quad(&M_integrand, data, points, iknot, xa, xb);
                 
@@ -191,7 +191,7 @@ Complex computeM_iknot(int a, int i, int j, int iknot, Complex R)
         return 0;
     
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
-    int points = /*order + 5*/20;
+    int points = Bspline::ECS().order() + std::abs(a) + 1;
     cArray xs = p_points(points, x1, x2);
     cArray ws = p_weights(points, x1, x2);
     
