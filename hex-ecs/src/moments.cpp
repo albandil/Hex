@@ -280,7 +280,7 @@ void RadialIntegrals::setupOneElectronIntegrals()
 void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t maxlambda)
 {
     // allocate storage
-    R_tr_dia_.resize(maxlambda);
+    R_tr_dia_.resize(maxlambda + 1);
     
     #pragma omp parallel
     {

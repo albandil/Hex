@@ -343,7 +343,7 @@ class RadialIntegrals
         //
         
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
-        std::vector<SymDiaMatrix> R_tr_dia_;
+        Array<SymDiaMatrix> R_tr_dia_;
 };
 
 #endif
