@@ -90,7 +90,7 @@ template <                                                                    \
                                                                               \
     size_t N = a.size();                                                      \
     for (size_t i = 0; i < N; i++)                                            \
-        pa[i] OP b;                                                           \
+        pa[i] OP##= b;                                                        \
                                                                               \
     return a;                                                                 \
 }                                                                             \
@@ -106,7 +106,7 @@ auto operator OP##= (OUT<T1> a, IN<T2> b)                                     \
                                                                               \
     size_t N = a.size();                                                      \
     for (size_t i = 0; i < N; i++)                                            \
-        pa[i] OP pb[i];                                                       \
+        pa[i] OP##= pb[i];                                                    \
                                                                               \
     return a;                                                                 \
 }
