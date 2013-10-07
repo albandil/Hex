@@ -31,6 +31,7 @@
  *        \mathrm{d}r_1 \ .
  * @f]
  * 
+ * @param bspline The B-spline environment to use when evaluating the solutions.
  * @param kf Outgoing projectile momenta.
  * @param ki incoming projectile momenta.
  * @param maxell Maximal angular momentum of the projectile.
@@ -77,6 +78,7 @@ cArray computeLambda (
  * @f]
  * where @f$ r_1 = \rho \cos\alpha @f$ and @f$ r_2 = \rho \sin\alpha @f$.
  * 
+ * @param bspline The B-spline environment to use when evaluating the solutions.
  * @param maxell Maximal angular momentum of the free electrons.
  * @param L Total angular momentum (partial wave).
  * @param Spin Conserved total spin (partial wave).
