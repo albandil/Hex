@@ -28,8 +28,6 @@
 #include "specf.h"
 #include "spmatrix.h"
 
-bool debug = false;
-
 cArray computeLambda (
     Bspline const & bspline,
     rArray const & kf, rArray const & ki,
