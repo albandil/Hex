@@ -348,4 +348,36 @@ class RadialIntegrals
         Array<SymDiaMatrix> R_tr_dia_;
 };
 
+class MultiLevelPreconditioner : public RadialIntegrals
+{
+    public:
+        
+        // constructor
+        MultiLevelPreconditioner(Bspline const & bspline, int p_order)
+            : RadialIntegrals(bspline), s_bspline_(bspline),
+              p_bspline_(p_order, unique(bspline.rknots()), bspline.ECStheta(), bspline.cknots()) {}
+        
+        // initialization of the preconditioner (computation of the radial integrals)
+        void setup(Parallel const & par, size_t maxlambda)
+        {
+            RadialIntegrals::setupOneElectronIntegrals();
+            RadialIntegrals::setupTwoElectronIntegrals(par, maxlambda);
+        }
+        
+        // preconditioning
+        void precondition(const cArrayView r, cArrayView z) const
+        {
+            // TODO ...
+            z = r;
+        }
+        
+    private:
+        
+        // B-spline environment for the computation
+        Bspline const & s_bspline_;
+        
+        // B-spline environment for the preconditioner
+        Bspline p_bspline_;
+}
+
 #endif
