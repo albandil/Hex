@@ -123,8 +123,8 @@ SymDiaMatrix SSOR_preconditioner(SymDiaMatrix const & A);
 
 /**
  * Callback-based Conjugate gradients.
- * @param bview Right hand side.
- * @param xview Output vector. An initial guess may be present at beginning.
+ * @param b Right hand side.
+ * @param x Output vector. An initial guess may be present at beginning.
  * @param eps Relative tolerance.
  * @param min_iterations Minimal iterations count.
  * @param max_iterations Maximal iterations count.
@@ -137,7 +137,7 @@ SymDiaMatrix SSOR_preconditioner(SymDiaMatrix const & A);
  */
 template <typename Preconditioner, typename Multiplier>
 unsigned cg_callbacks (
-    cArrayView const bview, cArrayView xview,
+    const cArrayView b, cArrayView x,
     double eps,
     unsigned min_iterations, unsigned max_iterations,
     Preconditioner apply_preconditioner,
@@ -146,8 +146,6 @@ unsigned cg_callbacks (
 ) {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
-    
-    cArray b(bview), x(xview);
     
     // compute norm of the right hand side
     double bnorm = b.norm();
@@ -255,7 +253,7 @@ unsigned cg_callbacks (
  */
 template <typename TFunctor1, typename TFunctor2>
 int bicgstab_callbacks (
-    cArrayView bview, cArrayView xview,
+    const cArrayView b, cArrayView x,
     double eps,
     int min_iterations, int max_iterations,
     TFunctor1 apply_preconditioner,
@@ -264,8 +262,6 @@ int bicgstab_callbacks (
 ) {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
-    
-    cArray b(bview), x(xview);
     
     int N = b.size();
     double bnorm = b.norm();
@@ -365,7 +361,7 @@ int bicgstab_callbacks (
  */
 template <typename TFunctor1, typename TFunctor2>
 int cgs_callbacks (
-    cArrayView bview, cArrayView xview,
+    const cArrayView b, cArrayView x,
     double eps,
     int min_iterations, int max_iterations,
     TFunctor1 apply_preconditioner,
@@ -375,7 +371,6 @@ int cgs_callbacks (
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
     
-    cArray x(xview), b(bview);
     int N = b.size();
     double bnorm = b.norm();
     

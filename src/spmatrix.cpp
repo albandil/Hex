@@ -35,46 +35,51 @@
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
 {
     // shorthands
-    size_t Csize = A.i_.size() * B.i_.size();
-    size_t Brows = B.m_;
-    size_t Bcols = B.n_;
-    
-    // create temporary matrix to hold the Kronecker product
-    CooMatrix C;
+    size_t Asize = A.x().size();
+    size_t Bsize = B.x().size();
+    size_t Csize = Asize * Bsize;
+    size_t Brows = B.rows();
+    size_t Bcols = B.cols();
     
     // set correct dimensions, pre-allocate space
-    C.m_ = A.m_ * B.m_;
-    C.n_ = A.n_ * B.n_;
-    C.i_ = lArray(Csize);
-    C.j_ = lArray(Csize);
-    C.x_ = cArray(Csize);
+    int m = A.rows() * B.rows();
+    int n = A.cols() * B.cols();
+    lArray C_i (Csize), C_j (Csize);
+    cArray C_x (Csize);
     
-    // get iterators
-    size_t ic = 0;
+    // get pointers
+    long const * restrict pA_i = A_i.data();
+    long const * restrict pB_i = B_i.data();
+    long const * restrict pC_i = C_i.data();
+    long const * restrict pA_j = A_j.data();
+    long const * restrict pB_j = B_j.data();
+    long const * restrict pC_j = C_j.data();
+    Complex const * restrict pA_x = A_x.data();
+    Complex const * restrict pB_x = B_x.data();
+    Complex       * restrict pC_x = C_x.data();
     
     // loop over A data
-    size_t Asize = A.i_.size();
     for (size_t ia = 0; ia < Asize; ia++)
     {
         // loop over B data
-        size_t Bsize = B.i_.size();
         for (size_t ib = 0; ib < Bsize; ib++)
         {
             // compute new row index
-            C.i_[ic] = A.i_[ia] * Brows + B.i_[ib];
+            pC_i = pA_i[ia] * Brows + pB_i[ib];
             
             // compute new column index
-            C.j_[ic] = A.j_[ia] * Bcols + B.j_[ib];
+            pC_j = pA_j[ia] * Bcols + pB_j[ib];
             
             // compute product of the two elements
-            C.x_[ic] = A.x_[ia] * B.x_[ib];
+            pC_x = pA_x[ia] * pB_x[ib];
             
             // move to next value of C
-            ic++;
+            pC_i++; pC_j++; pC_x++;
         }
     }
     
-    return C;
+    // return the Kronecker product
+    return CooMatrix(m, n, C_i, C_j, C_x);
 }
 
 CooMatrix eye(size_t N)
@@ -151,7 +156,7 @@ CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
     return *this;
 }
 
-cArray CscMatrix::dotT(const cArrayView&  b) const
+cArray CscMatrix::dotT(cArrayView const &  b) const
 {
     // create output array
     cArray c (n_);
@@ -345,7 +350,7 @@ CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
     return *this;
 }
 
-cArray CsrMatrix::dot(const cArrayView& b) const
+cArray CsrMatrix::dot(cArrayView const & b) const
 {
     // create output array
     cArray c(m_);
@@ -461,7 +466,7 @@ CsrMatrix::LUft CsrMatrix::factorize(double droptol) const
 #endif
 
 #ifndef NO_UMFPACK
-cArray CsrMatrix::solve(const cArray&  b, size_t eqs) const
+cArray CsrMatrix::solve(const cArrayView b, size_t eqs) const
 {
     // only square matrices are allowed
     assert(m_ == n_);
@@ -1075,14 +1080,14 @@ cArray CooMatrix::todense() const
 }
 
 #ifndef NO_UMFPACK
-CooMatrix& CooMatrix::operator *= (cArray const &  B)
+CooMatrix& CooMatrix::operator *= (const cArrayView B)
 {
     return *this = this->dot(B);
 }
 #endif
 
 #ifndef NO_UMFPACK
-CooMatrix CooMatrix::dot(cArrayView const & B) const
+CooMatrix CooMatrix::dot(const cArrayView B) const
 {
     // FIXME: This is a memory INEFFICIENT method.
     // NOTE: Row-major storage assumed for B.
@@ -1250,7 +1255,7 @@ SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0), dptrs_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0), dptrs_(0) {}
 
-SymDiaMatrix::SymDiaMatrix(int n, iArrayView const & id, cArrayView const & v)
+SymDiaMatrix::SymDiaMatrix(int n, const iArrayView id, const cArrayView v)
     : n_(n), elems_(v), idiag_(id) { setup_dptrs_(); }
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
@@ -1401,23 +1406,23 @@ SymDiaMatrix const & SymDiaMatrix::operator = (SymDiaMatrix const & A)
 SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     A.is_compatible(B);
-    return SymDiaMatrix(A.n_, A.idiag_, A.elems_ + B.elems_);
+    return SymDiaMatrix(A.size(), A.diag(), A.data() + B.data());
 }
 
 SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     A.is_compatible(B);
-    return SymDiaMatrix(A.n_, A.idiag_, A.elems_ - B.elems_);
+    return SymDiaMatrix(A.size(), A.diag(), A.data() - B.data());
 }
 
 SymDiaMatrix operator * (double z, SymDiaMatrix const & A)
 {
-    return SymDiaMatrix(A.n_, A.idiag_, z * A.elems_);
+    return SymDiaMatrix(A.size(), A.diag(), z * A.data());
 }
 
 SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A)
 {
-    return SymDiaMatrix(A.n_, A.idiag_, z * A.elems_);
+    return SymDiaMatrix(A.size(), A.diag(), z * A.data());
 }
 
 SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
@@ -1436,12 +1441,6 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
     int C_nnz = (C_hbw + 1) * (C_size + C_size - C_hbw) / 2;
     int A_Ndiag = A.diag().size();
     
-//     std::cout << "A_Ndiag = " << A_Ndiag << "\n";
-//     std::cout << "C bandwidth: " << C_bw << "\n";
-//     std::cout << "C half-bandwidth: " << C_hbw << "\n";
-//     std::cout << "C size: " << C_size << "\n";
-//     std::cout << "C nnz: " << C_nnz << "\n";
-    
     // create the output matrix
     SymDiaMatrix C (
         A.size(),
@@ -1458,19 +1457,12 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
             // get diagonal label
             int dA = A.diag(std::abs(idA)) * signum(idA);
             
-//             std::cout << "\nd = " << d << "\n";
-//             std::cout << "dA = " << dA << "\n";
-//             std::cout << "idA = " << idA << "\n";
-            
             // determine corresponding B's diagonal (shifted from A's by 'd'), and its label
             int dB = dA - d;
             int const * bptr = std::find(B.idiag_.begin(), B.idiag_.end(), std::abs(dB));
             if (bptr == B.idiag_.end())
                 continue;
             int idB = signum(dB) * (bptr - B.idiag_.begin());
-            
-//             std::cout << "dB = " << dB << "\n";
-//             std::cout << "idB = " << idB << "\n";
             
             // get starting/ending columns of the diagonals
             int start_column = std::max (
@@ -1485,26 +1477,14 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
             if (Nelems <= 0)
                 continue;
             
-//             std::cout << "start_column = " << start_column << "\n";
-//             std::cout << "end_column = " << end_column << "\n";
-            
             // get pointers
             Complex const * restrict pdA = A.dptr(std::abs(idA)) + (dA > 0 ? start_column - dA : start_column);
             Complex const * restrict pdB = B.dptr(std::abs(idB)) + (dB > 0 ? start_column - dB : start_column);
             Complex * restrict pdC = C.dptr(d) + start_column - dA;
             
-//             std::cout << "pdA = " << pdA << "\n";
-//             std::cout << "pdB = " << pdB << "\n";
-//             std::cout << "pdC = " << pdC << "\n";
-            
             // add multiple
             for (int i = 0; i < Nelems; i++)
-            {
                 pdC[i] += pdA[i] * pdB[i];
-//                 std::cout << "pdA[" << i << "] = " << pdA[i] << "\n";
-//                 std::cout << "pdB[" << i << "] = " << pdB[i] << "\n";
-//                 std::cout << "pdC[" << i << "] = " << pdC[i] << "\n";
-            }
         }
     }
     
@@ -1667,7 +1647,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
     return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot(cArrayView B, MatrixTriangle triangle) const
+cArray SymDiaMatrix::dot(const cArrayView B, MatrixTriangle triangle) const
 {
     // check dimensions
     if ((int)B.size() != n_)

@@ -75,10 +75,6 @@ class CscMatrix
     
 public:
     
-    // Friends
-    
-    friend class CooMatrix;
-    
     // Constructors
     
     CscMatrix()
@@ -178,10 +174,6 @@ private:
 class CsrMatrix {
     
 public:
-    
-    // Friends
-    
-    friend class CooMatrix;
     
     // Constructors
     
@@ -298,7 +290,7 @@ public:
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
         
-        cArray solve(cArrayView const & b, unsigned eqs = 1)
+        cArray solve(const cArrayView b, unsigned eqs = 1)
         {
             // reserve space for the solution
             cArray x(b.size());
@@ -310,7 +302,7 @@ public:
             return x;
         }
         
-        void solve(cArrayView const & b, cArrayView & x, unsigned eqs = 1)
+        void solve(const cArrayView b, cArrayView x, unsigned eqs = 1)
         {
             // solve for all RHSs
             for (size_t eq = 0; eq < eqs; eq++)
@@ -378,7 +370,7 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve(cArray const & b, size_t eqs = 1) const;
+    cArray solve(const cArrayView b, size_t eqs = 1) const;
     
     /**
      * Save matrix to HDF file.
@@ -513,10 +505,6 @@ private:
 class CooMatrix {
     
 public:
-    
-    // Friends
-    
-    friend CooMatrix kron(const CooMatrix& A, const CooMatrix& B);
     
     // Empty constructors
     
@@ -784,7 +772,7 @@ public:
      *          array, which must be integer multiple of *this's column
      *          count.
      */
-    CooMatrix& operator *= (cArray const &  B);
+    CooMatrix& operator *= (const cArrayView B);
     
     // Element-wise divide by a complex number
     CooMatrix& operator /= (Complex c)
@@ -841,7 +829,7 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve(cArray const & b, size_t eqs = 1) const
+    cArray solve(const cArrayView b, size_t eqs = 1) const
     {
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
@@ -889,7 +877,29 @@ private:
 /**
  * @brief Symmetric diagonal matrix.
  * 
- * Only the main and upper diagonals are stored.
+ * A multi-diagonal matrix is a sparse matrix of the structure
+ * @f[
+ *     A = \pmatrix {
+ *            \ast   & \dots  & \ast   &        &        &        \cr
+ *            \vdots & \ddots &        & \ddots &        &        \cr
+ *            \ast   &        & \ddots &        & \ddots &        \cr
+ *                   & \ddots &        & \ddots &        & \ast   \cr
+ *                   &        & \ddots &        & \ddots & \vdots \cr
+ *                   &        &        & \ast   & \dots  & \ast   \cr
+ *     } \ ,
+ * @f]
+ * i.e. it is banded, with nonzero elements only near to the diagonal.
+ * Some of the diagonals may be identically zero. This class holds all
+ * nonzero main and upper diagonals (lower diagonals are not necessary
+ * in the symmetric case). The diagonal storage has several advantages:
+ * 
+ * - Matrix-vector multiplication can be vectorized, in contrast to the
+ *   CSR-matrix-vector multiplication which requires a strongly irregular
+ *   memory access.
+ * - Matrix-matrix multiplication conserves the DIA structure, with just
+ *   a simple increase of bandwidth. It holds that the bandwidth of the
+ *   matrix C = AB is equal to the sum of the bandwidths of the factors
+ *   decreased by one.
  */
 class SymDiaMatrix {
 
@@ -911,7 +921,7 @@ public:
      * @param id Identifyiers of the diagonals (positive integers expected).
      * @param v Stacked (and padded if ncessary) diagonals.
      */
-    SymDiaMatrix(int n, iArrayView const & id, cArrayView const & v);
+    SymDiaMatrix(int n, const iArrayView id, const cArrayView v);
     
     /// Copy constructor.
     SymDiaMatrix(SymDiaMatrix const & A);
@@ -991,12 +1001,6 @@ public:
     SymDiaMatrix const & operator = (SymDiaMatrix && A);
     SymDiaMatrix const & operator = (SymDiaMatrix const & A);
     
-    friend SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
-    friend SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
-    friend SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B);
-    friend SymDiaMatrix operator * (double z, SymDiaMatrix const & A);
-    friend SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
-
     SymDiaMatrix const & operator += (SymDiaMatrix const & B);
     SymDiaMatrix const & operator -= (SymDiaMatrix const & B);
     
@@ -1222,7 +1226,7 @@ inline CooMatrix operator * (const Complex& z, const CooMatrix& B)
  * @param A COO-Matrix.
  * @param B Dense matrix (as a column-major ordered array).
  */
-inline CooMatrix operator * (const CooMatrix& A, cArray const & B)
+inline CooMatrix operator * (CooMatrix const & A, const cArrayView B)
 {
     CooMatrix C = A;
     return C *= B;
