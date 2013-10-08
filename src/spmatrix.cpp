@@ -35,8 +35,8 @@
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
 {
     // shorthands
-    size_t Asize = A.x().size();
-    size_t Bsize = B.x().size();
+    size_t Asize = A.v().size();
+    size_t Bsize = B.v().size();
     size_t Csize = Asize * Bsize;
     size_t Brows = B.rows();
     size_t Bcols = B.cols();
@@ -48,14 +48,14 @@ CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
     cArray C_x (Csize);
     
     // get pointers
-    long const * restrict pA_i = A_i.data();
-    long const * restrict pB_i = B_i.data();
-    long const * restrict pC_i = C_i.data();
-    long const * restrict pA_j = A_j.data();
-    long const * restrict pB_j = B_j.data();
-    long const * restrict pC_j = C_j.data();
-    Complex const * restrict pA_x = A_x.data();
-    Complex const * restrict pB_x = B_x.data();
+    long const * restrict pA_i = A.i().data();
+    long const * restrict pB_i = B.i().data();
+    long       * restrict pC_i = C_i.data();
+    long const * restrict pA_j = A.j().data();
+    long const * restrict pB_j = B.j().data();
+    long       * restrict pC_j = C_j.data();
+    Complex const * restrict pA_x = A.v().data();
+    Complex const * restrict pB_x = B.v().data();
     Complex       * restrict pC_x = C_x.data();
     
     // loop over A data
@@ -65,13 +65,13 @@ CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
         for (size_t ib = 0; ib < Bsize; ib++)
         {
             // compute new row index
-            pC_i = pA_i[ia] * Brows + pB_i[ib];
+            *pC_i = pA_i[ia] * Brows + pB_i[ib];
             
             // compute new column index
-            pC_j = pA_j[ia] * Bcols + pB_j[ib];
+            *pC_j = pA_j[ia] * Bcols + pB_j[ib];
             
             // compute product of the two elements
-            pC_x = pA_x[ia] * pB_x[ib];
+            *pC_x = pA_x[ia] * pB_x[ib];
             
             // move to next value of C
             pC_i++; pC_j++; pC_x++;
@@ -1459,10 +1459,10 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
             
             // determine corresponding B's diagonal (shifted from A's by 'd'), and its label
             int dB = dA - d;
-            int const * bptr = std::find(B.idiag_.begin(), B.idiag_.end(), std::abs(dB));
-            if (bptr == B.idiag_.end())
+            int const * bptr = std::find(B.diag().begin(), B.diag().end(), std::abs(dB));
+            if (bptr == B.diag().end())
                 continue;
-            int idB = signum(dB) * (bptr - B.idiag_.begin());
+            int idB = signum(dB) * (bptr - B.diag().begin());
             
             // get starting/ending columns of the diagonals
             int start_column = std::max (

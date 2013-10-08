@@ -755,7 +755,7 @@ public:
     }
     
     // multiplication
-    CooMatrix dot (cArrayView const &  B) const;
+    CooMatrix dot (const cArrayView B) const;
     
     /**
      * Double inner matrix-matrix product, \f$ A : B \f$.
