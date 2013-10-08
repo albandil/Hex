@@ -276,18 +276,14 @@ cArray Bspline::zip (
 
 
 Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
+    : rknots_(rknots), cknots_(cknots), theta_(th), rotation_(Complex(cos(th),sin(th))),
+      R0_(rknots_.back()), Rmax_(cknots_.back()), Nknot_(rknots.size() + cknots.size() + 1),
+      Nreknot_(rknots.size()), Nspline_(Nknot_ - order - 1), Nintval_(Nknot_ - 1),
+      order_(order)
 {
-    // globalize
-    order_ = order;
-    R0_ = rknots.back();
-    Rmax_ = cknots.back();
-    
     // real and complex knot counts; both include the knot R₀
     int rknots_len = rknots.size();
     int cknots_len = cknots.size();
-    
-    // the complex rotation factor
-    rotation_ = Complex(cos(th),sin(th));
     
     // join the sequences; rotate the complex one
     t_ = new Complex [rknots_len + cknots_len - 1];
@@ -295,17 +291,13 @@ Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView co
         t_[i] = rknots[i];
     for (int i = 1; i < cknots_len; i++)
         t_[i + rknots_len - 1] = rotate(cknots[i]);
-    
-    // set knot count and other global variables
-    Nreknot_ = rknots_len;
-    Nknot_ = rknots_len + cknots_len - 1;
-    Nintval_ = Nknot_ - 1;
-    Nspline_ = Nknot_ - order - 1;
 }
+
 
 // ----------------------------------------------------------------------- //
 //  Others                                                                 //
 // ----------------------------------------------------------------------- //
+
 
 int Bspline::knot(Complex x) const
 {

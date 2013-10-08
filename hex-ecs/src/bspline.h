@@ -15,6 +15,7 @@
 
 #include "arrays.h"
 #include "complex.h"
+#include "misc.h"
 
 /**
  * @brief B-spline environment.
@@ -196,11 +197,29 @@ class Bspline
         
         /// End of complex grid (real, unrotated).
         inline double Rmax() const { return Rmax_; };
+        
+        /// ECS rotation angle.
+        inline double ECStheta() const { return theta_; }
+        
+        /// real knots
+        inline rArray const & rknots() const { return rknots_; }
+        
+        /// complex knots
+        inline rArray const & cknots() const { return cknots_; }
     
     private:
     
+        /// real knots
+        rArray rknots_;
+        
+        /// complex knots
+        rArray cknots_;
+        
         /// knot sequence
         Complex * restrict t_;
+        
+        /// rotation angle (rad)
+        double theta_;
         
         /// ECS rotation factor
         Complex rotation_;
