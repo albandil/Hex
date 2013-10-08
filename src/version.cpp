@@ -14,4 +14,4 @@
 #define GIT_COMMIT "(unknown)"
 #endif
 
-char const * const commit_hash = GIT_COMMIT;
+char const * commit_hash = GIT_COMMIT;

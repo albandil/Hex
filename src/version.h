@@ -22,6 +22,6 @@
  * g++ version.cpp -DGIT_VERSION=\"6a4gfd4\" -o version.o
  * @endcode
  */
-extern char const * const commit_hash;
+extern char const * commit_hash;
 
 #endif
