@@ -1,16 +1,16 @@
 The following configuration successfully builds the package:
 
 Compiler:
-    GCC 4.7.1
+    GCC 4.7.2
 
 Libraries:
     GSL 1.15
-    O2scl 0.911
+    O2scl 0.912             (not versions 0.913+!)
     OpenBLAS 0.2.5
     SuiteSparse 4.0.2
-    png++ 0.2.5
-    sqlitepp 0.2
+    png++ 0.2.5             (included in libs/)
+    sqlitepp 0.2            (included in libs/)
     cln 1.3.2
-    fftw-3.3.2
+    fftw 3.3.2
     
     
