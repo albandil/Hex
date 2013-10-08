@@ -10,7 +10,7 @@ SUITESPARSELIBS = /usr/local/lib/libumfpack.a /usr/local/lib/libamd.a \
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 
-INCLUDE = $(OPENMPIINCLUDE)
+INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt \
 	-lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
 	-lm -lfftw3 -lgfortran -lpng
