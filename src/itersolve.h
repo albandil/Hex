@@ -163,7 +163,7 @@ unsigned cg_callbacks (
     //    use rather the right hand side as the initial guess
     if (r.norm() / bnorm > 1000)
     {
-        x.clear();
+        x.fill(0.);
         r = b;
     }
     
@@ -228,8 +228,6 @@ unsigned cg_callbacks (
         // move to the next iteration: store previous projection
         rho_old = rho_new;
     }
-    
-    xview = x;
     
     return k;
 }
@@ -338,7 +336,6 @@ int bicgstab_callbacks (
         omega_im1 = omega_i;
     }
     
-    xview = x;
     return i;
 }
 
@@ -433,7 +430,6 @@ int cgs_callbacks (
             break;
     }
     
-    xview = x;
     return i;
 }
 
