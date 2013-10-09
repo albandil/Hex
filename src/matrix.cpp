@@ -30,7 +30,59 @@
 #endif
     
 #include "arrays.h"
-#include "spmatrix.h"
+#include "matrix.h"
+
+ColMatrix RowMatrix::T() const
+{
+    return ColMatrix(cols(), rows(), data());
+}
+
+RowMatrix ColMatrix::T() const
+{
+    return RowMatrix(cols(), rows(), data());
+}
+
+RowMatrix operator * (RowMatrix const & A, ColMatrix const & B)
+{
+    assert(A.cols() == B.rows());
+    
+    // sizes
+    int rows = A.rows();
+    int cols = B.cols();
+    int comm = A.cols();
+    
+    // output matrix, initialized to zero
+    RowMatrix C(A.rows(), B.cols());
+    
+    // data pointers
+    Complex const * restrict pA = A.begin();
+    Complex const * restrict pB = B.begin();
+    Complex       * restrict pC = C.begin();
+    
+    // for all rows of A
+    for (int irow = 0; irow < rows; irow++)
+    {
+        // for all columns of B
+        for (int icol = 0; icol < cols; icol++)
+        {
+            // compute the scalar product "row * column"
+            for (int k = 0; k < comm; k++)
+                (*pC) += (*(pA + k)) * (*pB++);
+            
+            // move to next element of C
+            pC++;
+        }
+        
+        // move to the next row of A
+        pA += A.cols();
+        
+        // reset B's data pointer
+        pB = B.begin();
+    }
+    
+    // return result
+    return C;
+}
 
 CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
 {

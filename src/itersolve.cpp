@@ -12,7 +12,7 @@
 
 #include "arrays.h"
 #include "itersolve.h"
-#include "spmatrix.h"
+#include "matrix.h"
 
 cArray IC_preconditioner(cArrayView const & A, lArrayView const & I, lArrayView const & P)
 {

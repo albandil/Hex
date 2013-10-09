@@ -22,7 +22,7 @@
 #include "arrays.h"
 #include "input.h"
 #include "itersolve.h"
-#include "spmatrix.h"
+#include "matrix.h"
 
 /*
  * Load data from input file. Default filename is "hex.inp", but different

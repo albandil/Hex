@@ -26,7 +26,7 @@
 #include "clenshawcurtis.h"
 #include "moments.h"
 #include "specf.h"
-#include "spmatrix.h"
+#include "matrix.h"
 
 cArray computeLambda (
     Bspline const & bspline,

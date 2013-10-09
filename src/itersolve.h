@@ -18,7 +18,7 @@
 
 #include "arrays.h"
 #include "complex.h"
-#include "spmatrix.h"
+#include "matrix.h"
 
 typedef enum {
     no_prec,

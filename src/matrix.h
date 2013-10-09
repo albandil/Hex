@@ -31,10 +31,109 @@
 
 // declaration of classes in order to enable them as return types
 // of other classes before proper definition
+class RowMatrix;
+class ColMatrix;
 class CooMatrix;
 class CscMatrix;
 class CsrMatrix;
 class SymDiaMatrix;
+
+/**
+ * @brief DenseMatrix.
+ * 
+ * Base class for row- and column- oriented matrices.
+ */
+class DenseMatrix
+{
+    public:
+        
+        // constructors
+        DenseMatrix()
+            : rows_(0), cols_(0), data_() {}
+        DenseMatrix(int rows, int cols)
+            : rows_(rows), cols_(cols), data_(rows * cols) {}
+        DenseMatrix(int rows, int cols, const cArrayView data)
+            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
+        
+        // explicit conversion to cArrayView
+        cArrayView data () { return data_; }
+        const cArrayView data () const { return data_; }
+        
+        // getters
+        size_t size () const { return rows_ * cols_; }
+        int cols () const { return cols_; }
+        int rows () const { return rows_; }
+        Complex * begin () { return data_.begin(); }
+        Complex const * begin () const { return data_.begin(); }
+        
+    private:
+        
+        /// Row count.
+        int rows_;
+        
+        /// Column count.
+        int cols_;
+        
+        /// Matrix elements, consecutive rows joined to one array.
+        cArray data_;
+};
+
+/**
+ * @brief Dense (row-oriented) matrix.
+ * 
+ * This class represents a generally non-symmetric dense matrix. It is
+ * an encapsulation of the cArray class with some operators bundled to it.
+ */
+class RowMatrix : public DenseMatrix
+{
+    public:
+        
+        // constructor
+        RowMatrix ()
+            : DenseMatrix() {}
+        RowMatrix (int rows, int cols)
+            : DenseMatrix(rows, cols) {}
+        RowMatrix (int rows, int cols, const cArrayView data)
+            : DenseMatrix(rows, cols, data) {}
+        
+        // transpose
+        ColMatrix T() const;
+        
+        // row views
+        cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
+        const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
+};
+
+/**
+ * @brief Dense (column-oriented) matrix.
+ * 
+ * This class represents a generally non-symmetric dense matrix. It is
+ * an encapsulation of the cArray class with some operators bundled to it.
+ */
+class ColMatrix : public DenseMatrix
+{
+    public:
+        
+        // constructor
+        ColMatrix ()
+            : DenseMatrix() {}
+        ColMatrix (int rows, int cols)
+            : DenseMatrix(rows, cols) {}
+        ColMatrix (int rows, int cols, const cArrayView data)
+            : DenseMatrix(rows, cols, data) {}
+        
+        // transpose
+        RowMatrix T() const;
+        
+        // column views
+        cArrayView col(int i) { return cArrayView(data(), i * rows(), rows()); }
+        const cArrayView col(int i) const { return cArrayView(data(), i * rows(), rows()); }
+};
+
+/**
+ * @brief Dense matrix multiplication.
+ */
+RowMatrix operator * (RowMatrix const & A, ColMatrix const & B);
 
 /**
  * @brief Matrix parts.

@@ -33,7 +33,7 @@
 #include "misc.h"
 #include "moments.h"
 #include "parallel.h"
-#include "spmatrix.h"
+#include "matrix.h"
 #include "version.h"
 
 #ifndef SuiteSparse_time
