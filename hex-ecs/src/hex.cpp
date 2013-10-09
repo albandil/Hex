@@ -353,28 +353,6 @@ Stg2:
     // --------------------------------------------------------------------- //
     
     
-    // Distribute LU factorizations among processes ------------------------ //
-    //
-    std::map<int,int> LUs;
-    std::vector<int> info(par.Nproc());
-    int worker = 0;
-    std::cout << "Balancing " << coupled_states.size()
-              << " diagonal blocks among " << par.Nproc() 
-              << " worker processes...\n";
-    for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-    {
-        info[worker]++;                       // add work to the process 'worker'
-        
-        LUs[ill] = worker;                  // assign this block to worker
-        worker = (worker + 1) % par.Nproc();        // move to next worker
-    }
-    // print statistics
-    std::cout << "\t-> average " << coupled_states.size()/double(par.Nproc()) << " blocks/process\n";
-    std::cout << "\t-> min " << *std::min_element(info.begin(), info.end()) << " blocks/process\n";
-    std::cout << "\t-> max " << *std::max_element(info.begin(), info.end()) << " blocks/process\n";
-    // --------------------------------------------------------------------- //
-    
-    
     // For all right hand sides -------------------------------------------- //
     //
     std::cout << "Hamiltonian properties:\n";
@@ -459,7 +437,7 @@ Stg2:
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
-            if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
+            if (not par.isMyWork(ill))
                 continue;
             
             int l1 = coupled_states[ill].first;
@@ -494,7 +472,7 @@ Stg2:
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
-            if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
+            if (par.isMyWork(ill))
                 continue;
             
             // timer info
@@ -821,7 +799,7 @@ Stg2:
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
                     // skip computation of unwanted blocks for this process
-                    if (LUs.find(ill) == LUs.end() or LUs[ill] != par.iproc())
+                    if (not par.isMyWork(ill))
                         continue;
                     
                     // create copy-to view of "z"
@@ -926,7 +904,7 @@ Stg2:
                             &z[0] + ill * Nspline * Nspline,
                             Nspline * Nspline,
                             MPI_DOUBLE_COMPLEX,
-                            LUs[ill],
+                            par.iproc(),
                             MPI_COMM_WORLD
                         );
                     }
@@ -939,14 +917,14 @@ Stg2:
             {
                 // clear all output segments that are going to be referenced by this process
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-                    if (LUs.find(ill) != LUs.end() and LUs[ill] == par.iproc())
+                    if (par.isMyWork(ill))
                         cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
                 
                 // multiply "q" by the matrix of the system
                 # pragma omp parallel for schedule (dynamic,1) collapse(2)
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 for (unsigned illp = 0; illp < coupled_states.size(); illp++)
-                if (LUs.find(ill) != LUs.end() and LUs[ill] == par.iproc())
+                if (par.isMyWork(ill))
                 {
                     // row multi-index
                     int l1 = coupled_states[ill].first;
@@ -995,7 +973,7 @@ Stg2:
                             &q[0] + ill * Nspline * Nspline,
                             Nspline * Nspline,
                             MPI_DOUBLE_COMPLEX,
-                            LUs[ill],
+                            par.iproc(),
                             MPI_COMM_WORLD
                         );
                     }

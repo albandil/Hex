@@ -53,6 +53,9 @@ class Parallel
         /// Returns true if this process is the master process (id = 0).
         inline bool IamMaster() const { return iproc_ == 0; }
         
+        /// Returns true if the chunk is assigned to this process.
+        inline bool isMyWork(int i) const { return i % Nproc_ == iproc_; }
+        
         /// Returns true if the MPI is active.
         inline bool active() const { return active_; }
         
