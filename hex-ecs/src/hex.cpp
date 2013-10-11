@@ -152,14 +152,14 @@ int main(int argc, char* argv[])
     
     if (R0 >= Rmax)
         throw exception("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
-
+    
     Bspline bspline(order, real_knots, ecstheta, complex_knots);
     
     // shortcuts
     int Nspline = bspline.Nspline();
     
     // info
-    std::cout << "B-spline total count: " << Nspline << "\n\n";
+    std::cout << "B-spline solver count: " << Nspline << "\n\n";
     //
     // --------------------------------------------------------------------- //
     
@@ -468,11 +468,11 @@ Stg2:
         std::cout << "ok\n";
         
         // setup the preconditioner
-        std::cout << "\tCompose preconditioner matrices..." << std::flush;
+        std::cout << "\tCompose matrices for preconditioner " << preconditioner << "...  " << std::flush;
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             // skip computation of unwanted blocks for this process
-            if (par.isMyWork(ill))
+            if (not par.isMyWork(ill))
                 continue;
             
             // timer info
