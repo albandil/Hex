@@ -277,7 +277,7 @@ cArray Bspline::zip (
 
 Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
     : rknots_(rknots), cknots_(cknots), theta_(th), rotation_(Complex(cos(th),sin(th))),
-      R0_(rknots_.back()), Rmax_(cknots_.back()), Nknot_(rknots.size() + cknots.size() + 1),
+      R0_(rknots_.back()), Rmax_(cknots_.back()), Nknot_(rknots.size() + cknots.size() - 1),
       Nreknot_(rknots.size()), Nspline_(Nknot_ - order - 1), Nintval_(Nknot_ - 1),
       order_(order)
 {
