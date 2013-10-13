@@ -32,6 +32,17 @@
 #include "arrays.h"
 #include "matrix.h"
 
+void RowMatrix::reorder_()
+{
+    cArray new_data(data().size());
+    
+    for (int irow = 0; irow < rows(); irow++)
+    for (int icol = 0; icol < cols(); icol++)
+        new_data[irow * cols() + icol] = data()[icol * rows() + irow];
+    
+    data() = new_data;
+}
+
 ColMatrix RowMatrix::T() const
 {
     return ColMatrix(cols(), rows(), data());

@@ -53,7 +53,7 @@ class DenseMatrix
         DenseMatrix(int rows, int cols)
             : rows_(rows), cols_(cols), data_(rows * cols) {}
         DenseMatrix(int rows, int cols, const cArrayView data)
-            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
+            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == (size_t)(rows * cols)); }
         
         // explicit conversion to cArrayView
         cArrayView data () { return data_; }
@@ -76,32 +76,6 @@ class DenseMatrix
         
         /// Matrix elements, consecutive rows joined to one array.
         cArray data_;
-};
-
-/**
- * @brief Dense (row-oriented) matrix.
- * 
- * This class represents a generally non-symmetric dense matrix. It is
- * an encapsulation of the cArray class with some operators bundled to it.
- */
-class RowMatrix : public DenseMatrix
-{
-    public:
-        
-        // constructor
-        RowMatrix ()
-            : DenseMatrix() {}
-        RowMatrix (int rows, int cols)
-            : DenseMatrix(rows, cols) {}
-        RowMatrix (int rows, int cols, const cArrayView data)
-            : DenseMatrix(rows, cols, data) {}
-        
-        // transpose
-        ColMatrix T() const;
-        
-        // row views
-        cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
-        const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
 };
 
 /**
@@ -128,6 +102,39 @@ class ColMatrix : public DenseMatrix
         // column views
         cArrayView col(int i) { return cArrayView(data(), i * rows(), rows()); }
         const cArrayView col(int i) const { return cArrayView(data(), i * rows(), rows()); }
+};
+
+/**
+ * @brief Dense (row-oriented) matrix.
+ * 
+ * This class represents a generally non-symmetric dense matrix. It is
+ * an encapsulation of the cArray class with some operators bundled to it.
+ */
+class RowMatrix : public DenseMatrix
+{
+    public:
+        
+        // constructor
+        RowMatrix ()
+            : DenseMatrix() {}
+        RowMatrix (int rows, int cols)
+            : DenseMatrix(rows, cols) {}
+        RowMatrix (int rows, int cols, const cArrayView data)
+            : DenseMatrix(rows, cols, data) {}
+        RowMatrix (ColMatrix const & m)
+            : DenseMatrix(m.rows(), m.cols(), m.data()) { reorder_(); }
+        
+        // transpose
+        ColMatrix T() const;
+        
+        // row views
+        cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
+        const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
+        
+    private:
+        
+        /// Change "data" from column-oriented to row-oriented.
+        void reorder_();
 };
 
 /**
@@ -389,7 +396,7 @@ public:
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
         
-        cArray solve(const cArrayView b, unsigned eqs = 1)
+        cArray solve(const cArrayView b, unsigned eqs = 1) const
         {
             // reserve space for the solution
             cArray x(b.size());
@@ -401,7 +408,7 @@ public:
             return x;
         }
         
-        void solve(const cArrayView b, cArrayView x, unsigned eqs = 1)
+        void solve(const cArrayView b, cArrayView x, unsigned eqs = 1) const
         {
             // solve for all RHSs
             for (size_t eq = 0; eq < eqs; eq++)
@@ -443,7 +450,7 @@ public:
         char* filename_;
         
         /// Set of status flags produced by UMFPACK.
-        rArray info_;
+        mutable rArray info_;
     };
 
     /**
