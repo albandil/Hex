@@ -28,7 +28,7 @@ LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
-FILES = amplitudes arrays gauss bspline hdffile hex input itersolve \
+FILES = amplitudes arrays gauss bspline hdffile hex input \
 	matrix preconditioners radial slater specf version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))

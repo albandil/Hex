@@ -34,6 +34,95 @@ typedef enum {
 } Preconditioner;
 
 /**
+ * @brief Sparse incomplete Cholesky decomposition.
+ * 
+ * This routine computes the LDL-decomposition of a symmetric matrix,
+ * @f[
+ *     A = L D L^T \ ,
+ * @f]
+ * where @f$ L @f$ is a lower triangular matrix normalized so that it has
+ * units on the diagonal and @f$ D @f$ is a diagonal matrix.
+ * 
+ * @param A Matrix elements in the form of a consecutive array @f$ \left\{a_i\right\}_{i=1}^N @f$
+ *          as in
+ *          @f[
+ *                   \pmatrix
+ *                   {
+ *                       a_1 &     &     &        &       \cr
+ *                       a_2 & a_3 &     &        &       \cr
+ *                       a_4 & a_5 & a_6 &        &       \cr
+ *                       a_7 & a_8 & a_9 & a_{10} &       \cr
+ *                       \vdots &   &     &        & \ddots \cr
+ *                   }
+ *          @f]
+ *          Whenever @f$ a_k @f$ is equal to zero, it is (or can be) omitted from the input array.
+ * @param I %Array of column indices (one for every element of A).
+ * @param P %Array of row pointers, i.e. starting positions of rows of A. For dense matrix
+ *          it would be 0, 1, 3, 6, 10, ... The last element must be equal to the length
+ *          of both A and I.
+ * 
+ * @return The elements of @f$ L @f$ (below diagonal) and @f$ D @f$ (at diagonal) with the
+ *         exact sparse pattern as the input array A, i.e. specified by I and P arrays.
+ */
+cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
+
+/**
+ * @brief DIC preconditioner.
+ * 
+ * Setup the diagonal incomplete Cholesky preconditioner. It is a essentially the original
+ * matrix with a preconditioned diagonal and the strict upper and lower triangles normalized
+ * by the preconditioned diagonal, i.e. a matrix
+ * @f[
+ *     \matfbf{P} = \mathbf{\tilde{L}}_\mathbf{A} + \mathbf{D}^{-1} + \mathbf{\tilde{L}}_\mathbf{A}
+ * @f]
+ * for the preconditioner
+ * @f[
+ *     \mathbf{M} = (\mathbf{D} + \mathbf{L}_\mathbf{A})
+ *                  \mathbf{D}^{-1}
+ *                  (\mathbf{D} + \mathbf{U}_\mathbf{A})
+ *                =  (1 + \mathbf{\tilde{L}}_\mathbf{A})
+ *                  \mathbf{D}
+ *                  (1 + \mathbf{\tilde{U}}_\mathbf{A})
+ * @f]
+ * The formula for the elements of @f$ \mathbf{D} @f$ is
+ * @f[
+ *     d_i = a_{ii} - \sum_{k < i} a_{ik} d_{kk}^{-1} a_{ki} \ ,
+ * @f]
+ * and is to be evaluated along the diagonal, re-using the just computed values @f$ d_i @f$.
+ * Hence, the access pattern in dense matrix would be
+ * @f[
+ *     \pmatrix {
+ *        \ast &      &      & \ast &     &     \cr
+ *             & \ast &      & \ast &     &     \cr
+ *             &      & \ast & \ast &     &     \cr
+ *        \ast & \ast & \ast &    ? &     &     \cr
+ *             &      &      &      &     &     \cr
+ *             &      &      &      &     &     \cr
+ *     }
+ * @f]
+ * In the case of the sparse SymDiaMatrix, the asterisks will occur only on the nonzero
+ * diagonals.
+ * 
+ * @note The same preconditioner can be used for unsymmetric matrix. Then it is called
+ *       DILU (diagonal incomplete LU factorization). This function, though, is implemented
+ *       symmetrically (as the input is symmetrical by definition of the type).
+ * 
+ * @param A Matrix in SymDiaMatrix format that is to be preconditioned.
+ * @return The DIC preconditioner of the symmetric matrix.
+ */
+SymDiaMatrix DIC(SymDiaMatrix const & A);
+
+/**
+ * @brief SSOR preconditioner.
+ * 
+ * Symmetric successive over-relaxation preconditioner for @f$ \omega = 1 @f$.
+ * (Essentially symmetrized Gauss-Seidel). The resulting matrix contains
+ * normalized lower (and upper) triangle and in the place of the unit diagonal
+ * is the inverse diagonal of @f$ \mathbf{A} @f$. So, having the preconditioner
+ */
+SymDiaMatrix SSOR(SymDiaMatrix const & A);
+
+/**
  * @brief Preconditioner template.
  * 
  * This interface class declares all necessary methods that a valid preconditioner
@@ -153,7 +242,7 @@ class JacobiPreconditioner : public NoPreconditioner
         
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         
-        virtual void setup () { NoPreconditioner::setup(); }
+        virtual void setup ();
         virtual void update (double E);
         virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
@@ -161,8 +250,33 @@ class JacobiPreconditioner : public NoPreconditioner
         
     protected:
         
-        // inverse diagonal
-        cArray invd_;
+        // inverse diagonals for every block
+        cArrays invd_;
+};
+
+class SSORPreconditioner : public NoPreconditioner
+{
+    public:
+        
+        SSORPreconditioner (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline
+        ) : NoPreconditioner(par, inp, ll, bspline) {}
+        
+        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        
+        virtual void setup ();
+        virtual void update (double E);
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
+        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+    protected:
+        
+        // inverse diagonals for every block
+        std::vector<SymDiaMatrix> SSOR_;
 };
 
 class ILUPreconditioner : public NoPreconditioner
@@ -319,5 +433,7 @@ class MultiLevelPreconditioner : public NoPreconditioner
             SymDiaMatrix p_half_D_minus_Mm1_tr_kron_S_, p_S_kron_half_D_minus_Mm1_tr_,
                          p_Mm2_kron_S_, p_S_kron_Mm2_;
 };
+
+
 
 #endif

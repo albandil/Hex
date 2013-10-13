@@ -44,7 +44,7 @@ double SuiteSparse_time()
 }
 #endif
 
-void zip_solution(CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
+void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
 {
     if (cmd.zipmax < 0)
         cmd.zipmax = bspline.Rmax();
@@ -115,7 +115,7 @@ void zip_solution(CommandLine & cmd, Bspline const & bspline, std::vector<std::p
     }
 }
 
-int main(int argc, char* argv[])
+int main (int argc, char* argv[])
 {
     // Preparations ------------------------------------------------------- //
     //
@@ -161,26 +161,27 @@ int main(int argc, char* argv[])
     double R0 = inp.rknots.back();       // end of real grid
     double Rmax = inp.cknots.back();     // end of complex grid
     
+    // check ordering
     if (R0 >= Rmax)
-        throw exception("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
+        throw exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
     
-    Bspline bspline(inp.order, inp.rknots, inp.ecstheta, inp.cknots);
+    // create B-splines
+    Bspline bspline (inp.order, inp.rknots, inp.ecstheta, inp.cknots);
     
     // shortcuts
     int Nspline = bspline.Nspline();
     
     // info
     std::cout << "B-spline solver count: " << Nspline << "\n\n";
-    //
     // --------------------------------------------------------------------- //
     
     
     // Setup angular data -------------------------------------------------- //
     //
-    std::vector<std::pair<int,int>> coupled_states;
-    std::vector<int> workers;
-    
     std::cout << "Setting up the coupled angular states...\n";
+    
+    // coupled angular momentum pairs
+    std::vector<std::pair<int,int>> coupled_states;
     
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     for (int ell = 0; ell <= inp.levels; ell++)
@@ -201,7 +202,7 @@ int main(int argc, char* argv[])
     
     std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " diagonal blocks.\n";
     
-    // skip if nothing to compute
+    // skip if there is nothing to compute
     if (coupled_states.empty())
         exit(0);
     
@@ -209,43 +210,55 @@ int main(int argc, char* argv[])
     // --------------------------------------------------------------------- //
     
     
-    // --------------------------------------------------------------------- //
-    // initialize radial integrals
-    
     // zip file if told so
     if (cmd.zipfile.size() != 0 and par.IamMaster())
     {
-        zip_solution(cmd, bspline, coupled_states);
+        zip_solution (cmd, bspline, coupled_states);
         goto End;
     }
     
-Stg2:
+StgSolve:
 {
     // skip stage 2 if told so
     if (not (cmd.itinerary & CommandLine::StgSolve))
     {
         std::cout << "Skipped solution of the equation.\n";
-        goto Stg3;
+        goto StgExtract;
     }
     
-    
-    // Create and initialize preconditioner -------------------------------- //
     //
-    PreconditionerBase * prec = nullptr;
+    // Create and initialize preconditioner
+    //
     
-    if (cmd.preconditioner == no_prec)
-        prec = new NoPreconditioner (par, inp, coupled_states, bspline);
-    if (cmd.preconditioner == ilu_prec)
-        prec = new ILUPreconditioner (par, inp, coupled_states, bspline);
-    if (cmd.preconditioner == res_prec)
-        prec = new MultiLevelPreconditioner (par, inp, coupled_states, bspline);
+    PreconditionerBase * prec;
+    
+    switch (cmd.preconditioner)
+    {
+        case no_prec:
+            prec = new NoPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case jacobi_prec:
+            prec = new JacobiPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case ssor_prec:
+            prec = new SSORPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case ilu_prec:
+            prec = new ILUPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case res_prec:
+            prec = new MultiLevelPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        default:
+            throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
+    };
     
     prec->setup();
-    // --------------------------------------------------------------------- //
     
-    
-    // For all right hand sides -------------------------------------------- //
     //
+    // Solve the equations
+    //
+    
     std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n";
     int iterations_done = 0, computations_done = 0;
     for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
@@ -295,9 +308,7 @@ Stg2:
         // update the preconditioner
         prec->update(E);
         
-        // For all initial states ------------------------------------------- //
-        //
-        
+        // for all initial states
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
         {
             int li = std::get<1>(inp.instates[instate]);
@@ -326,11 +337,6 @@ Stg2:
                 computations_done++;
                 continue;
             }
-            
-            // Solve the Equations ------------------------------------------------- //
-            //
-            
-            std::cout << "\tSolve the equations.\n";
             
             // we may have already computed the previous solution - it will serve as initial guess
             current_solution = cArray(chi.size());
@@ -375,11 +381,9 @@ Stg2:
     
     std::cout << "\rSolving the systems... ok                                                            \n";
     std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)\n";
-    
-    // --------------------------------------------------------------------- //
-    
 }
-Stg3:
+
+StgExtract:
 {
     // skip stage 3 if told so
     if (not (cmd.itinerary & CommandLine::StgExtract))
@@ -407,8 +411,8 @@ Stg3:
     // write header
     fsql << "BEGIN TRANSACTION;\n";
     
-    
-    // Extract the cross sections ------------------------------------------ //
+    //
+    // Extract the cross sections
     //
     
     std::cout << "\nExtracting T-matrices...\n";
@@ -428,14 +432,13 @@ Stg3:
     
     int finished = 0;
     
-    for (int i = 0; i < (int)transitions.size(); i++)
+    for (unsigned i = 0; i < transitions.size(); i++)
     {
-#ifndef NO_MPI
-        // if MPI is active, compute only a subset of the transitions, corresponding to iproc
-        if (par.active() and i % par.Nproc() != par.iproc())
+        // skip other process's work
+        if (not par.isMyWork(i))
             continue;
-#endif
         
+        // get quantum numbers
         int Spin = std::get<0>(transitions[i]);
         int li   = std::get<1>(transitions[i]);
         int mi   = std::get<2>(transitions[i]);
@@ -575,11 +578,11 @@ Stg3:
                   << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
                   << " %        ";
     }
-    // --------------------------------------------------------------------- //
     
     fsql << "COMMIT;\n";
     fsql.close();
 }
+
 End:
 {
     std::cout << "\nDone.\n\n";

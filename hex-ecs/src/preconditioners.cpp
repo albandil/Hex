@@ -12,11 +12,201 @@
 
 #include <iostream>
 
+#include "arrays.h"
 #include "gauss.h"
 #include "input.h"
 #include "itersolve.h"
-#include "radial.h"
+#include "misc.h"
 #include "preconditioners.h"
+#include "radial.h"
+
+cArray IC (cArrayView const & A, lArrayView const & I, lArrayView const & P)
+{
+    // this will be returned
+    cArray LD(A.size());
+    
+    // check lengths
+    assert(A.size() == (size_t)P.back());
+    assert(I.size() == (size_t)P.back());
+    
+    // current row
+    int irow = 0;
+    
+    // for all elements of the output array
+    for (int pos = 0; pos < (int)LD.size(); pos++)
+    {
+        // get column index of this element
+        int icol = I[pos];
+        
+        // is this a diagonal?
+        if (icol == irow)
+        {
+            // Compute an element of D
+            // - start by copying corresponding coefficient from A
+            LD[pos] = A[pos];
+            
+            // - continue by subtracting all existing contributions from the current row
+            //   (loop over ELEMENTS)
+            for (int ielem = P[irow]; ielem < pos; ielem++)
+                LD[pos] -= LD[ielem] * LD[ielem] * LD[P[I[ielem]+1]-1];
+            
+            irow++;
+        }
+        else
+        {
+            // Compute an element of L
+            // - start by copying corresponding coefficient from A
+            LD[pos] = A[pos];
+            
+            // - continue by subtracting all existing contributions
+            //   (loop over COLUMNS)
+            int pos1 = P[irow], pos2 = P[icol];
+            while (pos1 < P[irow+1] and I[pos1] < icol and pos2 < P[icol+1] and I[pos2] < icol)
+            {
+                if (I[pos1] < I[pos2])
+                {
+                    pos1++;
+                }
+                else if (I[pos1] > I[pos2])
+                {
+                    pos2++;
+                }
+                else
+                {
+                    LD[pos] -= LD[pos1] * LD[pos2] * LD[P[I[pos1]+1]-1];
+                    pos1++; pos2++;
+                }
+            }
+            
+            // - finish by dividing by the diagonal element
+            LD[pos] /= LD[P[icol+1]-1];
+        }
+    }
+    
+    return LD;
+}
+
+SymDiaMatrix DIC (SymDiaMatrix const & A)
+{
+    #define THRESHOLD 1e-3
+    
+    //
+    // compute the preconditioned diagonal
+    //
+    
+    // the preconditioned diagonal
+    cArray D = A.main_diagonal();
+    
+    // pointer to the preconditioned diagonal data
+    Complex * const restrict pD = D.data();
+    
+    // pointer to the A's diagonal labels
+    int const * restrict pAd = A.diag().data();
+    
+    // array sizes
+    register int Nrows = D.size();
+    register int Ndiag = A.diag().size();
+    
+    // for all elements of the diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+    {
+        // pointer to the A's raw concatenated diagonal data
+        Complex const * restrict pA = A.data().data() + Nrows;
+        
+        // for all diagonals (except the main diagonal) constributing to DIC
+        for (register int idiag = 1; idiag < Ndiag and pAd[idiag] <= irow; idiag++)
+        {
+            // update pivot
+            pD[irow] -= pA[irow - pAd[idiag]] * pA[irow - pAd[idiag]] / pD[irow - pAd[idiag]];
+            
+            // if the pivod is too small, set it to one
+            if (std::abs(pD[irow]) < THRESHOLD)
+                pD[irow] = THRESHOLD;
+            
+            // move pA to the beginning of the next diagonal
+            pA += Nrows - pAd[idiag];
+        }
+    }
+    
+    //
+    // construct matrix of the preconditioner
+    //
+    
+    // the preconditioner matrix, initialized to A
+    SymDiaMatrix DIC(A);
+    
+    // pointer to DIC's data
+    Complex * restrict pDIC = DIC.data().data();
+    
+    // pointer to DIC's diagonal labels (same as A.diag())
+    int const * restrict pDICd = DIC.diag().data();
+    
+    // set the diagonal to the inverse of the DIC diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+        pDIC[irow] = 1. / pD[irow];
+    
+    // move on to the first non-main diagonal
+    pDIC += Nrows;
+    
+    // for all non-main diagonals
+    for (register int idiag = 1; idiag < Ndiag; idiag++)
+    {
+        // for all elements in the diagonal
+        for (register int irow = 0; irow < Nrows - pDICd[idiag]; irow++)
+        {
+            // divide the off-diagonal element by the correct diagonal element
+            pDIC[irow] *= pD[irow];
+        }
+        
+        // move to next diagonal
+        pDIC +=  Nrows - pDICd[idiag];
+    }
+    
+    return DIC;
+}
+
+SymDiaMatrix SSOR (SymDiaMatrix const & A)
+{
+    // array sizes
+    register int Nrows = A.size();
+    register int Ndiag = A.diag().size();
+    
+    // the preconditioner matrix, initialized to A
+    SymDiaMatrix SSOR(A);
+    
+    // pointer to SSOR's concatenated diagonal data
+    Complex * restrict pSSOR = SSOR.data().data();
+    
+    // pointer to SSOR's main diagonal
+    Complex const * const restrict pD = pSSOR;
+    
+    // pointer to SSOR's diagonal labels (same as A.diag())
+    int const * restrict pSSORd = SSOR.diag().data();
+    
+    // set the diagonal to the inverse of the A's diagonal
+    for (register int irow = 0; irow < Nrows; irow++)
+        pSSOR[irow] = 1. / pSSOR[irow];
+    
+    // move on to the first non-main diagonal
+    pSSOR += Nrows;
+    
+    // for all non-main diagonals
+    for (register int idiag = 1; idiag < Ndiag; idiag++)
+    {
+        // for all elements in the diagonal
+        for (register int irow = 0; irow < Nrows - pSSORd[idiag]; irow++)
+        {
+            // divide the off-diagonal element by the correct diagonal element
+            pSSOR[irow] *= pD[irow];
+        }
+        
+        // move to next diagonal
+        pSSOR +=  Nrows - pSSORd[idiag];
+    }
+    
+    return SSOR;
+}
+
 
 void NoPreconditioner::setup ()
 {
@@ -92,7 +282,7 @@ void NoPreconditioner::update (double E)
     std::cout << "ok\n";
 }
 
-void NoPreconditioner::rhs(cArrayView chi, int ie, int instate) const
+void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
 {
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
@@ -244,19 +434,39 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     par_.sync(q, Nspline * Nspline, l1_l2_.size());
 }
 
-void NoPreconditioner::precondition(const cArrayView r, cArrayView z) const
+void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     z = r;
 }
 
-void JacobiPreconditioner::update(double E)
+void JacobiPreconditioner::setup ()
 {
-    NoPreconditioner::update(E);
+    NoPreconditioner::setup();
     
-    // TODO
+    // resize attributes
+    invd_.resize(l1_l2_.size());
 }
 
-void JacobiPreconditioner::precondition(const cArrayView r, cArrayView z) const
+void JacobiPreconditioner::update (double E)
+{
+    // update parent
+    NoPreconditioner::update(E);
+    
+    // shorthands
+    int Nspline = s_rad_.bspline().Nspline();
+    
+    # pragma omp parallel for
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    {
+        // resize data array
+        invd_[ill] = cArray(Nspline * Nspline, 1.);
+        
+        // divide by the diagonal
+        invd_[ill] /= dia_blocks_[ill].main_diagonal();
+    }
+}
+
+void JacobiPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
@@ -268,15 +478,98 @@ void JacobiPreconditioner::precondition(const cArrayView r, cArrayView z) const
         cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
         cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
         
-        // multiply by the inverse diagonal
-        zview = invd_ * rview;
+        // apply preconditioner
+        auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
+        {
+            z = invd_[ill] * r;
+        };
+        
+        // multiply by matrix block
+        auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
+        {
+            q = dia_blocks_[ill].dot(p);
+        };
+            
+        // solve using the CG solver
+        cg_callbacks
+        (
+            rview,                  // rhs
+            zview,                  // solution
+            1e-11,                  // tolerance
+            0,                      // min. iterations
+            Nspline * Nspline,      // max. iteration
+            apply_preconditioner,
+            matrix_multiply,
+            false
+        );
     }
     
     // synchronize across processes
     par_.sync(z, Nspline * Nspline, l1_l2_.size());
 }
 
-void ILUPreconditioner::setup()
+void SSORPreconditioner::setup ()
+{
+    // setup parent
+    NoPreconditioner::setup();
+    
+    // resize array
+    SSOR_.resize(l1_l2_.size());
+}
+
+void SSORPreconditioner::update (double E)
+{
+    // update parent
+    NoPreconditioner::update(E);
+    
+    // compute preconditioner matrix
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+        SSOR_[ill] = SSOR(dia_blocks_[ill]);
+}
+
+void SSORPreconditioner::precondition (const cArrayView r, cArrayView z) const
+{
+    // shorthands
+    int Nspline = s_rad_.bspline().Nspline();
+    
+    # pragma omp parallel for
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
+        // create segment views
+        cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
+        cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
+        
+        // apply preconditioner
+        auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
+        {
+            z = SSOR_[ill].upperSolve( SSOR_[ill].dot( SSOR_[ill].lowerSolve(r), diagonal ) );
+        };
+            
+        // multiply by matrix block
+        auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
+        {
+            q = dia_blocks_[ill].dot(p);
+        };
+            
+        // solve using the CG solver
+        cg_callbacks
+        (
+            rview,                  // rhs
+            zview,                  // solution
+            1e-11,                  // tolerance
+            0,                      // min. iterations
+            Nspline * Nspline,      // max. iteration
+            apply_preconditioner,
+            matrix_multiply,
+            false     
+        );
+    }
+    
+    // synchronize across processes
+    par_.sync(z, Nspline * Nspline, l1_l2_.size());
+}
+
+void ILUPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
@@ -323,12 +616,12 @@ void ILUPreconditioner::update (double E)
               << " (" << mem / 1048576 << " MiB)\n";
 }
 
-void ILUPreconditioner::multiply(const cArrayView p, cArrayView q) const
+void ILUPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
     NoPreconditioner::multiply(p, q);
 }
 
-void ILUPreconditioner::rhs(cArrayView chi, int ienergy, int instate) const
+void ILUPreconditioner::rhs (cArrayView chi, int ienergy, int instate) const
 {
     NoPreconditioner::rhs(chi, ienergy, instate);
 }
@@ -364,14 +657,14 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
             // solve using the CG solver
             cg_callbacks
             (
-                rview,      // rhs
-                zview,      // solution
-                1e-11,      // tolerance
-                0,          // min. iterations
-                Nspline*Nspline,    // max. iteration
+                rview,                  // rhs
+                zview,                  // solution
+                1e-11,                  // tolerance
+                0,                      // min. iterations
+                Nspline * Nspline,      // max. iteration
                 apply_preconditioner,
                 matrix_multiply,
-                true     
+                false     
             );
         }
     }
@@ -380,56 +673,14 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync(z, Nspline * Nspline, l1_l2_.size());
 }
 
-
-/*
-for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-        {
-            // skip computation of unwanted blocks for this process
-            if (not par.isMyWork(ill))
-                continue;
-            
-            // timer info
-            std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-            
-            int l1 = l1_l2_[ill].first;
-            int l2 = l1_l2_[ill].second;
-            
-            // drop-tolerance-incomplete LU factorization
-            if (preconditioner == ilu_prec)
-            {
-                // log output
-                std::cout << "\n\t\t-> [" << par.iproc() << "] iLU factorization " 
-                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
-                
-                // drop-tolerance incomplete LU factorization
-                iLU[ill] = csr_blocks[ill].factorize(droptol);
-                
-                // log output
-                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << par.iproc() << "] "
-                          << "droptol " << droptol << ", "
-                          << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", "
-                          << "mem " << iLU[ill].size() / 1048576 << " MiB";
-            }
-            
-            // multi-resolution preconditioner
-            if (preconditioner == res_prec)
-            {
-                
-            }
-            
-            // Jacobi or SSOR preconditioner (Jacobi will use only the diagonal)
-            if (preconditioner == jacobi_prec or preconditioner == ssor_prec)
-            {
-                SSOR[ill] = SSOR_preconditioner(dia_blocks[ill]);
-            }
-        }
-*/
-
 void MultiLevelPreconditioner::setup ()
 {
     // setup parent
     NoPreconditioner::setup();
+    
+    // compute radial integrals
+    p_rad_.setupOneElectronIntegrals();
+    p_rad_.setupTwoElectronIntegrals(par_, s_rad_.maxlambda());
     
     // precompute kronecker products
     p_half_D_minus_Mm1_tr_kron_S_ = (0.5 * p_rad_.D() - p_rad_.Mm1_tr()).kron(p_rad_.S());
@@ -644,7 +895,7 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
 }
 
 /*
-            // block incomplete D-ILU
+        // block incomplete D-ILU
         std::vector<std::vector<SymDiaMatrix>> bcks(l1_l2_.size());
         std::vector<std::vector<CsrMatrix>> bcks_csr(l1_l2_.size());
         std::vector<std::vector<CsrMatrix::LUft>> bcks_lufts(l1_l2_.size());
@@ -805,9 +1056,10 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
                 );
             }
 */
-                    
+
+
 /*
-  // apply a block inversion preconditioner (parallel for ILU)
+                // apply a block inversion preconditioner (parallel for ILU)
                 # pragma omp parallel for if (preconditioner == ilu_prec)
                 for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
                 {
@@ -906,4 +1158,4 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
                     );
                 }
                 
-                */
+*/

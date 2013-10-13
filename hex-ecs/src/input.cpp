@@ -138,7 +138,7 @@ void CommandLine::parse(int argc, char* argv[])
                     "\t--stg-integ          (-a)  only do radial integrals                                                    \n"
                     "\t--stg-integ-solve    (-b)  only do integrals & solve                                                   \n"
                     "\t--stg-extract        (-c)  only extract amplitudes                                                     \n"
-                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, DIC, ILU} (default: ILU) \n"
+                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, ILU, res} (default: ILU) \n"
                     "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                  \n"
                     "                                                                                                         \n"
                 ;
@@ -192,11 +192,7 @@ void CommandLine::parse(int argc, char* argv[])
                 if (strcmp(optarg,"none") == 0) preconditioner = no_prec;
                 else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobi_prec;
                 else if (strcmp(optarg,"SSOR")   == 0) preconditioner = ssor_prec;
-                else if (strcmp(optarg,"DIC")    == 0) preconditioner = dic_prec;
                 else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
-                else if (strcmp(optarg,"sILU")   == 0) preconditioner = silu_prec;
-                else if (strcmp(optarg,"bILU")   == 0) preconditioner = bilu_prec;
-                else if (strcmp(optarg,"SPAI")   == 0) preconditioner = spai_prec;
                 else if (strcmp(optarg,"res")    == 0) preconditioner = res_prec;
                 else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
