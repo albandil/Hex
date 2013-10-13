@@ -168,10 +168,10 @@ class RadialIntegrals
             cArray const & Mtr_mLm1
         ) const;
         
-        Complex computeRdiag(int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
-        Complex computeRtri(int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
-        void R_inner_integrand(int n, Complex* in, Complex* out, void* data) const;
-        void R_outer_integrand(int n, Complex* in, Complex* out, void* data) const;
+        Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
+        Complex computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
+        void R_inner_integrand (int n, Complex* in, Complex* out, void* data) const;
+        void R_outer_integrand (int n, Complex* in, Complex* out, void* data) const;
         
         void allSymmetries (
             int i, int j, int k, int l,
@@ -332,7 +332,7 @@ class RadialIntegrals
             return R_tr_dia_[i];
         }
         
-        size_t maxlambda() const { return R_tr_dia_.size(); }
+        size_t maxlambda() const { return R_tr_dia_.size() - 1; }
         
     private:
         

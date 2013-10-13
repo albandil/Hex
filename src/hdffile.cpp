@@ -125,8 +125,6 @@ template<> bool HDFFile::write<Complex>(std::string dataset, Complex const * buf
 
 bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const
 {
-//     std::cout << "[HDFFile::read_] Read " << length << " elements from \"" << dataset << "\".\n";
-    
     if (not valid_)
         return false;
     

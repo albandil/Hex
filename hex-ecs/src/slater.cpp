@@ -28,7 +28,7 @@
  * @param x Radial coordinate of the other electron.
  * @param R Truncation radius.
  */
-inline double damp(Complex y, Complex x, Complex R)
+inline double damp (Complex y, Complex x, Complex R)
 {
     // compute hyperradius
     double r = hypot(x.real(), y.real());
@@ -41,7 +41,7 @@ inline double damp(Complex y, Complex x, Complex R)
     return tanh(0.125 * (R.real() - r));
 }
 
-void RadialIntegrals::R_inner_integrand(int n, Complex* in, Complex* out, void* data) const
+void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, void* data) const
 {
     // extract data
     auto params = *(std::tuple<int,int,int,int,int,Complex>*)data;
@@ -64,7 +64,7 @@ void RadialIntegrals::R_inner_integrand(int n, Complex* in, Complex* out, void* 
 }
 
 
-void RadialIntegrals::R_outer_integrand(int n, Complex* in, Complex* out, void* data) const
+void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, void* data) const
 {
     // extract data
     int i = ((int*)data)[0];
@@ -81,7 +81,8 @@ void RadialIntegrals::R_outer_integrand(int n, Complex* in, Complex* out, void* 
     bspline_.B(i, iknot, n, in, values_i);
     bspline_.B(j, iknot, n, in, values_j);
     
-    int points2 = bspline_.order() + L + 1;
+    // use at least 2nd order
+    int points2 = std::max (2, bspline_.order() + L + 1);
     
     // evaluate inner integral, fill output array
     for (int u = 0; u < n; u++)
@@ -98,7 +99,7 @@ void RadialIntegrals::R_outer_integrand(int n, Complex* in, Complex* out, void* 
 /**
  * Triangle integral
  */
-Complex RadialIntegrals::computeRtri(int L, int k, int l, int m, int n, int iknot, int iknotmax) const
+Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const
 {
     // data for the outer integral
     int data[7] = {k, l, m, n, L, iknot, iknotmax};
@@ -118,7 +119,7 @@ Complex RadialIntegrals::computeRtri(int L, int k, int l, int m, int n, int ikno
 /**
  * Diagonal part of Slater integral
  */
-Complex RadialIntegrals::computeRdiag(int L, int a, int b, int c, int d, int iknot, int iknotmax) const
+Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const
 {
     int order = bspline_.order();
     

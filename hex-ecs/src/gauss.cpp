@@ -20,6 +20,7 @@
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
+#include "misc.h"
 
 std::vector<std::pair<double*,double*>> GaussLegendre::data_ = {
     std::make_pair(nullptr, nullptr),  // n = 0
@@ -28,6 +29,10 @@ std::vector<std::pair<double*,double*>> GaussLegendre::data_ = {
 
 int GaussLegendre::gauss_nodes_and_weights(int points, const double* & vx, const double* & vw) const
 {
+    // enforce at least second order rule
+    if (points < 2)
+        throw exception ("[gauss_nodes_and_weights] Nor implemented for orders less than 2. Your input: %d.", points);
+    
     // first of all generate any missing data
     # pragma omp critical
     if (points >= (int)data_.size())

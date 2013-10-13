@@ -109,8 +109,8 @@ cArray RadialIntegrals::computeMi(int a, int iknotmax) const
                 if (xa == xb)
                     continue;
                 
-                // compute the moment
-                int points = order + abs(a) + 1;
+                // compute the moment (use at least 2nd order)
+                int points = std::max (2, order + abs(a) + 1);
                 int data[5] = {i, j, a, iknot, iknotmax};
                 Complex integral = g_.quadMFP (
                     this, &RadialIntegrals::M_integrand,
@@ -152,7 +152,8 @@ Complex RadialIntegrals::computeD_iknot(int i, int j, int iknot) const
         return 0;
     
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
-    int points = bspline_.order();
+    // - use at least 2nd order
+    int points = std::max (2, bspline_.order());
     cArray xs = g_.p_points(points, x1, x2);
     cArray ws = g_.p_weights(points, x1, x2);
     
@@ -202,7 +203,8 @@ Complex RadialIntegrals::computeM_iknot(int a, int i, int j, int iknot, Complex 
         return 0;
     
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
-    int points = bspline_.order() + std::abs(a) + 1;
+    // - use at least 2nd order
+    int points = std::max (2, bspline_.order() + std::abs(a) + 1);
     cArray xs = g_.p_points(points, x1, x2);
     cArray ws = g_.p_weights(points, x1, x2);
     
