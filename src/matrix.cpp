@@ -100,9 +100,9 @@ void RowMatrix::write (std::ofstream & out) const
     // data pointer
     Complex const * ptr = data().begin();
     
-    for (unsigned irow = 0; irow < rows(); irow++)
+    for (int irow = 0; irow < rows(); irow++)
     {
-        for (unsigned icol = 0; icol < cols(); icol++)
+        for (int icol = 0; icol < cols(); icol++)
             out << *ptr++ << " ";
         
         out << "\n";
@@ -233,7 +233,7 @@ CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
     return *this;
 }
 
-cArray CscMatrix::dotT(cArrayView const &  b) const
+cArray CscMatrix::dotT(const cArrayView b) const
 {
     // create output array
     cArray c (n_);
@@ -1378,7 +1378,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
         for (auto id : idiag_)
         {
             idiags.insert(id);
-            diags[id] = cCArrayView(elems_, dataptr, n_ - id);
+            diags[id] = cArrayView(elems_, dataptr, n_ - id);
             dataptr += n_ - id;
         }
         
@@ -1389,9 +1389,9 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
             idiags.insert(id);
             
             if (diags[id].size() == 0)
-                diags[id] = cCArrayView(elems_, dataptr, n_ - id);
+                diags[id] = cArrayView(elems_, dataptr, n_ - id);
             else
-                diags[id] += cCArrayView(elems_, dataptr, n_ - id);
+                diags[id] += cArrayView(elems_, dataptr, n_ - id);
             
             dataptr += n_ - id;
         }
@@ -1797,7 +1797,7 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
     return ::kron (this->tocoo(), B.tocoo()).todia();
 }
 
-cArray SymDiaMatrix::lowerSolve(cCArrayView b) const
+cArray SymDiaMatrix::lowerSolve (const cArrayView b) const
 {
     assert(size() == b.size());
     
@@ -1838,7 +1838,7 @@ cArray SymDiaMatrix::lowerSolve(cCArrayView b) const
     return x;
 }
 
-cArray SymDiaMatrix::upperSolve(cCArrayView b) const
+cArray SymDiaMatrix::upperSolve (const cArrayView b) const
 {
     assert(size() == b.size());
     
