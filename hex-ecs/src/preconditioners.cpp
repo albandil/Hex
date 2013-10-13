@@ -585,35 +585,28 @@ void ILUPreconditioner::update (double E)
     
     std::cout << "\t[" << par_.iproc() << "] Update preconditioner..." << std::flush;
     
-    // memory requirements
-    size_t mem = 0;
-    
-    // start timer
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    
     // for all diagonal blocks
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        if (par_.isMyWork(ill))
-        {
-            // create CSR block
-            csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
-            
-            // factorize the block
-            lu_[ill] = csr_blocks_[ill].factorize();
-            mem += lu_[ill].size();
-        }
+        // start timer
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        
+        // create CSR block
+        csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
+        
+        // factorize the block
+        lu_[ill] = csr_blocks_[ill].factorize();
+        
+        // stop timer
+        std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
+    
+        // compute time usage
+        std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    
+        // print info
+        std::cout << "\b\b\b in " << secs.count() / 60 << ":" << std::setw(2) << std::setfill('0') << secs.count() % 60
+                  << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
     }
-    
-    // stop timer
-    std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
-    
-    // compute time usage
-    std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    
-    // print info
-    std::cout << "\b\b\b in " << secs.count() / 60 << ":" << std::setw(2) << std::setfill('0') << secs.count() % 60
-              << " (" << mem / 1048576 << " MiB)\n";
 }
 
 void ILUPreconditioner::multiply (const cArrayView p, cArrayView q) const
@@ -637,10 +630,10 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
         if (par_.isMyWork(ill))
         {
             // create copy-to view of "z"
-            cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
+            cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
                     
             // create copy-from view of "r"
-            cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
+            cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
             
             // apply preconditioner
             auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
@@ -705,20 +698,21 @@ void MultiLevelPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-    std::cout << "[" << par_.iproc() << "] Update preconditioner.\n";
-    
     // resize arrays
     p_csr_.resize(l1_l2_.size());
     p_lu_.resize(l1_l2_.size());
-    
-    // memory requirements
-    size_t mem = 0;
     
     // construct hamiltonian blocks
     for (size_t ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
+        
+        std::cout << "\t[" << par_.iproc() << "] Update preconditioner for block ("
+                  << l1 << "," << l2 << ")..." << std::flush;
+        
+        // start timer
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         
         p_csr_[ill] = (
             E * p_rad_.S().kron(p_rad_.S())
@@ -729,10 +723,17 @@ void MultiLevelPreconditioner::update (double E)
         ).tocoo().tocsr();
         
         p_lu_[ill] = p_csr_[ill].factorize();
-        mem += p_lu_[ill].size();
-    }
+        
+        // stop timer
+        std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
+        
+        // compute time usage
+        std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start);
     
-    std::cout << "\t- mem: " << mem / 1048576 << "\n";
+        // print info
+        std::cout << "\b\b\b in " << secs.count() / 60 << ":" << std::setw(2) << std::setfill('0') << secs.count() % 60
+                  << " (" << p_lu_[ill].size() / 1048576 << " MiB)\n";
+    }
 }
 
 void MultiLevelPreconditioner::computeSigma_()
@@ -842,6 +843,11 @@ void MultiLevelPreconditioner::computeSigma_()
     // save the matrix
     spSigma_ = RowMatrix(SspSigma);
     psSigma_ = RowMatrix(SpsSigma);
+    
+    /// DEBUG
+    std::ofstream out;
+    out.open("spSigma.txt"); spSigma_.write(out); out.close();
+    out.open("psSigma.txt"); psSigma_.write(out); out.close();
 }
 
 void MultiLevelPreconditioner::rhs(cArrayView chi, int ienergy, int instate) const

@@ -97,11 +97,11 @@ class ColMatrix : public DenseMatrix
             : DenseMatrix(rows, cols, data) {}
         
         // transpose
-        RowMatrix T() const;
+        RowMatrix T () const;
         
         // column views
-        cArrayView col(int i) { return cArrayView(data(), i * rows(), rows()); }
-        const cArrayView col(int i) const { return cArrayView(data(), i * rows(), rows()); }
+        cArrayView col (int i) { return cArrayView(data(), i * rows(), rows()); }
+        const cArrayView col (int i) const { return cArrayView(data(), i * rows(), rows()); }
 };
 
 /**
@@ -130,6 +130,9 @@ class RowMatrix : public DenseMatrix
         // row views
         cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
         const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
+        
+        // write to file
+        void write (std::ofstream & out) const;
         
     private:
         

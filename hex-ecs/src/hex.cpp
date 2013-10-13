@@ -10,18 +10,14 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <algorithm>
 #include <cstdio>
 #include <cmath>
-#include <chrono>
-#include <cstring>
 #include <vector>
 #include <iostream>
 #include <string>
 #include <tuple>
 
 #include <gsl/gsl_errno.h>
-#include <omp.h>
 #include <H5Cpp.h>
 
 #include "amplitudes.h"
@@ -31,7 +27,6 @@
 #include "input.h"
 #include "itersolve.h"
 #include "misc.h"
-#include "matrix.h"
 #include "parallel.h"
 #include "preconditioners.h"
 #include "radial.h"

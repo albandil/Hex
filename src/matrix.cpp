@@ -95,7 +95,21 @@ RowMatrix operator * (RowMatrix const & A, ColMatrix const & B)
     return C;
 }
 
-CooMatrix kron(const CooMatrix& A, const CooMatrix& B)
+void RowMatrix::write (std::ofstream & out) const
+{
+    // data pointer
+    Complex const * ptr = data().begin();
+    
+    for (unsigned irow = 0; irow < rows(); irow++)
+    {
+        for (unsigned icol = 0; icol < cols(); icol++)
+            out << *ptr++ << " ";
+        
+        out << "\n";
+    }
+}
+
+CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
 {
     // shorthands
     size_t Asize = A.v().size();
