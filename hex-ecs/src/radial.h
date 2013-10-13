@@ -22,7 +22,7 @@
 #include "gauss.h"
 #include "parallel.h"
 #include "specf.h"
-#include "spmatrix.h"
+#include "matrix.h"
 
 class weightEdgeDamp
 {
@@ -83,7 +83,7 @@ class RadialIntegrals
         
         // public callable members
         void setupOneElectronIntegrals();
-        void setupTwoElectronIntegrals(Parallel const & par, size_t maxlambda);
+        void setupTwoElectronIntegrals(Parallel const & par, int maxlambda);
         
         /**
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$
@@ -189,7 +189,7 @@ class RadialIntegrals
          *                It is expected to have the "double operator() (Complex z)" interface,
          *                where the sent value is the complex coordinate.
          */
-        template <class Functor> cArray overlapP(int n, int l, Functor weightf)
+        template <class Functor> cArray overlapP (int n, int l, Functor weightf) const
         {
             cArray res(bspline_.Nspline());
             
@@ -254,7 +254,7 @@ class RadialIntegrals
          *                where the sent value is the complex coordinate.
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
-        template <class Functor> cArray overlapj(int maxell, std::vector<double> vk, Functor weightf)
+        template <class Functor> cArray overlapj (int maxell, const rArrayView vk, Functor weightf) const
         {
             // shorthands
             int Nenergy = vk.size();
@@ -318,6 +318,8 @@ class RadialIntegrals
             return res;
         }
         
+        Bspline const & bspline() const { return bspline_; }
+        
         SymDiaMatrix const & D() const { return D_; }
         SymDiaMatrix const & S() const { return S_; }
         SymDiaMatrix const & Mm1() const { return Mm1_; }
@@ -347,37 +349,5 @@ class RadialIntegrals
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
         Array<SymDiaMatrix> R_tr_dia_;
 };
-
-class MultiLevelPreconditioner : public RadialIntegrals
-{
-    public:
-        
-        // constructor
-        MultiLevelPreconditioner(Bspline const & bspline, int p_order)
-            : RadialIntegrals(bspline), s_bspline_(bspline),
-              p_bspline_(p_order, unique(bspline.rknots()), bspline.ECStheta(), bspline.cknots()) {}
-        
-        // initialization of the preconditioner (computation of the radial integrals)
-        void setup(Parallel const & par, size_t maxlambda)
-        {
-            RadialIntegrals::setupOneElectronIntegrals();
-            RadialIntegrals::setupTwoElectronIntegrals(par, maxlambda);
-        }
-        
-        // preconditioning
-        void precondition(const cArrayView r, cArrayView z) const
-        {
-            // TODO ...
-            z = r;
-        }
-        
-    private:
-        
-        // B-spline environment for the computation
-        Bspline const & s_bspline_;
-        
-        // B-spline environment for the preconditioner
-        Bspline p_bspline_;
-}
 
 #endif

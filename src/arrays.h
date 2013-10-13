@@ -55,14 +55,16 @@ public:
     typedef NumberType const * const_iterator;
     
     // empty constructor
-    ArrayView() : N(0), array(nullptr) {}
+    ArrayView()
+        : N(0), array(nullptr) {}
+    
+    // copy constructor
+    ArrayView(ArrayView const & a, size_t i = 0, size_t n = 0)
+        : N(n == 0 ? a.N : n), array(a.array + i) { assert(i + N <= a.N); }
     
     // construct view from Array non-const lvalue reference
     ArrayView(Array<NumberType> & a, size_t i = 0, size_t n = 0)
-    {
-        N = (n > 0) ? n : a.size();
-        array = a.data() + i;
-    }
+        : N(n == 0 ? a.size() : n), array(a.data() + i) { assert(i + N <= a.size()); }
     
     // construct view from Array const lvalue reference
     ArrayView(Array<NumberType> const & a, size_t i = 0, size_t n = 0)
@@ -537,12 +539,13 @@ private:
         
         // allocate the aligned memory; make sure there will be even number of elements
         // so that we can always use pairs
-        void* aligned_ptr;
-        posix_memalign (
+        void* aligned_ptr = nullptr;
+        int err = posix_memalign (
             &aligned_ptr,
             std::max(__alignof(NumberType), sizeof(void*)),
             (n + (n % 2)) * sizeof(NumberType)
         );
+        assert(err == 0);
         
         // get the number pointer
         NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
@@ -1270,23 +1273,24 @@ template <typename NumberType1, typename NumberType2> auto operator | (
     return result;
 }
 
-template <typename NumberType1, typename NumberType2> auto outer_product (
-    ArrayView<NumberType1> const & a, ArrayView<NumberType2> const & b
-) -> NumberArray<decltype(NumberType1(0) * NumberType2(0))>
+template <class T1, class T2> auto outer_product (
+    const ArrayView<T1> a,
+    const ArrayView<T2> b
+) -> NumberArray<decltype(T1(0) * T2(0))>
 {
-    NumberArray<decltype(NumberType1(0) * NumberType2(0))> c(a.size()*b.size());
+    NumberArray<decltype(T1(0) * T2(0))> c (a.size() * b.size());
     
     auto ic = c.begin();
     
     for (auto a_ : a)
-        for (auto b_ : b)
-            *(ic++) = a_ * b_;
-        
-        return c;
+    for (auto b_ : b)
+        *(ic++) = a_ * b_;
+    
+    return c;
 }
 
 // output to text stream.
-template <typename NumberType> std::ostream & operator << (std::ostream & out, ArrayView<NumberType> const & a)
+template <typename T> std::ostream & operator << (std::ostream & out, ArrayView<T> const & a)
 {
     out << "[";
     for (size_t i = 0; i < a.size(); i++)
@@ -1699,6 +1703,28 @@ template <typename T> NumberArray<T> join (Array<NumberArray<T>> const & arrays)
     }
     
     return res;
+}
+
+/**
+ * Drop all repetitions from sorted array.
+ */
+template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v)
+{
+    // create output array
+    NumberArray<T> w(v.size());
+    
+    // iterators
+    T * iw = w.begin();
+    T const * iv = v.begin();
+    
+    // copy all elements, drop repetitions
+    for (; iv != v.end(); iv++)
+        if (iw == w.begin() or *(iw - 1) != *iv)
+            *(iw++) = *iv;
+    
+    // resize and return output array
+    w.resize(iw - w.begin());
+    return w;
 }
 
 #endif

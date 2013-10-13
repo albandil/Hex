@@ -21,21 +21,16 @@
 
 #include "arrays.h"
 #include "input.h"
-#include "itersolve.h"
 #include "matrix.h"
+#include "preconditioners.h"
 
 /*
  * Load data from input file. Default filename is "hex.inp", but different
  * can be specified using the --input/-i option.
  */
 
-void parse_command_line (
-    int argc, char* argv[],
-    std::ifstream & inputfile,
-    std::string & zipfile, int & zipcount, double & zipmax,
-    bool & parallel, int & preconditioner, double & droptol,
-    int & itinerary
-){
+void CommandLine::parse(int argc, char* argv[])
+{
     // set short options
     char const * const short_options  = "ei:hz:n:R:mabcd:p:";
     
@@ -202,6 +197,7 @@ void parse_command_line (
                 else if (strcmp(optarg,"sILU")   == 0) preconditioner = silu_prec;
                 else if (strcmp(optarg,"bILU")   == 0) preconditioner = bilu_prec;
                 else if (strcmp(optarg,"SPAI")   == 0) preconditioner = spai_prec;
+                else if (strcmp(optarg,"res")    == 0) preconditioner = res_prec;
                 else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }
@@ -310,16 +306,8 @@ double read_dbl(std::ifstream& f)
     }
 }
 
-void parse_input_file (
-    std::ifstream& inputfile,
-    int& order, double& ecstheta, 
-    rArray& rknots, rArray& cknots,
-    int& ni,
-    std::vector<std::tuple<int,int,int>>& instates,
-    std::vector<std::tuple<int,int,int>>& outstates,
-    int& L, int& Spin, int& Pi, int& maxell,
-    rArray& Ei, double& B
-){
+void InputFile::read (std::ifstream & inputfile)
+{
     double x;
     
     // load B-spline parameters
@@ -389,6 +377,7 @@ void parse_input_file (
     
     // construct complex(-to-be) knot sequence
     for (unsigned i = 0; i < cknots_begin.size(); i++)
+    {
         cknots = concatenate (
             cknots,
             linspace(
@@ -397,7 +386,8 @@ void parse_input_file (
                 cknots_samples[i]
             )
         );
-
+    }
+    
     std::cout << "\n---------  Complex knots  ------------\n";
     for (auto knot = cknots.begin(); knot != cknots.end(); knot++)
         std::cout << *knot << " ";
@@ -521,12 +511,12 @@ void parse_input_file (
         L = read_int(inputfile);
         Spin = read_int(inputfile) % 2;
         Pi = read_int(inputfile) % 2;
-        maxell = read_int(inputfile);
+        levels = read_int(inputfile);
         
-        if (L + L%2 + maxell < maxli)
+        if (L + L%2 + levels < maxli)
             throw exception("Input error: ℓ is smaller than some initial angular momenta.\n");
         
-        if (L + L%2 + maxell < maxlf)
+        if (L + L%2 + levels < maxlf)
             throw exception("Input error: ℓ is smaller than some final angular momenta.\n");
         
     } catch (std::exception e) {
@@ -542,7 +532,7 @@ void parse_input_file (
     std::cout << "L = " << L << "\n";
     std::cout << "S = " << Spin << "\n";
     std::cout << "Π = " << Pi << "\n";
-    std::cout << "ℓ = " << maxell << "\n";
+    std::cout << "ℓ = " << levels << "\n";
     
     std::cout << "\n----------  Initial atomic states  -------------\n";
     for (auto state : instates)

@@ -19,8 +19,8 @@
 
 #include "arrays.h"
 #include "bspline.h"
-#include "moments.h"
 #include "gauss.h"
+#include "radial.h"
 
 /**
  * Potential suppressing factor. 

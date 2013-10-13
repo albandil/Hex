@@ -12,14 +12,15 @@
 
 #include <algorithm>
 #include <complex>
+#include <cstdio>
 
 #include <omp.h>
 
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
-#include "moments.h"
 #include "parallel.h"
+#include "radial.h"
 
 /**
  * Potential suppressing factor. 
@@ -250,35 +251,41 @@ Complex RadialIntegrals::computeM(int a, int i, int j, int maxknot) const
 
 void RadialIntegrals::setupOneElectronIntegrals()
 {
-    std::cout << "Loading/precomputing derivative overlaps... ";
+    // create file names for this radial integrals
+    char D_name[20], S_name[20], Mm1_name[20], Mm1_tr_name[20], Mm2_name[20];
+    std::snprintf (D_name,      sizeof(D_name),      "%d-D.hdf",      bspline_.order());
+    std::snprintf (S_name,      sizeof(S_name),      "%d-S.hdf",      bspline_.order());
+    std::snprintf (Mm1_name,    sizeof(Mm1_name),    "%d-Mm1.hdf",    bspline_.order());
+    std::snprintf (Mm1_tr_name, sizeof(Mm1_tr_name), "%d-Mm1_tr.hdf", bspline_.order());
+    std::snprintf (Mm2_name,    sizeof(Mm2_name),    "%d-Mm2.hdf",    bspline_.order());
     
-    D_.hdfload("D.hdf") or D_.populate (
+    // load/compute derivative overlaps
+    std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
+    D_.hdfload(D_name) or D_.populate (
         bspline_.order(), [=](int i, int j) -> Complex { return computeD(i, j, bspline_.Nknot() - 1); }
-    ).hdfsave("D.hdf");
+    ).hdfsave(D_name);
     
-    std::cout << "ok\n\nLoading/precomputing integral moments... ";
-    
-    S_.hdfload("S.hdf") or S_.populate (
+    // load/compute integral moments
+    std::cout << "ok\n\nLoading/precomputing integral moments... " << std::flush;
+    S_.hdfload(S_name) or S_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave("S.hdf");
-    //
-    Mm1_.hdfload("Mm1.hdf") or Mm1_.populate (
+    ).hdfsave(S_name);
+    Mm1_.hdfload(Mm1_name) or Mm1_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave("Mm1.hdf");
-    //
-    Mm1_tr_.hdfload("Mm1_tr.hdf") or Mm1_tr_.populate (
+    ).hdfsave(Mm1_name);
+    Mm1_tr_.hdfload(Mm1_tr_name) or Mm1_tr_.populate (
         bspline_.order(),    [=](int m, int n) -> Complex { return computeM(-1, m, n, bspline_.Nreknot() - 1);}
-    ).hdfsave("Mm1_tr.hdf");
-    //
-    Mm2_.hdfload("Mm2.hdf") or Mm2_.populate (
+    ).hdfsave(Mm1_tr_name);
+    Mm2_.hdfload(Mm2_name) or Mm2_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave("Mm2.hdf");
-    
+    ).hdfsave(Mm2_name);
     std::cout << "ok\n\n";
 }
 
-void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t maxlambda)
+void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, int maxlambda)
 {
+    char R_name[50];
+    
     // allocate storage
     R_tr_dia_.resize(maxlambda + 1);
     
@@ -299,20 +306,17 @@ void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t max
     int order = bspline_.order();
     
     // for all multipoles : compute / load
-    for (int lambda = 0; lambda <= (int)maxlambda; lambda++)
+    for (int lambda = 0; lambda <= maxlambda; lambda++)
     {
         // this process will only compute a subset of radial integrals
         if (lambda % par.Nproc() != par.iproc())
             continue;
         
         // look for precomputed data on disk
-        std::ostringstream oss2;
-        oss2 << "R_tr_dia_" << lambda << ".hdf";
-        int R_integ_exists = R_tr_dia_[lambda].hdfload(oss2.str().c_str());
-        
-        if (R_integ_exists)
+        std::snprintf(R_name, sizeof(R_name), "%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+        if (R_tr_dia_[lambda].hdfload(R_name))
         {
-            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << oss2.str().c_str() << "\"\n";
+            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_name << "\"\n";
             continue; // no need to compute
         }
         
@@ -362,7 +366,7 @@ void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t max
         
         // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
-        R_tr_dia_[lambda].hdfsave(oss2.str().c_str(), true, 10);
+        R_tr_dia_[lambda].hdfsave(R_name, true, 10);
         
         std::cout << "\t- integrals for λ = " << lambda << " computed\n";
     }
@@ -371,7 +375,7 @@ void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t max
 #ifndef NO_MPI
     if (par.active())
     {
-        for (int lambda = 0; lambda <= (int)maxlambda; lambda++)
+        for (int lambda = 0; lambda <= maxlambda; lambda++)
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();
@@ -399,13 +403,12 @@ void RadialIntegrals::setupTwoElectronIntegrals(Parallel const & par, size_t max
             
             if (owner != par.iproc())
             {
-                std::cout << "\t- integrals for λ = " << lambda << " retrieved from process " << owner << "\n";
+                std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << "\n";
                 
                 // save to disk (if the file doesn't already exist)
-                std::ostringstream oss3;
-                oss3 << "R_tr_dia_" << lambda << ".hdf";
-                if (not HDFFile(oss3.str().c_str(), HDFFile::readonly).valid())
-                    R_tr_dia_[lambda].hdfsave(oss3.str().c_str(), true, 10);
+                std::snprintf(R_name, sizeof(R_name), "%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+                if (not HDFFile(R_name, HDFFile::readonly).valid())
+                    R_tr_dia_[lambda].hdfsave(R_name, true, 10);
             }
         }
         MPI_Barrier(MPI_COMM_WORLD);

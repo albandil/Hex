@@ -24,7 +24,7 @@
 #include "bspline.h"
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
-#include "moments.h"
+#include "radial.h"
 #include "specf.h"
 #include "matrix.h"
 

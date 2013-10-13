@@ -20,18 +20,6 @@
 #include "complex.h"
 #include "matrix.h"
 
-typedef enum {
-    no_prec,
-    jacobi_prec,
-    ssor_prec,
-    dic_prec, // diagonal incomplete Choleski
-    ilu_prec , // droptol-incomplete LU
-    silu_prec,
-    bilu_prec,
-    res_prec, // multi-resolution preconditioner
-    spai_prec // sparse approximate inverse
-} Preconditioner;
-
 /**
  * @brief Sparse incomplete Cholesky decomposition.
  * 

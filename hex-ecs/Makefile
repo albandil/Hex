@@ -29,7 +29,7 @@ CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
 FILES = amplitudes arrays gauss bspline hdffile hex input itersolve \
-	matrix moments slater specf version
+	matrix preconditioners radial slater specf version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
