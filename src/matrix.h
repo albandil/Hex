@@ -190,9 +190,9 @@ public:
         : m_(0), n_(0) {}
     CscMatrix(size_t m, size_t n)
         : m_(m), n_(n) {}
-    CscMatrix(const CscMatrix& A)
+    CscMatrix(CscMatrix const & A)
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
-    CscMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
+    CscMatrix(size_t m, size_t n, lCArrayView p, lCArrayView i, cCArrayView x)
         : m_(m), n_(n), p_(p), i_(i), x_(x) {}
     
     // Destructor
@@ -210,7 +210,7 @@ public:
      * format.
      * @param b Vector to multiply with.
      */
-    cArray dotT(cArrayView const &  b) const;
+    cArray dotT(cCArrayView b) const;
     
     // Getters
     
@@ -818,7 +818,7 @@ public:
     }
     
     // Addition.
-    CooMatrix& operator += (const CooMatrix& A)
+    CooMatrix& operator += (CooMatrix const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
@@ -833,7 +833,7 @@ public:
     }
     
     // Subtraction.
-    CooMatrix& operator -= (const CooMatrix& A)
+    CooMatrix& operator -= (CooMatrix const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
@@ -1090,7 +1090,7 @@ public:
     iArray const & diag() const { return idiag_; }
     int diag(int i) const { return idiag_[i]; }
     cArray const & data() const { return elems_; }
-    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
+    ConstArrayView<Complex> main_diagonal() const { return ConstArrayView<Complex>(elems_, 0, n_); }
     Complex const * dptr(int i) const { return dptrs_[i]; }
     
     iArray & diag() { return idiag_; }
@@ -1124,7 +1124,7 @@ public:
      * @param triangle Whether to use only the upper or only the lower or both triangles
      *                 of the othwerwise symmetric matrix.
      */
-    cArray dot (cArrayView B, MatrixTriangle triangle = both) const;
+    cArray dot (cCArrayView B, MatrixTriangle triangle = both) const;
     
     /**
      * @brief Back-substitution (lower).
@@ -1134,7 +1134,7 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray lowerSolve (cArrayView b) const;
+    cArray lowerSolve (cCArrayView b) const;
     
     /**
      * @brief Back-substitution (upper).
@@ -1144,7 +1144,7 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray upperSolve (cArrayView b) const;
+    cArray upperSolve (cCArrayView b) const;
     
     /**
      * @brief Kronecker product.

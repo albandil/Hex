@@ -362,7 +362,7 @@ StgSolve:
                 matrix_multiply           // matrix multiplication callback
             );
             std::cout << "\tEnd CG callback\n";
-                
+            
             // update progress
             iterations_done += iterations;
             computations_done++;

@@ -1378,7 +1378,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
         for (auto id : idiag_)
         {
             idiags.insert(id);
-            diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+            diags[id] = cCArrayView(elems_, dataptr, n_ - id);
             dataptr += n_ - id;
         }
         
@@ -1389,9 +1389,9 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
             idiags.insert(id);
             
             if (diags[id].size() == 0)
-                diags[id] = cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+                diags[id] = cCArrayView(elems_, dataptr, n_ - id);
             else
-                diags[id] += cArray(elems_.data() + dataptr, elems_.begin() + dataptr + n_ - id);
+                diags[id] += cCArrayView(elems_, dataptr, n_ - id);
             
             dataptr += n_ - id;
         }
@@ -1797,7 +1797,7 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
     return ::kron (this->tocoo(), B.tocoo()).todia();
 }
 
-cArray SymDiaMatrix::lowerSolve(cArrayView b) const
+cArray SymDiaMatrix::lowerSolve(cCArrayView b) const
 {
     assert(size() == b.size());
     
@@ -1838,7 +1838,7 @@ cArray SymDiaMatrix::lowerSolve(cArrayView b) const
     return x;
 }
 
-cArray SymDiaMatrix::upperSolve(cArrayView b) const
+cArray SymDiaMatrix::upperSolve(cCArrayView b) const
 {
     assert(size() == b.size());
     
