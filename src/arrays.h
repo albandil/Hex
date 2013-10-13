@@ -542,10 +542,13 @@ private:
         void* aligned_ptr = nullptr;
         int err = posix_memalign (
             &aligned_ptr,
-            std::max(__alignof(NumberType), sizeof(void*)),
+            std::max(std::alignment_of<NumberType>::value, sizeof(void*)),
             (n + (n % 2)) * sizeof(NumberType)
         );
-        assert(err == 0);
+        
+        // check memory allocation success
+        if (err != 0)
+            throw exception ("[NumberArray<T>::alloc_] Aligned memory allocation error (%d).", err);
         
         // get the number pointer
         NumberType* ptr = reinterpret_cast<NumberType*>(aligned_ptr);
