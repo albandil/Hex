@@ -17,6 +17,7 @@
 #include "../interpolate.h"
 #include "../specf.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string ScatteringAmplitude::Id = "scatamp";
 const std::string ScatteringAmplitude::Description = "Scattering amplitude.";
@@ -171,7 +172,7 @@ bool ScatteringAmplitude::run (
 	cArray amplitudes = scattering_amplitude(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"

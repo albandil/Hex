@@ -17,6 +17,7 @@
 
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string TotalCrossSection::Id = "tcs";
 const std::string TotalCrossSection::Description = "Total cross section.";
@@ -93,7 +94,7 @@ bool TotalCrossSection::run (
 	}
 	
 	// write header
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Total cross section in " << unit_name(Lunits) << " for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << "\n" <<
 	    "# ordered by energy in " << unit_name(Eunits) << "\n" <<

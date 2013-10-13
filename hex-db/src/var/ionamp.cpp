@@ -20,6 +20,7 @@
 #include "../specf.h"
 #include "../variables.h"
 #include "../vec3d.h"
+#include "../version.h"
 
 const std::string IonizationAmplitude::Id = "ionamp";
 const std::string IonizationAmplitude::Description = "Ionization amplitude.";
@@ -186,7 +187,7 @@ bool IonizationAmplitude::run (
 	}
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Ionization amplitudes in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<

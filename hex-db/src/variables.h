@@ -178,9 +178,6 @@ public:
 		sqlitepp::session & db,
 		std::map<std::string,std::string> const & params
 	) const = 0;
-	
-	/// Returns the program logo for use in output.
-	std::string logo() const;
 };
 
 /**

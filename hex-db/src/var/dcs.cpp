@@ -20,6 +20,7 @@
 #include "../interpolate.h"
 #include "../specf.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string DifferentialCrossSection::Id = "dcs";
 const std::string DifferentialCrossSection::Description = "Differential cross section.";
@@ -154,7 +155,7 @@ bool DifferentialCrossSection::run (
 	rArray dcs = differential_cross_section(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Differential cross section in " << unit_name(Lunits) << " for \n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

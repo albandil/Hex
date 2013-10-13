@@ -20,6 +20,7 @@
 #include "../specf.h"
 #include "../variables.h"
 #include "../vec3d.h"
+#include "../version.h"
 
 const std::string TripleDifferentialCrossSection::Id = "tdcs";
 const std::string TripleDifferentialCrossSection::Description = "Triple differential ionization cross section.";
@@ -182,7 +183,7 @@ bool TripleDifferentialCrossSection::run (
 	}
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Triple differential cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     S = " << S << ", Ei = " << Ei / efactor << " " << unit_name(Eunits) << "\n" <<

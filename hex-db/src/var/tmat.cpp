@@ -17,6 +17,7 @@
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string TMatrix::Id = "tmat";
 const std::string TMatrix::Description = "T-matrix.";
@@ -130,7 +131,7 @@ bool TMatrix::run (
 	cArray T_out = interpolate(E_arr, T_arr, energies * efactor);
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# T-matrices in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

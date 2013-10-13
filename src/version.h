@@ -13,6 +13,8 @@
 #ifndef HEX_VERSION_H
 #define HEX_VERSION_H
 
+#include <string>
+
 /**
  * @brief Commit SHA identificator.
  * 
@@ -23,5 +25,13 @@
  * @endcode
  */
 extern char const * commit_hash;
+
+/**
+ * @brief Get ASCII logo.
+ * 
+ * Return the application ASCII logo for use in text outputs.
+ */
+std::string logo ();
+std::string logo_raw ();
 
 #endif

@@ -21,6 +21,7 @@
 #include "../chebyshev.h"
 #include "../variables.h"
 #include "../vec3d.h"
+#include "../version.h"
 
 const std::string IonizationF::Id = "ionf";
 const std::string IonizationF::Description = "Ionization amplitude radial part.";
@@ -153,7 +154,7 @@ bool IonizationF::run (
 	}
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Ionization amplitudes (radial part) in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     L = " << L << ", S = " << S << ", ℓ₁ = " << l1 << ", ℓ₂ = " << l2 << "\n" <<

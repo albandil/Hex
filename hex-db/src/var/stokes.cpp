@@ -17,6 +17,7 @@
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 //
 // forward declaration of recycled subroutines from other variables
@@ -144,7 +145,7 @@ bool StokesParameters::run (
 	rArray Pplus = hypot(Pl, P3);
 	
 	// write out
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Stokes parameters for\n"
 		"#     ni = " << ni << ", li = " << 0 << ",\n"
 	    "#     nf = " << nf << ", lf = " << 1 << ",\n"

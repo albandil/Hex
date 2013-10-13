@@ -17,6 +17,7 @@
 
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string CollisionStrength::Id = "colls";
 const std::string CollisionStrength::Description = "Collision strength (energy scaled integral cross section).";
@@ -105,7 +106,7 @@ bool CollisionStrength::run (
 	}
 	
 	// write header
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Collision strength (dimensionless) for\n"
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

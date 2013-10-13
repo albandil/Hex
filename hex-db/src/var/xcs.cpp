@@ -17,6 +17,7 @@
 #include "../interpolate.h"
 #include "../specf.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string ExtrapolatedCrossSection::Id = "xcs";
 const std::string ExtrapolatedCrossSection::Description = "Extrapolated cross section (using Aitken Δ²-process).";
@@ -151,7 +152,7 @@ bool ExtrapolatedCrossSection::run (
 	}
 	
 	// write header
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Extrapolated and complete cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

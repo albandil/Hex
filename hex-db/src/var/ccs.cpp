@@ -17,6 +17,7 @@
 
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string CompleteCrossSection::Id = "ccs";
 const std::string CompleteCrossSection::Description = "Complete cross section (L- and S-summed integral cross section).";
@@ -118,7 +119,7 @@ bool CompleteCrossSection::run (
 	}
 	
 	// write header
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Complete cross section in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

@@ -17,6 +17,7 @@
 #include "../specf.h"
 #include "../interpolate.h"
 #include "../variables.h"
+#include "../version.h"
 
 const std::string MomentumTransfer::Id = "momtf";
 const std::string MomentumTransfer::Description = "Momentum transfer.";
@@ -165,7 +166,7 @@ bool MomentumTransfer::run (
 	eta *= 1. / (4. * M_PI * M_PI);
 	
 	// write header
-	std::cout << this->logo() <<
+	std::cout << logo() <<
 		"# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
 		"#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
 	    "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
