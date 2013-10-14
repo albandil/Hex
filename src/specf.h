@@ -256,21 +256,6 @@ public:
     
     /// Evaluate the function.
     virtual T operator() (double x) const = 0;
-    
-    /**
-     * @brief Evaluate asymptotic form near to zero.
-     * @param x Evaluation radius.
-     * @return Pair (Complex y, int k) that can be used to reconstruct the value using
-     * @f[
-     *     f(x) = y \cdot x^k
-     * @f]
-     */
-    virtual std::pair<T,int> getZeroAsymptotic (double x) const = 0;
-    
-    /**
-     * @brief Classical turning point.
-     */
-    virtual double getTurningPoint () const = 0;
 };
 
 /**

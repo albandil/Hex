@@ -11,15 +11,14 @@ LFLAGS = $(LDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 # LFLAGS = $(LRILIS)
 
-FILES = arrays coulomb dwba1 dwba2 hdffile hydrogen main multi potential \
-	specf wave_distort wave_forbid wave_hyperb wave_irreg
+FILES = arrays dwba1 hdffile hydrogen main potential specf wave_distort
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-all: bin/dwba
+all: bin/hex-dwba
 
-bin/dwba: $(OBJECTS)
+bin/hex-dwba: $(OBJECTS)
 	@mkdir -p $(@D)
 	g++ $^ $(LFLAGS) -o $@
 
