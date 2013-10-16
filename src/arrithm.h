@@ -174,9 +174,9 @@ declareDeepBinaryOperatorTemplates(NumberArray, -, NumberArray)
 declareDeepBinaryOperatorTemplates(NumberArray, *, NumberArray)
 declareDeepBinaryOperatorTemplates(NumberArray, /, NumberArray)
 
-declareDeepBinaryOperatorTemplates(NumberArray, +, ArrayView)
-declareDeepBinaryOperatorTemplates(NumberArray, -, ArrayView)
-declareDeepBinaryOperatorTemplates(NumberArray, *, ArrayView)
-declareDeepBinaryOperatorTemplates(NumberArray, /, ArrayView)
+declareDeepBinaryOperatorTemplates(Array, +, ArrayView)
+declareDeepBinaryOperatorTemplates(Array, -, ArrayView)
+declareDeepBinaryOperatorTemplates(Array, *, ArrayView)
+declareDeepBinaryOperatorTemplates(Array, /, ArrayView)
 
 #endif
