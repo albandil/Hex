@@ -399,10 +399,10 @@ class MultiLevelPreconditioner : public NoPreconditioner
         Complex computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const;
         
         // transfer overlap matrix (s|p) multiplied from left by S⁻¹ (in s-basis)
-        RowMatrix spSigma_;
+        RowMatrix<Complex> spSigma_;
         
         // transfer overlap matrix (p|s) multiplied from left by S⁻¹ (in p-basis)
-        RowMatrix psSigma_;
+        RowMatrix<Complex> psSigma_;
         
         // solution objects
         

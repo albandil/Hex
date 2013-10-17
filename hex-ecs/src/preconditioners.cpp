@@ -778,8 +778,8 @@ void MultiLevelPreconditioner::computeSigma_()
     int qord = std::max (2, (ords + ordp) / 2);
     
     // allocate memory
-    ColMatrix spSigma (Nss, Nsp, cArray(N)), SspSigma (Nss, Nsp, cArray(N));
-    ColMatrix psSigma (Nsp, Nss, cArray(N)), SpsSigma (Nsp, Nss, cArray(N));
+    ColMatrix<Complex> spSigma (Nss, Nsp, cArray(N)), SspSigma (Nss, Nsp, cArray(N));
+    ColMatrix<Complex> psSigma (Nsp, Nss, cArray(N)), SpsSigma (Nsp, Nss, cArray(N));
     
     // for all B-splines
     for (int iss = 0; iss < Nss; iss++)
@@ -806,8 +806,8 @@ void MultiLevelPreconditioner::computeSigma_()
     
     /// DEBUG
     std::ofstream out;
-    out.open("spSigma0.txt"); RowMatrix(spSigma).write(out); out.close();
-    out.open("psSigma0.txt"); RowMatrix(psSigma).write(out); out.close();
+    out.open("spSigma0.txt"); RowMatrix<Complex>(spSigma).write(out); out.close();
+    out.open("psSigma0.txt"); RowMatrix<Complex>(psSigma).write(out); out.close();
     
     // compute inverse overlap matrices
     CsrMatrix csrSs = s_rad_.S().tocoo().tocsr();
@@ -822,12 +822,14 @@ void MultiLevelPreconditioner::computeSigma_()
         SpsSigma.col(icol) = luSp.solve(psSigma.col(icol));
     
     // save the matrix
-    spSigma_ = RowMatrix(SspSigma);
-    psSigma_ = RowMatrix(SpsSigma);
+    spSigma_ = RowMatrix<Complex>(SspSigma);
+    psSigma_ = RowMatrix<Complex>(SpsSigma);
     
     /// DEBUG
     out.open("spSigma.txt"); spSigma_.write(out); out.close();
     out.open("psSigma.txt"); psSigma_.write(out); out.close();
+    out.open("ABSspSigma.txt"); RowMatrix<double>(spSigma_.rows(), spSigma_.cols(), abs(spSigma_.data())).write(out); out.close();
+    out.open("ABSpsSigma.txt"); RowMatrix<double>(psSigma_.rows(), psSigma_.cols(), abs(psSigma_.data())).write(out); out.close();
 }
 
 void MultiLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
@@ -861,16 +863,16 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
             auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
             {
                 // reinterpret rs as a column matrix
-                ColMatrix Rs (Nss, Nss, r);
+                ColMatrix<Complex> Rs (Nss, Nss, r);
                 
                 // convert R^s to preconditioner basis
-                ColMatrix Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
+                ColMatrix<Complex> Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
                 
                 // solve the low-order system of equations
-                ColMatrix Zp (Nsp, Nsp, p_lu_[ill].solve(Rp.data()));
+                ColMatrix<Complex> Zp (Nsp, Nsp, p_lu_[ill].solve(Rp.data()));
                 
                 // convert Z^p to solver basis
-                ColMatrix Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
+                ColMatrix<Complex> Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
                 
                 // use the segment
                 z = Zs.data();

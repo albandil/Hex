@@ -31,8 +31,8 @@
 
 // declaration of classes in order to enable them as return types
 // of other classes before proper definition
-class RowMatrix;
-class ColMatrix;
+template <class T> class RowMatrix;
+template <class T> class ColMatrix;
 class CooMatrix;
 class CscMatrix;
 class CsrMatrix;
@@ -43,7 +43,7 @@ class SymDiaMatrix;
  * 
  * Base class for row- and column- oriented matrices.
  */
-class DenseMatrix
+template <class T> class DenseMatrix
 {
     public:
         
@@ -52,19 +52,19 @@ class DenseMatrix
             : rows_(0), cols_(0), data_() {}
         DenseMatrix(int rows, int cols)
             : rows_(rows), cols_(cols), data_(rows * cols) {}
-        DenseMatrix(int rows, int cols, const cArrayView data)
+        DenseMatrix(int rows, int cols, const ArrayView<T> data)
             : rows_(rows), cols_(cols), data_(data) { assert(data.size() == (size_t)(rows * cols)); }
         
         // explicit conversion to cArrayView
-        cArrayView data () { return data_; }
-        const cArrayView data () const { return data_; }
+        ArrayView<T> data () { return data_; }
+        const ArrayView<T> data () const { return data_; }
         
         // getters
         size_t size () const { return rows_ * cols_; }
         int cols () const { return cols_; }
         int rows () const { return rows_; }
-        Complex * begin () { return data_.begin(); }
-        Complex const * begin () const { return data_.begin(); }
+        T * begin () { return data_.begin(); }
+        T const * begin () const { return data_.begin(); }
         
     private:
         
@@ -75,7 +75,7 @@ class DenseMatrix
         int cols_;
         
         /// Matrix elements, consecutive rows joined to one array.
-        cArray data_;
+        NumberArray<T> data_;
 };
 
 /**
@@ -84,28 +84,55 @@ class DenseMatrix
  * This class represents a generally non-symmetric dense matrix. It is
  * an encapsulation of the cArray class with some operators bundled to it.
  */
-class ColMatrix : public DenseMatrix
+template <class Type> class ColMatrix : public DenseMatrix<Type>
 {
     public:
         
         // constructor
         ColMatrix ()
-            : DenseMatrix() {}
+            : DenseMatrix<Type>() {}
         ColMatrix (int rows, int cols)
-            : DenseMatrix(rows, cols) {}
-        ColMatrix (int rows, int cols, const cArrayView data)
-            : DenseMatrix(rows, cols, data) {}
+            : DenseMatrix<Type>(rows, cols) {}
+        ColMatrix (int rows, int cols, const ArrayView<Type> data)
+            : DenseMatrix<Type>(rows, cols, data) {}
         
         // transpose
-        RowMatrix T () const;
+        RowMatrix<Type> T () const
+        {
+            return RowMatrix<Type>
+            (
+                this->cols(),
+                this->rows(),
+                this->data()
+            );
+        }
         
         // column views
-        cArrayView col (int i) { return cArrayView(data(), i * rows(), rows()); }
-        const cArrayView col (int i) const { return cArrayView(data(), i * rows(), rows()); }
+        ArrayView<Type> col (int i)
+        {
+            return ArrayView<Type>
+            (
+                this->data(),
+                i * this->rows(),
+                this->rows()
+            );
+        }
+        const ArrayView<Type> col (int i) const
+        {
+            return ArrayView<Type>
+            (
+                this->data(),
+                i * this->rows(),
+                this->rows()
+            );
+        }
         
         // element access
-        Complex operator() (int i, int j) const { return col(j)[i]; }
-        Complex & operator() (int i, int j) { return col(j)[i]; }
+        Type operator() (int i, int j) const { return col(j)[i]; }
+        Type & operator() (int i, int j) { return col(j)[i]; }
+        
+    private:
+        
 };
 
 /**
@@ -114,44 +141,129 @@ class ColMatrix : public DenseMatrix
  * This class represents a generally non-symmetric dense matrix. It is
  * an encapsulation of the cArray class with some operators bundled to it.
  */
-class RowMatrix : public DenseMatrix
+template <class Type> class RowMatrix : public DenseMatrix<Type>
 {
     public:
         
         // constructor
         RowMatrix ()
-            : DenseMatrix() {}
+            : DenseMatrix<Type>() {}
         RowMatrix (int rows, int cols)
-            : DenseMatrix(rows, cols) {}
-        RowMatrix (int rows, int cols, const cArrayView data)
-            : DenseMatrix(rows, cols, data) {}
-        RowMatrix (ColMatrix const & m)
-            : DenseMatrix(m.rows(), m.cols(), m.data()) { reorder_(); }
+            : DenseMatrix<Type>(rows, cols) {}
+        RowMatrix (int rows, int cols, const ArrayView<Type> data)
+            : DenseMatrix<Type>(rows, cols, data) {}
+        RowMatrix (ColMatrix<Type> const & m)
+            : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
         
         // transpose
-        ColMatrix T() const;
+        ColMatrix<Type> T() const
+        {
+            return ColMatrix<Type>
+            (
+                this->cols(),
+                this->rows(),
+                this->data()
+            );
+        }
         
         // row views
-        cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
-        const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
+        ArrayView<Type> row(int i)
+        {
+            return ArrayView<Type>
+            (
+                this->data(),
+                i * this->cols(),
+                this->cols()
+            );
+        }
+        const ArrayView<Type> row(int i) const
+        {
+            return ArrayView<Type>
+            (
+                this->data(),
+                i * this->cols(),
+                this->cols()
+            );
+        }
         
         // element access
-        Complex operator() (int i, int j) const { return row(i)[j]; }
-        Complex & operator() (int i, int j) { return row(i)[j]; }
+        Type operator() (int i, int j) const { return row(i)[j]; }
+        Type & operator() (int i, int j) { return row(i)[j]; }
         
         // write to file
-        void write (std::ofstream & out) const;
+        void write (std::ofstream & out) const
+        {
+            // data pointer
+            Type const * ptr = this->data().begin();
+            
+            for (int irow = 0; irow < this->rows(); irow++)
+            {
+                for (int icol = 0; icol < this->cols(); icol++)
+                    out << *ptr++ << " ";
+                
+                out << "\n";
+            }
+        }
         
     private:
         
         /// Change "data" from column-oriented to row-oriented.
-        void reorder_();
+        void reorder_ ()
+        {
+            cArray new_data(this->data().size());
+            
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                new_data[irow * this->cols() + icol] = this->data()[icol * this->rows() + irow];
+            
+            this->data() = new_data;
+        }
 };
 
 /**
  * @brief Dense matrix multiplication.
  */
-RowMatrix operator * (RowMatrix const & A, ColMatrix const & B);
+template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
+{
+    assert(A.cols() == B.rows());
+    
+    // sizes
+    int rows = A.rows();
+    int cols = B.cols();
+    int comm = A.cols();
+    
+    // output matrix, initialized to zero
+    RowMatrix<Type> C(A.rows(), B.cols());
+    
+    // data pointers
+    Complex const * restrict pA = A.begin();
+    Complex const * restrict pB = B.begin();
+    Complex       * restrict pC = C.begin();
+    
+    // for all rows of A
+    for (int irow = 0; irow < rows; irow++)
+    {
+        // for all columns of B
+        for (int icol = 0; icol < cols; icol++)
+        {
+            // compute the scalar product "row * column"
+            for (int k = 0; k < comm; k++)
+                (*pC) += (*(pA + k)) * (*pB++);
+            
+            // move to next element of C
+            pC++;
+        }
+        
+        // move to the next row of A
+        pA += A.cols();
+        
+        // reset B's data pointer
+        pB = B.begin();
+    }
+    
+    // return result
+    return C;
+}
 
 /**
  * @brief Matrix parts.
