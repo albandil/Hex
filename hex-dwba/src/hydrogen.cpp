@@ -18,7 +18,6 @@
 #include <gsl/gsl_sf.h>
 
 #include "hydrogen.h"
-#include "interpolate.h"
 #include "misc.h"
 #include "specf.h"
 
@@ -311,90 +310,22 @@ namespace Hydrogen
 
 double HydrogenFunction::operator()(double r) const
 {
-    if (n != 0)
-    {
-        // this state is bound
-        // -------------------
+    // if too near, return simplified value
+    // 		if (r < 1e-5)
+    // 			return Hydrogen::getBoundN(n,l) * gsl_sf_pow_int(r,l+1);
         
-        // if too far, return zero
-        if (r > Far)
-            return 0.;
-        
-        // if too near, return simplified value
-        // 		if (r < 1e-5)
-        // 			return Hydrogen::getBoundN(n,l) * gsl_sf_pow_int(r,l+1);
-        
-        // else compute precise value
-        return Hydrogen::evalBoundState(n, l, r);
-    }
-    else
-    {
-        // this state is free
-        // ------------------
-        
-        // if near enough, return precise value
-        if (Far == 0 or r < Far)
-            return Hydrogen::evalFreeState(k, l, r, Sigma == 0 ? Nan : Sigma);
-        
-        // else evaluate using the scale factor
-        return Hydrogen::evalFreeState_asy(k, l, r, Sigma) / (1. + 0.5/(r*k*k));
-    }
-}
-
-Complex HydrogenFunction::operator()(Complex r) const
-{
-    if (n == 0)
-        throw exception("[HydrogenFunction] Do not use operator() for evaluating complex free states!");
-    
-    if (n == 1 and l == 0)
-        return 2. * r * exp(-r);
-    
-    throw exception("[HydrogenFunction] Complex argument for bound state P{%d,%d}(r) not implemented.", n, l);
+    // else compute precise value
+    return Hydrogen::evalBoundState(n_, l_, r);
 }
 
 double HydrogenFunction::getTurningPoint() const
 {
     // bound state
-    if (n != 0)
-        return n * (n - sqrt(n*n - l*(l+1.)));
+//     if (n != 0)
+        return n_ * (n_ - sqrt(n_*n_ - l_*(l_+1.)));
     
     // free state
-    else
-        return sqrt(l*(l+1))/k;
+//     else
+//         return sqrt(l*(l+1))/k;
 }
 
-std::pair<double,int> HydrogenFunction::getZeroAsymptotic(double x) const
-{
-    if (n == 0)
-    {
-        // free function
-        
-        if (x == 0)
-            return std::make_pair(0., l+1);
-        
-        double F, exp_F;
-        int err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*x, &F, &exp_F);
-        if (err != GSL_SUCCESS)
-            throw exception ("[HydrogenFunction::getZeroAsymptotic] Unable to evaluate at x = %g.", x);
-        if (not finite(F))
-            throw exception ("[HydrogenFunction::getZeroAsymptotic] %g when evaluating at x = %g.", F, x);
-        
-        return std::make_pair(sqrt(2./M_PI)/k * F / pow(x, l + 1), l + 1);
-        
-        // DLMF §33.5.1
-        // F ~ Cl * ρ^{l+1} = Cl * k^{l+1} * r^{x+1}
-        
-//         gsl_sf_result res;
-//         gsl_sf_coulomb_CL_e(l, -1/k, &res);
-        
-//         return std::make_pair(sqrt(2./M_PI)*pow(k,l) * res.val, l + 1);
-    }
-    else
-    {
-        // bound function
-        return std::make_pair (
-            Hydrogen::getBoundN(n,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*x/n) * exp(-x/n),
-            l + 1
-        );
-    }
-}
