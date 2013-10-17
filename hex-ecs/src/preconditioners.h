@@ -160,7 +160,7 @@ class PreconditionerBase
         /**
          * @brief Return the right-hand side.
          */
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const = 0;
+        virtual void rhs (const cArrayView chi, int ienergy, int instate) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -199,7 +199,7 @@ class NoPreconditioner : public PreconditionerBase
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const;
+        virtual void rhs (const cArrayView chi, int ienergy, int instate) const;
         virtual void multiply (const cArrayView p, cArrayView q) const;
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -244,7 +244,7 @@ class JacobiPreconditioner : public NoPreconditioner
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (const cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -269,7 +269,7 @@ class SSORPreconditioner : public NoPreconditioner
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (const cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -294,7 +294,7 @@ class ILUPreconditioner : public NoPreconditioner
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const;
+        virtual void rhs (const cArrayView chi, int ienergy, int instate) const;
         virtual void multiply (const cArrayView p, cArrayView q) const;
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -379,14 +379,14 @@ class MultiLevelPreconditioner : public NoPreconditioner
             Bspline const & s_bspline
         ) : NoPreconditioner(par,inp,ll,s_bspline),
             p_bspline_(1, sorted_unique(s_bspline.rknots()), s_bspline.ECStheta(), sorted_unique(s_bspline.cknots())),
-            p_rad_(p_bspline_)
+            p_rad_(p_bspline_), g_(p_bspline_)
         {}
         
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         
         void setup();
         void update (double E);
-        void rhs (cArrayView chi, int ienergy, int instate) const;
+        void rhs (const cArrayView chi, int ienergy, int instate) const;
         void multiply (const cArrayView p, cArrayView q) const;
         void precondition (const cArrayView r, cArrayView z) const;
         
@@ -394,6 +394,9 @@ class MultiLevelPreconditioner : public NoPreconditioner
         
         // compute transfer matrix
         void computeSigma_();
+        
+        // compute contribution to an element of the transfer matrix
+        Complex computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const;
         
         // transfer overlap matrix (s|p) multiplied from left by S⁻¹ (in s-basis)
         RowMatrix spSigma_;
@@ -432,6 +435,9 @@ class MultiLevelPreconditioner : public NoPreconditioner
             // - Kronecker products
             SymDiaMatrix p_half_D_minus_Mm1_tr_kron_S_, p_S_kron_half_D_minus_Mm1_tr_,
                          p_Mm2_kron_S_, p_S_kron_Mm2_;
+        
+        // integrator
+        GaussLegendre g_;
 };
 
 

@@ -282,7 +282,7 @@ void NoPreconditioner::update (double E)
     std::cout << "ok\n";
 }
 
-void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
+void NoPreconditioner::rhs (const cArrayView chi, int ie, int instate) const
 {
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
@@ -614,7 +614,7 @@ void ILUPreconditioner::multiply (const cArrayView p, cArrayView q) const
     NoPreconditioner::multiply(p, q);
 }
 
-void ILUPreconditioner::rhs (cArrayView chi, int ienergy, int instate) const
+void ILUPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
 {
     NoPreconditioner::rhs(chi, ienergy, instate);
 }
@@ -668,6 +668,11 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 void MultiLevelPreconditioner::setup ()
 {
+    std::cout << "Setting up ML preconditioner.\n";
+    std::cout << "\t- rknots = " << p_bspline_.rknots() << "\n";
+    std::cout << "\t- cknots = " << p_bspline_.cknots() << "\n";
+    std::cout << "\t- B-spline count = " << p_bspline_.Nspline() << "\n\n";
+    
     // setup parent
     NoPreconditioner::setup();
     
@@ -736,96 +741,73 @@ void MultiLevelPreconditioner::update (double E)
     }
 }
 
+Complex MultiLevelPreconditioner::computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const
+{
+    // get interval bounds
+    Complex t1 = p_bspline_.t(iknotp);
+    Complex t2 = p_bspline_.t(iknotp + 1);
+    
+    // get evaluation points and weights
+    cArray x = g_.p_points(qord, t1, t2);
+    cArray w = g_.p_weights(qord, t1, t2);
+    
+    // evaluate the B-splines
+    cArray Bp(qord), Bs(qord);
+    p_bspline_.B(ip, iknotp, qord, x.data(), Bp.data());
+    s_bspline_.B(is, iknots, qord, x.data(), Bs.data());
+    
+    // integrate
+    Complex sum = 0;
+    for (int i = 0; i < qord; i++)
+        sum += w[i] * Bp[i] * Bs[i];
+    return sum;
+}
+
 void MultiLevelPreconditioner::computeSigma_()
 {
     // sizes
     int Nss = s_bspline_.Nspline();
+    int Nks = s_bspline_.Nknot();
     int Nsp = p_bspline_.Nspline();
+    int Nkp = p_bspline_.Nknot();
     int ords = s_bspline_.order();
     int ordp = p_bspline_.order();
     size_t N = Nss * Nsp;
     
+    // quadrature order (use at least 2nd order)
+    int qord = std::max (2, (ords + ordp) / 2);
+    
     // allocate memory
-    spSigma_ = RowMatrix (Nss, Nsp, cArray(N));
-    psSigma_ = RowMatrix (Nsp, Nss, cArray(N));
+    ColMatrix spSigma (Nss, Nsp, cArray(N)), SspSigma (Nss, Nsp, cArray(N));
+    ColMatrix psSigma (Nsp, Nss, cArray(N)), SpsSigma (Nsp, Nss, cArray(N));
     
-    // integrator
-    GaussLegendre gs(s_bspline_), gp(p_bspline_);
-    
-    // evaluate B-splines on their definition intervals
-    int points = (ords + ordp)/2;
-    cArray Bss(Nss * (ords + 1) * points), Bsp(Nsp * (ordp + 1) * points);
-    for (int iss = 0; iss < Nss; iss++) // for all B-splines
-    {
-        for (int iknots = 0; iknots <= ords; iknots++) // for all definition intervals
-        {
-            s_bspline_.B (
-                iss,
-                iknots,
-                points, 
-                gs.p_points (
-                    points,
-                    s_bspline_.t(iknots),
-                    s_bspline_.t(iknots+1)
-                ).data(),
-                Bss.begin() + (iss * (ords + 1) + iknots) * points
-            );
-        }
-    }
-    for (int isp = 0; isp < Nsp; isp++) // for all B-splines
-    {
-        for (int iknotp = 0; iknotp <= ordp; iknotp++) // for all definition intervals
-        {
-            p_bspline_.B (
-                isp,
-                iknotp,
-                points,
-                gp.p_points (
-                    points,
-                    p_bspline_.t(iknotp),
-                    p_bspline_.t(iknotp+1)
-                ).data(),
-                Bsp.begin() + (isp * (ordp + 1) + iknotp) * points
-            );
-        }
-    }
-    
-    // create temporary raw Sigma matrices
-    ColMatrix spSigma(Nss, Nsp), SspSigma(Nss, Nsp);
-    ColMatrix psSigma(Nsp, Nss), SpsSigma(Nsp, Nss);
-    
-    // for all B-spline pairs
+    // for all B-splines
     for (int iss = 0; iss < Nss; iss++)
     for (int isp = 0; isp < Nsp; isp++)
     {
-        Complex elem = 0.;
-        
-        // get overlap interval boundaries (shifted by the respective order)
-        // WARNING : Full multiplicity of zero knot (= order) is assumed!
-        // FIXME : The intervals still could be optimized!
-        int iknot_start = std::max(isp - ordp, iss - ords);
-        int iknot_end   = std::min(isp + 1, iss + 1);
-        
-        // add contributions from all common intervals
-        for (int iknot = iknot_start; iknot < iknot_end; iknot++)
+        // for all preconditioner B-spline interknot intervals
+        for (int iknotp = isp; iknotp <= isp + ordp and iknotp < Nkp - 1; iknotp++)
         {
-            // get quadrature weights
-            // NOTE : Identical grids for (s) and (p) assumed (apart from the multiplicity).
-            cArray ws = gs.p_weights(points, p_bspline_.t(iknot + ordp), p_bspline_.t(iknot + ordp + 1));
+            // find corresponding solution basis knot
+            // WARNING : Assuming full multiplicity in zero and zero multiplicity elsewhere!
+            int iknots = iknotp + ords - 1;
             
-            // add contributions from all common quadrature points
-            for (int ipt = 0; ipt < points; ipt++)
-            {
-                elem += ws[ipt]
-                          * Bsp[(isp * (ordp + 1) + iknot + ordp) * points + ipt]
-                          * Bss[(iss * (ords + 1) + iknot + ords) * points + ipt];
-            }
+            // skip non-existent intervals
+            if (iknots < 0)
+                continue;
+            
+            // check that the knot indices correspond
+            assert(p_bspline_.t(iknotp) == s_bspline_.t(iknots));
+            
+            // evaluate B-spline integral on this interval
+            spSigma(iss, isp) = psSigma(isp, iss) = computeSigma_iknot_(qord, iss, iknots, isp, iknotp);
         }
-        
-        // store spSigma and psSigma
-        spSigma.data()[isp * Nsp + iss] = elem;
-        psSigma.data()[iss * Nss + isp] = elem;
     }
+    
+    /// DEBUG
+    std::ofstream out;
+    out.open("spSigma0.txt"); RowMatrix(spSigma).write(out); out.close();
+    out.open("psSigma0.txt"); RowMatrix(psSigma).write(out); out.close();
     
     // compute inverse overlap matrices
     CsrMatrix csrSs = s_rad_.S().tocoo().tocsr();
@@ -835,27 +817,25 @@ void MultiLevelPreconditioner::computeSigma_()
     
     // multiply by S⁻¹(s)
     for (int icol = 0; icol < spSigma.cols(); icol++)
-    {
         SspSigma.col(icol) = luSs.solve(spSigma.col(icol));
+    for (int icol = 0; icol < psSigma.cols(); icol++)
         SpsSigma.col(icol) = luSp.solve(psSigma.col(icol));
-    }
     
     // save the matrix
     spSigma_ = RowMatrix(SspSigma);
     psSigma_ = RowMatrix(SpsSigma);
     
     /// DEBUG
-    std::ofstream out;
     out.open("spSigma.txt"); spSigma_.write(out); out.close();
     out.open("psSigma.txt"); psSigma_.write(out); out.close();
 }
 
-void MultiLevelPreconditioner::rhs(cArrayView chi, int ienergy, int instate) const
+void MultiLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
 {
     NoPreconditioner::rhs(chi, ienergy, instate);
 }
 
-void MultiLevelPreconditioner::multiply(const cArrayView p, cArrayView q) const
+void MultiLevelPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
     NoPreconditioner::multiply(p, q);
 }
@@ -877,22 +857,43 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
             cArrayView rsview (rs, ill * N, (ill + 1) * N);
             cArrayView zsview (zs, ill * N, (ill + 1) * N);
             
-            // reinterpret rs as a column matrix
-            ColMatrix Rs (Nss, Nss, rsview);
+            // apply preconditioner
+            auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
+            {
+                // reinterpret rs as a column matrix
+                ColMatrix Rs (Nss, Nss, r);
+                
+                // convert R^s to preconditioner basis
+                ColMatrix Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
+                
+                // solve the low-order system of equations
+                ColMatrix Zp (Nsp, Nsp, p_lu_[ill].solve(Rp.data()));
+                
+                // convert Z^p to solver basis
+                ColMatrix Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
+                
+                // use the segment
+                z = Zs.data();
+            };
             
-            // convert R^s to preconditioner basis
-            ColMatrix Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
+            // multiply by matrix block
+            auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
+            {
+                q = dia_blocks_[ill].dot(p);
+            };
             
-            // solve the low-order system of equations
-            ColMatrix Zp (Nsp, Nsp);
-            for (int icol = 0; icol < Rp.cols(); icol++)
-                Zp.col(icol) = p_lu_[ill].solve(Rp.col(icol));
-            
-            // convert Z^p to solver basis
-            ColMatrix Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
-            
-            // use the segment
-            zsview = Zs.data();
+            // solve using the CG solver
+            cg_callbacks
+            (
+                rsview,                 // rhs
+                zsview,                 // solution
+                1e-11,                  // tolerance
+                0,                      // min. iterations
+                Nss * Nss,              // max. iteration
+                apply_preconditioner,
+                matrix_multiply,
+                true     
+            );
         }
     }
     

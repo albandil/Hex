@@ -481,7 +481,7 @@ png::byte* CsrMatrix::PngGenerator::get_next_row(size_t irow)
 }
 
 
-void CsrMatrix::plot(const char* filename, double threshold) const
+void CsrMatrix::plot (const char* filename, double threshold) const
 {
     // create output file
     std::ofstream out(filename, std::ios_base::out | std::ios_base::binary);
@@ -495,7 +495,7 @@ void CsrMatrix::plot(const char* filename, double threshold) const
 #endif
 
 #ifndef NO_UMFPACK
-CsrMatrix::LUft CsrMatrix::factorize(double droptol) const
+CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -543,7 +543,7 @@ CsrMatrix::LUft CsrMatrix::factorize(double droptol) const
 #endif
 
 #ifndef NO_UMFPACK
-cArray CsrMatrix::solve(const cArrayView b, size_t eqs) const
+cArray CsrMatrix::solve (const cArrayView b, size_t eqs) const
 {
     // only square matrices are allowed
     assert(m_ == n_);
@@ -560,22 +560,22 @@ cArray CsrMatrix::solve(const cArrayView b, size_t eqs) const
 }
 #endif
 
-void CsrMatrix::write(const char* filename) const
+void CsrMatrix::write (const char* filename) const
 {
-    FILE *f = fopen(filename, "w");
-    fprintf(f, "# Matrix %ld × %ld with %ld nonzero elements:\n\n", m_, n_, x_.size());
+    std::ofstream out (filename);
+    out << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
     for (unsigned irow = 0; irow < m_; irow++)
     {
         size_t idx1 = p_[irow];
         size_t idx2 = p_[irow + 1];
         
         for (size_t idx = idx1; idx < idx2; idx++)
-            fprintf(f, "%d\t%ld\t%g\t%g\n", irow, i_[idx], x_[idx].real(), x_[idx].imag());
+            out << irow << "\t" << i_[idx] << "\t" << x_[idx].real() << "\t" << x_[idx].imag() << "\n";
     }
-    fclose(f);
+    out.close();
 }
 
-bool CsrMatrix::hdfsave(const char* name) const
+bool CsrMatrix::hdfsave (const char* name) const
 {
 #ifndef NO_HDF
     try

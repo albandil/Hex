@@ -378,18 +378,18 @@ public:
     public:
         
         /// Default constructor.
-        LUft() :
+        LUft () :
             numeric_(0), matrix_(0), filename_(0), info_(UMFPACK_INFO) {}
         
         /// Copy constructor.
-        LUft(const LUft& lu) :
+        LUft (LUft const & lu) :
             numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft(const CsrMatrix* matrix, void* numeric) : 
+        LUft (const CsrMatrix* matrix, void* numeric) : 
             numeric_(numeric), matrix_(matrix), filename_(0), info_(UMFPACK_INFO) {}
         
-        void free()
+        void free ()
         { 
             if (numeric_ != 0)
             {
@@ -398,7 +398,7 @@ public:
             }
         }
         
-        size_t size() const
+        size_t size () const
         {
             long lnz, unz, m, n, nz_udiag;
             long status = umfpack_zl_get_lunz (
@@ -407,7 +407,7 @@ public:
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
         
-        cArray solve(const cArrayView b, unsigned eqs = 1) const
+        cArray solve (const cArrayView b, unsigned eqs = 1) const
         {
             // reserve space for the solution
             cArray x(b.size());
@@ -419,15 +419,15 @@ public:
             return x;
         }
         
-        void solve(const cArrayView b, cArrayView x, unsigned eqs = 1) const
+        void solve (const cArrayView b, cArrayView x, int eqs = 1) const
         {
+            // check sizes
+            assert (eqs * matrix_->n_ == (int)x.size());
+            assert (eqs * matrix_->n_ == (int)b.size());
+            
             // solve for all RHSs
-            for (size_t eq = 0; eq < eqs; eq++)
+            for (int eq = 0; eq < eqs; eq++)
             {
-                // is there enough RHSs?
-                if ((eq + 1) * matrix_->n_ > b.size())
-                    break;
-                
                 // solve for current RHS
                 long status = umfpack_zl_solve (
                     UMFPACK_Aat,
@@ -477,7 +477,7 @@ public:
      * @return Special structure of the LUft type, holding opaque information about
      *         the factorization.
      */
-    LUft factorize(double droptol = 0) const;
+    LUft factorize (double droptol = 0) const;
 #endif
     
     /**
