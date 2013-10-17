@@ -102,6 +102,10 @@ class ColMatrix : public DenseMatrix
         // column views
         cArrayView col (int i) { return cArrayView(data(), i * rows(), rows()); }
         const cArrayView col (int i) const { return cArrayView(data(), i * rows(), rows()); }
+        
+        // element access
+        Complex operator() (int i, int j) const { return col(j)[i]; }
+        Complex & operator() (int i, int j) { return col(j)[i]; }
 };
 
 /**
@@ -130,6 +134,10 @@ class RowMatrix : public DenseMatrix
         // row views
         cArrayView row(int i) { return cArrayView(data(), i * cols(), cols()); }
         const cArrayView row(int i) const { return cArrayView(data(), i * cols(), cols()); }
+        
+        // element access
+        Complex operator() (int i, int j) const { return row(i)[j]; }
+        Complex & operator() (int i, int j) { return row(i)[j]; }
         
         // write to file
         void write (std::ofstream & out) const;
