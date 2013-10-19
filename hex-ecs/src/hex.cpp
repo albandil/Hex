@@ -215,6 +215,9 @@ StgSolve:
         case res_prec:
             prec = new MultiLevelPreconditioner (par, inp, coupled_states, bspline);
             break;
+        case multi_prec:
+            prec = new MultiresPreconditioner (par, inp, coupled_states, bspline);
+            break;
         default:
             throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
     };

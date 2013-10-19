@@ -30,7 +30,8 @@ typedef enum {
     silu_prec,
     bilu_prec,
     res_prec, // multi-resolution preconditioner
-    spai_prec // sparse approximate inverse
+    spai_prec, // sparse approximate inverse
+    multi_prec
 } Preconditioner;
 
 /**
@@ -193,7 +194,7 @@ class NoPreconditioner : public PreconditionerBase
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline
         ) : PreconditionerBase(), par_(par), inp_(inp), l1_l2_(ll),
-            s_bspline_(bspline), s_rad_(bspline) {}
+            s_bspline_(bspline), s_rad_(s_bspline_) {}
         
         virtual RadialIntegrals const & rad () const { return s_rad_; }
         
@@ -218,7 +219,7 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<SymDiaMatrix> dia_blocks_;
         
         // B-spline environment for the solution
-        Bspline const & s_bspline_;
+        Bspline s_bspline_;
             
         // radial integrals for the solution
         RadialIntegrals s_rad_;
@@ -378,7 +379,12 @@ class MultiLevelPreconditioner : public SSORPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & s_bspline
         ) : SSORPreconditioner(par,inp,ll,s_bspline),
-            p_bspline_(1, sorted_unique(s_bspline.rknots()), s_bspline.ECStheta(), sorted_unique(s_bspline.cknots())),
+            p_bspline_ (
+                1,                                     // use first order for preconditioner basis
+                sorted_unique(s_bspline.rknots(), 1),  // allow just one consecutive occurence
+                s_bspline.ECStheta(),                  // copy rotation point
+                sorted_unique(s_bspline.cknots(), 1)   // allow just one consecutive occurence
+            ),
             p_rad_(p_bspline_), g_(p_bspline_)
         {}
         
@@ -430,6 +436,60 @@ class MultiLevelPreconditioner : public SSORPreconditioner
         GaussLegendre g_;
 };
 
-
+class MultiresPreconditioner : public PreconditionerBase
+{
+    public:
+        
+        // constructor
+        MultiresPreconditioner (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline
+        );
+        
+        // destructor
+        ~MultiresPreconditioner();
+        
+        // use data from the highest order
+        RadialIntegrals const & rad() const
+        {
+            return p_.back()->rad();
+        }
+        
+        // setup all levels
+        void setup () 
+        {
+            for (PreconditionerBase* p : p_)
+                p->setup();
+        }
+        
+        // update all levels
+        void update (double E)
+        {
+            for (PreconditionerBase* p : p_)
+                p->update(E);
+        }
+        
+        // use RHS from the highest preconditioner
+        void rhs (const cArrayView chi, int ienergy, int instate) const
+        {
+            p_.back()->rhs(chi, ienergy, instate);
+        }
+        
+        // multiply by the matrix of the highest order
+        void multiply (const cArrayView p, cArrayView q) const
+        {
+            p_.back()->multiply(p,q);
+        }
+        
+        // execute the preconditioner
+        void precondition (const cArrayView r, cArrayView z) const;
+        
+    private:
+        
+        // array of per-level preconditioners
+        std::vector<PreconditionerBase*> p_;
+};
 
 #endif

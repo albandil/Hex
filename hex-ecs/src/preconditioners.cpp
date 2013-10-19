@@ -431,7 +431,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     }
     
     // synchronize across processes
-    par_.sync(q, Nspline * Nspline, l1_l2_.size());
+    par_.sync (q, Nspline * Nspline, l1_l2_.size());
 }
 
 void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -505,7 +505,7 @@ void JacobiPreconditioner::precondition (const cArrayView r, cArrayView z) const
     }
     
     // synchronize across processes
-    par_.sync(z, Nspline * Nspline, l1_l2_.size());
+    par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
 void SSORPreconditioner::setup ()
@@ -566,7 +566,7 @@ void SSORPreconditioner::precondition (const cArrayView r, cArrayView z) const
     }
     
     // synchronize across processes
-    par_.sync(z, Nspline * Nspline, l1_l2_.size());
+    par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
 void ILUPreconditioner::setup ()
@@ -675,7 +675,7 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
     }
     
     // synchronize across processes
-    par_.sync(z, Nspline * Nspline, l1_l2_.size());
+    par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
 void MultiLevelPreconditioner::setup ()
@@ -782,7 +782,7 @@ void MultiLevelPreconditioner::computeSigma_()
 {
     // sizes
     int Nss = s_bspline_.Nspline();
-    int Nks = s_bspline_.Nknot();
+//     int Nks = s_bspline_.Nknot();
     int Nsp = p_bspline_.Nspline();
     int Nkp = p_bspline_.Nknot();
     int ords = s_bspline_.order();
@@ -929,8 +929,56 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
     }
     
     // synchronize across processes
-    par_.sync(zs, Nss * Nss, l1_l2_.size());
+    par_.sync (zs, Nss * Nss, l1_l2_.size());
 }
+
+
+MultiresPreconditioner::MultiresPreconditioner (
+    Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline
+){
+    // first order will be solved by ILU (-> ILUPreconditioner)
+    p_.push_back
+    (
+        new ILUPreconditioner
+        (
+            par, inp, ll,
+            Bspline
+            (
+                1,
+                sorted_unique(bspline.rknots(), 1),
+                bspline.ECStheta(),
+                sorted_unique(bspline.cknots(), 1)
+            )
+        )
+    );
+    
+    // all other levels need just common radial data (-> NoPreconditioner)
+    for (int ord = 2; ord <= bspline.order(); ord++)
+    {
+        // construct preconditioner
+        p_.push_back
+        (
+            new NoPreconditioner
+            (
+                par, inp, ll,
+                Bspline
+                (
+                    ord,
+                    sorted_unique(bspline.rknots(), ord),
+                    bspline.ECStheta(),
+                    sorted_unique(bspline.cknots(), ord)
+                )
+            )
+        );
+    }
+}
+
+void MultiresPreconditioner::precondition (const cArrayView r, cArrayView z) const
+{
+    // HOA WHOW... TODO
+    
+}
+
 
 /*
         // block incomplete D-ILU
