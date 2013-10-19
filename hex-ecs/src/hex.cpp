@@ -41,6 +41,7 @@ double SuiteSparse_time()
 
 void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
 {
+    // use whole grid if not restricted
     if (cmd.zipmax < 0)
         cmd.zipmax = bspline.Rmax();
     
@@ -48,65 +49,35 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     cArray ev;      // evaluated solution
     rArray grid;    // real evaluation grid
     
+    // size of solution (l,l)-segment
+    size_t N = bspline.Nspline() * bspline.Nspline();
+    
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
     
+    // load the requested file
     if (not sol.hdfload(cmd.zipfile.c_str()))
         throw exception("Cannot load file %s.", cmd.zipfile.c_str());
     
+    // evaluation grid
     grid = linspace(0., cmd.zipmax, cmd.zipcount);
     
+    // for all coupled angular momentum pairs
     for (unsigned ill = 0; ill < ll.size(); ill++)
     {
+        // angular momenta
         int l1 = ll[ill].first;
         int l2 = ll[ill].second;
         
         std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
         
-        // zip this partial wave
-        ev = bspline.zip (
-            cArrayView (
-                sol,
-                bspline.Nspline() * bspline.Nspline() * ill,
-                bspline.Nspline() * bspline.Nspline()
-            ),
-            grid, grid
+        // write to file
+        std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
+        bspline.writeVTK (
+            out,
+            sol.slice (ill * N, (ill + 1) * N),
+            grid,
+            grid
         );
-        
-        // write VTK header
-        std::ostringstream ofname;
-        ofname << cmd.zipfile << "_(" << l1 << "," << l2 << ").vtk";
-        std::ofstream out(ofname.str().c_str());
-        out << "# vtk DataFile Version 3.0\n";
-        out << "Hex-ecs wave function partial waves\n";
-        out << "ASCII\n";
-        out << "DATASET RECTILINEAR_GRID\n";
-        out << "DIMENSIONS " << cmd.zipcount << " " << cmd.zipcount << " 1\n";
-        out << "X_COORDINATES " << cmd.zipcount << " float\n";
-        out << grid.string() << "\n";
-        out << "Y_COORDINATES " << cmd.zipcount << " float\n";
-        out << grid.string() << "\n";
-        out << "Z_COORDINATES 1 float\n";
-        out << "0\n";
-        out << "POINT_DATA " << cmd.zipcount * cmd.zipcount << "\n";
-        out << "FIELD wavefunction 2\n";
-        
-        // save real part
-        out << "pw_" << l1 << "_" << l2 << "_re 1 " << cmd.zipcount * cmd.zipcount << " float\n";
-        for (int i = 0; i < cmd.zipcount; i++)
-        {
-            for (int j = 0; j < cmd.zipcount; j++)
-                out << ev[i * cmd.zipcount + j].real() << " ";
-            out << "\n";
-        }
-        
-        // save imaginary part
-        out << "pw_" << l1 << "_" << l2 << "_im 1 " << cmd.zipcount * cmd.zipcount << " float\n";
-        for (int i = 0; i < cmd.zipcount; i++)
-        {
-            for (int j = 0; j < cmd.zipcount; j++)
-                out << ev[i * cmd.zipcount + j].imag() << " ";
-            out << "\n";
-        }
     }
 }
 

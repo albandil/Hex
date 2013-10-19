@@ -74,7 +74,7 @@ void Bspline::dB(int i, int iknot, int n, Complex const * const restrict x, Comp
 // ----------------------------------------------------------------------- //
 
 
-cArray Bspline::zip (cArrayView const & coeff, rArrayView const & grid) const
+cArray Bspline::zip (const cArrayView coeff, const rArrayView grid) const
 {
     // evaluated function
     cArray f(grid.size());
@@ -126,12 +126,8 @@ cArray Bspline::zip (cArrayView const & coeff, rArrayView const & grid) const
     return f;
 }
 
-cArray Bspline::zip (
-    cArrayView const & coeff,
-    rArrayView const & xgrid,
-    rArrayView const & ygrid
-) const {
-    
+cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const
+{
     // evaluated function
     cArray f(xgrid.size() * ygrid.size());
     
@@ -267,6 +263,50 @@ cArray Bspline::zip (
     }
     
     return f;
+}
+
+void Bspline::writeVTK (std::ofstream & out, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const
+{
+    // array lengths
+    int nx = xgrid.size();
+    int ny = ygrid.size();
+    int N = nx * ny;
+    
+    // zip this partial wave
+    cArray ev = zip (coeff, xgrid, ygrid);
+    
+    // write VTK header
+    out << "# vtk DataFile Version 3.0\n";
+    out << "Hex-ecs wave function partial waves\n";
+    out << "ASCII\n";
+    out << "DATASET RECTILINEAR_GRID\n";
+    out << "DIMENSIONS " << nx << " " << ny << " 1\n";
+    out << "X_COORDINATES " << nx << " float\n";
+    out << to_string(xgrid) << "\n";
+    out << "Y_COORDINATES " << ny << " float\n";
+    out << to_string(ygrid) << "\n";
+    out << "Z_COORDINATES 1 float\n";
+    out << "0\n";
+    out << "POINT_DATA " << N << "\n";
+    out << "FIELD wavefunction 2\n";
+    
+    // save real part
+    out << "realpart 1 " << N << " float\n";
+    for (int i = 0; i < nx; i++)
+    {
+        for (int j = 0; j < ny; j++)
+            out << ev[i * ny + j].real() << " ";
+        out << "\n";
+    }
+    
+    // save imaginary part
+    out << "imagpart 1 " << N << " float\n";
+    for (int i = 0; i < nx; i++)
+    {
+        for (int j = 0; j < ny; j++)
+            out << ev[i * ny + j].imag() << " ";
+        out << "\n";
+    }
 }
 
 

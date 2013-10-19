@@ -128,7 +128,7 @@ class Bspline
          * The length of \c coeff must be at least equal to the spline count and it is
          * these first \c Nspline coefficients that are used in evaluation.
          */
-        cArray zip (cArrayView const & coeff, rArrayView const & grid) const;
+        cArray zip (const cArrayView coeff, const rArrayView grid) const;
         
         /**
          * @brief Zip 2D expansion.
@@ -141,7 +141,12 @@ class Bspline
          * The length of \c coeff must be at least equal to the spline count squared and it is
          * these first \c Nspline**2 coefficients that are used in evaluation.
          */
-        cArray zip (cArrayView const & coeff, rArrayView const & xgrid, rArrayView const & ygrid) const;
+        cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
+        
+        /**
+         * @brief Zip 2D expansion to VTK.
+         */
+        void writeVTK (std::ofstream & out, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
         
         /**
          * @brief Get knot index for coordinate.
