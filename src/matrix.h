@@ -210,7 +210,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         /// Change "data" from column-oriented to row-oriented.
         void reorder_ ()
         {
-            cArray new_data(this->data().size());
+            cArray new_data (this->data().size());
             
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
@@ -1302,7 +1302,8 @@ public:
     // Conversions to other formats
     //
     
-    CooMatrix tocoo(MatrixTriangle triangle = both) const;
+    CooMatrix tocoo (MatrixTriangle triangle = both) const;
+    RowMatrix<Complex> torow (MatrixTriangle triangle = both) const;
     
     //
     // Output

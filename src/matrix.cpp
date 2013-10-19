@@ -1817,3 +1817,35 @@ std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A)
     
     return out;
 }
+
+RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
+{
+    RowMatrix<Complex> M(size(), size());
+    
+    // for all diagonals
+    for (int d : diag())
+    {
+        // main diagonal
+        if ((d == 0) and (triangle & diagonal))
+        {
+            for (int i = 0; i < size(); i++)
+                M(i,i) = main_diagonal()[i];
+        }
+        
+        // upper triangle
+        if ((d != 0) and (triangle & strict_upper))
+        {
+            for (int i = 0; i < size() - d; i++)
+                M(i,i+d) = dptr(d)[i];
+        }
+        
+        // lower triangle
+        if ((d != 0) and (triangle & strict_lower))
+        {
+            for (int i = 0; i < size() - d; i++)
+                M(i+d,i) = dptr(d)[i];
+        }
+    }
+    
+    return M;
+}
