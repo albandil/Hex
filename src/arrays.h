@@ -1701,9 +1701,9 @@ template <typename T> NumberArray<T> join (Array<NumberArray<T>> const & arrays)
 }
 
 /**
- * Drop all repetitions from sorted array.
+ * Drop all redundant repetitions from sorted array.
  */
-template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v)
+template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v, int n = 1)
 {
     // create output array
     NumberArray<T> w(v.size());
@@ -1711,11 +1711,24 @@ template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v)
     // iterators
     T * iw = w.begin();
     T const * iv = v.begin();
+    int repeat = 0;
     
-    // copy all elements, drop repetitions
-    for (; iv != v.end(); iv++)
+    // copy all elements, drop repetitions above "repeat"
+    while (iv != v.end())
+    {
+        // use this element definitely if
+        // - it is the first element
+        // - it differs from the preceding element
         if (iw == w.begin() or *(iw - 1) != *iv)
+            repeat = 0;
+        
+        // use the conforming element
+        if (++repeat < n)
             *(iw++) = *iv;
+        
+        // move on to the next element
+        iv++;
+    }
     
     // resize and return output array
     w.resize(iw - w.begin());
@@ -1742,6 +1755,9 @@ template <class T> void smoothen (ArrayView<T> v)
     }
 }
 
+/**
+ * @brief Convert ArrayView<T> to a string.
+ */
 template <class T> std::string to_string (const ArrayView<T> v)
 {
     std::ostringstream ss;
