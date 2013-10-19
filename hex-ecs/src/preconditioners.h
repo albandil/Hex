@@ -367,7 +367,7 @@ class ILUPreconditioner : public NoPreconditioner
  * where the word "Matrix" indicates that we want to split long vector into a square matrix. The resulting square matrix
  * @f$ \mathbf{R} @f$ will then have the same structure.
  */
-class MultiLevelPreconditioner : public NoPreconditioner
+class MultiLevelPreconditioner : public SSORPreconditioner
 {
     public:
         
@@ -377,7 +377,7 @@ class MultiLevelPreconditioner : public NoPreconditioner
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & s_bspline
-        ) : NoPreconditioner(par,inp,ll,s_bspline),
+        ) : SSORPreconditioner(par,inp,ll,s_bspline),
             p_bspline_(1, sorted_unique(s_bspline.rknots()), s_bspline.ECStheta(), sorted_unique(s_bspline.cknots())),
             p_rad_(p_bspline_), g_(p_bspline_)
         {}
@@ -404,13 +404,9 @@ class MultiLevelPreconditioner : public NoPreconditioner
         // transfer overlap matrix (p|s) multiplied from left by S⁻¹ (in p-basis)
         RowMatrix<Complex> psSigma_;
         
-        // solution objects
-        
-            // - solution overlap matrix in CSR form (needed for LU)
-            CsrMatrix s_csrS_;
-            
-            // - LU decomposition of the solution overlap matrix
-            CsrMatrix::LUft s_luS_;
+        /// DEBUG
+        ColMatrix<Complex> spSigma, SspSigma;
+        ColMatrix<Complex> psSigma, SpsSigma;
         
         // preconditioner objects
             
@@ -420,12 +416,6 @@ class MultiLevelPreconditioner : public NoPreconditioner
             // - radial integrals for the preconditioning
             RadialIntegrals p_rad_;
             
-            // - solution overlap matrix in CSR form (needed for LU)
-            CsrMatrix p_csrS_;
-            
-            // - LU decomposition of the solution overlap matrix
-            CsrMatrix::LUft p_luS_;
-            
             // diagonal blocks in the preconditioner basis
             std::vector<CsrMatrix> p_csr_;
             
@@ -434,7 +424,7 @@ class MultiLevelPreconditioner : public NoPreconditioner
             
             // - Kronecker products
             SymDiaMatrix p_half_D_minus_Mm1_tr_kron_S_, p_S_kron_half_D_minus_Mm1_tr_,
-                         p_Mm2_kron_S_, p_S_kron_Mm2_;
+                         p_Mm2_kron_S_, p_S_kron_Mm2_, p_S_kron_S_;
         
         // integrator
         GaussLegendre g_;

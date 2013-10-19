@@ -639,6 +639,18 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
             auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
             {
                 z = lu_[ill].solve(r);
+                
+                /// DEBUG
+//                 cArray Mz(z.size());
+//                 multiply(z, Mz);
+//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
+                
+                /// DEBUG
+//                 std::ofstream out;
+//                 rArray grid = linspace (0., 100., 1001);
+//                 out.open("z1.vtk"); s_bspline_.writeVTK(out, z, grid, grid); out.close();
+//                 out.open("r1.vtk"); s_bspline_.writeVTK(out, r, grid, grid); out.close();
+//                 exit(0);
             };
             
             // multiply by matrix block
@@ -674,25 +686,18 @@ void MultiLevelPreconditioner::setup ()
     std::cout << "\t- B-spline count = " << p_bspline_.Nspline() << "\n\n";
     
     // setup parent
-    NoPreconditioner::setup();
+    SSORPreconditioner::setup();
     
     // compute radial integrals
     p_rad_.setupOneElectronIntegrals();
     p_rad_.setupTwoElectronIntegrals(par_, s_rad_.maxlambda());
     
     // precompute kronecker products
+    p_S_kron_S_ = p_rad_.S().kron(p_rad_.S());
     p_half_D_minus_Mm1_tr_kron_S_ = (0.5 * p_rad_.D() - p_rad_.Mm1_tr()).kron(p_rad_.S());
     p_S_kron_half_D_minus_Mm1_tr_ = p_rad_.S().kron(0.5 * p_rad_.D() - p_rad_.Mm1_tr());
     p_Mm2_kron_S_ = p_rad_.Mm2().kron(p_rad_.S());
     p_S_kron_Mm2_ = p_rad_.S().kron(p_rad_.Mm2());
-    
-    // convert overlap matrices to CSR format
-    s_csrS_ = s_rad_.S().tocoo().tocsr();
-    p_csrS_ = p_rad_.S().tocoo().tocsr();
-    
-    // LU-factorize the overlap matrices
-    s_luS_ = s_csrS_.factorize();
-    p_luS_ = p_csrS_.factorize();
     
     // compute the transition overlap matrix
     computeSigma_();
@@ -701,11 +706,14 @@ void MultiLevelPreconditioner::setup ()
 void MultiLevelPreconditioner::update (double E)
 {
     // update parent
-    NoPreconditioner::update(E);
+    SSORPreconditioner::update(E);
     
     // resize arrays
     p_csr_.resize(l1_l2_.size());
     p_lu_.resize(l1_l2_.size());
+    
+    // use total angular momentum from parent
+    int L = NoPreconditioner::inp_.L;
     
     // construct hamiltonian blocks
     for (size_t ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
@@ -719,14 +727,21 @@ void MultiLevelPreconditioner::update (double E)
         // start timer
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         
-        p_csr_[ill] = (
-            E * p_rad_.S().kron(p_rad_.S())
+        // construct DIA block
+        SymDiaMatrix p_dia = E * p_S_kron_S_
             - p_half_D_minus_Mm1_tr_kron_S_
             - p_S_kron_half_D_minus_Mm1_tr_
             - (0.5 * l1 * (l1 + 1.)) * p_Mm2_kron_S_
-            - (0.5 * l2 * (l2 + 1.)) * p_S_kron_Mm2_
-        ).tocoo().tocsr();
+            - (0.5 * l2 * (l2 + 1.)) * p_S_kron_Mm2_;
+        for (unsigned lambda = 0; lambda <= p_rad_.maxlambda(); lambda++)
+        {
+            Complex f = computef(lambda,l1,l2,l1,l2,L);
+            if (f != 0.)
+                p_dia -= f * p_rad_.R_tr_dia(lambda);
+        }
         
+        // convert DIA block to CSR and factorize
+        p_csr_[ill] = p_dia.tocoo().tocsr();
         p_lu_[ill] = p_csr_[ill].factorize();
         
         // stop timer
@@ -774,17 +789,22 @@ void MultiLevelPreconditioner::computeSigma_()
     int ordp = p_bspline_.order();
     size_t N = Nss * Nsp;
     
-    // quadrature order (use at least 2nd order)
-    int qord = std::max (2, (ords + ordp) / 2);
+    // quadrature order (use at least 2nd order rule)
+    int qord = std::max (2, (ords + ordp + 1) / 2);
     
     // allocate memory
-    ColMatrix<Complex> spSigma (Nss, Nsp, cArray(N)), SspSigma (Nss, Nsp, cArray(N));
-    ColMatrix<Complex> psSigma (Nsp, Nss, cArray(N)), SpsSigma (Nsp, Nss, cArray(N));
+    spSigma = ColMatrix<Complex>(Nss, Nsp, cArray(N));
+    SspSigma = ColMatrix<Complex>(Nss, Nsp, cArray(N));
+    psSigma = ColMatrix<Complex>(Nsp, Nss, cArray(N));
+    SpsSigma = ColMatrix<Complex>(Nsp, Nss, cArray(N));
     
     // for all B-splines
     for (int iss = 0; iss < Nss; iss++)
     for (int isp = 0; isp < Nsp; isp++)
     {
+        // element of the Sigma matrix
+        Complex elem = 0.;
+        
         // for all preconditioner B-spline interknot intervals
         for (int iknotp = isp; iknotp <= isp + ordp and iknotp < Nkp - 1; iknotp++)
         {
@@ -800,14 +820,12 @@ void MultiLevelPreconditioner::computeSigma_()
             assert(p_bspline_.t(iknotp) == s_bspline_.t(iknots));
             
             // evaluate B-spline integral on this interval
-            spSigma(iss, isp) = psSigma(isp, iss) = computeSigma_iknot_(qord, iss, iknots, isp, iknotp);
+            elem += computeSigma_iknot_(qord, iss, iknots, isp, iknotp);
         }
+        
+        // update the elements
+        spSigma(iss, isp) = psSigma(isp, iss) = elem;
     }
-    
-    /// DEBUG
-    std::ofstream out;
-    out.open("spSigma0.txt"); RowMatrix<Complex>(spSigma).write(out); out.close();
-    out.open("psSigma0.txt"); RowMatrix<Complex>(psSigma).write(out); out.close();
     
     // compute inverse overlap matrices
     CsrMatrix csrSs = s_rad_.S().tocoo().tocsr();
@@ -824,12 +842,6 @@ void MultiLevelPreconditioner::computeSigma_()
     // save the matrix
     spSigma_ = RowMatrix<Complex>(SspSigma);
     psSigma_ = RowMatrix<Complex>(SpsSigma);
-    
-    /// DEBUG
-    out.open("spSigma.txt"); spSigma_.write(out); out.close();
-    out.open("psSigma.txt"); psSigma_.write(out); out.close();
-    out.open("ABSspSigma.txt"); RowMatrix<double>(spSigma_.rows(), spSigma_.cols(), abs(spSigma_.data())).write(out); out.close();
-    out.open("ABSpsSigma.txt"); RowMatrix<double>(psSigma_.rows(), psSigma_.cols(), abs(psSigma_.data())).write(out); out.close();
 }
 
 void MultiLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
@@ -847,7 +859,7 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
     // shorthands
     int Nss = s_bspline_.Nspline();
     int Nsp = p_bspline_.Nspline();
-    size_t  N = Nss * Nsp;
+    size_t  N = Nss * Nss;
     
     // for all work items
     # pragma omp parallel for schedule (dynamic, 1)
@@ -874,8 +886,25 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
                 // convert Z^p to solver basis
                 ColMatrix<Complex> Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
                 
-                // use the segment
-                z = Zs.data();
+                /// DEBUG
+//                 cArray Mz(z.size());
+//                 multiply(Zs.data(), Mz);
+//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
+                
+                /// DEBUG
+//                 std::ofstream out;
+//                 rArray grid = linspace (0., 100., 1001);
+//                 out.open("Rp.vtk"); p_bspline_.writeVTK(out, Rp.data(), grid, grid); out.close();
+//                 out.open("Rs.vtk"); s_bspline_.writeVTK(out, Rs.data(), grid, grid); out.close();
+//                 out.open("Zp.vtk"); p_bspline_.writeVTK(out, Zp.data(), grid, grid); out.close();
+//                 out.open("Zs.vtk"); s_bspline_.writeVTK(out, Zs.data(), grid, grid); out.close();
+//                 out.open("Zss.vtk"); s_bspline_.writeVTK(out, z, grid, grid); out.close();
+                
+                /// DEBUG
+//                 multiply(z, Mz);
+//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
+                
+                exit(0);
             };
             
             // multiply by matrix block

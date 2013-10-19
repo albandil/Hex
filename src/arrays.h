@@ -1239,14 +1239,6 @@ public:
         return unpack;
     }
 #endif
-    
-    std::string string() const
-    {
-        std::ostringstream ss;
-        for (NumberType const & x : *this)
-            ss << x << " ";
-        return ss.str();
-    }
 };
 
 #include "arrithm.h"
@@ -1728,6 +1720,34 @@ template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v)
     // resize and return output array
     w.resize(iw - w.begin());
     return w;
+}
+
+/**
+ * @brief Running average.
+ * 
+ * Overwrite the given vector v = {v1, v2, v3, ..., vN} by vector
+ * {v1, (v1+v2)/2, (v2+v3)/2, ..., (v_(N-1)+vN)/2}.
+ */
+template <class T> void smoothen (ArrayView<T> v)
+{
+    if (v.size() == 0)
+        return;
+    
+    T prev = v[0], newv;
+    for (int i = 1; i < v.size(); i++)
+    {
+        newv = 0.5 * (prev + v[i]);
+        prev = v[i];
+        v[i] = newv;
+    }
+}
+
+template <class T> std::string to_string (const ArrayView<T> v)
+{
+    std::ostringstream ss;
+    for (T const & x : v)
+        ss << x << " ";
+    return ss.str();
 }
 
 #endif
