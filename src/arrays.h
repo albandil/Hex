@@ -1723,7 +1723,7 @@ template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v, int n = 1
             repeat = 0;
         
         // use the conforming element
-        if (++repeat < n)
+        if (++repeat <= n)
             *(iw++) = *iv;
         
         // move on to the next element
@@ -1732,6 +1732,7 @@ template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v, int n = 1
     
     // resize and return output array
     w.resize(iw - w.begin());
+    
     return w;
 }
 
