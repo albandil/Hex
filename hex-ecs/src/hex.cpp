@@ -212,10 +212,10 @@ StgSolve:
         case ilu_prec:
             prec = new ILUPreconditioner (par, inp, coupled_states, bspline);
             break;
-        case res_prec:
-            prec = new MultiLevelPreconditioner (par, inp, coupled_states, bspline);
+        case two_prec:
+            prec = new TwoLevelPreconditioner (par, inp, coupled_states, bspline);
             break;
-        case multi_prec:
+        case res_prec:
             prec = new MultiresPreconditioner (par, inp, coupled_states, bspline);
             break;
         default:

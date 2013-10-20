@@ -31,7 +31,7 @@ typedef enum {
     bilu_prec,
     res_prec, // multi-resolution preconditioner
     spai_prec, // sparse approximate inverse
-    multi_prec
+    two_prec
 } Preconditioner;
 
 /**
@@ -368,12 +368,12 @@ class ILUPreconditioner : public NoPreconditioner
  * where the word "Matrix" indicates that we want to split long vector into a square matrix. The resulting square matrix
  * @f$ \mathbf{R} @f$ will then have the same structure.
  */
-class MultiLevelPreconditioner : public SSORPreconditioner
+class TwoLevelPreconditioner : public SSORPreconditioner
 {
     public:
         
         // constructor
-        MultiLevelPreconditioner (
+        TwoLevelPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -388,7 +388,7 @@ class MultiLevelPreconditioner : public SSORPreconditioner
             p_rad_(p_bspline_), g_(p_bspline_)
         {}
         
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         
         void setup();
         void update (double E);

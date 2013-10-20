@@ -678,7 +678,7 @@ void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
-void MultiLevelPreconditioner::setup ()
+void TwoLevelPreconditioner::setup ()
 {
     std::cout << "Setting up ML preconditioner.\n";
     std::cout << "\t- rknots = " << p_bspline_.rknots() << "\n";
@@ -703,7 +703,7 @@ void MultiLevelPreconditioner::setup ()
     computeSigma_();
 }
 
-void MultiLevelPreconditioner::update (double E)
+void TwoLevelPreconditioner::update (double E)
 {
     // update parent
     SSORPreconditioner::update(E);
@@ -756,7 +756,7 @@ void MultiLevelPreconditioner::update (double E)
     }
 }
 
-Complex MultiLevelPreconditioner::computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const
+Complex TwoLevelPreconditioner::computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const
 {
     // get interval bounds
     Complex t1 = p_bspline_.t(iknotp);
@@ -778,7 +778,7 @@ Complex MultiLevelPreconditioner::computeSigma_iknot_ (int qord, int is, int ikn
     return sum;
 }
 
-void MultiLevelPreconditioner::computeSigma_()
+void TwoLevelPreconditioner::computeSigma_()
 {
     // sizes
     int Nss = s_bspline_.Nspline();
@@ -844,17 +844,17 @@ void MultiLevelPreconditioner::computeSigma_()
     psSigma_ = RowMatrix<Complex>(SpsSigma);
 }
 
-void MultiLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
+void TwoLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
 {
     NoPreconditioner::rhs(chi, ienergy, instate);
 }
 
-void MultiLevelPreconditioner::multiply (const cArrayView p, cArrayView q) const
+void TwoLevelPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
     NoPreconditioner::multiply(p, q);
 }
 
-void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs) const
+void TwoLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs) const
 {
     // shorthands
     int Nss = s_bspline_.Nspline();
@@ -904,7 +904,7 @@ void MultiLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs)
 //                 multiply(z, Mz);
 //                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
                 
-                exit(0);
+//                 exit(0);
             };
             
             // multiply by matrix block
