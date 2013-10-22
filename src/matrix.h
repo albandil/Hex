@@ -205,6 +205,38 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             }
         }
         
+        void plot_abs (std::ofstream & out) const
+        {
+            // create empty gray-scale 1-bit image
+            png::image<png::gray_pixel_1> image (this->cols(), this->rows());
+            
+            // skip empty matrix
+            if (this->data().size() > 0)
+            {
+                // find minimal and maximal value
+                double min = std::abs(this->data()[0]), max = std::abs(this->data()[0]);
+                for (Type const & x : this->data())
+                {
+                    double absx = std::abs(x);
+                    if (absx < min) min = absx;
+                    if (absx > max) max = absx;
+                }
+                
+                // for all elements
+                for (int y = 0; y < this->rows(); y++)
+                {
+                    for (int x = 0; x < this->cols(); x++)
+                    {
+                        double fraction = 1. - (std::abs(this->data()[y * this->cols() + x]) - min) / (max - min);
+                        image.set_pixel(x, y, std::ceil(65535 * fraction));
+                    }
+                }
+            }
+            
+            // save image
+            image.write_stream(out);
+        }
+        
     private:
         
         /// Change "data" from column-oriented to row-oriented.
@@ -451,8 +483,8 @@ public:
     
 #ifndef NO_PNG
     /**
-     * PNG row data generator for use in \ref plot function.
-     */
+    * PNG row data generator for use in \ref plot function.
+    */
     class PngGenerator : public png::generator<png::gray_pixel_1,PngGenerator>
     {
         typedef png::generator<png::gray_pixel_1,PngGenerator> base_t;
@@ -461,26 +493,26 @@ public:
         
         public:
             
-            PngGenerator(CsrMatrix const * mat, double threshold);
-            ~PngGenerator();
+            PngGenerator (CsrMatrix const * mat, double threshold);
+            ~PngGenerator ();
             
-            png::byte* get_next_row(size_t pos);
+            png::byte* get_next_row (size_t pos);
             
         private:
             
-            CsrMatrix const * Mat;
-            row buffer;
-            double Threshold;
+            CsrMatrix const * M_;
+            row buff_;
+            double threshold_;
     };
-    
+
     /**
-     * Save matrix structure as a black-and-white image.
-     * @param filename File name.
-     * @param threshold Largest absolute value represented by white colour.
-     */
-    void plot(const char* filename, double threshold = 0.) const;
+        * Save matrix structure as a black-and-white image.
+        * @param filename File name.
+        * @param threshold Largest absolute value represented by white colour.
+        */
+    void plot (const char* filename, double threshold = 0.) const;
 #endif
-    
+
 #ifndef NO_UMFPACK
     /**
      * LU factorization

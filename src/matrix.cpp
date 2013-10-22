@@ -375,8 +375,8 @@ cArray CsrMatrix::dot(cArrayView const & b) const
 }
 
 #ifndef NO_PNG
-CsrMatrix::PngGenerator::PngGenerator(const CsrMatrix* mat, double threshold)
-    : base_t(mat->cols(), mat->rows()), Mat(mat), buffer(mat->cols()), Threshold(threshold)
+CsrMatrix::PngGenerator::PngGenerator (CsrMatrix const * mat, double threshold)
+    : base_t(mat->cols(), mat->rows()), M_(mat), buff_(mat->cols()), threshold_(threshold)
 {
 }
 
@@ -387,20 +387,20 @@ CsrMatrix::PngGenerator::~PngGenerator()
 png::byte* CsrMatrix::PngGenerator::get_next_row(size_t irow)
 {
     // get column indices
-    int idx_min = Mat->p_[irow];
-    int idx_max = Mat->p_[irow + 1];
+    int idx_min = M_->p_[irow];
+    int idx_max = M_->p_[irow + 1];
     
     // clear memory
-    for (int icol = 0; icol < (int)Mat->cols(); icol++)
-        buffer[icol] = 1;
+    for (int icol = 0; icol < (int)M_->cols(); icol++)
+        buff_[icol] = 1;
     
     // for all nonzero columns
     for (int idx = idx_min; idx < idx_max; idx++)
-        if (std::abs(Mat->x_[idx]) > Threshold)
-            buffer[Mat->i_[idx]] = 0;
+        if (std::abs(M_->x_[idx]) > threshold_)
+            buff_[M_->i_[idx]] = 0;
         
     // pass the buffer
-    return reinterpret_cast<png::byte*>(row_traits::get_data(buffer));
+    return reinterpret_cast<png::byte*>(row_traits::get_data(buff_));
 }
 
 
@@ -1828,21 +1828,21 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
         // main diagonal
         if ((d == 0) and (triangle & diagonal))
         {
-            for (int i = 0; i < size(); i++)
+            for (unsigned i = 0; i < size(); i++)
                 M(i,i) = main_diagonal()[i];
         }
         
         // upper triangle
         if ((d != 0) and (triangle & strict_upper))
         {
-            for (int i = 0; i < size() - d; i++)
+            for (unsigned i = 0; i < size() - d; i++)
                 M(i,i+d) = dptr(d)[i];
         }
         
         // lower triangle
         if ((d != 0) and (triangle & strict_lower))
         {
-            for (int i = 0; i < size() - d; i++)
+            for (unsigned i = 0; i < size() - d; i++)
                 M(i+d,i) = dptr(d)[i];
         }
     }
