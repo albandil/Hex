@@ -190,10 +190,11 @@ void CommandLine::parse(int argc, char* argv[])
             {
                 // preconditioner
                 if (strcmp(optarg,"none") == 0) preconditioner = no_prec;
-                else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobi_prec;
-                else if (strcmp(optarg,"SSOR")   == 0) preconditioner = ssor_prec;
-                else if (strcmp(optarg,"ILU")    == 0) preconditioner = ilu_prec;
-                else if (strcmp(optarg,"res")    == 0) preconditioner = res_prec;
+                else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobiCG_prec;
+                else if (strcmp(optarg,"SSOR") == 0) preconditioner = ssorCG_prec;
+                else if (strcmp(optarg,"ILU") == 0) preconditioner = iluCG_prec;
+                else if (strcmp(optarg,"res") == 0) preconditioner = res_prec;
+                else if (strcmp(optarg,"SPAI") == 0) preconditioner = spaiCG_prec;
                 else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }

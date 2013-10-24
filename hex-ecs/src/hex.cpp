@@ -203,14 +203,17 @@ StgSolve:
         case no_prec:
             prec = new NoPreconditioner (par, inp, coupled_states, bspline);
             break;
-        case jacobi_prec:
-            prec = new JacobiPreconditioner (par, inp, coupled_states, bspline);
+        case CG_prec:
+            prec = new CGPreconditioner (par, inp, coupled_states, bspline);
             break;
-        case ssor_prec:
-            prec = new SSORPreconditioner (par, inp, coupled_states, bspline);
+        case jacobiCG_prec:
+            prec = new JacobiCGPreconditioner (par, inp, coupled_states, bspline);
             break;
-        case ilu_prec:
-            prec = new ILUPreconditioner (par, inp, coupled_states, bspline);
+        case ssorCG_prec:
+            prec = new SSORCGPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case iluCG_prec:
+            prec = new ILUCGPreconditioner (par, inp, coupled_states, bspline, cmd.droptol);
             break;
         case two_prec:
             prec = new TwoLevelPreconditioner (par, inp, coupled_states, bspline);

@@ -251,6 +251,7 @@ void NoPreconditioner::update (double E)
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     
     // setup diagonal blocks
+    # pragma omp parallel for
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
     {
         // skip computation of unwanted blocks for this process
@@ -282,7 +283,7 @@ void NoPreconditioner::update (double E)
     std::cout << "ok\n";
 }
 
-void NoPreconditioner::rhs (const cArrayView chi, int ie, int instate) const
+void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
 {
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
@@ -299,7 +300,7 @@ void NoPreconditioner::rhs (const cArrayView chi, int ie, int instate) const
     );
     
     // j-expansions
-    cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps);
+    cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
@@ -406,7 +407,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         cArray q_contrib (Nspline * Nspline);
         
         // copy-from segment of "p"
-        cArrayView p_block(p, illp * Nspline * Nspline, Nspline * Nspline);
+        cArrayView p_block (p, illp * Nspline * Nspline, Nspline * Nspline);
         
         // multiply by hamiltonian terms
         if (ill == illp)
@@ -420,6 +421,10 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 Complex f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                
+                if (not finite(std::abs(f)))
+                    throw exception ("f[%d](%d,%d,%d,%d;%d) = %g", lambda, l1, l2, l1p, l2p, inp_.L, f.real());
+                
                 if (f != 0.)
                     q_contrib -= f * s_rad_.R_tr_dia(lambda).dot(p_block);
             }
@@ -439,7 +444,41 @@ void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
     z = r;
 }
 
-void JacobiPreconditioner::setup ()
+void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
+{
+    // shorthands
+    int Nspline = s_rad_.bspline().Nspline();
+    
+    # pragma omp parallel for schedule (dynamic, 1)
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
+        // create segment views
+        cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
+        cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
+        
+        // wrappers around the callbacks
+        auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
+        auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
+        
+        // solve using the CG solver
+        cg_callbacks
+        (
+            rview,                  // rhs
+            zview,                  // solution
+            1e-11,                  // tolerance
+            0,                      // min. iterations
+            Nspline * Nspline,      // max. iteration
+            inner_prec,             // preconditioner
+            inner_mmul,             // matrix multiplication
+            false
+        );
+    }
+    
+    // synchronize across processes
+    par_.sync (z, Nspline * Nspline, l1_l2_.size());
+}
+
+void JacobiCGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
@@ -447,7 +486,7 @@ void JacobiPreconditioner::setup ()
     invd_.resize(l1_l2_.size());
 }
 
-void JacobiPreconditioner::update (double E)
+void JacobiCGPreconditioner::update (double E)
 {
     // update parent
     NoPreconditioner::update(E);
@@ -466,49 +505,7 @@ void JacobiPreconditioner::update (double E)
     }
 }
 
-void JacobiPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
-    
-    # pragma omp parallel for
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-    {
-        // create segment views
-        cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
-        cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
-        
-        // apply preconditioner
-        auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
-        {
-            z = invd_[ill] * r;
-        };
-        
-        // multiply by matrix block
-        auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
-        {
-            q = dia_blocks_[ill].dot(p);
-        };
-            
-        // solve using the CG solver
-        cg_callbacks
-        (
-            rview,                  // rhs
-            zview,                  // solution
-            1e-11,                  // tolerance
-            0,                      // min. iterations
-            Nspline * Nspline,      // max. iteration
-            apply_preconditioner,
-            matrix_multiply,
-            false
-        );
-    }
-    
-    // synchronize across processes
-    par_.sync (z, Nspline * Nspline, l1_l2_.size());
-}
-
-void SSORPreconditioner::setup ()
+void SSORCGPreconditioner::setup ()
 {
     // setup parent
     NoPreconditioner::setup();
@@ -517,7 +514,7 @@ void SSORPreconditioner::setup ()
     SSOR_.resize(l1_l2_.size());
 }
 
-void SSORPreconditioner::update (double E)
+void SSORCGPreconditioner::update (double E)
 {
     // update parent
     NoPreconditioner::update(E);
@@ -527,49 +524,7 @@ void SSORPreconditioner::update (double E)
         SSOR_[ill] = SSOR(dia_blocks_[ill]);
 }
 
-void SSORPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
-    
-    # pragma omp parallel for
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-    {
-        // create segment views
-        cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
-        cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
-        
-        // apply preconditioner
-        auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
-        {
-            z = SSOR_[ill].upperSolve( SSOR_[ill].dot( SSOR_[ill].lowerSolve(r), diagonal ) );
-        };
-            
-        // multiply by matrix block
-        auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
-        {
-            q = dia_blocks_[ill].dot(p);
-        };
-            
-        // solve using the CG solver
-        cg_callbacks
-        (
-            rview,                  // rhs
-            zview,                  // solution
-            1e-11,                  // tolerance
-            0,                      // min. iterations
-            Nspline * Nspline,      // max. iteration
-            apply_preconditioner,
-            matrix_multiply,
-            false     
-        );
-    }
-    
-    // synchronize across processes
-    par_.sync (z, Nspline * Nspline, l1_l2_.size());
-}
-
-void ILUPreconditioner::setup ()
+void ILUCGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
@@ -578,16 +533,18 @@ void ILUPreconditioner::setup ()
     lu_.resize(l1_l2_.size());
 }
 
-void ILUPreconditioner::update (double E)
+void ILUCGPreconditioner::update (double E)
 {
     // update parent
     NoPreconditioner::update(E);
     
-    std::cout << "\t[" << par_.iproc() << "] Update preconditioner..." << std::flush;
+    std::cout << "\t[" << par_.iproc() << "] Update preconditioner\n";
     
     // for all diagonal blocks
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
+        
         // start timer
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         
@@ -595,7 +552,7 @@ void ILUPreconditioner::update (double E)
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
         // factorize the block
-        lu_[ill] = csr_blocks_[ill].factorize();
+        lu_[ill] = csr_blocks_[ill].factorize(droptol_);
         
         // stop timer
         std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
@@ -609,74 +566,20 @@ void ILUPreconditioner::update (double E)
     }
 }
 
-void ILUPreconditioner::multiply (const cArrayView p, cArrayView q) const
+void SPAICGPreconditioner::setup()
 {
-    NoPreconditioner::multiply(p, q);
+    // setup parent
+    NoPreconditioner::setup();
+    
+    
 }
 
-void ILUPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
+void SPAICGPreconditioner::update (double E)
 {
-    NoPreconditioner::rhs(chi, ienergy, instate);
+    // update parent
+    NoPreconditioner::update(E);
 }
 
-void ILUPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
-    
-    // for all diagonal blocks
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-    {
-        if (par_.isMyWork(ill))
-        {
-            // create copy-to view of "z"
-            cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
-                    
-            // create copy-from view of "r"
-            cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
-            
-            // apply preconditioner
-            auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
-            {
-                z = lu_[ill].solve(r);
-                
-                /// DEBUG
-//                 cArray Mz(z.size());
-//                 multiply(z, Mz);
-//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
-                
-                /// DEBUG
-//                 std::ofstream out;
-//                 rArray grid = linspace (0., 100., 1001);
-//                 out.open("z1.vtk"); s_bspline_.writeVTK(out, z, grid, grid); out.close();
-//                 out.open("r1.vtk"); s_bspline_.writeVTK(out, r, grid, grid); out.close();
-//                 exit(0);
-            };
-            
-            // multiply by matrix block
-            auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
-            {
-                q = dia_blocks_[ill].dot(p);
-            };
-            
-            // solve using the CG solver
-            cg_callbacks
-            (
-                rview,                  // rhs
-                zview,                  // solution
-                1e-11,                  // tolerance
-                0,                      // min. iterations
-                Nspline * Nspline,      // max. iteration
-                apply_preconditioner,
-                matrix_multiply,
-                false     
-            );
-        }
-    }
-    
-    // synchronize across processes
-    par_.sync (z, Nspline * Nspline, l1_l2_.size());
-}
 
 void TwoLevelPreconditioner::setup ()
 {
@@ -686,7 +589,7 @@ void TwoLevelPreconditioner::setup ()
     std::cout << "\t- B-spline count = " << p_bspline_.Nspline() << "\n\n";
     
     // setup parent
-    SSORPreconditioner::setup();
+    SSORCGPreconditioner::setup();
     
     // compute radial integrals
     p_rad_.setupOneElectronIntegrals();
@@ -706,7 +609,7 @@ void TwoLevelPreconditioner::setup ()
 void TwoLevelPreconditioner::update (double E)
 {
     // update parent
-    SSORPreconditioner::update(E);
+    SSORCGPreconditioner::update(E);
     
     // resize arrays
     p_csr_.resize(l1_l2_.size());
@@ -854,92 +757,37 @@ void TwoLevelPreconditioner::multiply (const cArrayView p, cArrayView q) const
     NoPreconditioner::multiply(p, q);
 }
 
-void TwoLevelPreconditioner::precondition (const cArrayView rs, cArrayView zs) const
+void TwoLevelPreconditioner::CG_prec (int iblock, const cArrayView rs, cArrayView zs) const
 {
     // shorthands
     int Nss = s_bspline_.Nspline();
     int Nsp = p_bspline_.Nspline();
     size_t  N = Nss * Nss;
     
-    // for all work items
-    # pragma omp parallel for schedule (dynamic, 1)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-    {
-        if (par_.isMyWork(ill))
-        {
-            // get segment view
-            cArrayView rsview (rs, ill * N, (ill + 1) * N);
-            cArrayView zsview (zs, ill * N, (ill + 1) * N);
-            
-            // apply preconditioner
-            auto apply_preconditioner = [ & ](const cArrayView r, cArrayView z) -> void
-            {
-                // reinterpret rs as a column matrix
-                ColMatrix<Complex> Rs (Nss, Nss, r);
-                
-                // convert R^s to preconditioner basis
-                ColMatrix<Complex> Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
-                
-                // solve the low-order system of equations
-                ColMatrix<Complex> Zp (Nsp, Nsp, p_lu_[ill].solve(Rp.data()));
-                
-                // convert Z^p to solver basis
-                ColMatrix<Complex> Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
-                
-                /// DEBUG
-//                 cArray Mz(z.size());
-//                 multiply(Zs.data(), Mz);
-//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
-                
-                /// DEBUG
-//                 std::ofstream out;
-//                 rArray grid = linspace (0., 100., 1001);
-//                 out.open("Rp.vtk"); p_bspline_.writeVTK(out, Rp.data(), grid, grid); out.close();
-//                 out.open("Rs.vtk"); s_bspline_.writeVTK(out, Rs.data(), grid, grid); out.close();
-//                 out.open("Zp.vtk"); p_bspline_.writeVTK(out, Zp.data(), grid, grid); out.close();
-//                 out.open("Zs.vtk"); s_bspline_.writeVTK(out, Zs.data(), grid, grid); out.close();
-//                 out.open("Zss.vtk"); s_bspline_.writeVTK(out, z, grid, grid); out.close();
-                
-                /// DEBUG
-//                 multiply(z, Mz);
-//                 std::cout << "\t|r| = " << r.norm() << ", |r - Mz| = " << (r - Mz).norm() << "\n";
-                
-//                 exit(0);
-            };
-            
-            // multiply by matrix block
-            auto matrix_multiply = [ & ](const cArrayView p, cArrayView q) -> void
-            {
-                q = dia_blocks_[ill].dot(p);
-            };
-            
-            // solve using the CG solver
-            cg_callbacks
-            (
-                rsview,                 // rhs
-                zsview,                 // solution
-                1e-11,                  // tolerance
-                0,                      // min. iterations
-                Nss * Nss,              // max. iteration
-                apply_preconditioner,
-                matrix_multiply,
-                true     
-            );
-        }
-    }
+    // reinterpret rs as a column matrix
+    ColMatrix<Complex> Rs (Nss, Nss, rs);
     
-    // synchronize across processes
-    par_.sync (zs, Nss * Nss, l1_l2_.size());
+    // convert R^s to preconditioner basis
+    ColMatrix<Complex> Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
+    
+    // solve the low-order system of equations
+    ColMatrix<Complex> Zp (Nsp, Nsp, p_lu_[iblock].solve(Rp.data()));
+    
+    // convert Z^p to solver basis
+    ColMatrix<Complex> Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
+    
+    // use the result
+    zs = Zs.data();
 }
 
 
 MultiresPreconditioner::MultiresPreconditioner (
     Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline
 ){
-    // first order will be solved by ILU (-> ILUPreconditioner)
+    // first order will be solved by ILU (-> ILUCGPreconditioner)
     p_.push_back
     (
-        new ILUPreconditioner
+        new ILUCGPreconditioner
         (
             par, inp, ll,
             Bspline

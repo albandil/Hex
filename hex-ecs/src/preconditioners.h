@@ -19,19 +19,26 @@
 #include "radial.h"
 #include "parallel.h"
 
+/**
+ * @brief List of available preconditioners.
+ */
 typedef enum {
-// default:
-    ilu_prec , // droptol-incomplete LU
-// other
-    no_prec,
-    jacobi_prec,
-    ssor_prec,
-    dic_prec, // diagonal incomplete Choleski
-    silu_prec,
-    bilu_prec,
-    res_prec, // multi-resolution preconditioner
-    spai_prec, // sparse approximate inverse
-    two_prec
+    /// Solve diagonal blocks by drop-tolerance incomplete LU factorization (default).
+    iluCG_prec = 0,
+    /// No preconditioner.
+    no_prec = 1,
+    /// Solve diagonal blocks by non-preconditioned CG iterations.
+    CG_prec = 2,
+    /// Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+    jacobiCG_prec = 3,
+    /// Solve diagonal blocks by SSOR-preconditioned CG iterations.
+    ssorCG_prec = 4,
+    /// Multi-resolution preconditioner (@note not implemented yet).
+    res_prec = 5,
+    /// Solve diagonal blocks by SPAI-preconditioned CG iterations.
+    spaiCG_prec = 6,
+    /// Solve diagonal blocks by two-level precondtioned CG iterations.
+    two_prec = 7
 } Preconditioner;
 
 /**
@@ -65,7 +72,7 @@ typedef enum {
  * @return The elements of @f$ L @f$ (below diagonal) and @f$ D @f$ (at diagonal) with the
  *         exact sparse pattern as the input array A, i.e. specified by I and P arrays.
  */
-cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
+cArray iChol (cArrayView const & A, lArrayView const & I, lArrayView const & P);
 
 /**
  * @brief DIC preconditioner.
@@ -111,7 +118,7 @@ cArray iChol(cArrayView const & A, lArrayView const & I, lArrayView const & P);
  * @param A Matrix in SymDiaMatrix format that is to be preconditioned.
  * @return The DIC preconditioner of the symmetric matrix.
  */
-SymDiaMatrix DIC(SymDiaMatrix const & A);
+SymDiaMatrix DIC (SymDiaMatrix const & A);
 
 /**
  * @brief SSOR preconditioner.
@@ -121,7 +128,7 @@ SymDiaMatrix DIC(SymDiaMatrix const & A);
  * normalized lower (and upper) triangle and in the place of the unit diagonal
  * is the inverse diagonal of @f$ \mathbf{A} @f$. So, having the preconditioner
  */
-SymDiaMatrix SSOR(SymDiaMatrix const & A);
+SymDiaMatrix SSOR (SymDiaMatrix const & A);
 
 /**
  * @brief Preconditioner template.
@@ -161,7 +168,7 @@ class PreconditionerBase
         /**
          * @brief Return the right-hand side.
          */
-        virtual void rhs (const cArrayView chi, int ienergy, int instate) const = 0;
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -200,7 +207,7 @@ class NoPreconditioner : public PreconditionerBase
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (const cArrayView chi, int ienergy, int instate) const;
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const;
         virtual void multiply (const cArrayView p, cArrayView q) const;
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -230,24 +237,55 @@ class NoPreconditioner : public PreconditionerBase
             S_kron_half_D_minus_Mm1_tr_;
 };
 
-class JacobiPreconditioner : public NoPreconditioner
+class CGPreconditioner : public NoPreconditioner
 {
     public:
         
-        JacobiPreconditioner (
+        CGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline
         ) : NoPreconditioner(par, inp, ll, bspline) {}
         
+        // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        virtual void setup () { return NoPreconditioner::setup(); }
+        virtual void update (double E) { return NoPreconditioner::update(E); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         
+        // declare own definitions
+        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callbacks
+        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const { q = dia_blocks_[iblock].dot(p); }
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
+};
+
+class JacobiCGPreconditioner : public CGPreconditioner
+{
+    public:
+        
+        JacobiCGPreconditioner (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline
+        ) : CGPreconditioner(par, inp, ll, bspline) {}
+        
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
+        
+        // declare own definitions
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (const cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
-        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = invd_[iblock] * r; }
         
     protected:
         
@@ -255,24 +293,29 @@ class JacobiPreconditioner : public NoPreconditioner
         cArrays invd_;
 };
 
-class SSORPreconditioner : public NoPreconditioner
+class SSORCGPreconditioner : public CGPreconditioner
 {
     public:
         
-        SSORPreconditioner (
+        SSORCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline
-        ) : NoPreconditioner(par, inp, ll, bspline) {}
+        ) : CGPreconditioner(par, inp, ll, bspline) {}
         
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
         
+        // declare own definitions
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (const cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
-        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = SSOR_[iblock].upperSolve( SSOR_[iblock].dot( SSOR_[iblock].lowerSolve(r), diagonal ) ); }
         
     protected:
         
@@ -280,26 +323,35 @@ class SSORPreconditioner : public NoPreconditioner
         std::vector<SymDiaMatrix> SSOR_;
 };
 
-class ILUPreconditioner : public NoPreconditioner
+class ILUCGPreconditioner : public CGPreconditioner
 {
     public:
         
-        ILUPreconditioner (
+        ILUCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : NoPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            double droptol = 0.
+        ) : CGPreconditioner(par, inp, ll, bspline), droptol_(droptol) {}
         
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
         
+        // declare own definitions
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (const cArrayView chi, int ienergy, int instate) const;
-        virtual void multiply (const cArrayView p, cArrayView q) const;
-        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = lu_[iblock].solve(r); }
         
     protected:
+        
+        // drop tolarance for the factorizations
+        double droptol_;
         
         // diagonal CSR block for every coupled state
         std::vector<CsrMatrix> csr_blocks_;
@@ -309,7 +361,40 @@ class ILUPreconditioner : public NoPreconditioner
 };
 
 /**
- * @brief Multi-resolution preconditioner.
+ * @brief Sparse approximate inverse preconditioner.
+ */
+class SPAICGPreconditioner : public CGPreconditioner
+{
+    public:
+        
+        SPAICGPreconditioner  (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline
+        ) : CGPreconditioner(par, inp, ll, bspline) {}
+        
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        
+        // declare own definitions
+        virtual void setup ();
+        virtual void update (double E);
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = spai_[iblock].dot(r); }
+        
+    private:
+        
+        // SPAIs for every diagonal block
+        std::vector<SymDiaMatrix> spai_;
+};
+
+/**
+ * @brief Two-resolution preconditioner.
  * 
  * This preconditioner class is inspired by the method of multi-resolution in the finite
  * difference computations. A high-order differential operator that gives rise to the
@@ -368,7 +453,7 @@ class ILUPreconditioner : public NoPreconditioner
  * where the word "Matrix" indicates that we want to split long vector into a square matrix. The resulting square matrix
  * @f$ \mathbf{R} @f$ will then have the same structure.
  */
-class TwoLevelPreconditioner : public SSORPreconditioner
+class TwoLevelPreconditioner : public SSORCGPreconditioner
 {
     public:
         
@@ -378,7 +463,7 @@ class TwoLevelPreconditioner : public SSORPreconditioner
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & s_bspline
-        ) : SSORPreconditioner(par,inp,ll,s_bspline),
+        ) : SSORCGPreconditioner(par,inp,ll,s_bspline),
             p_bspline_ (
                 1,                                     // use first order for preconditioner basis
                 sorted_unique(s_bspline.rknots(), 1),  // allow just one consecutive occurence
@@ -388,13 +473,18 @@ class TwoLevelPreconditioner : public SSORPreconditioner
             p_rad_(p_bspline_), g_(p_bspline_)
         {}
         
-        RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        // reuse parent definitions
+        RadialIntegrals const & rad () const { return SSORCGPreconditioner::rad(); }
+        void precondition (const cArrayView r, cArrayView z) const { SSORCGPreconditioner::precondition(r,z); }
         
+        // declare own definitions
         void setup();
         void update (double E);
-        void rhs (const cArrayView chi, int ienergy, int instate) const;
+        void rhs (cArrayView chi, int ienergy, int instate) const;
         void multiply (const cArrayView p, cArrayView q) const;
-        void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callback
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         
@@ -472,7 +562,7 @@ class MultiresPreconditioner : public PreconditionerBase
         }
         
         // use RHS from the highest preconditioner
-        void rhs (const cArrayView chi, int ienergy, int instate) const
+        void rhs (cArrayView chi, int ienergy, int instate) const
         {
             p_.back()->rhs(chi, ienergy, instate);
         }
