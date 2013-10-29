@@ -141,8 +141,8 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
 Complex RadialIntegrals::computeR (
     int lambda,
     int a, int b, int c, int d,
-    const cArray& Mtr_L, const cArray& Mtr_mLm1
-                 
+    cArray const & Mtr_L, cArray const & Mtr_mLm1,
+    cArray const & scale
 ) const {
     int order = bspline_.order();
     int Nreknot = bspline_.Nreknot();
@@ -168,38 +168,31 @@ Complex RadialIntegrals::computeR (
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a - order)) * (order+1);
-    Complex const * const Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a - order)) * (order+1);
-    Complex const * const Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b - order)) * (order+1);
-    Complex const * const Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b - order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a - order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a - order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b - order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b - order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
-    double B_re = 0., B_im = 0.;
     for (int ix = 0; ix < (int)Nreknot - 1; ix++)
     {
+        // M-moments scale
+        Complex const * const restrict scale_ix = scale.data() + ix * (Nreknot - 1);
+        
         for (int iy = ix + 1; iy < (int)Nreknot - 1; iy++)
         {
-            Complex B (0.,0.);
-            
             // ix < iy
             if (a <= ix and ix <= a + (int)order and
                 b <= iy and iy <= b + (int)order)
-                B += Mtr_L_ac[ix - a] * Mtr_mLm1_bd[iy - b];
+                Rtr_Labcd_offdiag += Mtr_L_ac[ix - a] * Mtr_mLm1_bd[iy - b] * scale_ix[iy];
             
             // ix > iy (by renaming the ix,iy indices)
             if (b <= ix and ix <= b + (int)order and
                 a <= iy and iy <= a + (int)order)
-                B += Mtr_L_bd[ix - b] * Mtr_mLm1_ac[iy - a];
-            
-            // store full integral contribution
-            B_re += B.real();
-            B_im += B.imag();
+                Rtr_Labcd_offdiag += Mtr_L_bd[ix - b] * Mtr_mLm1_ac[iy - a] * scale_ix[iy];
         }
     }
     
-    // store offdiagonal R-type integral contributions
-    Rtr_Labcd_offdiag = Complex(B_re, B_im);
-
     // sum the diagonal and offdiagonal contributions
     return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
 }

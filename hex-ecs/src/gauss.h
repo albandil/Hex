@@ -135,11 +135,9 @@ class GaussLegendre
             (ptr->*f)(points, xs.data(), values, data);
             
             // sum the results
-            Complex result = std::inner_product (
-                values, values + points,
-                ws.begin(),
-                Complex(0.)
-            );
+            Complex result = 0.;
+            for (int ipt = 0; ipt < points; ipt++)
+                result += values[ipt] * ws[ipt];
             
             return result;
         }

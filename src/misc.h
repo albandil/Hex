@@ -14,8 +14,10 @@
 #define HEX_MISC
 
 #include <exception>
+#include <chrono>
 #include <complex>
 #include <cstdio>
+#include <iostream>
 #include <limits>
 
 /**
@@ -208,5 +210,49 @@ template <class ...Params> char const * format (Params ...p)
     snprintf(text, sizeof(text), p...);
     return text;
 }
+
+/**
+ * @brief Timing class.
+ * 
+ * The Timer class is a singleton that can be used for a comfortable computation of
+ * elapsed time. The usage would be:
+ * @code
+ *     Timer::timer().start();
+ * 
+ *     // .. block ...
+ * 
+ *     std:cout << "Time = " << Timer::timer().stop() << "secs.\n";
+ * @endcode
+ */
+class Timer
+{
+    public:
+        
+        /// Return object reference (singleton interface).
+        static Timer const & timer()
+        {
+            static Timer timer_;
+            return timer_;
+        }
+        
+        /// Start timer.
+        void start () const
+        {
+            start_ = std::chrono::system_clock::now();
+        }
+        
+        /// Stop timer and return elapsed time in seconds.
+        int stop () const
+        {
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
+            std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
+            return secs.count();
+        }
+        
+    private:
+        
+        /// Start time.
+        mutable std::chrono::system_clock::time_point start_;
+};
 
 #endif

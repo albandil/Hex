@@ -93,7 +93,7 @@ class RadialIntegrals
          * @param iknot  Interval index.
          */
         Complex computeD_iknot(int i, int j, int iknot) const;
-
+        
         /**
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
          * @param i B-spline index.
@@ -101,7 +101,7 @@ class RadialIntegrals
          * @param maxknot Right-most knot of any integration.
          */
         Complex computeD(int i, int j, int maxknot = -1) const;
-
+        
         /**
          * Compute integral moment of coordinate power between the B-splines
          * @f$ B_i @f$ and @f$ B_j @f$
@@ -113,7 +113,7 @@ class RadialIntegrals
          * @param R      Potential truncation point.
          */
         Complex computeM_iknot(int a, int i, int j, int iknot, Complex R) const;
-
+        
         /**
          * Compute integral moment of coordinate power between the B-splines
          * @f$ B_i @f$ and @f$ B_j @f$
@@ -123,7 +123,7 @@ class RadialIntegrals
          * @param maxknot Right-most knot of any integration.
          */
         Complex computeM(int a, int i, int j, int maxknot = 0) const;
-
+        
         /**
          * Compute integral moment of degree "a" for every B-spline pair and every
          * interknot sub-interval. Store in 1-D array of shape
@@ -135,6 +135,8 @@ class RadialIntegrals
          * @param a Moment degree.
          */
         cArray computeMi(int a, int iknotmax = 0) const;
+        
+        cArray computeScale (int a, int iknotmax = 0) const;
         
         void M_integrand(int n, Complex *in, Complex *out, void *data) const;
         
@@ -148,6 +150,9 @@ class RadialIntegrals
          * @param l Fourth (y-dependent) B-spline index.
          * @param Mtr_L As above, for R₀-truncated moments.
          * @param Mtr_mLm1 As above, for R₀-truncated moments.
+         * @param scale Per-knot scale factors. The product M_L * M_mLm1 needs to be multiplied
+         *              by scale[ix][iy], where ix and iy number the knots. The dimensions of scale
+         *              have to be (Nreknot-1)×(Nreknot-1).
          * 
          * Given the R-type integral symmetry, following calls will produce identical results:
          * 
@@ -165,7 +170,8 @@ class RadialIntegrals
             int lambda,
             int i, int j, int k, int l,
             cArray const & Mtr_L,
-            cArray const & Mtr_mLm1
+            cArray const & Mtr_mLm1,
+            cArray const & scale
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
