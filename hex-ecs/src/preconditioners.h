@@ -38,7 +38,9 @@ typedef enum {
     /// Solve diagonal blocks by SPAI-preconditioned CG iterations.
     spaiCG_prec = 6,
     /// Solve diagonal blocks by two-level precondtioned CG iterations.
-    two_prec = 7
+    two_prec = 7,
+    /// Diagonal incomplete Cholesky factorization + CG iterations.
+    dicCG_prec = 8
 } Preconditioner;
 
 /**
@@ -81,20 +83,20 @@ cArray iChol (cArrayView const & A, lArrayView const & I, lArrayView const & P);
  * matrix with a preconditioned diagonal and the strict upper and lower triangles normalized
  * by the preconditioned diagonal, i.e. a matrix
  * @f[
- *     \matfbf{P} = \mathbf{\tilde{L}}_\mathbf{A} + \mathbf{D}^{-1} + \mathbf{\tilde{L}}_\mathbf{A}
+ *     \mathbf{P} = \mathbf{\tilde{L}}_\mathbf{A} + \mathbf{D}^{-1} + \mathbf{\tilde{L}}_\mathbf{A}^T
  * @f]
  * for the preconditioner
  * @f[
  *     \mathbf{M} = (\mathbf{D} + \mathbf{L}_\mathbf{A})
  *                  \mathbf{D}^{-1}
  *                  (\mathbf{D} + \mathbf{U}_\mathbf{A})
- *                =  (1 + \mathbf{\tilde{L}}_\mathbf{A})
+ *                =  (1 + \mathbf{\tilde{U}}_\mathbf{A}^T)
  *                  \mathbf{D}
  *                  (1 + \mathbf{\tilde{U}}_\mathbf{A})
  * @f]
  * The formula for the elements of @f$ \mathbf{D} @f$ is
  * @f[
- *     d_i = a_{ii} - \sum_{k < i} a_{ik} d_{kk}^{-1} a_{ki} \ ,
+ *     d_i = a_{ii} - \sum_{k < i} a_{ik} d_{k}^{-1} a_{ki} \ ,
  * @f]
  * and is to be evaluated along the diagonal, re-using the just computed values @f$ d_i @f$.
  * Hence, the access pattern in dense matrix would be
@@ -358,6 +360,44 @@ class ILUCGPreconditioner : public CGPreconditioner
         
         // LU decompositions of the CSR blocks
         std::vector<CsrMatrix::LUft> lu_;
+};
+
+/**
+ * @brief Incomplete Cholesky CG preconditioner.
+ */
+class DICCGPreconditioner : public CGPreconditioner
+{
+    public: 
+        
+        DICCGPreconditioner (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline
+        ) : CGPreconditioner(par, inp, ll, bspline) {}
+        
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        
+        // declare own definitions
+        virtual void setup ();
+        virtual void update (double E);
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const
+        {
+            z = DIC_[iblock].upperSolve( DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ) );
+            write_array(DIC_[iblock].lowerSolve(r), "a1.dat");
+            write_array(DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ), "a2.dat");
+            write_array(DIC_[iblock].upperSolve( DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ) ), "a3.dat");
+        }
+        
+    private:
+        
+        std::vector<SymDiaMatrix> DIC_;
 };
 
 /**

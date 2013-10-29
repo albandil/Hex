@@ -195,6 +195,7 @@ void CommandLine::parse(int argc, char* argv[])
                 else if (strcmp(optarg,"ILU") == 0) preconditioner = iluCG_prec;
                 else if (strcmp(optarg,"res") == 0) preconditioner = res_prec;
                 else if (strcmp(optarg,"SPAI") == 0) preconditioner = spaiCG_prec;
+                else if (strcmp(optarg,"DIC") == 0) preconditioner = dicCG_prec;
                 else throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }

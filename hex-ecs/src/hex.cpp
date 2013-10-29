@@ -215,6 +215,9 @@ StgSolve:
         case iluCG_prec:
             prec = new ILUCGPreconditioner (par, inp, coupled_states, bspline, cmd.droptol);
             break;
+        case dicCG_prec:
+            prec = new DICCGPreconditioner (par, inp, coupled_states, bspline);
+            break;
         case two_prec:
             prec = new TwoLevelPreconditioner (par, inp, coupled_states, bspline);
             break;

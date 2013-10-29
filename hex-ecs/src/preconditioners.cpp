@@ -12,6 +12,8 @@
 
 #include <iostream>
 
+#include <CL/cl.h>
+
 #include "arrays.h"
 #include "gauss.h"
 #include "input.h"
@@ -88,7 +90,9 @@ cArray IC (cArrayView const & A, lArrayView const & I, lArrayView const & P)
 
 SymDiaMatrix DIC (SymDiaMatrix const & A)
 {
-    #define THRESHOLD 1e-3
+    #define THRESHOLD 1e-5
+    
+    write_array(A.data(), "A.dat");
     
     //
     // compute the preconditioned diagonal
@@ -107,10 +111,10 @@ SymDiaMatrix DIC (SymDiaMatrix const & A)
     register int Nrows = D.size();
     register int Ndiag = A.diag().size();
     
-    // for all elements of the diagonal
+    // for all elements of the main diagonal
     for (register int irow = 0; irow < Nrows; irow++)
     {
-        // pointer to the A's raw concatenated diagonal data
+        // pointer to the A's raw concatenated diagonal data (starting at first non-main diagonal)
         Complex const * restrict pA = A.data().data() + Nrows;
         
         // for all diagonals (except the main diagonal) constributing to DIC
@@ -119,9 +123,8 @@ SymDiaMatrix DIC (SymDiaMatrix const & A)
             // update pivot
             pD[irow] -= pA[irow - pAd[idiag]] * pA[irow - pAd[idiag]] / pD[irow - pAd[idiag]];
             
-            // if the pivod is too small, set it to one
             if (std::abs(pD[irow]) < THRESHOLD)
-                pD[irow] = THRESHOLD;
+                throw exception ("[DIC] Pivot too small for irow = %d", irow);
             
             // move pA to the beginning of the next diagonal
             pA += Nrows - pAd[idiag];
@@ -139,7 +142,7 @@ SymDiaMatrix DIC (SymDiaMatrix const & A)
     Complex * restrict pDIC = DIC.data().data();
     
     // pointer to DIC's diagonal labels (same as A.diag())
-    int const * restrict pDICd = DIC.diag().data();
+    int const * const restrict pDICd = DIC.diag().data();
     
     // set the diagonal to the inverse of the DIC diagonal
     for (register int irow = 0; irow < Nrows; irow++)
@@ -148,7 +151,7 @@ SymDiaMatrix DIC (SymDiaMatrix const & A)
     // move on to the first non-main diagonal
     pDIC += Nrows;
     
-    // for all non-main diagonals
+    // for all non-main upper diagonals
     for (register int idiag = 1; idiag < Ndiag; idiag++)
     {
         // for all elements in the diagonal
@@ -158,10 +161,11 @@ SymDiaMatrix DIC (SymDiaMatrix const & A)
             pDIC[irow] *= pD[irow];
         }
         
-        // move to next diagonal
+        // move on to the next diagonal
         pDIC +=  Nrows - pDICd[idiag];
     }
     
+    write_array(DIC.data(), "DIC.dat");
     return DIC;
 }
 
@@ -389,7 +393,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         if (par_.isMyWork(ill))
             cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
     
-    // multiply "q" by the matrix of the system
+    // multiply "p" by the matrix of the system
     # pragma omp parallel for schedule (dynamic,1) collapse(2)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
     for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
@@ -421,9 +425,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 Complex f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                if (not finite(std::abs(f)))
-                    throw exception ("f[%d](%d,%d,%d,%d;%d) = %g", lambda, l1, l2, l1p, l2p, inp_.L, f.real());
                 
                 if (f != 0.)
                     q_contrib -= f * s_rad_.R_tr_dia(lambda).dot(p_block);
@@ -546,7 +547,7 @@ void ILUCGPreconditioner::update (double E)
         std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
         
         // start timer
-        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        Timer::timer().start();
         
         // create CSR block
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
@@ -554,30 +555,49 @@ void ILUCGPreconditioner::update (double E)
         // factorize the block
         lu_[ill] = csr_blocks_[ill].factorize(droptol_);
         
-        // stop timer
-        std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
-    
-        // compute time usage
-        std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        // time usage
+        int secs = Timer::timer().stop();
     
         // print info
-        std::cout << "\b\b\b in " << secs.count() / 60 << ":" << std::setw(2) << std::setfill('0') << secs.count() % 60
+        std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
                   << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
     }
 }
+
+void DICCGPreconditioner::setup()
+{
+    CGPreconditioner::setup();
+    DIC_.resize(l1_l2_.size());
+}
+
+void DICCGPreconditioner::update(double E)
+{
+    CGPreconditioner::update(E);
+    
+    // diagonal incomplete Cholesky factorization
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    {
+        DIC_[ill] = DIC(dia_blocks_[ill]);
+        write_array(DIC_[ill].main_diagonal(), format("DIC-main_diagonal-%d.dat", ill));
+        write_array(DIC_[ill].data(), format("DIC-al_data-%d.dat", ill));
+    }
+}
+
 
 void SPAICGPreconditioner::setup()
 {
     // setup parent
     NoPreconditioner::setup();
     
-    
+    // TODO
 }
 
 void SPAICGPreconditioner::update (double E)
 {
     // update parent
     NoPreconditioner::update(E);
+    
+    // TODO
 }
 
 
@@ -628,7 +648,7 @@ void TwoLevelPreconditioner::update (double E)
                   << l1 << "," << l2 << ")..." << std::flush;
         
         // start timer
-        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        Timer::timer().start();
         
         // construct DIA block
         SymDiaMatrix p_dia = E * p_S_kron_S_
@@ -648,13 +668,10 @@ void TwoLevelPreconditioner::update (double E)
         p_lu_[ill] = p_csr_[ill].factorize();
         
         // stop timer
-        std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
+        int secs = Timer::timer().stop();
         
-        // compute time usage
-        std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    
         // print info
-        std::cout << "\b\b\b in " << secs.count() / 60 << ":" << std::setw(2) << std::setfill('0') << secs.count() % 60
+        std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
                   << " (" << p_lu_[ill].size() / 1048576 << " MiB)\n";
     }
 }
@@ -826,270 +843,3 @@ void MultiresPreconditioner::precondition (const cArrayView r, cArrayView z) con
     // HOA WHOW... TODO
     
 }
-
-
-/*
-        // block incomplete D-ILU
-        std::vector<std::vector<SymDiaMatrix>> bcks(l1_l2_.size());
-        std::vector<std::vector<CsrMatrix>> bcks_csr(l1_l2_.size());
-        std::vector<std::vector<CsrMatrix::LUft>> bcks_lufts(l1_l2_.size());
-        
-        // sparse approximate inverse
-        std::vector<SymDiaMatrix> spai(l1_l2_.size());
-        
-        // incomplete Cholesky factorization of the diagonal blocks
-        //   L + Lt - I
-        std::vector<SymDiaMatrix> icholL(l1_l2_.size());
-        //   D⁻¹
-        std::vector<cArray> icholD(l1_l2_.size());
-        
-        // diagonal incomplete Cholesky (DIC) preconditioner
-        std::vector<SymDiaMatrix> DIC(l1_l2_.size());
- 
-            // diagonal incomplete Cholesky factorization
-            if (preconditioner == dic_prec)
-            {
-                DIC[ill] = DIC_preconditioner(dia_blocks[ill]);
-                cArray(DIC[ill].main_diagonal()).hdfsave(format("DIC-%d.hdf",ill));
-            }
- 
-            if (preconditioner == bilu_prec)
-            {
-                // log output
-                std::cout << "\n\t\t-> [" << par.iproc() << "] block D-ILU factorization "
-                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
-                
-                // allocate space
-                std::vector<SymDiaMatrix> ibcks(Nspline);
-                bcks[ill].resize(Nspline);
-                bcks_csr[ill].resize(Nspline);
-                bcks_lufts[ill].resize(Nspline);
-                
-                std::cout << "\t\t   [" << par.iproc() << "] ";
-                std::cout << "computing blocks and SPAIs\n";
-                
-                // for all diagonal blocks
-                for (int iblock = 0; iblock < Nspline; iblock++)
-                {
-                    // - compute the block
-                    bcks[ill][iblock] = E * rad.S().main_diagonal()[iblock] * rad.S()
-                            - 0.5 * rad.D().main_diagonal()[iblock] * rad.S()
-                            - 0.5 * rad.S().main_diagonal()[iblock] * rad.D()
-                            - 0.5 * l1 * (l1 + 1.) * rad.Mm2().main_diagonal()[iblock] * rad.S()
-                            - 0.5 * l2 * (l2 + 1.) * rad.S().main_diagonal()[iblock] * rad.Mm2()
-                            + rad.Mm1_tr().main_diagonal()[iblock] * rad.S()
-                            + rad.S().main_diagonal()[iblock] * rad.Mm1_tr();
-                    
-                    // - invert using the SPAI
-                    ibcks[iblock] = SymDiaMatrix (
-                        Nspline,
-                        iArray(1), // = (int[]){ 0 }
-                        cArray(Nspline,1.)/bcks[ill][iblock].main_diagonal()
-                    );
-                }
-                
-                std::cout << "\t\t   [" << par.iproc() << "] ";
-                std::cout << "preconditioning the diagonal\n";
-                
-                // for all diagonals of overlap matrix
-                for (int idiag = 1; idiag <= order; idiag++)
-                {
-                    // for all elements of this diagonal
-                    for (int irow = 0; irow < Nspline - idiag; irow++)
-                    {
-                        // - construct corresponding block of Kronecker product
-                        SymDiaMatrix bck = E * rad.S().dptr(idiag)[irow] * rad.S()
-                                - 0.5 * rad.D().dptr(idiag)[irow] * rad.S()
-                                - 0.5 * rad.S().dptr(idiag)[irow] * rad.D()
-                                - 0.5 * l1 * (l1 + 1.) * rad.Mm2().dptr(idiag)[irow] * rad.S()
-                                - 0.5 * l2 * (l2 + 1.) * rad.S().dptr(idiag)[irow] * rad.Mm2()
-                                + rad.Mm1_tr().dptr(idiag)[irow] * rad.S()
-                                + rad.S().dptr(idiag)[irow] * rad.Mm1_tr();
-                        
-                        
-                        // - update pivot
-                        bcks[ill][irow+idiag] -= bck * (ibcks[irow] * bck);
-                        
-                    }
-                }
-                
-                std::cout << "\t\t   [" << par.iproc() << "] ";
-                std::cout << "factorization of the pivots\n";
-                
-                // convert and factorize the pivots
-                size_t size = 0;
-                for (int iblock = 0; iblock < Nspline; iblock++)
-                {
-                    
-                    bcks_csr[ill][iblock] = bcks[ill][iblock].tocoo().tocsr();
-                    bcks_lufts[ill][iblock] = bcks_csr[ill][iblock].factorize(droptol);
-                    size += bcks_lufts[ill][iblock].size();
-                }
-                
-                // log output
-                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << par.iproc() << "] ";
-                std::cout << "droptol " << droptol << ", ";
-                std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
-                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
-                std::cout << "mem " << size/1048576 << " MiB";
-            }
-            
-            // drop-tolerance-incomplete single-electron LU factorization
-            if (preconditioner == silu_prec)
-            {
-                // log output
-                std::cout << "\n\t\t-> [" << par.iproc() << "] s-iLU factorization "
-                          << ill << " of (" << l1 << "," << l2 << ") block started\n";
-                
-                // allocate space
-                scsr_blocks[ill].resize(Nspline);
-                siLU[ill].resize(Nspline);
-                
-                unsigned size = 0;
-                
-                // for all single-electron blocks
-                for (int iblock = 0; iblock < Nspline; iblock++)
-                {
-                    // setup the single-electron block
-                    scsr_blocks[ill][iblock] = (
-                        E * rad.S().main_diagonal()[iblock] * rad.S()
-                      - 0.5 * rad.D().main_diagonal()[iblock] * rad.S()
-                      - 0.5 * rad.S().main_diagonal()[iblock] * rad.D()
-                      - 0.5 * l1 * (l1 + 1.) * rad.Mm2().main_diagonal()[iblock] * rad.S()
-                      - 0.5 * l2 * (l2 + 1.) * rad.S().main_diagonal()[iblock] * rad.Mm2()
-                      + rad.Mm1_tr().main_diagonal()[iblock] * rad.S()
-                      + rad.S().main_diagonal()[iblock] * rad.Mm1_tr()
-                    ).tocoo().tocsr();
-                    
-//                     scsr_blocks[ill][iblock].plot(format("scsr-%d-%.03d.png", ill, iblock), 1.);
-//                     scsr_blocks[ill][iblock].hdfsave(format("scsr-%d-%.03d.hdf", ill, iblock));
-                    
-                    // factorize the block
-                    siLU[ill][iblock] = scsr_blocks[ill][iblock].factorize(droptol);
-                    size += siLU[ill][iblock].size();
-                }
-                
-                // log output
-                std::chrono::duration<int> sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
-                std::cout << "\t\t   [" << par.iproc() << "] ";
-                std::cout << "droptol " << droptol << ", ";
-                std::cout << "time " << sec.count() / 60 << ":" << std::setfill('0') << std::setw(2) << sec.count() % 60 << ", ";
-                std::cout << "average " << (sec.count() / Nspline) / 60 << ":" << std::setfill('0') << std::setw(2) << (sec.count() / Nspline) % 60 << ", ";
-                std::cout << "mem " << size/1048576 << " MiB";
-            }
-            
-            // sparse approximate inverse preconditioner
-            if (preconditioner == spai_prec)
-            {
-                // use diagonal preconditioner
-                spai[ill] = SymDiaMatrix (
-                    Nspline * Nspline,
-                    iArray(1),
-                    cArray(Nspline * Nspline, 1.) / dia_blocks[ill].main_diagonal()
-                );
-            }
-*/
-
-
-/*
-                // apply a block inversion preconditioner (parallel for ILU)
-                # pragma omp parallel for if (preconditioner == ilu_prec)
-                for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-                {
-                    // skip computation of unwanted blocks for this process
-                    if (not par.isMyWork(ill))
-                        continue;
-                    
-                    // create copy-to view of "z"
-                    cArrayView zview(z, ill * Nspline * Nspline, Nspline * Nspline);
-                    
-                    // create copy-from view of "r"
-                    cArrayView rview(r, ill * Nspline * Nspline, Nspline * Nspline);
-                    
-                    // preconditioner of the nested CG
-                    auto apply_inner_preconditioner = [ & ](cArray const & r, cArray & z) -> void
-                    {
-                        // Incomplete LU factorization
-                        if (preconditioner == ilu_prec)
-                            z = iLU[ill].solve(r);
-                        
-                        // single-electron Incomplete LU factorization
-                        // TODO Needs some modification to work!
-                        if (preconditioner == silu_prec)
-                        {
-                            // for all single-electron blocks
-                            # pragma omp parallel for
-                            for (int iblock = 0; iblock < Nspline; iblock++)
-                            {
-                                // precondition by inverting a single diagonal block
-                                cArrayView rview (r, iblock * Nspline, Nspline);
-                                cArrayView zview (z, iblock * Nspline, Nspline);
-                                zview = siLU[ill][iblock].solve(rview);
-                            }
-                        }
-                        
-                        // block D-ILU
-                        if (preconditioner == bilu_prec)
-                        {
-                            // for all single-electron blocks
-                            # pragma omp parallel for
-                            for (int iblock = 0; iblock < Nspline; iblock++)
-                            {
-                                // precondition by inverting a single diagonal block
-                                cArrayView rview (r, iblock * Nspline, Nspline);
-                                cArrayView zview (z, iblock * Nspline, Nspline);
-                                zview = bcks_lufts[ill][iblock].solve(rview);
-                            }
-                        }
-                        
-                        // Diagonal Incomplete Cholesky factorization
-                        // TODO Needs to implement pivoting to work!
-                        if (preconditioner == dic_prec)
-                        {
-                            z = DIC[ill].upperSolve( DIC[ill].dot( DIC[ill].lowerSolve(r), diagonal ) );
-                            std::cout << z.norm()/r.norm() << "\n";
-                            std::cout << cArray(DIC[ill].main_diagonal()).norm() << "\n";
-                        }
-                        
-                        // Sparse Approximate Inverse preconditioner
-                        if (preconditioner == spai_prec)
-                            z = spai[ill].dot(r);
-                        
-                        // Symmetric Successive Over-Relaxation
-                        // NOTE seems slower than Jacobi
-                        if (preconditioner == ssor_prec)
-                            z = SSOR[ill].upperSolve( SSOR[ill].dot( SSOR[ill].lowerSolve(r), diagonal ) );
-                        
-                        // Jacobi preconditioning
-                        // NOTE seems the fastest
-                        if (preconditioner == jacobi_prec)
-                            z = SSOR[ill].dot(r,diagonal);
-                        
-                        // no preconditioning
-                        // NOTE seems slower than Jacobi
-                        if (preconditioner == no_prec)
-                            z = r;
-                    };
-                    
-                    // multiply by matrix block
-                    auto inner_matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
-                    {
-                        q = dia_blocks[ill].dot(p);
-                    };
-                    
-                    // solve using the CG solver
-                    cg_callbacks
-                    (
-                        rview,      // rhs
-                        zview,      // solution
-                        1e-11,      // tolerance
-                        0,          // min. iterations
-                        Nspline*Nspline,    // max. iteration
-                        apply_inner_preconditioner,
-                        inner_matrix_multiply,
-                        true       // verbose
-                    );
-                }
-                
-*/
