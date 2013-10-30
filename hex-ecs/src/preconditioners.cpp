@@ -12,8 +12,6 @@
 
 #include <iostream>
 
-#include <CL/cl.h>
-
 #include "arrays.h"
 #include "gauss.h"
 #include "input.h"
