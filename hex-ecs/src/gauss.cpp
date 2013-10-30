@@ -27,7 +27,7 @@ std::vector<std::pair<double*,double*>> GaussLegendre::data_ = {
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
-int GaussLegendre::gauss_nodes_and_weights(int points, const double* & vx, const double* & vw) const
+int GaussLegendre::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
 {
     // enforce at least second order rule
     if (points < 2)
@@ -71,11 +71,11 @@ int GaussLegendre::gauss_nodes_and_weights(int points, const double* & vx, const
     return points;
 }
 
-cArray GaussLegendre::p_points(int& points, Complex x1, Complex x2) const
+cArray GaussLegendre::p_points (int points, Complex x1, Complex x2) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
-    points = gauss_nodes_and_weights(points, vx, vw);
+    points = gauss_nodes_and_weights (points, vx, vw);
     
     // prepare centre and half-width of the interval
     Complex hw = 0.5 * (x2 - x1);
@@ -92,12 +92,11 @@ cArray GaussLegendre::p_points(int& points, Complex x1, Complex x2) const
     return xs;
 }
 
-
-cArray GaussLegendre::p_weights(int& points, Complex x1, Complex x2) const
+cArray GaussLegendre::p_weights (int points, Complex x1, Complex x2) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
-    points = gauss_nodes_and_weights(points, vx, vw);
+    points = gauss_nodes_and_weights (points, vx, vw);
     
     // prepare halfwidth of the interval
     Complex hw = 0.5 * (x2 - x1);

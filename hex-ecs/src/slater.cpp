@@ -41,16 +41,8 @@ inline double damp (Complex y, Complex x, Complex R)
     return tanh(0.125 * (R.real() - r));
 }
 
-void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, void* data) const
+void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const
 {
-    // extract data
-    auto params = *(std::tuple<int,int,int,int,int,Complex>*)data;
-    int i = std::get<0>(params);
-    int j = std::get<1>(params);
-    int L = std::get<2>(params);
-    int iknot = std::get<3>(params);
-    int iknotmax = std::get<4>(params);
-    Complex x = std::get<5>(params);
     Complex R = bspline_.t(iknotmax);
     
     // evaluate B-splines
@@ -64,16 +56,9 @@ void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, void*
 }
 
 
-void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, void* data) const
+void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const
 {
     // extract data
-    int i = ((int*)data)[0];
-    int j = ((int*)data)[1];
-    int k = ((int*)data)[2];
-    int l = ((int*)data)[3];
-    int L = ((int*)data)[4];
-    int iknot = ((int*)data)[5];
-    int iknotmax = ((int*)data)[6];
     Complex R = bspline_.t(iknotmax);
     
     // evaluate B-splines
@@ -87,10 +72,10 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, void*
     // evaluate inner integral, fill output array
     for (int u = 0; u < n; u++)
     {
-        auto data2 = std::make_tuple(k,l,L,iknot,iknotmax,in[u]);
-        out[u] = values_i[u] * values_j[u] / in[u] * damp(0, in[u], R) * g_.quadMFP (
-                 this, &RadialIntegrals::R_inner_integrand,
-                 &data2, points2, iknot, bspline_.t(iknot), in[u]
+        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_.quadMFP (
+                 this, &RadialIntegrals::R_inner_integrand,                    // integrand pointers
+                 points2, iknot, bspline_.t(iknot), in[u],                     // integrator parameters
+                 k, l, L, iknot, iknotmax, in[u]                               // integrand data
         );
     }
 }
@@ -110,8 +95,9 @@ Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int ikn
     
     // integrate
     return g_.quadMFP (
-        this, &RadialIntegrals::R_outer_integrand,
-        data, points, iknot, bspline_.t(iknot), bspline_.t(iknot+1)
+        this, &RadialIntegrals::R_outer_integrand,                // integrand pointers
+        points, iknot, bspline_.t(iknot), bspline_.t(iknot+1),    // integrator parameters
+        k, l, m, n, L, iknot, iknotmax                            // integrand data
     );
 }
 
@@ -141,8 +127,7 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
 Complex RadialIntegrals::computeR (
     int lambda,
     int a, int b, int c, int d,
-    cArray const & Mtr_L, cArray const & Mtr_mLm1,
-    cArray const & scale
+    cArray const & Mtr_L, cArray const & Mtr_mLm1
 ) const {
     int order = bspline_.order();
     int Nreknot = bspline_.Nreknot();
@@ -176,20 +161,17 @@ Complex RadialIntegrals::computeR (
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     for (int ix = 0; ix < (int)Nreknot - 1; ix++)
     {
-        // M-moments scale
-        Complex const * const restrict scale_ix = scale.data() + ix * (Nreknot - 1);
-        
         for (int iy = ix + 1; iy < (int)Nreknot - 1; iy++)
         {
             // ix < iy
             if (a <= ix and ix <= a + (int)order and
                 b <= iy and iy <= b + (int)order)
-                Rtr_Labcd_offdiag += Mtr_L_ac[ix - a] * Mtr_mLm1_bd[iy - b] * scale_ix[iy];
+                Rtr_Labcd_offdiag += std::exp (Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b]);
             
             // ix > iy (by renaming the ix,iy indices)
             if (b <= ix and ix <= b + (int)order and
                 a <= iy and iy <= a + (int)order)
-                Rtr_Labcd_offdiag += Mtr_L_bd[ix - b] * Mtr_mLm1_ac[iy - a] * scale_ix[iy];
+                Rtr_Labcd_offdiag += std::exp (Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a]);
         }
     }
     

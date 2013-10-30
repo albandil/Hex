@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <complex>
+#include <cmath>
 #include <cstdio>
 
 #include <omp.h>
@@ -22,11 +23,6 @@
 #include "parallel.h"
 #include "radial.h"
 
-/**
- * Potential suppressing factor. 
- * @param r Radius.
- * @param R Truncation radius.
- */
 inline double damp (Complex r, Complex R)
 {
     // if sufficiently far, return clean zero
@@ -41,49 +37,39 @@ inline double damp (Complex r, Complex R)
 //  Computation of B-spline moments                                        //
 // ----------------------------------------------------------------------- //
 
-cArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
+rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
 {
     // get last knot (end of last interval)
     if (iknotmax == 0)
         iknotmax = bspline_.Nknot() - 1;
     
-    // quadrature orders
-    // NOTE : must match those in RadialIntegrals::computeMi !
-    int Npts_x = std::max (2, bspline_.order() + lambda + 1);
-    int Npts_y = std::max (2, bspline_.order() + lambda + 2);
+    // quadrature order
+    // NOTE : must match that in RadialIntegrals::computeMi !
+    int Npts = std::max (2, bspline_.order() + abs(lambda) + 1);
     
-    // output array
-    cArray data(iknotmax * iknotmax);
-    Complex * restrict p = data.begin();
+    // output arrays
+    rArray data (iknotmax);
     
-    // for all knots of M_L
-    for (int iknotx = 0; iknotx < iknotmax; iknotx++)
+    // for all knots
+    for (int iknot = 0; iknot < iknotmax; iknot++)
     {
-        // get left-most Gauss-Legendre point
-        Complex rho_x = g_.p_points(Npts_x, bspline_.t(iknotx), bspline_.t(iknotx+1))[0];
+        // skip zero-length intervals
+        if (bspline_.t(iknot) == bspline_.t(iknot + 1))
+            continue;
         
-        // for all knots of M_mLm1
-        for (int iknoty = 0; iknoty < iknotmax; iknoty++)
-        {
-            // get left-most Gauss-Legendre point
-            Complex rho_y = g_.p_points(Npts_y, bspline_.t(iknoty), bspline_.t(iknoty+1))[0];
-            
-            // compute scale
-            *(p++) = (rho_x == 0. or rho_y == 0.) ? 0. : pow(rho_x/rho_y, lambda)/rho_y;
-        }
+        // get (real part of) the left-most Gauss-Legendre point
+        double rho = g_.p_points(Npts, bspline_.t(iknot), bspline_.t(iknot+1))[0].real();
+        
+        // compute logarithms of the scale factors
+        data[iknot] = log(rho);
     }
     
     return data;
 }
 
-void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex * const restrict out, void *data) const
+void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex * const restrict out, int i, int j, int a, int iknot, int iknotmax, double& logscale) const
 {
     // extract data
-    int i = ((int*)data)[0];
-    int j = ((int*)data)[1];
-    int a = ((int*)data)[2];
-    int iknot = ((int*)data)[3];
-    int iknotmax = ((int*)data)[4];
     Complex R = bspline_.t(iknotmax);
     
     // evaluate B-splines
@@ -91,25 +77,67 @@ void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex *
     bspline_.B(i, iknot, n, in, values_i);
     bspline_.B(j, iknot, n, in, values_j);
     
+    // all evaluations produced finite results
+    bool all_finite = true;
+    
     // fill output array
-    int k;
     if (R != 0.)
     {
-        for (k = 0; k < n; k++)
-            out[k] = values_i[k] * values_j[k] * pow(in[k]/in[0],a) * damp(in[k],R);
+        for (int k = 0; k < n; k++)
+        {
+            out[k] = values_i[k] * values_j[k] * pow(in[k],a) * damp(in[k],R);
+            
+            if (not (all_finite = all_finite and finite(out[k].real()) and finite(out[k].imag())))
+                break;
+        }
     }
     else
     {
-        for (k = 0; k < n; k++)
-            out[k] = values_i[k] * values_j[k] * pow(in[k]/in[0],a);
+        for (int k = 0; k < n; k++)
+        {
+            out[k] = values_i[k] * values_j[k] * pow(in[k],a);
+            
+            if (not (all_finite = all_finite and finite(out[k].real()) and finite(out[k].imag())))
+                break;
+        }
+    }
+    
+    //
+    // check that all elements are finite
+    //
+    
+    if (not all_finite)
+    {
+        // compute logarithms of the integrand
+        if (R != 0.)
+        {
+            for (int k = 0; k < n; k++)
+            {
+                out[k] = std::log(values_i[k]) + std::log(values_j[k]) + double(a) * std::log(in[k]) + std::log(damp(in[k],R));
+                
+                // use newly computed value as scale, if larger than the current value
+                if (out[k].real() > logscale)
+                    logscale = out[k].real();
+            }
+        }
+        else
+        {
+            for (int k = 0; k < n; k++)
+            {
+                out[k] = std::log(values_i[k]) + std::log(values_j[k]) + double(a) * std::log(in[k]);
+                
+                // use newly computed value as scale, if larger than the current value
+                if (out[k].real() > logscale)
+                    logscale = out[k].real();
+            }
+        }
+        
+        // scale values by subtracting logarithms and exponentialize, so that they can be integrated by weighed summing
+        for (int k = 0; k < n; k++)
+            out[k] = std::exp(Complex(out[k].real() - logscale, out[k].imag()));
     }
 }
 
-/** 
- * Compute two-spline integral moment of degree "a"
- * @param a Moment degree.
- * @param iknotmax Truncation knot.
- */
 cArray RadialIntegrals::computeMi (int a, int iknotmax) const
 {
     int Nspline = bspline_.Nspline();
@@ -117,6 +145,8 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
     
     int i, j, iknot;
     size_t size = Nspline * (2 * order + 1) * (order + 1);
+    
+    // (logarithms of) partial integral moments
     cArray m(size);
     
     // for all B-splines
@@ -144,15 +174,19 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 if (xa == xb)
                     continue;
                 
-                // compute the moment (use at least 2nd order)
+                // results of the quadrature
+                Complex integral;
+                double logscale = 0.; // logarithm of the scale
+                
+                // use at least 2nd order
                 int points = std::max (2, order + abs(a) + 1);
-                int data[5] = {i, j, a, iknot, iknotmax};
-                Complex integral = g_.quadMFP (
-                    this, &RadialIntegrals::M_integrand,
-                    data, points, iknot, xa, xb
+                
+                // integrate
+                integral = g_.quadMFP (
+                    this, &RadialIntegrals::M_integrand,       // integrand pointer
+                    points, iknot, xa, xb,                     // integration parameters
+                    i, j, a, iknot, iknotmax, logscale         // data to pass to the integrator
                 );
-                if (not finite(integral.real()) or not finite(integral.imag()))
-                    throw exception ("Mi integral contribution not finite for ispline1 = %d, ispline2 = %d, iknot = %d.", i, j, iknot);
                 
                 // get the coordinates in m-matrix
                 int x_1 = i;                // reference spline is i-th
@@ -164,13 +198,14 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 int y_2 = i - (j - order);
                 int z_2 = iknot - j;
                 
-                // save to m-matrix
-                m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = integral;
-                m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = integral;
+                // save to m- and s-matrix
+                m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = std::log(integral) + logscale;
+                m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = std::log(integral) + logscale;
             }
         }
     }
     
+    write_array(m, "m.dat");
     return m;
 }
 
@@ -359,12 +394,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
             continue; // no need to compute
         }
         
-        // precompute necessary partial integral moments
-        cArray Mtr_L    = computeMi( lambda,   bspline_.Nreknot() - 1);
-        cArray Mtr_mLm1 = computeMi(-lambda-1, bspline_.Nreknot() - 1);
+        // logarithms of partial integral moments
+        cArray Mtr_L, Mtr_mLm1;
         
-        // get scaling used for the moments
-        cArray scale    = computeScale(lambda, bspline_.Nreknot() - 1);
+        // compute partial moments
+        Mtr_L    = computeMi ( lambda, bspline_.Nreknot() - 1);
+        Mtr_mLm1 = computeMi (-lambda-1, bspline_.Nreknot() - 1);
         
         // elements of R_tr
         lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
@@ -372,7 +407,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
         
         # pragma omp parallel default(none) \
             private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
-            firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1, scale) \
+            firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
             shared (R_tr_i, R_tr_j, R_tr_v)
         {
             // for all B-spline pairs
@@ -389,7 +424,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
                         continue;
                     
                     // evaluate B-spline integral
-                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1, scale);
+                    Complex Rijkl_tr = computeR (lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
                     
                     // store all symmetries
                     allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);

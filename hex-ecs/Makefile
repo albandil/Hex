@@ -3,7 +3,7 @@
 CPP = g++
 
 SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconfig
-SUITESPARSELIBS = $(patsubst %,/mnt/home/benda/software/lib/lib%.a,$(SUITESPARSENAMES))
+SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include

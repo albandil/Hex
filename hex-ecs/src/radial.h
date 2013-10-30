@@ -125,20 +125,19 @@ class RadialIntegrals
         Complex computeM(int a, int i, int j, int maxknot = 0) const;
         
         /**
-         * Compute integral moment of degree "a" for every B-spline pair and every
+         * Compute logarithms of integral moment of degree "a" for every B-spline pair and every
          * interknot sub-interval. Store in 1-D array of shape
          * @code
          * [ Nspline × Nspline × Nintval ]
          * @endcode
-         * Zero entries are stores as well, to allow for better caching.
          *  
          * @param a Moment degree.
          */
         cArray computeMi(int a, int iknotmax = 0) const;
         
-        cArray computeScale (int a, int iknotmax = 0) const;
+        rArray computeScale (int a, int iknotmax = 0) const;
         
-        void M_integrand(int n, Complex *in, Complex *out, void *data) const;
+        void M_integrand (int n, Complex *in, Complex *out, int i, int j, int a, int iknot, int iknotmax, double& logscale) const;
         
         /**
          * Compute the two-electron (Slater-type) four-B-spline integral.
@@ -148,11 +147,8 @@ class RadialIntegrals
          * @param j Second (y-dependent) B-spline index.
          * @param k Third (x-dependent) B-spline index.
          * @param l Fourth (y-dependent) B-spline index.
-         * @param Mtr_L As above, for R₀-truncated moments.
-         * @param Mtr_mLm1 As above, for R₀-truncated moments.
-         * @param scale Per-knot scale factors. The product M_L * M_mLm1 needs to be multiplied
-         *              by scale[ix][iy], where ix and iy number the knots. The dimensions of scale
-         *              have to be (Nreknot-1)×(Nreknot-1).
+         * @param Mtr_L Logarithms of R₀-truncated partial moments.
+         * @param Mtr_mLm1 Logarithms of R₀-truncated partial moments.
          * 
          * Given the R-type integral symmetry, following calls will produce identical results:
          * 
@@ -170,14 +166,13 @@ class RadialIntegrals
             int lambda,
             int i, int j, int k, int l,
             cArray const & Mtr_L,
-            cArray const & Mtr_mLm1,
-            cArray const & scale
+            cArray const & Mtr_mLm1
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
         Complex computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
-        void R_inner_integrand (int n, Complex* in, Complex* out, void* data) const;
-        void R_outer_integrand (int n, Complex* in, Complex* out, void* data) const;
+        void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
+        void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
         
         void allSymmetries (
             int i, int j, int k, int l,
