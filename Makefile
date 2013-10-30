@@ -8,5 +8,5 @@ $(SUBDIRS)::
 	+make -C $@ $(MAKECMDGOALS)
 	mkdir -p bin; cd bin; ln -fs ../$@/bin/* .; cd ..
 	
-all clean : $(SUBDIRS)
+all clean doc : $(SUBDIRS)
 
