@@ -1,4 +1,4 @@
-.PHONY: all exe lib clean
+.PHONY: all exe lib clean doc
 
 CPP = g++
 
@@ -31,6 +31,9 @@ all: pollversion exe lib
 
 pollversion:
 	@touch src/version.cpp
+
+doc:
+	doxygen
 
 clean:
 	rm -f obj/*.o obj/*.dep bin/hex-db*

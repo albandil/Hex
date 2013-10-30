@@ -1,3 +1,5 @@
+.PHONY: all clean doc
+
 CXXDEBUG = -g -fPIC -std=c++11 -Wall
 CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNDEBUG
 
@@ -28,3 +30,6 @@ obj/%.o: src/%.cpp
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDENCIES) bin/dwba
+
+doc:
+	doxygen

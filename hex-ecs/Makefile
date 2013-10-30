@@ -1,11 +1,9 @@
-.PHONY: all docu clean pollversion
+.PHONY: all doc clean pollversion
 
 CPP = g++
 
-SUITESPARSELIBS = /usr/local/lib/libumfpack.a /usr/local/lib/libamd.a \
-	/usr/local/lib/libcholmod.a /usr/local/lib/libcolamd.a \
-	/usr/local/lib/libcamd.a /usr/local/lib/libccolamd.a \
-	/usr/local/lib/libmetis.a /usr/local/lib/libsuitesparseconfig.a
+SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconfig
+SUITESPARSELIBS = $(patsubst %,/mnt/home/benda/software/lib/lib%.a,$(SUITESPARSENAMES))
 
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
@@ -25,7 +23,7 @@ LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
 # CFLAGS = $(CFLAGS_DEBUG)
 # LFLAGS = $(LFLAGS_DEBUG)
-CFLAGS = $(CFLAGS_RELEASE)
+CFLAGS = $(CFLAGS_RELEASE) -DNO_MPI
 LFLAGS = $(LFLAGS_RELEASE)
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
@@ -40,7 +38,7 @@ all: pollversion bin/hex-ecs
 pollversion:
 	@touch src/version.cpp
 
-docu:
+doc:
 	doxygen
 
 clean:

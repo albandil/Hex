@@ -1,3 +1,5 @@
+.PHONY: all clean doc
+
 CXX = g++
 CFLAGS = -Ofast -Wall -std=c++11
 LFLAGS = -lgsl -lgslcblas -lo2scl -lcln -lhdf5 -lhdf5_cpp
@@ -19,3 +21,6 @@ obj/%.o: src/%.cpp
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDENCIES) bin/pwba
+
+doc:
+	doxygen
