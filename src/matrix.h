@@ -1235,6 +1235,9 @@ public:
 
     ~SymDiaMatrix() {}
     
+    // free all fields, set dimensions to zero
+    void clear () { *this = std::move(SymDiaMatrix()); }
+    
     //
     // Getters
     //

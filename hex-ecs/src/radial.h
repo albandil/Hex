@@ -83,7 +83,7 @@ class RadialIntegrals
         
         // public callable members
         void setupOneElectronIntegrals();
-        void setupTwoElectronIntegrals(Parallel const & par, int maxlambda);
+        void setupTwoElectronIntegrals(Parallel const & par, const ArrayView<bool> lambdas);
         
         /**
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$

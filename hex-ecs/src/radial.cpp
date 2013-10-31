@@ -357,19 +357,19 @@ void RadialIntegrals::setupOneElectronIntegrals ()
     std::cout << "ok\n\n";
 }
 
-void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxlambda)
+void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const ArrayView<bool> lambdas)
 {
     char R_name[50];
     
     // allocate storage
-    R_tr_dia_.resize(maxlambda + 1);
+    R_tr_dia_.resize(lambdas.size());
     
     #pragma omp parallel
     {
         #pragma omp master
         {
             std::cout << "Precomputing multipole integrals (λ = 0 .. " 
-                      << maxlambda
+                      << lambdas.size() - 1
                       << ") using " 
                       << omp_get_num_threads() 
                       << " threads.\n";
@@ -381,7 +381,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
     int order = bspline_.order();
     
     // for all multipoles : compute / load
-    for (int lambda = 0; lambda <= maxlambda; lambda++)
+    for (int lambda = 0; lambda < lambdas.size(); lambda++)
     {
         // this process will only compute a subset of radial integrals
         if (lambda % par.Nproc() != par.iproc())
@@ -452,7 +452,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
 #ifndef NO_MPI
     if (par.active())
     {
-        for (int lambda = 0; lambda <= maxlambda; lambda++)
+        for (int lambda = 0; lambda < lambdas.size(); lambda++)
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();
@@ -487,6 +487,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, int maxla
                 if (not HDFFile(R_name, HDFFile::readonly).valid())
                     R_tr_dia_[lambda].hdfsave(R_name, true, 10);
             }
+            
+            // are we to keep this radial integral for this process?
+            if (not lambdas[lambda])
+                R_tr_dia_[lambda].clear();
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }

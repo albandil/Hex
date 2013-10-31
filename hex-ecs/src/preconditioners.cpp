@@ -209,12 +209,84 @@ SymDiaMatrix SSOR (SymDiaMatrix const & A)
     return SSOR;
 }
 
+/**
+ * @brief zGELSS
+ * 
+ * LAPACK routine for Linear Least Squares.
+ * @param M M is INTEGER.
+ *          The number of rows of the matrix A. M >= 0.
+ * @param N N is INTEGER.
+ *          The number of columns of the matrix A. N >= 0.
+ * @param NRHS NRHS is INTEGER.
+ *             The number of right hand sides, i.e., the number of columns of the matrices B and X. NRHS >= 0.
+ * @param A A is COMPLEX*16 array, dimension (LDA,N).
+ *          On entry, the M-by-N matrix A.
+ *          On exit, the first min(m,n) rows of A are overwritten with its right singular vectors, stored rowwise.
+ * @param LDA LDA is INTEGER.
+ *            The leading dimension of the array A. LDA >= max(1,M).
+ * @param B B is COMPLEX*16 array, dimension (LDB,NRHS).
+ *          On entry, the M-by-NRHS right hand side matrix B.
+ *          On exit, B is overwritten by the N-by-NRHS solution matrix X. If m >= n and RANK = n, the residual sum-of-squares for
+ *          the solution in the i-th column is given by the sum of squares of the modulus of elements n+1:m in that column.
+ * @param LDB LDB is INTEGER.
+ *            The leading dimension of the array B.  LDB >= max(1,M,N).
+ * @param S S is DOUBLE PRECISION array, dimension (min(M,N)).
+ *          The singular values of A in decreasing order.
+ *          The condition number of A in the 2-norm = S(1)/S(min(m,n)).
+ * @param RCOND RCOND is DOUBLE PRECISION.
+ *              RCOND is used to determine the effective rank of A.
+ *              Singular values S(i) <= RCOND*S(1) are treated as zero. If RCOND < 0, machine precision is used instead.
+ * @param RANK RANK is INTEGER.
+ *             The effective rank of A, i.e., the number of singular values
+ *             which are greater than RCOND*S(1).
+ * @param WORK WORK is COMPLEX*16 array, dimension (MAX(1,LWORK)).
+ *             On exit, if INFO = 0, WORK(1) returns the optimal LWORK.
+ * @param LWORK LWORK is INTEGER.
+ *              The dimension of the array WORK. LWORK >= 1, and also:
+ *              LWORK >=  2*min(M,N) + max(M,N,NRHS) For good performance, LWORK should generally be larger.
+ *              If LWORK = -1, then a workspace query is assumed; the routine
+ *              only calculates the optimal size of the WORK array, returns
+ *              this value as the first entry of the WORK array, and no error
+ *              message related to LWORK is issued by XERBLA.
+ * @param RWORK RWORK is DOUBLE PRECISION array, dimension (5*min(M,N)).
+ * @param INFO INFO is INTEGER
+ *             -     = 0:  successful exit
+ *             -     < 0:  if INFO = -i, the i-th argument had an illegal value.
+ *             -     > 0:  the algorithm for computing the SVD failed to converge;
+ *                         if INFO = i, i off-diagonal elements of an intermediate
+ *                         bidiagonal form did not converge to zero.
+ */
+extern void zgelss_
+(
+    int * M,
+    int * N,
+    int * NRHS,
+    Complex * A,
+    int * LDA,
+    Complex * B,
+    int * LDB,
+    double * S,
+    double * RCOND,
+    int * RANK,
+    Complex * WORK,
+    int * LWORK,
+    double * RWORK,
+    int * INFO
+);
+
+SymDiaMatrix SPAI (SymDiaMatrix const & A)
+{
+    // TODO
+}
 
 void NoPreconditioner::setup ()
 {
+    // determine which lambdas are needed by this process TODO
+    Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
+    
     // compute large radial integrals
     s_rad_.setupOneElectronIntegrals();
-    s_rad_.setupTwoElectronIntegrals(par_, inp_.L + 2 * inp_.levels);
+    s_rad_.setupTwoElectronIntegrals(par_, lambdas);
     
     std::cout << "Creating Kronecker products... ";
     
@@ -251,6 +323,8 @@ void NoPreconditioner::setup ()
 void NoPreconditioner::update (double E)
 {
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
+    
+    size_t size = 0;
     
     // setup diagonal blocks
     # pragma omp parallel for
@@ -586,8 +660,6 @@ void SPAICGPreconditioner::setup()
 {
     // setup parent
     NoPreconditioner::setup();
-    
-    // TODO
 }
 
 void SPAICGPreconditioner::update (double E)
@@ -595,7 +667,9 @@ void SPAICGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-    // TODO
+    // for all diagonal blocks sitting on this CPU compute SPAI
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+        spai_[ill] = SPAI(dia_blocks_[ill]);
 }
 
 
@@ -609,9 +683,12 @@ void TwoLevelPreconditioner::setup ()
     // setup parent
     SSORCGPreconditioner::setup();
     
+    // which lambdas to keep on this CPU TODO
+    Array<bool> lambdas (s_rad_.maxlambda() + 1, true);
+    
     // compute radial integrals
     p_rad_.setupOneElectronIntegrals();
-    p_rad_.setupTwoElectronIntegrals(par_, s_rad_.maxlambda());
+    p_rad_.setupTwoElectronIntegrals(par_, lambdas);
     
     // precompute kronecker products
     p_S_kron_S_ = p_rad_.S().kron(p_rad_.S());

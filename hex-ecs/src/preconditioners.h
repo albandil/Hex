@@ -133,6 +133,14 @@ SymDiaMatrix DIC (SymDiaMatrix const & A);
 SymDiaMatrix SSOR (SymDiaMatrix const & A);
 
 /**
+ * @brief SPAI preconditioner.
+ * 
+ * Compute symmetric (?) sparse aproximate inverse of a given matrix A that has the same
+ * sparse structure as A. This function uses LAPACK routine zgelss.
+ */
+SymDiaMatrix SPAI (SymDiaMatrix const & A);
+
+/**
  * @brief Preconditioner template.
  * 
  * This interface class declares all necessary methods that a valid preconditioner
