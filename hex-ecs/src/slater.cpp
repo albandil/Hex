@@ -86,9 +86,6 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
  */
 Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const
 {
-    // data for the outer integral
-    int data[7] = {k, l, m, n, L, iknot, iknotmax};
-    
     // raise point count - this is not a poly!
     // TODO Estimate the order.
     int points = bspline_.order() + L + 10; 
@@ -166,12 +163,20 @@ Complex RadialIntegrals::computeR (
             // ix < iy
             if (a <= ix and ix <= a + (int)order and
                 b <= iy and iy <= b + (int)order)
-                Rtr_Labcd_offdiag += std::exp (Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b]);
+            {
+                Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
+                if (finite(lg.imag()))
+                    Rtr_Labcd_offdiag += std::exp (lg);
+            }
             
             // ix > iy (by renaming the ix,iy indices)
             if (b <= ix and ix <= b + (int)order and
                 a <= iy and iy <= a + (int)order)
-                Rtr_Labcd_offdiag += std::exp (Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a]);
+            {
+                Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
+                if (finite(lg.imag()))
+                    Rtr_Labcd_offdiag += std::exp (lg);
+            }
         }
     }
     

@@ -147,7 +147,7 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
     size_t size = Nspline * (2 * order + 1) * (order + 1);
     
     // (logarithms of) partial integral moments
-    cArray m(size);
+    cArray m (size, Complex(0.,Inf));
     
     // for all B-splines
     for (i = 0; i < (int)Nspline; i++)
@@ -199,8 +199,9 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 int z_2 = iknot - j;
                 
                 // save to m- and s-matrix
-                m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = std::log(integral) + logscale;
-                m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = std::log(integral) + logscale;
+                Complex lg = ((integral == 0.) ? Complex(0.,Inf) : std::log(integral) + logscale);
+                m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = lg;
+                m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = lg;
             }
         }
     }
