@@ -205,6 +205,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             }
         }
         
+#ifndef NO_PNG
         void plot_abs (std::ofstream & out) const
         {
             // create empty gray-scale 1-bit image
@@ -236,6 +237,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             // save image
             image.write_stream(out);
         }
+#endif
         
     private:
         
