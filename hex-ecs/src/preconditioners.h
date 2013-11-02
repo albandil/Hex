@@ -136,10 +136,12 @@ SymDiaMatrix SSOR (SymDiaMatrix const & A);
  * @brief SPAI preconditioner.
  * 
  * Compute sparse aproximate inverse of a given symmetrix diagonal matrix A. The sparse
- * structure of the SPAI is set to the sparse structure of A.
+ * structure of the SPAI is set by the second parameter that contains list of non-lower
+ * diagonal indices (greater than or equal to zero).
+ * 
  * This function uses Lapack routine ZGELSD.
  */
-CooMatrix SPAI (SymDiaMatrix const & A);
+CooMatrix SPAI (SymDiaMatrix const & A, const iArrayView diagonals);
 
 /**
  * @brief Preconditioner template.

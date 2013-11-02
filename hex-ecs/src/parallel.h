@@ -145,6 +145,17 @@ class Parallel
 #endif
         }
         
+        /**
+         * @brief Wait for completition of all running tasks.
+         * 
+         * Inserts a MPI BARRIER.
+         */
+        void wait () const
+        {
+            if (active_)
+                MPI_Barrier(MPI_COMM_WORLD);
+        }
+        
     private:
         
         // whether the MPI is on

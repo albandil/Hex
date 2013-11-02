@@ -13,5 +13,5 @@ Libraries:
     fftw 3.3.3
     
 Optional dependencies:
-    png++ 0.2.5             (included in libs/, works e.g. with libpng-15)
+    png++ 0.2.5             (included in libs/, works e.g. with libpng-1.5)
     

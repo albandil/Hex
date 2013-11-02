@@ -266,7 +266,7 @@ void LapackLeastSquares (ColMatrix<Complex> const & A, cArrayView b)
         throw exception ("[SPAI] The Lapack routine ZGELSS returned INFO = %d.", info);
 }
 
-CooMatrix SPAI (SymDiaMatrix const & A)
+CooMatrix SPAI (SymDiaMatrix const & A, iArrayView diagonals)
 {
     // dimensions
     int Asize = A.size();
@@ -282,7 +282,7 @@ CooMatrix SPAI (SymDiaMatrix const & A)
         // assemble non-zero pattern of the column m[icol] (will be same as nonzero pattern of A[:,icol])
         //
         std::set<int> mnz;
-        for (int id : A.diag())
+        for (int id : diagonals)
         {
             if (id <= icol) // upper (or main) diagonal contributes to nz
                 mnz.insert(icol - id);
@@ -399,12 +399,8 @@ void NoPreconditioner::update (double E)
     
     // setup diagonal blocks
     # pragma omp parallel for
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        // skip computation of unwanted blocks for this process
-        if (not par_.isMyWork(ill))
-            continue;
-        
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
         
@@ -427,6 +423,7 @@ void NoPreconditioner::update (double E)
         dia_blocks_[ill] = E * S_kron_S_ - Hdiag;
     }
     
+    par_.wait();
     std::cout << "ok\n";
 }
 
@@ -639,7 +636,7 @@ void JacobiCGPreconditioner::update (double E)
     int Nspline = s_rad_.bspline().Nspline();
     
     # pragma omp parallel for
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // resize data array
         invd_[ill] = cArray(Nspline * Nspline, 1.);
@@ -647,6 +644,8 @@ void JacobiCGPreconditioner::update (double E)
         // divide by the diagonal
         invd_[ill] /= dia_blocks_[ill].main_diagonal();
     }
+    
+    par_.wait();
 }
 
 void SSORCGPreconditioner::setup ()
@@ -718,12 +717,8 @@ void DICCGPreconditioner::update(double E)
     CGPreconditioner::update(E);
     
     // diagonal incomplete Cholesky factorization
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-    {
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
         DIC_[ill] = DIC(dia_blocks_[ill]);
-        write_array(DIC_[ill].main_diagonal(), format("DIC-main_diagonal-%d.dat", ill));
-        write_array(DIC_[ill].data(), format("DIC-al_data-%d.dat", ill));
-    }
 }
 
 #ifndef NO_LAPACK
@@ -744,9 +739,12 @@ void SPAICGPreconditioner::update (double E)
     std::cout << "\tCompute SPAI preconditioner... " << std::flush;
     Timer::timer().start();
     
+    // set diagonal pattern for the inverse
+    iArray diagset = dia_blocks_[0].diag();
+    
     // for all diagonal blocks sitting on this CPU compute SPAI
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-        spai_[ill] = SPAI(dia_blocks_[ill]).tocsr();
+        spai_[ill] = SPAI(dia_blocks_[ill], diagset).tocsr();
     
     int secs = Timer::timer().stop();
     std::cout << "done in " << (secs / 60) << std::setw(2) << std::setfill('0') << (secs % 60) << "\n";
