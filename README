@@ -5,12 +5,13 @@ Compiler:
 
 Libraries:
     GSL 1.15
-    O2scl 0.912             (not versions 0.913+!)
-    OpenBLAS 0.2.5
+    O2scl 0.912             (not higher!)
+    OpenBLAS 0.2.5          (more specifically: git#df554aeb)
     SuiteSparse 4.0.2
-    png++ 0.2.5             (included in libs/)
     sqlitepp 0.2            (included in libs/)
     cln 1.3.2
-    fftw 3.3.2
+    fftw 3.3.3
     
+Optional dependencies:
+    png++ 0.2.5             (included in libs/, works e.g. with libpng-15)
     

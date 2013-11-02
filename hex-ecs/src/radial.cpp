@@ -381,7 +381,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
     int order = bspline_.order();
     
     // for all multipoles : compute / load
-    for (int lambda = 0; lambda < lambdas.size(); lambda++)
+    for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
         // this process will only compute a subset of radial integrals
         if (lambda % par.Nproc() != par.iproc())
@@ -452,7 +452,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
 #ifndef NO_MPI
     if (par.active())
     {
-        for (int lambda = 0; lambda < lambdas.size(); lambda++)
+        for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();

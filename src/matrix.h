@@ -191,17 +191,20 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         Type & operator() (int i, int j) { return row(i)[j]; }
         
         // write to file
-        void write (std::ofstream & out) const
+        void write (std::ostream & out, std::string const & pre = "", std::string const & pos = "") const
         {
             // data pointer
             Type const * ptr = this->data().begin();
             
             for (int irow = 0; irow < this->rows(); irow++)
             {
+                out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
-                    out << *ptr++ << " ";
+                {
+                    if (*ptr >= 0) out << " "; out << *ptr++ << " ";
+                }
                 
-                out << "\n";
+                out << pos << "\n";
             }
         }
         
@@ -244,7 +247,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         /// Change "data" from column-oriented to row-oriented.
         void reorder_ ()
         {
-            cArray new_data (this->data().size());
+            NumberArray<Type> new_data (this->data().size());
             
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
@@ -270,9 +273,9 @@ template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, Col
     RowMatrix<Type> C(A.rows(), B.cols());
     
     // data pointers
-    Complex const * restrict pA = A.begin();
-    Complex const * restrict pB = B.begin();
-    Complex       * restrict pC = C.begin();
+    Type const * restrict pA = A.begin();
+    Type const * restrict pB = B.begin();
+    Type       * restrict pC = C.begin();
     
     // for all rows of A
     for (int irow = 0; irow < rows; irow++)
@@ -691,6 +694,11 @@ public:
     CooMatrix tocoo() const;
     
     /**
+     * Convert to dense matrix.
+     */
+    RowMatrix<Complex> torow() const;
+    
+    /**
      * Solves upper triangular system of equations using backsubstitution.
      * The matrix needs not be triangular, but elements under the diagonal
      * won't be used or changed.
@@ -1076,6 +1084,27 @@ public:
     // Convert to CSR matrix.
     CsrMatrix tocsr() const;
     
+    // Convert to dense matrix of a given underlying type.
+    template <typename DenseMatrixType> DenseMatrixType todense() const
+    {
+        DenseMatrixType M (rows(), cols());
+        for (unsigned idx = 0; idx < x_.size(); idx++)
+            M (i_[idx], j_[idx]) = x_[idx];
+        return M;
+    }
+    
+    // Convert to dense matrix (row-ordered).
+    RowMatrix<Complex> torow() const
+    {
+        return todense<RowMatrix<Complex>>();
+    }
+    
+    // Convert to dense matrix (column-ordered).
+    ColMatrix<Complex> tocol() const
+    {
+        return todense<ColMatrix<Complex>>();
+    }
+    
     /**
      * @brief Convert to symmetric DIA format.
      * 
@@ -1244,20 +1273,83 @@ public:
     // Getters
     //
     
+    /**
+     * @brief Diagonal indices.
+     * 
+     * Return array of indices of the stored diagonals. These are always
+     * only main and upper diagonals, so all numbers are non-negative.
+     * The array is sorted and begins with zero. Its length is always
+     * larger than zero.
+     */
+    //@{
     iArray const & diag() const { return idiag_; }
-    int diag(int i) const { return idiag_[i]; }
-    cArray const & data() const { return elems_; }
-    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
-    Complex const * dptr(int i) const { return dptrs_[i]; }
-    
     iArray & diag() { return idiag_; }
-    cArray & data() { return elems_; }
-    cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
-    Complex * dptr(int i) { return dptrs_[i]; }
+    //@}
     
+    /**
+     * @brief Diagonal index.
+     * 
+     * Return diagonal index for of i-th stored diagonal. The zero-th stored
+     * diagonal is always the main diagonal (= 0), but it doesn't have to hold
+     * for next diagonals.
+     */
+    int diag(int i) const { return idiag_[i]; }
+    
+    /**
+     * @brief Main diagonal.
+     * 
+     * Return direct-access view of the main diagonal.
+     */
+    //@{
+    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
+    cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
+    //@}
+    
+    /**
+     * @brief Data pointer.
+     * 
+     * Return direct-access data pointer.
+     */
+    //@{
+    cArray const & data() const { return elems_; }
+    cArray & data() { return elems_; }
+    //@}
+    
+    /**
+     * @brief Pointer to diagonal data.
+     * 
+     * @param i Index of the diagonal in the "idiag_" array.
+     *          The maximal value is thus less then the number stored
+     *          diagonals.
+     */
+    //@{
+    Complex const * dptr(int i) const { return dptrs_[i]; }
+    Complex * dptr(int i) { return dptrs_[i]; }
+    //@}
+    
+    /**
+     * @brief Matrix dimension.
+     * 
+     * Return row/column count. The matrix is symmetric and so both
+     * counts are equal.
+     */
     size_t size() const { return n_; }
+    
+    /**
+     * @brief Bandwidth.
+     * 
+     * Return the bandwidth of the matrix, i.e. number of all (upper, main an lower)
+     * diagonals that would have to be stored in a full banded-matrix format.
+     */
     int bandwidth() const { return 1 + 2 * idiag_.back(); }
     
+    /**
+     * @brief Check compatibility of matrices.
+     * 
+     * Check that the matrix B has the same dimensions as *this matrix and
+     * also that they keep the same diagonals. Such matrices can be very effectively
+     * summed and subtracted -- just by doing the operation on the stored element arrays.
+     */
     bool is_compatible (SymDiaMatrix const & B) const;
     
     //
@@ -1359,10 +1451,10 @@ private:
     
     // upper diagonal indices starting from zero
     iArray idiag_;
-    
+public:
     // diagonal data pointers
     std::vector<Complex*> dptrs_;
-    
+private:
     /** 
      * @brief Setup diagonal data pointers
      * 

@@ -11,6 +11,7 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <iostream>
+#include <set>
 
 #include "arrays.h"
 #include "gauss.h"
@@ -209,54 +210,8 @@ SymDiaMatrix SSOR (SymDiaMatrix const & A)
     return SSOR;
 }
 
-/**
- * @brief zGELSS
- * 
- * LAPACK routine for Linear Least Squares.
- * @param M M is INTEGER.
- *          The number of rows of the matrix A. M >= 0.
- * @param N N is INTEGER.
- *          The number of columns of the matrix A. N >= 0.
- * @param NRHS NRHS is INTEGER.
- *             The number of right hand sides, i.e., the number of columns of the matrices B and X. NRHS >= 0.
- * @param A A is COMPLEX*16 array, dimension (LDA,N).
- *          On entry, the M-by-N matrix A.
- *          On exit, the first min(m,n) rows of A are overwritten with its right singular vectors, stored rowwise.
- * @param LDA LDA is INTEGER.
- *            The leading dimension of the array A. LDA >= max(1,M).
- * @param B B is COMPLEX*16 array, dimension (LDB,NRHS).
- *          On entry, the M-by-NRHS right hand side matrix B.
- *          On exit, B is overwritten by the N-by-NRHS solution matrix X. If m >= n and RANK = n, the residual sum-of-squares for
- *          the solution in the i-th column is given by the sum of squares of the modulus of elements n+1:m in that column.
- * @param LDB LDB is INTEGER.
- *            The leading dimension of the array B.  LDB >= max(1,M,N).
- * @param S S is DOUBLE PRECISION array, dimension (min(M,N)).
- *          The singular values of A in decreasing order.
- *          The condition number of A in the 2-norm = S(1)/S(min(m,n)).
- * @param RCOND RCOND is DOUBLE PRECISION.
- *              RCOND is used to determine the effective rank of A.
- *              Singular values S(i) <= RCOND*S(1) are treated as zero. If RCOND < 0, machine precision is used instead.
- * @param RANK RANK is INTEGER.
- *             The effective rank of A, i.e., the number of singular values
- *             which are greater than RCOND*S(1).
- * @param WORK WORK is COMPLEX*16 array, dimension (MAX(1,LWORK)).
- *             On exit, if INFO = 0, WORK(1) returns the optimal LWORK.
- * @param LWORK LWORK is INTEGER.
- *              The dimension of the array WORK. LWORK >= 1, and also:
- *              LWORK >=  2*min(M,N) + max(M,N,NRHS) For good performance, LWORK should generally be larger.
- *              If LWORK = -1, then a workspace query is assumed; the routine
- *              only calculates the optimal size of the WORK array, returns
- *              this value as the first entry of the WORK array, and no error
- *              message related to LWORK is issued by XERBLA.
- * @param RWORK RWORK is DOUBLE PRECISION array, dimension (5*min(M,N)).
- * @param INFO INFO is INTEGER
- *             -     = 0:  successful exit
- *             -     < 0:  if INFO = -i, the i-th argument had an illegal value.
- *             -     > 0:  the algorithm for computing the SVD failed to converge;
- *                         if INFO = i, i off-diagonal elements of an intermediate
- *                         bidiagonal form did not converge to zero.
- */
-extern void zgelss_
+#ifndef NO_LAPACK
+extern "C" void zgelsd_
 (
     int * M,
     int * N,
@@ -271,13 +226,131 @@ extern void zgelss_
     Complex * WORK,
     int * LWORK,
     double * RWORK,
+    int * IWORK,
     int * INFO
 );
 
-SymDiaMatrix SPAI (SymDiaMatrix const & A)
+void LapackLeastSquares (ColMatrix<Complex> const & A, cArrayView b)
 {
-    // TODO
+    if ((size_t)A.rows() != b.size())
+        throw exception ("[LapackLeastSquares] Matrix row count (%d) is different from RHS size (%d).", A.rows(), b.size());
+    
+    // set data to pass to Lapack
+    int m = A.rows();
+    int n = A.cols();
+    int nrhs = 1;
+    rArray svd (n);
+    double rcond = -1;
+    int rank = n;
+    int info = 0;
+    cArray work(1);
+    rArray rwork(1);
+    iArray iwork(1);
+    
+    // query for optimal dimensions of work arrays
+    int lwork = -1;
+    zgelsd_(&m, &n, &nrhs, const_cast<Complex*>(A.data().begin()), &m, b.data(), &m, svd.data(), &rcond, &rank, work.data(), &lwork, rwork.data(), iwork.data(), &info);
+    
+    if (info != 0)
+        throw exception ("[SPAI] The Lapack routine ZGELSS returned INFO = %d.", info);
+    
+    // resize work arrays
+    lwork = work.resize(work[0].real());
+    rwork.resize(rwork[0]);
+    iwork.resize(iwork[0]);
+    
+    // compute the least squares
+    zgelsd_(&m, &n, &nrhs, const_cast<Complex*>(A.data().begin()), &m, b.data(), &m, svd.data(), &rcond, &rank, work.data(), &lwork, rwork.data(), iwork.data(), &info);
+    
+    if (info != 0)
+        throw exception ("[SPAI] The Lapack routine ZGELSS returned INFO = %d.", info);
 }
+
+CooMatrix SPAI (SymDiaMatrix const & A)
+{
+    // dimensions
+    int Asize = A.size();
+    
+    // preconditioner
+    CooMatrix M (Asize, Asize);
+    
+    // for all columns of M
+    for (int icol = 0; icol < Asize; icol++)
+    {
+        std::cout << icol << "\n";
+        
+        // assemble non-zero pattern of the column m[icol] (will be same as nonzero pattern of A[:,icol])
+        //
+        std::set<int> mnz;
+        for (int id : A.diag())
+        {
+            if (id <= icol) // upper (or main) diagonal contributes to nz
+                mnz.insert(icol - id);
+            if (icol + id < Asize) // lower diagonal contributes to nz
+                mnz.insert(icol + id);
+        }
+        
+        // assemble non-zero pattern of the right hand side e_icol (defined by nonzero rows of A[:,{mnz}] submatrix)
+        //
+        std::set<int> enz;
+        for (int acol : mnz)
+        {
+            // loop over all A'd diagonals
+            for (int id : A.diag())
+            {
+                if (id <= acol) // upper (or main) diagonal contributes to nz
+                    enz.insert(acol - id);
+                if (acol + id < Asize) // lower diagonal contributes to nz
+                    enz.insert(acol + id);
+            }
+        }
+        
+        // construct the dense sub-matrix of A
+        //
+        ColMatrix<Complex> submA (enz.size(), mnz.size()); // FORTRAN column-wise ordering necessary for Lapack.
+        Complex * psubmA = submA.data().begin();
+        for (int orgA_col : mnz) // original A's columns
+        {
+            for (int orgA_row : enz) // original A's rows
+            {
+                // which diagonal is this?
+                int d = std::abs(orgA_col - orgA_row);
+                
+                // does it contain any data?
+                iArray::const_iterator ptrd = std::find(A.diag().begin(),A.diag().end(),d);
+                if (ptrd != A.diag().end())
+                    *psubmA = A.dptr(ptrd-A.diag().begin())[std::min(orgA_row,orgA_col)];
+                
+                psubmA++;
+            }
+        }
+        
+        // construct the right-hand side
+        //
+        cArray e (enz.size());
+        Complex * pe = e.data();
+        for (int erow : enz)
+        {
+            // icol-th vector "e" has 'one' as the icol-th element (if not excluded by pattern)
+            if (erow == icol)
+                *pe = 1.;
+            pe++;
+        }
+        
+        // solve the overdetermined system Am = e using Lapack routine
+        //
+        LapackLeastSquares(submA, e); // overwrites 'e'
+        
+        // store computed data
+        //
+        Complex const * px = e.data();
+        for (int mrow : mnz)
+            M.add(mrow, icol, *(px++));
+    }
+    
+    return M;
+}
+#endif
 
 void NoPreconditioner::setup ()
 {
@@ -323,8 +396,6 @@ void NoPreconditioner::setup ()
 void NoPreconditioner::update (double E)
 {
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
-    
-    size_t size = 0;
     
     // setup diagonal blocks
     # pragma omp parallel for
@@ -543,7 +614,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false
+            true
         );
     }
     
@@ -655,11 +726,14 @@ void DICCGPreconditioner::update(double E)
     }
 }
 
-
+#ifndef NO_LAPACK
 void SPAICGPreconditioner::setup()
 {
     // setup parent
     NoPreconditioner::setup();
+    
+    // reserve space for preconditioner
+    spai_.resize(l1_l2_.size());
 }
 
 void SPAICGPreconditioner::update (double E)
@@ -667,11 +741,17 @@ void SPAICGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
+    std::cout << "\tCompute SPAI preconditioner... " << std::flush;
+    Timer::timer().start();
+    
     // for all diagonal blocks sitting on this CPU compute SPAI
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-        spai_[ill] = SPAI(dia_blocks_[ill]);
+        spai_[ill] = SPAI(dia_blocks_[ill]).tocsr();
+    
+    int secs = Timer::timer().stop();
+    std::cout << "done in " << (secs / 60) << std::setw(2) << std::setfill('0') << (secs % 60) << "\n";
 }
-
+#endif
 
 void TwoLevelPreconditioner::setup ()
 {
@@ -854,8 +934,7 @@ void TwoLevelPreconditioner::CG_prec (int iblock, const cArrayView rs, cArrayVie
     // shorthands
     int Nss = s_bspline_.Nspline();
     int Nsp = p_bspline_.Nspline();
-    size_t  N = Nss * Nss;
-    
+
     // reinterpret rs as a column matrix
     ColMatrix<Complex> Rs (Nss, Nss, rs);
     

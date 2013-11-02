@@ -11,7 +11,7 @@ OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt \
 	-lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
-	-lm -lfftw3 -lgfortran -lpng
+	-lm -lfftw3 -lgfortran -lpng -llapack
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -23,7 +23,7 @@ LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
 # CFLAGS = $(CFLAGS_DEBUG)
 # LFLAGS = $(LFLAGS_DEBUG)
-CFLAGS = $(CFLAGS_RELEASE) -DNO_MPI
+CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \

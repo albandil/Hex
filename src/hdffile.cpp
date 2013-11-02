@@ -135,7 +135,7 @@ bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::Atom
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         
-        if (length != dspc.getSimpleExtentNpoints())
+        if (length != (hsize_t)dspc.getSimpleExtentNpoints())
             throw exception ("Dimensions do not match, %ld != %ld.", length, dspc.getSimpleExtentNpoints());
         
         dset.read(buffer, dtype, dspc, dspc);

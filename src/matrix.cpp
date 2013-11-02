@@ -23,6 +23,12 @@
 
 #ifndef NO_UMFPACK
 #include <umfpack.h>
+#ifndef SuiteSparse_time
+double SuiteSparse_time()
+{
+    return 0.;
+}
+#endif
 #endif
 
 #ifndef NO_HDF
@@ -746,7 +752,27 @@ CooMatrix CsrMatrix::tocoo() const
 }
 #endif
 
-CsrMatrix CsrMatrix::sparse_like(const CsrMatrix& B) const
+RowMatrix<Complex> CsrMatrix::torow () const
+{
+    RowMatrix<Complex> M (rows(),cols());
+    for (unsigned irow = 0; irow < rows(); irow++)
+    {
+        unsigned rptr_begin = p_[irow];
+        unsigned rptr_end = p_[irow + 1];
+        
+        for (unsigned idx = rptr_begin; idx < rptr_end; idx++)
+        {
+            unsigned icol = i_[idx];
+            Complex x = x_[idx];
+            
+            M(irow, icol) = x;
+        }
+    }
+    
+    return M;
+}
+
+CsrMatrix CsrMatrix::sparse_like (const CsrMatrix& B) const
 {
     // check dimensions
     assert(m_ == B.m_);
@@ -1025,7 +1051,7 @@ SymDiaMatrix CooMatrix::todia(MatrixTriangle triangle) const
     );
 }
 
-void CooMatrix::write(const char* filename) const
+void CooMatrix::write (const char* filename) const
 {
     std::ofstream f(filename);
     

@@ -135,10 +135,11 @@ SymDiaMatrix SSOR (SymDiaMatrix const & A);
 /**
  * @brief SPAI preconditioner.
  * 
- * Compute symmetric (?) sparse aproximate inverse of a given matrix A that has the same
- * sparse structure as A. This function uses LAPACK routine zgelss.
+ * Compute sparse aproximate inverse of a given symmetrix diagonal matrix A. The sparse
+ * structure of the SPAI is set to the sparse structure of A.
+ * This function uses Lapack routine ZGELSD.
  */
-SymDiaMatrix SPAI (SymDiaMatrix const & A);
+CooMatrix SPAI (SymDiaMatrix const & A);
 
 /**
  * @brief Preconditioner template.
@@ -398,9 +399,6 @@ class DICCGPreconditioner : public CGPreconditioner
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const
         {
             z = DIC_[iblock].upperSolve( DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ) );
-            write_array(DIC_[iblock].lowerSolve(r), "a1.dat");
-            write_array(DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ), "a2.dat");
-            write_array(DIC_[iblock].upperSolve( DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ) ), "a3.dat");
         }
         
     private:
@@ -411,6 +409,7 @@ class DICCGPreconditioner : public CGPreconditioner
 /**
  * @brief Sparse approximate inverse preconditioner.
  */
+#ifndef NO_LAPACK
 class SPAICGPreconditioner : public CGPreconditioner
 {
     public:
@@ -433,13 +432,17 @@ class SPAICGPreconditioner : public CGPreconditioner
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = spai_[iblock].dot(r); }
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const
+        {
+            z = spai_[iblock].dot(r);
+        }
         
     private:
         
         // SPAIs for every diagonal block
-        std::vector<SymDiaMatrix> spai_;
+        std::vector<CsrMatrix> spai_;
 };
+#endif
 
 /**
  * @brief Two-resolution preconditioner.

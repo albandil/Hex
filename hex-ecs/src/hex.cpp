@@ -32,13 +32,6 @@
 #include "radial.h"
 #include "version.h"
 
-#ifndef SuiteSparse_time
-double SuiteSparse_time()
-{
-    return 0.;
-}
-#endif
-
 void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
 {
     // use whole grid if not restricted
@@ -183,7 +176,7 @@ int main (int argc, char* argv[])
         goto End;
     }
     
-StgSolve:
+// StgSolve:
 {
     // skip stage 2 if told so
     if (not (cmd.itinerary & CommandLine::StgSolve))
@@ -223,6 +216,9 @@ StgSolve:
             break;
         case res_prec:
             prec = new MultiresPreconditioner (par, inp, coupled_states, bspline);
+            break;
+        case spaiCG_prec:
+            prec = new SPAICGPreconditioner (par, inp, coupled_states, bspline);
             break;
         default:
             throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
