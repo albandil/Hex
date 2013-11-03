@@ -1,17 +1,17 @@
 .PHONY: all clean doc
 
 CXX = g++
-CFLAGS = -Ofast -Wall -std=c++11
-LFLAGS = -lgsl -lgslcblas -lo2scl -lcln -lhdf5 -lhdf5_cpp
+CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF
+LFLAGS = -lgsl -lgslcblas -lo2scl -lcln
 
-FILES = pwba symbolic specf arrays hdffile
+FILES = pwba symbolic specf arrays
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-all: bin/pwba
+all: bin/hex-pwba
 
-bin/pwba: $(OBJECTS)
+bin/hex-pwba: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(LFLAGS) $^ -o $@
 

@@ -33,7 +33,6 @@
 #include "complex.h"
 #include "misc.h"
 
-class HDFFile;
 template <typename DataType> class Array;
 template <typename NumberType> class NumberArray;
 
