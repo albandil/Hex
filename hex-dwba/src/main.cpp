@@ -34,7 +34,7 @@ int main (int argc, char *argv[])
     if (argc != 7)
     {
         std::cout << "\nUsage:\n";
-        std::cout << "\tdwba <ni> <li> <nf> <lf> <Ei> <sigmaeps>\n\n";
+        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps>\n\n";
         exit(0);
     }
     
