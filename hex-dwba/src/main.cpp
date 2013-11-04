@@ -21,7 +21,7 @@
 #include "hydrogen.h"
 #include "potential.h"
 
-int main(int argc, char *argv[])
+int main (int argc, char *argv[])
 {
     // 	gsl_set_error_handler_off();
     H5::Exception::dontPrint();
@@ -30,16 +30,12 @@ int main(int argc, char *argv[])
     std::setvbuf(stdout, 0, _IONBF, 0);
     std::setvbuf(stderr, 0, _IONBF, 0);
     
-    // initialize debug output file
-    std::ofstream logfile("dwba.log");
-    std::clog.rdbuf(logfile.rdbuf());
-    
     // print usage info if called in a wrong way
     if (argc != 7)
     {
         std::cout << "\nUsage:\n";
         std::cout << "\tdwba <ni> <li> <nf> <lf> <Ei> <sigmaeps>\n\n";
-        return 0;
+        exit(0);
     }
     
     // extract parameters
@@ -173,21 +169,17 @@ int main(int argc, char *argv[])
         Tdir.push_back(Tdir_lf);
         Texc.push_back(Texc_lf);
         
-        std::cout << "b\n";
-        
         // convergence check
-        rArray sigma_singlet_lf = pow(abs(Tdir_lf + Texc_lf), 2); std::cout << "sigma_singlet_lf = " << sigma_singlet_lf << "\n\n";
-        rArray sigma_triplet_lf = pow(abs(Tdir_lf - Texc_lf), 2); std::cout << "sigma_triplet_lf = " << sigma_triplet_lf << "\n\n";
-        rArray sigma_singlet = sums(pow(abs(Tdir + Texc), 2));  std::cout << "sigma_singlet = " << sigma_singlet << "\n\n";
-        rArray sigma_triplet = sums(pow(abs(Tdir - Texc), 2));  std::cout << "sigma_triplet = " << sigma_triplet << "\n\n";
-        rArray relcng_singlet = sigma_singlet_lf/sigma_singlet; std::cout << "relcng_singlet = " << relcng_singlet << "\n\n";
-        rArray relcng_triplet = sigma_triplet_lf/sigma_triplet; std::cout << "relcng_triplet = " << relcng_triplet << "\n\n";
+        rArray sigma_singlet_lf = pow(abs(Tdir_lf + Texc_lf), 2);
+        rArray sigma_triplet_lf = pow(abs(Tdir_lf - Texc_lf), 2);
+        rArray sigma_singlet = sums(pow(abs(Tdir + Texc), 2));
+        rArray sigma_triplet = sums(pow(abs(Tdir - Texc), 2));
+        rArray relcng_singlet = sigma_singlet_lf/sigma_singlet;
+        rArray relcng_triplet = sigma_triplet_lf/sigma_triplet;
         std::cout << "\tδ (singlet) = " << relcng_singlet << "\n";
         std::cout << "\tδ (triplet) = " << relcng_triplet << "\n";
         if (std::max(max(relcng_singlet), max(relcng_triplet)) < sigmaeps)
             break;
-        
-        std::cout << "c\n";
         
         // update regulators ("do not unnecessarily refine epsilons")
         double Td_contrib = std::max(max(abs(Tdir_lf)/sigma_singlet), max(abs(Tdir_lf)/sigma_triplet));
@@ -262,4 +254,3 @@ int main(int argc, char *argv[])
         
     return 0;
 }
-    

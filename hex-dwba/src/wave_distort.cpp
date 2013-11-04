@@ -173,8 +173,8 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         if (ln > 0)
         {
             // match to the forbidden region
-            yg[0][0] = pow(r0,ln+1) * y0g[samples0-1][0];
-            yg[0][1] = (ln+1)*pow(r0,ln) * y0g[samples0-1][0] + pow(r0,ln+1) * y0g[samples0-1][1];
+            yg[0][0] = y0g[samples0-1][0];
+            yg[0][1] = (ln+1)/r0 * y0g[samples0-1][0] + y0g[samples0-1][1];
         }
         else
         {
@@ -183,13 +183,22 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
             yg[0][1] = 1;
         }
         
-        // solve (and do not re-normalize!)
-        solve2(xg, samples + 1, h, yg, ypg, yerrg, adapt_stepper, derivs, ABORT_ON_OVERFLOW);
+        // solve
+        solve2 (xg, samples + 1, h, yg, ypg, yerrg, adapt_stepper, derivs, NORMALIZE_ON_OVERFLOW);
+        
+        // values y0g[last] and yg[first] shoud be equal -- normalize the classically forbidden part (if any)
+        if (ln > 0)
+        {
+            double scale_factor = yg[0][0] / y0g[samples0-1][0];
+            
+            for (int i = 0; i < samples0; i++)
+                y0g[i][0] *= scale_factor;
+        }
         
         // compute phase shift; use last point
-        double R   = xg[samples-1];
-        double val =  yg[samples-1][0];
-        double der = ypg[samples-1][0];
+        double R   = xg[samples-2];
+        double val =  yg[samples-2][0];
+        double der = ypg[samples-2][0];
         double D = der / val;
         double pilhalf = M_PI * ln / 2.;
         double tg_delta = (kn * cos(kn*R - pilhalf) - D * sin(kn*R - pilhalf)) /
@@ -249,7 +258,7 @@ double DistortedWave::operator() (double x) const
     
     // or interpolate using cspline interpolator in the classically forbidden region
     else
-        return gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr) * pow(x,ln+1);
+        return gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr) * pow(x/r0,ln+1);
 }
 
 std::pair<double,int> DistortedWave::getZeroAsymptotic (double x) const
@@ -269,7 +278,7 @@ std::pair<double,int> DistortedWave::getZeroAsymptotic (double x) const
     
     // or interpolate using cspline interpolator in the classically forbidden region
     else
-        y = gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr);
+        y = gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr) / pow(r0,ln+1);
     
     return std::make_pair(y, ln + 1);
 }

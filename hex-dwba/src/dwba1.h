@@ -22,7 +22,7 @@
  */
 namespace DWBA1
 {
-	
+    
 /**
  * Computes the one-electron part of direct T-matrix,
  * \f[
@@ -35,14 +35,14 @@ namespace DWBA1
  * \param k Initial (= final) wavenumber.
  */
 Complex computeDirect1e(
-	DistortingPotential const& U,
-	int l, double k
+    DistortingPotential const& U,
+    int l, double k
 );
-	
+    
 /**
  * Computes the two-electron part of the direct T-matrix,
  * \f[
- * 	       D_{l_f}^{(2)} = \frac{1}{k_i k_f} \sum_{l_i \lambda}
+ *            D_{l_f}^{(2)} = \frac{1}{k_i k_f} \sum_{l_i \lambda}
  *         \mathrm{i}^{l_i - l_f} \frac{\sqrt{4\pi(2l_i+1)}}{2\lambda + 1}
  *         G_{L_i M_i \lambda M_f-M_i}^{L_f M_f}
  *         G_{l_f M_i-M_f \lambda M_f-M_i}^{l_i 0} I_{\mathrm{dir}} \ ,
@@ -64,11 +64,11 @@ Complex computeDirect1e(
  * \param li Initial projectile partial wave.
  */
 Complex computeDirect2e(
-	const DistortingPotential& U, int lambda,
-	int Nf, int Lf, double kf, int lf,
-	int Ni, int Li, double ki, int li
+    const DistortingPotential& U, int lambda,
+    int Nf, int Lf, double kf, int lf,
+    int Ni, int Li, double ki, int li
 );
-	
+    
 /**
  * Computes the one-electron part of exchange T-matrix,
  * \f[
@@ -86,15 +86,15 @@ Complex computeDirect2e(
  * \param kf Final projectile wavenumber.
  */
 Complex computeExchange1e(
-	DistortingPotential const& U,
-	int Ni, int Li, double ki,
-	int Nf, int Lf, double kf
+    DistortingPotential const& U,
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf
 );
 
 /**
  * Computes the two-electron part of the exchange T-matrix,
  * \f[
- * 	       E_{l_f}^{(2)} = \frac{1}{k_i k_f} \sum_{l_i \lambda}
+ *            E_{l_f}^{(2)} = \frac{1}{k_i k_f} \sum_{l_i \lambda}
  *         \mathrm{i}^{l_i - l_f} \frac{\sqrt{4\pi(2l_i+1)}}{2\lambda + 1}
  *         G_{l_i 0 \lambda M_f}^{L_f M_f}
  *         G_{l_f M_i-M_f \lambda M_f}^{L_i M_i} I_{\mathrm{exc}} \ ,
@@ -116,9 +116,9 @@ Complex computeExchange1e(
  * \param li Initial projectile partial wave.
  */
 Complex computeExchange2e(
-	const DistortingPotential& U, int lambda,
-	int Nf, int Lf, double kf, int lf,
-	int Ni, int Li, double ki, int li
+    const DistortingPotential& U, int lambda,
+    int Nf, int Lf, double kf, int lf,
+    int Ni, int Li, double ki, int li
 );
 
 }; // end of namespace DWBA1

@@ -39,108 +39,108 @@
  */
 template <typename Functor> class GaussKronrod
 {
-	private:
-		Functor F;
-		double Result, AbsErr;
-		bool Ok;
-		std::string Status;
-		double eval(double x) { return F(x); }
+    private:
+        Functor F;
+        double Result, AbsErr;
+        bool Ok;
+        std::string Status;
+        double eval(double x) { return F(x); }
 
-	public:
-		GaussKronrod(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
-		~GaussKronrod() {}
-		
-		/** \brief Compute the integral.
-		 *
-		 * Performs the integration on a given interval. Uses specialized routines
-		 * from the O₂scl library, which itself just wraps GSL (and that is, in this
-		 * case, nothing than C-port of QuadPack).
-		 * 
-		 * You can compute improper integrals. For specifying "infinity" as
-		 * one or both bounds use either
-		 * 
-		 * \code
-		 *     std::numeric_limits<double>::infinity()
-		 * \endcode
-		 * 
-		 * for positive infinity or
-		 * 
-		 * \code
-		 *     -std::numeric_limits<double>::infinity()
-		 * \endcode
-		 * 
-		 * for negative infinity.
-		 * 
-		 * \return The value of \ref Ok (i.e. whether the last integration has
-		 * been successful according to the library).
-		 */
-		bool integrate(double a, double b)
-		{
-			// reset
-			Result = AbsErr = Nan;
-			Ok = true;
-			Status.clear();
-			
-			if (a == b) { return 0; }
-			
-			if (isnan(a) || isnan(b))
-			{
-				Ok = false;
-				Status = std::string("ERROR: Some of the integration bounds is not defined!");
-				return false;
-			}
-			
-			// otočíme znaménko
-			if (a > b)
-			{
-				integrate(b, a);
-				Result = -Result;
-				return Ok;
-			}
-			
-			// EvalPtr je ukazatel na členskou funkci Integrator::eval, kterou budeme posílat
-			// do knihovních funkcí.
-			o2scl::funct_mfptr<GaussKronrod<Functor>> EvalPtr(const_cast<GaussKronrod<Functor>*>(this), &GaussKronrod<Functor>::eval);
-			o2scl::inte<o2scl::funct_mfptr<GaussKronrod<Functor>>> *R = 0;
-			
-			// podle konečnosti mezí vybere správný integrátor
-			if (finite(a) && finite(b))          /* -∞ < a < b < +∞ */
-				R = new o2scl::gsl_inte_qag<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-			else if (finite(a) && !finite(b))    /* -∞ < a < b = +∞ */
-				R = new o2scl::gsl_inte_qagiu<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-			else if (!finite(a) && finite(b))    /* -∞ = a < b < +∞ */
-				R = new o2scl::gsl_inte_qagil<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-			else                                 /* -∞ = a < b = +∞ */
-				R = new o2scl::gsl_inte_qagi<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-			
-			// pozor! o2scl kope!
-			try
-			{
-				// provede integraci
-				R->integ_err(EvalPtr, a, b, Result, AbsErr);
-			}
-			catch (o2scl::exc_runtime_error e)
-			{
-				// Integrace se úplně nepovedla, ale pořád lepší než nic. Text výjimy
-				// uložíme a necháme uživatele, aby o adlším pokračování rozhodl sám.
-				Status = std::string(e.what());
-				Ok = false;
-			}
-			catch (o2scl::exc_exception e)
-			{
-				// totéž
-				Status = std::string(e.what());
-				Ok = false;
-			}
-			
-			delete R;
-			return Ok;
-		}
-		
-		const std::string& status() const { return Status; }	// text chybového hlášení
-		bool ok() const { return Ok; }					// proběhla poslední integrace v pořádku?
-		double result() const { return Result; }		// výsledek poslední integrace
-		double abserr() const { return AbsErr; }		// a její absolutní chyba
+    public:
+        GaussKronrod(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
+        ~GaussKronrod() {}
+        
+        /** \brief Compute the integral.
+         *
+         * Performs the integration on a given interval. Uses specialized routines
+         * from the O₂scl library, which itself just wraps GSL (and that is, in this
+         * case, nothing than C-port of QuadPack).
+         * 
+         * You can compute improper integrals. For specifying "infinity" as
+         * one or both bounds use either
+         * 
+         * \code
+         *     std::numeric_limits<double>::infinity()
+         * \endcode
+         * 
+         * for positive infinity or
+         * 
+         * \code
+         *     -std::numeric_limits<double>::infinity()
+         * \endcode
+         * 
+         * for negative infinity.
+         * 
+         * \return The value of \ref Ok (i.e. whether the last integration has
+         * been successful according to the library).
+         */
+        bool integrate(double a, double b)
+        {
+            // reset
+            Result = AbsErr = Nan;
+            Ok = true;
+            Status.clear();
+            
+            if (a == b) { return 0; }
+            
+            if (isnan(a) || isnan(b))
+            {
+                Ok = false;
+                Status = std::string("ERROR: Some of the integration bounds is not defined!");
+                return false;
+            }
+            
+            // otočíme znaménko
+            if (a > b)
+            {
+                integrate(b, a);
+                Result = -Result;
+                return Ok;
+            }
+            
+            // EvalPtr je ukazatel na členskou funkci Integrator::eval, kterou budeme posílat
+            // do knihovních funkcí.
+            o2scl::funct_mfptr<GaussKronrod<Functor>> EvalPtr(const_cast<GaussKronrod<Functor>*>(this), &GaussKronrod<Functor>::eval);
+            o2scl::inte<o2scl::funct_mfptr<GaussKronrod<Functor>>> *R = 0;
+            
+            // podle konečnosti mezí vybere správný integrátor
+            if (finite(a) && finite(b))          /* -∞ < a < b < +∞ */
+                R = new o2scl::gsl_inte_qag<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            else if (finite(a) && !finite(b))    /* -∞ < a < b = +∞ */
+                R = new o2scl::gsl_inte_qagiu<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            else if (!finite(a) && finite(b))    /* -∞ = a < b < +∞ */
+                R = new o2scl::gsl_inte_qagil<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            else                                 /* -∞ = a < b = +∞ */
+                R = new o2scl::gsl_inte_qagi<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            
+            // pozor! o2scl kope!
+            try
+            {
+                // provede integraci
+                R->integ_err(EvalPtr, a, b, Result, AbsErr);
+            }
+            catch (o2scl::exc_runtime_error e)
+            {
+                // Integrace se úplně nepovedla, ale pořád lepší než nic. Text výjimy
+                // uložíme a necháme uživatele, aby o adlším pokračování rozhodl sám.
+                Status = std::string(e.what());
+                Ok = false;
+            }
+            catch (o2scl::exc_exception e)
+            {
+                // totéž
+                Status = std::string(e.what());
+                Ok = false;
+            }
+            
+            delete R;
+            return Ok;
+        }
+        
+        const std::string& status() const { return Status; }    // text chybového hlášení
+        bool ok() const { return Ok; }                    // proběhla poslední integrace v pořádku?
+        double result() const { return Result; }        // výsledek poslední integrace
+        double abserr() const { return AbsErr; }        // a její absolutní chyba
 };
 
 #endif
