@@ -206,7 +206,6 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
         }
     }
     
-    write_array(m, "m.dat");
     return m;
 }
 
