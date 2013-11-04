@@ -16,7 +16,7 @@
 #include "arrays.h"
 #include "complex.h"
 
-rArray abs (cArray const &u)
+rArray abs (const cArrayView u)
 {
     rArray v(u.size());
     
@@ -47,7 +47,7 @@ NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> co
     assert(A.size() == B.size());
     
     size_t N = A.size();
-    Array<double> C (N);
+    NumberArray<double> C (N);
 
     for (size_t i = 0; i < N; i++)
         C[i] = hypot(A[i], B[i]);
@@ -60,7 +60,7 @@ NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> co
     assert(A.size() == B.size());
     
     size_t N = A.size();
-    Array<double> C (N);
+    NumberArray<double> C (N);
 
     for (size_t i = 0; i < N; i++)
         C[i] = atan2(A[i], B[i]);
@@ -71,7 +71,7 @@ NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> co
 NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 {
     size_t N = A.size();
-    Array<double> B (N);
+    NumberArray<double> B (N);
 
     for (size_t i = 0; i < N; i++)
         B[i] = sqrabs(A[i]);
@@ -82,7 +82,7 @@ NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 NumberArray<double> realpart (NumberArray<Complex> const & A)
 {
     size_t N = A.size();
-    Array<double> B (N);
+    NumberArray<double> B (N);
 
     for (size_t i = 0; i < N; i++)
         B[i] = A[i].real();
@@ -93,7 +93,7 @@ NumberArray<double> realpart (NumberArray<Complex> const & A)
 NumberArray<double> imagpart (NumberArray<Complex> const & A)
 {
     size_t N = A.size();
-    Array<double> B (N);
+    NumberArray<double> B (N);
 
     for (size_t i = 0; i < N; i++)
         B[i] = A[i].imag();
@@ -101,7 +101,7 @@ NumberArray<double> imagpart (NumberArray<Complex> const & A)
     return B;
 }
 
-template<> void write_array(ArrayView<double> array, const char* filename)
+template<> void write_array (NumberArray<double> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -109,7 +109,7 @@ template<> void write_array(ArrayView<double> array, const char* filename)
     fout.close();
 }
 
-template<> void write_array(ArrayView<double> grid, ArrayView<double> array, const char* filename)
+template<> void write_array (NumberArray<double> grid, NumberArray<double> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -117,7 +117,7 @@ template<> void write_array(ArrayView<double> grid, ArrayView<double> array, con
     fout.close();
 }
 
-template<> void write_array(ArrayView<Complex> array, const char* filename)
+template<> void write_array (NumberArray<Complex> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -125,7 +125,7 @@ template<> void write_array(ArrayView<Complex> array, const char* filename)
     fout.close();
 }
 
-template<> void write_array(ArrayView<double> grid, ArrayView<Complex> array, const char* filename)
+template<> void write_array (NumberArray<double> grid, NumberArray<Complex> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
