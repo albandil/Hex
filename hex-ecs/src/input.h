@@ -32,7 +32,7 @@
  * - zipmax: Radial cutoff for solution zipping useful if one is interested
  *               only in the near-origin behaviour.
  * - parallel: Whether to use OpenMPI.
- * - preconditioner: %Preconditioner to use. See \ref Preconditioner for available types.
+ * - preconditioner: %Preconditioner to use. See \ref Preconditioners::AvailableTypes for available types.
  * - droptol: Drop tolerance for the iLU preconditioner.
  * - itinerary: Run only first stage (computation of the radial integrals).
  */

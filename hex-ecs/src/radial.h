@@ -132,6 +132,7 @@ class RadialIntegrals
          * @endcode
          *  
          * @param a Moment degree.
+         * @param iknotmax Index of knot that terminates the integration range.
          */
         cArray computeMi(int a, int iknotmax = 0) const;
         

@@ -356,7 +356,9 @@ const std::string NoPreconditioner::name = "none";
 
 void NoPreconditioner::setup ()
 {
-    // determine which lambdas are needed by this process TODO
+    // TODO : Determine which lambdas are needed by this process.
+    // NOTE : At the moment each process holds in memory radial integrals
+    //        for all lambdas, which needlessly raises memory requirements.
     Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
     
     // compute large radial integrals

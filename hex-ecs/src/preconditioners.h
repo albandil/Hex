@@ -21,8 +21,6 @@
 #include "radial.h"
 #include "parallel.h"
 
-class PreconditionerBase;
-
 /**
  * @brief Sparse incomplete Cholesky decomposition.
  * 
@@ -184,6 +182,17 @@ class PreconditionerBase
         virtual void precondition (const cArrayView r, cArrayView z) const = 0;
 };
 
+/**
+ * @brief Solution driver without actual preconditioner.
+ * 
+ * This class "preconditions" by identity matrix, but implements all other important
+ * routines, that can be used by derived classes, namely:
+ * - setup : Loads / computed radial integrals for construction of the matrix of the set
+ *           and for the construction of the right-hand side.
+ * - update : Creates the diagonal blocks.
+ * - rhs : Composes the right-hand side.
+ * - multiply : Multiplies a vector by the matrix of the set of equations.
+ */
 class NoPreconditioner : public PreconditionerBase
 {
     public:
@@ -233,6 +242,13 @@ class NoPreconditioner : public PreconditionerBase
             S_kron_half_D_minus_Mm1_tr_;
 };
 
+/**
+ * @brief CG iteration-based preconditioner.
+ * 
+ * This class adds some preconditioning capabilities to its base class
+ * NoPreconditioner. The preconditioning is done by diagonal block solution
+ * using the conjugate gradients solver (which itself is non-preconditioned).
+ */
 class CGPreconditioner : public NoPreconditioner
 {
     public:
@@ -262,6 +278,12 @@ class CGPreconditioner : public NoPreconditioner
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
 };
 
+/**
+ * @brief Jacobi-preconditioned CG-based preconditioner.
+ * 
+ * Enhances CGPreconditioner conjugate gradients solver by Jacobi (diagonal) preconditioning.
+ * This is done by redefining virtual function CG_prec.
+ */
 class JacobiCGPreconditioner : public CGPreconditioner
 {
     public:
@@ -295,6 +317,12 @@ class JacobiCGPreconditioner : public CGPreconditioner
         cArrays invd_;
 };
 
+/**
+ * @brief SSOR-preconditioned CG-based preconditioner.
+ * 
+ * Enhances CGPreconditioner conjugate gradients solver by SSOR preconditioning.
+ * This is done by redefining virtual function CG_prec.
+ */
 class SSORCGPreconditioner : public CGPreconditioner
 {
     public:
@@ -328,6 +356,13 @@ class SSORCGPreconditioner : public CGPreconditioner
         std::vector<SymDiaMatrix> SSOR_;
 };
 
+/**
+ * @brief ILU-preconditioned CG-based preconditioner.
+ * 
+ * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
+ * preconditioning. This is done by redefining virtual function CG_prec. The factorization
+ * is drop tolerance based and is computed by UMFPACK.
+ */
 class ILUCGPreconditioner : public CGPreconditioner
 {
     public:
@@ -368,7 +403,11 @@ class ILUCGPreconditioner : public CGPreconditioner
 };
 
 /**
- * @brief Incomplete Cholesky CG preconditioner.
+ * @brief DIC-preconditioned CG-based preconditioner.
+ * 
+ * Enhances CGPreconditioner conjugate gradients solver by diagonal incomplete
+ * Choleski factorization preconditioning. This is done by redefining virtual function CG_prec.
+ * This preconditioner probably won't work due to pivot breakdown.
  */
 class DICCGPreconditioner : public CGPreconditioner
 {
@@ -406,7 +445,12 @@ class DICCGPreconditioner : public CGPreconditioner
 };
 
 /**
- * @brief Sparse approximate inverse preconditioner.
+ * @brief SPAI-preconditioned CG-based preconditioner.
+ * 
+ * Enhances CGPreconditioner conjugate gradients solver by sparse approximate inverse
+ * preconditioning. This is done by redefining virtual function CG_prec.
+ * This preconditioner requires Lapack (for dense least squares problems)
+ * and its construction is rather slow. Moreover, it doesn't seem to work.
  */
 #ifndef NO_LAPACK
 class SPAICGPreconditioner : public CGPreconditioner
@@ -473,19 +517,19 @@ class SPAICGPreconditioner : public CGPreconditioner
  *   between the bases. This is done by the equations
  *   @f[
  *          \mathbf{S}^{(p)}\otimes\mathbf{S}^{(p)} \mathbf{r}^{(p)}
- *          = \mathbb{\Sigma}^{(p,q)} \mathbf{r}^{(q)}
+ *          = \mathbb{\Sigma}^{(p,q)} \otimes \mathbb{\Sigma}^{(p,q)} \mathbf{r}^{(q)}
  *   @f]
  * - Together we have the sequence
  *   @f[
  *          \mathbf{S}^{(p)}\otimes\mathbf{S}^{(p)} \mathbf{r}^{(p)}
- *          = \mathbb{\Sigma}^{(p,s)} \mathbf{r}^{(s)}
+ *          = \mathbb{\Sigma}^{(p,s)} \otimes \mathbb{\Sigma}^{(p,s)} \mathbf{r}^{(s)}
  *   @f]
  *   @f[
  *          \mathbf{M}^{(p)}\mathbf{z}^{(p)} = \mathbf{r}^{(p)}
  *   @f]
  *   @f[
  *          \mathbf{S}^{(s)}\otimes\mathbf{S}^{(s)} \mathbf{z}^{(s)}
- *          = \mathbb{\Sigma}^{(s,p)} \mathbf{z}^{(p)}
+ *          = \mathbb{\Sigma}^{(s,p)} \otimes \mathbb{\Sigma}^{(s,p)} \mathbf{z}^{(p)}
  *   @f]
  *   instead of the single equation
  *   @f[
@@ -499,9 +543,9 @@ class SPAICGPreconditioner : public CGPreconditioner
  * @f]
  * The solution of transition equations can be recast into a matrix form of Kronecker product,
  * @f[
- *        \mathbf{S}^{(p)} \mathbf{R}^{(p)} \mathbf{S}^{(p)T} = \mathrm{Matrix}(\mathbb{\Sigma}^{(p,q)} \mathbf{r}^{(q)})
+ *        \mathbf{S}^{(p)} \mathbf{R}^{(p)} \mathbf{S}^{(p)T} = \mathbb{\Sigma}^{(p,q)}\mathrm{Matrix}(\mathbf{r}^{(q)})\mathbb{\Sigma}^{(p,q)^T}
  *        \qquad\Rightarrow\qquad
- *        \mathbf{R}^{(p)} = \mathbf{S}^{(p)^{-1}} \mathrm{Matrix}(\mathbb{\Sigma}^{(p,q)} \mathbf{r}^{(q)}) \mathbf{S}^{(p)^{-T}}
+ *        \mathbf{R}^{(p)} = \mathbf{S}^{(p)^{-1}} \mathbb{\Sigma}^{(p,q)} \mathrm{Matrix}(\mathbf{r}^{(q)}) \mathbb{\Sigma}^{(p,q)^T} \mathbf{S}^{(p)^{-T}}
  * @f]
  * where the word "Matrix" indicates that we want to split long vector into a square matrix. The resulting square matrix
  * @f$ \mathbf{R} @f$ will then have the same structure.
@@ -582,6 +626,11 @@ class TwoLevelPreconditioner : public SSORCGPreconditioner
         GaussLegendre g_;
 };
 
+/**
+ * @brief Multi-resolution (V-cycle) preconditioner.
+ * 
+ * @note Not implemented yet.
+ */
 class MultiresPreconditioner : public PreconditionerBase
 {
     public:
@@ -641,6 +690,28 @@ class MultiresPreconditioner : public PreconditionerBase
         std::vector<PreconditionerBase*> p_;
 };
 
+/**
+ * @brief Preconditioner traits.
+ * 
+ * This class is used for accessing all available preconditioners. Preconditioner types and objects
+ * are never accessed in any other way than by calling the member functions of this class or through
+ * the pointer retrieved from the method "choose".
+ * 
+ * For this reason, addition of a new preconditioner is very simple. One just needs to derive the new
+ * preconditioner class from PreconditionerBase, specify a name to be used on command line as static
+ * attribute (see code below) and add the class name to the tuple AvailableTypes.
+ * 
+ * @code
+ *     class MyNewPreconditioner
+ *     {
+ *         public:
+ *             static const std::string name;
+ * 
+ *             // other compulsory methods
+ *             // ...
+ *     };
+ * @endcode
+ */
 class Preconditioners
 {
     public:
@@ -648,7 +719,7 @@ class Preconditioners
         /**
          * @brief List of available preconditioners.
          * 
-         * First one (ILUCGPreconditioner at the moment) is considered default. This is the only place that has to be modified
+         * First one (ILUCGPreconditioner at the moment) is considered default. This tuple is the only place that has to be modified
          * when adding a new preconditioner to Hex-ECS (besides the obvious declaration and definition somewhere in reach, ideally
          * in "preconditioners.h" and "preconditioners.cpp").
          */

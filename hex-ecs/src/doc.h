@@ -10,63 +10,66 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef _DOC_H_
-#define _DOC_H_
+#ifndef HEX_ECS_DOC
+#define HEX_ECS_DOC
 
 /**
  * @mainpage
  * 
- * @author Jakub Benda ⓒ 2011, MFF UK
- * @date 23.9.2011
+ * @author Jakub Benda, MFF UK
+ * @date 5. 11. 2013
  * 
  * 
  * @section purpose Purpose
  * 
- * Hex computes total cross section for elastic and excitational
- * electron-atom scattering.
- * 
+ * Hex-ECS computes partial T-matrices for elastic, excitation and ionization
+ * electron-hydrogen scattering. Together with the interface program Hex-DB
+ * it offers the possibility of generating many scatterign quantities like
+ * differential or integral cross sections.
  * 
  * @section libs Language and libraries
  * 
- * Hex is written in C++11, one may thus need a newer compiler.
- * Specifically, the not obvious language elements used here are:
+ * Hex is written in C++11 to make use of comfort of the modern C++ extensions,
+ * so one may need a newer compiler. Tested compilers are:
  * 
- * - “variadic templates” (ability to pass deliberate number of parameters to
- *   a function template, and also mechanisms to process these)
- *   @code
- *   template <typename T, typename ...Params> function(T firstparam, Params ...otherparams)
- *   {
- * 	     ... body ...
- *   }
- *   @endcode
- * - “right angle brackets” (comfortable nested templates syntax)
- *   @code
- *   std::vector<std::complex<double>> array(N);
- *   @endcode
- * - “Λ-functions” (on-the-fly creation of anonymous functions)
- *   @code
- *   auto lambda_scaler = [ factor ](double x) -> double { return factor * x; };
- *   @endcode
- * - <b>auto</b> datatype
- *   @code
- *   for (auto iterator = array.begin(); iterator != array.end(); iterator++)
- * 	 {
- *       ... body ...
- *   }
- *   @endcode
+ * - GCC 4.7.2
+ * - Intel C++ Compiler 14.0
  * 
- * All these features are supported by GCC 4.6+
- * and by Intel Composer XE 12 SP1 and higher.
- * Program also needs following external packages:
+ * Both worked with the same Makefile, just by setting the variable CPP to "g++"
+ * or "icpc". The program also uses following external packages (tested versions
+ * are given in parentheses):
  * 
- * - GNU Scientific Library for Wigner coupling coefficients and some other
- *   special functions
- * - SuiteSparse/UMFPACK for sparse matrix manipulation and for a direct sparse
- *   system solver
- * - HDF5 library for standardized binary output of intermediate results to speed up
- *   further simillar calculations. And also, it saves RAM during the computation.
- *   \note The HDF5 library often comes with custom compiler wrappers. These are
- *         not used here, as “it works without them”.
+ * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.15):
+ *   for Wigner coupling coefficients and some other special functions.
+ * - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
+ *   for sparse matrix manipulation and for a direct sparse system solver.
+ * - <a href="http://www.hdfgroup.org/HDF5/">HDF5</a> (1.8.11):
+ *   for standardized binary output of intermediate results
+ *   (used to speed up further simillar calculations).
+ * - <a href="http://www.fftw.org/">FFTW</a> (3.3.3):
+ *   for fast evaluation of %Chebyshev expansions by Fast Fourier Transform.
+ * - OpenMP (2.1): for parallelization at single machine.
+ * - MPI (OpenMPI 1.6): for parallelization at cluster.
+ * 
+ * The next libraries are optional:
+ * - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.5):
+ *   Free BLAS implementation that can be compiled for a specific
+ *   CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
+ *   OpenBLAS is optional because SuiteSparse can be configured to use
+ *   a different BLAS implementation.
+ * - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <u>older</u>):
+ *   PNG read/write interface, for debugging purposes. The code that references
+ *   png++ can be excluded from compilation by the option -DNO_PNG.
+ *   For convenience, this library is directly included in the source code of Hex-ecs.
+ * 
+ * All listed libraries are open-source and easily obtainable on the internet
+ * and in the repositories of some Linux distributions (openSUSE 12.3 at least).
+ * 
+ * Equations in this documentation use MathJax, which should work in every
+ * up-to-date JavaScript-enabled web browser. Tested browsers are:
+ * 
+ * - Mozilla Firefox 24.0
+ * - Konqueror 4.10.5
  * 
  * @section theory Theory
  * 
