@@ -13,35 +13,15 @@
 #ifndef HEX_PRECONDITIONERS
 #define HEX_PRECONDITIONERS
 
+#include <tuple>
+
 #include "arrays.h"
 #include "input.h"
 #include "matrix.h"
 #include "radial.h"
 #include "parallel.h"
 
-/**
- * @brief List of available preconditioners.
- */
-typedef enum {
-    /// Solve diagonal blocks by drop-tolerance incomplete LU factorization (default).
-    iluCG_prec = 0,
-    /// No preconditioner.
-    no_prec = 1,
-    /// Solve diagonal blocks by non-preconditioned CG iterations.
-    CG_prec = 2,
-    /// Solve diagonal blocks by Jacobi-preconditioned CG iterations.
-    jacobiCG_prec = 3,
-    /// Solve diagonal blocks by SSOR-preconditioned CG iterations.
-    ssorCG_prec = 4,
-    /// Multi-resolution preconditioner (@note not implemented yet).
-    res_prec = 5,
-    /// Solve diagonal blocks by SPAI-preconditioned CG iterations.
-    spaiCG_prec = 6,
-    /// Solve diagonal blocks by two-level precondtioned CG iterations.
-    two_prec = 7,
-    /// Diagonal incomplete Cholesky factorization + CG iterations.
-    dicCG_prec = 8
-} Preconditioner;
+class PreconditionerBase;
 
 /**
  * @brief Sparse incomplete Cholesky decomposition.
@@ -208,11 +188,14 @@ class NoPreconditioner : public PreconditionerBase
 {
     public:
         
+        static const std::string name;
+        
         NoPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
+            Bspline const & bspline,
+            CommandLine const & cmd
         ) : PreconditionerBase(), par_(par), inp_(inp), l1_l2_(ll),
             s_bspline_(bspline), s_rad_(s_bspline_) {}
         
@@ -254,12 +237,15 @@ class CGPreconditioner : public NoPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         CGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : NoPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
@@ -280,12 +266,15 @@ class JacobiCGPreconditioner : public CGPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         JacobiCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : CGPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -310,12 +299,15 @@ class SSORCGPreconditioner : public CGPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         SSORCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : CGPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -340,13 +332,15 @@ class ILUCGPreconditioner : public CGPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         ILUCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
-            double droptol = 0.
-        ) : CGPreconditioner(par, inp, ll, bspline), droptol_(droptol) {}
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -380,12 +374,15 @@ class DICCGPreconditioner : public CGPreconditioner
 {
     public: 
         
+        static const std::string name;
+        
         DICCGPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : CGPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -416,12 +413,15 @@ class SPAICGPreconditioner : public CGPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         SPAICGPreconditioner  (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
-        ) : CGPreconditioner(par, inp, ll, bspline) {}
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -510,13 +510,16 @@ class TwoLevelPreconditioner : public SSORCGPreconditioner
 {
     public:
         
+        static const std::string name;
+        
         // constructor
         TwoLevelPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & s_bspline
-        ) : SSORCGPreconditioner(par,inp,ll,s_bspline),
+            Bspline const & s_bspline,
+            CommandLine const & cmd
+        ) : SSORCGPreconditioner(par,inp,ll,s_bspline, cmd),
             p_bspline_ (
                 1,                                     // use first order for preconditioner basis
                 sorted_unique(s_bspline.rknots(), 1),  // allow just one consecutive occurence
@@ -583,12 +586,15 @@ class MultiresPreconditioner : public PreconditionerBase
 {
     public:
         
+        static const std::string name;
+        
         // constructor
         MultiresPreconditioner (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline
+            Bspline const & bspline,
+            CommandLine const & cmd
         );
         
         // destructor
@@ -635,4 +641,76 @@ class MultiresPreconditioner : public PreconditionerBase
         std::vector<PreconditionerBase*> p_;
 };
 
+class Preconditioners
+{
+    public:
+        
+        /**
+         * @brief List of available preconditioners.
+         * 
+         * First one (ILUCGPreconditioner at the moment) is considered default. This is the only place that has to be modified
+         * when adding a new preconditioner to Hex-ECS (besides the obvious declaration and definition somewhere in reach, ideally
+         * in "preconditioners.h" and "preconditioners.cpp").
+         */
+        typedef std::tuple <
+            ILUCGPreconditioner,        // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
+            NoPreconditioner,           // No preconditioner.
+            CGPreconditioner,           // Solve diagonal blocks by non-preconditioned CG iterations.
+            JacobiCGPreconditioner,     // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+            SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+            MultiresPreconditioner,     // Multi-resolution preconditioner (@note not implemented yet).
+            SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.
+            TwoLevelPreconditioner,     // Solve diagonal blocks by two-level precondtioned CG iterations.
+            DICCGPreconditioner         // Diagonal incomplete Cholesky factorization + CG iterations.
+        > AvailableTypes;
+        
+        /**
+         * @brief Return pointer to new preconditioner object.
+         * 
+         * The preconditioner index from CommandLine::preconditioner is used
+         * to choose the correct preconditioner.
+         */
+        //@{
+        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose (
+            Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
+        ){
+            // check if i-th preconditioner is the right one
+            // - Yes : return new pointer of its type
+            // - No : try the next preconditioner
+            return (i == cmd.preconditioner) ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline, cmd) : choose<i+1>(par, inp, ll, bspline, cmd);
+        }
+        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose (
+            Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
+        ){
+            // we visited all available preconditioners without success : return NULL pointer
+            return nullptr;
+        }
+        //@}
+        
+        /**
+         * @brief Find preconditioner by name.
+         * 
+         * Return index of the corresponding preconditioner in AvailableTypes or (-1) if
+         * none such exists. "Corresponding preconditioner" is such type that has a static
+         * member
+         * @code
+         *     std::string name;
+         * @endcode
+         * equal to the argument of this function.
+         */
+        //@{
+        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),int>::type findByName (std::string name)
+        {
+            // check if i-th preconditioner is the right one
+            // - Yes : return new pointer of its type
+            // - No : try the next preconditioner
+            return (name == std::tuple_element<i,AvailableTypes>::type::name) ? i : findByName<i+1>(name);
+        }
+        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),int>::type findByName (std::string name)
+        {
+            // we visited all available preconditioners without success : return invalid index (-1)
+            return -1;
+        }
+        //@}
+};
 #endif

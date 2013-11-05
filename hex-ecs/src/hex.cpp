@@ -185,45 +185,10 @@ int main (int argc, char* argv[])
         goto StgExtract;
     }
     
-    //
-    // Create and initialize preconditioner
-    //
-    
-    PreconditionerBase * prec;
-    
-    switch (cmd.preconditioner)
-    {
-        case no_prec:
-            prec = new NoPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case CG_prec:
-            prec = new CGPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case jacobiCG_prec:
-            prec = new JacobiCGPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case ssorCG_prec:
-            prec = new SSORCGPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case iluCG_prec:
-            prec = new ILUCGPreconditioner (par, inp, coupled_states, bspline, cmd.droptol);
-            break;
-        case dicCG_prec:
-            prec = new DICCGPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case two_prec:
-            prec = new TwoLevelPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case res_prec:
-            prec = new MultiresPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        case spaiCG_prec:
-            prec = new SPAICGPreconditioner (par, inp, coupled_states, bspline);
-            break;
-        default:
-            throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
-    };
-    
+    // create and initialize the preconditioner
+    PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
+    if (prec == nullptr)
+        throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
     prec->setup();
     
     //

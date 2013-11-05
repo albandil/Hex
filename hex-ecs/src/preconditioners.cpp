@@ -352,6 +352,8 @@ CooMatrix SPAI (SymDiaMatrix const & A, iArrayView diagonals)
 }
 #endif
 
+const std::string NoPreconditioner::name = "none";
+
 void NoPreconditioner::setup ()
 {
     // determine which lambdas are needed by this process TODO
@@ -585,6 +587,8 @@ void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
     z = r;
 }
 
+const std::string CGPreconditioner::name = "cg";
+
 void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     // shorthands
@@ -619,6 +623,8 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
+const std::string JacobiCGPreconditioner::name = "Jacobi";
+
 void JacobiCGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
@@ -648,6 +654,8 @@ void JacobiCGPreconditioner::update (double E)
     par_.wait();
 }
 
+const std::string SSORCGPreconditioner::name = "SSOR";
+
 void SSORCGPreconditioner::setup ()
 {
     // setup parent
@@ -666,6 +674,8 @@ void SSORCGPreconditioner::update (double E)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
         SSOR_[ill] = SSOR(dia_blocks_[ill]);
 }
+
+const std::string ILUCGPreconditioner::name = "ILU";
 
 void ILUCGPreconditioner::setup ()
 {
@@ -706,6 +716,8 @@ void ILUCGPreconditioner::update (double E)
     }
 }
 
+const std::string DICCGPreconditioner::name = "DIC";
+
 void DICCGPreconditioner::setup()
 {
     CGPreconditioner::setup();
@@ -722,6 +734,8 @@ void DICCGPreconditioner::update(double E)
 }
 
 #ifndef NO_LAPACK
+const std::string SPAICGPreconditioner::name = "SPAI";
+
 void SPAICGPreconditioner::setup()
 {
     // setup parent
@@ -750,6 +764,8 @@ void SPAICGPreconditioner::update (double E)
     std::cout << "done in " << (secs / 60) << std::setw(2) << std::setfill('0') << (secs % 60) << "\n";
 }
 #endif
+
+const std::string TwoLevelPreconditioner::name = "two";
 
 void TwoLevelPreconditioner::setup ()
 {
@@ -949,9 +965,10 @@ void TwoLevelPreconditioner::CG_prec (int iblock, const cArrayView rs, cArrayVie
     zs = Zs.data();
 }
 
+const std::string MultiresPreconditioner::name = "res";
 
 MultiresPreconditioner::MultiresPreconditioner (
-    Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline
+    Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
 ){
     // first order will be solved by ILU (-> ILUCGPreconditioner)
     p_.push_back
@@ -965,7 +982,8 @@ MultiresPreconditioner::MultiresPreconditioner (
                 sorted_unique(bspline.rknots(), 1),
                 bspline.ECStheta(),
                 sorted_unique(bspline.cknots(), 1)
-            )
+            ),
+            cmd
         )
     );
     
@@ -984,7 +1002,8 @@ MultiresPreconditioner::MultiresPreconditioner (
                     sorted_unique(bspline.rknots(), ord),
                     bspline.ECStheta(),
                     sorted_unique(bspline.cknots(), ord)
-                )
+                ),
+                cmd
             )
         );
     }

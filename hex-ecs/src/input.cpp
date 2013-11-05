@@ -29,7 +29,7 @@
  * can be specified using the --input/-i option.
  */
 
-void CommandLine::parse(int argc, char* argv[])
+void CommandLine::parse (int argc, char* argv[])
 {
     // set short options
     char const * const short_options  = "ei:hz:n:R:mabcd:p:";
@@ -138,7 +138,7 @@ void CommandLine::parse(int argc, char* argv[])
                     "\t--stg-integ          (-a)  only do radial integrals                                                    \n"
                     "\t--stg-integ-solve    (-b)  only do integrals & solve                                                   \n"
                     "\t--stg-extract        (-c)  only extract amplitudes                                                     \n"
-                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, ILU, res} (default: ILU) \n"
+                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, ILU, ...} (default: ILU) \n"
                     "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                  \n"
                     "                                                                                                         \n"
                 ;
@@ -189,14 +189,8 @@ void CommandLine::parse(int argc, char* argv[])
             case 'p':
             {
                 // preconditioner
-                if (strcmp(optarg,"none") == 0) preconditioner = no_prec;
-                else if (strcmp(optarg,"Jacobi") == 0) preconditioner = jacobiCG_prec;
-                else if (strcmp(optarg,"SSOR") == 0) preconditioner = ssorCG_prec;
-                else if (strcmp(optarg,"ILU") == 0) preconditioner = iluCG_prec;
-                else if (strcmp(optarg,"res") == 0) preconditioner = res_prec;
-                else if (strcmp(optarg,"SPAI") == 0) preconditioner = spaiCG_prec;
-                else if (strcmp(optarg,"DIC") == 0) preconditioner = dicCG_prec;
-                else throw exception("Unknown preconditioner \"%s\".", optarg);
+                if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
+                    throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
             }
 #ifndef NO_MPI
@@ -222,7 +216,7 @@ void CommandLine::parse(int argc, char* argv[])
     } while (next_option != -1);
 }
 
-long read_int(std::ifstream& f)
+long read_int (std::ifstream& f)
 {
     // text buffer
     std::string s;
@@ -263,7 +257,7 @@ long read_int(std::ifstream& f)
     }
 }
 
-double read_dbl(std::ifstream& f)
+double read_dbl (std::ifstream& f)
 {
     // text buffer
     std::string s;
