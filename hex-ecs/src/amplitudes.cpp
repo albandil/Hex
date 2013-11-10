@@ -286,7 +286,7 @@ cArrays computeXi (
     ics.clear();
     
     // array of Chebyshev expansions for every Ei and angular state
-    cArrays results;
+    cArrays results (coupled_states.size());
     
     // B-spline count
     int Nspline = bspline.Nspline();
@@ -308,7 +308,6 @@ cArrays computeXi (
         double kmax = sqrt(Ei[ie] - 1./(ni*ni));
         
         // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
-        # pragma omp parallel for
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             int l1 = coupled_states[ill].first;
@@ -320,8 +319,8 @@ cArrays computeXi (
             cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
             
             // compute new ionization amplitude
-            Chebyshev<double,Complex> CB = fcheb(bspline, PsiSc, kmax, l1, l2);
-            results.push_back(CB.coeffs());
+            Chebyshev<double,Complex> CB = fcheb (bspline, PsiSc, kmax, l1, l2);
+            results[ill] = CB.coeffs();
             
             // integrate the expansion
             int tail = CB.tail(1e-10);
@@ -330,11 +329,8 @@ cArrays computeXi (
             ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
             double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
             
-            # pragma omp critical
-            {
-                std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
-                ics[ie] += cs;
-            }
+            std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
+            ics[ie] += cs;
         }
     }
     
