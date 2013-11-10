@@ -29,39 +29,39 @@
  */
 template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray<T> const & y0, rArray const & x)
 {
-	if (x0.size() == 0)
-		throw exception ("Nothing to interpolate.\n");
-	
-	if (x0.size() == 1)
-		return y0;
-	
-	// output array
-	NumberArray<T> y(x.size());
-	
-	for (size_t i = 0; i < x.size(); i++)
-	{
-		// right guardian
-		rArray::const_iterator right = std::upper_bound(x0.begin(), x0.end(), x[i]);
-		
-		if (right == x0.end() or right == x0.begin())
-		{
-			y[i] = T(0);
-			continue;
-		}
-		
-		// neighbours
-		double x0_left = *(right - 1);
-		double x0_right = *right;
-		T y0_left = y0[right - 1 - x0.begin()];
-		T y0_right = y0[right - x0.begin()];
-		
-		// compute linear average
-		y[i] = (y0_left * (x0_right - x[i]) + y0_right * (x[i] - x0_left)) / (x0_right - x0_left);
-	}
-	
-	// FIXME implement better schemes
-	
-	return y;
+//     if (x0.size() == 0)
+//         throw exception ("Nothing to interpolate.\n");
+    
+    if (x0.size() < 2)
+        return y0;
+    
+    // output array
+    NumberArray<T> y(x.size());
+    
+    for (size_t i = 0; i < x.size(); i++)
+    {
+        // right guardian
+        rArray::const_iterator right = std::upper_bound(x0.begin(), x0.end(), x[i]);
+        
+        if (right == x0.end() or right == x0.begin())
+        {
+            y[i] = T(0);
+            continue;
+        }
+        
+        // neighbours
+        double x0_left = *(right - 1);
+        double x0_right = *right;
+        T y0_left = y0[right - 1 - x0.begin()];
+        T y0_right = y0[right - x0.begin()];
+        
+        // compute linear average
+        y[i] = (y0_left * (x0_right - x[i]) + y0_right * (x[i] - x0_left)) / (x0_right - x0_left);
+    }
+    
+    // FIXME implement better schemes
+    
+    return y;
 }
 
 /**
@@ -89,31 +89,31 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
  */
 inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, int interpolation)
 {
-	if (x0.size() == 0)
-		throw exception ("Nothing to interpolate.\n");
-	
-	if (x0.size() == 1)
-		return y0;
-	
-	// setup the interpolator
-	o2scl::interp_o2scl_vec<const double*> itp (
-		x0.size(),
-		x0.data(), y0.data(),
-		interpolation
-	);
-	
-	// interpolate
-	rArray y(x.size());
-	for (size_t i = 0; i < x.size(); i++)
-	{
-		// check that we are not extrapolating
-		if (x0.front() <= x[i] and x[i] <= x0.back())
-			y[i] = itp(x[i]);
-		else
-			y[i] = 0.;
-	}
-	
-	return y;
+//     if (x0.size() == 0)
+//         throw exception ("Nothing to interpolate.\n");
+    
+    if (x0.size() < 2)
+        return y0;
+    
+    // setup the interpolator
+    o2scl::interp_o2scl_vec<const double*> itp (
+        x0.size(),
+        x0.data(), y0.data(),
+        interpolation
+    );
+    
+    // interpolate
+    rArray y(x.size());
+    for (size_t i = 0; i < x.size(); i++)
+    {
+        // check that we are not extrapolating
+        if (x0.front() <= x[i] and x[i] <= x0.back())
+            y[i] = itp(x[i]);
+        else
+            y[i] = 0.;
+    }
+    
+    return y;
 }
 
 #endif

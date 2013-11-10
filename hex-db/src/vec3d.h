@@ -17,9 +17,9 @@
 
 struct vec3d
 {
-	double x;
-	double y;
-	double z;
+    double x;
+    double y;
+    double z;
 };
 
 // write to stream

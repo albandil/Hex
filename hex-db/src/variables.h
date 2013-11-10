@@ -73,8 +73,8 @@ std::string unit_name(aUnit u);
  */
 inline std::ostream & operator << (std::ostream & os, std::pair<vec3d,vec3d> const & p)
 {
-	os << p.first << " " << p.second;
-	return os;
+    os << p.first << " " << p.second;
+    return os;
 }
 
 /**
@@ -82,9 +82,9 @@ inline std::ostream & operator << (std::ostream & os, std::pair<vec3d,vec3d> con
  */
 inline std::istream & operator >> (std::istream & is, std::pair<vec3d,vec3d> & p)
 {
-	is >> p.first;
-	is >> p.second;
-	return is;
+    is >> p.first;
+    is >> p.second;
+    return is;
 }
 
 /**
@@ -92,18 +92,18 @@ inline std::istream & operator >> (std::istream & is, std::pair<vec3d,vec3d> & p
  */
 template<typename T> std::vector<T> readStandardInput()
 {
-	std::vector<T> data;
-	
-	T x;
-	while (not std::cin.eof())
-	{
-		std::cin >> std::ws;
-		std::cin >> x;
-		std::cin >> std::ws;
-		data.push_back(x);
-	}
-	
-	return data;
+    std::vector<T> data;
+    
+    T x;
+    while (not std::cin.eof())
+    {
+        std::cin >> std::ws;
+        std::cin >> x;
+        std::cin >> std::ws;
+        data.push_back(x);
+    }
+    
+    return data;
 }
 
 /**
@@ -118,21 +118,21 @@ template<typename T> std::vector<T> readStandardInput()
  *             message if the entry is not find.
  */
 template <typename T> T As (
-	std::map<std::string,std::string> const & dict,
-	std::string const & keyword,
-	std::string const & name
+    std::map<std::string,std::string> const & dict,
+    std::string const & keyword,
+    std::string const & name
 )
 {
-	// check existence of the keyword
-	std::map<std::string,std::string>::const_iterator it = dict.find(keyword);
-	if (it == dict.end())
-		throw exception ("ERROR: \"%s\" requires specifying the parameter \"--%s\"!\n", name.c_str(), keyword.c_str());
-	
-	// convert to int
-	T x;
-	std::istringstream ss(it->second);
-	ss >> x;
-	return x;
+    // check existence of the keyword
+    std::map<std::string,std::string>::const_iterator it = dict.find(keyword);
+    if (it == dict.end())
+        throw exception ("ERROR: \"%s\" requires specifying the parameter \"--%s\"!\n", name.c_str(), keyword.c_str());
+    
+    // convert to int
+    T x;
+    std::istringstream ss(it->second);
+    ss >> x;
+    return x;
 }
 
 /**
@@ -144,40 +144,40 @@ template <typename T> T As (
 class Variable
 {
 public:
-	
-	/// destructor
-	virtual ~Variable() {}
-	
-	// getters
-	
-	/// String identification of the variable.
-	virtual std::string const & id() const = 0;
-	
-	/// Longer description text for use in program help.
-	virtual std::string const & description() const = 0;
-	
-	/// SQL statements that create the required table, or empty vector if not needed.
-	virtual std::vector<std::string> const & SQL_CreateTable() const = 0;
-	
-	/// SQL statements that update the table after insetion of new data.
-	virtual std::vector<std::string> const & SQL_Update() const = 0;
-	
-	/// List of all scattering event parameters that have to be specified by user.
-	virtual std::vector<std::string> const & deps() const = 0;
-	
-	/// List of vectorizable scattering event parameters that have to be specified by user.
-	virtual std::vector<std::string> const & vdeps() const = 0;
+    
+    /// destructor
+    virtual ~Variable() {}
+    
+    // getters
+    
+    /// String identification of the variable.
+    virtual std::string const & id() const = 0;
+    
+    /// Longer description text for use in program help.
+    virtual std::string const & description() const = 0;
+    
+    /// SQL statements that create the required table, or empty vector if not needed.
+    virtual std::vector<std::string> const & SQL_CreateTable() const = 0;
+    
+    /// SQL statements that update the table after insetion of new data.
+    virtual std::vector<std::string> const & SQL_Update() const = 0;
+    
+    /// List of all scattering event parameters that have to be specified by user.
+    virtual std::vector<std::string> const & deps() const = 0;
+    
+    /// List of vectorizable scattering event parameters that have to be specified by user.
+    virtual std::vector<std::string> const & vdeps() const = 0;
 
-	// others
-	
-	/// initialize (e.g.) by defining external routines for SQLite
-	virtual bool initialize (sqlitepp::session & db) const = 0;
-	
-	/// write out requested data
-	virtual bool run (
-		sqlitepp::session & db,
-		std::map<std::string,std::string> const & params
-	) const = 0;
+    // others
+    
+    /// initialize (e.g.) by defining external routines for SQLite
+    virtual bool initialize (sqlitepp::session & db) const = 0;
+    
+    /// write out requested data
+    virtual bool run (
+        sqlitepp::session & db,
+        std::map<std::string,std::string> const & params
+    ) const = 0;
 };
 
 /**
@@ -189,25 +189,25 @@ public:
 class VariableList
 {
 public:
-	
-	VariableList();
-	~VariableList();
-	
-	Variable const * const get (std::string const & id) const;
-	
-	//
-	// STL vector interface
-	//
-	typedef std::vector<Variable*>::iterator iterator;
-	typedef std::vector<Variable*>::const_iterator const_iterator;
-	inline iterator begin() { return list.begin(); }
-	inline iterator end()   { return list.end();   }
-	inline const_iterator begin() const { return list.begin(); }
-	inline const_iterator end()   const { return list.end();   }
-	
+    
+    VariableList();
+    ~VariableList();
+    
+    Variable const * const get (std::string const & id) const;
+    
+    //
+    // STL vector interface
+    //
+    typedef std::vector<Variable*>::iterator iterator;
+    typedef std::vector<Variable*>::const_iterator const_iterator;
+    inline iterator begin() { return list.begin(); }
+    inline iterator end()   { return list.end();   }
+    inline const_iterator begin() const { return list.begin(); }
+    inline const_iterator end()   const { return list.end();   }
+    
 private:
-	
-	std::vector<Variable*> list;
+    
+    std::vector<Variable*> list;
 };
 
 /**
@@ -229,31 +229,31 @@ private:
  * to be included by every other source file.
  */
 #define AddNewVariableClass(ClassName) \
-	class ClassName : public Variable \
+    class ClassName : public Variable \
 { \
-	public: \
+    public: \
 \
-		bool initialize(sqlitepp::session & db) const; \
+        bool initialize(sqlitepp::session & db) const; \
 \
-		static const std::string Id; \
-		std::string const & id() const { return Id; } \
+        static const std::string Id; \
+        std::string const & id() const { return Id; } \
 \
-		static const std::string Description; \
-		std::string const & description() const { return Description; } \
+        static const std::string Description; \
+        std::string const & description() const { return Description; } \
 \
-		static const std::vector<std::string> Dependencies; \
-		std::vector<std::string> const & deps() const { return Dependencies; } \
+        static const std::vector<std::string> Dependencies; \
+        std::vector<std::string> const & deps() const { return Dependencies; } \
 \
-		static const std::vector<std::string> VecDependencies; \
-		std::vector<std::string> const & vdeps() const { return VecDependencies; } \
+        static const std::vector<std::string> VecDependencies; \
+        std::vector<std::string> const & vdeps() const { return VecDependencies; } \
 \
-		std::vector<std::string> const & SQL_CreateTable() const; \
-		std::vector<std::string> const & SQL_Update() const; \
+        std::vector<std::string> const & SQL_CreateTable() const; \
+        std::vector<std::string> const & SQL_Update() const; \
 \
-		bool run ( \
-			sqlitepp::session & db, \
-			std::map<std::string,std::string> const & params \
-		) const; \
+        bool run ( \
+            sqlitepp::session & db, \
+            std::map<std::string,std::string> const & params \
+        ) const; \
 };
 
 /// Create class for T-matrix (tmat)

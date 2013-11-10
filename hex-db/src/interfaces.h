@@ -95,10 +95,10 @@ void dump(const char* dumpname);
  * \param amplitudes Results (N complex numbers as 2N real numbers).
  */
 extern "C" void scattering_amplitude (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * S, double const * Ei,
-	int const * N, double const * theta, double * amplitudes
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * S, double const * Ei,
+    int const * N, double const * theta, double * amplitudes
 );
 
 /**
@@ -120,10 +120,10 @@ extern "C" void scattering_amplitude (
  * \param dsigma Results.
  */
 extern "C" void differential_cross_section (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * S, double const * Ei,
-	int const * N, double const * theta, double * dsigma
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * S, double const * Ei,
+    int const * N, double const * theta, double * dsigma
 );
 
 /**
@@ -146,10 +146,10 @@ extern "C" void differential_cross_section (
  * \param eta Results.
  */
 extern "C" void momentum_transfer (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * L, int const * S,
-	int const * N, double const * Ei, double * eta
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * L, int const * S,
+    int const * N, double const * Ei, double * eta
 );
 
 /**
@@ -174,10 +174,10 @@ extern "C" void momentum_transfer (
  * \param sigma Results.
  */
 extern "C" void integral_cross_section (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * L, int const * S,
-	int const * N, double const * Ei, double * sigma
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * L, int const * S,
+    int const * N, double const * Ei, double * sigma
 );
 
 /**
@@ -196,9 +196,9 @@ extern "C" void integral_cross_section (
  * \param sigma Results.
  */
 extern "C" void complete_cross_section (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * N, double const * Ei, double * sigma
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * N, double const * Ei, double * sigma
 );
 
 /**
@@ -218,9 +218,9 @@ extern "C" void complete_cross_section (
  * \param sigma Results.
  */
 extern "C" void extrapolate_cross_section (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * N, double const * Ei, double * sigma
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * N, double const * Ei, double * sigma
 );
 
 /**
@@ -242,10 +242,10 @@ extern "C" void extrapolate_cross_section (
  * \param omega Results.
  */
 extern "C" void collision_strength (
-	int const * ni, int const * li, int const * mi,
-	int const * nf, int const * lf, int const * mf,
-	int const * L, int const * S,
-	int const * N, double const * Ei, double * omega
+    int const * ni, int const * li, int const * mi,
+    int const * nf, int const * lf, int const * mf,
+    int const * L, int const * S,
+    int const * N, double const * Ei, double * omega
 );
 
 /**
@@ -262,8 +262,8 @@ extern "C" void collision_strength (
  * \param sigma Results.
  */
 extern "C" void total_cross_section (
-	int const * ni, int const * li, int const * mi,
-	int const * N, double const * Ei, double * sigma
+    int const * ni, int const * li, int const * mi,
+    int const * N, double const * Ei, double * sigma
 );
 
 #endif

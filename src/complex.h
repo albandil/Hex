@@ -22,13 +22,13 @@ typedef std::complex<long double> LComplex;
 // define some missing complex and mixed arithmetic
 template <typename C1, typename C2> auto operator * (std::complex<C1> a, std::complex<C2> b) -> std::complex<decltype(C1(0.)*C2(0.))>
 {
-	typedef decltype(C1(0.) * C2(0.)) T;
-	return std::complex<T>(a) * std::complex<T>(b);
+    typedef decltype(C1(0.) * C2(0.)) T;
+    return std::complex<T>(a) * std::complex<T>(b);
 }
 template <typename C1, typename C2> auto operator / (std::complex<C1> a, std::complex<C2> b) -> std::complex<decltype(C1(0.)/C2(0.))>
 {
-	typedef decltype(C1(0.) * C2(0.)) T;
-	return std::complex<T>(a) / std::complex<T>(b);
+    typedef decltype(C1(0.) * C2(0.)) T;
+    return std::complex<T>(a) / std::complex<T>(b);
 }
 
 // define squared modulus of a complex number
@@ -37,13 +37,13 @@ inline double sqrabs (Complex z) { return z.real() * z.real() + z.imag() * z.ima
 // Complex ordering by real parts
 inline bool Complex_realpart_less (Complex const & a, Complex const & b)
 {
-	return a.real() < b.real();
+    return a.real() < b.real();
 }
 
 // Complex ordering by imaginary parts
 inline bool Complex_imagpart_less (Complex const & a, Complex const & b)
 {
-	return a.imag() < b.imag();
+    return a.imag() < b.imag();
 }
 
 #endif
