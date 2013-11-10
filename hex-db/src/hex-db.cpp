@@ -234,7 +234,7 @@ void avail()
     std::cout << "        AND T1.ni = T2.ni\n";
     std::cout << "        AND T1.li = T2.li\n";
     std::cout << "        AND T1.mi = T2.mi\n";
-    std::cout << "    WHERE T1.ThisL = T2.ThisL OR T2.ThisL IS NULL\n";
+    std::cout << "    WHERE T1.ThisL = T2.ThisL OR T2.ThisL IS NULL;\n";
     std::cout << "\n";
     std::cout << "SELECT * FROM SStackedLs;\n";
     std::cout << "\n";
