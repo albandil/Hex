@@ -69,6 +69,9 @@ double DistortingPotential::getConstant() const
 
 double DistortingPotential::getFarRadius() const
 {
+    return 400; // FIXME
+    
+/*
     // determine from parameters of the potential
     #define U_THRESHOLD    1e-50
     #define U_MAX_ITERS    100
@@ -76,7 +79,7 @@ double DistortingPotential::getFarRadius() const
     // hunt for low value
     double far = 1., far_value;
     while ((far_value = fabs((*this)(far *= 2))) > U_THRESHOLD)
-        /* continue hunting */;
+        // continue hunting ;
     
     // bisect for exact value
     double near = 1.;
@@ -93,6 +96,7 @@ double DistortingPotential::getFarRadius() const
     }
     
     return (near + far) * 0.5;
+*/
 }
 
 void DistortingPotential::toFile(const char* filename) const
