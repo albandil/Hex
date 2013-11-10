@@ -83,7 +83,7 @@ int DistortedWave::derivs0(double x, size_t nv, const o2scl::ovector_base& y, o2
 }
 
 DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U)
-    : Evaluations(0), U(_U), kn(_kn), ln(_ln), r0(sqrt(ln*(ln+1)) / kn), rf(U.getFarRadius())
+    : Evaluations(0), U(_U), kn(_kn), ln(_ln), r0(sqrt(ln*(ln+1)) / kn), rf(std::max(2*r0,U.getFarRadius()))
 {
     // determine discretization, use at least 1000 samples
     int N = 1000;               // N samples per wave length
