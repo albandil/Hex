@@ -200,6 +200,7 @@ int main (int argc, char *argv[])
     std::ostringstream oss;
     oss << Ni << "_" << Li << "-" << Nf << "_" << Lf << "-" << Ei << ".sql";
     std::ofstream fsql(oss.str().c_str());
+    fsql << "BEGIN TRANSACTION\n";
     for (int Mi = -Li; Mi <= Li; Mi++)
     for (int Mf = -Lf; Mf <= Lf; Mf++)
     for (int ell = 0; ell < (int)Tdir.size(); ell++)
@@ -221,6 +222,7 @@ int main (int argc, char *argv[])
             << ");\n";
         }
     }
+    fsql << "COMMIT;\n";
     fsql.close();
         
     // extract integral cross section for all transitions
