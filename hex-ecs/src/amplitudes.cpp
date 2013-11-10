@@ -300,7 +300,7 @@ cArrays computeXi (
         
         // load the solution
         cArray solution;
-        #pragma omp critical
+        # pragma omp critical
         if (not solution.hdfload(oss.str().c_str()))
             throw exception ("Can't open the solution file \"%s\"!", oss.str().c_str());
         
@@ -308,6 +308,7 @@ cArrays computeXi (
         double kmax = sqrt(Ei[ie] - 1./(ni*ni));
         
         // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
+        # pragma omp parallel for
         for (unsigned ill = 0; ill < coupled_states.size(); ill++)
         {
             int l1 = coupled_states[ill].first;
@@ -328,8 +329,12 @@ cArrays computeXi (
             auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
             ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
             double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
-            std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
-            ics[ie] += cs;
+            
+            # pragma omp critical
+            {
+                std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
+                ics[ie] += cs;
+            }
         }
     }
     
