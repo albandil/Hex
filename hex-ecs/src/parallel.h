@@ -152,8 +152,10 @@ class Parallel
          */
         void wait () const
         {
+#ifndef NO_MPI
             if (active_)
                 MPI_Barrier(MPI_COMM_WORLD);
+#endif
         }
         
     private:
