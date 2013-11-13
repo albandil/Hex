@@ -19,38 +19,59 @@
 #include "arrays.h"
 #include "potential.h"
 
+const rArrays Ucoeffs = {
+  // U(1s)
+    { -1. },
+  // U(2s)
+    { -.125, -.25, -.25 },
+  // U(3s)
+    { -.001828989483310471, .005486968449931412, -.04938271604938271, -.1481481481481481, -.5555555555555556 },
+  // U(4s)
+    { -6.781684027777778E-6, 1.3563368055555555E-4, -0.00146484375, 0.00390625, -0.0234375, -0.09375, -0.4375 },
+  // U(5s)
+    { -9.102222222222223E-9, 5.006222222222222E-7, -1.2288E-5, 1.4563555555555555E-4, -0.001024, 0.00256, -0.0128, -0.064, -0.36 }
+  // ... TODO the rest ...
+};
+
 DistortingPotential DistortingPotential::operator= (DistortingPotential const& V)
 {
+    // copy data
     n_ = V.n_;
     k_ = V.k_;
-    
     return *this;
 }
 
 bool DistortingPotential::operator== (DistortingPotential const & V) const
 {
+    // check equality
     return n_ == V.n_ and k_ == V.k_;
 }
 
-double DistortingPotential::operator() (double x) const
+double DistortingPotential::operator () (double x) const
 {
+    // skip empty potential
     if (n_ == 0 and k_ == 0)
         return 0.;
     
-    if (n_ == 1)
-        return -(1.+1./x)*exp(-2.*x);
+    // disallow distorsion by free states
+    if (k_ != 0)
+        throw exception ("U not implemented for k != 0.");
     
-    if (n_ == 2)
-        return -((0.125*x+0.25)*x+0.75+1./x)*exp(-x);
+    // stop if not enough precomputed coefficients
+    if (n_ > (int)Ucoeffs.size())
+        throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
     
-    if (n_ == 3)
-        return -(((((4*x-12)*x+108)*x+324)*x+1215)/2187 + 1/x)*exp(-2*x/3);
+    // get correct polynomial coefficients
+    rArray const & coeffs = Ucoeffs[n_ - 1];
     
-    printf("U not implemented for n = %d\n", n_);    // FIXME
-    abort();
+    // evaluate (P(x) - 1/x) * exp(-2*x/n)
+    double eval = 0;
+    for (double factor : coeffs)
+        eval = eval * x + factor;
+    return (eval - 1./x) * exp(-2.*x/n_);
 }
 
-double DistortingPotential::plusMonopole(double x) const
+double DistortingPotential::plusMonopole (double x) const
 {
     if (x == 0.)
         return getConstant();
@@ -58,16 +79,25 @@ double DistortingPotential::plusMonopole(double x) const
     return 1./x + (*this)(x);
 }
 
-double DistortingPotential::getConstant() const
+double DistortingPotential::getConstant () const
 {
-    if (n_ == 1)
-        return -1.;
+    // skip empty potential
+    if (n_ == 0 and k_ == 0)
+        return 0.;
     
-    printf("U not implemented for n = %d\n", n_);    // FIXME
-    abort();
+    // disallow distorsion by free states
+    if (k_ != 0)
+        throw exception ("U not implemented for k != 0.");
+    
+    // stop if not enough precomputed coefficients
+    if (n_ > (int)Ucoeffs.size())
+        throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
+    
+    // return the x -> 0 limiting value withou the monopole term
+    return Ucoeffs[n_ - 1].back();
 }
 
-double DistortingPotential::getFarRadius() const
+double DistortingPotential::getFarRadius () const
 {
     return 400; // FIXME
     
@@ -99,11 +129,16 @@ double DistortingPotential::getFarRadius() const
 */
 }
 
-void DistortingPotential::toFile(const char* filename) const
+void DistortingPotential::toFile (const char* filename) const
 {
+    // generate evaluation grid
     rArray grid = linspace(0., getFarRadius(), 1000);
     rArray vals(grid.size());
+    
+    // evaluate
     for (int i = 0; i < (int)grid.size(); i++)
         vals[i] = (*this)(grid[i]);
+    
+    // write to text file
     write_array(grid, vals, filename);
 }

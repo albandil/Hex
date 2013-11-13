@@ -86,7 +86,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
     : Evaluations(0), U(_U), kn(_kn), ln(_ln), r0(sqrt(ln*(ln+1)) / kn), rf(std::max(2*r0,U.getFarRadius()))
 {
     // determine discretization, use at least 1000 samples
-    int N = 1000;               // N samples per wave length
+    int N = 100;                // N samples per wave length
     h = std::min (              // grid step
         2*M_PI/(N*kn),          //  -> N samples per wave length and
         (rf-r0)/1000            //  -> at least 1000 samples totally
@@ -94,7 +94,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
     samples = (rf-r0)/h + 1;    // with both boundaries
     
     // discretization of the classically forbidden region
-    samples0 = 100;
+    samples0 = 1000;
     h0 = r0 / (samples0 - 1);
     
     if (ln == 0)

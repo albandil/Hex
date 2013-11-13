@@ -20,7 +20,22 @@
 #include "hydrogen.h"
 #include "specf.h"
 
-class DistortedWave;
+/**
+ * @brief U polynomial coefficients.
+ * 
+ * Can be generated in Maxima CAS.
+ * @code
+ *     R(n,l,r) := sqrt((2/n)^3 * (n-l-1)!/(2*n*(n+l)!)) * gen_laguerre(n-l-1,2*l+1,2*r/n) * (2*r/n)^l * exp(-r/n);
+ *     Ucoeffs(n) := block ( [ tmp ],
+ *         tmp : expand(integrate(R(n,0,r)^2*r^2*(1/r-1/x), r, x, inf)*exp(2*x/n)+1/x),
+ *         reverse(makelist(float(coeff(tmp, x, i)), i, 0, length(tmp)-1))
+ *     );
+ *     Ucoeffs(1);
+ *     Ucoeffs(2);
+ *       ...
+ * @endcode
+ */
+extern const rArrays Ucoeffs;
 
 /**
  * \brief Distorting potential information.
@@ -81,7 +96,6 @@ public:
      * \f[
      *      U(r) = -\left(1 + \frac{1}{r}\right) \mathrm{e}^{-2r} \ .
      * \f]
-     * \todo Hard-code more distorting potentials.
      * \todo Implement runtime generation of distorting potentials.
      * \param x Coordinate where to evaluate.
      */
@@ -121,12 +135,8 @@ public:
      * 
      * Return the asymptotic constant around zero,
      * \f[
-     *     a = \lim_{r \rightarrow 0+} \left( \frac{1}{r} + U(r) \right)
+     *     a = \lim_{r \rightarrow 0+} \left( \frac{1}{r} + U(r) \right) \ .
      * \f]
-     * At the moment, it is hard-coded, and only for \f$ n = 1 \f$ state
-     * (for which \f$ a = 1 \f$.
-     * \todo Hard-code more distorting potential limits.
-     * \todo Implement runtime generation of distorting potential limits.
      */
     double getConstant() const;
     
@@ -134,11 +144,7 @@ public:
      * \brief Return largest evaluated coordinate.
      * 
      * Return a radius sufficiently far from the atom. The radial
-     * orbital ought to be small here. At the moment it is hard-coded
-     * with a value \f$ R_{\mathrm{far}} = 200 \f$, which is sufficient
-     * for \f$ n = 1 \f$ distorting state, but less for higher states.
-     * \todo Implement runtime computation of far radius based on
-     *       Laguerre polynomials behaviour.
+     * orbital ought to be small here.
      */
     double getFarRadius() const;
     
@@ -150,7 +156,5 @@ private:
     int n_;        // principal quantum number of distorting state
     double k_;    // wavenumber of distorting state
 };
-
-#include "wave_distort.h"
 
 #endif
