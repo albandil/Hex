@@ -20,12 +20,14 @@
 #include "potential.h"
 
 const rArrays Ucoeffs = {
+  // empty
+    {},
   // U(1s)
     { -1. },
   // U(2s)
-    { -.125, -.25, -.25 },
+    { -0.125, -0.25, -0.25 },
   // U(3s)
-    { -.001828989483310471, .005486968449931412, -.04938271604938271, -.1481481481481481, -.5555555555555556 },
+    { -0.001828989483310471, 0.005486968449931412, -0.04938271604938271, -0.1481481481481481, -0.5555555555555556 },
   // U(4s)
     { -6.781684027777778E-6, 1.3563368055555555E-4, -0.00146484375, 0.00390625, -0.0234375, -0.09375, -0.4375 },
   // U(5s)
@@ -58,11 +60,11 @@ double DistortingPotential::operator () (double x) const
         throw exception ("U not implemented for k != 0.");
     
     // stop if not enough precomputed coefficients
-    if (n_ > (int)Ucoeffs.size())
+    if (n_ >= (int)Ucoeffs.size())
         throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
     
     // get correct polynomial coefficients
-    rArray const & coeffs = Ucoeffs[n_ - 1];
+    rArray const & coeffs = Ucoeffs[n_];
     
     // evaluate (P(x) - 1/x) * exp(-2*x/n)
     double eval = 0;
@@ -73,9 +75,11 @@ double DistortingPotential::operator () (double x) const
 
 double DistortingPotential::plusMonopole (double x) const
 {
+    // in origin returm true asymptotic
     if (x == 0.)
         return getConstant();
     
+    // otherwise compute
     return 1./x + (*this)(x);
 }
 
@@ -90,26 +94,31 @@ double DistortingPotential::getConstant () const
         throw exception ("U not implemented for k != 0.");
     
     // stop if not enough precomputed coefficients
-    if (n_ > (int)Ucoeffs.size())
+    if (n_ >= (int)Ucoeffs.size())
         throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
     
     // return the x -> 0 limiting value withou the monopole term
-    return Ucoeffs[n_ - 1].back();
+    return Ucoeffs[n_].back();
 }
 
 double DistortingPotential::getFarRadius () const
 {
-    return 400; // FIXME
+    // if the rmax has been overriden, use the supplied value
+    if (rmax_ != 0.)
+        return rmax_;
     
-/*
+    //
+    // otherwise compute rmax using hunt & bisect run
+    //
+    
     // determine from parameters of the potential
-    #define U_THRESHOLD    1e-50
-    #define U_MAX_ITERS    100
+    #define U_THRESHOLD    1e-100
+    #define U_MAX_ITERS    1000
     
     // hunt for low value
     double far = 1., far_value;
     while ((far_value = fabs((*this)(far *= 2))) > U_THRESHOLD)
-        // continue hunting ;
+        /* continue hunting */;
     
     // bisect for exact value
     double near = 1.;
@@ -126,7 +135,6 @@ double DistortingPotential::getFarRadius () const
     }
     
     return (near + far) * 0.5;
-*/
 }
 
 void DistortingPotential::toFile (const char* filename) const

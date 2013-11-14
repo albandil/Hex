@@ -20,6 +20,7 @@
 #include "dwba1.h"
 #include "hydrogen.h"
 #include "potential.h"
+#include "wave_distort.h"
 
 int main (int argc, char *argv[])
 {
@@ -31,10 +32,10 @@ int main (int argc, char *argv[])
     std::setvbuf(stderr, 0, _IONBF, 0);
     
     // print usage info if called in a wrong way
-    if (argc != 7)
+    if (argc != 8)
     {
         std::cout << "\nUsage:\n";
-        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps>\n\n";
+        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> <rmax>\n\n";
         exit(0);
     }
     
@@ -47,6 +48,7 @@ int main (int argc, char *argv[])
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(Ni*Ni) + 1./(Nf*Nf));
     double sigmaeps = strtod(argv[6], 0);
+    double rmax = strtod(argv[7], 0);
     
     int MM = (2*Li+1)*(2*Lf+1);		// m⟶m"transition count
     
@@ -64,9 +66,8 @@ int main (int argc, char *argv[])
     HydrogenFunction psif(Nf, Lf);
     
     // distorting potentials
-    DistortingPotential Uf(Nf);
-    DistortingPotential Ui(Ni);
-    DistortingPotential Ug(1);
+    DistortingPotential Uf(Nf,rmax);
+    DistortingPotential Ui(Ni,rmax);
     
     for (int lf = 0; ; lf++)
     {

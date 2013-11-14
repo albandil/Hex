@@ -72,10 +72,10 @@ class DistortingPotential : public RadialFunction<double>
 public:
     // constructors
     // @{
-    DistortingPotential() : n_(0), k_(0.) {}
-    DistortingPotential(int n) : n_(n), k_(0.) {}
-    DistortingPotential(double k) : n_(0), k_(k) {}
-    DistortingPotential(DistortingPotential const & U) : n_(U.n_), k_(U.k_) {}
+    DistortingPotential() : n_(0), k_(0.), rmax_(0) {}
+    DistortingPotential(int n, double rmax = 0.) : n_(n), k_(0.), rmax_(rmax) {}
+    DistortingPotential(double k, double rmax = 0.) : n_(0), k_(k), rmax_(rmax) {}
+    DistortingPotential(DistortingPotential const & U) : n_(U.n_), k_(U.k_), rmax_(U.rmax_) {}
     // @}
     
     /**
@@ -154,7 +154,8 @@ public:
     
 private:
     int n_;        // principal quantum number of distorting state
-    double k_;    // wavenumber of distorting state
+    double k_;     // wavenumber of distorting state
+    double rmax_;  // far radius
 };
 
 #endif
