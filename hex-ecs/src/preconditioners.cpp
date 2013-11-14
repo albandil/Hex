@@ -21,6 +21,10 @@
 #include "preconditioners.h"
 #include "radial.h"
 
+#ifndef NO_OPENCL
+    #include "opencl.h"
+#endif
+
 cArray IC (cArrayView const & A, lArrayView const & I, lArrayView const & P)
 {
     // this will be returned
@@ -618,6 +622,98 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
             false
+        );
+    }
+    
+    // synchronize across processes
+    par_.sync (z, Nspline * Nspline, l1_l2_.size());
+}
+
+const std::string GPUCGPreconditioner::name = "gpucg";
+
+void GPUCGPreconditioner::setup()
+{
+    NoPreconditioner::setup();
+    
+    csr_blocks_.resize(l1_l2_.size());
+}
+
+void GPUCGPreconditioner::update (double E)
+{
+    NoPreconditioner::update(E);
+    
+    for (size_t ill = 0; ill < l1_l2_.size(); ill++)
+        csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
+}
+
+void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
+{
+    // shorthands
+    int Nspline = s_rad_.bspline().Nspline();
+    
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
+        // create OpenCL representation of segment views
+        clArrayView<Complex> rsegment (r.begin() + ill * Nspline * Nspline, r.end() + (ill + 1) * Nspline * Nspline);
+        clArrayView<Complex> zsegment (z.begin() + ill * Nspline * Nspline, z.end() + (ill + 1) * Nspline * Nspline);
+        clNumberArray<Complex> tmp (Nspline * Nspline);
+        
+        // create OpenCL representation of the matrix block
+        clArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        clArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        clNumberArray<Complex> Ax (csr_blocks_[ill].x());  Ax.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        
+        // OpenCL implementation of basic operations
+        auto axby_operation = [&](Complex a, const clArrayView<Complex> x, Complex b, const clArrayView<Complex> y, clArrayView<Complex> z) -> void
+        {
+            // multiply
+            //     a * x + b * y -> z
+            OpenCLEnvironment::axby().args(a, x, b, y, z);
+            OpenCLEnvironment::axby().exec(z.size());
+        };
+        auto scalar_product = [&](const clArrayView<Complex> x, const clArrayView<Complex> y) ->  Complex
+        {
+            // multiply
+            //     x * y -> tmp
+            OpenCLEnvironment::amul().args(x, y, tmp);
+            OpenCLEnvironment::amul().exec(tmp.size());
+            
+            // download data from GPU
+            tmp.download();
+            return sum(tmp);
+        };
+        
+        // wrappers around the CG callbacks
+        auto inner_mmul = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
+        {
+            // multiply
+            //      b = A · a
+            OpenCLEnvironment::mmul().args(Ap, Ai, Ax, a, b);
+            OpenCLEnvironment::mmul().exec(b.size());
+        };
+        auto inner_prec = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
+        {
+            // copy (using axpy; NOTE : this can be optimized)
+            //     b = a
+            OpenCLEnvironment::axby().args(1., a, 0., a, b);
+            OpenCLEnvironment::axby().exec(b.size());
+        };
+        
+        // solve using the CG solver
+        cg_callbacks <
+            clNumberArray<Complex>,
+            clArrayView<Complex>
+        > (
+            rsegment,               // rhs
+            zsegment,               // solution
+            1e-11,                  // tolerance
+            0,                      // min. iterations
+            Nspline * Nspline,      // max. iteration
+            inner_prec,             // preconditioner
+            inner_mmul,             // matrix multiplication
+            false,                  // no verbose output
+            axby_operation,         // a*x+b*y -> z operation
+            scalar_product          // scalar product of two CL arrays
         );
     }
     

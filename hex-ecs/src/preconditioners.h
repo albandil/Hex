@@ -21,6 +21,10 @@
 #include "radial.h"
 #include "parallel.h"
 
+#ifndef NO_OPENCL
+    #include "opencl.h"
+#endif
+
 /**
  * @brief Sparse incomplete Cholesky decomposition.
  * 
@@ -301,8 +305,8 @@ class GPUCGPreconditioner : public NoPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
+        virtual void setup ();
+        virtual void update (double E);
         virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         
@@ -312,6 +316,10 @@ class GPUCGPreconditioner : public NoPreconditioner
         // inner CG callbacks
         virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const { q = dia_blocks_[iblock].dot(p); }
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
+        
+    private:
+        
+        std::vector<CsrMatrix> csr_blocks_;
 };
 
 /**

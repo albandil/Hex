@@ -13,40 +13,48 @@
 #ifndef HEX_OPENCL
 #define HEX_OPENCL
 
-static const char * const source =
-"double2 complex_multiply (double2 a, double2 b)                                                                                           \n"
-"{                                                                                                                                         \n"
-"    double2 c;                                                                                                                            \n"
-"    c.x = a.x * b.x - a.y * b.y;                                                                                                          \n"
-"    c.y = a.x * b.y + a.y * b.x;                                                                                                          \n"
-"    return c;                                                                                                                             \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void a_vec_b_vec (__constant double2 a, __constant double2 *x, __constant double2 b, __constant double2 *y, __global double2 *z) \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    z[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void vec_mul_vec (__constant double2 *a, __constant double2 *b, __global double2 *c)                                             \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    z[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel CSR_dot_vec (__constant uint *Ap, __constant uint *Ai, __constant double2 *Ax, __constant double2 *x, __global double2 *y)       \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    double2 sprod = 0.;                                                                                                                   \n"
-"                                                                                                                                          \n"
-"    for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)                                                                                         \n"
-"        sprod += complex_multiply(Ax[idx],x[Ai[idx]]);                                                                                    \n"
-"                                                                                                                                          \n"
-"    y[i] = sprod;                                                                                                                         \n"
-"}                                                                                                                                         \n"
+#ifndef NO_OPENCL
+
+#include <CL/cl.h>
+
+#include "arrays.h"
+
+// forward declarations
+class OpenCLEnvironment;
+class clKernel;
+
+extern const char * const source;
 
 class OpenCLEnvironment
 {
+    public:
+        
+        OpenCLEnvironment ();
+        ~OpenCLEnvironment ();
+        
+        /**
+         * @brief Return OpenCLEnvironment instance.
+         * 
+         * Singleton interface to OpenCLEnvironment.
+         */
+        static OpenCLEnvironment & get ()
+        {
+            static OpenCLEnvironment env_;
+            return env_;
+        }
+        
+        //
+        // Kernels
+        //
+        
+        static clKernel const & axby () { return *(get().axby_); }
+        static clKernel const & amul () { return *(get().amul_); }
+        static clKernel const & mmul () { return *(get().mmul_); }
+        
+        static cl_context context () { return get().context_; }
+        static cl_program program () { return get().program_; }
+        static cl_command_queue queue () { return get().queue_; }
+        
     private:
         
         // OpenCL handles
@@ -57,173 +65,325 @@ class OpenCLEnvironment
         cl_program program_;
         
         // computational kernels
-        clKernel mmul_;
-        clKernel amul_;
-        clKernel axby_;
+        clKernel *mmul_;
+        clKernel *amul_;
+        clKernel *axby_;
+};
+
+class clKernel
+{
+    public:
+        
+        clKernel ()
+            : kernel_(nullptr) {}
+        clKernel (const char* entry_pt)
+            : kernel_(clCreateKernel(OpenCLEnvironment::program(), entry_pt, nullptr)) {}
+        
+        ~clKernel ()
+        {
+            // FIXME ? release kernel
+        }
+        
+        template <int iarg = 0> void args ()
+        {
+            // do nothing
+        }
+        
+        template <
+            int iarg = 0,
+            class Arg,
+            class ...Args
+        > void args (Arg ai, Args ...an)
+        {
+            setArg(ai, iarg);
+            args<iarg + 1>(an...);
+        }
+        
+        template <
+            class Arg,
+            class = typename std::enable_if<is_scalar<Arg>::value>::type
+        > void setArg (Arg a, int iarg)
+        {
+            clSetKernelArg (kernel_, iarg, sizeof(Arg), &a);
+        }
+        
+        template <
+            class Arg,
+            class = typename std::enable_if<!is_scalar<Arg>::value>::type
+        > void setArg (Arg a, int iarg)
+        {
+            clSetKernelArg (kernel_, iarg, sizeof(a.handle()), &(a.handle()));
+        }
+        
+        void exec (size_t n) const
+        {
+            if (kernel_ == nullptr)
+                throw exception ("[clKernel::enqueueExecution] Kernel not initialized.");
+                
+            clEnqueueNDRangeKernel (OpenCLEnvironment::queue(), kernel_, 1, nullptr, &n, nullptr, 0, nullptr, nullptr);
+            clFinish(OpenCLEnvironment::queue());
+        }
+        
+    private:
+        
+        // kernel handle
+        cl_kernel kernel_;
+};
+
+template <class T> class clArrayView : public ArrayView<T>
+{
+    private:
+        
+        /// Memory handle to the data copy on the GPU.
+        cl_mem cl_handle_;
+        
+        /// Whether the data are synchronized between RAM and GPU.
+        bool sync_;
         
     public:
         
-        OpenCLEnvironment ()
+        //
+        // aliases
+        //
+        
+        typedef T DataType;
+        typedef T * iterator;
+        typedef T const * const_iterator;
+        
+        //
+        // constructors
+        //
+        
+        clArrayView ()
+            : ArrayView<T>(), cl_handle_(nullptr), sync_(false) {}
+        clArrayView (const_iterator i, const_iterator j)
+            : ArrayView<T>(const_cast<iterator>(i),const_cast<iterator>(j)), cl_handle_(nullptr), sync_(false) {}
+        clArrayView (ArrayView<T> v)
+            : ArrayView<T>(v), cl_handle_(nullptr), sync_(false) {}
+        clArrayView (clArrayView<T> const & v)
+            : ArrayView<T>(v.begin(), v.end()), cl_handle_(v.cl_handle_), sync_(v.sync_) {}
+        
+        //
+        // destructor
+        //
+        
+        virtual ~clArrayView ()
         {
-            // setup environment
-            clGetPlatformIDs (1, &platform_, nullptr);
-            clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
-            context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
-            queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
-            program_ = clCreateProgramWithSource (context_, 1, &source, nullptr, nullptr);
-            clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr);
-            
-            // set program entry points
-            mmul_ = clKernel ("CSR_dot_vec");
-            amul_ = clKernel ("vec_mul_vec");
-            axby_ = clKernel ("a_vec_b_vec");
+            // free GPU memory
+            disconnect ();
         }
         
-        class clKernel
-        {
-            public:
-                
-                clKernel (const char* entry_pt)
-                    : kernel_(clCreateKernel(program_, entry_pt, nullptr)) {}
-                
-                ~clKernel ()
-                {
-                    // ? release kernel
-                }
-                
-                void enqueueExecution (size_t n)
-                {
-                    clEnqueueNDRangeKernel (queue_, kernel_, 1, nullptr, &n, nullptr, 0, nullptr, nullptr);
-                }
-                
-            private:
-                
-                cl_kernel kernel_;
-        };
+        //
+        // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
+        //
         
-        template <class T> class clArray : public NumberArray<T>
-        {
-            private:
-                
-                /// Memory handle to the data copy on the GPU.
-                cl_mem cl_handle_;
-                
-                /// Whether the data are synchronized between RAM and GPU.
-                bool sync_;
-                
-            public:
-                
-                //
-                // aliases
-                //
-                
-                typedef T DataType;
-                typedef T * iterator;
-                typedef T const * const_iterator;
-                
-                //
-                // constructors
-                //
-                
-                clArray ()
-                    : NumberArray<T>(), cl_handle_(nullptr), sync_(false) {}
-                clArray (size_t n, T x = T(0))
-                    : NumberArray<T>(n,x), cl_handle_(nullptr), sync_(false) {}
-                clArray (std::initializer_list<T> list)
-                    : NumberArray<T>(list), cl_handle_(nullptr), sync_(false) {}
-                
-                //
-                // destructor
-                //
-                
-                virtual ~clArray ()
-                {
-                    // free GPU memory
-                    disconnect ();
-                    
-                    // free RAM
-                    NumberArray<T>::~NumberArray();
-                }
-                
-                //
-                // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
-                //
-                
-                size_t size () const
-                    { return NumberArray<T>::size(); }
-                T const & operator [] (size_t i) const
-                    { return NumberArray<T>::operator[](i); }
-                T & operator [] (size_t i)
-                    { sync_ = false; return NumberArray<T>::operator[](i); }
-                T const * data () const
-                    { return NumberArray<T>::data(); }
-                T * data ()
-                    { sync_ = false; return NumberArray<T>::data(); }
-                const_iterator begin () const
-                    { return NumberArray<T>::begin(); }
-                const_iterator cbegin () const
-                    { return NumberArray<T>::cbegin(); }
-                iterator begin ()
-                    { sync_ = false; return NumberArray<T>::begin(); }
-                const_iterator end () const
-                    { return NumberArray<T>::end(); }
-                const_iterator cend () const
-                    { return NumberArray<T>::cend(); }
-                iterator end ()
-                    { sync_ = false; return NumberArray<T>::end(); }
-                T const & front (size_t i = 0) const
-                    { return NumberArray<T>::front(i); }
-                T & front (size_t i = 0)
-                    { sync_ = false; return NumberArray<T>::front(i); }
-                T const & back (size_t i = 0) const
-                    { return NumberArray<T>::back(i); }
-                T & back (size_t i = 0)
-                    { sync_ = false; return NumberArray<T>::back(i); }
-                
-                //
-                // OpenCL intrinsics
-                //
-                
-                bool is_connected () const
-                {
-                    return cl_handle_ != nullptr;
-                }
-                
-                void connect (cl_mem_flags flags)
-                {
-                    // release previous allocation prior to creating a new buffer !
-                    if (cl_handle_ != nullptr)
-                        throw exception ("[clArray::connect] Release the buffer before connecting!");
-                    
-                    // allocate memory on GPU
-                    cl_handle_ = clCreateBuffer (context_, flags, size() * sizeof(T), nullptr, nullptr);
-                    
-                    // mark as synchronized if the data ware copied
-                    if (flags & CL_MEM_COPY_HOST_PTR)
-                        sync_ = true;
-                }
-                
-                void disconnect ()
-                {
-                    // release previous allocations
-                    if (cl_handle_ != nullptr)
-                        clReleaseMemObject(cl_handle_);
-                    
-                    // clear pointer
-                    cl_handle_ = nullptr;
-                }
-                
-                void enqueueUpload ()
-                {
-                    clEnqueueReadBuffer (queue_, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-                }
-                
-                void enqueueDownload ()
-                {
-                    clEnqueueWriteBuffer (queue_, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-                }
-        };
+        size_t size () const
+            { return ArrayView<T>::size(); }
+        T const & operator [] (size_t i) const
+            { return ArrayView<T>::operator[](i); }
+        T & operator [] (size_t i)
+            { sync_ = false; return ArrayView<T>::operator[](i); }
+        T const * data () const
+            { return ArrayView<T>::data(); }
+        T * data ()
+            { sync_ = false; return ArrayView<T>::data(); }
+        const_iterator begin () const
+            { return ArrayView<T>::begin(); }
+        iterator begin ()
+            { sync_ = false; return ArrayView<T>::begin(); }
+        const_iterator end () const
+            { return ArrayView<T>::end(); }
+        iterator end ()
+            { sync_ = false; return ArrayView<T>::end(); }
+        T const & front (size_t i = 0) const
+            { return ArrayView<T>::front(i); }
+        T & front (size_t i = 0)
+            { sync_ = false; return ArrayView<T>::front(i); }
+        T const & back (size_t i = 0) const
+            { return ArrayView<T>::back(i); }
+        T & back (size_t i = 0)
+            { sync_ = false; return ArrayView<T>::back(i); }
         
+        //
+        // OpenCL intrinsics
+        //
+        
+        bool is_connected () const
+        {
+            return cl_handle_ != nullptr;
+        }
+        
+        void connect (cl_mem_flags flags)
+        {
+            // release previous allocation prior to creating a new buffer !
+            if (cl_handle_ != nullptr)
+                throw exception ("[clArray::connect] Release the buffer before connecting!");
+            
+            // allocate memory on GPU
+            cl_handle_ = clCreateBuffer (OpenCLEnvironment::context(), flags, size() * sizeof(T), nullptr, nullptr);
+            
+            // mark as synchronized if the data ware copied
+            if (flags & CL_MEM_COPY_HOST_PTR)
+                sync_ = true;
+        }
+        
+        void disconnect ()
+        {
+            // release previous allocations
+            if (cl_handle_ != nullptr)
+                clReleaseMemObject(cl_handle_);
+            
+            // clear pointer
+            cl_handle_ = nullptr;
+        }
+        
+        void enqueueUpload ()
+        {
+            clEnqueueReadBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            clFinish(OpenCLEnvironment::queue());
+            sync_ = true;
+        }
+        
+        void enqueueDownload ()
+        {
+            clEnqueueWriteBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            clFinish(OpenCLEnvironment::queue());
+            sync_ = true;
+        }
+        
+        cl_mem handle () const
+        {
+            return cl_handle_;
+        }
 };
+
+template <class T> class clNumberArray : virtual public clArrayView<T>, virtual public NumberArray<T>
+{
+    private:
+        
+        /// Memory handle to the data copy on the GPU.
+        cl_mem cl_handle_;
+        
+        /// Whether the data are synchronized between RAM and GPU.
+        bool sync_;
+        
+    public:
+        
+        //
+        // aliases
+        //
+        
+        typedef T DataType;
+        typedef T * iterator;
+        typedef T const * const_iterator;
+        
+        //
+        // constructors
+        //
+        
+        clNumberArray ()
+            : NumberArray<T>(), cl_handle_(nullptr), sync_(false) {}
+        clNumberArray (size_t n, T x = T(0))
+            : NumberArray<T>(n,x), cl_handle_(nullptr), sync_(false) {}
+        clNumberArray (size_t n, T const * ptr)
+            : NumberArray<T>(n,ptr), cl_handle_(nullptr), sync_(false) {}
+        clNumberArray (ArrayView<T> v)
+            : NumberArray<T>(v), cl_handle_(nullptr), sync_(false) {}
+        clNumberArray (clArrayView<T> const & v)
+            : NumberArray<T>(v.size(), v.data()), cl_handle_(v.cl_handle_), sync_(v.sync_) {}
+        
+        //
+        // destructor
+        //
+        
+        virtual ~clNumberArray ()
+        {
+            // free GPU memory
+            disconnect ();
+            
+            // free RAM
+            NumberArray<T>::~NumberArray();
+        }
+        
+        //
+        // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
+        //
+        
+        size_t size () const
+            { return NumberArray<T>::size(); }
+        T const & operator [] (size_t i) const
+            { return NumberArray<T>::operator[](i); }
+        T & operator [] (size_t i)
+            { sync_ = false; return NumberArray<T>::operator[](i); }
+        T const * data () const
+            { return NumberArray<T>::data(); }
+        T * data ()
+            { sync_ = false; return NumberArray<T>::data(); }
+        const_iterator begin () const
+            { return NumberArray<T>::begin(); }
+        iterator begin ()
+            { sync_ = false; return ArrayView<T>::begin(); }
+        const_iterator end () const
+            { return NumberArray<T>::end(); }
+        iterator end ()
+            { sync_ = false; return ArrayView<T>::end(); }
+        T const & front (size_t i = 0) const
+            { return NumberArray<T>::front(i); }
+        T & front (size_t i = 0)
+            { sync_ = false; return ArrayView<T>::front(i); }
+        T const & back (size_t i = 0) const
+            { return NumberArray<T>::back(i); }
+        T & back (size_t i = 0)
+            { sync_ = false; return NumberArray<T>::back(i); }
+        
+        //
+        // OpenCL intrinsics
+        //
+        
+        bool is_connected () const
+        {
+            return cl_handle_ != nullptr;
+        }
+        
+        void connect (cl_mem_flags flags)
+        {
+            // release previous allocation prior to creating a new buffer !
+            if (cl_handle_ != nullptr)
+                throw exception ("[clArray::connect] Release the buffer before connecting!");
+            
+            // allocate memory on GPU
+            cl_handle_ = clCreateBuffer(OpenCLEnvironment::context(), flags, size() * sizeof(T), nullptr, nullptr);
+            
+            // mark as synchronized if the data ware copied
+            if (flags & CL_MEM_COPY_HOST_PTR)
+                sync_ = true;
+        }
+        
+        void disconnect ()
+        {
+            // release previous allocations
+            if (cl_handle_ != nullptr)
+                clReleaseMemObject(cl_handle_);
+            
+            // clear pointer
+            cl_handle_ = nullptr;
+        }
+        
+        void download ()
+        {
+            clEnqueueReadBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            clFinish(OpenCLEnvironment::queue());
+            sync_ = true;
+        }
+        
+        void upload ()
+        {
+            clEnqueueWriteBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            clFinish(OpenCLEnvironment::queue());
+            sync_ = true;
+        }
+};
+
+#endif
 
 #endif

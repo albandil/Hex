@@ -5,12 +5,15 @@ CPP = g++
 SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconfig
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
-OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
+OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
-INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs
-LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) -lmpi -lmpi_cxx -lrt \
-	-lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
+OPENCLINCLUDE = -I/opt/AMDAPP/include
+OPENCLLIBS = -lOpenCL
+
+INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs $(OPENCLINCLUDE)
+LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
+	-lmpi -lmpi_cxx -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
 	-lm -lfftw3 -lgfortran -lpng -llapack
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
@@ -27,7 +30,7 @@ CFLAGS = $(CFLAGS_RELEASE)
 LFLAGS = $(LFLAGS_RELEASE)
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
-	matrix preconditioners radial slater specf version
+	matrix opencl preconditioners radial slater specf version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))

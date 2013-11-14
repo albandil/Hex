@@ -86,9 +86,9 @@ private:
 // memory alignment
 #ifndef alignof
 #ifdef __GNUC__
-    #define aligned(x,y) (__builtin_assume_aligned((x),(y)))
+    #define aligned_ptr(x,y) (__builtin_assume_aligned((x),(y)))
 #else
-    #define aligned(x,y) (x)
+    #define aligned_ptr(x,y) (x)
     #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
 #endif
 #endif

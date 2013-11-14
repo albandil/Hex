@@ -570,11 +570,11 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
         
         virtual T * data ()
         {
-            return (T *)aligned(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
+            return (T *)aligned_ptr(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
         }
         virtual T const * data () const
         {
-            return (T * const)aligned(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
+            return (T * const)aligned_ptr(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
         }
         
         //

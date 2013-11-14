@@ -57,9 +57,9 @@ template <
     class MatrixMultiplication,
     class AxbyOperation = decltype(complex_axby),
     class ScalarProduct = decltype(operator|<Complex>)
->
-unsigned cg_callbacks (
-    const TArrayView b, TArrayView x,
+> unsigned cg_callbacks (
+    const TArrayView b,
+    TArrayView x,
     double eps,
     unsigned min_iterations, unsigned max_iterations,
     Preconditioner apply_preconditioner,
