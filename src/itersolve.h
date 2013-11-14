@@ -20,6 +20,22 @@
 #include "complex.h"
 #include "matrix.h"
 
+inline void complex_axby (Complex a, const cArrayView x, Complex b, const cArrayView y, cArrayView z)
+{
+    size_t N = z.size();
+    assert (N == x.size());
+    assert (N == y.size());
+    
+    // accelerators
+    Complex const * const restrict px = x.data();
+    Complex const * const restrict py = y.data();
+    Complex       * const restrict pz = z.data();
+    
+    // do the axby per element
+    for (size_t i = 0; i < N; i++)
+        pz[i] = a * px[i] + b * py[i];
+}
+
 /**
  * Callback-based Conjugate gradients.
  * @param b Right hand side.
@@ -34,14 +50,23 @@
  * @param verbose Whether to display progress information.
  * @return Iteration count.
  */
-template <typename Preconditioner, typename Multiplier>
+template <
+    class TArray,
+    class TArrayView,
+    class Preconditioner,
+    class MatrixMultiplication,
+    class AxbyOperation = decltype(complex_axby),
+    class ScalarProduct = decltype(operator|<Complex>)
+>
 unsigned cg_callbacks (
-    const cArrayView b, cArrayView x,
+    const TArrayView b, TArrayView x,
     double eps,
     unsigned min_iterations, unsigned max_iterations,
     Preconditioner apply_preconditioner,
-    Multiplier matrix_multiply,
-    bool verbose = true
+    MatrixMultiplication matrix_multiply,
+    bool verbose = true,
+    AxbyOperation axby = complex_axby,
+    ScalarProduct scalar_product = operator|<Complex>
 ) {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
@@ -51,12 +76,12 @@ unsigned cg_callbacks (
     
     // some arrays (search directions etc.)
     size_t N = b.size();
-    cArray p(N), q(N), z(N);
+    TArray p(N), q(N), z(N);
     
     // residual; initialized to starting residual using the initial guess
     cArray r(N);
     matrix_multiply(x, r);
-    r = b - r;
+    axby (1., b, -1., r, r);
     
     // if the (non-zero) initial guess seems horribly wrong,
     //    use rather the right hand side as the initial guess
@@ -89,28 +114,28 @@ unsigned cg_callbacks (
         apply_preconditioner(r, z);
         
         // compute projection ρ = r·z
-        rho_new = (r|z);
+        rho_new = scalar_product(r, z);
         
         // setup search direction p
         if (k == 0)
         {
-            p = z;
+            axby (1., z, 0., z, p);
         }
         else
         {
             beta = rho_new / rho_old;
-            p = z + beta * p;
+            axby (1., z, beta, p, p);
         }
         
         // move to next Krylov subspace by multiplying A·p
         matrix_multiply(p, q);
         
         // compute projection ratio α
-        alpha = rho_new / (p|q);
+        alpha = rho_new / scalar_product(p, q);
         
         // update the solution and the residual
-        x += alpha * p;
-        r -= alpha * q;
+        axby (1., x, alpha, p, x);
+        axby (1., r, -alpha, q, r);
         
         // compute and check norm
         double rnorm = r.norm();

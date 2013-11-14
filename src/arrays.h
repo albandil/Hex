@@ -1023,22 +1023,18 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
 #include "arrithm.h"
 
 // scalar product of two arrays.
-template <typename NumberType1, typename NumberType2> auto operator | (
-    NumberArray<NumberType1> const & a, NumberArray<NumberType2> const & b
-) -> decltype(NumberType1(0)*NumberType2(0))
+template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
 {
-    // store size
+    // get size; check if sizes match
     size_t N = a.size();
-    
-    // check if sizes match
     assert(N == b.size());
     
     // the scalar product
-    decltype(NumberType1(0)*NumberType2(0)) result = 0;
+    T result = 0;
     
     // iterators
-    NumberType1 const * const restrict pa = a.data();
-    NumberType2 const * const restrict pb = b.data();
+    T const * const restrict pa = a.data();
+    T const * const restrict pb = b.data();
     
     // sum the products
     for (size_t i = 0; i < N; i++)

@@ -279,6 +279,42 @@ class CGPreconditioner : public NoPreconditioner
 };
 
 /**
+ * @brief CG iteration-based preconditioner (GPU variant).
+ * 
+ * This class adds some preconditioning capabilities to its base class
+ * NoPreconditioner. The preconditioning is done by diagonal block solution
+ * using the conjugate gradients solver (which itself is non-preconditioned).
+ */
+class GPUCGPreconditioner : public NoPreconditioner
+{
+    public:
+        
+        static const std::string name;
+        
+        GPUCGPreconditioner (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
+        
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
+        virtual void setup () { return NoPreconditioner::setup(); }
+        virtual void update (double E) { return NoPreconditioner::update(E); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
+        
+        // declare own definitions
+        virtual void precondition (const cArrayView r, cArrayView z) const;
+        
+        // inner CG callbacks
+        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const { q = dia_blocks_[iblock].dot(p); }
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
+};
+
+/**
  * @brief Jacobi-preconditioned CG-based preconditioner.
  * 
  * Enhances CGPreconditioner conjugate gradients solver by Jacobi (diagonal) preconditioning.

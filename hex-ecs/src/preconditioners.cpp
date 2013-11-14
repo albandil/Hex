@@ -608,7 +608,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
         // solve using the CG solver
-        cg_callbacks
+        cg_callbacks<cArray>
         (
             rview,                  // rhs
             zview,                  // solution

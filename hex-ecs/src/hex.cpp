@@ -293,7 +293,8 @@ int main (int argc, char* argv[])
             // custom conjugate gradients callback-based solver
             double tolerance = 1e-10;
             std::cout << "\tStart CG callback with tolerance " << tolerance << "\n";
-            unsigned iterations = cg_callbacks (
+            unsigned iterations = cg_callbacks<cArray>
+            (
                 chi,                      // right-hand side
                 current_solution,         // on input, the initial guess, on return, the solution
                 tolerance,                // requested precision, |A·x - b|² < ε·|b|²
