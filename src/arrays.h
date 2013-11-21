@@ -40,7 +40,7 @@ template <class T> class PlainAllocator
         static void free (T * ptr) { if (ptr != nullptr) delete [] ptr; }
 };
 
-template <class T> class AlignedAllocator
+template <class T, size_t alignment = std::alignment_of<T>::value> class AlignedAllocator
 {
     public:
         // allocate aligned memory
@@ -55,7 +55,7 @@ template <class T> class AlignedAllocator
             void* aligned_ptr = nullptr;
             int err = posix_memalign (
                 &aligned_ptr,
-                std::max(std::alignment_of<T>::value, sizeof(void*)),
+                std::max(alignment, sizeof(void*)),
                 (n + (n % 2)) * sizeof(T)
             );
             
@@ -82,7 +82,7 @@ template <class T> class AlignedAllocator
 };
 
 template <class T, class Alloc = PlainAllocator<T>> class Array;
-template <class T> class NumberArray;
+template <class T, class Alloc = AlignedAllocator<T>> class NumberArray;
 
 /**
  * @brief Array shallow copy.
@@ -450,7 +450,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
  * - a collection of overloaded arithmetic operators (sum of two arrays,
  *   difference, multiplication by a number etc.)
  */
-template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
+template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
 {
     public:
         
@@ -468,35 +468,35 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
         
         // default constructor, creates an empty array
         NumberArray ()
-            : Array<T,AlignedAllocator<T>>(), Nres_(size()) {}
+            : Array<T,Alloc>(), Nres_(size()) {}
         
         // constructor, creates a length-n "x"-filled array
         NumberArray (size_t n, T x = 0)
-            : Array<T,AlignedAllocator<T>>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()) {}
         
         // constructor, copies a length-n "array
         NumberArray (size_t n, T const * x)
-            : Array<T,AlignedAllocator<T>>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()) {}
         
         // copy constructor from ArrayView const lvalue reference
         NumberArray (ArrayView<T> const & a)
-            : Array<T,AlignedAllocator<T>>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()) {}
         
         // copy constructor from Array const lvalue reference
         NumberArray (NumberArray<T> const & a)
-            : Array<T,AlignedAllocator<T>>((ArrayView<T> const &)a), Nres_(size()) {}
+            : Array<T,Alloc>((ArrayView<T> const &)a), Nres_(size()) {}
         
         // copy constructor from std::vector
         NumberArray (std::vector<T> const & a)
-            : Array<T,AlignedAllocator<T>>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()) {}
         
         // copy constructor from initializer list
         NumberArray (std::initializer_list<T> a)
-            : Array<T,AlignedAllocator<T>>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()) {}
         
         // copy constructor from two forward iterators
         template <typename ForwardIterator> NumberArray (ForwardIterator i, ForwardIterator j)
-            : Array<T,AlignedAllocator<T>>(i,j), Nres_(size()) {}
+            : Array<T,Alloc>(i,j), Nres_(size()) {}
         
         // copy constructor from Array rvalue reference
         NumberArray (NumberArray<T> && a)
@@ -528,12 +528,12 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
             }
             
             Nres_ = n;
-            T * new_array = AlignedAllocator<T>::alloc(Nres_);
+            T * new_array = Alloc::alloc(Nres_);
             
             for (size_t i = 0; i < n; i++)
                 new_array[i] = (i < size()) ? (*this)[i] : T(0);
             
-            AlignedAllocator<T>::free (ArrayView<T>::array_);
+            Alloc::free (ArrayView<T>::array_);
             ArrayView<T>::N_ = n;
             ArrayView<T>::array_ = new_array;
             
@@ -544,12 +544,12 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
             if (n > Nres_)
             {
                 Nres_ = n;
-                T* new_array = AlignedAllocator<T>::alloc(Nres_);
+                T* new_array = Alloc::alloc(Nres_);
                 
                 if (size() > 0)
                 {
                     memcpy (new_array, data(), size() * sizeof(T));
-                    AlignedAllocator<T>::free (ArrayView<T>::array_);
+                    Alloc::free (ArrayView<T>::array_);
                 }
                 
                 ArrayView<T>::array_ = new_array;
@@ -600,14 +600,14 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
                 Nres_ = 2 * Nres_ + 1;
                 
                 // allocate space
-                T* new_array = AlignedAllocator<T>::alloc(Nres_);
+                T* new_array = Alloc::alloc(Nres_);
                 
                 // copy original data
                 memcpy(new_array, data(), size() * sizeof(T));
                 
                 // destroy original array
                 if (data() != nullptr)
-                    AlignedAllocator<T>::free (ArrayView<T>::array_);
+                    Alloc::free (ArrayView<T>::array_);
                 
                 // use new array
                 ArrayView<T>::array_ = new_array;
@@ -619,7 +619,7 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
         
         T pop_back()
         {
-            return Array<T,AlignedAllocator<T>>::pop_back();
+            return Array<T,Alloc>::pop_back();
         }
         
         template <class InputIterator> void append (
@@ -631,14 +631,14 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
                 Nres_ += last - first;
                 
                 // allocate space
-                T* new_array = AlignedAllocator<T>::alloc(Nres_);
+                T* new_array = Alloc::alloc(Nres_);
                 
                 // copy original data
                 memcpy(new_array, data(), size() * sizeof(T));
                 
                 // destroy original array
                 if (data() != nullptr)
-                    AlignedAllocator<T>::free (ArrayView<T>::array_);
+                    Alloc::free (ArrayView<T>::array_);
                 
                 // use new array
                 ArrayView<T>::array_ = new_array;
@@ -667,11 +667,11 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
             if (data() == nullptr or Nres_ < b.size())
             {
                 // delete insufficient storage
-                AlignedAllocator<T>::free (ArrayView<T>::array_);
+                Alloc::free (ArrayView<T>::array_);
                 
                 // allocate new storage
                 Nres_ = b.size();
-                ArrayView<T>::array_ = AlignedAllocator<T>::alloc(Nres_);
+                ArrayView<T>::array_ = Alloc::alloc(Nres_);
             }
             
             // set the new dimension
@@ -774,7 +774,7 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
         void fromBlob (std::string const & s)
         {
             if (data() != nullptr and size() != 0)
-                AlignedAllocator<T>::free (ArrayView<T>::array_);
+                Alloc::free (ArrayView<T>::array_);
             
             // the first character outght to be "x" or "X"
             // the second character outght to be "'"
@@ -790,7 +790,7 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
             ArrayView<T>::N_ = bytes / sizeof(T);
             
             // allocate space
-            ArrayView<T>::array_ = AlignedAllocator<T>::alloc(size());
+            ArrayView<T>::array_ = Alloc::alloc(size());
             
             // for all bytes
             for (size_t i = 0; i < bytes; i++)
@@ -901,7 +901,7 @@ template <typename T> class NumberArray : public Array<T, AlignedAllocator<T>>
             // remove previous data
             if (data() != nullptr)
             {
-                AlignedAllocator<T>::free (ArrayView<T>::array_);
+                Alloc::free (ArrayView<T>::array_);
                 ArrayView<T>::array_ = nullptr;
                 ArrayView<T>::N_ = Nres_ = 0;
             }

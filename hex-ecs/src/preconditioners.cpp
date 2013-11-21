@@ -629,13 +629,77 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
+#ifndef NO_OPENCL
+
+const char * const source =
+"double2 complex_multiply (double2 a, double2 b)                                                                                           \n"
+"{                                                                                                                                         \n"
+"    double2 c;                                                                                                                            \n"
+"    c.x = a.x * b.x - a.y * b.y;                                                                                                          \n"
+"    c.y = a.x * b.y + a.y * b.x;                                                                                                          \n"
+"    return c;                                                                                                                             \n"
+"}                                                                                                                                         \n"
+"                                                                                                                                          \n"
+"__kernel void a_vec_b_vec (__constant double2 a, __constant double2 *x, __constant double2 b, __constant double2 *y, __global double2 *z) \n"
+"{                                                                                                                                         \n"
+"    uint i = get_global_id(0);                                                                                                            \n"
+"    z[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
+"}                                                                                                                                         \n"
+"                                                                                                                                          \n"
+"__kernel void vec_mul_vec (__constant double2 *a, __constant double2 *b, __global double2 *c)                                             \n"
+"{                                                                                                                                         \n"
+"    uint i = get_global_id(0);                                                                                                            \n"
+"    z[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
+"}                                                                                                                                         \n"
+"                                                                                                                                          \n"
+"__kernel CSR_dot_vec (__constant uint *Ap, __constant uint *Ai, __constant double2 *Ax, __constant double2 *x, __global double2 *y)       \n"
+"{                                                                                                                                         \n"
+"    uint i = get_global_id(0);                                                                                                            \n"
+"    double2 sprod = 0.;                                                                                                                   \n"
+"                                                                                                                                          \n"
+"    for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)                                                                                         \n"
+"        sprod += complex_multiply(Ax[idx],x[Ai[idx]]);                                                                                    \n"
+"                                                                                                                                          \n"
+"    y[i] = sprod;                                                                                                                         \n"
+"}                                                                                                                                         \n";
+
 const std::string GPUCGPreconditioner::name = "gpucg";
 
-void GPUCGPreconditioner::setup()
+void GPUCGPreconditioner::setup ()
 {
+    // initialize parent
     NoPreconditioner::setup();
     
+    // reserve space for diagonal blocks
     csr_blocks_.resize(l1_l2_.size());
+    
+    // setup OpenCL environment
+    clGetPlatformIDs (1, &platform_, nullptr);
+    clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
+    context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
+    queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
+    program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
+    clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr);
+    
+    // OpenCL information
+    std::cout << "=== OpenCL information ===\n";
+    cl_ulong size;
+    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "Local memory size: " << size/1024 << " kiB\n";
+    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "Global memory size: " << std::setprecision(3) << size/pow(1024,3) << " GiB\n";
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
+    std::cout << "Max compute units: " << size << "\n";
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "Max work group size: " << size << "\n\n";
+    
+    std::cout << "=== Kernel source ===\n";
+    std::cout << source << "\n\n";
+    
+    // set program entry points
+    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr);
+    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
+    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
 }
 
 void GPUCGPreconditioner::update (double E)
@@ -649,34 +713,43 @@ void GPUCGPreconditioner::update (double E)
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
+    size_t Nspline = s_rad_.bspline().Nspline();
+    size_t Nsegsiz = Nspline * Nspline;
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create OpenCL representation of segment views
-        clArrayView<Complex> rsegment (r.begin() + ill * Nspline * Nspline, r.end() + (ill + 1) * Nspline * Nspline);
-        clArrayView<Complex> zsegment (z.begin() + ill * Nspline * Nspline, z.end() + (ill + 1) * Nspline * Nspline);
-        clNumberArray<Complex> tmp (Nspline * Nspline);
+        CLArrayView<Complex> rsegment (r.data(), ill * Nsegsiz, Nsegsiz);
+        CLArrayView<Complex> zsegment (z.data(), ill * Nsegsiz, Nsegsiz);
+        CLArray<Complex> tmp (Nsegsiz);
         
         // create OpenCL representation of the matrix block
-        clArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        clArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        clNumberArray<Complex> Ax (csr_blocks_[ill].x());  Ax.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArray<Complex>     Ax (csr_blocks_[ill].x());    Ax.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         
         // OpenCL implementation of basic operations
-        auto axby_operation = [&](Complex a, const clArrayView<Complex> x, Complex b, const clArrayView<Complex> y, clArrayView<Complex> z) -> void
+        auto axby_operation = [&](Complex a, const CLArrayView<Complex> x, Complex b, const CLArrayView<Complex> y, CLArrayView<Complex> z) -> void
         {
             // multiply
             //     a * x + b * y -> z
-            OpenCLEnvironment::axby().args(a, x, b, y, z);
-            OpenCLEnvironment::axby().exec(z.size());
+            clSetKernelArg (axby_, 0, sizeof(a),          &a);
+            clSetKernelArg (axby_, 1, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (axby_, 2, sizeof(b),          &b);
+            clSetKernelArg (axby_, 3, sizeof(y.handle()), &y.handle());
+            clSetKernelArg (axby_, 4, sizeof(z.handle()), &z.handle());
+            clEnqueueNDRangeKernel (queue_, axby_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
         };
-        auto scalar_product = [&](const clArrayView<Complex> x, const clArrayView<Complex> y) ->  Complex
+        auto scalar_product = [&](const CLArrayView<Complex> x, const CLArrayView<Complex> y) ->  Complex
         {
             // multiply
             //     x * y -> tmp
-            OpenCLEnvironment::amul().args(x, y, tmp);
-            OpenCLEnvironment::amul().exec(tmp.size());
+            clSetKernelArg (amul_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (amul_, 1, sizeof(y.handle()), &y.handle());
+            clSetKernelArg (amul_, 2, sizeof(tmp.handle()), &tmp.handle());
+            clEnqueueNDRangeKernel (queue_, amul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
             
             // download data from GPU
             tmp.download();
@@ -684,26 +757,33 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         };
         
         // wrappers around the CG callbacks
-        auto inner_mmul = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
+        auto inner_mmul = [&](const CLArrayView<Complex> a, CLArrayView<Complex> b) -> void
         {
             // multiply
             //      b = A · a
-            OpenCLEnvironment::mmul().args(Ap, Ai, Ax, a, b);
-            OpenCLEnvironment::mmul().exec(b.size());
+            clSetKernelArg (mmul_, 0, sizeof(Ap.handle()), &Ap.handle());
+            clSetKernelArg (mmul_, 1, sizeof(Ai.handle()), &Ai.handle());
+            clSetKernelArg (mmul_, 2, sizeof(Ax.handle()), &Ax.handle());
+            clSetKernelArg (mmul_, 3, sizeof(a),           &a);
+            clSetKernelArg (mmul_, 4, sizeof(b),           &b);
+            clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
         };
-        auto inner_prec = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
+        auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
         {
             // copy (using axpy; NOTE : this can be optimized)
-            //     b = a
-            OpenCLEnvironment::axby().args(1., a, 0., a, b);
-            OpenCLEnvironment::axby().exec(b.size());
+            //     y = x
+            Complex a = 1., b = 0.;
+            clSetKernelArg (axby_, 0, sizeof(a),          &a);
+            clSetKernelArg (axby_, 1, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (axby_, 2, sizeof(b),          &b);
+            clSetKernelArg (axby_, 3, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (axby_, 4, sizeof(y.handle()), &y.handle());
         };
         
         // solve using the CG solver
-        cg_callbacks <
-            clNumberArray<Complex>,
-            clArrayView<Complex>
-        > (
+        cg_callbacks<CLArray<Complex>,CLArrayView<Complex>>
+        (
             rsegment,               // rhs
             zsegment,               // solution
             1e-11,                  // tolerance
@@ -720,6 +800,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
+#endif
 
 const std::string JacobiCGPreconditioner::name = "Jacobi";
 

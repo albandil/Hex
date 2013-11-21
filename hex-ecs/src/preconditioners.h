@@ -289,6 +289,7 @@ class CGPreconditioner : public NoPreconditioner
  * NoPreconditioner. The preconditioning is done by diagonal block solution
  * using the conjugate gradients solver (which itself is non-preconditioned).
  */
+#ifndef NO_OPENCL
 class GPUCGPreconditioner : public NoPreconditioner
 {
     public:
@@ -319,8 +320,22 @@ class GPUCGPreconditioner : public NoPreconditioner
         
     private:
         
+        // diagonal blocks
         std::vector<CsrMatrix> csr_blocks_;
+        
+        // OpenCL environment
+        cl_platform_id platform_;
+        cl_device_id device_;
+        cl_context context_;
+        cl_command_queue queue_;
+        cl_program program_;
+        
+        // computational kernels
+        cl_kernel mmul_;
+        cl_kernel amul_;
+        cl_kernel axby_;
 };
+#endif
 
 /**
  * @brief Jacobi-preconditioned CG-based preconditioner.
