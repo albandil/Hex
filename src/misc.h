@@ -244,7 +244,7 @@ class Timer
         /// Stop timer and return elapsed time in seconds.
         int stop () const
         {
-            std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
             return secs.count();
         }

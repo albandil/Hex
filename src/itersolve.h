@@ -19,6 +19,7 @@
 #include "arrays.h"
 #include "complex.h"
 #include "matrix.h"
+#include "misc.h"
 
 inline void complex_axby (Complex a, const cArrayView x, Complex b, const cArrayView y, cArrayView z)
 {
@@ -68,8 +69,7 @@ template <
     AxbyOperation axby = complex_axby,
     ScalarProduct scalar_product = operator|<Complex>
 ) {
-    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-    std::chrono::duration<int> sec;
+    Timer::timer().start();
     
     // compute norm of the right hand side
     double bnorm = b.norm();
@@ -79,7 +79,7 @@ template <
     TArray p(N), q(N), z(N);
     
     // residual; initialized to starting residual using the initial guess
-    cArray r(N);
+    TArray r(N);
     matrix_multiply(x, r);
     axby (1., b, -1., r, r);
     
@@ -101,13 +101,13 @@ template <
     unsigned k;
     for (k = 0; k < max_iterations; k++)
     {
-        sec = std::chrono::duration_cast<std::chrono::duration<int>>(std::chrono::steady_clock::now()-start);
+        int sec = Timer::timer().stop();
         
         if (verbose)
         {
             std::cout << "\t[cg] Residual relative magnitude after "
                     << k << " iterations: " << r.norm() / bnorm
-                    << " (" << sec.count()/60 << " min)\n";
+                    << " (" << sec / 60 << " min)\n";
         }
         
         // apply desired preconditioner
