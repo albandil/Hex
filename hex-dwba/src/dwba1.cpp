@@ -17,6 +17,7 @@
 #include "hydrogen.h"
 #include "gausskronrod.h"
 #include "specf.h"
+#include "wave_distort.h"
 
 namespace DWBA1
 {
