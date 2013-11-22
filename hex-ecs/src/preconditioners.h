@@ -202,6 +202,7 @@ class NoPreconditioner : public PreconditionerBase
     public:
         
         static const std::string name;
+        static const std::string description;
         
         NoPreconditioner (
             Parallel const & par,
@@ -258,6 +259,7 @@ class CGPreconditioner : public NoPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         CGPreconditioner (
             Parallel const & par,
@@ -295,6 +297,7 @@ class GPUCGPreconditioner : public NoPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         GPUCGPreconditioner (
             Parallel const & par,
@@ -348,6 +351,7 @@ class JacobiCGPreconditioner : public CGPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         JacobiCGPreconditioner (
             Parallel const & par,
@@ -387,6 +391,7 @@ class SSORCGPreconditioner : public CGPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         SSORCGPreconditioner (
             Parallel const & par,
@@ -427,6 +432,7 @@ class ILUCGPreconditioner : public CGPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         ILUCGPreconditioner (
             Parallel const & par,
@@ -473,6 +479,7 @@ class DICCGPreconditioner : public CGPreconditioner
     public: 
         
         static const std::string name;
+        static const std::string description;
         
         DICCGPreconditioner (
             Parallel const & par,
@@ -517,6 +524,7 @@ class SPAICGPreconditioner : public CGPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         SPAICGPreconditioner  (
             Parallel const & par,
@@ -614,6 +622,7 @@ class TwoLevelPreconditioner : public SSORCGPreconditioner
     public:
         
         static const std::string name;
+        static const std::string description;
         
         // constructor
         TwoLevelPreconditioner (
@@ -695,6 +704,7 @@ class MultiresPreconditioner : public PreconditionerBase
     public:
         
         static const std::string name;
+        static const std::string description;
         
         // constructor
         MultiresPreconditioner (
@@ -795,6 +805,14 @@ class Preconditioners
         > AvailableTypes;
         
         /**
+         * @brief Number of available preconditioners.
+         */
+        static size_t size ()
+        {
+            return std::tuple_size<AvailableTypes>::value;
+        }
+        
+        /**
          * @brief Return pointer to new preconditioner object.
          * 
          * The preconditioner index from CommandLine::preconditioner is used
@@ -840,6 +858,34 @@ class Preconditioners
         {
             // we visited all available preconditioners without success : return invalid index (-1)
             return -1;
+        }
+        //@}
+        
+        /**
+         * @brief Get name of the preconditioner.
+         */
+        //@{
+        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
+        {
+            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::name : name<i+1>(idx);
+        }
+        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
+        {
+            return "";
+        }
+        //@}
+        
+        /**
+         * @brief Get description of the preconditioner.
+         */
+        //@{
+        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
+        {
+            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::description : description<i+1>(idx);
+        }
+        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
+        {
+            return "";
         }
         //@}
 };

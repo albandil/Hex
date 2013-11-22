@@ -32,7 +32,7 @@
 void CommandLine::parse (int argc, char* argv[])
 {
     // set short options
-    char const * const short_options  = "ei:hz:n:R:mabcd:p:";
+    char const * const short_options  = "ei:hz:n:R:mabcd:p:P";
     
     // set long options
     const option long_options[] = {
@@ -50,6 +50,7 @@ void CommandLine::parse (int argc, char* argv[])
         {"stg-extract",       0,   0, 'c'},
         {"drop-tolerance",    1,   0, 'd'},
         {"preconditioner",    1,   0, 'p'},
+        {"prec-info",         0,   0, 'P'},
         {0,                   0,   0,   0}
     };
     
@@ -103,7 +104,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "# initial energies in Rydbergs\n"
                     " 0.65   -1\n"
                     " 0.95\n"
-                    " 301\n"
+                    "    3\n"
                     "\n"
                     "# magnetic field\n"
                     " 0\n"
@@ -123,11 +124,9 @@ void CommandLine::parse (int argc, char* argv[])
             case 'h':
             {
                 // print usage information
-                std::cout <<
-                    "------------------------------------------------                                                         \n"
+                std::cout << "\n"
                     "Available switches (short forms in parentheses):                                                         \n"
-                    "------------------------------------------------                                                         \n"
-                    "\nGeneral:                                                                                               \n"
+                    "                                                                                                         \n"
                     "\t--example            (-e)  create sample input file                                                    \n"
                     "\t--help               (-h)  display this help                                                           \n"
                     "\t--input <filename>   (-i)  use custom input file                                                       \n"
@@ -138,7 +137,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ          (-a)  only do radial integrals                                                    \n"
                     "\t--stg-integ-solve    (-b)  only do integrals & solve                                                   \n"
                     "\t--stg-extract        (-c)  only extract amplitudes                                                     \n"
-                    "\t--preconditioner     (-p)  preconditioner to use; one of {none, Jacobi, SSOR, ILU, ...} (default: ILU) \n"
+                    "\t--preconditioner     (-p)  preconditioner to use (default: ILU)                                        \n"
+                    "\t--prec-info          (-P)  list of available preconditioners with short description of each            \n"
                     "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                  \n"
                     "                                                                                                         \n"
                 ;
@@ -192,6 +192,18 @@ void CommandLine::parse (int argc, char* argv[])
                 if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
                     throw exception("Unknown preconditioner \"%s\".", optarg);
                 break;
+            }
+            case 'P':
+            {
+                // preconditioners description
+                std::cout << "\nPreconditioners description:\n\n";
+                for (unsigned i = 0; i < Preconditioners::size(); i++)
+                {
+                    std::cout << Preconditioners::name(i) << "\n";
+                    std::cout << "\t" << Preconditioners::description(i) << "\n";
+                }
+                std::cout << "\n";
+                exit (0);
             }
 #ifndef NO_MPI
             case 'm':

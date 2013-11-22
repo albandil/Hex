@@ -357,6 +357,7 @@ CooMatrix SPAI (SymDiaMatrix const & A, iArrayView diagonals)
 #endif
 
 const std::string NoPreconditioner::name = "none";
+const std::string NoPreconditioner::description = "No preconditioner, the vector will be returned intact.";
 
 void NoPreconditioner::setup ()
 {
@@ -594,6 +595,7 @@ void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
 }
 
 const std::string CGPreconditioner::name = "cg";
+const std::string CGPreconditioner::description = "Block inversion using plain conjugate gradients.";
 
 void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
@@ -664,6 +666,7 @@ const char * const source =
 "}                                                                                                                                         \n";
 
 const std::string GPUCGPreconditioner::name = "gpucg";
+const std::string GPUCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients (GPU variant).";
 
 void GPUCGPreconditioner::setup ()
 {
@@ -719,14 +722,14 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create OpenCL representation of segment views
-        CLArrayView<Complex> rsegment (r.data(), ill * Nsegsiz, Nsegsiz);
-        CLArrayView<Complex> zsegment (z.data(), ill * Nsegsiz, Nsegsiz);
+        CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);
+        CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);
         CLArray<Complex> tmp (Nsegsiz);
         
         // create OpenCL representation of the matrix block
-        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex>     Ax (csr_blocks_[ill].x());    Ax.connect(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArray<Complex>     Ax (csr_blocks_[ill].x());    Ax.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         
         // OpenCL implementation of basic operations
         auto axby_operation = [&](Complex a, const CLArrayView<Complex> x, Complex b, const CLArrayView<Complex> y, CLArrayView<Complex> z) -> void
@@ -749,10 +752,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clSetKernelArg (amul_, 1, sizeof(y.handle()), &y.handle());
             clSetKernelArg (amul_, 2, sizeof(tmp.handle()), &tmp.handle());
             clEnqueueNDRangeKernel (queue_, amul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            tmp.EnqueueDownload(queue_);
             clFinish (queue_);
             
-            // download data from GPU
-            tmp.download();
+            // sum the product of the arrays
             return sum(tmp);
         };
         
@@ -795,6 +798,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             axby_operation,         // a*x+b*y -> z operation
             scalar_product          // scalar product of two CL arrays
         );
+        
+        // download data arrays from the GPU
+        zsegment.EnqueueDownload(queue_);
+        clFinish(queue_);
     }
     
     // synchronize across processes
@@ -803,6 +810,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 #endif
 
 const std::string JacobiCGPreconditioner::name = "Jacobi";
+const std::string JacobiCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients.";
 
 void JacobiCGPreconditioner::setup ()
 {
@@ -834,6 +842,7 @@ void JacobiCGPreconditioner::update (double E)
 }
 
 const std::string SSORCGPreconditioner::name = "SSOR";
+const std::string SSORCGPreconditioner::description = "Block inversion using SSOR-preconditioned conjugate gradients.";
 
 void SSORCGPreconditioner::setup ()
 {
@@ -855,6 +864,7 @@ void SSORCGPreconditioner::update (double E)
 }
 
 const std::string ILUCGPreconditioner::name = "ILU";
+const std::string ILUCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
 
 void ILUCGPreconditioner::setup ()
 {
@@ -896,6 +906,7 @@ void ILUCGPreconditioner::update (double E)
 }
 
 const std::string DICCGPreconditioner::name = "DIC";
+const std::string DICCGPreconditioner::description = "Block inversion using DIC-preconditioned conjugate gradients [not working].";
 
 void DICCGPreconditioner::setup()
 {
@@ -914,6 +925,7 @@ void DICCGPreconditioner::update(double E)
 
 #ifndef NO_LAPACK
 const std::string SPAICGPreconditioner::name = "SPAI";
+const std::string SPAICGPreconditioner::description = "Block inversion using SPAI-preconditioned conjugate gradients [not working].";
 
 void SPAICGPreconditioner::setup()
 {
@@ -945,6 +957,7 @@ void SPAICGPreconditioner::update (double E)
 #endif
 
 const std::string TwoLevelPreconditioner::name = "two";
+const std::string TwoLevelPreconditioner::description = "Block inversion using conjugate gradients preconditioned by solution of coarse system [not working].";
 
 void TwoLevelPreconditioner::setup ()
 {
@@ -1145,6 +1158,7 @@ void TwoLevelPreconditioner::CG_prec (int iblock, const cArrayView rs, cArrayVie
 }
 
 const std::string MultiresPreconditioner::name = "res";
+const std::string MultiresPreconditioner::description = "Multi-resolution preconditioner [implementation not finished].";
 
 MultiresPreconditioner::MultiresPreconditioner (
     Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
