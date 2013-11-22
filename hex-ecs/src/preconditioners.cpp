@@ -666,7 +666,7 @@ const char * const source =
 "}                                                                                                                                         \n";
 
 const std::string GPUCGPreconditioner::name = "gpucg";
-const std::string GPUCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients (GPU variant).";
+const std::string GPUCGPreconditioner::description = "Block inversion using plain conjugate gradients (GPU variant).";
 
 void GPUCGPreconditioner::setup ()
 {
