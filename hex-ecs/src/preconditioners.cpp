@@ -642,26 +642,26 @@ const char * const source =
 "    return c;                                                                                                                             \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel void a_vec_b_vec (__private double2 a, __global double2 *x, __private double2 b, __constant double2 *y)                          \n"
+"__kernel void a_vec_b_vec (__private double2 a, __global double2 *x, __private double2 b, __global double2 *y)                            \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
 "    x[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel void vec_mul_vec (__constant double2 *a, __constant double2 *b, __global double2 *c)                                             \n"
+"__kernel void vec_mul_vec (__global double2 *a, __global double2 *b, __global double2 *c)                                                 \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
 "    c[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel void vec_norm (__constant double2 *v, __global double *n)                                                                        \n"
+"__kernel void vec_norm (__global double2 *v, __global double *n)                                                                          \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
 "    double2 vi = v[i];                                                                                                                    \n"
 "    n[i] = vi.x * vi.x + vi.y * vi.y;                                                                                                     \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel void CSR_dot_vec (__constant long *Ap, __constant long *Ai, __constant double2 *Ax, __constant double2 *x, __global double2 *y)  \n"
+"__kernel void CSR_dot_vec (__global long *Ap, __global long *Ai, __global double2 *Ax, __global double2 *x, __global double2 *y)          \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
 "    double2 sprod = 0.;                                                                                                                   \n"
@@ -683,47 +683,55 @@ void GPUCGPreconditioner::setup ()
     // reserve space for diagonal blocks
     csr_blocks_.resize(l1_l2_.size());
     
-    // setup OpenCL environment
-    std::cout << "clGetPlatformIDs: " << clGetPlatformIDs (1, &platform_, nullptr) << "\n";
-    std::cout << "clGetDeviceIDs: " << clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr) << "\n";
+    std::cout << "Setting up OpenCL environment\n";
+    char text [1000];
     
-    // OpenCL information
-    std::cout << "=== OpenCL information ===\n";
+    // use platform 0
+    clGetPlatformIDs (1, &platform_, nullptr);
+    clGetPlatformInfo (platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
+    std::cout << "\tplatform: " << text << " ";
+    clGetPlatformInfo (platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
+    std::cout << "(" << text << ")\n";
+    
+    // use device 0
+    clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
+    clGetDeviceInfo (device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
+    std::cout << "\tdevice: " << text << " ";
+    clGetDeviceInfo (device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
+    std::cout << "(" << text << ")\n";
     cl_ulong size;
-    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "Local memory size: " << size/1024 << " kiB\n";
-    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "Global memory size: " << std::setprecision(3) << size/pow(1024,3) << " GiB\n";
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "Max compute units: " << size << "\n";
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "Max work group size: " << size << "\n\n";
+    clGetDeviceInfo (device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "\tlocal memory size: " << size/1024 << " kiB\n";
+    clGetDeviceInfo (device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "\tglobal memory size: " << std::setprecision(3) << size/pow(1024,3) << " GiB\n";
+    clGetDeviceInfo (device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
+    std::cout << "\tmax compute units: " << size << "\n";
+    clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
+    std::cout << "\tmax work group size: " << size << "\n\n";
     
     // create context and command queue
     context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
     queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
     
-    // print the source [DEBUG]
-    std::cout << "=== Kernel source ===\n";
-    std::cout << source << "\n\n";
-    
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
-    std::cout << "clBuildProgram: " << clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr) << "\n";
+    clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr);
     
-    /// DEBUG
     cl_build_status status;
-    char log [100000];
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
-    std::cout << "clGetProgramBuildInfo: status = " << status << "\n";
-    clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
-    std::cout << "clGetProgramBuildInfo: log \n" << log << "\n";
+    if (status != 0)
+    {
+        char log [100000];
+        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
+        std::cout << "clGetProgramBuildInfo: log \n" << log << "\n";
+        exit(0);
+    }
     
     // set program entry points
-    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr); std::cout << "mmul_ = " << mmul_ << "\n";
-    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr); std::cout << "amul_ = " << amul_ << "\n";
-    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr); std::cout << "axby_ = " << axby_ << "\n";
-    vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr); std::cout << "vnrm_ = " << vnrm_ << "\n";
+    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr);
+    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
+    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
+    vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
 }
 
 void GPUCGPreconditioner::update (double E)
@@ -847,7 +855,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            true,                   // verbose output?
+            false,                  // verbose output?
             new_opencl_array,       // return array that is initialized and connected to GPU
             axby_operation,         // a*x+b*y -> z operation
             scalar_product,         // scalar product of two CL arrays
@@ -864,8 +872,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         Ap.disconnect();
         Ai.disconnect();
         Ax.disconnect();
-        
-        exit(0);
     }
     
     // synchronize across processes
