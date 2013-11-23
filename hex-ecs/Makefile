@@ -8,8 +8,13 @@ SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
+# AMD OpenCL
 OPENCLINCLUDE = -I/opt/AMDAPP/include
 OPENCLLIBS = -lOpenCL
+
+# Intel OpenCL
+# OPENCLINCLUDE = -I/opt/intel/opencl-1.2-3.1.1.11385/include
+# OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
 
 INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs $(OPENCLINCLUDE)
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
