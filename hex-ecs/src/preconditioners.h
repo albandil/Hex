@@ -337,6 +337,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_kernel mmul_;
         cl_kernel amul_;
         cl_kernel axby_;
+        cl_kernel vnrm_;
 };
 #endif
 
@@ -797,6 +798,7 @@ class Preconditioners
             NoPreconditioner,           // No preconditioner.
             CGPreconditioner,           // Solve diagonal blocks by non-preconditioned CG iterations.
             JacobiCGPreconditioner,     // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+            GPUCGPreconditioner,        // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
             SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
             MultiresPreconditioner,     // Multi-resolution preconditioner (@note not implemented yet).
             SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.

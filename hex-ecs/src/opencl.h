@@ -21,13 +21,10 @@
 
 template <class T> class CLArrayView : public ArrayView<T>
 {
-    private:
+    protected:
         
         /// Memory handle to the data copy on the GPU.
         cl_mem cl_handle_;
-        
-        /// Whether the data are synchronized between RAM and GPU.
-        bool sync_;
         
     public:
         
@@ -40,17 +37,26 @@ template <class T> class CLArrayView : public ArrayView<T>
         typedef T const * const_iterator;
         
         //
-        // constructors
+        // basic constructors
         //
         
         CLArrayView ()
-            : ArrayView<T>(), cl_handle_(nullptr), sync_(false) {}
-        CLArrayView (const_iterator i, const_iterator j)
-            : ArrayView<T>(const_cast<iterator>(i),const_cast<iterator>(j)), cl_handle_(nullptr), sync_(false) {}
-        CLArrayView (ArrayView<T> v)
-            : ArrayView<T>(v), cl_handle_(nullptr), sync_(false) {}
+            : ArrayView<T>(), cl_handle_(nullptr) { /*std::cout << "Init Default\n";*/ }
+        CLArrayView (size_t n, T const * ptr)
+            : ArrayView<T>(n, const_cast<T*>(ptr)), cl_handle_(nullptr) { /*std::cout << "Init from ptr.\n";*/ }
+        CLArrayView (ArrayView<T> v, size_t i = 0, size_t n = 0)
+            : ArrayView<T>(v, i, n), cl_handle_(nullptr) { /*std::cout << "Init from ArrayView\n";*/ }
         CLArrayView (CLArrayView<T> const & v)
-            : ArrayView<T>(v.begin(), v.end()), cl_handle_(v.cl_handle_), sync_(v.sync_) {}
+            : ArrayView<T>(v), cl_handle_(v.cl_handle_) { /*std::cout << "Init from CLArrayView\n";*/ }
+        CLArrayView (CLArrayView<T> && v)
+            : ArrayView<T>(), cl_handle_(nullptr)
+        {
+            std::swap (ArrayView<T>::array_, v.ArrayView<T>::array_);
+            std::swap (ArrayView<T>::N_,     v.ArrayView<T>::N_    );
+            std::swap (cl_handle_,           v.cl_handle_          );
+            
+//             std::cout << "Init CLArrayView from CLArrayView&&.\n";
+        }
         
         //
         // destructor
@@ -59,7 +65,7 @@ template <class T> class CLArrayView : public ArrayView<T>
         virtual ~CLArrayView ()
         {
             // free GPU memory
-            disconnect ();
+//             disconnect ();
         }
         
         //
@@ -96,7 +102,7 @@ template <class T> class CLArrayView : public ArrayView<T>
                 throw exception ("[clArray::connect] Release the buffer before connecting!");
             
             // allocate memory on GPU
-            cl_handle_ = clCreateBuffer (context, flags, size() * sizeof(T), nullptr, nullptr);
+            cl_handle_ = clCreateBuffer (context, flags, size() * sizeof(T), data(), nullptr);
         }
         
         void disconnect ()
@@ -109,19 +115,18 @@ template <class T> class CLArrayView : public ArrayView<T>
             cl_handle_ = nullptr;
         }
         
-        void enqueueUpload (cl_command_queue queue)
+        cl_int EnqueueUpload (cl_command_queue queue)
         {
-            clEnqueueReadBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-            clFinish(queue);
+            return clEnqueueWriteBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
-        void enqueueDownload (cl_command_queue queue)
+        cl_int EnqueueDownload (cl_command_queue queue)
         {
-            clEnqueueWriteBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-            clFinish(queue);
+//             std::cout << "EnqueueDownload of " << size() << " elements starting from " << data() << "\n";
+            return clEnqueueReadBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
-        cl_mem handle () const
+        cl_mem const & handle () const
         {
             return cl_handle_;
         }
@@ -141,19 +146,17 @@ template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray
         typedef T const * const_iterator;
         
         //
-        // constructors
+        // basic constructors
         //
         
         CLArray ()
-            : NumberArray<T>(), cl_handle_(nullptr), sync_(false) {}
+            : CLArrayView<T>() {}
         CLArray (size_t n, T x = T(0))
-            : NumberArray<T>(n,x), cl_handle_(nullptr), sync_(false) {}
-        CLArray (size_t n, T const * ptr)
-            : NumberArray<T>(n,ptr), cl_handle_(nullptr), sync_(false) {}
-        CLArray (ArrayView<T> v)
-            : NumberArray<T>(v), cl_handle_(nullptr), sync_(false) {}
-        CLArray (CLArrayView<T> const & v)
-            : NumberArray<T>(v.size(), v.data()), cl_handle_(v.cl_handle_), sync_(v.sync_) {}
+            : CLArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < n; i++) (*this)[i] = x; }
+        CLArray (ArrayView<T> v, size_t i = 0, size_t n = 0)
+            : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n)) { for (size_t j = 0; j < size(); j++) (*this)[j] = v[i+j]; }
+        CLArray (CLArray<T,Alloc> && rvrf)
+            : CLArrayView<T>(std::move(rvrf)) { /*std::cout << "Init CLArray from CLArray&&.\n";*/ }
         
         //
         // destructor
@@ -162,42 +165,29 @@ template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray
         virtual ~CLArray ()
         {
             // free GPU memory
-            disconnect ();
+            disconnect();
             
-            // free RAM
-            NumberArray<T>::~NumberArray();
+            // free RAM memory
+            Alloc::free(data());
         }
         
         //
         // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
         //
         
-        size_t size () const
-            { return NumberArray<T>::size(); }
-        T const & operator [] (size_t i) const
-            { return NumberArray<T>::operator[](i); }
-        T & operator [] (size_t i)
-            { sync_ = false; return NumberArray<T>::operator[](i); }
-        T const * data () const
-            { return NumberArray<T>::data(); }
-        T * data ()
-            { sync_ = false; return NumberArray<T>::data(); }
-        const_iterator begin () const
-            { return NumberArray<T>::begin(); }
-        iterator begin ()
-            { sync_ = false; return ArrayView<T>::begin(); }
-        const_iterator end () const
-            { return NumberArray<T>::end(); }
-        iterator end ()
-            { sync_ = false; return ArrayView<T>::end(); }
-        T const & front (size_t i = 0) const
-            { return NumberArray<T>::front(i); }
-        T & front (size_t i = 0)
-            { sync_ = false; return ArrayView<T>::front(i); }
-        T const & back (size_t i = 0) const
-            { return NumberArray<T>::back(i); }
-        T & back (size_t i = 0)
-            { sync_ = false; return NumberArray<T>::back(i); }
+        size_t size () const                        { return CLArrayView<T>::size();        }
+        T const & operator [] (size_t i) const      { return CLArrayView<T>::operator[](i); }
+        T & operator [] (size_t i)                  { return CLArrayView<T>::operator[](i); }
+        T const * data () const                     { return CLArrayView<T>::data();        }
+        T * data ()                                 { return CLArrayView<T>::data();        }
+        const_iterator begin () const               { return CLArrayView<T>::begin();       }
+        iterator begin ()                           { return CLArrayView<T>::begin();       }
+        const_iterator end () const                 { return CLArrayView<T>::end();         }
+        iterator end ()                             { return CLArrayView<T>::end();         }
+        T const & front (size_t i = 0) const        { return CLArrayView<T>::front(i);      }
+        T & front (size_t i = 0)                    { return CLArrayView<T>::front(i);      }
+        T const & back (size_t i = 0) const         { return CLArrayView<T>::back(i);       }
+        T & back (size_t i = 0)                     { return CLArrayView<T>::back(i);       }
         
         //
         // OpenCL intrinsics
@@ -205,45 +195,32 @@ template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray
         
         bool is_connected () const
         {
-            return cl_handle_ != nullptr;
+            return CLArrayView<T>::is_connected();
         }
         
-        void connect (cl_mem_flags flags)
+        void connect (cl_context context, cl_mem_flags flags = CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE)
         {
-            // release previous allocation prior to creating a new buffer !
-            if (cl_handle_ != nullptr)
-                throw exception ("[clArray::connect] Release the buffer before connecting!");
-            
-            // allocate memory on GPU
-            cl_handle_ = clCreateBuffer(OpenCLEnvironment::context(), flags, size() * sizeof(T), nullptr, nullptr);
-            
-            // mark as synchronized if the data ware copied
-            if (flags & CL_MEM_COPY_HOST_PTR)
-                sync_ = true;
+            CLArrayView<T>::connect(context, flags);
         }
         
         void disconnect ()
         {
-            // release previous allocations
-            if (cl_handle_ != nullptr)
-                clReleaseMemObject(cl_handle_);
-            
-            // clear pointer
-            cl_handle_ = nullptr;
+            CLArrayView<T>::disconnect();
         }
         
-        void download ()
+        cl_int EnqueueDownload (cl_command_queue queue)
         {
-            clEnqueueReadBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-            clFinish(OpenCLEnvironment::queue());
-            sync_ = true;
+            return CLArrayView<T>::EnqueueDownload(queue);
         }
         
-        void upload ()
+        cl_int EnqueueUpload (cl_command_queue queue)
         {
-            clEnqueueWriteBuffer (OpenCLEnvironment::queue(), cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
-            clFinish(OpenCLEnvironment::queue());
-            sync_ = true;
+            return CLArrayView<T>::EnqueueUpload(queue);
+        }
+        
+        cl_mem const & handle () const
+        {
+            return CLArrayView<T>::handle();
         }
 };
 

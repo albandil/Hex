@@ -614,7 +614,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
         // solve using the CG solver
-        cg_callbacks<cArray>
+        cg_callbacks < cArray, cArrayView >
         (
             rview,                  // rhs
             zview,                  // solution
@@ -623,7 +623,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false
+            true
         );
     }
     
@@ -634,7 +634,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 #ifndef NO_OPENCL
 
 const char * const source =
-"double2 complex_multiply (double2 a, double2 b)                                                                                           \n"
+"inline double2 complex_multiply (double2 a, double2 b)                                                                                    \n"
 "{                                                                                                                                         \n"
 "    double2 c;                                                                                                                            \n"
 "    c.x = a.x * b.x - a.y * b.y;                                                                                                          \n"
@@ -642,19 +642,26 @@ const char * const source =
 "    return c;                                                                                                                             \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel void a_vec_b_vec (__constant double2 a, __constant double2 *x, __constant double2 b, __constant double2 *y, __global double2 *z) \n"
+"__kernel void a_vec_b_vec (__private double2 a, __global double2 *x, __private double2 b, __constant double2 *y)                          \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
-"    z[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
+"    x[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
 "__kernel void vec_mul_vec (__constant double2 *a, __constant double2 *b, __global double2 *c)                                             \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
-"    z[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
+"    c[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
 "}                                                                                                                                         \n"
 "                                                                                                                                          \n"
-"__kernel CSR_dot_vec (__constant uint *Ap, __constant uint *Ai, __constant double2 *Ax, __constant double2 *x, __global double2 *y)       \n"
+"__kernel void vec_norm (__constant double2 *v, __global double *n)                                                                        \n"
+"{                                                                                                                                         \n"
+"    uint i = get_global_id(0);                                                                                                            \n"
+"    double2 vi = v[i];                                                                                                                    \n"
+"    n[i] = vi.x * vi.x + vi.y * vi.y;                                                                                                     \n"
+"}                                                                                                                                         \n"
+"                                                                                                                                          \n"
+"__kernel void CSR_dot_vec (__constant long *Ap, __constant long *Ai, __constant double2 *Ax, __constant double2 *x, __global double2 *y)  \n"
 "{                                                                                                                                         \n"
 "    uint i = get_global_id(0);                                                                                                            \n"
 "    double2 sprod = 0.;                                                                                                                   \n"
@@ -666,7 +673,7 @@ const char * const source =
 "}                                                                                                                                         \n";
 
 const std::string GPUCGPreconditioner::name = "gpucg";
-const std::string GPUCGPreconditioner::description = "Block inversion using plain conjugate gradients (GPU variant).";
+const std::string GPUCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients (GPU variant).";
 
 void GPUCGPreconditioner::setup ()
 {
@@ -677,12 +684,8 @@ void GPUCGPreconditioner::setup ()
     csr_blocks_.resize(l1_l2_.size());
     
     // setup OpenCL environment
-    clGetPlatformIDs (1, &platform_, nullptr);
-    clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
-    context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
-    queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
-    program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
-    clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr);
+    std::cout << "clGetPlatformIDs: " << clGetPlatformIDs (1, &platform_, nullptr) << "\n";
+    std::cout << "clGetDeviceIDs: " << clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr) << "\n";
     
     // OpenCL information
     std::cout << "=== OpenCL information ===\n";
@@ -696,13 +699,31 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "Max work group size: " << size << "\n\n";
     
+    // create context and command queue
+    context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
+    queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
+    
+    // print the source [DEBUG]
     std::cout << "=== Kernel source ===\n";
     std::cout << source << "\n\n";
     
+    // build program
+    program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
+    std::cout << "clBuildProgram: " << clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr) << "\n";
+    
+    /// DEBUG
+    cl_build_status status;
+    char log [100000];
+    clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
+    std::cout << "clGetProgramBuildInfo: status = " << status << "\n";
+    clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
+    std::cout << "clGetProgramBuildInfo: log \n" << log << "\n";
+    
     // set program entry points
-    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr);
-    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
-    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
+    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr); std::cout << "mmul_ = " << mmul_ << "\n";
+    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr); std::cout << "amul_ = " << amul_ << "\n";
+    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr); std::cout << "axby_ = " << axby_ << "\n";
+    vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr); std::cout << "vnrm_ = " << vnrm_ << "\n";
 }
 
 void GPUCGPreconditioner::update (double E)
@@ -721,18 +742,35 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        // create OpenCL representation of segment views
-        CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);
-        CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);
-        CLArray<Complex> tmp (Nsegsiz);
+        // create OpenCL representation of segment views + transfer data to GPU memory
+        CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<Complex> tmp (Nsegsiz);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<double>  nrm (Nsegsiz);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
-        // create OpenCL representation of the matrix block
-        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex>     Ax (csr_blocks_[ill].x());    Ax.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        // create OpenCL representation of the matrix block + transfer data to GPU memory
+        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<Complex> Ax (csr_blocks_[ill].x());    Ax.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        
+        // create OpenCL representation of the inverse diagonal + transfer data to GPU memory
+        CLArray<Complex> invd (1. / dia_blocks_[ill].main_diagonal());  invd.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        
+        // allocation (and upload) of an OpenCL array
+        auto new_opencl_array = [&](size_t n) -> CLArray<Complex>
+        {
+            // create array
+            CLArray<Complex> a(n);
+            
+            // connect the array to GPU
+            a.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+            
+            // use this array
+            return a;
+        };
         
         // OpenCL implementation of basic operations
-        auto axby_operation = [&](Complex a, const CLArrayView<Complex> x, Complex b, const CLArrayView<Complex> y, CLArrayView<Complex> z) -> void
+        auto axby_operation = [&](Complex a, CLArrayView<Complex> x, Complex b, const CLArrayView<Complex> y) -> void
         {
             // multiply
             //     a * x + b * y -> z
@@ -740,7 +778,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clSetKernelArg (axby_, 1, sizeof(x.handle()), &x.handle());
             clSetKernelArg (axby_, 2, sizeof(b),          &b);
             clSetKernelArg (axby_, 3, sizeof(y.handle()), &y.handle());
-            clSetKernelArg (axby_, 4, sizeof(z.handle()), &z.handle());
             clEnqueueNDRangeKernel (queue_, axby_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
@@ -758,6 +795,19 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             // sum the product of the arrays
             return sum(tmp);
         };
+        auto compute_norm = [&](const CLArrayView<Complex> x) -> double
+        {
+            // multiply
+            //     |x|² -> nrm
+            clSetKernelArg (vnrm_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (vnrm_, 1, sizeof(nrm.handle()), &nrm.handle());
+            clEnqueueNDRangeKernel (queue_, vnrm_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            nrm.EnqueueDownload(queue_);
+            clFinish (queue_);
+            
+            // return square root of the sum
+            return sqrt(sum(nrm));
+        };
         
         // wrappers around the CG callbacks
         auto inner_mmul = [&](const CLArrayView<Complex> a, CLArrayView<Complex> b) -> void
@@ -767,46 +817,61 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clSetKernelArg (mmul_, 0, sizeof(Ap.handle()), &Ap.handle());
             clSetKernelArg (mmul_, 1, sizeof(Ai.handle()), &Ai.handle());
             clSetKernelArg (mmul_, 2, sizeof(Ax.handle()), &Ax.handle());
-            clSetKernelArg (mmul_, 3, sizeof(a),           &a);
-            clSetKernelArg (mmul_, 4, sizeof(b),           &b);
+            clSetKernelArg (mmul_, 3, sizeof(a.handle()),  &a.handle());
+            clSetKernelArg (mmul_, 4, sizeof(b.handle()),  &b.handle());
             clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
         auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
         {
-            // copy (using axpy; NOTE : this can be optimized)
-            //     y = x
-            Complex a = 1., b = 0.;
-            clSetKernelArg (axby_, 0, sizeof(a),          &a);
-            clSetKernelArg (axby_, 1, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (axby_, 2, sizeof(b),          &b);
-            clSetKernelArg (axby_, 3, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (axby_, 4, sizeof(y.handle()), &y.handle());
+            // multiply by the inverse diagonal
+            //     y = invd * x
+            clSetKernelArg (amul_, 0, sizeof(invd.handle()), &invd.handle());
+            clSetKernelArg (amul_, 1, sizeof(x.handle()),    &x.handle());
+            clSetKernelArg (amul_, 2, sizeof(y.handle()),    &y.handle());
+            clEnqueueNDRangeKernel (queue_, amul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
         };
         
         // solve using the CG solver
-        cg_callbacks<CLArray<Complex>,CLArrayView<Complex>>
+        cg_callbacks
+        <
+            CLArray<Complex>,
+            CLArrayView<Complex>
+        >
         (
             rsegment,               // rhs
-            zsegment,               // solution
+            zsegment,               // solution to be filled
             1e-11,                  // tolerance
             0,                      // min. iterations
-            Nspline * Nspline,      // max. iteration
+            Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false,                  // no verbose output
+            true,                   // verbose output?
+            new_opencl_array,       // return array that is initialized and connected to GPU
             axby_operation,         // a*x+b*y -> z operation
-            scalar_product          // scalar product of two CL arrays
+            scalar_product,         // scalar product of two CL arrays
+            compute_norm            // evaluate norm of the vector
         );
         
         // download data arrays from the GPU
         zsegment.EnqueueDownload(queue_);
         clFinish(queue_);
+        
+        // free GPU memory
+        rsegment.disconnect();
+        zsegment.disconnect();
+        Ap.disconnect();
+        Ai.disconnect();
+        Ax.disconnect();
+        
+        exit(0);
     }
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
+
 #endif
 
 const std::string JacobiCGPreconditioner::name = "Jacobi";
@@ -825,18 +890,10 @@ void JacobiCGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-    // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
-    
+    // compute inverse diagonals
     # pragma omp parallel for
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-    {
-        // resize data array
-        invd_[ill] = cArray(Nspline * Nspline, 1.);
-        
-        // divide by the diagonal
-        invd_[ill] /= dia_blocks_[ill].main_diagonal();
-    }
+        invd_[ill] = 1. / dia_blocks_[ill].main_diagonal();
     
     par_.wait();
 }
