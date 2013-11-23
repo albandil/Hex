@@ -24,7 +24,8 @@
 
 #define declareDeepUnaryOperatorTemplates(IN,OP)                              \
                                                                               \
-template <class T> IN<T> operator OP (IN<T> const & a)                        \
+template <class T>                                                            \
+IN<T> operator OP (IN<T> const & a)                                           \
 {                                                                             \
     IN<T> b(a);                                                               \
     for (T & e : b)                                                           \
@@ -44,8 +45,7 @@ template <                                                                    \
     class T1,                                                                 \
     class T2,                                                                 \
     class = typename std::enable_if<is_scalar<T2>::value>::type               \
-> auto operator OP##= (OUT<T1> & a, T2 const & b)                             \
-                                    -> OUT<decltype(T1(1) OP T2(1))>          \
+> OUT<T1> operator OP##= (OUT<T1> & a, T2 const & b)                          \
 {                                                                             \
     T1 * restrict pa = a.data();                                              \
                                                                               \
@@ -57,8 +57,7 @@ template <                                                                    \
 }                                                                             \
                                                                               \
 template <class T1, class T2>                                                 \
-auto operator OP##= (OUT<T1> & a, IN<T2> const & b)                           \
-                                    -> OUT<decltype(T1(1) OP T2(1))>          \
+OUT<T1> operator OP##= (OUT<T1> & a, IN<T2> const & b)                        \
 {                                                                             \
     assert(a.size() == b.size());                                             \
                                                                               \
@@ -83,8 +82,7 @@ template <                                                                    \
     class T1,                                                                 \
     class T2,                                                                 \
     class = typename std::enable_if<is_scalar<T2>::value>::type               \
-> auto operator OP##= (OUT<T1> a, T2 const & b)                               \
-                                    -> OUT<decltype(T1(1) OP T2(1))>          \
+> OUT<T1> operator OP##= (OUT<T1> a, T2 const & b)                            \
 {                                                                             \
     T1 * restrict pa = a.data();                                              \
                                                                               \
@@ -96,8 +94,7 @@ template <                                                                    \
 }                                                                             \
                                                                               \
 template <class T1, class T2>                                                 \
-auto operator OP##= (OUT<T1> a, IN<T2> b)                                     \
-                                    -> OUT<decltype(T1(1) OP T2(1))>          \
+OUT<T1> operator OP##= (OUT<T1> a, IN<T2> b)                                  \
 {                                                                             \
     assert(a.size() == b.size());                                             \
                                                                               \
@@ -122,18 +119,20 @@ declareShallowReducedArithmeticTemplates(ArrayView, /, ArrayView)
 
 #define declareDeepBinaryOperatorTemplates(OUT,OP,IN)                         \
                                                                               \
-template <class T1, class T2>                                                 \
-auto operator OP (IN<T1> const & a, IN<T2> const & b)                         \
-                                             -> OUT<decltype(T1(1) OP T2(1))> \
+template <                                                                    \
+    class T1,                                                                 \
+    class T2,                                                                 \
+    class T3 = decltype(T1(1) OP T2(1))                                       \
+> OUT<T3> operator OP (IN<T1> const & a, IN<T2> const & b)                    \
 {                                                                             \
     assert(a.size() == b.size());                                             \
                                                                               \
     size_t N = a.size();                                                      \
-    OUT<decltype(T1(1) OP T2(1))> c(N);                                       \
+    OUT<T3> c(N);                                                             \
                                                                               \
     T1 const * restrict pa = a.data();                                        \
-    T1 const * restrict pb = b.data();                                        \
-    T1       * restrict pc = c.data();                                        \
+    T2 const * restrict pb = b.data();                                        \
+    T3       * restrict pc = c.data();                                        \
                                                                               \
     for (size_t i = 0; i < N; i++)                                            \
         pc[i] = pa[i] OP pb[i];                                               \
@@ -144,15 +143,15 @@ auto operator OP (IN<T1> const & a, IN<T2> const & b)                         \
 template <                                                                    \
     class T1,                                                                 \
     class T2,                                                                 \
+    class T3 = decltype(T1(1) OP T2(1)),                                      \
     class = typename std::enable_if<is_scalar<T2>::value>::type               \
-> auto operator OP (IN<T1> const & a, T2 const & b)                           \
-                                             -> OUT<decltype(T1(1) OP T2(1))> \
+> OUT<T3> operator OP (IN<T1> const & a, T2 const & b)                        \
 {                                                                             \
     size_t N = a.size();                                                      \
-    OUT<decltype(T1(1) OP T2(1))> c(N);                                       \
+    OUT<T3> c(N);                                                             \
                                                                               \
     T1 const * restrict pa = a.data();                                        \
-    T1       * restrict pc = c.data();                                        \
+    T3       * restrict pc = c.data();                                        \
                                                                               \
     for (size_t i = 0; i < N; i++)                                            \
         pc[i] = pa[i] OP b;                                                   \
@@ -162,11 +161,20 @@ template <                                                                    \
 template <                                                                    \
     class T1,                                                                 \
     class T2,                                                                 \
+    class T3 = decltype(T1(1) OP T2(1)),                                      \
     class = typename std::enable_if<is_scalar<T1>::value>::type               \
-> auto operator OP (T1 const & a, IN<T2> const & b)                           \
-                                             -> OUT<decltype(T1(1) OP T2(1))> \
+> OUT<T3> operator OP (T1 const & a, IN<T2> const & b)                        \
 {                                                                             \
-    return operator OP (b, a);                                                \
+    size_t N = b.size();                                                      \
+    OUT<T3> c(N);                                                             \
+                                                                              \
+    T2 const * restrict pb = b.data();                                        \
+    T3       * restrict pc = c.data();                                        \
+                                                                              \
+    for (size_t i = 0; i < N; i++)                                            \
+        pc[i] = a OP pb[i];                                                   \
+                                                                              \
+    return c;                                                                 \
 }                                                                             \
 
 declareDeepBinaryOperatorTemplates(NumberArray, +, NumberArray)
