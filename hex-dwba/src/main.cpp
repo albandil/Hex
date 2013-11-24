@@ -32,10 +32,10 @@ int main (int argc, char *argv[])
     std::setvbuf(stderr, 0, _IONBF, 0);
     
     // print usage info if called in a wrong way
-    if (argc != 8)
+    if (argc != 7 and argc != 8)
     {
         std::cout << "\nUsage:\n";
-        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> <rmax>\n\n";
+        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> [<rmax>]\n\n";
         exit(0);
     }
     
@@ -48,7 +48,7 @@ int main (int argc, char *argv[])
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(Ni*Ni) + 1./(Nf*Nf));
     double sigmaeps = strtod(argv[6], 0);
-    double rmax = strtod(argv[7], 0);
+    double rmax = (argc == 8) ? strtod(argv[7], 0) : -1.;
     
     int MM = (2*Li+1)*(2*Lf+1);		// m⟶m"transition count
     

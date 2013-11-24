@@ -104,7 +104,7 @@ double DistortingPotential::getConstant () const
 double DistortingPotential::getFarRadius () const
 {
     // if the rmax has been overriden, use the supplied value
-    if (rmax_ != 0.)
+    if (rmax_ > 0.)
         return rmax_;
     
     //

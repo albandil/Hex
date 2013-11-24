@@ -6,7 +6,7 @@ CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNDEBUG
 LIB = -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -lcln -lfftw3
 
 LDEBUG = -g -fPIC $(LIB)
-LRILIS = -O3 -fPIC $(LIB)
+LRILIS = -Ofast -fPIC $(LIB)
 
 CXXFLAGS = $(CXXDEBUG)
 LFLAGS = $(LDEBUG)
