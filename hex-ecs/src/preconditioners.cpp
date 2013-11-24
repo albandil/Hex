@@ -715,7 +715,7 @@ void GPUCGPreconditioner::setup ()
     
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
-    clBuildProgram (program_, 1, &device_, nullptr, nullptr, nullptr);
+    clBuildProgram (program_, 1, &device_, "-cl-strict-aliasing -cl-fast-relaxed-math", nullptr, nullptr);
     
     cl_build_status status;
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);

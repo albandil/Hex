@@ -21,74 +21,169 @@
 #include "matrix.h"
 #include "misc.h"
 
-inline void complex_axby (Complex a, const cArrayView x, Complex b, const cArrayView y, cArrayView z)
+/**
+ * @brief Return new complex array.
+ * 
+ * Create (and return a copy of) a NumberArray<Complex> object. This is used as
+ * a default method of creating an array in cg_callbacks. It can be substituted
+ * by a different method, if necessary; for example when the created array needs
+ * to be registered at GPU first.
+ */
+inline cArray default_new_complex_array (size_t n)
 {
-    size_t N = z.size();
-    assert (N == x.size());
-    assert (N == y.size());
-    
-    // accelerators
-    Complex const * const restrict px = x.data();
-    Complex const * const restrict py = y.data();
-    Complex       * const restrict pz = z.data();
-    
-    // do the axby per element
-    for (size_t i = 0; i < N; i++)
-        pz[i] = a * px[i] + b * py[i];
+    return cArray(n);
 }
 
 /**
- * Callback-based Conjugate gradients.
+ * @brief Compute norm of an array.
+ * 
+ * This routine is the default way of how to compute a norm of an object. It can be
+ * overloaded by some more sophisticated implementation (e.g. BLAS or OpenCL version).
+ */
+inline double default_compute_norm (const cArrayView x)
+{
+    return x.norm();
+}
+
+/**
+ * @brief Do the @f$ \alpha x + \beta y @f$ operation.
+ * 
+ * Computes a linear combination of two vectors and stores the output in the first
+ * vector. This is a default implementation of the method. It can be substituted by
+ * another, if necessary; for example one could call specialized routine from BLAS
+ * or use a GPU kernel.
+ */
+inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArrayView y)
+{
+    size_t N = x.size();
+    assert (N == y.size());
+    
+    // accelerators
+    Complex       * const restrict px = x.data();
+    Complex const * const restrict py = y.data();
+    
+    // do the axby per element
+    for (size_t i = 0; i < N; i++)
+        px[i] = a * px[i] + b * py[i];
+}
+
+/**
+ * @brief Conjugate gradients solver.
+ * 
+ * Callback-based conjugate gradients. There is a variety of template arguments and
+ * function parameters that aim at generality so that the function can be used with
+ * various implementations of array arithmetic. The numerically intensive sections
+ * are being computed by user-supplied routines. Also the array types have a template
+ * character; they are
+ * - TArray: A stand-alone array type that can be allocated. Has to support
+ *           the methods "norm" (computation of 2-norm), "size" (length of the array)
+ *           and "data" (pointer to the raw data).
+ * - TArrayView: Either a reference to TArray, or a different compatible type that
+ *               supports the three listed methods. It is not necessary to be allocable.
+ * 
+ * 
+ * - NewArray: routine that allocates an array and possibly does something more, e.g.
+ *             registers the array at the computing device (GPU). NewArray has to be
+ *             compatible with the signature
+ *   @code
+ *       TArray (*NewArray)
+ *   @endcode
+ * - Preconditioner: routine that 
+ * 
  * @param b Right hand side.
  * @param x Output vector. An initial guess may be present at beginning.
  * @param eps Relative tolerance.
  * @param min_iterations Minimal iterations count.
  * @param max_iterations Maximal iterations count.
- * @param apply_preconditioner Functor compatible with void(*)(const Array&, Array&) prototype.
- *                             Should apply a custom preconditioner to a given vector.
- * @param matrix_multiply Functor compatible with void(*)(const Array&, Array&) prototype.
- *                        Should multiply the given vector by the matrix of the equation set.
+ * @param apply_preconditioner Functor compatible with the signature
+ *        @code
+ *            void (*) (const TArrayView, TArrayView)
+ *        @endcode
+ *        Applies a custom preconditioner to the vector given as first argument
+ *        and stores the result in the second argument.
+ * @param matrix_multiply Functor compatible with the signature
+ *        @code
+ *            void (*) (const TArrayView, TArrayView)
+ *        @endcode
+ *        Multiplies the vector given in the first argument by the matrix of the
+ *        equation set. The result will be stored in the second argument.
  * @param verbose Whether to display progress information.
+ * @param new_array Functor compatible with the signature
+ *        @code
+ *            TArray (*) (size_t)
+ *        @endcode
+ *        Allocates (and preprocesses, if needed) a new array of type TArray and
+ *        returns a copy of the array. This can be useful when the new arrays need
+ *        to be uploaded to a different computing device (mostly GPU).
+ * @param axby Functor compatible with the signature
+ *        @code
+ *            void (*) (Complex a, const TArrayView x, Complex b, const TArrayView y)
+ *        @endcode
+ *        Stores the linear combination @f$ a\mathbf{x} + b\mathbf{y} @f$ into the
+ *        array @f$ \mathbf{x} @f$.
+ * @param scalar_product Functor compatible with the signature
+ *        @code
+ *            Complex (*) (const TArrayView x, const TArrayView y)
+ *        @endcode
+ *        Computes the scalar product (without complex conjugation), i.e. the sum
+ *        @f[
+ *                 \sum_{i = 1}^N x_i y_i \ .
+ *        @f]
+ * 
  * @return Iteration count.
  */
-template <
+template
+<
     class TArray,
     class TArrayView,
     class Preconditioner,
     class MatrixMultiplication,
-    class AxbyOperation = decltype(complex_axby),
-    class ScalarProduct = decltype(operator|<Complex>)
-> unsigned cg_callbacks (
-    const TArrayView b,
-    TArrayView x,
-    double eps,
-    unsigned min_iterations, unsigned max_iterations,
-    Preconditioner apply_preconditioner,
+    class NewArray      = decltype(default_new_complex_array),
+    class AxbyOperation = decltype(default_complex_axby),
+    class ScalarProduct = decltype(operator|<Complex>),
+    class ComputeNorm   = decltype(default_compute_norm)
+>
+unsigned cg_callbacks
+(
+        const TArrayView b,
+              TArrayView x,
+                  double eps,
+                unsigned min_iterations,
+                unsigned max_iterations,
+          Preconditioner apply_preconditioner,
     MatrixMultiplication matrix_multiply,
-    bool verbose = true,
-    AxbyOperation axby = complex_axby,
-    ScalarProduct scalar_product = operator|<Complex>
-) {
+                    bool verbose        = true,
+                NewArray new_array      = default_new_complex_array,
+           AxbyOperation axby           = default_complex_axby,
+           ScalarProduct scalar_product = operator|<Complex>,
+             ComputeNorm compute_norm   = default_compute_norm
+)
+{
     Timer::timer().start();
     
     // compute norm of the right hand side
-    double bnorm = b.norm();
+    double bnorm = compute_norm(b);
     
-    // some arrays (search directions etc.)
+    // get size of the problem
     size_t N = b.size();
-    TArray p(N), q(N), z(N);
+    
+    // some auxiliary arrays (search directions etc.)
+    TArray p (std::move(new_array(N)));
+    TArray q (std::move(new_array(N)));
+    TArray z (std::move(new_array(N)));
     
     // residual; initialized to starting residual using the initial guess
-    TArray r(N);
-    matrix_multiply(x, r);
-    axby (1., b, -1., r, r);
+    TArray r (std::move(new_array(N)));
+    matrix_multiply(x, r); // r = A x
+    axby (-1., r, 1., b); // r = b - r
+    double rnorm = compute_norm(r);
     
     // if the (non-zero) initial guess seems horribly wrong,
     //    use rather the right hand side as the initial guess
-    if (r.norm() / bnorm > 1000)
+    if (rnorm / bnorm > 1000)
     {
         x.fill(0.);
-        r = b;
+        axby (0., r, 1., b); // r = b
     }
     
     // some other scalar variables
@@ -106,12 +201,12 @@ template <
         if (verbose)
         {
             std::cout << "\t[cg] Residual relative magnitude after "
-                    << k << " iterations: " << r.norm() / bnorm
+                    << k << " iterations: " << rnorm / bnorm
                     << " (" << sec / 60 << " min)\n";
         }
         
         // apply desired preconditioner
-        apply_preconditioner(r, z);
+        apply_preconditioner(r, z); // z = M⁻¹r
         
         // compute projection ρ = r·z
         rho_new = scalar_product(r, z);
@@ -119,12 +214,12 @@ template <
         // setup search direction p
         if (k == 0)
         {
-            axby (1., z, 0., z, p);
+            axby (0., p, 1., z); // p = z
         }
         else
         {
             beta = rho_new / rho_old;
-            axby (1., z, beta, p, p);
+            axby (beta, p, 1, z); // p = beta p + z
         }
         
         // move to next Krylov subspace by multiplying A·p
@@ -134,11 +229,11 @@ template <
         alpha = rho_new / scalar_product(p, q);
         
         // update the solution and the residual
-        axby (1., x, alpha, p, x);
-        axby (1., r, -alpha, q, r);
+        axby (1., x, alpha, p); // x = x + α p
+        axby (1., r, -alpha, q); // r = r - α q
         
         // compute and check norm
-        double rnorm = r.norm();
+        rnorm = compute_norm(r);
         if (not finite(rnorm))
         {
             std::cout << "\t[cg] Oh my god... the norm of the solution is not finite. Something went wrong!\n";

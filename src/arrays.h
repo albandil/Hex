@@ -130,6 +130,10 @@ template <class T> class ArrayView
         ArrayView (const_iterator i, const_iterator j)
             : N_(j - i), array_(const_cast<T*>(&(*i))) {}
         
+        // construct from right-value reference
+        ArrayView (ArrayView<T> && r)
+            : ArrayView() { std::swap(N_, r.N_); std::swap(array_, r.array_); }
+        
         // destructor
         virtual ~ArrayView () {}
     
@@ -500,10 +504,10 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         
         // copy constructor from Array rvalue reference
         NumberArray (NumberArray<T> && a)
-            : NumberArray()
+            : Array<T,Alloc>()
         {
-            std::swap(ArrayView<T>::N_,a.ArrayView<T>::N_);
-            std::swap(ArrayView<T>::array_,a.ArrayView<T>::array_);
+            std::swap(ArrayView<T>::N_, a.ArrayView<T>::N_);
+            std::swap(ArrayView<T>::array_, a.ArrayView<T>::array_);
             std::swap(Nres_,a.Nres_);
         }
         
@@ -824,7 +828,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         * @param docompress Whether to apply a trivial compression (contract the repeated zeros).
         * @param consec Minimal consecutive occurences for compression.
         */
-        bool  hdfsave (const char* name, bool docompress = false, int consec = 10) const
+        bool hdfsave (const char* name, bool docompress = false, int consec = 10) const
         {
             // save to HDF file
             HDFFile hdf(name, HDFFile::overwrite);
@@ -1219,7 +1223,7 @@ typedef Array<cArray>             cArrays;
  */
 inline rArray concatenate ()
 {
-    return rArray (0);
+    return rArray();
 }
 
 /**
@@ -1246,7 +1250,7 @@ template <typename ...Params> rArray concatenate (rArray const & v1, Params ...p
         for (size_t i = 0; i < v2.size(); i++)
             v[i + v1.size()] = v2[i];
         return v;
-    }	
+    }
 }
 
 // return absolute values
