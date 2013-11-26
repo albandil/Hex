@@ -633,47 +633,17 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 #ifndef NO_OPENCL
 
-const char * const source =
-"inline double2 complex_multiply (double2 a, double2 b)                                                                                    \n"
-"{                                                                                                                                         \n"
-"    double2 c;                                                                                                                            \n"
-"    c.x = a.x * b.x - a.y * b.y;                                                                                                          \n"
-"    c.y = a.x * b.y + a.y * b.x;                                                                                                          \n"
-"    return c;                                                                                                                             \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void a_vec_b_vec (__private double2 a, __global double2 *x, __private double2 b, __global double2 *y)                            \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    x[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);                                                                           \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void vec_mul_vec (__global double2 *a, __global double2 *b, __global double2 *c)                                                 \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    c[i] = complex_multiply(a[i],b[i]);                                                                                                   \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void vec_norm (__global double2 *v, __global double *n)                                                                          \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    double2 vi = v[i];                                                                                                                    \n"
-"    n[i] = vi.x * vi.x + vi.y * vi.y;                                                                                                     \n"
-"}                                                                                                                                         \n"
-"                                                                                                                                          \n"
-"__kernel void CSR_dot_vec (__global long *Ap, __global long *Ai, __global double2 *Ax, __global double2 *x, __global double2 *y)          \n"
-"{                                                                                                                                         \n"
-"    uint i = get_global_id(0);                                                                                                            \n"
-"    double2 sprod = 0.;                                                                                                                   \n"
-"                                                                                                                                          \n"
-"    for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)                                                                                         \n"
-"        sprod += complex_multiply(Ax[idx],x[Ai[idx]]);                                                                                    \n"
-"                                                                                                                                          \n"
-"    y[i] = sprod;                                                                                                                         \n"
-"}                                                                                                                                         \n";
-
 const std::string GPUCGPreconditioner::name = "gpucg";
 const std::string GPUCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients (GPU variant).";
+
+// kernels' source as byte array, generated by "xxd" from the CL source
+char kernels_cl [] = {
+    #include "kernels_cl.c"
+    , 0x00 // terminate the string by zero
+};
+
+// pointer to the source; to be used in setup
+char * source = &kernels_cl[0];
 
 void GPUCGPreconditioner::setup ()
 {

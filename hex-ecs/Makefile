@@ -60,4 +60,7 @@ obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CPP) $(CFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
+src/kernels_cl.c: src/kernels.cl
+	xxd -i src/kernels.cl | tail -n+2 | head -n-2 > src/kernels_cl.c
+
 -include $(wildcard obj/*.dep)
