@@ -95,7 +95,7 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
     // multiply matrix row by the vector (per component)
     if (ilocal < Ndiag)
     {
-        tmp[ilocal] = A[ilocal] * x[icol];
+        tmp[ilocal] = complex_multiply(A[ilocal],x[icol]);
     }
     
     // filter out NaN-s
