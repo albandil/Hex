@@ -1299,7 +1299,7 @@ void SymDiaMatrix::setup_dptrs_()
     for (int i = 0; i <= d; i++)
     {
         dptrs_[i] = ptr;
-        ptr += n_ - i;
+        ptr += n_ - idiag_[i];
     }
 }
 
@@ -1900,13 +1900,16 @@ cArray SymDiaMatrix::toPaddedRows () const
         // get data pointer for this diagonal
         Complex const * const pa = dptr(idiag);
         
+        // get diagonal label
+        int ldiag = diag(idiag);
+        
         // store the upper diagonal elements
-        for (int i = 0; i + idiag < Nrows; i++)
-            padr[ndiag - 1 + idiag + i * Ndiag] = pa[i];
+        for (int irow = 0; irow + ldiag < Nrows; irow++)
+            padr[ndiag - 1 + idiag + irow * Ndiag] = pa[irow];
         
         // store the lower diagonal elements
-        for (int i = idiag; i < Nrows; i++)
-            padr[ndiag - 1 - idiag + i * Ndiag] = pa[i - idiag];
+        for (int irow = ldiag; irow < Nrows; irow++)
+            padr[ndiag - 1 - idiag + irow * Ndiag] = pa[irow - ldiag];
     }
     
     return padr;
