@@ -1431,6 +1431,7 @@ public:
     // Conversions to other formats
     //
     
+    cArray toPaddedRows () const;
     CooMatrix tocoo (MatrixTriangle triangle = both) const;
     RowMatrix<Complex> torow (MatrixTriangle triangle = both) const;
     

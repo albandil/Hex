@@ -652,6 +652,7 @@ void GPUCGPreconditioner::setup ()
     
     // reserve space for diagonal blocks
     csr_blocks_.resize(l1_l2_.size());
+    block_.resize(l1_l2_.size());
     
     std::cout << "Setting up OpenCL environment\n";
     char text [1000];
@@ -709,7 +710,13 @@ void GPUCGPreconditioner::update (double E)
     NoPreconditioner::update(E);
     
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
+    {
+        // convert DIA block to CSR [TEMPORARY]
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
+        
+        // resize and clear the array data
+        block_[ill] = dia_blocks_[ill].toPaddedRows();
+    }
 }
 
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const

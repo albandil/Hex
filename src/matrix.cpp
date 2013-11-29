@@ -1875,3 +1875,39 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
     
     return M;
 }
+
+cArray SymDiaMatrix::toPaddedRows () const
+{
+    // stored diagonals count
+    int ndiag = diag().size();
+    
+    // all diagonals count
+    int Ndiag = 2 * ndiag - 1;
+    
+    // row count
+    int Nrows = n_;
+    
+    // create zero array of the right length
+    cArray padr (Nrows * Ndiag);
+    
+    // add main diagonal
+    for (int i = 0; i < Nrows; i++)
+        padr[ndiag - 1 + i * Ndiag] = data()[i];
+    
+    // add non-main diagonals
+    for (int idiag = 1; idiag < ndiag; idiag++)
+    {
+        // get data pointer for this diagonal
+        Complex const * const pa = dptr(idiag);
+        
+        // store the upper diagonal elements
+        for (int i = 0; i + idiag < Nrows; i++)
+            padr[ndiag - 1 + idiag + i * Ndiag] = pa[i];
+        
+        // store the lower diagonal elements
+        for (int i = idiag; i < Nrows; i++)
+            padr[ndiag - 1 - idiag + i * Ndiag] = pa[i - idiag];
+    }
+    
+    return padr;
+}

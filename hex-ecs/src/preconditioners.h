@@ -325,6 +325,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         
         // diagonal blocks
         std::vector<CsrMatrix> csr_blocks_;
+        std::vector<cArray> block_;
         
         // OpenCL environment
         cl_platform_id platform_;
