@@ -1,7 +1,22 @@
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2013                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 /**
  * @brief Complex multiplication.
+ * 
+ * Multiplies two complex numbers and returns the product.
  */
-inline double2 complex_multiply (double2 a, double2 b)
+inline double2 cpxm (double2 a, double2 b)
 {
     double2 c;
     c.x = a.x * b.x - a.y * b.y;
@@ -11,24 +26,34 @@ inline double2 complex_multiply (double2 a, double2 b)
 
 /**
  * @brief AXBY operation.
+ * 
+ * Computes the linear combination @f$ ax + by @f$ of vectors @f$ x @f$ and 
+ * @f$ y @f$ and stores the result in @f$ x @f$.
  */
 kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
 {
     uint i = get_global_id(0);
-    x[i] = complex_multiply(a,x[i]) + complex_multiply(b,y[i]);
+    x[i] = cpxm(a,x[i]) + cpxm(b,y[i]);
 }
 
 /**
  * @brief Vector-vector multiplication.
+ * 
+ * Computes per-element vector-vector multiplication @f$ a * b @f$ and stores
+ * the resulting vector in @f$ c @f$,
  */
 kernel void vec_mul_vec (global double2 *a, global double2 *b, global double2 *c)
 {
     uint i = get_global_id(0);
-    c[i] = complex_multiply(a[i],b[i]);
+    c[i] = cpxm(a[i],b[i]);
 }
 
 /**
  * @brief Per-element square of a vector.
+ * 
+ * Similarly to @ref vec_mul_vec, computes a per-element square of
+ * a given vector @f$ v @f$ and stores the result in the vector 
+ * given as the second argument.
  */
 kernel void vec_norm (global double2 *v, global double *n)
 {
@@ -39,6 +64,10 @@ kernel void vec_norm (global double2 *v, global double *n)
 
 /**
  * @brief CSR-matrix-vector multiplication.
+ * 
+ * Multiplies the given vector @f$ x @f$ by a compressed sparse row-major
+ * matrix given as three arrays (row pointers, column indices and matrix
+ * elements). The resulting vector is stored in @f$ y @f$.
  */
 kernel void CSR_dot_vec (global long *Ap, global long *Ai, global double2 *Ax, global double2 *x, global double2 *y)
 {
@@ -46,20 +75,24 @@ kernel void CSR_dot_vec (global long *Ap, global long *Ai, global double2 *Ax, g
     double2 sprod = 0.;
     
     for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)
-        sprod += complex_multiply(Ax[idx],x[Ai[idx]]);
+        sprod += cpxm(Ax[idx],x[Ai[idx]]);
     
     y[i] = sprod;
 }
 
-/**
- * @brief DIA-matrix-vector multiplication.
- */
-kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y)
+/*kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y)
 {
-    // B-spline order and derived numbers to be supplied before compilation
-    const uint order = 5;
-    const uint Ndiag = 121;
-    const uint Nlocal = 128;
+    // some compile-time constants ------------------------------------- //
+    //
+    
+    // NOTE : Need to be modified by the program if
+    //                 order != 5        or
+    //               Nspline != 114
+    
+    #define Ndiag   121    // = (2*order + 1)^2
+    #define Nlocal  128    // = Ndiag rounded to multiple of 64
+    #define Nrow    13689  // = Nspline^2
+    #define Ncol    13689  // = Nspline^2
     
     // diagonal labels
     const int diagonals [] = {
@@ -74,35 +107,29 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
          346,  347,  348,  349,  350,  351,  352,  353,  354,  355,  356,
          463,  464,  465,  466,  467,  468,  469,  470,  471,  472,  473,
          580,  581,  582,  583,  584,  585,  586,  587,  588,  589,  590
-    };
+    };    
+                                                                         //
+    // ----------------------------------------------------------------- //
     
     // get group indices (numbering the rows)
     int irow = get_group_id(0);
-    int Nrow = get_num_groups(0);
+    
+    // get global indices (numbering the consecutive elements of matrix)
+    int ielem = get_global_id(0) % get_local_size(0) + irow * Ndiag;
     
     // get local indices (numbering the diagonals)
     int ilocal = get_local_id(0);
-    
-    // get column index
+        
+    // get column indices
     int icol = irow + diagonals[ilocal];
-    
-    // --------------------------------------------------------------------- //
     
     // define and clear the temporary result array
     local double2 tmp[Nlocal];
     tmp[ilocal] = 0.;
     
-    // multiply matrix row by the vector (per component)
-    if (ilocal < Ndiag)
-    {
-        tmp[ilocal] = complex_multiply(A[ilocal],x[icol]);
-    }
-    
-    // filter out NaN-s
-    if (!(tmp[ilocal] == tmp[ilocal]))
-    {
-        tmp[ilocal] = 0.;
-    }
+    // multiply matrix row by the vector (per component, mask by column range)
+    if (ilocal < Ndiag && 0 <= icol && icol < Ncol)
+        tmp[ilocal] = cpxm(A[ielem],x[icol]);
     
     // wait for finish of local memory writes
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -111,18 +138,18 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
     uint stride = 1, size = Nlocal;
     while (size > 1)
     {
-        if (ilocal % (2 * stride) == 0)
-            tmp[ilocal] += tmp[ilocal + stride];
+        // sum elements
+        tmp[ilocal] += tmp[ilocal + stride];
         
+        // update stride and size
         stride *= 2;
         size /= 2;
+        
+        // wait for finish of local memory writes
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
-    
-    // --------------------------------------------------------------------- //
     
     // group master will store the result of the dot product
     if (ilocal == 0)
-    {
-        y[irow] += tmp[0];
-    }
-}
+        y[irow] = tmp[0];
+}*/

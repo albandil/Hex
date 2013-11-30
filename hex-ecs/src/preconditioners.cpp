@@ -623,7 +623,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            true
+            false                   // verbose output
         );
     }
     
@@ -709,19 +709,21 @@ void GPUCGPreconditioner::update (double E)
 {
     NoPreconditioner::update(E);
     
+    std::cout << "Update preconditioner..." << std::flush;
+    
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
     {
-        // convert DIA block to CSR [TEMPORARY]
+        // convert DIA block to CSR
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
-        
-        // resize and clear the array data
-        block_[ill] = dia_blocks_[ill].toPaddedRows();
     }
+    
+    std::cout << "ok\n";
 }
 
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     // shorthands
+    size_t order = s_rad_.bspline().order();
     size_t Nspline = s_rad_.bspline().Nspline();
     size_t Nsegsiz = Nspline * Nspline;
     
@@ -819,11 +821,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         };
         
         // solve using the CG solver
-        cg_callbacks
-        <
-            CLArray<Complex>,
-            CLArrayView<Complex>
-        >
+        cg_callbacks < CLArray<Complex>, CLArrayView<Complex> >
         (
             rsegment,               // rhs
             zsegment,               // solution to be filled
@@ -832,7 +830,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false,                  // verbose output?
+            false,                  // verbose output
             new_opencl_array,       // return array that is initialized and connected to GPU
             axby_operation,         // a*x+b*y -> z operation
             scalar_product,         // scalar product of two CL arrays

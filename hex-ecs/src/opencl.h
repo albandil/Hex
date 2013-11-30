@@ -155,8 +155,10 @@ template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray
             : CLArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < n; i++) (*this)[i] = x; }
         CLArray (ArrayView<T> v, size_t i = 0, size_t n = 0)
             : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n)) { for (size_t j = 0; j < size(); j++) (*this)[j] = v[i+j]; }
+        CLArray (std::initializer_list<T> list)
+            : CLArrayView<T>(list.size(), Alloc::alloc(list.size())) { size_t i = 0; for (auto it = list.begin(); it != list.end(); it++) (*this)[i++] = *it; }
         CLArray (CLArray<T,Alloc> && rvrf)
-            : CLArrayView<T>(std::move(rvrf)) { /*std::cout << "Init CLArray from CLArray&&.\n";*/ }
+            : CLArrayView<T>(std::move(rvrf)) {}
         
         //
         // destructor
