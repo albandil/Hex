@@ -1,0 +1,78 @@
+
+        / /   / /    __    \ \  / /
+       / /__ / /   / _ \    \ \/ /
+      /  ___  /   | |/_/    / /\ \
+     / /   / /    \_\      / /  \ \
+
+                 HEX-ECS
+
+------------
+Dependencies
+------------
+
+The program is written in C++11 and can be successfully compiled by the
+following compilers:
+
+ * GCC 4.7.2
+ * Intel C++ 14.0 (tested with GCC 4.7.2 headers only)
+ 
+There are several external libraries that are being used for some partial tasks.
+Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
+Makefile and the library link is removed from LIBRARY variable in Makefile.
+Here is the list of the libraries with versions that were used:
+
+ * OpenMPI 1.6
+            Optional, can be eluded by -DNO_MPI.
+            Used for distributed parallellization (hex-ecs --mpi).
+
+ * HDF 1.8.11
+            Needed, obtainable from 
+                http://www.hdfgroup.org/HDF5/release/obtain5.html
+            Used for intermediate output of results.
+
+ * UMFPACK 5.6.1
+            Needed, obtainable as a part of SuiteSparse from 
+                http://www.cise.ufl.edu/research/sparse/SuiteSparse/
+            Used for solution of sparse linear systems.
+
+ * OpenBLAS 0.2.8
+            Optional, but some BLAS implementation is necessary for SuiteSparse
+            for dense matrix kernels. OpenBLAS is one of the best open-source
+            implementations. Obtainable from
+                http://www.openblas.net/
+            Not directly used by hex-ecs.
+
+ * GSL 1.15
+            Needed, obtainable from
+                http://www.gnu.org/software/gsl/
+            Used for special functions and some others.
+
+ * FFTW 3.3.3
+            Needed, obtainable from
+                http://www.fftw.org/download.html
+            Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
+
+ * OpenCL 1.2
+            Optional, obtainable from CPU/GPU manufacturer web pages or from
+            other vendors. Used for [preliminary] GPU support (preconditioner
+            "gpuJacobi").
+
+
+-------------
+Build and run
+-------------
+
+Once the needed libraries are present in the system include and library paths,
+all that is necessary to build the program is running "make" from this directory.
+
+> make
+
+This should create an executable "hex-ecs" in the subdirectory "bin/". A simple
+test run can be executed in the following way:
+
+> mkdir test ; cd test                 # create a subdirectory for the test run
+> ../bin/hex-ecs --example             # generate a sample input file
+> ../bin/hex-ecs --input example.inp   # use the input file
+
+If the libraries are installed in non-standard locations, one needs to edit the
+Makefile accordingly.
