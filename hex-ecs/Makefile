@@ -30,7 +30,7 @@ LAPACKFLAGS = -DNO_LAPACK
 
 # PNG++ environment
 PNGFLAGS = -DNO_PNG
-# PNGPPINCLUDE = -I$(shell pwd)/../libs
+# PNGPPINCLUDE = -I./libs
 # PNGPPLIBS = -lpng
                                                                                     #
 #####################################################################################
