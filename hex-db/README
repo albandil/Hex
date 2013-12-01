@@ -1,0 +1,70 @@
+
+        / /   / /    __    \ \  / /
+       / /__ / /   / _ \    \ \/ /
+      /  ___  /   | |/_/    / /\ \
+     / /   / /    \_\      / /  \ \
+
+                 HEX-DB
+
+------------
+Dependencies
+------------
+
+The program is written in C++11 and can be successfully compiled by the
+following compilers:
+
+ * GCC 4.7.2
+ * Intel C++ 14.0 (tested with GCC 4.7.2 headers only)
+ 
+There are several external libraries that are being used for some partial tasks.
+Here is the list of the libraries with versions that were used:
+
+ * GSL 1.15
+            Obtainable from
+                http://www.gnu.org/software/gsl/
+            Used for special functions and some others.
+
+ * FFTW 3.3.3
+            Obtainable from
+                http://www.fftw.org/download.html
+            Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
+
+ * o2scl 0.912
+			Obtainable from
+				http://o2scl.sourceforge.net/
+			Used for interpolation. Note that higher versions are not compatible
+			with hex-dwba.
+
+ * SQLite 3.7.14
+			Obtainable from
+				http://www.sqlite.org/download.html
+			Used for access to the database files.
+
+-------------
+Build and run
+-------------
+
+Once the needed libraries are present in the system include and library paths,
+all that is necessary to build the program is running "make" from this directory.
+
+> make
+
+This should create an executable "hex-db" in the subdirectory "bin/". One can
+then create an empty database by the command
+
+> bin/hex-db --new
+
+The tables present in the new database can be listed using "sqlite3" program,
+
+> sqlite3 hex.db .tables    # prints "ccs ics ionf tmat"
+
+The SQL statements used to create the tables can be retrieved similarly,
+
+> sqlite3 hex.db .schema
+
+As soon as there are some data to import, one will run
+
+> bin/hex-db --import <SQL_batch_file> --update
+
+If the external libraries are installed in non-standard locations, one needs to
+edit the Makefile accordingly.

@@ -2,19 +2,20 @@
 
 CPP = g++
 
-CFLAGS = -Wall -std=c++11 -I $(shell pwd)/../libs -fPIC
-LFLAGS = -L $(shell pwd)/../libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
+CFLAGS = -Wall -std=c++11 -I $(shell pwd)/libs -fPIC
+LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
+# CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
 
-SQLITEPP = ../libs/libsqlitepp.a
+SQLITEPP = libs/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction
-SQLITEPPSRC = $(patsubst %,../libs/sqlitepp/%.cpp,$(SQLITEPPNAMES))
+SQLITEPPSRC = $(patsubst %,libs/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
 FILES = arrays hex-db specf variables vec3d version
@@ -61,7 +62,7 @@ obj/%.o: src/var/%.cpp
 # -----------------------------------------------------------------------------
 # SQLite++ library
 
-$(SQLITEPPOBJ) : obj/%.o : ../libs/sqlitepp/%.cpp
+$(SQLITEPPOBJ) : obj/%.o : libs/sqlitepp/%.cpp
 	g++ -O2 -fPIC -c $^ -o $@
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
