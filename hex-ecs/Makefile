@@ -1,38 +1,54 @@
 .PHONY: all doc clean pollversion
 
+###################################################################################
+# Editable section
+
+# Compiler executable
 CPP = g++
 
+# Suite Sparse environment
 SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconfig
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
+# OpenMPI environment
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
-# AMD OpenCL
-OPENCLINCLUDE = -I/opt/AMDAPP/include
-OPENCLLIBS = -lOpenCL
+# AMD OpenCL environment
+OPENCLFLAGS = -DNO_OPENCL
+# OPENCLINCLUDE = -I/opt/AMDAPP/include
+# OPENCLLIBS = -lOpenCL
 
-# Intel OpenCL
+# Intel OpenCL environment
 # OPENCLINCLUDE = -I/opt/intel/opencl-1.2-3.1.1.11385/include
 # OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
 
-INCLUDE = $(OPENMPIINCLUDE) -I$(shell pwd)/../libs $(OPENCLINCLUDE)
-LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
+# Lapack environment
+LAPACKFLAGS = -DNO_LAPACK
+# LAPACKINCLUDE =
+# LAPACKLIBS = -lgfortran -llapack
+
+# PNG++ environment
+PNGFLAGS = -DNO_PNG
+# PNGPPINCLUDE = -I$(shell pwd)/../libs
+# PNGPPLIBS = -lpng
+                                                                                    #
+#####################################################################################
+
+INCLUDE = $(OPENMPIINCLUDE) $(OPENCLINCLUDE) $(LAPACKINCLUDE) $(PNGPPINCLUDE)
+LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) \
 	-lmpi -lmpi_cxx -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
-	-lm -lfftw3 -lgfortran -lpng -llapack
+	-lm -lfftw3 $(OPENCLLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-LFLAGS_DEBUG = -g -fopenmp -fPIC $(LIBRARY)
-
 CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-LFLAGS_RELEASE = -Ofast -fopenmp -fPIC $(LIBRARY)
 
-# CFLAGS = $(CFLAGS_DEBUG)
-# LFLAGS = $(LFLAGS_DEBUG)
-CFLAGS = $(CFLAGS_RELEASE)
-LFLAGS = $(LFLAGS_RELEASE)
+LFLAGS = -fopenmp -fPIC $(LIBRARY)
+
+# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
 	matrix preconditioners radial slater specf version
