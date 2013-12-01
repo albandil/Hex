@@ -799,12 +799,14 @@ class Preconditioners
             NoPreconditioner,           // No preconditioner.
             CGPreconditioner,           // Solve diagonal blocks by non-preconditioned CG iterations.
             JacobiCGPreconditioner,     // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+#ifndef NO_OPENCL
             GPUCGPreconditioner,        // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
-            SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
-            MultiresPreconditioner,     // Multi-resolution preconditioner (@note not implemented yet).
-            SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.
-            TwoLevelPreconditioner,     // Solve diagonal blocks by two-level precondtioned CG iterations.
-            DICCGPreconditioner         // Diagonal incomplete Cholesky factorization + CG iterations.
+#endif
+            SSORCGPreconditioner        // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+//             MultiresPreconditioner,     // Multi-resolution preconditioner.
+//             SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.
+//             TwoLevelPreconditioner,     // Solve diagonal blocks by two-level precondtioned CG iterations.
+//             DICCGPreconditioner         // Diagonal incomplete Cholesky factorization + CG iterations.
         > AvailableTypes;
         
         /**
