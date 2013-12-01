@@ -48,7 +48,7 @@ CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGI
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
 # CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) -mtune=native -march=native
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
 	matrix preconditioners radial slater specf version
