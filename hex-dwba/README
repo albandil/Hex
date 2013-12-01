@@ -1,0 +1,81 @@
+
+        / /   / /    __    \ \  / /
+       / /__ / /   / _ \    \ \/ /
+      /  ___  /   | |/_/    / /\ \
+     / /   / /    \_\      / /  \ \
+
+                 HEX-DWBA
+
+------------
+Dependencies
+------------
+
+The program is written in C++11 and can be successfully compiled by the
+following compilers:
+
+ * GCC 4.7.2
+ * Intel C++ 14.0 (tested with GCC 4.7.2 headers only)
+ 
+There are several external libraries that are being used for some partial tasks.
+Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
+Makefile and the library link is removed from LIBRARY variable in Makefile.
+Here is the list of the libraries with versions that were used:
+
+ * HDF 1.8.11
+            Optional, obtainable from 
+                http://www.hdfgroup.org/HDF5/release/obtain5.html
+            Used for intermediate output of results.
+
+ * GSL 1.15
+            Needed, obtainable from
+                http://www.gnu.org/software/gsl/
+            Used for special functions and some others.
+
+ * FFTW 3.3.3
+            Needed, obtainable from
+                http://www.fftw.org/download.html
+            Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
+
+ * o2scl 0.912
+            Obtainable from
+                http://o2scl.sourceforge.net/
+            Used for interpolation. Note that higher versions are not compatible
+            with hex-dwba.
+
+
+-------------
+Build and run
+-------------
+
+Once the needed libraries are present in the system include and library paths,
+all that is necessary to build the program is running "make" from this directory.
+
+> make
+
+This should create an executable "hex-dwba" in the subdirectory "bin/". A simple
+test run can be executed in the following way:
+
+> mkdir test ; cd test                 # create a subdirectory for the test run
+> ../bin/hex-dwba 1 0 1 0 4. 1e-5      # run simple computation H(1s)->H(1s) 4Ry
+
+The last line of output will contain the following entries:
+ 1) impact energy (4 Ry)
+ 2) cross sections
+ 3) partial wave count
+
+The cross sections are given in the following order
+
+  For mi = -li, ..., li
+  {
+    For mf = -lf, ..., lf
+    {
+      WRITE sigma(mi,mf)
+    }
+    WRITE Sum[mf] { sigma(mi,mf) }
+  }
+  WRITE Sum[mi,mf] { sigma(mi,mf) }
+
+In our case mi = mf = li = lf = 0, so there are three identical numbers.
+
+If the libraries are installed in non-standard locations, one needs to edit the
+Makefile accordingly.
