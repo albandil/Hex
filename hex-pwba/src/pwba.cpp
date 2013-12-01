@@ -259,12 +259,21 @@ int main(int argc, char* argv[])
     //
     
     std::cout << Ei << "\t";
+    double sumsumsigma = 0;
     for (int Mi = -Li; Mi <= Li; Mi++)
-    for (int Mf = -Lf; Mf <= Lf; Mf++)
     {
-        auto tcs = cross_section(ki,Li,Mi,kf,Lf,Mf,maxL,Idir,Iexc);
-        std::cout << tcs.first + tcs.second << "\t" << tcs.first << "\t" << tcs.second;
+        double sumsigma = 0;
+        for (int Mf = -Lf; Mf <= Lf; Mf++)
+        {
+            std::pair<double,double> cs = cross_section (ki,Li,Mi,kf,Lf,Mf,maxL,Idir,Iexc);
+            double tcs = cs.first + cs.second;
+            sumsigma += tcs;
+            std::cout << tcs << "\t";
+        }
+        sumsumsigma += sumsigma;
+        std::cout << sumsigma << "\t";
     }
+    std::cout << sumsumsigma << "\t";
     std::cout << maxL << "\n";
     
     //

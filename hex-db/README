@@ -30,15 +30,15 @@ Here is the list of the libraries with versions that were used:
             Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
 
  * o2scl 0.912
-			Obtainable from
-				http://o2scl.sourceforge.net/
-			Used for interpolation. Note that higher versions are not compatible
-			with hex-dwba.
+            Obtainable from
+                http://o2scl.sourceforge.net/
+            Used for interpolation. Note that higher versions are not compatible
+            with hex-dwba.
 
  * SQLite 3.7.14
-			Obtainable from
-				http://www.sqlite.org/download.html
-			Used for access to the database files.
+            Obtainable from
+                http://www.sqlite.org/download.html
+            Used for access to the database files.
 
 -------------
 Build and run
