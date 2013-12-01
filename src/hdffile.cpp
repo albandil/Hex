@@ -10,6 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#ifndef NO_HDF
+
 #include <iostream>
 #include <string>
 #include <H5Cpp.h>
@@ -170,3 +172,5 @@ bool HDFFile::write_(std::string dataset, void const * buffer, hsize_t length, H
         return false;
     }
 }
+
+#endif

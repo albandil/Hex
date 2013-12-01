@@ -813,7 +813,6 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             }
         }
     
-#ifndef NO_HDF
         /**
         * @brief Save array to HDF file.
         * 
@@ -830,6 +829,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         */
         bool hdfsave (const char* name, bool docompress = false, int consec = 10) const
         {
+#ifndef NO_HDF
             // save to HDF file
             HDFFile hdf(name, HDFFile::overwrite);
             
@@ -866,6 +866,9 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             }
             
             return true;
+#else
+            return false;
+#endif
         }
         
         /**
@@ -874,6 +877,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         */
         bool hdfload (std::string name)
         {
+#ifndef NO_HDF
             // open the file
             HDFFile hdf(name, HDFFile::readonly);
             
@@ -914,6 +918,9 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             *this = elements.decompress(zero_blocks);
             
             return true;
+#else
+            return false;
+#endif
         }
         
         // get compressed array
@@ -1021,7 +1028,6 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             return unpack;
         }
-#endif
 };
 
 #include "arrithm.h"

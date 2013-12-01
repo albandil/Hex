@@ -1,17 +1,22 @@
 .PHONY: all clean doc
 
-CXXDEBUG = -g -fPIC -std=c++11 -Wall
-CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNDEBUG
+##############################################################
+# Editable part
 
-LIB = -lrt -lopenblas -lo2scl -lgsl -lgslcblas -lhdf5 -lhdf5_cpp -lcln -lfftw3
+# HDF library
+HDFFLAGS = -DNO_HDF
+# HDFINCLUDE = 
+# HDFLIBS = -lhdf5 -lhdf5_cpp
+                                                              #
+###############################################################
 
-LDEBUG = -g -fPIC $(LIB)
-LRILIS = -Ofast -fPIC $(LIB)
+CXXDEBUG = -g -fPIC -std=c++11 -Wall $(HDFINCLUDE) $(HDFFLAGS)
+CXXRILIS = -O3 -fPIC -std=c++11 -Wall $(HDFINCLUDE) $(HDFFLAGS) -DNDEBUG
+LIBRARY = -lrt -lo2scl -lgsl -lgslcblas -lfftw3 $(HDFLIBS)
 
-CXXFLAGS = $(CXXDEBUG)
-LFLAGS = $(LDEBUG)
-# CXXFLAGS = $(CXXRILIS)
-# LFLAGS = $(LRILIS)
+# CXXFLAGS = $(CXXDEBUG)
+CXXFLAGS = $(CXXRILIS)
+LFLAGS = -fPIC $(LIBRARY)
 
 FILES = arrays dwba1 hdffile hydrogen main potential specf wave_distort
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))

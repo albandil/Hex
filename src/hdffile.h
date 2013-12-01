@@ -10,8 +10,10 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_HDFFILE_H
-#define HEX_HDFFILE_H
+#ifndef HEX_HDFFILE
+#define HEX_HDFFILE
+
+#ifndef NO_HDF
 
 #include <string>
 #include <H5Cpp.h>
@@ -50,5 +52,7 @@ private:
     bool read_(std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const;
     bool write_(std::string dataset, void const * buffer, hsize_t length, H5::AtomType dtype);
 };
+
+#endif
 
 #endif

@@ -25,7 +25,9 @@
 int main (int argc, char *argv[])
 {
     // 	gsl_set_error_handler_off();
+#ifndef NO_HDF
     H5::Exception::dontPrint();
+#endif
     
     // disable STDOUT/STDERR buffering
     std::setvbuf(stdout, 0, _IONBF, 0);
