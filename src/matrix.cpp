@@ -1691,9 +1691,9 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
     // - "aligned" to convince the auto-vectorizer that vectorization is worth
     // NOTE: cArray (= NumberArray<Complex>) is aligned on sizeof(Complex) boundary
     // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
-    Complex       *       restrict rp_res    = (Complex*)aligned_ptr(&res[0],    sizeof(Complex));
-    Complex const *       restrict rp_elems_ = (Complex*)aligned_ptr(&elems_[0], sizeof(Complex));
-    Complex const * const restrict rp_B      = (Complex*)aligned_ptr(&B[0],      sizeof(Complex));
+    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(&res[0],    sizeof(Complex));
+    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(&elems_[0], sizeof(Complex));
+    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(&B[0],      sizeof(Complex));
     
     // for all elements in the main diagonal
     if (triangle & diagonal)
@@ -1722,13 +1722,13 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
         // for all elements of the current diagonal
         if (triangle & strict_upper)
         {
-            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
+//             # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
             for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem]         += rp_elems_[ielem] * rp_B[ielem + idiag];
         }
         if (triangle & strict_lower)
         {
-            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
+//             # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
             for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem + idiag] += rp_elems_[ielem] * rp_B[ielem];
         }
