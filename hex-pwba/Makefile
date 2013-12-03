@@ -1,6 +1,14 @@
 .PHONY: all clean doc
 
+##############################################################
+# Editable part
+
+# compiler executable
 CXX = g++
+# CXX = icpc
+                                                             #
+##############################################################
+
 CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF
 LFLAGS = -lgsl -lgslcblas -lo2scl -lcln
 

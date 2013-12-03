@@ -3,6 +3,9 @@
 ##############################################################
 # Editable part
 
+CXX = g++
+# CXX = icpc
+
 # HDF library
 HDFFLAGS = -DNO_HDF
 # HDFINCLUDE = 
@@ -27,11 +30,11 @@ all: bin/hex-dwba
 
 bin/hex-dwba: $(OBJECTS)
 	@mkdir -p $(@D)
-	g++ $^ $(LFLAGS) -o $@
+	$(CXX) $^ $(LFLAGS) -o $@
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	g++ -c $(CXXFLAGS) $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) -c $(CXXFLAGS) $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDENCIES) bin/dwba

@@ -1,6 +1,12 @@
 .PHONY: all exe lib clean doc
 
+##############################################################
+# Editable part
+
 CPP = g++
+# CPP = icpc
+
+##############################################################
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/libs -fPIC
 LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
