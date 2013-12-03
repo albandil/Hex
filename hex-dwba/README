@@ -42,6 +42,8 @@ Here is the list of the libraries with versions that were used:
             Used for interpolation. Note that higher versions are not compatible
             with hex-dwba.
 
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
 
 -------------
 Build and run

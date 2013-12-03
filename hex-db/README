@@ -40,6 +40,9 @@ Here is the list of the libraries with versions that were used:
                 http://www.sqlite.org/download.html
             Used for access to the database files.
 
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
+
 -------------
 Build and run
 -------------

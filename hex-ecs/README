@@ -57,6 +57,8 @@ Here is the list of the libraries with versions that were used:
             other vendors. Used for [preliminary] GPU support (preconditioner
             "gpuJacobi").
 
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
 
 -------------
 Build and run

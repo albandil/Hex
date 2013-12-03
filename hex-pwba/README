@@ -38,6 +38,8 @@ Here is the list of the libraries with versions that were used:
             Used for rational arithmetic to speed up analytically algorithmizable
             integration.
 
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
 
 -------------
 Build and run
