@@ -23,6 +23,7 @@
 #include "misc.h"
 #include "specf.h"
 #include "symbolic.h"
+#include "version.h"
 
 double compute_Idir (int li, int lf, int lam, int Ni, int Li, double ki, int Nf, int Lf, double kf)
 {
