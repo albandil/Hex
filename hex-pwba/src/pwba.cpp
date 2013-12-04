@@ -192,6 +192,9 @@ int main(int argc, char* argv[])
         exit(0);
     }
     
+    // write program logo
+    std::cout << logo() << "\n";
+    
     // atomic quantum numbers
     int Ni = strtol(argv[1], 0, 10);
     int Li = strtol(argv[2], 0, 10);
