@@ -20,6 +20,7 @@
 #include "dwba1.h"
 #include "hydrogen.h"
 #include "potential.h"
+#include "version.h"
 #include "wave_distort.h"
 
 int main (int argc, char *argv[])
@@ -40,6 +41,9 @@ int main (int argc, char *argv[])
         std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> [<rmax>]\n\n";
         exit(0);
     }
+    
+    // draw package logo
+    std::cout << logo() << "\n";
     
     // extract parameters
     int Ni = strtol(argv[1], 0, 10);
