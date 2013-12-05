@@ -684,9 +684,27 @@ void GPUCGPreconditioner::setup ()
     context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
     queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
     
+    // setup the structure of the matrices
+    int order = s_bspline_.order();
+    int Nspline = s_bspline_.Nspline();
+    iArray diags;
+    for (int i = -order; i <= order; i++)
+        for (int j = -order; j <= order; j++)
+            diags.push_back(i * Nspline + j);
+    std::string diagonals = to_string(diags, ',');
+    
+    // setup compile flags
+    std::ostringstream flags;
+    flags << "-cl-strict-aliasing -cl-fast-relaxed-math ";
+    flags << "-DORDER=" << order << " ";
+    flags << "-DNSPLINE=" << Nspline << " ";
+    
+    // NOTE: Not working for AMD compiler.
+//     flags << "-DDIAGONALS=" << diagonals << " ";
+    
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
-    clBuildProgram (program_, 1, &device_, "-cl-strict-aliasing -cl-fast-relaxed-math", nullptr, nullptr);
+    clBuildProgram (program_, 1, &device_, flags.str().c_str(), nullptr, nullptr);
     
     cl_build_status status;
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
@@ -699,7 +717,7 @@ void GPUCGPreconditioner::setup ()
     }
     
     // set program entry points
-    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr);
+    mmul_ = clCreateKernel(program_, "DIA_dot_vec", nullptr);
     amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
     axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
     vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
@@ -715,6 +733,9 @@ void GPUCGPreconditioner::update (double E)
     {
         // convert DIA block to CSR
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
+        
+        // convert DIA to stacked columns
+        block_[ill] = dia_blocks_[ill].toPaddedCols();
     }
     
     std::cout << "ok\n";
@@ -735,9 +756,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         CLArray<double>  nrm (Nsegsiz);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
         // create OpenCL representation of the matrix block + transfer data to GPU memory
-        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<Complex> Ax (csr_blocks_[ill].x());    Ax.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<Complex> A (block_[ill]); A.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         
         // create OpenCL representation of the inverse diagonal + transfer data to GPU memory
         CLArray<Complex> invd (1. / dia_blocks_[ill].main_diagonal());  invd.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
@@ -800,11 +819,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //      b = A · a
-            clSetKernelArg (mmul_, 0, sizeof(Ap.handle()), &Ap.handle());
-            clSetKernelArg (mmul_, 1, sizeof(Ai.handle()), &Ai.handle());
-            clSetKernelArg (mmul_, 2, sizeof(Ax.handle()), &Ax.handle());
-            clSetKernelArg (mmul_, 3, sizeof(a.handle()),  &a.handle());
-            clSetKernelArg (mmul_, 4, sizeof(b.handle()),  &b.handle());
+            clSetKernelArg (mmul_, 0, sizeof(A.handle()),  &A.handle());
+            clSetKernelArg (mmul_, 1, sizeof(a.handle()),  &a.handle());
+            clSetKernelArg (mmul_, 2, sizeof(b.handle()),  &b.handle());
             clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
@@ -843,9 +860,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // free GPU memory
         rsegment.disconnect();
         zsegment.disconnect();
-        Ap.disconnect();
-        Ai.disconnect();
-        Ax.disconnect();
+        A.disconnect();
     }
     
     // synchronize across processes

@@ -1914,3 +1914,42 @@ cArray SymDiaMatrix::toPaddedRows () const
     
     return padr;
 }
+
+cArray SymDiaMatrix::toPaddedCols () const
+{
+    // stored diagonals count
+    int ndiag = diag().size();
+    
+    // all diagonals count
+    int Ndiag = 2 * ndiag - 1;
+    
+    // row count
+    int Nrows = n_;
+    
+    // create zero array of the right length
+    cArray padr (Nrows * Ndiag);
+    
+    // add main diagonal
+    for (int i = 0; i < Nrows; i++)
+        padr[(ndiag - 1) * Nrows + i] = data()[i];
+    
+    // add non-main diagonals
+    for (int idiag = 1; idiag < ndiag; idiag++)
+    {
+        // get data pointer for this diagonal
+        Complex const * const pa = dptr(idiag);
+        
+        // get diagonal label
+        int ldiag = diag(idiag);
+        
+        // store the upper diagonal elements
+        for (int irow = 0; irow + ldiag < Nrows; irow++)
+            padr[(ndiag - 1 + idiag) * Nrows + irow] = pa[irow];
+        
+        // store the lower diagonal elements
+        for (int irow = ldiag; irow < Nrows; irow++)
+            padr[(ndiag - 1 - idiag) * Nrows + irow] = pa[irow - ldiag];
+    }
+    
+    return padr;
+}

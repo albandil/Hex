@@ -1552,12 +1552,22 @@ template <class T> void smoothen (ArrayView<T> v)
 /**
  * @brief Convert ArrayView<T> to a string.
  */
-template <class T> std::string to_string (const ArrayView<T> v)
+template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 {
     std::ostringstream ss;
-    for (T const & x : v)
-        ss << x << " ";
+    for (size_t i = 0; i < v.size(); i++)
+    {
+        if (i == 0)
+            ss << v[i];
+        else
+            ss << sep << v[i];
+    }
     return ss.str();
 }
+
+/**
+ * @brief Drop small elements of array (replace by zero).
+ */
+rArray threshold (const rArrayView a, double eps);
 
 #endif
