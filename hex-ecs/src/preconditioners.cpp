@@ -696,11 +696,11 @@ void GPUCGPreconditioner::setup ()
     // setup compile flags
     std::ostringstream flags;
     flags << "-cl-strict-aliasing -cl-fast-relaxed-math ";
-    flags << "-DORDER=" << order << " ";
-    flags << "-DNSPLINE=" << Nspline << " ";
+    flags << "-D ORDER=" << order << " ";
+    flags << "-D NSPLINE=" << Nspline << " ";
     
     // NOTE: Not working for AMD compiler.
-//     flags << "-DDIAGONALS=" << diagonals << " ";
+    flags << "-D DIAGONALS=" << diagonals << " ";
     
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -727,7 +727,7 @@ void GPUCGPreconditioner::update (double E)
 {
     NoPreconditioner::update(E);
     
-    std::cout << "Update preconditioner..." << std::flush;
+    std::cout << "\tUpdate preconditioner..." << std::flush;
     
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
     {
