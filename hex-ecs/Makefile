@@ -12,27 +12,31 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconf
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
 # OpenMPI environment
+#OPENMPIFLAGS = -DNO_MPI
 OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
 OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
-# AMD OpenCL environment
+# OpenCL environment
 OPENCLFLAGS = -DNO_OPENCL
-# OPENCLINCLUDE = -I/opt/AMDAPP/include
-# OPENCLLIBS = -lOpenCL
+# AMD
+#OPENCLINCLUDE = -I/opt/AMDAPP/include
+#OPENCLLIBS = -lOpenCL
+# Intel
+#OPENCLINCLUDE = -I/opt/intel/opencl-1.2-3.1.1.11385/include
+#OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
+# NVidia
+#OPENCLINCLUDE = -I/usr/include/nvidia-current/
+#OPENCLLIBS = -lOpenCL
 
-# Intel OpenCL environment
-# OPENCLINCLUDE = -I/opt/intel/opencl-1.2-3.1.1.11385/include
-# OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
-
-# Lapack environment
+# Lapack
 LAPACKFLAGS = -DNO_LAPACK
-# LAPACKINCLUDE =
-# LAPACKLIBS = -lgfortran -llapack
+#LAPACKINCLUDE =
+#LAPACKLIBS = -lgfortran -llapack
 
-# PNG++ environment
+# PNG++
 PNGFLAGS = -DNO_PNG
-# PNGPPINCLUDE = -I./libs
-# PNGPPLIBS = -lpng
+#PNGPPINCLUDE = -I./libs
+#PNGPPLIBS = -lpng
                                                                                     #
 #####################################################################################
 
@@ -48,8 +52,9 @@ CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGI
 
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
-# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) -mtune=native -march=native
+# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) $(OPENCLFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) \
+         -mtune=native -march=native
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
 	matrix preconditioners radial slater specf version
