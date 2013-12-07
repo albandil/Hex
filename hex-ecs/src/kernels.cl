@@ -12,13 +12,13 @@
 
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
-// -DORDER=...
+// -D ORDER=...
 // #define ORDER 5
 
-// -DNSPLINE=...
+// -D NSPLINE=...
 // #define NSPLINE 117
 
-// -DDIAGONALS=... [NOTE: Not working for AMD compiler.]
+// -D DIAGONALS=...
 // #define DIAGONALS \
 //     -590, -589, -588, -587, -586, -585, -584, -583, -582, -581, -580, \
 //     -473, -472, -471, -470, -469, -468, -467, -466, -465, -464, -463, \
@@ -31,6 +31,9 @@
 //      346,  347,  348,  349,  350,  351,  352,  353,  354,  355,  356, \
 //      463,  464,  465,  466,  467,  468,  469,  470,  471,  472,  473, \
 //      580,  581,  582,  583,  584,  585,  586,  587,  588,  589,  590
+//
+// -D NLOCAL=...
+// #define NLOCAL 64
 
 // Derived variables.
 #define NDIAG   ((2*ORDER+1)*(2*ORDER+1))
@@ -89,21 +92,71 @@ kernel void vec_norm (global double2 *v, global double *n)
 }
 
 /**
- * @brief Naive CSR-matrix-vector multiplication.
- * 
- * Multiplies the given vector @f$ x @f$ by a compressed sparse row-major
- * matrix given as three arrays (row pointers, column indices and matrix
- * elements). The resulting vector is stored in @f$ y @f$.
+ * @brief Full scalar product.
  */
-kernel void CSR_dot_vec (global long *Ap, global long *Ai, global double2 *Ax, global double2 *x, global double2 *y)
+kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
 {
-    uint i = get_global_id(0);
-    double2 sprod = 0.;
+    uint iglobal = get_global_id(0);
+    double2 ui = u[iglobal];
+    double2 vi = v[iglobal];
     
-    for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)
-        sprod += cpxm(Ax[idx],x[Ai[idx]]);
+    uint ilocal = get_local_id(0);
+    local double2 uv[NLOCAL];
+    uv[ilocal].x = ui.x * vi.x - ui.y * vi.y;
+    uv[ilocal].y = ui.x * vi.y + ui.y * vi.x;
     
-    y[i] = sprod;
+    // wait on completition of local write instructions
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // reduce the per-element products
+    int stride = 1;
+    while (stride < NLOCAL)
+    {
+        if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
+            uv[ilocal] += uv[ilocal + stride];
+        
+        stride *= 2;
+        
+        // wait on completition of local write instructions
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    
+    // write the reduced scalar product as computed by this group
+    if (ilocal == 0)
+        z[get_group_id(0)] = uv[0];
+}
+
+/**
+ * @brief Full vector norm.
+ */
+kernel void norm (global double2 *v, global double *z)
+{
+    uint iglobal = get_global_id(0);
+    double2 vi = v[iglobal];
+    
+    uint ilocal = get_local_id(0);
+    local double vv[NLOCAL];
+    vv[ilocal] = vi.x * vi.x + vi.y * vi.y;
+    
+    // wait on completition of local write instructions
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // reduce the per-element products
+    int stride = 1;
+    while (stride < NLOCAL)
+    {
+        if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
+            vv[ilocal] += vv[ilocal + stride];
+        
+        stride *= 2;
+        
+        // wait on completition of local write instructions
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    
+    // write the reduced scalar product as computed by this group
+    if (ilocal == 0)
+        z[get_group_id(0)] = vv[0];
 }
 
 /**

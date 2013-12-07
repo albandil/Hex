@@ -680,6 +680,10 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax work group size: " << size << "\n\n";
     
+    // choose (e.g.) the largest workgroup
+    // NOTE : This may not be the most efficient choice.
+    Nlocal_ = size;
+    
     // create context and command queue
     context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
     queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
@@ -696,11 +700,10 @@ void GPUCGPreconditioner::setup ()
     // setup compile flags
     std::ostringstream flags;
     flags << "-cl-strict-aliasing -cl-fast-relaxed-math ";
-    flags << "-D ORDER=" << order << " ";
-    flags << "-D NSPLINE=" << Nspline << " ";
-    
-    // NOTE: Not working for AMD compiler.
+    flags << "-D ORDER="     << order     << " ";
+    flags << "-D NSPLINE="   << Nspline   << " ";
     flags << "-D DIAGONALS=" << diagonals << " ";
+    flags << "-D NLOCAL="    << Nlocal_   << " ";
     
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -721,6 +724,8 @@ void GPUCGPreconditioner::setup ()
     amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
     axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
     vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
+    norm_ = clCreateKernel(program_, "norm",        nullptr);
+    spro_ = clCreateKernel(program_, "scalar_product", nullptr);
 }
 
 void GPUCGPreconditioner::update (double E)
@@ -729,14 +734,9 @@ void GPUCGPreconditioner::update (double E)
     
     std::cout << "\tUpdate preconditioner..." << std::flush;
     
+    // zero-pad diagonals of the diagonal DIA blocks
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
-    {
-        // convert DIA block to CSR
-        csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
-        
-        // convert DIA to stacked columns
         block_[ill] = dia_blocks_[ill].toPaddedCols();
-    }
     
     std::cout << "ok\n";
 }
@@ -752,8 +752,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // create OpenCL representation of segment views + transfer data to GPU memory
         CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex> tmp (Nsegsiz);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<double>  nrm (Nsegsiz);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
         // create OpenCL representation of the matrix block + transfer data to GPU memory
         CLArrayView<Complex> A (block_[ill]); A.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
@@ -790,10 +790,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     x * y -> tmp
-            clSetKernelArg (amul_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (amul_, 1, sizeof(y.handle()), &y.handle());
-            clSetKernelArg (amul_, 2, sizeof(tmp.handle()), &tmp.handle());
-            clEnqueueNDRangeKernel (queue_, amul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg (spro_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (spro_, 1, sizeof(y.handle()), &y.handle());
+            clSetKernelArg (spro_, 2, sizeof(tmp.handle()), &tmp.handle());
+            clEnqueueNDRangeKernel (queue_, spro_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             tmp.EnqueueDownload(queue_);
             clFinish (queue_);
             
@@ -804,9 +804,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     |x|² -> nrm
-            clSetKernelArg (vnrm_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (vnrm_, 1, sizeof(nrm.handle()), &nrm.handle());
-            clEnqueueNDRangeKernel (queue_, vnrm_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg (norm_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (norm_, 1, sizeof(nrm.handle()), &nrm.handle());
+            clEnqueueNDRangeKernel (queue_, norm_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             nrm.EnqueueDownload(queue_);
             clFinish (queue_);
             
@@ -822,7 +822,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clSetKernelArg (mmul_, 0, sizeof(A.handle()),  &A.handle());
             clSetKernelArg (mmul_, 1, sizeof(a.handle()),  &a.handle());
             clSetKernelArg (mmul_, 2, sizeof(b.handle()),  &b.handle());
-            clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish (queue_);
         };
         auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
@@ -860,6 +860,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // free GPU memory
         rsegment.disconnect();
         zsegment.disconnect();
+        tmp.disconnect();
+        nrm.disconnect();
         A.disconnect();
     }
     

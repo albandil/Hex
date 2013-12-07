@@ -334,11 +334,16 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_command_queue queue_;
         cl_program program_;
         
+        // size of a workgroup
+        size_t Nlocal_;
+        
         // computational kernels
         cl_kernel mmul_;
         cl_kernel amul_;
         cl_kernel axby_;
         cl_kernel vnrm_;
+        cl_kernel norm_;
+        cl_kernel spro_;
 };
 #endif
 
