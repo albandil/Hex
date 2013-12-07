@@ -48,7 +48,7 @@ void CommandLine::parse (int argc, char* argv[])
         {"stg-integ",         0,   0, 'a'},
         {"stg-integ-solve",   0,   0, 'b'},
         {"stg-extract",       0,   0, 'c'},
-        {"drop-tolerance",    1,   0, 'd'},
+        {"droptol",           1,   0, 'd'},
         {"preconditioner",    1,   0, 'p'},
         {"prec-info",         0,   0, 'P'},
         {0,                   0,   0,   0}
