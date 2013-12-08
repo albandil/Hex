@@ -942,7 +942,7 @@ void ILUCGPreconditioner::update (double E)
         std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
         
         // start timer
-        Timer::timer().start();
+        Timer timer;
         
         // create CSR block
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
@@ -951,7 +951,7 @@ void ILUCGPreconditioner::update (double E)
         lu_[ill] = csr_blocks_[ill].factorize(droptol_);
         
         // time usage
-        int secs = Timer::timer().stop();
+        int secs = timer.elapsed();
     
         // print info
         std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60

@@ -229,20 +229,17 @@ class Timer
     public:
         
         /// Return object reference (singleton interface).
-        static Timer const & timer()
-        {
-            static Timer timer_;
-            return timer_;
-        }
+        Timer()
+            : start_(std::chrono::system_clock::now()) {}
         
         /// Start timer.
-        void start () const
+        void reset ()
         {
             start_ = std::chrono::system_clock::now();
         }
         
         /// Stop timer and return elapsed time in seconds.
-        int stop () const
+        int elapsed ()
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);

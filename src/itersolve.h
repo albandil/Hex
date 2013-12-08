@@ -159,7 +159,7 @@ unsigned cg_callbacks
              ComputeNorm compute_norm   = default_compute_norm
 )
 {
-    Timer::timer().start();
+    Timer timer;
     
     // compute norm of the right hand side
     double bnorm = compute_norm(b);
@@ -196,7 +196,7 @@ unsigned cg_callbacks
     unsigned k;
     for (k = 0; k < max_iterations; k++)
     {
-        int sec = Timer::timer().stop();
+        int sec = timer.elapsed();
         
         if (verbose)
         {
