@@ -430,6 +430,20 @@ void NoPreconditioner::update (double E)
         
         // finalize the matrix
         dia_blocks_[ill] = E * S_kron_S_ - Hdiag;
+        
+        // if out-of-core is enabled, dump the matrix to disk
+        if (cmd_.outofcore)
+        {
+            // link diagonal block to a disk file
+            dia_blocks_[ill].link(format("dblk-%d.hdf", ill));
+            
+            // save diagonal block to disk
+            # pragma omp critical
+            dia_blocks_[ill].hdfsave();
+            
+            // release memory
+            dia_blocks_[ill].drop();
+        }
     }
     
     par_.wait();
@@ -565,8 +579,21 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // multiply by hamiltonian terms
         if (ill == illp)
         {
-            // reuse the diagonal block
+            if (cmd_.outofcore)
+            {
+                // read diagonal block from a linked file
+                # pragma omp critical
+                dia_blocks_[ill].hdfload();
+            }
+            
+            // use the diagonal block for multiplication
             q_contrib += dia_blocks_[ill].dot(p_block);
+            
+            if (cmd_.outofcore)
+            {
+                // release the memory
+                dia_blocks_[ill].drop();
+            }
         }
         else
         {
@@ -629,6 +656,30 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
+}
+
+void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
+{
+    if (cmd_.outofcore)
+    {
+        // load matrix from disk file
+        # pragma omp critical
+        dia_blocks_[iblock].hdfload();
+    }
+    
+    // multiply
+    q = dia_blocks_[iblock].dot(p);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        dia_blocks_[iblock].drop();
+    }
+}
+
+void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    z = r;
 }
 
 #ifndef NO_OPENCL
@@ -736,7 +787,30 @@ void GPUCGPreconditioner::update (double E)
     
     // zero-pad diagonals of the diagonal DIA blocks
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
+    {
+        if (cmd_.outofcore)
+        {
+            // load dia_blocks_[ill] from linked file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
         block_[ill] = dia_blocks_[ill].toPaddedCols();
+        
+        if (cmd_.outofcore)
+        {
+            // link this array to a HDF file
+            block_[ill].link(format("pdblk-%d.hdf", ill));
+            
+            // save this array to a HDF file
+            # pragma omp critical
+            block_[ill].hdfsave();
+            
+            // free memory
+            block_[ill].drop();
+            dia_blocks_[ill].drop();
+        }
+    }
     
     std::cout << "ok\n";
 }
@@ -749,6 +823,15 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        if (cmd_.outofcore)
+        {
+            // load linked files from disk
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+            # pragma omp critical
+            block_[ill].hdfload();
+        }
+        
         // create OpenCL representation of segment views + transfer data to GPU memory
         CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
@@ -863,10 +946,41 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         tmp.disconnect();
         nrm.disconnect();
         A.disconnect();
+        
+        if (cmd_.outofcore)
+        {
+            // release memory
+            block_[ill].drop();
+            dia_blocks_[ill].drop();
+        }
     }
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
+}
+
+void GPUCGPreconditioner::CG_mmul(int iblock, const cArrayView p, cArrayView q) const
+{
+    if (cmd_.outofcore)
+    {
+        // read matrix from file
+        # pragma omp critical
+        dia_blocks_[iblock].hdfload();
+    }
+    
+    // multiply
+    q = dia_blocks_[iblock].dot(p);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        dia_blocks_[iblock].drop();
+    }
+}
+
+void GPUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    z = r;
 }
 
 #endif
@@ -890,7 +1004,22 @@ void JacobiCGPreconditioner::update (double E)
     // compute inverse diagonals
     # pragma omp parallel for
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
+        if (cmd_.outofcore)
+        {
+            // load DIA block from linked disk file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
         invd_[ill] = 1. / dia_blocks_[ill].main_diagonal();
+        
+        if (cmd_.outofcore)
+        {
+            // release memory
+            dia_blocks_[ill].drop();
+        }
+    }
     
     par_.wait();
 }
@@ -914,7 +1043,45 @@ void SSORCGPreconditioner::update (double E)
     
     // compute preconditioner matrix
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
         SSOR_[ill] = SSOR(dia_blocks_[ill]);
+        
+        if (cmd_.outofcore)
+        {
+            // link to a disk file
+            SSOR_[ill].link(format("ssor-%d.hdf"));
+            
+            // save to the file
+            # pragma omp critical
+            SSOR_[ill].hdfsave();
+            
+            // release memory
+            SSOR_[ill].drop();
+        }
+    }
+}
+
+void SSORCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+{
+    if (cmd_.outofcore)
+    {
+        // load data from a linked disk file
+        # pragma omp critical
+        SSOR_[iblock].hdfload();
+    }
+    
+    z = SSOR_[iblock].upperSolve (
+            SSOR_[iblock].dot (
+                SSOR_[iblock].lowerSolve(r),
+                diagonal
+            )
+    );
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        SSOR_[iblock].drop();
+    }
 }
 
 const std::string ILUCGPreconditioner::name = "ILU";
@@ -941,6 +1108,13 @@ void ILUCGPreconditioner::update (double E)
     {
         std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
         
+        if (cmd_.outofcore)
+        {
+            // load DIA block from a linked disk file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
         // start timer
         Timer timer;
         
@@ -952,10 +1126,49 @@ void ILUCGPreconditioner::update (double E)
         
         // time usage
         int secs = timer.elapsed();
-    
+        
         // print info
         std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
                   << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
+        
+        if (cmd_.outofcore)
+        {
+            // link CSR block to a disk file
+            csr_blocks_[ill].link(format("csr-%d.hdf", ill));
+            # pragma omp critical
+            csr_blocks_[ill].hdfsave();
+            
+            // release memory
+            csr_blocks_[ill].drop();
+            dia_blocks_[ill].drop();
+            
+            // link to a disk file
+            lu_[ill].link(format("lu-%d.upk", ill));
+            # pragma omp critical
+            lu_[ill].save();
+            lu_[ill].drop();
+        }
+    }
+}
+
+void ILUCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+{
+    if (cmd_.outofcore)
+    {
+        // load data from linked disk files
+        # pragma omp critical
+        csr_blocks_[iblock].hdfload();
+        # pragma omp critical
+        lu_[iblock].load();
+    }
+    
+    z = lu_[iblock].solve(r);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        csr_blocks_[iblock].drop();
+        lu_[iblock].drop();
     }
 }
 

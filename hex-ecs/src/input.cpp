@@ -32,7 +32,7 @@
 void CommandLine::parse (int argc, char* argv[])
 {
     // set short options
-    char const * const short_options  = "ei:hz:n:R:mabcd:p:P";
+    char const * const short_options  = "ei:hz:n:R:mabcOd:p:P";
     
     // set long options
     const option long_options[] = {
@@ -48,6 +48,7 @@ void CommandLine::parse (int argc, char* argv[])
         {"stg-integ",         0,   0, 'a'},
         {"stg-integ-solve",   0,   0, 'b'},
         {"stg-extract",       0,   0, 'c'},
+        {"out-of-core",       0,   0, 'O'},
         {"droptol",           1,   0, 'd'},
         {"preconditioner",    1,   0, 'p'},
         {"prec-info",         0,   0, 'P'},
@@ -178,6 +179,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // run only the third part (extraction of amplitudes)
                 itinerary = StgExtract;
+                break;
+            }
+            case 'O':
+            {
+                // use out-of-core functionality: store diagonal blocks on disk
+                outofcore = true;
                 break;
             }
             case 'd':

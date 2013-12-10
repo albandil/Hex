@@ -489,7 +489,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
             
             // are we to keep this radial integral for this process?
             if (not lambdas[lambda])
-                R_tr_dia_[lambda].clear();
+                R_tr_dia_[lambda].drop();
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }

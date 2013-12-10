@@ -444,17 +444,28 @@ public:
     // Constructors
     
     CsrMatrix()
-        : m_(0), n_(0) {}
+        : m_(0), n_(0), name_() {}
     CsrMatrix(size_t m, size_t n)
-        : m_(m), n_(n) {}
+        : m_(m), n_(n), name_() {}
     CsrMatrix(CsrMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
     CsrMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
+        : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     
     // Destructor
     
     ~CsrMatrix() {}
+    
+    /**
+     * @brief Clear data.
+     */
+    void drop ()
+    {
+        m_ = n_ = 0;
+        p_.drop();
+        i_.drop();
+        x_.drop();
+    }
     
     /**
      * Ordinary matrix-vector product, \f$ A\cdot b \f$.
@@ -520,33 +531,36 @@ public:
 
 #ifndef NO_UMFPACK
     /**
-     * LU factorization
+     * @brief LU factorization object
      */
     class LUft
     {
     public:
         
         /// Default constructor.
-        LUft () :
-            numeric_(0), matrix_(0), filename_(0), info_(UMFPACK_INFO) {}
+        LUft ()
+            : numeric_(nullptr), matrix_(nullptr), filename_(), info_(UMFPACK_INFO) {}
         
         /// Copy constructor.
-        LUft (LUft const & lu) :
-            numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
+        LUft (LUft const & lu)
+            : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft (const CsrMatrix* matrix, void* numeric) : 
-            numeric_(numeric), matrix_(matrix), filename_(0), info_(UMFPACK_INFO) {}
+        LUft (const CsrMatrix* matrix, void* numeric)
+            : numeric_(numeric), matrix_(matrix), filename_(), info_(UMFPACK_INFO) {}
         
+        /// Destructor.
         void free ()
         { 
-            if (numeric_ != 0)
-            {
-                umfpack_zl_free_numeric(&numeric_);
-                numeric_ = 0;
-            }
+            drop();
         }
         
+        /**
+         * @brief Size of the numerical data.
+         * 
+         * Return the number of bytes occupied by the stored elements
+         * of the LU-factorization. This doesn't contain any other structural data.
+         */
         size_t size () const
         {
             long lnz, unz, m, n, nz_udiag;
@@ -556,6 +570,10 @@ public:
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
         
+        /**
+         * @brief Solve equations.
+         */
+        //@{
         cArray solve (const cArrayView b, unsigned eqs = 1) const
         {
             // reserve space for the solution
@@ -567,7 +585,6 @@ public:
             // return the result
             return x;
         }
-        
         void solve (const cArrayView b, cArrayView x, int eqs = 1) const
         {
             // check sizes
@@ -581,22 +598,94 @@ public:
                 long status = umfpack_zl_solve (
                     UMFPACK_Aat,
                     matrix_->p_.data(), matrix_->i_.data(),
-                    reinterpret_cast<const double*>(matrix_->x_.data()), 0,
-                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), 0,
-                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), 0,
+                    reinterpret_cast<const double*>(matrix_->x_.data()), nullptr,
+                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), nullptr,
+                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), nullptr,
                     numeric_, nullptr, &info_[0]
                 );
                 
                 // check output
-                if (status != 0)
+                if (status != UMFPACK_OK)
                 {
                     std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << "\n";
                     umfpack_zl_report_status(0, status);
                 }
             }
         }
+        //@}
         
+        /**
+         * @brief Get info array.
+         * 
+         * Get UMFPACK "info" array.
+         */
         rArray const & info() const { return info_; }
+        
+        /**
+         * @brief Link to a disk file.
+         * 
+         * This function will set a filename that will be used if
+         * any of the functions @ref save or @ref load is used without
+         * a specific filename.
+         */
+        void link (std::string name) { filename_ = name; }
+        
+        /**
+         * @brief Save Numeric object to a disk file.
+         * 
+         * Stores the LU-factorization data in the native UMFPACK format
+         * to a disk file.
+         */
+        void save (std::string name) const
+        {
+            long err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
+            
+            if (err == UMFPACK_ERROR_invalid_Numeric_object)
+                throw exception ("[LUft::save] Invalid numeric object.");
+            
+            if (err == UMFPACK_ERROR_file_IO)
+                throw exception ("[LUft::save] I/O error.");
+        }
+        void save () const
+        {
+            save (filename_);
+        }
+        
+        /**
+         * @brief Load Numeric object from a disk file.
+         * 
+         * The expected format is the format of umfpack_zl_save_numeric.
+         */
+        //@{
+        void load (std::string name)
+        {
+            long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
+            
+            if (err == UMFPACK_ERROR_out_of_memory)
+                throw exception ("[LUft::load] Out of memory.");
+            
+            if (err == UMFPACK_ERROR_file_IO)
+                throw exception ("[LUft::save] I/O error.");
+        }
+        void load ()
+        {
+            load (filename_);
+        }
+        //@}
+        
+        /**
+         * @brief Free memory.
+         * 
+         * Release memory occupied by the LU-factorization numeric object.
+         */
+        void drop ()
+        {
+            if (numeric_ != nullptr)
+            {
+                umfpack_zl_free_numeric (&numeric_);
+                numeric_ = nullptr;
+            }
+        }
         
     private:
         
@@ -606,8 +695,8 @@ public:
         /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
         const CsrMatrix* matrix_;
         
-        /// (not used at the moment)
-        char* filename_;
+        /// Linked HDF file name.
+        std::string filename_;
         
         /// Set of status flags produced by UMFPACK.
         mutable rArray info_;
@@ -639,16 +728,30 @@ public:
     cArray solve(const cArrayView b, size_t eqs = 1) const;
     
     /**
+     * @brief Link to a disk file.
+     * 
+     * Set a default I/O file that will be used if any of the functions
+     * @ref hdfload or @ref hdfsave will be used without an explicit filename.
+     */
+    void link (std::string name);
+    
+    /**
      * Save matrix to HDF file.
      * @param name Filename.
      */
-    bool hdfsave(const char* name) const;
+    //@{
+    bool hdfsave () const { return hdfsave(name_); }
+    bool hdfsave (std::string name) const;
+    //@}
     
     /**
      * Load matrix from HDF file.
      * @param name Filename.
      */
-    bool hdfload(const char* name);
+    //@{
+    bool hdfload () { return hdfload(name_); }
+    bool hdfload (std::string name);
+    //@}
     
     /**
      * Element-wise access (const).
@@ -758,6 +861,8 @@ private:
     lArray i_;
     cArray x_;
     
+    // linked HDF file
+    std::string name_;
 };
 
 
@@ -1267,7 +1372,13 @@ public:
     ~SymDiaMatrix() {}
     
     // free all fields, set dimensions to zero
-    void clear () { *this = std::move(SymDiaMatrix()); }
+    void drop ()
+    {
+        n_ = 0;
+        elems_.drop();
+        idiag_.drop();
+        dptrs_.clear();
+    }
     
     //
     // Getters
@@ -1405,6 +1516,8 @@ public:
     // HDF interface
     //
     
+    void link (std::string name);
+    
     /**
      * @brief Load from file.
      * 
@@ -1412,7 +1525,10 @@ public:
      * 
      * @return True on successful read, false otherwise (mostly when doesn't exist).
      */
-    bool hdfload(const char* name);
+    //@{
+    bool hdfload () { return hdfload (name_); }
+    bool hdfload (std::string name);
+    //@}
     
     /**
      * @brief Save data to file.
@@ -1425,7 +1541,10 @@ public:
      * 
      * @return True on successful write, false otherwise.
      */
-    bool hdfsave(const char* name, bool docompress = false, int consec = 10) const;
+    //@{
+    bool hdfsave () const { return hdfsave (name_); }
+    bool hdfsave (std::string name, bool docompress = false, int consec = 10) const;
+    //@}
 
     //
     // Conversions to other formats
@@ -1453,10 +1572,13 @@ private:
     
     // upper diagonal indices starting from zero
     iArray idiag_;
-public:
+    
+    // name of linked HDF file
+    std::string name_;
+    
     // diagonal data pointers
     std::vector<Complex*> dptrs_;
-private:
+    
     /** 
      * @brief Setup diagonal data pointers
      * 
