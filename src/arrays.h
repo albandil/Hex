@@ -668,7 +668,9 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         
         void drop ()
         {
-            resize(0);
+            Nres_ = ArrayView<T>::N_ = 0;
+            Alloc::free (ArrayView<T>::array_);
+            ArrayView<T>::array_ = nullptr;
         }
         
         //
