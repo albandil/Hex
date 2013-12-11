@@ -32,7 +32,7 @@
  * @f]
  * of a function F with signature
  * @code
- * Tout F(double Tin)
+ * Tout F (Tin x)
  * @endcode
  */
 template <typename Tin, typename Tout> class Chebyshev
