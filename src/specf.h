@@ -39,7 +39,7 @@
 
 inline double hydro_P(unsigned n, unsigned l, double z)
 {
-    return gsl_sf_hydrogenicR(n, l, 1, z);
+    return z * gsl_sf_hydrogenicR(n, l, 1, z);
 }
 
 /** Hydrogen radial function (radius-multiplied)
