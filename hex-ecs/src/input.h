@@ -50,7 +50,7 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), droptol(1e-15),
-              preconditioner(0), itinerary(StgNone)
+              preconditioner(0), itinerary(StgNone), outofcore(false)
         {
             // get command line options
             parse(argc, argv);
@@ -75,6 +75,7 @@ class CommandLine
         double droptol;
         int preconditioner;
         int itinerary;
+        bool outofcore;
 };
 
 /**

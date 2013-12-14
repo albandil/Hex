@@ -193,7 +193,7 @@ public:
     VariableList();
     ~VariableList();
     
-    Variable const * const get (std::string const & id) const;
+    Variable const * get (std::string const & id) const;
     
     //
     // STL vector interface

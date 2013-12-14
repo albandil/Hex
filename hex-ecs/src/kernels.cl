@@ -10,6 +10,35 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
+
+// -D ORDER=...
+// #define ORDER 5
+
+// -D NSPLINE=...
+// #define NSPLINE 117
+
+// -D DIAGONALS=...
+// #define DIAGONALS \
+//     -590, -589, -588, -587, -586, -585, -584, -583, -582, -581, -580, \
+//     -473, -472, -471, -470, -469, -468, -467, -466, -465, -464, -463, \
+//     -356, -355, -354, -353, -352, -351, -350, -349, -348, -347, -346, \
+//     -239, -238, -237, -236, -235, -234, -233, -232, -231, -230, -229, \
+//     -122, -121, -120, -119, -118, -117, -116, -115, -114, -113, -112, \
+//       -5,   -4,   -3,   -2,   -1,    0,    1,    2,    3,    4,    5, \
+//      112,  113,  114,  115,  116,  117,  118,  119,  120,  121,  122, \
+//      229,  230,  231,  232,  233,  234,  235,  236,  237,  238,  239, \
+//      346,  347,  348,  349,  350,  351,  352,  353,  354,  355,  356, \
+//      463,  464,  465,  466,  467,  468,  469,  470,  471,  472,  473, \
+//      580,  581,  582,  583,  584,  585,  586,  587,  588,  589,  590
+//
+// -D NLOCAL=...
+// #define NLOCAL 64
+
+// Derived variables.
+#define NDIAG   ((2*ORDER+1)*(2*ORDER+1))
+#define NROW    (NSPLINE * NSPLINE)
+#define NCOL    (NSPLINE * NSPLINE)
 
 /**
  * @brief Complex multiplication.
@@ -63,93 +92,130 @@ kernel void vec_norm (global double2 *v, global double *n)
 }
 
 /**
- * @brief CSR-matrix-vector multiplication.
- * 
- * Multiplies the given vector @f$ x @f$ by a compressed sparse row-major
- * matrix given as three arrays (row pointers, column indices and matrix
- * elements). The resulting vector is stored in @f$ y @f$.
+ * @brief Full scalar product.
  */
-kernel void CSR_dot_vec (global long *Ap, global long *Ai, global double2 *Ax, global double2 *x, global double2 *y)
+kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
 {
-    uint i = get_global_id(0);
-    double2 sprod = 0.;
+    uint iglobal = get_global_id(0);
+    double2 ui = u[iglobal];
+    double2 vi = v[iglobal];
     
-    for (int idx = Ap[i]; idx < Ap[i + 1]; idx++)
-        sprod += cpxm(Ax[idx],x[Ai[idx]]);
+    uint ilocal = get_local_id(0);
+    local double2 uv[NLOCAL];
+    uv[ilocal].x = ui.x * vi.x - ui.y * vi.y;
+    uv[ilocal].y = ui.x * vi.y + ui.y * vi.x;
     
-    y[i] = sprod;
-}
-
-/*kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y)
-{
-    // some compile-time constants ------------------------------------- //
-    //
-    
-    // NOTE : Need to be modified by the program if
-    //                 order != 5        or
-    //               Nspline != 114
-    
-    #define Ndiag   121    // = (2*order + 1)^2
-    #define Nlocal  128    // = Ndiag rounded to multiple of 64
-    #define Nrow    13689  // = Nspline^2
-    #define Ncol    13689  // = Nspline^2
-    
-    // diagonal labels
-    const int diagonals [] = {
-        -590, -589, -588, -587, -586, -585, -584, -583, -582, -581, -580,
-        -473, -472, -471, -470, -469, -468, -467, -466, -465, -464, -463,
-        -356, -355, -354, -353, -352, -351, -350, -349, -348, -347, -346,
-        -239, -238, -237, -236, -235, -234, -233, -232, -231, -230, -229,
-        -122, -121, -120, -119, -118, -117, -116, -115, -114, -113, -112,
-          -5,   -4,   -3,   -2,   -1,    0,    1,    2,    3,    4,    5,
-         112,  113,  114,  115,  116,  117,  118,  119,  120,  121,  122,
-         229,  230,  231,  232,  233,  234,  235,  236,  237,  238,  239,
-         346,  347,  348,  349,  350,  351,  352,  353,  354,  355,  356,
-         463,  464,  465,  466,  467,  468,  469,  470,  471,  472,  473,
-         580,  581,  582,  583,  584,  585,  586,  587,  588,  589,  590
-    };    
-                                                                         //
-    // ----------------------------------------------------------------- //
-    
-    // get group indices (numbering the rows)
-    int irow = get_group_id(0);
-    
-    // get global indices (numbering the consecutive elements of matrix)
-    int ielem = get_global_id(0) % get_local_size(0) + irow * Ndiag;
-    
-    // get local indices (numbering the diagonals)
-    int ilocal = get_local_id(0);
-        
-    // get column indices
-    int icol = irow + diagonals[ilocal];
-    
-    // define and clear the temporary result array
-    local double2 tmp[Nlocal];
-    tmp[ilocal] = 0.;
-    
-    // multiply matrix row by the vector (per component, mask by column range)
-    if (ilocal < Ndiag && 0 <= icol && icol < Ncol)
-        tmp[ilocal] = cpxm(A[ielem],x[icol]);
-    
-    // wait for finish of local memory writes
+    // wait on completition of local write instructions
     barrier(CLK_LOCAL_MEM_FENCE);
     
-    // reduce the dot product by bisection
-    uint stride = 1, size = Nlocal;
-    while (size > 1)
+    // reduce the per-element products
+    int stride = 1;
+    while (stride < NLOCAL)
     {
-        // sum elements
-        tmp[ilocal] += tmp[ilocal + stride];
+        if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
+            uv[ilocal] += uv[ilocal + stride];
         
-        // update stride and size
         stride *= 2;
-        size /= 2;
         
-        // wait for finish of local memory writes
+        // wait on completition of local write instructions
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
-    // group master will store the result of the dot product
+    // write the reduced scalar product as computed by this group
     if (ilocal == 0)
-        y[irow] = tmp[0];
-}*/
+        z[get_group_id(0)] = uv[0];
+}
+
+/**
+ * @brief Full vector norm.
+ */
+kernel void norm (global double2 *v, global double *z)
+{
+    uint iglobal = get_global_id(0);
+    double2 vi = v[iglobal];
+    
+    uint ilocal = get_local_id(0);
+    local double vv[NLOCAL];
+    vv[ilocal] = vi.x * vi.x + vi.y * vi.y;
+    
+    // wait on completition of local write instructions
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // reduce the per-element products
+    int stride = 1;
+    while (stride < NLOCAL)
+    {
+        if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
+            vv[ilocal] += vv[ilocal + stride];
+        
+        stride *= 2;
+        
+        // wait on completition of local write instructions
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    
+    // write the reduced scalar product as computed by this group
+    if (ilocal == 0)
+        z[get_group_id(0)] = vv[0];
+}
+
+/**
+ * @brief DIA-matrix-vector multiplication.
+ * 
+ * The input matrix is supplied in the form of zero-padded concatenated diagonals.
+ * For example, the matrix
+ * @f[
+ *     A = \pmatrix {
+ *         a_{11} & a_{12} &        &        &        \cr
+ *         a_{21} & a_{22} & a_{23} &        &        \cr
+ *                & a_{32} & a_{33} & a_{34} &        \cr
+ *                &        & a_{43} & a_{44} & a_{45} \cr
+ *                &        &        & a_{54} & a_{55} \cr
+ *     }
+ * @f]
+ * would be column-padded to
+ * @f[
+ *     A' = \pmatrix {
+ *              0 & a_{11} & a_{12} \cr
+ *         a_{21} & a_{22} & a_{23} \cr
+ *         a_{32} & a_{33} & a_{34} \cr
+ *         a_{43} & a_{44} & a_{45} \cr
+ *         a_{54} & a_{55} &      0 \cr
+ *     }
+ * @f]
+ * and sent in as a 1D array
+ * @f[
+ *     A'' = [0, a_{21} , a_{32}, a_{43}, a_{54}; a_{11}, a_{22}, a_{33}, a_{44}, a_{55}; a_{12}, a_{23}, a_{34}, a_{45}, 0] \ .
+ * @f]
+ */
+kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y)
+{
+    // diagonal labels
+    const int diagonals [] = { DIAGONALS };
+    
+    // matrix row for this local thread
+    int irow = get_global_id(0);
+    
+    // only do something if this matrix row exists
+    if (irow < NROW)
+    {
+        // scalar product
+        double2 yloc = 0;
+        
+        // for all diagonals
+        for (int idiag = 0; idiag < NDIAG; idiag++)
+        {
+            // get column index for all threads
+            int icol = irow + diagonals[idiag];
+            
+            // multiply the elements
+            if (0 <= icol && icol < NCOL)
+            {
+                yloc += cpxm(A[idiag * NROW + irow], x[icol]);
+            }
+        }
+        
+        // copy results to global memory
+        y[irow] = yloc;
+    }
+}

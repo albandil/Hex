@@ -1,7 +1,8 @@
 The following configuration successfully builds the package:
 
 Compiler:
-    GCC 4.7.2
+    GCC 4.7.2 or
+    Intel C++ Composer XE 14.0 SP1 Update 1
 
 Libraries:
     GSL 1.15

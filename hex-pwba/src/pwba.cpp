@@ -23,6 +23,7 @@
 #include "misc.h"
 #include "specf.h"
 #include "symbolic.h"
+#include "version.h"
 
 double compute_Idir (int li, int lf, int lam, int Ni, int Li, double ki, int Nf, int Lf, double kf)
 {
@@ -191,6 +192,9 @@ int main(int argc, char* argv[])
         printf("\nUsage:\n\thex-pwba <ni> <li> <nf> <lf> <maxL> <Ei> <sigmaeps>\n\n");
         exit(0);
     }
+    
+    // write program logo
+    std::cout << logo() << "\n";
     
     // atomic quantum numbers
     int Ni = strtol(argv[1], 0, 10);

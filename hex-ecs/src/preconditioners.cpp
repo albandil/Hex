@@ -430,6 +430,20 @@ void NoPreconditioner::update (double E)
         
         // finalize the matrix
         dia_blocks_[ill] = E * S_kron_S_ - Hdiag;
+        
+        // if out-of-core is enabled, dump the matrix to disk
+        if (cmd_.outofcore)
+        {
+            // link diagonal block to a disk file
+            dia_blocks_[ill].link(format("dblk-%d.hdf", ill));
+            
+            // save diagonal block to disk
+            # pragma omp critical
+            dia_blocks_[ill].hdfsave();
+            
+            // release memory
+            dia_blocks_[ill].drop();
+        }
     }
     
     par_.wait();
@@ -565,8 +579,21 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // multiply by hamiltonian terms
         if (ill == illp)
         {
-            // reuse the diagonal block
+            if (cmd_.outofcore)
+            {
+                // read diagonal block from a linked file
+                # pragma omp critical
+                dia_blocks_[ill].hdfload();
+            }
+            
+            // use the diagonal block for multiplication
             q_contrib += dia_blocks_[ill].dot(p_block);
+            
+            if (cmd_.outofcore)
+            {
+                // release the memory
+                dia_blocks_[ill].drop();
+            }
         }
         else
         {
@@ -631,6 +658,30 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
+void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
+{
+    if (cmd_.outofcore)
+    {
+        // load matrix from disk file
+        # pragma omp critical
+        dia_blocks_[iblock].hdfload();
+    }
+    
+    // multiply
+    q = dia_blocks_[iblock].dot(p);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        dia_blocks_[iblock].drop();
+    }
+}
+
+void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    z = r;
+}
+
 #ifndef NO_OPENCL
 
 const std::string GPUCGPreconditioner::name = "gpuJacobi";
@@ -680,13 +731,34 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax work group size: " << size << "\n\n";
     
+    // choose (e.g.) the largest workgroup
+    // NOTE : This may not be the most efficient choice.
+    Nlocal_ = size;
+    
     // create context and command queue
     context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
     queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
     
+    // setup the structure of the matrices
+    int order = s_bspline_.order();
+    int Nspline = s_bspline_.Nspline();
+    iArray diags;
+    for (int i = -order; i <= order; i++)
+        for (int j = -order; j <= order; j++)
+            diags.push_back(i * Nspline + j);
+    std::string diagonals = to_string(diags, ',');
+    
+    // setup compile flags
+    std::ostringstream flags;
+    flags << "-cl-strict-aliasing -cl-fast-relaxed-math ";
+    flags << "-D ORDER="     << order     << " ";
+    flags << "-D NSPLINE="   << Nspline   << " ";
+    flags << "-D DIAGONALS=" << diagonals << " ";
+    flags << "-D NLOCAL="    << Nlocal_   << " ";
+    
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
-    clBuildProgram (program_, 1, &device_, "-cl-strict-aliasing -cl-fast-relaxed-math", nullptr, nullptr);
+    clBuildProgram (program_, 1, &device_, flags.str().c_str(), nullptr, nullptr);
     
     cl_build_status status;
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
@@ -699,22 +771,45 @@ void GPUCGPreconditioner::setup ()
     }
     
     // set program entry points
-    mmul_ = clCreateKernel(program_, "CSR_dot_vec", nullptr);
+    mmul_ = clCreateKernel(program_, "DIA_dot_vec", nullptr);
     amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
     axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
     vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
+    norm_ = clCreateKernel(program_, "norm",        nullptr);
+    spro_ = clCreateKernel(program_, "scalar_product", nullptr);
 }
 
 void GPUCGPreconditioner::update (double E)
 {
     NoPreconditioner::update(E);
     
-    std::cout << "Update preconditioner..." << std::flush;
+    std::cout << "\tUpdate preconditioner..." << std::flush;
     
+    // zero-pad diagonals of the diagonal DIA blocks
     for (size_t ill = 0; ill < l1_l2_.size(); ill++)
     {
-        // convert DIA block to CSR
-        csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
+        if (cmd_.outofcore)
+        {
+            // load dia_blocks_[ill] from linked file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
+        block_[ill] = dia_blocks_[ill].toPaddedCols();
+        
+        if (cmd_.outofcore)
+        {
+            // link this array to a HDF file
+            block_[ill].link(format("pdblk-%d.hdf", ill));
+            
+            // save this array to a HDF file
+            # pragma omp critical
+            block_[ill].hdfsave();
+            
+            // free memory
+            block_[ill].drop();
+            dia_blocks_[ill].drop();
+        }
     }
     
     std::cout << "ok\n";
@@ -728,16 +823,23 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        if (cmd_.outofcore)
+        {
+            // load linked files from disk
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+            # pragma omp critical
+            block_[ill].hdfload();
+        }
+        
         // create OpenCL representation of segment views + transfer data to GPU memory
         CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex> tmp (Nsegsiz);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<double>  nrm (Nsegsiz);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        CLArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
         // create OpenCL representation of the matrix block + transfer data to GPU memory
-        CLArrayView<cl_long> Ap (csr_blocks_[ill].p());    Ap.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<cl_long> Ai (csr_blocks_[ill].i());    Ai.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-        CLArrayView<Complex> Ax (csr_blocks_[ill].x());    Ax.connect (context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        CLArrayView<Complex> A (block_[ill]); A.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         
         // create OpenCL representation of the inverse diagonal + transfer data to GPU memory
         CLArray<Complex> invd (1. / dia_blocks_[ill].main_diagonal());  invd.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
@@ -771,10 +873,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     x * y -> tmp
-            clSetKernelArg (amul_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (amul_, 1, sizeof(y.handle()), &y.handle());
-            clSetKernelArg (amul_, 2, sizeof(tmp.handle()), &tmp.handle());
-            clEnqueueNDRangeKernel (queue_, amul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg (spro_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (spro_, 1, sizeof(y.handle()), &y.handle());
+            clSetKernelArg (spro_, 2, sizeof(tmp.handle()), &tmp.handle());
+            clEnqueueNDRangeKernel (queue_, spro_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             tmp.EnqueueDownload(queue_);
             clFinish (queue_);
             
@@ -785,9 +887,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     |x|² -> nrm
-            clSetKernelArg (vnrm_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (vnrm_, 1, sizeof(nrm.handle()), &nrm.handle());
-            clEnqueueNDRangeKernel (queue_, vnrm_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg (norm_, 0, sizeof(x.handle()), &x.handle());
+            clSetKernelArg (norm_, 1, sizeof(nrm.handle()), &nrm.handle());
+            clEnqueueNDRangeKernel (queue_, norm_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             nrm.EnqueueDownload(queue_);
             clFinish (queue_);
             
@@ -800,12 +902,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //      b = A · a
-            clSetKernelArg (mmul_, 0, sizeof(Ap.handle()), &Ap.handle());
-            clSetKernelArg (mmul_, 1, sizeof(Ai.handle()), &Ai.handle());
-            clSetKernelArg (mmul_, 2, sizeof(Ax.handle()), &Ax.handle());
-            clSetKernelArg (mmul_, 3, sizeof(a.handle()),  &a.handle());
-            clSetKernelArg (mmul_, 4, sizeof(b.handle()),  &b.handle());
-            clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg (mmul_, 0, sizeof(A.handle()),  &A.handle());
+            clSetKernelArg (mmul_, 1, sizeof(a.handle()),  &a.handle());
+            clSetKernelArg (mmul_, 2, sizeof(b.handle()),  &b.handle());
+            clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish (queue_);
         };
         auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
@@ -843,13 +943,44 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // free GPU memory
         rsegment.disconnect();
         zsegment.disconnect();
-        Ap.disconnect();
-        Ai.disconnect();
-        Ax.disconnect();
+        tmp.disconnect();
+        nrm.disconnect();
+        A.disconnect();
+        
+        if (cmd_.outofcore)
+        {
+            // release memory
+            block_[ill].drop();
+            dia_blocks_[ill].drop();
+        }
     }
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
+}
+
+void GPUCGPreconditioner::CG_mmul(int iblock, const cArrayView p, cArrayView q) const
+{
+    if (cmd_.outofcore)
+    {
+        // read matrix from file
+        # pragma omp critical
+        dia_blocks_[iblock].hdfload();
+    }
+    
+    // multiply
+    q = dia_blocks_[iblock].dot(p);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        dia_blocks_[iblock].drop();
+    }
+}
+
+void GPUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    z = r;
 }
 
 #endif
@@ -873,7 +1004,22 @@ void JacobiCGPreconditioner::update (double E)
     // compute inverse diagonals
     # pragma omp parallel for
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
+        if (cmd_.outofcore)
+        {
+            // load DIA block from linked disk file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
         invd_[ill] = 1. / dia_blocks_[ill].main_diagonal();
+        
+        if (cmd_.outofcore)
+        {
+            // release memory
+            dia_blocks_[ill].drop();
+        }
+    }
     
     par_.wait();
 }
@@ -897,7 +1043,45 @@ void SSORCGPreconditioner::update (double E)
     
     // compute preconditioner matrix
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    {
         SSOR_[ill] = SSOR(dia_blocks_[ill]);
+        
+        if (cmd_.outofcore)
+        {
+            // link to a disk file
+            SSOR_[ill].link(format("ssor-%d.hdf"));
+            
+            // save to the file
+            # pragma omp critical
+            SSOR_[ill].hdfsave();
+            
+            // release memory
+            SSOR_[ill].drop();
+        }
+    }
+}
+
+void SSORCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+{
+    if (cmd_.outofcore)
+    {
+        // load data from a linked disk file
+        # pragma omp critical
+        SSOR_[iblock].hdfload();
+    }
+    
+    z = SSOR_[iblock].upperSolve (
+            SSOR_[iblock].dot (
+                SSOR_[iblock].lowerSolve(r),
+                diagonal
+            )
+    );
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        SSOR_[iblock].drop();
+    }
 }
 
 const std::string ILUCGPreconditioner::name = "ILU";
@@ -924,8 +1108,15 @@ void ILUCGPreconditioner::update (double E)
     {
         std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
         
+        if (cmd_.outofcore)
+        {
+            // load DIA block from a linked disk file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
+        
         // start timer
-        Timer::timer().start();
+        Timer timer;
         
         // create CSR block
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
@@ -934,11 +1125,50 @@ void ILUCGPreconditioner::update (double E)
         lu_[ill] = csr_blocks_[ill].factorize(droptol_);
         
         // time usage
-        int secs = Timer::timer().stop();
-    
+        int secs = timer.elapsed();
+        
         // print info
         std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
                   << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
+        
+        if (cmd_.outofcore)
+        {
+            // link CSR block to a disk file
+            csr_blocks_[ill].link(format("csr-%d.hdf", ill));
+            # pragma omp critical
+            csr_blocks_[ill].hdfsave();
+            
+            // release memory
+            csr_blocks_[ill].drop();
+            dia_blocks_[ill].drop();
+            
+            // link to a disk file
+            lu_[ill].link(format("lu-%d.upk", ill));
+            # pragma omp critical
+            lu_[ill].save();
+            lu_[ill].drop();
+        }
+    }
+}
+
+void ILUCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+{
+    if (cmd_.outofcore)
+    {
+        // load data from linked disk files
+        # pragma omp critical
+        csr_blocks_[iblock].hdfload();
+        # pragma omp critical
+        lu_[iblock].load();
+    }
+    
+    z = lu_[iblock].solve(r);
+    
+    if (cmd_.outofcore)
+    {
+        // release memory
+        csr_blocks_[iblock].drop();
+        lu_[iblock].drop();
     }
 }
 

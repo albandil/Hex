@@ -468,47 +468,51 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         /// Allocated memory.
         size_t Nres_;
         
+        /// HDF file to store to / load from.
+        std::string name_;
+        
     public:
         
         // default constructor, creates an empty array
         NumberArray ()
-            : Array<T,Alloc>(), Nres_(size()) {}
+            : Array<T,Alloc>(), Nres_(size()), name_() {}
         
         // constructor, creates a length-n "x"-filled array
         NumberArray (size_t n, T x = 0)
-            : Array<T,Alloc>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // constructor, copies a length-n "array
         NumberArray (size_t n, T const * x)
-            : Array<T,Alloc>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // copy constructor from ArrayView const lvalue reference
         NumberArray (ArrayView<T> const & a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from Array const lvalue reference
         NumberArray (NumberArray<T> const & a)
-            : Array<T,Alloc>((ArrayView<T> const &)a), Nres_(size()) {}
+            : Array<T,Alloc>((ArrayView<T> const &)a), Nres_(size()), name_() {}
         
         // copy constructor from std::vector
         NumberArray (std::vector<T> const & a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from initializer list
         NumberArray (std::initializer_list<T> a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from two forward iterators
         template <typename ForwardIterator> NumberArray (ForwardIterator i, ForwardIterator j)
-            : Array<T,Alloc>(i,j), Nres_(size()) {}
+            : Array<T,Alloc>(i,j), Nres_(size()), name_() {}
         
         // copy constructor from Array rvalue reference
         NumberArray (NumberArray<T> && a)
-            : Array<T,Alloc>()
+            : Array<T,Alloc>(), name_()
         {
             std::swap(ArrayView<T>::N_, a.ArrayView<T>::N_);
             std::swap(ArrayView<T>::array_, a.ArrayView<T>::array_);
             std::swap(Nres_,a.Nres_);
+            std::swap(name_, a.name_);
         }
         
         // destructor
@@ -662,6 +666,13 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             memset(ArrayView<T>::array_, 0, size() * sizeof(T));
         }
         
+        void drop ()
+        {
+            Nres_ = ArrayView<T>::N_ = 0;
+            Alloc::free (ArrayView<T>::array_);
+            ArrayView<T>::array_ = nullptr;
+        }
+        
         //
         // assignment operators
         //
@@ -812,7 +823,19 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 reinterpret_cast<char*>(data())[i] = byte;
             }
         }
-    
+        
+        /**
+         * @brief Link to a HDF file.
+         * 
+         * In order to avoid repetitious specifying of the HDF filename,
+         * it is possible to link the array to a single file and then use
+         * @ref hdfload and @ref hdfsave functions without arguments.
+         */
+        void link (std::string name)
+        {
+            name_ = name;
+        }
+        
         /**
         * @brief Save array to HDF file.
         * 
@@ -827,7 +850,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         * @param docompress Whether to apply a trivial compression (contract the repeated zeros).
         * @param consec Minimal consecutive occurences for compression.
         */
-        bool hdfsave (const char* name, bool docompress = false, int consec = 10) const
+        //@{
+        bool hdfsave (std::string name, bool docompress = false, int consec = 10) const
         {
 #ifndef NO_HDF
             // save to HDF file
@@ -870,11 +894,17 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return false;
 #endif
         }
+        bool hdfsave () const
+        {
+            return hdfsave (name_);
+        }
+        //@}
         
         /**
         * Load array from HDF file.
         * @param name Filename.
         */
+        //@{
         bool hdfload (std::string name)
         {
 #ifndef NO_HDF
@@ -922,6 +952,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return false;
 #endif
         }
+        bool hdfload ()
+        {
+            return hdfload (name_);
+        }
+        //@}
         
         // get compressed array
         std::tuple<NumberArray<int>,NumberArray<T>> compress (int consec) const
@@ -1552,12 +1587,22 @@ template <class T> void smoothen (ArrayView<T> v)
 /**
  * @brief Convert ArrayView<T> to a string.
  */
-template <class T> std::string to_string (const ArrayView<T> v)
+template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 {
     std::ostringstream ss;
-    for (T const & x : v)
-        ss << x << " ";
+    for (size_t i = 0; i < v.size(); i++)
+    {
+        if (i == 0)
+            ss << v[i];
+        else
+            ss << sep << v[i];
+    }
     return ss.str();
 }
+
+/**
+ * @brief Drop small elements of array (replace by zero).
+ */
+rArray threshold (const rArrayView a, double eps);
 
 #endif

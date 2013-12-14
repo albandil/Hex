@@ -32,7 +32,7 @@
 void CommandLine::parse (int argc, char* argv[])
 {
     // set short options
-    char const * const short_options  = "ei:hz:n:R:mabcd:p:P";
+    char const * const short_options  = "ei:hz:n:R:mabcOd:p:P";
     
     // set long options
     const option long_options[] = {
@@ -48,7 +48,8 @@ void CommandLine::parse (int argc, char* argv[])
         {"stg-integ",         0,   0, 'a'},
         {"stg-integ-solve",   0,   0, 'b'},
         {"stg-extract",       0,   0, 'c'},
-        {"drop-tolerance",    1,   0, 'd'},
+        {"out-of-core",       0,   0, 'O'},
+        {"droptol",           1,   0, 'd'},
         {"preconditioner",    1,   0, 'p'},
         {"prec-info",         0,   0, 'P'},
         {0,                   0,   0,   0}
@@ -125,22 +126,23 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                         \n"
-                    "                                                                                                         \n"
-                    "\t--example            (-e)  create sample input file                                                    \n"
-                    "\t--help               (-h)  display this help                                                           \n"
-                    "\t--input <filename>   (-i)  use custom input file                                                       \n"
-                    "\t--zipfile <filename> (-z)  solution file to zip                                                        \n"
-                    "\t--zipcount <number>  (-n)  zip samples                                                                 \n"
-                    "\t--zipmax <number>    (-R)  maximal radius to use for solution zipping                                  \n"
-                    "\t--mpi                (-m)  use MPI                                                                     \n"
-                    "\t--stg-integ          (-a)  only do radial integrals                                                    \n"
-                    "\t--stg-integ-solve    (-b)  only do integrals & solve                                                   \n"
-                    "\t--stg-extract        (-c)  only extract amplitudes                                                     \n"
-                    "\t--preconditioner     (-p)  preconditioner to use (default: ILU)                                        \n"
-                    "\t--prec-info          (-P)  list of available preconditioners with short description of each            \n"
-                    "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                  \n"
-                    "                                                                                                         \n"
+                    "Available switches (short forms in parentheses):                                                             \n"
+                    "                                                                                                             \n"
+                    "\t--example            (-e)  create sample input file                                                        \n"
+                    "\t--help               (-h)  display this help                                                               \n"
+                    "\t--input <filename>   (-i)  use custom input file                                                           \n"
+                    "\t--zipfile <filename> (-z)  solution file to zip                                                            \n"
+                    "\t--zipcount <number>  (-n)  zip samples                                                                     \n"
+                    "\t--zipmax <number>    (-R)  maximal radius to use for solution zipping                                      \n"
+                    "\t--mpi                (-m)  use MPI                                                                         \n"
+                    "\t--stg-integ          (-a)  only do radial integrals                                                        \n"
+                    "\t--stg-integ-solve    (-b)  only do integrals & solve                                                       \n"
+                    "\t--stg-extract        (-c)  only extract amplitudes                                                         \n"
+                    "\t--preconditioner     (-p)  preconditioner to use (default: ILU)                                            \n"
+                    "\t--prec-info          (-P)  list of available preconditioners with short description of each                \n"
+                    "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
+                    "\t--out-of-core        (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
+                    "                                                                                                             \n"
                 ;
                 exit(0);
             }
@@ -178,6 +180,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // run only the third part (extraction of amplitudes)
                 itinerary = StgExtract;
+                break;
+            }
+            case 'O':
+            {
+                // use out-of-core functionality: store diagonal blocks on disk
+                outofcore = true;
                 break;
             }
             case 'd':

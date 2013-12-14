@@ -504,7 +504,12 @@ void CsrMatrix::write (const char* filename) const
     out.close();
 }
 
-bool CsrMatrix::hdfsave (const char* name) const
+void CsrMatrix::link (std::string name)
+{
+    name_ = name;
+}
+
+bool CsrMatrix::hdfsave (std::string name) const
 {
 #ifndef NO_HDF
     try
@@ -542,7 +547,7 @@ bool CsrMatrix::hdfsave (const char* name) const
 #endif
 }
 
-bool CsrMatrix::hdfload(const char* name)
+bool CsrMatrix::hdfload (std::string name)
 {
 #ifndef NO_HDF
     try
@@ -1277,18 +1282,18 @@ bool CooMatrix::hdfload(const char* name)
 #endif
 }
 
-SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0), dptrs_(0) {}
+SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0), name_(), dptrs_(0) {}
 
-SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0), dptrs_(0) {}
+SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0), name_(), dptrs_(0) {}
 
 SymDiaMatrix::SymDiaMatrix(int n, const iArrayView id, const cArrayView v)
-    : n_(n), elems_(v), idiag_(id) { setup_dptrs_(); }
+    : n_(n), elems_(v), idiag_(id), name_() { setup_dptrs_(); }
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
-    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_) { setup_dptrs_(); }
+    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_), name_() { setup_dptrs_(); }
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
-    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)) { setup_dptrs_(); }
+    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)), name_(A.name_) { setup_dptrs_(); }
 
 void SymDiaMatrix::setup_dptrs_()
 {
@@ -1529,7 +1534,7 @@ bool SymDiaMatrix::is_compatible(SymDiaMatrix const & B) const
     return true;
 }
 
-bool SymDiaMatrix::hdfload(char const * name)
+bool SymDiaMatrix::hdfload (std::string name)
 {
 #ifndef NO_HDF
     try
@@ -1574,7 +1579,7 @@ bool SymDiaMatrix::hdfload(char const * name)
 #endif
 }
 
-bool SymDiaMatrix::hdfsave(const char* name, bool docompress, int consec) const
+bool SymDiaMatrix::hdfsave (std::string name, bool docompress, int consec) const
 {
 #ifndef NO_HDF
     HDFFile hdf(name, HDFFile::overwrite);
@@ -1913,4 +1918,48 @@ cArray SymDiaMatrix::toPaddedRows () const
     }
     
     return padr;
+}
+
+cArray SymDiaMatrix::toPaddedCols () const
+{
+    // stored diagonals count
+    int ndiag = diag().size();
+    
+    // all diagonals count
+    int Ndiag = 2 * ndiag - 1;
+    
+    // row count
+    int Nrows = n_;
+    
+    // create zero array of the right length
+    cArray padr (Nrows * Ndiag);
+    
+    // add main diagonal
+    for (int i = 0; i < Nrows; i++)
+        padr[(ndiag - 1) * Nrows + i] = data()[i];
+    
+    // add non-main diagonals
+    for (int idiag = 1; idiag < ndiag; idiag++)
+    {
+        // get data pointer for this diagonal
+        Complex const * const pa = dptr(idiag);
+        
+        // get diagonal label
+        int ldiag = diag(idiag);
+        
+        // store the upper diagonal elements
+        for (int irow = 0; irow + ldiag < Nrows; irow++)
+            padr[(ndiag - 1 + idiag) * Nrows + irow] = pa[irow];
+        
+        // store the lower diagonal elements
+        for (int irow = ldiag; irow < Nrows; irow++)
+            padr[(ndiag - 1 - idiag) * Nrows + irow] = pa[irow - ldiag];
+    }
+    
+    return padr;
+}
+
+void SymDiaMatrix::link (std::string name)
+{
+    name_ = name;
 }

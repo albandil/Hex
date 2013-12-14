@@ -1,10 +1,20 @@
-.PHONY: all clean doc
+.PHONY: all clean doc pollversion
 
+##############################################################
+# Editable part
+
+# compiler executable
 CXX = g++
-CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF
+# CXX = icpc
+                                                             #
+##############################################################
+
+GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+
+CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
 LFLAGS = -lgsl -lgslcblas -lo2scl -lcln
 
-FILES = pwba symbolic specf arrays
+FILES = pwba symbolic specf arrays version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
