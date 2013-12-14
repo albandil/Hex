@@ -762,12 +762,16 @@ void GPUCGPreconditioner::setup ()
     
     cl_build_status status;
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
-    if (status != 0)
+    if (status != CL_SUCCESS)
     {
+        std::cout << "\nSource:\n" << source << "\n";
+        std::cout << "\nCommand line:\n" << flags.str() << "\n\n";
+        
         char log [100000];
         clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
         std::cout << "clGetProgramBuildInfo: log \n" << log << "\n";
-        exit(0);
+        
+        throw exception ("Failed to initialize OpenCL.");
     }
     
     // set program entry points
