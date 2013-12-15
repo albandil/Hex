@@ -49,7 +49,7 @@ void CommandLine::parse (int argc, char* argv[])
         {"stg-integ-solve",   0,   0, 'b'},
         {"stg-extract",       0,   0, 'c'},
         {"out-of-core",       0,   0, 'O'},
-        {"droptol",           1,   0, 'd'},
+        {"drop-tolerance",    1,   0, 'd'},
         {"preconditioner",    1,   0, 'p'},
         {"prec-info",         0,   0, 'P'},
         {0,                   0,   0,   0}
@@ -140,7 +140,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-extract        (-c)  only extract amplitudes                                                         \n"
                     "\t--preconditioner     (-p)  preconditioner to use (default: ILU)                                            \n"
                     "\t--prec-info          (-P)  list of available preconditioners with short description of each                \n"
-                    "\t--droptol            (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
+                    "\t--drop-tolerance     (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core        (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "                                                                                                             \n"
                 ;
