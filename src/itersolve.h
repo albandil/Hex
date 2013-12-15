@@ -129,6 +129,11 @@ inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArr
  *        @f[
  *                 \sum_{i = 1}^N x_i y_i \ .
  *        @f]
+ * @param compute_norm Functor compatible with signature
+ *        @code
+ *            double (*) (const TArrayView x)
+ *        @endcode
+ *        Computes the norm of the array.
  * 
  * @return Iteration count.
  */
