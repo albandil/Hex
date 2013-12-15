@@ -435,7 +435,7 @@ void NoPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link diagonal block to a disk file
-            dia_blocks_[ill].link(format("dblk-%d.hdf", ill));
+            dia_blocks_[ill].link(format("dblk-%d.ooc", ill));
             
             // save diagonal block to disk
             # pragma omp critical
@@ -804,7 +804,7 @@ void GPUCGPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link this array to a HDF file
-            block_[ill].link(format("pdblk-%d.hdf", ill));
+            block_[ill].link(format("pdblk-%d.ooc", ill));
             
             // save this array to a HDF file
             # pragma omp critical
@@ -827,6 +827,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        std::cout << "\t\t\t -precondition block " << ill << "\n";
+        
         if (cmd_.outofcore)
         {
             // load linked files from disk
@@ -963,30 +965,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
 }
 
-void GPUCGPreconditioner::CG_mmul(int iblock, const cArrayView p, cArrayView q) const
-{
-    if (cmd_.outofcore)
-    {
-        // read matrix from file
-        # pragma omp critical
-        dia_blocks_[iblock].hdfload();
-    }
-    
-    // multiply
-    q = dia_blocks_[iblock].dot(p);
-    
-    if (cmd_.outofcore)
-    {
-        // release memory
-        dia_blocks_[iblock].drop();
-    }
-}
-
-void GPUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
-{
-    z = r;
-}
-
 #endif
 
 const std::string JacobiCGPreconditioner::name = "Jacobi";
@@ -1053,7 +1031,7 @@ void SSORCGPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link to a disk file
-            SSOR_[ill].link(format("ssor-%d.hdf"));
+            SSOR_[ill].link(format("ssor-%d.ooc"));
             
             // save to the file
             # pragma omp critical
@@ -1138,7 +1116,7 @@ void ILUCGPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link CSR block to a disk file
-            csr_blocks_[ill].link(format("csr-%d.hdf", ill));
+            csr_blocks_[ill].link(format("csr-%d.ooc", ill));
             # pragma omp critical
             csr_blocks_[ill].hdfsave();
             
@@ -1147,7 +1125,7 @@ void ILUCGPreconditioner::update (double E)
             dia_blocks_[ill].drop();
             
             // link to a disk file
-            lu_[ill].link(format("lu-%d.upk", ill));
+            lu_[ill].link(format("lu-%d.ooc", ill));
             # pragma omp critical
             lu_[ill].save();
             lu_[ill].drop();
