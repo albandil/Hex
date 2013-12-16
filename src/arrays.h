@@ -13,6 +13,7 @@
 #ifndef HEX_ARRAYS
 #define HEX_ARRAYS
 
+#include <cassert>
 #include <complex>
 #include <cstring>
 #include <fstream>
@@ -23,8 +24,6 @@
 #include <typeinfo>
 #include <type_traits>
 #include <vector>
-
-#include <assert.h>
 
 #ifndef NO_HDF
 #include "hdffile.h"

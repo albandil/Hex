@@ -23,7 +23,6 @@
 #include <png++/png.hpp>
 #endif
 
-#include <unistd.h>
 #include <umfpack.h>
 
 #include "arrays.h"

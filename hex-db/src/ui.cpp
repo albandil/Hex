@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
-#include <getopt.h>
 
 #include "hex-db.h"
 #include "variables.h"
