@@ -320,10 +320,6 @@ class GPUCGPreconditioner : public NoPreconditioner
         // declare own definitions
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
-        // inner CG callbacks
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        
     private:
         
         // diagonal blocks
