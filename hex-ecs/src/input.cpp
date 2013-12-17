@@ -24,42 +24,42 @@
 #include "preconditioners.h"
 
 const std::string sample_input =
-	"# B-spline parameters \n"
-	"# order      θ\n"
-	"      4   0.63\n"
-	"\n"
-	"# real knot sequences\n"
-	" 0.0  0.1   3   -1\n"
-	" 0.0  2.0  60\n"
-	"   4   20  58\n"
-	"\n"
-	"# complex knot sequences\n"
-	"  60    -1\n"
-	" 100\n"
-	"  41\n"
-	"\n"
-	"# initial atomic states\n"
-	"# ni\n"
-	"  1\n"
-	"# angular states (li, mi)\n"
-	"  0  -1\n"
-	"  0\n"
-	"\n"
-	"# final atomic states (nf, lf)\n"
-	"  1  -1\n"
-	"  0\n"
-	"\n"
-	"# angular momenta\n"
-	"# L  S  Pi limit\n"
-	"  0  0  0  4\n"
-	"\n"
-	"# initial energies in Rydbergs\n"
-	" 0.65   -1\n"
-	" 0.95\n"
-	"    3\n"
-	"\n"
-	"# magnetic field\n"
-	" 0\n";
+    "# B-spline parameters \n"
+    "# order      θ\n"
+    "      4   0.63\n"
+    "\n"
+    "# real knot sequences\n"
+    " 0.0  0.1   3   -1\n"
+    " 0.0  2.0  60\n"
+    "   4   20  58\n"
+    "\n"
+    "# complex knot sequences\n"
+    "  60    -1\n"
+    " 100\n"
+    "  41\n"
+    "\n"
+    "# initial atomic states\n"
+    "# ni\n"
+    "  1\n"
+    "# angular states (li, mi)\n"
+    "  0  -1\n"
+    "  0\n"
+    "\n"
+    "# final atomic states (nf, lf)\n"
+    "  1  -1\n"
+    "  0\n"
+    "\n"
+    "# angular momenta\n"
+    "# L  S  Pi limit\n"
+    "  0  0  0  4\n"
+    "\n"
+    "# initial energies in Rydbergs\n"
+    " 0.65   -1\n"
+    " 0.95\n"
+    "    3\n"
+    "\n"
+    "# magnetic field\n"
+    " 0\n";
 
 
 void CommandLine::parse (int argc, char* argv[])
@@ -67,35 +67,35 @@ void CommandLine::parse (int argc, char* argv[])
     ParseCommandLine
     (
         argc, argv,
-		
+        
         "example", "e", 0, [&](std::string optarg) -> bool
-			{
-				std::cout << "Writing sample input file to \"example.inp\".\n\n";
-				
-				// produce sample input file
-				std::ofstream out("example.inp");
-				if (out.bad())
-					throw exception ("Error: Cannot write to \"example.inp\"\n");
-				
-				out << sample_input;
-					
-				out.close();
-				exit(0);
-			},
-		"input", "i", 1, [&](std::string optarg) -> bool
-			{
-				// set custom input file
-				inputfile.open(optarg);
-				if (not inputfile.good())
-					throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
-				return true;
+            {
+                std::cout << "Writing sample input file to \"example.inp\".\n\n";
+                
+                // produce sample input file
+                std::ofstream out("example.inp");
+                if (out.bad())
+                    throw exception ("Error: Cannot write to \"example.inp\"\n");
+                
+                out << sample_input;
+                    
+                out.close();
+                exit(0);
             },
-		"help", "h", 0, [&](std::string optarg) -> bool
-			{
+        "input", "i", 1, [&](std::string optarg) -> bool
+            {
+                // set custom input file
+                inputfile.open(optarg);
+                if (not inputfile.good())
+                    throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                return true;
+            },
+        "help", "h", 0, [&](std::string optarg) -> bool
+            {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                             \n"
-                    "                                                                                                             \n"
+                    "Available switches (short forms in parentheses):                                                                  \n"
+                    "                                                                                                                  \n"
                     "\t--example                 (-e)  create sample input file                                                        \n"
                     "\t--help                    (-h)  display this help                                                               \n"
                     "\t--input <filename>        (-i)  use custom input file                                                           \n"
@@ -110,75 +110,75 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
                     "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
-                    "                                                                                                             \n"
+                    "                                                                                                                  \n"
                 ;
                 exit(0);
             },
-		"zipfile", "z", 1, [&](std::string optarg) -> bool
-			{
+        "zipfile", "z", 1, [&](std::string optarg) -> bool
+            {
                 // zip B-spline expansion file
                 zipfile = std::string (basename(optarg.c_str()));
                 return true;
             },
         "zipcount", "n", 1, [&](std::string optarg) -> bool
-			{
+            {
                 // zip samples
                 zipcount = atol(optarg.c_str());
                 return true;
             },
         "zipmax", "R", 1, [&](std::string optarg) -> bool
-			{
+            {
                 // zip bounding box
                 zipmax = atof(optarg.c_str());
                 return true;
             },
 #ifndef NO_MPI
-		"mpi", "m", 0, [&](std::string optarg) -> bool
-			{
+        "mpi", "m", 0, [&](std::string optarg) -> bool
+            {
                 // use MPI
                 parallel = true;
                 return true;
             },
 #endif
-		"stg-integ", "a", 0, [&](std::string optarg) -> bool
-			{
+        "stg-integ", "a", 0, [&](std::string optarg) -> bool
+            {
                 // run only the first part (computation of radial integrals)
                 itinerary = StgRadial;
                 return true;
             },
         "stg-integ-solve", "b", 0, [&](std::string optarg) -> bool
-			{
+            {
                 // run only the first part (computation of radial integrals)
                 itinerary = StgRadial | StgSolve;
                 return true;
             },
         "stg-extract", "c", 0, [&](std::string optarg) -> bool
-			{
+            {
                 // run only the third part (extraction of amplitudes)
                 itinerary = StgExtract;
                 return true;
             },
         "out-of-core", "O", 0, [&](std::string optarg) -> bool
-			{
+            {
                 // use out-of-core functionality: store diagonal blocks on disk
                 outofcore = true;
                 return true;
             },
         "drop-tolerance", "d", 1, [&](std::string optarg) -> bool
-			{
+            {
                 // drop tolerance for iLU-factorization
                 droptol = atof(optarg.c_str());
                 return true;
             },
         "preconditioner", "p", 1, [&](std::string optarg) -> bool
-			{
-				// preconditioner
+            {
+                // preconditioner
                 if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
                     throw exception("Unknown preconditioner \"%s\".", optarg.c_str());
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
-			{
+            {
                 // preconditioners description
                 std::cout << "\nPreconditioners description:\n\n";
                 for (unsigned i = 0; i < Preconditioners::size(); i++)
@@ -189,11 +189,11 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << "\n";
                 exit (0);
             },
-		
-		[&] (std::string optname, std::string optarg) -> bool
-		{
-			throw exception ("Unknown switch \"%s\".", optname.c_str());
-		}
+        
+        [&] (std::string optname, std::string optarg) -> bool
+        {
+            throw exception ("Unknown switch \"%s\".", optname.c_str());
+        }
     );
 }
 
