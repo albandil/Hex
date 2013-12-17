@@ -1,4 +1,4 @@
-.PHONY: all clean doc
+.PHONY: all clean doc dist distclean
 
 SUBDIRS = stack f hdf2txt hdf2hdf chebeval
 
@@ -11,4 +11,10 @@ $(SUBDIRS)::
 all clean: $(SUBDIRS)
 
 doc:
-	
+	# nothing to do
+
+dist:
+	# nothing to do
+
+distclean:
+	# nothing to do
