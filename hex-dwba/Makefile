@@ -1,4 +1,4 @@
-.PHONY: all clean doc pollversion
+.PHONY: all clean doc pollversion dist distclean
 
 ##############################################################
 # Editable part
@@ -33,6 +33,17 @@ all: pollversion bin/hex-dwba
 
 pollversion:
 	touch src/version.cpp
+
+dist:
+	mkdir -p hex-dwba
+	cp --recursive --dereference README Makefile Doxyfile src hex-dwba/
+	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-dwba/Makefile
+	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-dwba/Makefile
+	tar --create --gzip --file=hex-dwba-$(GIT_COMMIT).tar.gz hex-dwba
+	rm -rf hex-dwba/
+
+distclean:
+	rm -rf hex-dwba hex-dwba-*.tar.gz
 
 bin/hex-dwba: $(OBJECTS)
 	@mkdir -p $(@D)

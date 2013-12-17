@@ -1,4 +1,4 @@
-.PHONY: all doc clean pollversion
+.PHONY: all doc clean pollversion dist distclean
 
 ###################################################################################
 # Editable section
@@ -52,8 +52,8 @@ CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGI
 
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
-# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) $(OPENCLFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) \
+# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) \
          -mtune=native -march=native
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
@@ -71,8 +71,20 @@ pollversion:
 doc:
 	doxygen
 
+dist:
+	mkdir -p hex-ecs/libs
+	cp --recursive --dereference README Makefile Doxyfile hexe.gif hexe-small.gif src hex-ecs/
+	cp --recursive libs/png++ hex-ecs/libs
+	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-ecs/Makefile
+	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-ecs/Makefile
+	tar --create --gzip --file=hex-ecs-$(GIT_COMMIT).tar.gz hex-ecs
+	rm -rf hex-ecs/
+
 clean:
 	rm -f bin/hex $(OBJECTS) $(DEPENDENCIES)
+
+distclean:
+	rm -rf hex-ecs hex-ecs-*.tar.gz
 
 bin/hex-ecs: $(OBJECTS)
 	@mkdir -p $(@D)

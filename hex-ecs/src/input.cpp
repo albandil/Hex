@@ -180,7 +180,7 @@ void CommandLine::parse (int argc, char* argv[])
         "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
             {
                 // preconditioners description
-                std::cout << "\nPreconditioners description:\n\n";
+                std::cout << "\nPreconditioners description (first one is default):\n\n";
                 for (unsigned i = 0; i < Preconditioners::size(); i++)
                 {
                     std::cout << Preconditioners::name(i) << "\n";
