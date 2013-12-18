@@ -20,6 +20,8 @@
 #include <o2scl/gsl_rkf45.h>
 #include <o2scl/gsl_rk8pd.h>
 
+#include <gsl/gsl_odeiv2.h>
+
 #define DIVERGENCE_THRESHOLD    100
 
 #define ABORT_ON_OVERFLOW       0

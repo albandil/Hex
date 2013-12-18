@@ -118,8 +118,8 @@ bool TotalCrossSection::run (
         
         // interpolate
         rArray tcs = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
         
         // output
         for (size_t i = 0; i < energies.size(); i++)

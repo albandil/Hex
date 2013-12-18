@@ -9,7 +9,7 @@ CPP = g++
 ##############################################################
 
 CFLAGS = -Wall -std=c++11 -I $(shell pwd)/libs -fPIC
-LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lo2scl -lfftw3
+LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lfftw3
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

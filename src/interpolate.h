@@ -15,7 +15,7 @@
 
 #include <algorithm>
 
-#include <o2scl/interp.h>
+#include <gsl/gsl_interp.h>
 
 #include "arrays.h"
 
@@ -72,22 +72,29 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
  * \param y0 Discrete samples
  * \param x  Evaluation (interpolation) points.
  * \param interpolation Interpolation type.
- * \code
-   enum {
-     // Linear
-     itp_linear=0,
-     // Cubic spline for natural boundary conditions
-     itp_cspline=1,
-     // Cubic spline for periodic boundary conditions
-     itp_cspline_peri=2,
-     // Akima spline for natural boundary conditions
-     itp_akima=3,
-     // Akima spline for periodic boundary conditions
-     itp_akima_peri=4
-   };
- * \endcode
+ *  - gsl_interp_linear : Linear interpolation. This interpolation method
+ *    does not require any additional memory. 
+ *  - gsl_interp_polynomial : Polynomial interpolation. This method should only
+ *    be used for interpolating small numbers of points because polynomial
+ *    interpolation introduces large oscillations, even for well-behaved datasets.
+ *    The number of terms in the interpolating polynomial is equal to the number of points. 
+ *  - gsl_interp_cspline : Cubic spline with natural boundary conditions.
+ *    The resulting curve is piecewise cubic on each interval, with matching
+ *    first and second derivatives at the supplied data-points. The second
+ *    derivative is chosen to be zero at the first point and last point. 
+ *  - gsl_interp_cspline_periodic : Cubic spline with periodic boundary 
+ *    conditions. The resulting curve is piecewise cubic on each interval, 
+ *    with matching first and second derivatives at the supplied data-points. 
+ *    The derivatives at the first and last points are also matched. Note 
+ *    that the last point in the data must have the same y-value as the 
+ *    first point, otherwise the resulting periodic interpolation will have 
+ *    a discontinuity at the boundary.
+ *  - gsl_interp_akima : Non-rounded Akima spline with natural boundary 
+ *    conditions. This method uses the non-rounded corner algorithm of Wodicka. 
+ *  - gsl_interp_akima_periodic : Non-rounded Akima spline with periodic 
+ *    boundary conditions. This method uses the non-rounded corner algorithm of Wodicka.
  */
-inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, int interpolation)
+inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, const gsl_interp_type * interpolation)
 {
 //     if (x0.size() == 0)
 //         throw exception ("Nothing to interpolate.\n");
@@ -96,11 +103,9 @@ inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray con
         return y0;
     
     // setup the interpolator
-    o2scl::interp_o2scl_vec<const double*> itp (
-        x0.size(),
-        x0.data(), y0.data(),
-        interpolation
-    );
+    gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());
+    gsl_interp_init (itp, x0.data(), y0.data(), x0.size());
+    gsl_interp_accel *accel = gsl_interp_accel_alloc ();
     
     // interpolate
     rArray y(x.size());
@@ -108,10 +113,14 @@ inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray con
     {
         // check that we are not extrapolating
         if (x0.front() <= x[i] and x[i] <= x0.back())
-            y[i] = itp(x[i]);
+            y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
         else
             y[i] = 0.;
     }
+    
+    // release memory
+    gsl_interp_accel_free (accel);
+    gsl_interp_free (itp);
     
     return y;
 }

@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "../arrays.h"
-#include "../interpolate.h"
 #include "../variables.h"
 #include "../version.h"
 
