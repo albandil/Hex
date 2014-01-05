@@ -258,7 +258,7 @@ int main(int argc, char* argv[])
     if (maxL >= maxl_limit)
     {
         std::cerr << "Warning: Partial wave limit " << maxl_limit
-                  << " reached for E = " << Ei << " Ry, the result may lack the desired presicion.\n";
+                  << " reached for E = " << Ei << " Ry, the result may lack the desired precision.\n";
     }
     
     //
