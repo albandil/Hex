@@ -36,12 +36,6 @@ Here is the list of the libraries with versions that were used:
                 http://www.fftw.org/download.html
             Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
 
- * o2scl 0.912
-            Obtainable from
-                http://o2scl.sourceforge.net/
-            Used for interpolation. Note that higher versions are not compatible
-            with hex-dwba.
-
 Some or all of the libraries may be present in precompiled form in the repositories
 of the Linux distribution used.
 

@@ -6,7 +6,6 @@ Compiler:
 
 Libraries:
     GSL 1.15
-    O2scl 0.912             (not higher!)
     OpenBLAS 0.2.5          (more specifically: git#df554aeb)
     SuiteSparse 4.0.2
     sqlitepp 0.2            (included in libs/)

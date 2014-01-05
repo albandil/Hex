@@ -25,7 +25,9 @@
 
 int main (int argc, char *argv[])
 {
-    // 	gsl_set_error_handler_off();
+    // turn off GSL error jumps
+    gsl_set_error_handler_off();
+    
 #ifndef NO_HDF
     H5::Exception::dontPrint();
 #endif

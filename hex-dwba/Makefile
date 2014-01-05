@@ -17,7 +17,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CXXDEBUG = -g -fPIC -std=c++11 -Wall $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXRILIS = -O3 -fPIC -std=c++11 -Wall $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
-LIBRARY = -lrt -lo2scl -lgsl -lgslcblas -lfftw3 $(HDFLIBS)
+LIBRARY = -lrt -lgsl -lgslcblas -lfftw3 $(HDFLIBS)
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)

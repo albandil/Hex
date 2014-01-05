@@ -26,12 +26,6 @@ Here is the list of the libraries with versions that were used:
                 http://www.gnu.org/software/gsl/
             Used for special functions and some others.
 
- * o2scl 0.912
-            Obtainable from
-                http://o2scl.sourceforge.net/
-            Used for interpolation. Note that higher versions are not compatible
-            with hex-dwba.
-
  * CLN 1.3.2
             Obtainable from
                 http://www.ginac.de/CLN/

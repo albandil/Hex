@@ -187,6 +187,9 @@ std::pair<double,double> cross_section (
 
 int main(int argc, char* argv[])
 {
+    // disable GSL error handler
+    gsl_set_error_handler_off();
+    
     if (argc != 8)
     {
         printf("\nUsage:\n\thex-pwba <ni> <li> <nf> <lf> <maxL> <Ei> <sigmaeps>\n\n");
