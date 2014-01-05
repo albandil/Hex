@@ -24,11 +24,11 @@ template <class DefaultCallback> bool HandleSwitch
     DefaultCallback callback
 )
 {
-	// check bounds
-	if (i >= argc)
-		return false;
-	
-	// option name
+    // check bounds
+    if (i >= argc)
+        return false;
+    
+    // option name
     std::string optname = argv[i];
     
     // remove leading dashes from the optname
@@ -42,10 +42,11 @@ template <class DefaultCallback> bool HandleSwitch
     auto iter = std::find (optname.begin(), optname.end(), '=');
     if (iter != optname.end())
     {
-        optarg = optname.substr(iter-optname.begin(), optname.end()-iter-1);
+        optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
     
+    i++;
     return callback (optname, optarg);
 }
 
@@ -74,7 +75,7 @@ template <class Callback, class ...Params> bool HandleSwitch
     auto iter = std::find (optname.begin(), optname.end(), '=');
     if (iter != optname.end())
     {
-        optarg = optname.substr(iter-optname.begin(), optname.end()-iter-1);
+        optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
     
