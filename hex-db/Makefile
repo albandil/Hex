@@ -34,7 +34,7 @@ VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
 
-all: pollversion exe lib
+all: pollversion exe
 
 pollversion:
 	@touch src/version.cpp
@@ -81,7 +81,7 @@ obj/%.o: src/var/%.cpp
 # SQLite++ library
 
 $(SQLITEPPOBJ) : obj/%.o : libs/sqlitepp/%.cpp
-	g++ -O2 -fPIC -c $^ -o $@
+	$(CPP) -O2 -fPIC -c $^ -o $@
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
 	ar cr $@ $^
