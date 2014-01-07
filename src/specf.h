@@ -375,9 +375,85 @@ double coul_F_asy(int l, double k, double r, double sigma = Nan);
 double coul_F_sigma(int l, double k);
 
 /**
+ * @brief Check triangle inequality.
+ * 
+ * Verify that the three angular momenta satisfy triangle inequalities, i.e.
+ * @f[
+ *       |j_1 - j_2 | \le j_3 \le j_1 + j_2
+ * @f]
+ * and analogously for all (cyclical) permutations of indices.
+ */
+bool makes_triangle (int two_j1, int two_j2, int two_j3);
+
+/**
+ * @brief Auxiliary function used in coupling coefficient computations.
+ * 
+ * The triangle function, defined as
+ * @f[
+ *     \Delta(j_1,j_2,j_3) = \sqrt{
+ *         \frac{(j_1+j_2-j_3)!(j_1-j_2+j_3)!(-j_1+j_2+j_3)!}{(j_1+j_2+j_3+1)!}
+ *     } \ .
+ * @f]
+ */
+double logdelta (int two_j1, int two_j2, int two_j3);
+
+/**
+ * @brief Wigner 3j coefficient.
+ * 
+ * Compute the Wigner 3j coefficient. Even though there is a routine "gsl_sf_coupling_3j"
+ * in GSL library, it has to be implemented anew, because of factorial overflows. This
+ * routine computes all factorials only in logarithms using the standard function "lgamma".
+ * The formula is taken from Edmonds, A. R.: Angular momentum in quantum mechanics, Princeton
+ * 1968.
+ * @f[
+ *     \left( \matrix{j_1 7 j_2 & j_3 \cr m_1 & m_2 & m_3} \right)
+ *     = \epsilon(j_1,j_2,j_3)\Delta(j_1,j_2,j_3) \delta_{m_1+m_2+m_3}^0 (-1)^{j_1-j_2-m_3}
+ *     \sqrt{(j_1+m_1)! (j_1-m_1)! (j_2+m_2)! (j_2-m_2)! (j_3+m_3)! (j_3-m_3)!}
+ *     \sum_k \frac{(-1)^2}{k! (j_1+j_2-j_3-k)! (j_1-m_1-k)! (j_2+m_2-k)! (j_3-j_2+m_1+k)!
+ *     (j_3-j_1-m_2+k)!} \ ,
+ * @f]
+ * @f[
+ *     \epsilon(j_1,j_2,j_3) = \cases{1 & triangle inequality satisfied \cr 0 & otherwise} \ .
+ * @f]
+ * See @ref delta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
+ * Note that the arguments @f$ j_1, j_2, j_3, m_1, m_2, m_3 @f$ need to be supplied
+ * doubled, as @f$ 2j_1, 2j_2, 2j_3, 2m_1, 2m_2, 2m_3 @f$ so that the parameters can
+ * be considered integral even though the half-integral angular momentum is allowed.
+ */
+//@{
+double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, int two_m3);
+#define Wigner3j(a,b,c,d,e,f) Wigner3j_2(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
+//@}
+
+/**
+ * @brief Wigner 6j coefficient.
+ * 
+ * Compute the Wigner 6j coefficient. Even though there is a routine "gsl_sf_coupling_6j"
+ * in GSL library, it has to be implemented anew, because of factorial overflows. This
+ * routine computes all factorials only in logarithms using the standard function "lgamma".
+ * The formula is taken from Edmonds, A. R.: Angular momentum in quantum mechanics, Princeton
+ * 1968.
+ * @f[
+ *     \left\{ \matrix{j_1 & j_2 & j_3 \cr j_4 & j_5 & j_6} \right\}
+ *     =
+ *     \Delta(j_1,j_2,j_3) \Delta(j_3,j_4,j_5) \Delta(j_1,j_5,j_6) \Delta(j_2,j_4,j_6)
+ *     \sum_k \frac{(-1)^k (k+1)!}{(k-j_1-j_2-j_3)! (k-j_1-j_5-j_6)! (k-j_2-j_4-j_6)!
+ *     (k-j_3-j_4-j_5)! (j_1+j_2+j_4+j_5-k)! (j_1+j_3+j_4+j_6-k)! (j_2+j_3+j_5+j_6-k)!} \ .
+ * @f]
+ * See @ref delta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
+ * Note that the arguments @f$ j_1, j_2, j_3, j_4, j_5, j_6 @f$ need to be supplied
+ * doubled, as @f$ 2j_1, 2j_2, 2j_3, 2j_4, 2j_5, 2j_6 @f$ so that the parameters can
+ * be considered integral even though the half-integral angular momentum is allowed.
+ */
+//@{
+double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, int two_j6);
+#define Wigner6j(a,b,c,d,e,f) Wigner6j_2(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
+//@}
+
+/**
  * @return Value of @f$ f(\lambda,l_1,l_2,l_1',l_2',L) @f$.
  */
-double computef(int lambda, int l1, int l2, int l1p, int l2p, int L);
+double computef (int lambda, int l1, int l2, int l1p, int l2p, int L);
 
 /**
  * Clebsch-Gordan coefficient. In present implementation valid only for

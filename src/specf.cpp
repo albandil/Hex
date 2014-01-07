@@ -425,15 +425,171 @@ double coul_F_asy(int l, double k, double r, double sigma)
         return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + coul_F_sigma(l,k));
 }
 
-#define Wigner3j(a,b,c,d,e,f) gsl_sf_coupling_3j(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
-#define Wigner6j(a,b,c,d,e,f) gsl_sf_coupling_6j(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
-
-double computef(int lambda, int l1, int l2, int l1p, int l2p, int L)
+bool makes_triangle (int two_j1, int two_j2, int two_j3)
 {
-    return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1))
-        * Wigner6j(l1, l2, L, l2p, l1p, lambda)
-        * Wigner3j(l1, lambda, l1p, 0, 0, 0)
-        * Wigner3j(l2, lambda, l2p, 0, 0, 0);
+    return std::abs(two_j1 - two_j2) <= two_j3 and two_j3 <= two_j1 + two_j2
+       and std::abs(two_j2 - two_j3) <= two_j1 and two_j1 <= two_j2 + two_j3
+       and std::abs(two_j3 - two_j1) <= two_j2 and two_j2 <= two_j3 + two_j1;
+}
+
+double logdelta (int two_j1, int two_j2, int two_j3)
+{
+    return .5 * (
+        lgamma(1 + (  two_j1 + two_j2 - two_j3) / 2)
+      + lgamma(1 + (  two_j1 - two_j2 + two_j3) / 2)
+      + lgamma(1 + (- two_j1 + two_j2 + two_j3) / 2)
+      - lgamma(2 + (  two_j1 + two_j2 + two_j3) / 2)
+    );
+}
+
+double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, int two_m3)
+{
+    // check conservation of the projection
+    if (two_m1 + two_m2 + two_m3 != 0)
+        return 0.;
+    
+    // check conservation of the magnitude
+    // - sum of magnitudes has to be integer (=> twice the sum has to be even number)
+    if ((two_j1 + two_j2 + two_j3) % 2 != 0)
+        return 0.;
+    // - in case of all zero projections the sum of magnitudes has to be even number
+    if (two_m1 == 0 and two_m2 == 0 and two_m3 == 0 and ((two_j1 + two_j2 + two_j3) / 2) % 2 != 0)
+        return 0.;
+    
+    // check projection magnitudes
+    if (std::abs(two_m1) > two_j1 or std::abs(two_m2) > two_j2 or std::abs(two_m2) > two_j2)
+        return 0.;
+    
+    // check triangle inequalities
+    if (not makes_triangle (two_j1, two_j2, two_j3))
+        return 0.;
+    
+    // determine sign
+    int Sign = (((two_j1 - two_j2 - two_m3) / 2) % 2 == 0) ? 1 : -1;
+    
+    // evaluate Delta-coefficient
+    double lnDelta = logdelta (two_j1, two_j2, two_j3);
+    
+    // precompute square root terms
+    double lnSqrt = .5*(
+        lgamma(1 + (two_j1 + two_m1) / 2)
+      + lgamma(1 + (two_j1 - two_m1) / 2)
+      + lgamma(1 + (two_j2 + two_m2) / 2)
+      + lgamma(1 + (two_j2 - two_m2) / 2)
+      + lgamma(1 + (two_j3 + two_m3) / 2)
+      + lgamma(1 + (two_j3 - two_m3) / 2)
+    );
+    
+    // compute the sum bounds
+    int kmax = mmin (
+        two_j1 + two_j2 - two_j3,
+        two_j1 - two_m1,
+        two_j2 + two_m2
+    ) / 2;
+    int kmin = mmax (
+       -two_j3 + two_j2 - two_m1,
+       -two_j3 + two_j1 + two_m2,
+        0
+    ) / 2;
+    
+    // compute the sum
+    double Sum = 0.;
+    for (int k = kmin; k <= kmax; k++)
+    {
+        // evaluate term
+        double Term = exp (
+              lnDelta
+            + lnSqrt
+            - lgamma(1 + k)
+            - lgamma(1 + (two_j1 + two_j2 - two_j3) / 2 - k)
+            - lgamma(1 + (two_j1 - two_m1) / 2 - k)
+            - lgamma(1 + (two_j2 + two_m2) / 2 - k)
+            - lgamma(1 + (two_j3 - two_j2 + two_m1) / 2 + k)
+            - lgamma(1 + (two_j3 - two_j1 - two_m2) / 2 + k)
+        );
+        
+        // update sum
+        Sum = (k % 2 == 0) ? (Sum + Term) : (Sum - Term);
+    }
+    
+    // return result
+    return Sign * Sum;
+}
+
+double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, int two_j6)
+{
+    // check that triads have integer sum (i.e. twice the sum is even)
+    if ((two_j1 + two_j2 + two_j3) % 2 != 0 or
+        (two_j3 + two_j4 + two_j5) % 2 != 0 or
+        (two_j1 + two_j5 + two_j6) % 2 != 0 or
+        (two_j2 + two_j4 + two_j6) % 2 != 0)
+        return 0.;
+    
+    // check triangle inequalities
+    if (not makes_triangle (two_j1, two_j2, two_j3) or
+        not makes_triangle (two_j3, two_j4, two_j5) or
+        not makes_triangle (two_j1, two_j5, two_j6) or
+        not makes_triangle (two_j2, two_j4, two_j6))
+        return 0.;
+    
+    // compute Delta functions
+    double d1 = logdelta (two_j1, two_j2, two_j3);
+    double d2 = logdelta (two_j3, two_j4, two_j5);
+    double d3 = logdelta (two_j1, two_j5, two_j6);
+    double d4 = logdelta (two_j2, two_j4, two_j6);
+    
+    // determine sum bounds
+    int kmin = mmax (
+        two_j1 + two_j2 + two_j3,
+        two_j1 + two_j5 + two_j6,
+        two_j2 + two_j4 + two_j6,
+        two_j3 + two_j4 + two_j5
+    ) / 2;
+    int kmax = mmin (
+        two_j1 + two_j2 + two_j4 + two_j5,
+        two_j1 + two_j3 + two_j4 + two_j6,
+        two_j2 + two_j3 + two_j5 + two_j6
+    ) / 2;
+    
+    // compute the sum
+    double Sum = 0.;
+    for (int k = kmin; k <= kmax; k++)
+    {
+        // compute the new term
+        double Term = exp (
+              d1 + d2 + d3 + d4
+            + lgamma (2 + k)
+            - lgamma (1 + k + (- two_j1 - two_j2 - two_j3) / 2)
+            - lgamma (1 + k + (- two_j1 - two_j5 - two_j6) / 2)
+            - lgamma (1 + k + (- two_j2 - two_j4 - two_j6) / 2)
+            - lgamma (1 + k + (- two_j3 - two_j4 - two_j5) / 2)
+            - lgamma (1 + (two_j1 + two_j2 + two_j4 + two_j5) / 2 - k)
+            - lgamma (1 + (two_j1 + two_j3 + two_j4 + two_j6) / 2 - k)
+            - lgamma (1 + (two_j2 + two_j3 + two_j5 + two_j6) / 2 - k)
+        );
+        
+        // update the sum
+        Sum = (k % 2 == 0) ? Sum + Term : Sum - Term;
+    }
+    
+    // return the result
+    return Sum;
+}
+
+double computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
+{
+    double A = Wigner6j(l1, l2, L, l2p, l1p, lambda);
+    double B = Wigner3j(l1, lambda, l1p, 0, 0, 0);
+    double C = Wigner3j(l2, lambda, l2p, 0, 0, 0);
+    
+    if (not finite(A))
+        throw exception ("Wigner6j(%d,%d,%d,%d,%d,%d) not finite.", l1, l2, L, l2p, l1p, lambda);
+    if (not finite(B))
+        throw exception ("Wigner3j(%d,%d,%d,0,0,0) not finite.", l1, lambda, l1p);
+    if (not finite(C))
+        throw exception ("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
+    
+    return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
 }
 
 inline long double dfact(long double x)

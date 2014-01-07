@@ -424,6 +424,10 @@ void NoPreconditioner::update (double E)
         for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
             Complex f = computef(lambda,l1,l2,l1,l2,inp_.L);
+            
+            if (not Complex_finite(f))
+                throw exception ("Overflow in computation of f[%d](%d,%d,%d,%d).", inp_.L, l1, l2, l1, l2);
+            
             if (f != 0.)
                 Hdiag += f * s_rad_.R_tr_dia(lambda);
         }
