@@ -12,9 +12,9 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconf
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
 # OpenMPI environment
-#OPENMPIFLAGS = -DNO_MPI
-OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
-OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
+OPENMPIFLAGS = -DNO_MPI
+#OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
+#OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
 # OpenCL environment
 OPENCLFLAGS = -DNO_OPENCL
