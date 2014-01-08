@@ -27,7 +27,7 @@
  * 
  * Use something like:
  * @code
- * throw exception("[Error %d] Pointed has the value 0x%x!", id, ptr);
+ * throw exception("[Error %d] Pointer has the value 0x%x!", id, ptr);
  * @endcode
  * 
  * @note Hard limit 256 charasters.
