@@ -27,7 +27,7 @@
  * 
  * Use something like:
  * @code
- * throw exception("[Error %d] Pointed has the value 0x%x!", id, ptr);
+ * throw exception("[Error %d] Pointer has the value 0x%x!", id, ptr);
  * @endcode
  * 
  * @note Hard limit 256 charasters.
@@ -214,14 +214,14 @@ template <class ...Params> char const * format (Params ...p)
 /**
  * @brief Timing class.
  * 
- * The Timer class is a singleton that can be used for a comfortable computation of
+ * The Timer class can be used for a comfortable computation of
  * elapsed time. The usage would be:
  * @code
- *     Timer::timer().start();
+ *     Timer timer;
  * 
  *     // .. block ...
  * 
- *     std:cout << "Time = " << Timer::timer().stop() << "secs.\n";
+ *     std:cout << "Time = " << timer.elapsed() << "secs.\n";
  * @endcode
  */
 class Timer
