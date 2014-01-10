@@ -14,7 +14,7 @@ SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 # OpenMPI environment
 OPENMPIFLAGS = -DNO_MPI
 #OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
-#OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
+#OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64 -lmpi -lmpi_cxx
 
 # OpenCL environment
 OPENCLFLAGS = -DNO_OPENCL
@@ -42,8 +42,8 @@ PNGFLAGS = -DNO_PNG
 
 INCLUDE = $(OPENMPIINCLUDE) $(OPENCLINCLUDE) $(LAPACKINCLUDE) $(PNGPPINCLUDE)
 LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) \
-	-lmpi -lmpi_cxx -lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
-	-lm -lfftw3 $(OPENCLLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+	-lrt -lhdf5_cpp -lhdf5 -lgsl -lopenblas -lgslcblas -lpthread \
+	-lm -lfftw3 $(OPENMPILIBS) $(OPENCLLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -52,8 +52,8 @@ CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGI
 
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
-# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) \
+# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFLAGS) \
          -mtune=native -march=native
 
 FILES = amplitudes arrays gauss bspline hdffile hex input \
