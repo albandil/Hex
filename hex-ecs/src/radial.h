@@ -20,6 +20,7 @@
 #include "bspline.h"
 #include "complex.h"
 #include "gauss.h"
+#include "input.h"
 #include "parallel.h"
 #include "specf.h"
 #include "matrix.h"
@@ -83,7 +84,7 @@ class RadialIntegrals
         
         // public callable members
         void setupOneElectronIntegrals();
-        void setupTwoElectronIntegrals(Parallel const & par, const ArrayView<bool> lambdas);
+        void setupTwoElectronIntegrals(Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
         
         /**
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$

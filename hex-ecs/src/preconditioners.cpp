@@ -368,7 +368,7 @@ void NoPreconditioner::setup ()
     
     // compute large radial integrals
     s_rad_.setupOneElectronIntegrals();
-    s_rad_.setupTwoElectronIntegrals(par_, lambdas);
+    s_rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
     
     std::cout << "Creating Kronecker products... ";
     
@@ -425,11 +425,30 @@ void NoPreconditioner::update (double E)
         {
             Complex f = computef(lambda,l1,l2,l1,l2,inp_.L);
             
+            // check that the "f" coefficient is valid (no factorial overflow etc.)
             if (not Complex_finite(f))
                 throw exception ("Overflow in computation of f[%d](%d,%d,%d,%d).", inp_.L, l1, l2, l1, l2);
             
-            if (f != 0.)
-                Hdiag += f * s_rad_.R_tr_dia(lambda);
+            // check that the "f" coefficient is nonzero
+            if (f == 0.)
+                continue;
+            
+            // load two-electron integrals if necessary
+            SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+            if (cmd_.outofcore)
+            {
+                # pragma omp critical
+                ref_R_tr_dia.hdfload();
+            }
+            
+            // add two-electron contributions
+            Hdiag += f * ref_R_tr_dia;
+            
+            // unload the two-electron integrals if necessary
+            if (cmd_.outofcore)
+            {
+                ref_R_tr_dia.drop();
+            }
         }
         
         // finalize the matrix
@@ -515,20 +534,44 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
             // skip angular forbidden right hand sides
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
-                Complex f1 = computef(lambda, l1, l2, li, l, inp_.L);
-                Complex f2 = computef(lambda, l1, l2, l, li, inp_.L);
+                double f1 = computef(lambda, l1, l2, li, l, inp_.L);
+                double f2 = computef(lambda, l1, l2, l, li, inp_.L);
                 
-                if (f1 != 0.)
+                // abort if any of the coefficients is non-number (factorial overflow etc.)
+                if (not finite(f1))
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, li, l, inp_.L);
+                if (not finite(f2))
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, l, li, inp_.L);
+                
+                // skip contribution if both coefficients are zero
+                if (f1 == 0. and f2 == 0.)
+                    continue;
+                
+                // load two-electron integrals if necessary
+                SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+                if (cmd_.outofcore)
                 {
-                    chi_block += (prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1);
+                    # pragma omp critical
+                    ref_R_tr_dia.hdfload();
                 }
                 
+                // add the contributions
+                if (f1 != 0.)
+                {
+                    chi_block += (prefactor * f1) * ref_R_tr_dia.dot(Pj1);
+                }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-                        chi_block += (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
+                        chi_block += (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
                     else
-                        chi_block -= (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
+                        chi_block -= (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
+                }
+                
+                // unload two-electron integrals if necessary
+                if (cmd_.outofcore)
+                {
+                    ref_R_tr_dia.drop();
                 }
             }
             
@@ -604,10 +647,31 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // compute the offdiagonal block
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
-                Complex f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                double f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
                 
-                if (f != 0.)
-                    q_contrib -= f * s_rad_.R_tr_dia(lambda).dot(p_block);
+                // check finiteness
+                if (not finite(f))
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                
+                // check non-zero
+                if (f == 0.)
+                    continue;
+                
+                // load two-electron integrals if necessary
+                SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+                if (cmd_.outofcore)
+                {
+                    # pragma omp critical
+                    ref_R_tr_dia.hdfload();
+                }
+                
+                q_contrib -= Complex(f) * ref_R_tr_dia.dot(p_block);
+                
+                // unload two-electron integrals if necessary
+                if (cmd_.outofcore)
+                {
+                    ref_R_tr_dia.drop();
+                }
             }
         }
         

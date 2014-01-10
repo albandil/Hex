@@ -1516,6 +1516,7 @@ public:
     //
     
     void link (std::string name);
+    std::string linkedto () const { return name_; }
     
     /**
      * @brief Load from file.

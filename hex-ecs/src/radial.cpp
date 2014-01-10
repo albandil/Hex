@@ -356,9 +356,9 @@ void RadialIntegrals::setupOneElectronIntegrals ()
     std::cout << "ok\n\n";
 }
 
-void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const ArrayView<bool> lambdas)
+void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
-    char R_name[50];
+    std::string R_name;
     
     // allocate storage
     R_tr_dia_.resize(lambdas.size());
@@ -387,10 +387,18 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
             continue;
         
         // look for precomputed data on disk
-        std::snprintf(R_name, sizeof(R_name), "%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+        R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
         if (R_tr_dia_[lambda].hdfload(R_name))
         {
             std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_name << "\"\n";
+            
+            // link and unload the disk file if out of core computation is active
+            if (cmd.outofcore)
+            {
+                R_tr_dia_[lambda].link(R_name);
+                R_tr_dia_[lambda].drop();
+            }
+            
             continue; // no need to compute
         }
         
@@ -444,8 +452,18 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
         R_tr_dia_[lambda].hdfsave(R_name, true, 10);
         
+        // link and unload the disk file if out of core computation is active
+        if (cmd.outofcore)
+        {
+            R_tr_dia_[lambda].link(R_name);
+            R_tr_dia_[lambda].drop();
+        }
+        
         std::cout << "\t- integrals for λ = " << lambda << " computed\n";
     }
+    
+    // size
+    int R_size = 0;
     
     // for all multipoles : synchronize
 #ifndef NO_MPI
@@ -455,6 +473,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();
+            
+            // owner may need to load the data
+            if (cmd.outofcore and owner == par.iproc())
+                R_tr_dia_[lambda].hdfload();
             
             // get dimensions
             int diagsize = R_tr_dia_[lambda].diag().size();
@@ -482,19 +504,22 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, const Arr
                 std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << "\n";
                 
                 // save to disk (if the file doesn't already exist)
-                std::snprintf(R_name, sizeof(R_name), "%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+                R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
                 if (not HDFFile(R_name, HDFFile::readonly).valid())
                     R_tr_dia_[lambda].hdfsave(R_name, true, 10);
             }
             
+            // store size
+            R_size = R_tr_dia_[lambda].data().size();
+            
             // are we to keep this radial integral for this process?
-            if (not lambdas[lambda])
+            if (cmd.outofcore or not lambdas[lambda])
                 R_tr_dia_[lambda].drop();
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
 #endif
     
-    std::cout << "\t- R_tr[λ] has " << R_tr_dia_[0].data().size() << " nonzero elements\n";
+    std::cout << "\t- R_tr[λ] has " << R_size << " nonzero elements\n";
     // --------------------------------------------------------------------- //
 }
