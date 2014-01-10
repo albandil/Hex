@@ -372,8 +372,8 @@ void NoPreconditioner::setup ()
     
     std::cout << "Creating Kronecker products... ";
     
-    // Kronecker producs
-    # pragma omp parallel sections
+    // Kronecker products
+    # pragma omp parallel sections if (!cmd_.outofcore)
     {
         # pragma omp section
         S_kron_S_   = s_rad_.S().kron(s_rad_.S());
@@ -388,7 +388,7 @@ void NoPreconditioner::setup ()
         # pragma omp section
         half_D_minus_Mm1_tr_ = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
     }
-    # pragma omp parallel sections
+    # pragma omp parallel sections if (!cmd_.outofcore)
     {
         # pragma omp section
         half_D_minus_Mm1_tr_kron_S_ = half_D_minus_Mm1_tr_.kron(s_rad_.S());
