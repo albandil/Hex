@@ -59,8 +59,12 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             );
             
             // check memory allocation success
+            if (err == EINVAL)
+                throw exception ("[AlignedAllocator<T>::alloc] The alignment argument was not a power of two, or was not a multiple of sizeof(void *).");
+            if (err == ENOMEM)
+                throw exception ("[AlignedAllocator<T>::alloc] There was insufficient memory to fulfill the allocation request.");
             if (err != 0)
-                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error (%d).", err);
+                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error %d.", err);
             
             // get the number pointer
             T* ptr = reinterpret_cast<T*>(aligned_ptr);
