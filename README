@@ -14,6 +14,8 @@ Third-party libraries:
     
 Optional dependencies:
     png++ 0.2.5             (included in libs/, works e.g. with libpng 1.5)
-    OpenMPI
-    OpenCL
-
+    OpenMPI 1.7.2
+    OpenCL 1.2
+    
+Code documentation generation:
+    Doxygen 1.8.5
