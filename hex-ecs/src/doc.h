@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -17,7 +17,7 @@
  * @mainpage
  * 
  * @author Jakub Benda, MFF UK
- * @date 5. 11. 2013
+ * @date 12. 1. 2014
  * 
  * 
  * @section purpose Purpose
@@ -32,14 +32,14 @@
  * Hex is written in C++11 to make use of comfort of the modern C++ extensions,
  * so one may need a newer compiler. Tested compilers are:
  * 
- * - GCC 4.7.2
+ * - GCC 4.8.1
  * - Intel C++ Compiler 14.0
  * 
  * Both worked with the same Makefile, just by setting the variable CPP to "g++"
  * or "icpc". The program also uses following external packages (tested versions
  * are given in parentheses):
  * 
- * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.15):
+ * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.16):
  *   for Wigner coupling coefficients and some other special functions.
  * - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
  *   for sparse matrix manipulation and for a direct sparse system solver.
@@ -52,12 +52,12 @@
  * - MPI (OpenMPI 1.6): for parallelization at cluster.
  * 
  * The next libraries are optional:
- * - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.5):
+ * - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.8):
  *   Free BLAS implementation that can be compiled for a specific
  *   CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
  *   OpenBLAS is optional because SuiteSparse can be configured to use
  *   a different BLAS implementation.
- * - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <u>older</u>):
+ * - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <b>older</b>):
  *   PNG read/write interface, for debugging purposes. The code that references
  *   png++ can be excluded from compilation by the option -DNO_PNG.
  *   For convenience, this library is directly included in the source code of Hex-ecs.

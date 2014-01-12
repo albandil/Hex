@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -20,12 +20,12 @@
 #include "arrays.h"
 
 /**
- * \brief Return linearly interpolated values.
+ * @brief Return linearly interpolated values.
  * 
  * Returns an array of interpolates of the array y0 for every value of x.
- * \param x0 X-values for the discrete samples.
- * \param y0 Discrete samples
- * \param x  Evaluation (interpolation) points.
+ * @param x0 X-values for the discrete samples.
+ * @param y0 Discrete samples
+ * @param x  Evaluation (interpolation) points.
  */
 template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray<T> const & y0, rArray const & x)
 {
@@ -65,13 +65,13 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
 }
 
 /**
- * \brief Return values interpolated by O₂scl.
+ * @brief Return values interpolated by O₂scl.
  * 
  * Returns an array of interpolates of the array y0 for every value of x.
- * \param x0 X-values for the discrete samples.
- * \param y0 Discrete samples
- * \param x  Evaluation (interpolation) points.
- * \param interpolation Interpolation type.
+ * @param x0 X-values for the discrete samples.
+ * @param y0 Discrete samples
+ * @param x  Evaluation (interpolation) points.
+ * @param interpolation Interpolation type.
  *  - gsl_interp_linear : Linear interpolation. This interpolation method
  *    does not require any additional memory. 
  *  - gsl_interp_polynomial : Polynomial interpolation. This method should only

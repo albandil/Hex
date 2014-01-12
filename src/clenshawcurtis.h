@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -25,6 +25,17 @@
 #include "compact.h"
 #include "misc.h"
 
+/**
+ * @brief Clenshaw-Curtis quadrature.
+ * 
+ * Clenshaw-Curtis integrator class. Constructor of the class accepts the
+ * function that will be integrated. The actual quadrature is done on the
+ * call to ClenshawCurtis::integrate. Clenshaw-Curtis quadrature evaluates
+ * the function in the Chebyshev nodes and uses sophisticated algorithm to
+ * extract the value of the quadrature. For more details see Numerical
+ * recipes (3rd ed.). The present implementation uses fast Fourier transform
+ * from FFTW for fast computation.
+ */
 template <class Functor, typename FType> class ClenshawCurtis
 {
 public:
@@ -92,7 +103,10 @@ public:
     inline bool throwall() const { return Throw; }
     
     /**
+     * @brief General integration.
+     * 
      * Clenshaw-Curtis quadrature, main interface.
+     * 
      * @param x1 Left bound (allowed infinite).
      * @param x2 Right bound (allowed infinite).
      * @param n On input, maximal subdivision for a single bisection. (No effect
@@ -153,7 +167,10 @@ public:
     }
     
     /**
+     * @brief Finite integration.
+     * 
      * Clenshaw-Curtis quadrature for finite interval (a,b).
+     * 
      * @param x1 Left bound (allowed infinite).
      * @param x2 Right bound (allowed infinite).
      * @param n On output, evaluations needed for a converged result.
@@ -363,9 +380,11 @@ public:
     }
     
     /**
+     * @brief Improper integration.
+     * 
      * Clenshaw-Curtis quadrature for infinite-infinite interval (-∞,+∞).
-     * @param n On output, evaluations needed for 
-     *          converged result.
+     * 
+     * @param n On output, evaluations needed for converged result.
      */
     FType integrate_ii (int * n = nullptr) const
     {

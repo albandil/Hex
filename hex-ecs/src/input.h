@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -35,6 +35,7 @@
  * - preconditioner: %Preconditioner to use. See \ref Preconditioners::AvailableTypes for available types.
  * - droptol: Drop tolerance for the iLU preconditioner.
  * - itinerary: Run only first stage (computation of the radial integrals).
+ * - outofcore: Whether to keep precomputed data only on disk and spare RAM.
  */
 class CommandLine
 {

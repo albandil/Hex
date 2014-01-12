@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -75,7 +75,11 @@ public:
     /**
      * @brief Compute the transformation.
      * 
-     * Generate and store the Chebyshev coefficients.
+     * Generate and store the Chebyshev coefficients. After evaluation
+     * of the approximated function in the Chebyshev nodes, the computation
+     * of Chebyshev expansion coefficients is done using the fast Fourier
+     * transform provided by FFTW.
+     * 
      * @param f Function of the signature Tout(*)(Tin) to be approximated.
      * @param n Number of the coefficients to compute.
      * @param a Left boundary of the approximation inerval.
@@ -101,6 +105,8 @@ public:
     }
     
     /**
+     * @brief Evaluate expansion.
+     * 
      * Use Clenshaw recurrence formula for evaluation of 'm' terms.
      * The formula has the advantage of not evaluating goniometric funtions.
      */
@@ -124,6 +130,8 @@ public:
     }
     
     /**
+     * @brief Get significant number of coefficients.
+     * 
      * Get index of the first Chebyshev approximation coefficient
      * that is smaller than 'eps' times the sum of fabs(C[k])
      * truncated after this term. If no such term exists, the total
@@ -154,6 +162,8 @@ public:
     }
     
     /**
+     * @brief Evaluate expansion.
+     * 
      * Return approximated value where the terms of magnitude less than 'eps'
      * are discarded.
      */
@@ -192,6 +202,8 @@ public:
     } Integration;
     
     /**
+     * @brief Get expansion of integral of the approximated function.
+     * 
      * Return Chebyshev aproximation of the function primitive to the
      * stored Chebyshev approximation.
      * 
@@ -258,6 +270,8 @@ public:
     }
     
     /**
+     * @brief Chebyshev node in interval.
+     * 
      * Get Chebyshev root in the interval (x1,x2).
      * @param N Order of the polynomial.
      * @param k index of the root.
@@ -270,7 +284,9 @@ public:
     }
     
     /**
-     * Write out the coefficients.
+     * @brief Convert to string.
+     * 
+     * Write out the coefficients to std::string.
      */
     std::string str() const
     {
@@ -288,12 +304,15 @@ public:
         return out.str();
     }
     
+    /// Return reference to the coefficient array.
     NumberArray<Tout> const & coeffs() const
     {
         return C;
     }
     
     /**
+     * @brief Chebyshev node from (0,1).
+     * 
      * Get k-th root of the N-order Chebyshev polynomial.
      */
     inline static double node (int k, int N)
@@ -332,6 +351,8 @@ private:
 
 /**
  * @brief Chebyshev approximation of a given real function.
+ * 
+ * Uses the function "fftw_plan_r2r_1d" for real data.
  */
 template<> template <class Functor> 
 void Chebyshev<double,double>::generate (Functor const & f, int n, double a, double b)
@@ -367,6 +388,9 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
 
 /**
  * @brief Chebyshev approximation of a given complex function.
+ * 
+ * Uses the function "fftw_plan_dft_1d" for complex data. Slower than the
+ * real "generate".
  */
 template<> template <class Functor>
 void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, double b)

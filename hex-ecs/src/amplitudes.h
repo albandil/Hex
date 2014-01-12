@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -19,6 +19,8 @@
 #include "bspline.h"
 
 /**
+ * @brief Extract radial part of scattering amplitude.
+ * 
  * Compute radial integrals for evaluation of the discrete T-matrices,
  * @f[
  *    \Lambda_l^{(1)LMS} = 
@@ -61,6 +63,8 @@ cArray computeLambda (
 );
 
 /**
+ * @brief Extract radial part of ionization amplitude.
+ * 
  * Compute hyperangular integrals for evaluation of the ionization T-matrices,
  * @f[
  *     \Xi_{\ell_1 \ell_2}^{LS}(k_1,k_2) =

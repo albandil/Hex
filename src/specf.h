@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -415,7 +415,7 @@ double logdelta (int two_j1, int two_j2, int two_j3);
  * @f[
  *     \epsilon(j_1,j_2,j_3) = \cases{1 & triangle inequality satisfied \cr 0 & otherwise} \ .
  * @f]
- * See @ref delta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
+ * See @ref logdelta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
  * Note that the arguments @f$ j_1, j_2, j_3, m_1, m_2, m_3 @f$ need to be supplied
  * doubled, as @f$ 2j_1, 2j_2, 2j_3, 2m_1, 2m_2, 2m_3 @f$ so that the parameters can
  * be considered integral even though the half-integral angular momentum is allowed.
@@ -440,7 +440,7 @@ double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, i
  *     \sum_k \frac{(-1)^k (k+1)!}{(k-j_1-j_2-j_3)! (k-j_1-j_5-j_6)! (k-j_2-j_4-j_6)!
  *     (k-j_3-j_4-j_5)! (j_1+j_2+j_4+j_5-k)! (j_1+j_3+j_4+j_6-k)! (j_2+j_3+j_5+j_6-k)!} \ .
  * @f]
- * See @ref delta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
+ * See @ref logdelta for definition of the triangle function @f$ \Delta(a,b,c) @f$.
  * Note that the arguments @f$ j_1, j_2, j_3, j_4, j_5, j_6 @f$ need to be supplied
  * doubled, as @f$ 2j_1, 2j_2, 2j_3, 2j_4, 2j_5, 2j_6 @f$ so that the parameters can
  * be considered integral even though the half-integral angular momentum is allowed.
@@ -456,13 +456,18 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
 double computef (int lambda, int l1, int l2, int l1p, int l2p, int L);
 
 /**
- * Clebsch-Gordan coefficient. In present implementation valid only for
- * integer (not half-integer) angular momenta. [One needs to correct the signs!]
+ * @brief Clebsch-Gordan coefficient.
+ * 
+ * @note In present implementation valid only for
+ * integer (not half-integer) angular momenta.
+ * [Otherwise one needs to correct the signs.]
  */
 double ClebschGordan(int l1, int m1, int l2, int m2, int L, int M);
 
 /**
- * Gaunt's integral.
+ * @brief Gaunt's integral.
+ * 
+ * Computes the integral of three spherical harmonic functions.
  * @f[
  * \int_{4\pi} Y_{l_1m_1} Y_{l_2m_2} Y^{\ast}_{lm} \mathrm{d}\Omega \ .
  * @f]

@@ -1,5 +1,7 @@
 SUBDIRS = hex-db hex-ecs hex-pwba hex-dwba utilities
 
+GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
+
 .PHONY: $(SUBDIRS)
 
 default : all
@@ -8,4 +10,14 @@ $(SUBDIRS)::
 	+make -C $@ $(MAKECMDGOALS)
 	mkdir -p bin; cd bin; ln -fs ../$@/bin/* .; cd ..
 	
-all clean doc dist distclean : $(SUBDIRS)
+all clean allclean doc docclean : $(SUBDIRS)
+
+dist: $(SUBDIRS)
+	@mkdir -p release
+	cp hex-db/hex-db-$(GIT_COMMIT).tar.gz \
+	   hex-dwba/hex-dwba-$(GIT_COMMIT).tar.gz \
+	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \
+	   hex-pwba/hex-pwba-$(GIT_COMMIT).tar.gz     release/
+
+distclean : $(SUBDIRS)
+	rm -rf release

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -18,6 +18,18 @@
 
 #include "bspline.h"
 
+/**
+ * @brief Gauss-Legendre quadrature.
+ * 
+ * This class's purpose is aid in fixed-order Gauss-Legendre quadrature.
+ * It is constructed above a B-spline environment, which is passed to the
+ * constructor. The functions "p_points" and "p_weights" return evaluation nodes
+ * and weights, respectively, and the functions "quad" do the fixed-order
+ * quadrature itself. Every call to p_points or p_weights resuts in call
+ * to gauss_nodes_and_weights, which uses GSL to get the requested data.
+ * The computed nodes and weights are stored in a cache table to allow
+ * faster subsequent computations.
+ */
 class GaussLegendre
 {
     public:
@@ -27,7 +39,11 @@ class GaussLegendre
             : bspline_(bspline) {}
         
         /**
-         * Get pointer to precomputed values of Gauss-Legendre points.
+         * @brief Retrieve Gauss-Legendre data.
+         * 
+         * Precompute Gauss-Legendre quadrature data (if not already done
+         * is some previous call) and return pointers to the chache table.
+         * 
          * @param points Gauss-Legendre points half-count. If too low/high, the return value
          *               will contain the (used) nearest implemented value.
          * @param vx     On return, the Gauss-Legendre nodes (nonnegative half of them).
@@ -36,7 +52,11 @@ class GaussLegendre
         int gauss_nodes_and_weights (int points, const double* &vx, const double* &vw) const;
 
         /**
-         * Get Gauss-Legendre points in complex interval.
+         * @brief Get Gauss-Legendre quadrature points in interval.
+         * 
+         * Map Gauss-Legendre points provided by @ref gauss_nodes_and_weights
+         * to a complex interval @f$ (x_1,x_2) @f$.
+         * 
          * @param points Number of Gauss-Legendre points.
          * @param x1 Left boundary of the interval.
          * @param x2 Right boundary of the interval.
@@ -44,16 +64,21 @@ class GaussLegendre
         cArray p_points (int points, Complex x1, Complex x2) const;
 
         /**
-         * Get Gauss-Legendre weights in complex interval.
+         * @brief Get Gauss-Legendre quadrature weights in interval.
+         * 
+         * Map Gauss-Legendre weights provided by @ref gauss_nodes_and_weights
+         * to a complex interval @f$ (x_1,x_2) @f$.
+         * 
          * @param points Number of Gauss-Legendtre points.
          * @param x1 Left boundary of the interval.
          * @param x2 Right boundary of the interval.
          */
         cArray p_weights (int points, Complex x1, Complex x2) const;
 
-        /** Gauss-Legendre integrator
+        /**
+         * @brief Gauss-Legendre integrator
          * 
-         * Integrate function.
+         * Integrate the given function.
          * 
          * @param f Function of type (void (*) (unsigned, complex*, complex*, data...)),
          *          where the first parameter is number of points to evaluate, the second parameter

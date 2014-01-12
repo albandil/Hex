@@ -1,4 +1,4 @@
-.PHONY: all clean doc pollversion dist distclean
+.PHONY: all clean allclean doc docclean pollversion dist distclean
 
 ##############################################################
 # Editable part
@@ -31,14 +31,17 @@ DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
 all: pollversion bin/hex-dwba
 
+allclean: clean docclean distclean
+
 pollversion:
 	touch src/version.cpp
 
 dist:
 	mkdir -p hex-dwba
-	cp --recursive --dereference README Makefile Doxyfile src hex-dwba/
+	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-dwba/
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-dwba/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-dwba/Makefile
+	sed -i "s/\.\.\/media\///g" hex-dwba/Doxyfile
 	tar --create --gzip --file=hex-dwba-$(GIT_COMMIT).tar.gz hex-dwba
 	rm -rf hex-dwba/
 
@@ -58,3 +61,6 @@ clean:
 
 doc:
 	doxygen
+
+docclean:
+	rm -rf html

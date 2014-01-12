@@ -1,4 +1,4 @@
-.PHONY: all doc clean pollversion dist distclean
+.PHONY: all doc docclean clean allclean pollversion dist distclean
 
 ###################################################################################
 # Editable section
@@ -71,17 +71,23 @@ pollversion:
 doc:
 	doxygen
 
+docclean:
+	rm -rf html
+
 dist:
 	mkdir -p hex-ecs/libs
-	cp --recursive --dereference README Makefile Doxyfile hexe.gif hexe-small.gif src hex-ecs/
+	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-ecs/
 	cp --recursive libs/png++ hex-ecs/libs
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-ecs/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-ecs/Makefile
+	sed -i "s/\.\.\/media\///g" hex-ecs/Doxyfile
 	tar --create --gzip --file=hex-ecs-$(GIT_COMMIT).tar.gz hex-ecs
 	rm -rf hex-ecs/
 
 clean:
 	rm -f bin/hex $(OBJECTS) $(DEPENDENCIES)
+
+allclean: clean docclean distclean
 
 distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz

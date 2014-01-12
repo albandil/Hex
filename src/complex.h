@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -32,25 +32,25 @@ template <typename C1, typename C2> auto operator / (std::complex<C1> a, std::co
     return std::complex<T>(a) / std::complex<T>(b);
 }
 
-// squared modulus of a complex number
+/// Squared modulus of a complex number.
 inline double sqrabs (Complex z)
 {
     return z.real() * z.real() + z.imag() * z.imag();
 }
 
-// Complex ordering by real parts
+/// Complex ordering by real parts.
 inline bool Complex_realpart_less (Complex const & a, Complex const & b)
 {
     return a.real() < b.real();
 }
 
-// Complex ordering by imaginary parts
+/// Complex ordering by imaginary parts.
 inline bool Complex_imagpart_less (Complex const & a, Complex const & b)
 {
     return a.imag() < b.imag();
 }
 
-// finite check for complex number
+/// Finite check for complex number.
 inline bool Complex_finite (Complex const & z)
 {
     return finite(z.real()) and finite(z.imag());

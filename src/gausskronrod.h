@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -110,7 +110,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
          * 
          * for negative infinity.
          * 
-         * @return The value of @ref Ok (i.e. whether the last integration has
+         * @return The value of "Ok" (i.e. whether the last integration has
          * been successful according to the library).
          */
         bool integrate (double a, double b)

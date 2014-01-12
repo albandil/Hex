@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -18,6 +18,20 @@
 
 #include "misc.h"
 
+/**
+ * @brief Command line option default hanndler.
+ * 
+ * This function is used by the parser ParseCommandLine and it is not expected
+ * to be used on its own by the user. It is called by ParseCommandLine or by
+ * the other HandleSwitch function template if the remaining number of handlers
+ * is one -- just the default callback.
+ * @param i Index of current argv[i] being parsed. On return, the value is
+ *          incremented because the argv[i] will have been digested by this function.
+ * @param argc Argc as passed to the main function.
+ * @param argv Argv as passed to the main function.
+ * @param callback Default callback, which is a functor accepting two std::string
+ *                 parameters: the unmatched option and its optarg.
+ */
 template <class DefaultCallback> bool HandleSwitch
 (
     int &i, int argc, char* argv[],
@@ -29,7 +43,7 @@ template <class DefaultCallback> bool HandleSwitch
         return false;
     
     // option name
-    std::string optname = argv[i];
+    std::string optname = argv[i++];
     
     // remove leading dashes from the optname
     while (optname[0] == '-')
@@ -45,11 +59,36 @@ template <class DefaultCallback> bool HandleSwitch
         optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
+    else
+    {
+        // look for optarg in the next argv[]
+        if (i < argc and argv[i][0] != '-')
+            optarg = argv[i++];
+    }
     
-    i++;
     return callback (optname, optarg);
 }
 
+/**
+ * @brief Command line option handler.
+ * 
+ * This function is used by the parser ParseCommandLine and it is not expected
+ * to be used on its own by the user.
+ * @param i Index of the option (argv[i]) to handle. On return, the value can
+ *          be once or more times incremented, if more argv[i] values have been
+ *          digested as optarg-s.
+ * @param argc Argc as passed to the main function.
+ * @param argv Argv as passed to the main function.
+ * @param longoptname Long option name of the handler to use.
+ * @param shortoptname Short option name of the handler to use.
+ * @param noptarg Number of optarg-s needed for this option.
+ * @param callback Callback function accepting std::string optarg and returning bool.
+ * @param ...params Other params that will be ignored in this pass, but may be used
+ *                  in the next one if argv[i] does match neither longoptname nor
+ *                  shortoptname.
+ * @return True if the parsing is to be continued, false to stop the parsing
+ *         (e.g. on reaching i == argc).
+ */
 template <class Callback, class ...Params> bool HandleSwitch
 (
     int &i, int argc, char* argv[],
@@ -113,6 +152,44 @@ template <class Callback, class ...Params> bool HandleSwitch
     return HandleSwitch (i, argc, argv, params...);
 }
 
+/**
+ * @brief Parse command line.
+ * 
+ * This variadic function template can be used to parse the command line
+ * arguments. For every argv[i], i > 0, it will scan through the supplied
+ * handlers and whenever it finds a correct handler, it will call the
+ * associated callback function. A "handler" is a quartet of parameters:
+ * - [std::string] long option name (e.g. "help")
+ * - [std::string] short option name (e.g. "h")
+ * - [unsigned] expected number of optargs (zero or one in the present implementation)
+ * - [functor] callback function that accepts exactly one string argument (the optarg)
+ * 
+ * A typical usage of the parser is:
+ * @code
+ *     ParseCommandLine (
+ *         argc, argv,
+ *         "help", "h", 0, [](std::string optarg) -> bool { std::cout << "Help.\n"; return true; },
+ *         "sleep", "s", 1, [](std::string optarg) -> bool { sleep(atoi(optarg.c_str())); return true; },
+ *         ...
+ *         [](std::string opt, std::string optarg) -> bool { std::cout << "Unknown option \"" << opt << "\" with argument \"" << optarg << "\"\n"; }
+ *     );
+ * @endcode
+ * 
+ * The last argument is the default handler that accepts also the option name. It is used
+ * if no handler matched the option name. If any handler returns "false", it will stop the
+ * parsing of further options. The long and short options are equivalent -- both are expected
+ * to be introduced by one or more dashes on the command line. Short options can't be chained
+ * (e.g. "-hs") in the present implementation. The option argument can be given with or without
+ * the equation sign.
+ * @code
+ *   # all variants are allowed:
+ *     ./program --option=optarg
+ *     ./program --option optarg
+ *     ./program -o=optarg
+ *     ./program -------option optarg
+ *     ...
+ * @endcode
+ */
 template <class ...Params> void ParseCommandLine
 (
     int argc, char* argv[], Params ...params

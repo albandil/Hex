@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -13,6 +13,7 @@
 #ifndef HEX_VARIABLES
 #define HEX_VARIABLES
 
+#include <iostream>
 #include <string>
 #include <map>
 #include <vector>
@@ -24,7 +25,7 @@
 #include "vec3d.h"
 
 /**
- * \brief Energy units change.
+ * @brief Energy units change.
  * 
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
@@ -32,7 +33,7 @@
 double change_units(eUnit A, eUnit B);
 
 /**
- * \brief Lengths units change.
+ * @brief Lengths units change.
  * 
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
@@ -40,7 +41,7 @@ double change_units(eUnit A, eUnit B);
 double change_units(lUnit A, lUnit B);
 
 /**
- * \brief Angular units change.
+ * @brief Angular units change.
  * 
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
@@ -48,21 +49,21 @@ double change_units(lUnit A, lUnit B);
 double change_units(aUnit A, aUnit B);
 
 /**
- * \brief Energy unit name.
+ * @brief Energy unit name.
  * 
  * Return energy unit name as string.
  */
 std::string unit_name(eUnit u);
 
 /**
- * \brief Length unit name.
+ * @brief Length unit name.
  * 
  * Return length unit name as string.
  */
 std::string unit_name(lUnit u);
 
 /**
- * \brief Length unit name.
+ * @brief Length unit name.
  * 
  * Return length unit name as string.
  */
@@ -107,14 +108,14 @@ template<typename T> std::vector<T> readStandardInput()
 }
 
 /**
- * \brief Convert dictionary entry to a numeric type.
+ * @brief Convert dictionary entry to a numeric type.
  * 
  * Being given a dictionary (= string-string map) and a keyword,
  * the function finds a correct entry and returns its value converted
  * to the template datatype.
- * \param dict Dictionary to search in.
- * \param keyword Entry to look for.
- * \param name Identification of the calling authority for use in error
+ * @param dict Dictionary to search in.
+ * @param keyword Entry to look for.
+ * @param name Identification of the calling authority for use in error
  *             message if the entry is not find.
  */
 template <typename T> T As (
@@ -136,7 +137,7 @@ template <typename T> T As (
 }
 
 /**
- * \brief Base class for scatering variables.
+ * @brief Base class for scatering variables.
  * 
  * This is the heritage base for all scattering quantities that can be
  * computed by hex-db.
@@ -181,7 +182,7 @@ public:
 };
 
 /**
- * \brief List of variables.
+ * @brief List of variables.
  * 
  * All available variables are elements of the list. They are being added in
  * the constructor.
@@ -211,18 +212,18 @@ private:
 };
 
 /**
- * \brief Create class for a given variable name.
+ * @brief Create class for a given variable name.
  * 
  * Creates class declaration so that only definition of the unique 
  * members is necessary. This method allows easy addition of new
  * scattering variables; one just needs to add the line
- * \code
- * AddNewVariableClass(NewVariableClassName);
- * \endcode
+ * @code
+ *     AddNewVariableClass(NewVariableClassName);
+ * @endcode
  * at the end of "variables.h", add a line
- * \code
- * new NewVariableClassName,
- * \endcode
+ * @code
+ *     new NewVariableClassName,
+ * @endcode
  * among others into the constructor of VariableList in "variables.cpp"
  * and implement the methods in a new CPP file, which is then linked
  * to the program. It is not necessary to write a custom header which needs

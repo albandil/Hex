@@ -5,7 +5,7 @@
 *                     /  ___  /   | |/_/    / /\ \                          *
 *                    / /   / /    \_\      / /  \ \                         *
 *                                                                           *
-*                         Jakub Benda (c) 2013                              *
+*                         Jakub Benda (c) 2014                              *
 *                     Charles University in Prague                          *
 *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */

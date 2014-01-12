@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -15,6 +15,7 @@
 
 #include <iostream>
 
+/// Simple 3D vector class.
 struct vec3d
 {
     double x;
@@ -22,28 +23,28 @@ struct vec3d
     double z;
 };
 
-// write to stream
+/// Write to stream.
 std::ostream & operator << (std::ostream & os, vec3d const & v);
 
-// read from stream
+/// Read from stream.
 std::istream & operator >> (std::istream & is, vec3d & v);
 
-// dot product
+/// Dot product.
 double dot (vec3d const & u, vec3d const & v);
 
-// cross product
+/// Cross product.
 vec3d cross (vec3d const & u, vec3d const & v);
 
-// vector difference
+/// Vector difference.
 vec3d operator - (vec3d const & u, vec3d const & v);
 
-// vector scaling
+/// Vector scaling.
 vec3d operator * (vec3d const & u, double a);
 
-// vector length
+/// Vector length.
 double norm (vec3d const & v);
 
-// return normal vector
+/// Return normal vector.
 vec3d normalize (vec3d const & v);
 
 #endif

@@ -1,4 +1,4 @@
-.PHONY: all exe lib clean doc dist distclean
+.PHONY: all exe lib clean allclean doc docclean dist distclean
 
 ##############################################################
 # Editable part
@@ -42,12 +42,16 @@ pollversion:
 doc:
 	doxygen
 
+docclean:
+	rm -rf html
+
 dist:
 	mkdir -p hex-db/libs
-	cp --recursive --dereference README Makefile Doxyfile hexe-small.gif src hex-db/
+	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-db/
 	cp --recursive libs/sqlitepp hex-db/libs
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-db/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-db/Makefile
+	sed -i "s/\.\.\/media\///g" hex-db/Doxyfile
 	tar --create --gzip --file=hex-db-$(GIT_COMMIT).tar.gz hex-db
 	rm -rf hex-db/
 
@@ -56,6 +60,8 @@ clean:
 
 distclean:
 	rm -rf hex-db hex-db-*.tar.gz
+
+allclean: clean distclean docclean
 
 exe: bin/hex-db
 

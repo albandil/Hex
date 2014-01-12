@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -20,6 +20,8 @@
 #include "misc.h"
 
 /**
+ * @brief Compute limit.
+ * 
  * Limit
  * @f[
  *     \lim_{t \rightarrow x} F(t)
@@ -65,7 +67,10 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 }
 
 /**
- * An auxiliary interface class.
+ * @brief Compactification.
+ * 
+ * An auxiliary interface class. All other compactification classes
+ * are derived from this class.
  */
 template <typename FType> class ICompactification
 {
@@ -78,6 +83,8 @@ public:
 };
 
 /**
+ * @brief Compactification of a function from finite interval.
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formula is used:
@@ -128,7 +135,7 @@ public:
     }
 
     /**
-     * Evaluate the compactified function.
+     * @brief Evaluate the compactified function.
      * @param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
@@ -142,6 +149,8 @@ private:
 };
 
 /**
+ * @brief Compactification of a function from (-∞,b] to (-1,1].
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
@@ -215,6 +224,8 @@ private:
 };
 
 /**
+ * @brief Compactification of a function from [a,+∞) to [-1,1).
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
@@ -289,10 +300,12 @@ private:
 };
 
 /**
+ * @brief Compactification multiplied by its jacobian.
+ * 
  * A wrapper around the compactification classes which returns function
  * value multiplied by the Jacobian of the compactification transformation.
  * It is meant for the use in integration, so that one can just call its
- * operator() interface.
+ * operator() interface instead of operator()*jacobian
  */
 template <class Functor, typename FType> class CompactIntegrand
 {

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -22,58 +22,62 @@
 #include "interfaces.h"
 
 /**
- * \mainpage
+ * @mainpage
  * 
- * \section theory Theory
+ * @author Jakub Benda, MFF UK
+ * @date 12. 1. 2014
  * 
- * The program <b>Hex</b> produces output in the form of radial part
- * of the T-matrix. The full T-matrix for transition \f$ (n_i,l_i,m_i) \rightarrow
- * (n_f,l_f,m_f) \f$ at energy \f$ E = k_i^2 - n_i^{-2} = k_f^2 - n_f^{-2} \f$
- * (energy is in Rydbergs) is
- * \f[
+ * 
+ * @section theory Theory
+ * 
+ * The computational modules of the package <b>Hex</b> produce output in the form
+ * of radial part of the T-matrix. The full T-matrix for transition
+ * @f$ (n_i,l_i,m_i) \rightarrow (n_f,l_f,m_f) @f$ at energy
+ * @f$ E = k_i^2 - n_i^{-2} = k_f^2 - n_f^{-2} @f$ (energy is in Rydbergs) is
+ * @f[
  *        T_{n_i l_i m_i\rightarrow n_f l_f m_f}^{L M S} (E) =
  *        \delta_{Mm_f}
  *        \sum_\ell T_\ell^{LMS}(E) Y_{l_f m_f}(\hat{\vec k}_f) ,
- * \f]
+ * @f]
  * where the radial part depends on theory. It will be much different for exterior
  * complex scaling and for Born approximation. This utility code (and associated
  * standalone interface library) can then be used to produce following information:
  *
- * - the scattering amplitude ( \ref scattering_amplitude )
- *   \f[
+ * - the scattering amplitude
+ *   @f[
  *       f_{i \rightarrow f}^{S}(E) = -\frac{1}{2\pi} T_{i \rightarrow f}^{S}(E) =
  *       -\frac{1}{2\pi} \sum_{L} f_{i \rightarrow f}^{LS}(E) = 
  *       -\frac{1}{2\pi} \sum_{\ell L} Y_{\ell m_i-m_f}(\hat{\vec{k}}_f) T_{fi,\ell}^{LS}(E) \ ,
- *   \f]
- * - the differential cross section ( \ref differential_cross_section )
- *   \f[
+ *   @f]
+ * - the differential cross section
+ *   @f[
  *       \frac{\mathrm{d}\sigma_{i \rightarrow f}^{S}}{\mathrm{d}\Omega}(E) = 
  *       \frac{k_f}{k_i} \frac{2S+1}{4} |f_{i \rightarrow j}^{S}|^2 \ ,
- *   \f]
- * - the partial integral cross section ( \ref integral_cross_section )
- *   \f[
+ *   @f]
+ * - the partial integral cross section
+ *   @f[
  *       \sigma_{i \rightarrow f}^{LS}(E) = \frac{k_f}{k_i} \frac{2S + 1}{4}
  *       \int_{4\pi} |f_{i \rightarrow f}^{LS}(E)|^2 \mathrm{d}\Omega(\hat{\vec{k}}_f)
  *       = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2} \sum_\ell |T_{fi,\ell}^{LS}(E)|^2 \ ,
- *   \f]
- * - the “complete” integral cross section ( \ref complete_cross_section, \ref extrapolate_cross_section )
- *   \f[
+ *   @f]
+ * - the “complete” integral cross section
+ *   @f[
  *       \sigma_{i \rightarrow f}(E) = \sum_{LS} \sigma_{i \rightarrow f}^{LS}(E) \ ,
- *   \f]
- * - the total cross section ( \ref total_cross_section )
- *   \f[
+ *   @f]
+ * - the total cross section
+ *   @f[
  *       \sigma_i(E) = \sum_{n_f = 1}^\infty \sum_{l_f = 0}^{n_f - 1}
  *       \sum_{m_f = -l_f}^{l_f} \sigma_{i \rightarrow f}(E) \ ,
- *   \f]
- * - and also the dimensionless, $i \leftrightarrow j$ symmetrical, collision strength ( \ref collision_strength )
- *   \f[
+ *   @f]
+ * - and also the dimensionless, @f$ i \leftrightarrow j @f$ symmetrical, collision strength
+ *   @f[
  *       \Omega_{i \rightarrow f}^{LS} (E) = k_i^2 \sigma_{i \rightarrow f}^{LS}(E)
- *   \f]
- * - or the momentum transfer ( \ref momentum_transfer )
- *   \f[
+ *   @f]
+ * - or the momentum transfer
+ *   @f[
  *       \eta_{i \rightarrow f}^{LS} = \int \frac{\mathrm{d}\sigma_{i \rightarrow f}^{LS}}{\mathrm{d}\Omega}(E) (1 - \cos\vartheta)
  *       \mathrm{d}\Omega(\hat{\vec{k}}_f) \ .
- *   \f]
+ *   @f]
  * 
  * \section database The database
  * 
@@ -89,8 +93,8 @@
  * <tr><td>L</td> <td>INTEGER</td> <td>Conserved total angular momentum of a partial wave.</td></tr>
  * <tr><td>S</td> <td>INTEGER</td> <td>Conserved total spin of the system.</td></tr>
  * <tr><td>Ei</td> <td>DOUBLE PRECISION</td> <td>Projectile impact energy.</td></tr>
- * <tr><td>Re_T_ell</td> <td>DOUBLE PRECISION</td> <td>%Real part of \f$ T_\ell \f$.</td></tr>
- * <tr><td>Im_T_ell</td> <td>DOUBLE PRECISION</td> <td>Imaginary part of \f$ T_\ell \f$.</td></tr>
+ * <tr><td>Re_T_ell</td> <td>DOUBLE PRECISION</td> <td>%Real part of @f$ T_\ell @f$.</td></tr>
+ * <tr><td>Im_T_ell</td> <td>DOUBLE PRECISION</td> <td>Imaginary part of @f$ T_\ell @f$.</td></tr>
  * </table></center>
  * 
  * The initial database file can be created by the shell command
@@ -116,8 +120,8 @@
  *    nf = 1 and lf = 0 and mf = 0 and
  *    Ei > 0.75 and Ei <= 0.88' > output.txt
  * </pre>
- * which will print real and imaginary parts of H(1s) \f$ \rightarrow \f$ H(1s)
- * T-matrices for energies between \f$ E = 0.75 \f$&nbsp;Ry and \f$ E = 0.88 \f$&nbsp;Ry into
+ * which will print real and imaginary parts of H(1s) @f$ \rightarrow @f$ H(1s)
+ * T-matrices for energies between @f$ E = 0.75 @f$&nbsp;Ry and @f$ E = 0.88 @f$&nbsp;Ry into
  * the file "output.txt".
  * 
  * \section usage Usage
@@ -172,38 +176,38 @@
  * from the database. If there are no relevant data in database, the result will be zero. If the available
  * energy interval doesn't contain some of the required energies, appropriate error message will be printed.
  * Here are some examples of usage:
- * <pre>
- * # scattering amplitude
- * seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
- *
- * # differential cross section
- * seq 0.01 0.01 3.14    | hex-db --database="hex.db" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
- *
- * # momentum transfer
- * seq 0.650 0.001 0.850 | hex-db --database="hex.db" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
- *
- * # integral cross section
- * seq 0.650 0.001 0.850 | hex-db --database="hex.db" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
- *
- * # sum integral cross section
- * seq 0.650 0.001 0.850 | hex-db --database="hex.db" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0
- *
- * # collision strength
- * seq 0.650 0.001 0.850 | hex-db --database="hex.db" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
- *
- * # total cross section
- * seq 0.650 0.001 0.850 | hex-db --database="hex.db" --tcs        --ni=1 --li=0 --mi=0
- * </pre>
+   @verbatim
+   # scattering amplitude
+   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
+  
+   # differential cross section
+   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
+  
+   # momentum transfer
+   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
+  
+   # integral cross section
+   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
+  
+   # sum integral cross section
+   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0
+  
+   # collision strength
+   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
+  
+   # total cross section
+   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --tcs        --ni=1 --li=0 --mi=0
+   @endverbatim
  * You may need to set the LC_NUMERIC environment variable to en_US.utf8 (or en_GB.utf8 or any other
  * localitation that uses decimal point instead of decimal comma). An alternative is the workaround with sed.
- * <pre>
- * # scattering amplitude in Czech environment (1)
- * export LC_NUMERIC=en_GB.utf8
- * seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
- * 
- * # scattering amplitude in Czech environment (2)
- * seq 0.01 0.01 3.14 | sed -e "s/,/\./g" | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
- * </pre>
+   @verbatim
+   # scattering amplitude in Czech environment (1)
+   export LC_NUMERIC=en_GB.utf8
+   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
+   
+   # scattering amplitude in Czech environment (2)
+   seq 0.01 0.01 3.14 | sed -e "s/,/\./g" | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
+   @endverbatim
  */
 
 /// Energy units

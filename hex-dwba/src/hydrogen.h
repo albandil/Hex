@@ -5,10 +5,10 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
- * \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #ifndef HEX_HYDROGEN
 #define HEX_HYDROGEN
@@ -24,7 +24,10 @@
 #define DEFAULT_MAXSTEPS    1000
 
 /**
- * Namespace holding routines concerned with the hydrogen atom.
+ * @brief Hydrogen atom.
+ * 
+ * Namespace holding routines concerned with the hydrogen atom. Only a narrow
+ * subset of the members is used.
  */
 namespace Hydrogen
 {

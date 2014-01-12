@@ -5,52 +5,92 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_DB_INTERFACES_H
-#define HEX_DB_INTERFACES_H
+#ifndef HEX_DB_INTERFACES
+#define HEX_DB_INTERFACES
 
 /**
- * Create new database
- */
-void create_new_database();
-
-/**
- * Initialize
- */
-void initialize(const char* dbname);
-
-/**
- * Import SQL batch file.
- * Equivalent to
- * \code
- *     sqlite3 "hex.db" < "batchfile.sql"
- * \endcode
- */
-void import(const char* sqlname);
-
-/**
- * Update integral cross section.
- * Used after import of T-matrices.
- */
-void update();
-
-/**
- * \brief Optimize the SQLite database file.
+ * @brief Initialize the environment.
  * 
- * Reduces the occupied space.
+ * The function will open existing database with path specified in "dbname".
+ * If the database does not exist, a new empty database will be created.
+ * Also, all registered variables will be given chance to initialize by
+ * the function
+ * @code
+ *    Variable::initialize (sqlitepp::session & db)
+ * @endcode
+ * This can be used to register special functions needed later in the SQL
+ * statements. For example the variable IntegralCrossSection registeres
+ * two functions: the simple square root and a more complicated numerical
+ * integrator that uses ClenshawCurtis quadrature.
+ * 
+ * The function "initialize" also disables journalling to speed up insertion
+ * of data.
  */
-void optimize();
+void initialize (const char* dbname);
 
 /**
- * \brief Print data summary.
+ * @brief Create new database.
+ * 
+ * This will create the necessary table structure in a new empty database.
+ * It is necessary to call @ref initialize first, so that the databse file
+ * is created and opened. The tables are created by the call to
+ * @code
+ *     Variable::SQL_CreateTable();
+ * @endcode
+ * for every registered variable. The return value is a vector of SQL statement
+ * which are executed.
+ */
+void create_new_database ();
+
+/**
+ * @brief Import SQL batch file.
+ * 
+ * The effect of this function should be equivalent to direct use of sqlite3
+ * program:
+ * @code
+ *     sqlite3 hex.db < batchfile.sql
+ * @endcode
+ * 
+ * The function uses one line at a time and splits the lines into statements
+ * on semicolons. For this reason it does not allow multi-line statements.
+ * The statements produced by computational modules have always one statement
+ * per line.
+ */
+void import (const char* sqlname);
+
+/**
+ * @brief Update integral and complete cross section.
+ * 
+ * This function is used after import of T-matrices. All variables will be
+ * given chance to update themselves using the function
+ * @code
+ *     Variable::SQL_Update();
+ * @endcode
+ * which returns SQL statement that should do the update. If a variable
+ * uses other variables besides T-matrices for its update, it must be inserted
+ * to VariableList AFTER those variables, because the order of update is
+ * set by the order in the list.
+ */
+void update ();
+
+/**
+ * @brief Optimize the SQLite database file.
+ * 
+ * Reduces the occupied space using the VACUUM statement.
+ */
+void optimize ();
+
+/**
+ * @brief Print data summary.
  * 
  * Prints highest partial waves for consecutive energy ranges per initial state.
  * Example:
- * \code
+ * @code
    1   0   0    0.05     0.6    3
    1   0   0    0.65     0.85   4
    1   0   0    0.8501   0.89   3
@@ -58,41 +98,41 @@ void optimize();
    1   0   0    1.2      5.0    6
    1   0   0    5.2     40.0    9
    1   0   0   40.0     40.0    9
- * \endcode
+ * @endcode
  */
-void avail();
+void avail ();
 
 /**
- * \brief Dump contents of the T-matrix table.
+ * @brief Dump contents of the T-matrix table.
  * 
  * The output can be used to construct an equivalent table.
  * The corresponding code is
- * \code
+ * @code
  * sqlite> .mode insert
  * sqlite> select * from tmat
- * \endcode
+ * @endcode
  */
-void dump(const char* dumpname);
+void dump (const char* dumpname);
 
 #if 0
 
 /**
  * Return the scattering amplitude.
- * \f[
+ * @f[
  *      f^S = -\frac{1}{2\pi} \sum_{\ell L} T^{LMS}_\ell Y_{l_f M-m_f}
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param S Total spin (only needed for proper anti/symmetrization
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param S Total spin (only needed for proper anti/symmetrization
  *          of the initial wave function).
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param N Array length.
- * \param theta Polar angle of scattered electron.
- * \param amplitudes Results (N complex numbers as 2N real numbers).
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param N Array length.
+ * @param theta Polar angle of scattered electron.
+ * @param amplitudes Results (N complex numbers as 2N real numbers).
  */
 extern "C" void scattering_amplitude (
     int const * ni, int const * li, int const * mi,
@@ -103,21 +143,21 @@ extern "C" void scattering_amplitude (
 
 /**
  * Compute the differential cross section.
- * \f[
+ * @f[
  *       \frac{\mathrm{d}\sigma^S}{\mathrm{d}\Omega} = \frac{k_f}{k_i} \frac{2S+1}{4} |f^S|^2
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param S Total spin (only needed for proper anti/symmetrization
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param S Total spin (only needed for proper anti/symmetrization
  *          of the initial wave function).
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param theta Polar angle of scattered electron.
- * \param dsigma Results.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param theta Polar angle of scattered electron.
+ * @param dsigma Results.
  */
 extern "C" void differential_cross_section (
     int const * ni, int const * li, int const * mi,
@@ -128,22 +168,22 @@ extern "C" void differential_cross_section (
 
 /**
  * Compute the momentum transfer.
- * \f[
+ * @f[
  *      \eta = \int \frac{\mathrm{d}\sigma}{\mathrm{d}\Omega} (1 - \cos\theta) \mathrm{d}\Omega(\hat{\vec{k}}_f)
  *      = ...
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param L Total angular momentum of the electrons.
- * \param S Total spin (only needed for proper anti/symmetrization
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param L Total angular momentum of the electrons.
+ * @param S Total spin (only needed for proper anti/symmetrization
  *          of the initial wave function).
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param eta Results.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param eta Results.
  */
 extern "C" void momentum_transfer (
     int const * ni, int const * li, int const * mi,
@@ -154,24 +194,24 @@ extern "C" void momentum_transfer (
 
 /**
  * Compute integral cross section \f$ \sigma^{LS} \f$,
- * \f[
+ * @f[
  *      \sigma^{LS}(E) = \int_{4\pi} \frac{\mathrm{d}\sigma^S}{\mathrm{d}\Omega}
  *      \mathrm{d}\Omega(\hat{\vec{k}}_f)
  *      \Rightarrow
  *      \sigma^{LS}(E) = \frac{k_f}{k_i} \frac{1}{4\pi^2} \frac{2S+1}{4} \sum_\ell \left|T_\ell^{LMS}\right|^2
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param L Total angular momentum of the electrons.
- * \param S Total spin (only needed for proper anti/symmetrization
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param L Total angular momentum of the electrons.
+ * @param S Total spin (only needed for proper anti/symmetrization
  *          of the initial wave function).
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param sigma Results.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param sigma Results.
  */
 extern "C" void integral_cross_section (
     int const * ni, int const * li, int const * mi,
@@ -182,18 +222,18 @@ extern "C" void integral_cross_section (
 
 /**
  * Sum integral cross sections.
- * \f[
+ * @f[
  *      \sigma_{i \rightarrow f}(E) = \sum_{LS} \sigma_{i \rightarrow f}^{LS}(E)
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$).
- * \param sigma Results.
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$).
+ * @param sigma Results.
  */
 extern "C" void complete_cross_section (
     int const * ni, int const * li, int const * mi,
@@ -203,19 +243,19 @@ extern "C" void complete_cross_section (
 
 /**
  * Sum integral cross sections and extrapolate \f$ L \rightarrow \infty \f$.
- * \f[
+ * @f[
  *      \sigma_{i \rightarrow f}(E) = \sum_{LS} \sigma_{i \rightarrow f}^{LS}(E)
- * \f]
+ * @f]
  * The extrapolation is done using Aitken Δ²-process. 
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param sigma Results.
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param sigma Results.
  */
 extern "C" void extrapolate_cross_section (
     int const * ni, int const * li, int const * mi,
@@ -225,21 +265,21 @@ extern "C" void extrapolate_cross_section (
 
 /**
  * Compute the collision strength.
- * \f[
+ * @f[
  *     \Omega_{i \rightarrow f}(E) = k_i^2 (2L+1) (2S+1) \sigma_{i \rightarrow f}(E)
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param nf Final atomic principal quantum number.
- * \param lf Final atomic principal quantum number.
- * \param mf Final atomic magnetic quantum number.
- * \param L Total angular momentum of the electrons.
- * \param S Total spin (only needed for proper anti/symmetrization
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param nf Final atomic principal quantum number.
+ * @param lf Final atomic principal quantum number.
+ * @param mf Final atomic magnetic quantum number.
+ * @param L Total angular momentum of the electrons.
+ * @param S Total spin (only needed for proper anti/symmetrization
  *          of the initial wave function).
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
- * \param omega Results.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$)
+ * @param omega Results.
  */
 extern "C" void collision_strength (
     int const * ni, int const * li, int const * mi,
@@ -250,16 +290,16 @@ extern "C" void collision_strength (
 
 /**
  * Compute total cross section.
- * \f[
+ * @f[
  *      \sigma_{i \rightarrow *}(E) = \sum_{n_f = 0}^\infty \sum_{l_f = 0}^{n_f - 1}
  *             \sigma_{i \rightarrow f}(E)
- * \f]
- * \param ni Initial atomic principal quantum number.
- * \param li Initial atomic orbital quantum number.
- * \param mi Initial atomic magnetic quantum number.
- * \param N Array length.
- * \param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$).
- * \param sigma Results.
+ * @f]
+ * @param ni Initial atomic principal quantum number.
+ * @param li Initial atomic orbital quantum number.
+ * @param mi Initial atomic magnetic quantum number.
+ * @param N Array length.
+ * @param Ei Projectile energy in Rydbergs (\f$ = k_i^2 \f$).
+ * @param sigma Results.
  */
 extern "C" void total_cross_section (
     int const * ni, int const * li, int const * mi,

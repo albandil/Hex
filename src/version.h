@@ -5,33 +5,31 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_VERSION_H
-#define HEX_VERSION_H
+#ifndef HEX_VERSION
+#define HEX_VERSION
 
 #include <string>
 
 /**
- * @brief Commit SHA identificator.
+ * @brief SHA identificator of the commit.
  * 
  * A text variable holding the commit hash identificator. It is initialized
  * to the string passed by means of GIT_COMMIT variable during compulation.
  * @code
- * g++ version.cpp -DGIT_VERSION=\"6a4gfd4\" -o version.o
+ *     g++ version.cpp -DGIT_COMMIT=\"6a4gfd4\" -o version.o
  * @endcode
  */
 extern char const * commit_hash;
 
-/**
- * @brief Get ASCII logo.
- * 
- * Return the application ASCII logo for use in text outputs.
- */
+/// Return the application ASCII logo for use in text outputs.
 std::string logo ();
+
+/// Return the application ASCII logo for use in terminal outputs.
 std::string logo_raw ();
 
 #endif
