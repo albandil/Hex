@@ -13,9 +13,6 @@
 #ifndef HEX_DISTORTING_POTENTIAL
 #define HEX_DISTORTING_POTENTIAL
 
-#include <o2scl/interp.h>
-#include <o2scl/ode_funct.h>
-
 #include "arrays.h"
 #include "hydrogen.h"
 #include "specf.h"
