@@ -396,7 +396,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (cmd.outofcore)
             {
                 R_tr_dia_[lambda].link(R_name);
-                R_tr_dia_[lambda].drop();
+//                 R_tr_dia_[lambda].drop();
             }
             
             continue; // no need to compute
@@ -456,14 +456,11 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (cmd.outofcore)
         {
             R_tr_dia_[lambda].link(R_name);
-            R_tr_dia_[lambda].drop();
+//             R_tr_dia_[lambda].drop();
         }
         
         std::cout << "\t- integrals for λ = " << lambda << " computed\n";
     }
-    
-    // size
-    int R_size = 0;
     
     // for all multipoles : synchronize
 #ifndef NO_MPI
@@ -475,8 +472,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             int owner = lambda % par.Nproc();
             
             // owner may need to load the data
-            if (cmd.outofcore and owner == par.iproc())
-                R_tr_dia_[lambda].hdfload();
+//             if (cmd.outofcore and owner == par.iproc())
+//                 R_tr_dia_[lambda].hdfload();
             
             // get dimensions
             int diagsize = R_tr_dia_[lambda].diag().size();
@@ -509,17 +506,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     R_tr_dia_[lambda].hdfsave(R_name, true, 10);
             }
             
-            // store size
-            R_size = R_tr_dia_[lambda].data().size();
-            
             // are we to keep this radial integral for this process?
-            if (cmd.outofcore or not lambdas[lambda])
-                R_tr_dia_[lambda].drop();
+//             if (cmd.outofcore or not lambdas[lambda])
+//                 R_tr_dia_[lambda].drop();
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
 #endif
     
-    std::cout << "\t- R_tr[λ] has " << R_size << " nonzero elements\n";
     // --------------------------------------------------------------------- //
 }

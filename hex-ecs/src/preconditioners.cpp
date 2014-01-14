@@ -434,21 +434,23 @@ void NoPreconditioner::update (double E)
                 continue;
             
             // load two-electron integrals if necessary
-            SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-            if (cmd_.outofcore)
-            {
-                # pragma omp critical
-                ref_R_tr_dia.hdfload();
-            }
+//             SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+//             if (cmd_.outofcore)
+//             {
+//                 # pragma omp critical
+//                 ref_R_tr_dia.hdfload();
+//             }
             
             // add two-electron contributions
-            Hdiag += f * ref_R_tr_dia;
+//             Hdiag += f * ref_R_tr_dia;
+            Hdiag += f * s_rad_.R_tr_dia(lambda);
             
             // unload the two-electron integrals if necessary
-            if (cmd_.outofcore)
-            {
-                ref_R_tr_dia.drop();
-            }
+//             if (cmd_.outofcore)
+//             {
+//                 #pragma omp critical
+//                 ref_R_tr_dia.drop();
+//             }
         }
         
         // finalize the matrix
@@ -459,9 +461,10 @@ void NoPreconditioner::update (double E)
         {
             // link diagonal block to a disk file
             dia_blocks_[ill].link(format("dblk-%d.ooc", ill));
+            std::cout << "linked to " << dia_blocks_[ill].linkedto() << "\n";
             
             // save diagonal block to disk
-            # pragma omp critical
+            # pragma omp critical   
             dia_blocks_[ill].hdfsave();
             
             // release memory
@@ -548,31 +551,34 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
                     continue;
                 
                 // load two-electron integrals if necessary
-                SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-                if (cmd_.outofcore)
-                {
-                    # pragma omp critical
-                    ref_R_tr_dia.hdfload();
-                }
+//                 SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+//                 if (cmd_.outofcore)
+//                 {
+//                     # pragma omp critical
+//                     ref_R_tr_dia.hdfload();
+//                 }
                 
                 // add the contributions
                 if (f1 != 0.)
                 {
-                    chi_block += (prefactor * f1) * ref_R_tr_dia.dot(Pj1);
+//                     chi_block += (prefactor * f1) * ref_R_tr_dia.dot(Pj1);
+                    chi_block += (prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1);
                 }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-                        chi_block += (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
+//                         chi_block += (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
+                        chi_block += (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
                     else
-                        chi_block -= (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
+//                         chi_block -= (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
+                        chi_block -= (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
                 }
                 
                 // unload two-electron integrals if necessary
-                if (cmd_.outofcore)
-                {
-                    ref_R_tr_dia.drop();
-                }
+//                 if (cmd_.outofcore)
+//                 {
+//                     ref_R_tr_dia.drop();
+//                 }
             }
             
             if (li == l1 and l == l2)
@@ -658,20 +664,21 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                     continue;
                 
                 // load two-electron integrals if necessary
-                SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-                if (cmd_.outofcore)
-                {
-                    # pragma omp critical
-                    ref_R_tr_dia.hdfload();
-                }
+//                 SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
+//                 if (cmd_.outofcore)
+//                 {
+//                     # pragma omp critical
+//                     ref_R_tr_dia.hdfload();
+//                 }
                 
-                q_contrib -= Complex(f) * ref_R_tr_dia.dot(p_block);
+//                 q_contrib -= Complex(f) * ref_R_tr_dia.dot(p_block);
+                q_contrib -= Complex(f) * s_rad_.R_tr_dia(lambda).dot(p_block);
                 
                 // unload two-electron integrals if necessary
-                if (cmd_.outofcore)
-                {
-                    ref_R_tr_dia.drop();
-                }
+//                 if (cmd_.outofcore)
+//                 {
+//                     ref_R_tr_dia.drop();
+//                 }
             }
         }
         
