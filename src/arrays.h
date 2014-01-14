@@ -97,15 +97,6 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
          * class. If the alignment were less than sizeof(void*), the alignment
          * is changed to sizeof(void*) because smaller values are invalid
          * anyway. The code uses system-dependent allocation functions.
-         * For Linux systems (assumed from macro "__linux__")
-           @code
-               posix_memalign(&aligned_ptr, alignment, size);
-           @endcode
-         * for Windows systems (assumed from macro "_WIN32")
-           @code
-               aligned_ptr = _aligned_malloc(size, alignment);
-           @endcode
-         * and for other, unknown systems the compilation is stopped.
          */
         static T * alloc (size_t n)
         {
@@ -115,38 +106,16 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             
             // allocate the aligned memory; make sure there will be even number of elements
             // so that we can always use pairs
-            void* aligned_ptr = nullptr;
             size_t bytes = (n + (n % 2)) * sizeof(T);
             size_t align = std::max(alignment, sizeof(void*));
             
-#if defined (__linux__)
-            
-            // use POSIX function
-            int err = posix_memalign (&aligned_ptr, align, bytes);
-            
-            // check memory allocation success
-            if (err == EINVAL)
-                throw exception ("[AlignedAllocator<T>::alloc] The alignment argument was not a power of two, or was not a multiple of sizeof(void *).");
-            if (err == ENOMEM)
-                throw exception ("[AlignedAllocator<T>::alloc] There was insufficient memory to fulfill the allocation request.");
-            if (err != 0)
-                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error %d.", err);
-            
-#elif defined (_WIN32)
-            
-            // use WINDOWS function
-            aligned_ptr = _aligned_malloc (bytes, align);
+            // use standard function
+            void* aligned_ptr = aligned_alloc (align, bytes);
             
             // check the return value
             if (aligned_ptr == nullptr)
                 throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error. Probably out of memory.");
             
-#else       
-            
-            // unknown system
-            #error "This program uses aligned memory, which is implemented only for Linux and Windows systems."
-            
-#endif
             // get the number pointer
             T* ptr = reinterpret_cast<T*>(aligned_ptr);
             
@@ -167,22 +136,8 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
          */
         static void free (T * ptr)
         {
-#if defined (__linux__)
-            
             if (ptr != nullptr)
                 ::free (ptr);
-            
-#elif defined (_WIN32)
-            
-            if (ptr != nullptr)
-                _aligned_free (ptr);
-            
-#else
-            
-            // unknown system
-            #error "This program uses aligned memory, which is implemented only for Linux and Windows systems."
-            
-#endif
         }
 };
 
