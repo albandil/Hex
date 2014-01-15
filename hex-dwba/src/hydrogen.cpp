@@ -171,7 +171,7 @@ namespace Hydrogen
         if (k * r > 1)
         {
             // probably due to "iteration process out of control" for large radii
-            return coul_F_asy(l, k, r, (finite(sigma) ? sigma : coul_F_sigma(l,k)));
+            return coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k)));
         }
         
         // some other problem
@@ -183,7 +183,7 @@ namespace Hydrogen
     
     double evalFreeStatePhase (double k, int l, double sigma)
     {
-        return l * 0.5 * M_PI + (finite(sigma) ? sigma : coul_F_sigma(l,k));
+        return l * 0.5 * M_PI + (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
     }
     
     double evalSturmian (int n, int l, double r, double lambda)
@@ -232,7 +232,7 @@ namespace Hydrogen
     double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
     {
         // precompute Coulomb shift
-        Sigma = finite(Sigma) ? Sigma : coul_F_sigma(l,k);
+        Sigma = std::isfinite(Sigma) ? Sigma : coul_F_sigma(l,k);
         
         //
         // hunt phase
@@ -289,7 +289,7 @@ namespace Hydrogen
         return idx_mid * M_PI;
     }
     
-}; // endof namespace Hydrogen
+} // endof namespace Hydrogen
 
 double HydrogenFunction::operator() (double r) const
 {

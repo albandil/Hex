@@ -54,8 +54,6 @@ template <class T> class CLArrayView : public ArrayView<T>
             std::swap (ArrayView<T>::array_, v.ArrayView<T>::array_);
             std::swap (ArrayView<T>::N_,     v.ArrayView<T>::N_    );
             std::swap (cl_handle_,           v.cl_handle_          );
-            
-//             std::cout << "Init CLArrayView from CLArrayView&&.\n";
         }
         
         //
@@ -64,8 +62,6 @@ template <class T> class CLArrayView : public ArrayView<T>
         
         virtual ~CLArrayView ()
         {
-            // free GPU memory
-//             disconnect ();
         }
         
         //
@@ -122,7 +118,6 @@ template <class T> class CLArrayView : public ArrayView<T>
         
         cl_int EnqueueDownload (cl_command_queue queue)
         {
-//             std::cout << "EnqueueDownload of " << size() << " elements starting from " << data() << "\n";
             return clEnqueueReadBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
@@ -132,8 +127,12 @@ template <class T> class CLArrayView : public ArrayView<T>
         }
 };
 
+#ifndef NO_ALIGN
 #define CL_ALIGNMENT 4096
 template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray : public CLArrayView<T>
+#else
+template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArrayView<T>
+#endif
 {
     public:
         

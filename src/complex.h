@@ -53,7 +53,7 @@ inline bool Complex_imagpart_less (Complex const & a, Complex const & b)
 /// Finite check for complex number.
 inline bool Complex_finite (Complex const & z)
 {
-    return finite(z.real()) and finite(z.imag());
+    return std::isfinite(z.real()) and std::isfinite(z.imag());
 }
 
 #endif

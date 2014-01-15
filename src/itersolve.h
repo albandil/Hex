@@ -239,7 +239,7 @@ unsigned cg_callbacks
         
         // compute and check norm
         rnorm = compute_norm(r);
-        if (not finite(rnorm))
+        if (not std::isfinite(rnorm))
         {
             std::cout << "\t[cg] Oh my god... the norm of the solution is not finite. Something went wrong!\n";
             break;

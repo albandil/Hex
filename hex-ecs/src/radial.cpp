@@ -87,7 +87,7 @@ void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex *
         {
             out[k] = values_i[k] * values_j[k] * pow(in[k],a) * damp(in[k],R);
             
-            if (not (all_finite = all_finite and finite(out[k].real()) and finite(out[k].imag())))
+            if (not (all_finite = Complex_finite(out[k])))
                 break;
         }
     }
@@ -97,7 +97,7 @@ void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex *
         {
             out[k] = values_i[k] * values_j[k] * pow(in[k],a);
             
-            if (not (all_finite = all_finite and finite(out[k].real()) and finite(out[k].imag())))
+            if (not (all_finite = Complex_finite(out[k])))
                 break;
         }
     }

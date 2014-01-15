@@ -33,8 +33,8 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 {
     // initial position
     double x0;
-    if (x > 0.) x0 = finite(x) ? 0.5 * x :  1.;
-    if (x < 0.) x0 = finite(x) ? 0.5 * x : -1.;
+    if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
+    if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
 
     // function value
     FType f0 = F(x0), f;
@@ -109,7 +109,7 @@ public:
         double b
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
-        if (not finite(a) or not finite(b))
+        if (not std::isfinite(a) or not std::isfinite(b))
             throw exception("[CompactificationF] Interval has to be finite!");
     }
 
@@ -181,7 +181,7 @@ public:
     double scale (double x) const
     {
         assert (x <= B);
-        return finite(x) ? (x - B + L) / (x - B - L) : 1.;
+        return std::isfinite(x) ? (x - B + L) / (x - B - L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
@@ -257,7 +257,7 @@ public:
     double scale (double x) const
     {
         assert (x >= A);
-        return finite(x) ? (x - A - L) / (x - A + L) : 1.;
+        return std::isfinite(x) ? (x - A - L) / (x - A + L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
@@ -323,11 +323,11 @@ public:
         bool limit = true,
         double L = 1.0
     ) : Compactification(nullptr) {
-        if (finite(a) and finite(b))
+        if (std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationF<Functor,FType> (f, a, b);
-        else if (finite(a) and not finite(b))
+        else if (std::isfinite(a) and not std::isfinite(b))
             Compactification = new CompactificationR<Functor,FType> (f, a, limit, L);
-        else if (not finite(a) and finite(b))
+        else if (not std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
         else
             throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");

@@ -1,13 +1,13 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
-*                                                                           *
-*                       / /   / /    __    \ \  / /                         *
-*                      / /__ / /   / _ \    \ \/ /                          *
-*                     /  ___  /   | |/_/    / /\ \                          *
-*                    / /   / /    \_\      / /  \ \                         *
-*                                                                           *
-*                         Jakub Benda (c) 2014                              *
-*                     Charles University in Prague                          *
-*                                                                           *
+ *                                                                           *
+ *                       / /   / /    __    \ \  / /                         *
+ *                      / /__ / /   / _ \    \ \/ /                          *
+ *                     /  ___  /   | |/_/    / /\ \                          *
+ *                    / /   / /    \_\      / /  \ \                         *
+ *                                                                           *
+ *                         Jakub Benda (c) 2014                              *
+ *                     Charles University in Prague                          *
+ *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <algorithm>
@@ -1693,12 +1693,18 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
     
     // data pointers
     // - "restricted" and "aligned" for maximization of the cache usage
-    // - "aligned" to convince the auto-vectorizer that vectorization is worth
-    // NOTE: cArray (= NumberArray<Complex>) is aligned on sizeof(Complex) boundary
+    // - optionally "aligned" to convince the auto-vectorizer of the worth of the vectorization using AVX instructions
+    // NOTE: cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary
     // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
-    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(&res[0],    sizeof(Complex));
-    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(&elems_[0], sizeof(Complex));
-    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(&B[0],      sizeof(Complex));
+#if !defined(NO_ALIGN) && (defined(__GNUC__) || defined(__INTEL_COMPILER))
+    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(res.data(),    2*sizeof(Complex));
+    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(elems_.data(), 2*sizeof(Complex));
+    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(B.data(),      2*sizeof(Complex));
+#else
+    Complex       *       restrict rp_res    = &res[0];
+    Complex const *       restrict rp_elems_ = &elems_[0];
+    Complex const * const restrict rp_B      = &B[0];
+#endif
     
     // for all elements in the main diagonal
     if (triangle & diagonal)

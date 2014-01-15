@@ -135,7 +135,7 @@ namespace Hydrogen
      * \f]
      */
     double getFreeFar(double k, int l, double Sigma = Nan, double eps = 1e-10, int max_steps = DEFAULT_MAXSTEPS);
-};
+}
     
 /**
  * Hydrogen radial function.

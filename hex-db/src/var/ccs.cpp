@@ -149,7 +149,7 @@ bool CompleteCrossSection::run (
             
         // output
         for (size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << (finite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << "\n";
+            std::cout << energies[i] << "\t" << (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << "\n";
     }
     
     return true;

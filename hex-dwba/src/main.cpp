@@ -143,7 +143,7 @@ int main (int argc, char *argv[])
                     {
                         double Gaunts_dir = Gaunt(lambda, Mi - Mf, li, 0, lf, Mi - Mf) * Gaunt(lambda, Mi - Mf, Lf, Mf, Li, Mi);
                         
-                        if (not finite(Gaunts_dir))
+                        if (not std::isfinite(Gaunts_dir))
                             throw exception ("Gaunt failure!\n");
                         
                         Tdir_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat * Gaunts_dir;
@@ -165,7 +165,7 @@ int main (int argc, char *argv[])
                     {
                         double Gaunts_exc = Gaunt(lambda, -Mf, Li, Mi, lf, Mi - Mf) * Gaunt(lambda, -Mf, Lf, Mf, li, 0);
                         
-                        if (not finite(Gaunts_exc))
+                        if (not std::isfinite(Gaunts_exc))
                             throw exception ("Gaunt failure!\n");
                         
                         Texc_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat * Gaunts_exc;

@@ -1562,6 +1562,9 @@ public:
      * 
      * @param B Dense matrix. It is supposed to be stored by columns and to have
      *          dimensions n times k, where n is the column count of (*this) matrix.
+     *          Also, though only a view of the array is required, it is assumed
+     *          that B is actually rArray, i.e. that it is aligned with the alignment
+     *          2*sizeof(T).
      * @param triangle Whether to use only the upper or only the lower or both triangles
      *                 of the othwerwise symmetric matrix.
      */

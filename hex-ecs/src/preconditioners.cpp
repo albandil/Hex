@@ -541,9 +541,9 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
                 double f2 = computef(lambda, l1, l2, l, li, inp_.L);
                 
                 // abort if any of the coefficients is non-number (factorial overflow etc.)
-                if (not finite(f1))
+                if (not std::isfinite(f1))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, li, l, inp_.L);
-                if (not finite(f2))
+                if (not std::isfinite(f2))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, l, li, inp_.L);
                 
                 // skip contribution if both coefficients are zero
@@ -656,7 +656,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 double f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
                 
                 // check finiteness
-                if (not finite(f))
+                if (not std::isfinite(f))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                 
                 // check non-zero

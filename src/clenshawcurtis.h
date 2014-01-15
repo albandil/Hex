@@ -119,11 +119,11 @@ public:
             return 0.;
         
         // if both bounds are infinite, call a specialized function
-        if (not finite(x1) and not finite(x2))
+        if (not std::isfinite(x1) and not std::isfinite(x2))
             return integrate_ii(n);
 
         // lower bound is infinite
-        if (not finite(x1))
+        if (not std::isfinite(x1))
         {
             // the compactified functor
             CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
@@ -143,7 +143,7 @@ public:
         }
 
         // upper bound is infinite
-        if (not finite(x2))
+        if (not std::isfinite(x2))
         {
             // the compactified functor
             CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
@@ -234,12 +234,12 @@ public:
                 {
                     fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
                     
-                    if (not finite(std::abs(fvals[k])))
+                    if (not std::isfinite(std::abs(fvals[k])))
                         throw exception("[%s] \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
-                if (not finite(std::abs(fvals[N])))
+                if (not std::isfinite(std::abs(fvals[N])))
                     throw exception("[%s] \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
             }
             else
@@ -250,7 +250,7 @@ public:
                 {
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
                     
-                    if (not finite(std::abs(fvals[k])))
+                    if (not std::isfinite(std::abs(fvals[k])))
                         throw exception("[%s] \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
                 }
                 fvals[N] = fvals_prev[N/2];
@@ -300,8 +300,8 @@ public:
                 
                 return FType(2. * (x2 - x1) / N) * sum;
             }
-            else if ( finite(std::abs(sum)) 
-                  and finite(std::abs(sum_prev)) 
+            else if ( std::isfinite(std::abs(sum)) 
+                  and std::isfinite(std::abs(sum_prev)) 
                   and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
             {
                 if (Verbose)
@@ -411,7 +411,7 @@ public:
                 {
                     double x = i * M_PI / N;
                     fvals[i] = F(L / tan(x));
-                    if (not finite(std::abs(fvals[i])))
+                    if (not std::isfinite(std::abs(fvals[i])))
                         fvals[i] = 0;
                     weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
                 }
@@ -430,7 +430,7 @@ public:
                     {
                         double x = i * M_PI / N;
                         fvals[i] = F(L / tan(x));
-                        if (not finite(std::abs(fvals[i])))
+                        if (not std::isfinite(std::abs(fvals[i])))
                             fvals[i] = 0;
                         weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
                     }

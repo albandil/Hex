@@ -95,7 +95,7 @@ int solve2 (
             );
             
             // check finiteness
-            if (not finite(y_row[0]))
+            if (not std::isfinite(y_row[0]))
                 throw exception("[solve2] Infinite result (%g) for i = %d", y_row[0], i);
             
             // advance number of steps

@@ -121,7 +121,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
             
             if (a == b) { return 0; }
             
-            if (isnan(a) || isnan(b))
+            if (std::isnan(a) || std::isnan(b))
             {
                 Ok = false;
                 return false;
@@ -145,7 +145,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
             double Result1, Result2, AbsErr1, AbsErr2;
             
             // use correct integrator
-            if (finite(a) and finite(b))          /* -∞ < a < b < +∞ */
+            if (std::isfinite(a) and std::isfinite(b))          /* -∞ < a < b < +∞ */
             {
                 err = gsl_integration_qag
                 (
@@ -156,7 +156,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     &Result, &AbsErr
                 ); 
             }
-            else if (finite(a) and not finite(b))    /* -∞ < a < b = +∞ */
+            else if (std::isfinite(a) and not std::isfinite(b))    /* -∞ < a < b = +∞ */
             {
                 err = gsl_integration_qagiu
                 (
@@ -166,7 +166,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     &Result, &AbsErr
                 );
             }
-            else if (not finite(a) and finite(b))    /* -∞ = a < b < +∞ */
+            else if (not std::isfinite(a) and std::isfinite(b))    /* -∞ = a < b < +∞ */
             {
                 err = gsl_integration_qagil
                 (

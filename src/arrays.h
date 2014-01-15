@@ -72,6 +72,7 @@ template <class T> class PlainAllocator
         }
 };
 
+#ifndef NO_ALIGN
 /**
  * @brief Aligned memory allocator.
  * 
@@ -110,10 +111,11 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             size_t align = std::max(alignment, sizeof(void*));
             
             // use standard function
-            void* aligned_ptr = aligned_alloc (align, bytes);
+            void* aligned_ptr = nullptr;
+            int err = posix_memalign(&aligned_ptr, align, bytes);
             
             // check the return value
-            if (aligned_ptr == nullptr)
+            if (err != 0 or aligned_ptr == nullptr)
                 throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error. Probably out of memory.");
             
             // get the number pointer
@@ -137,15 +139,37 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
         static void free (T * ptr)
         {
             if (ptr != nullptr)
-                ::free (ptr);
+                std::free (ptr);
         }
 };
+#endif
 
-// forward declaration of Array (unaligned array of items)
-template <class T, class Alloc = PlainAllocator<T>> class Array;
+// Forward declaration of Array (unaligned array of items).
+template <
+    class T,
+    class Alloc = PlainAllocator<T>
+> class Array;
 
-// forward declaration of NumberArray (aligned array of numbers)
-template <class T, class Alloc = AlignedAllocator<T>> class NumberArray;
+#ifndef NO_ALIGN
+// Forward declaration of NumberArray (aligned array of numbers).
+// - Align at least at multiples of sizeof(void*), but preferably on multiples
+//   of 2*sizeof(Complex). This should enable vectorization of Complex
+//   operations using AVX instruction, bacause two Complex numbers occupy
+//   2*2*64 = 256 bits, which is the size of AVX register.
+template <
+    class T,
+    class Alloc = AlignedAllocator <
+        T,
+        larger_of ( sizeof(void*), 2*sizeof(T) )
+    >
+> class NumberArray;
+#else
+// Forward declaration of NumberArray (unaligned array of numbers).
+template <
+    class T,
+    class Alloc = PlainAllocator<T>
+> class NumberArray;
+#endif
 
 /**
  * @brief Array view.
@@ -732,17 +756,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         //@{
         virtual T * data ()
         {
-            return (T *) aligned_ptr (
-                ArrayView<T>::array_,
-                std::max (std::alignment_of<T>::value, sizeof(Complex))
-            );
+            return ArrayView<T>::array_;
         }
         virtual T const * data () const
         {
-            return (T * const) aligned_ptr (
-                ArrayView<T>::array_,
-                std::max (std::alignment_of<T>::value, sizeof(Complex))
-            );
+            return ArrayView<T>::array_;
         }
         //@}
         

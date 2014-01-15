@@ -121,6 +121,6 @@ Complex computeExchange2e(
     int Ni, int Li, double ki, int li
 );
 
-}; // end of namespace DWBA1
+} // end of namespace DWBA1
 
 #endif

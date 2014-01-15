@@ -34,8 +34,15 @@ cArray ric_jv(int lmax, Complex z)
         rArray ev(lmax+1);
         int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
         
+        // check that all evaluations are finite
+        bool all_finite = std::all_of (
+            ev.begin(),
+            ev.end(),
+            [](double x) -> bool { return std::isfinite(x); }
+        );
+        
         // stop at failure
-        if (err != GSL_SUCCESS or not std::all_of(ev.begin(), ev.end(), finite))
+        if (err != GSL_SUCCESS or not all_finite)
         {
             if (z.real() < lmax)
             {
@@ -330,7 +337,7 @@ int coul_F_michel(int l, double k, double r, double& F, double& Fp)
     // check the result and use asymptotics if the full turned unstable
     #define ASYEPS 1e-5 // TODO tune?
     //	if (std::abs(x) < ASYEPS and ( not finite(phi) or not finite(phip) ))
-    if (std::abs(x) < ASYEPS or not finite(phi) or not finite(phip))
+    if (std::abs(x) < ASYEPS or not std::isfinite(phi) or not std::isfinite(phip))
     {
         // use x ⟶ 0 asymptotic formulas
         phip = pow(1 + a, 1./3);
@@ -386,7 +393,7 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
     err = gsl_sf_coulomb_wave_FG_e (eta, k*r, l, 0, &f, &fp, &g, &gp, &ef, &eg);
     
     // if the results are reliable, use them
-    if (finite(f.val) and finite(fp.val))
+    if (std::isfinite(f.val) and std::isfinite(fp.val))
     {
         F = f.val;
         Fp = fp.val;
@@ -419,7 +426,7 @@ double coul_F_sigma(int l, double k)
 
 double coul_F_asy(int l, double k, double r, double sigma)
 {
-    if (finite(sigma))
+    if (std::isfinite(sigma))
         return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + sigma);
     else
         return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + coul_F_sigma(l,k));
@@ -582,11 +589,11 @@ double computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     double B = Wigner3j(l1, lambda, l1p, 0, 0, 0);
     double C = Wigner3j(l2, lambda, l2p, 0, 0, 0);
     
-    if (not finite(A))
+    if (not std::isfinite(A))
         throw exception ("Wigner6j(%d,%d,%d,%d,%d,%d) not finite.", l1, l2, L, l2p, l1p, lambda);
-    if (not finite(B))
+    if (not std::isfinite(B))
         throw exception ("Wigner3j(%d,%d,%d,0,0,0) not finite.", l1, lambda, l1p);
-    if (not finite(C))
+    if (not std::isfinite(C))
         throw exception ("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
     
     return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
