@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="hex-dwba" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Release">
+				<Option output="bin/Release/hex-dwba" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-std=c++11" />
+      <Add directory="../include" />
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add option="-DNDEBUG" />
+			<Add option="-DNO_HDF" />
+			<Add directory="../include" />
+		</Compiler>
+		<Linker>
+      <Add option="-static-libstdc++" />
+			<Add library="..\lib\libgsl.a" />
+		</Linker>
+		<Unit filename="src/arrays.cpp" />
+		<Unit filename="src/arrays.h" />
+		<Unit filename="src/arrithm.h" />
+		<Unit filename="src/complex.h" />
+		<Unit filename="src/doc.h" />
+		<Unit filename="src/dwba1.cpp" />
+		<Unit filename="src/dwba1.h" />
+		<Unit filename="src/gausskronrod.h" />
+		<Unit filename="src/hdffile.cpp" />
+		<Unit filename="src/hdffile.h" />
+		<Unit filename="src/hydrogen.cpp" />
+		<Unit filename="src/hydrogen.h" />
+		<Unit filename="src/main.cpp" />
+		<Unit filename="src/misc.h" />
+		<Unit filename="src/ode.h" />
+		<Unit filename="src/potential.cpp" />
+		<Unit filename="src/potential.h" />
+		<Unit filename="src/specf.cpp" />
+		<Unit filename="src/specf.h" />
+		<Unit filename="src/version.cpp" />
+		<Unit filename="src/version.h" />
+		<Unit filename="src/wave_distort.cpp" />
+		<Unit filename="src/wave_distort.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
