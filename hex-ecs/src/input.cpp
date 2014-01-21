@@ -17,8 +17,6 @@
 #include <string>
 #include <tuple>
 
-#include <libgen.h>
-
 #include "arrays.h"
 #include "cmdline.h"
 #include "input.h"
@@ -104,7 +102,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zipfile <filename>      (-z)  solution file to zip                                                            \n"
                     "\t--zipcount <number>       (-n)  zip samples                                                                     \n"
                     "\t--zipmax <number>         (-R)  maximal radius to use for solution zipping                                      \n"
+#ifndef NO_MPI
                     "\t--mpi                     (-m)  use MPI                                                                         \n"
+#endif
                     "\t--stg-integ               (-a)  only do radial integrals                                                        \n"
                     "\t--stg-integ-solve         (-b)  only do integrals & solve                                                       \n"
                     "\t--stg-extract             (-c)  only extract amplitudes                                                         \n"
