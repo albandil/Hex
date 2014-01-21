@@ -461,7 +461,6 @@ void NoPreconditioner::update (double E)
         {
             // link diagonal block to a disk file
             dia_blocks_[ill].link(format("dblk-%d.ooc", ill));
-            std::cout << "linked to " << dia_blocks_[ill].linkedto() << "\n";
             
             // save diagonal block to disk
             # pragma omp critical   
