@@ -73,6 +73,11 @@ private:
     #define M_2_PI 0.63661977236758134308
 #endif
 
+/// square root of 2
+#ifndef M_SQRT2
+    #define M_SQRT2 1.41421356237309504880
+#endif
+
 // # define M_E           2.7182818284590452354   /* e */
 // # define M_LOG2E        1.4426950408889634074   /* log_2 e */
 // # define M_LOG10E       0.43429448190325182765  /* log_10 e */

@@ -327,11 +327,11 @@ void RadialIntegrals::setupOneElectronIntegrals ()
 {
     // create file names for this radial integrals
     char D_name[20], S_name[20], Mm1_name[20], Mm1_tr_name[20], Mm2_name[20];
-    std::snprintf (D_name,      sizeof(D_name),      "%d-D.hdf",      bspline_.order());
-    std::snprintf (S_name,      sizeof(S_name),      "%d-S.hdf",      bspline_.order());
-    std::snprintf (Mm1_name,    sizeof(Mm1_name),    "%d-Mm1.hdf",    bspline_.order());
-    std::snprintf (Mm1_tr_name, sizeof(Mm1_tr_name), "%d-Mm1_tr.hdf", bspline_.order());
-    std::snprintf (Mm2_name,    sizeof(Mm2_name),    "%d-Mm2.hdf",    bspline_.order());
+    snprintf (D_name,      sizeof(D_name),      "%d-D.hdf",      bspline_.order());
+    snprintf (S_name,      sizeof(S_name),      "%d-S.hdf",      bspline_.order());
+    snprintf (Mm1_name,    sizeof(Mm1_name),    "%d-Mm1.hdf",    bspline_.order());
+    snprintf (Mm1_tr_name, sizeof(Mm1_tr_name), "%d-Mm1_tr.hdf", bspline_.order());
+    snprintf (Mm2_name,    sizeof(Mm2_name),    "%d-Mm2.hdf",    bspline_.order());
     
     // load/compute derivative overlaps
     std::cout << "Loading/precomputing derivative overlaps... " << std::flush;

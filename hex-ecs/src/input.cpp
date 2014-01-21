@@ -17,6 +17,8 @@
 #include <string>
 #include <tuple>
 
+#include <libgen.h>
+
 #include "arrays.h"
 #include "cmdline.h"
 #include "input.h"
@@ -117,7 +119,7 @@ void CommandLine::parse (int argc, char* argv[])
         "zipfile", "z", 1, [&](std::string optarg) -> bool
             {
                 // zip B-spline expansion file
-                zipfile = std::string (basename(optarg.c_str()));
+                zipfile = optarg;
                 return true;
             },
         "zipcount", "n", 1, [&](std::string optarg) -> bool
