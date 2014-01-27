@@ -345,6 +345,51 @@
  * of the i-th B-spline and the (final) hydrogenic or Riccatti-Bessel function, and @f$ S[P]_i @f$
  * and @f$ S[j]_i @f$ stand for (truncated) overlap integrals of the i-th B-spline and
  * the (final) hydrogenic or Riccatti-Bessel function.
+ *
+ * @section code Implementation in the code
+ *
+ * The code runs along the following outline:
+ * - The program is initialized. Parameters from the command line are stored for later
+ *   use in the class CommandLine.
+ * - The optional multi-process parallel environment (MPI) is set up. All parallel
+ *   communication is mediated by the class Parallel. The parallelization by MPI
+ *   is used whenever the switch --mpi is present on the command line. The number of
+ *   processes (= "communicator rank") is given as an argument to the MPI launcher. E.g.
+     @verbatim
+         mpirun -np 4 hex-ecs --mpi
+     @endverbatim
+ * - Note that the parallelization by OpenMP is used always and does not use any classes,
+ *   nor does it depend on MPI in any way. The number of OpenMP threads is completely independent
+ *   on the communicator size and can be specified by the environment variable OMP_NUM_THREADS.
+ *   The number of threads on every machine used in the MPI network can be different.
+ * - From here on, all the steps are executed by every machine in the MPI scope.
+ * - The input file specified on the command line (--input/-i) is found and read. If the name
+ *   was not given on command line, the default "hex.inp" is used. If the file doesn't exist,
+ *   the program aborts. The values from the input file are contained in the object InputFile.
+ * - A B-spline basis is created according to the input (class Bspline).
+ * - A list of available angular states is assembled. The number of these states is restricted
+ *   by @f$ L @f$, @f$ \Pi @f$ and @f$ n_L @f$.
+ * - A preconditioner is selected in accord with the user's choice. It is stored only in the
+ *   form of a pointer to the base class PreconditionerBase, whose methods are reimplemented
+ *   in all derived classes (specific preconditioners). The constructor is called, which will
+ *   in all cases trigger also the computation of the radial integrals that are needed by
+ *   all preconditioners. The radial integrals are managed by the class RadialIntegrals.
+ * - For all impact energies:
+ *     - The preconditioner for the set of equations is updated for this energy (method "update").
+ *     - For all initial states:
+ *         - Check that at least some allowed angular states contribute to this combination
+ *           of @f$ L @f$, @f$ \Pi @f$, @f$ n_L @f$ and @f$ l_i @f$. If not, skip this inital state.
+ *         - Check that the solution for this initial state and this impact energy hasn't been
+ *           already computed. If it has been, skip this initial state.
+ *         - The B-spline expansion of the right hand side is computed (method "rhs" of the chosen
+ *           preconditioner class).
+ *         - Run the preconditioned conjugate gradients solver. If there already is a solution for the
+ *           previous energy, use it as an initial guess.
+ *         - Save the solution to disk.
+ * - For all initial and final states:
+ *     - Compute T-matrices for all available partial waves.
+ *     - Save the T-matrices to SQL files.
+ *     - Evaluate and print the integral cross sections.
  */
 
 #endif
