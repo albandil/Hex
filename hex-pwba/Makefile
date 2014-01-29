@@ -11,7 +11,7 @@ CXX = g++
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
+CFLAGS = -O3 -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
 LFLAGS = -lgsl -lgslcblas -lcln
 
 FILES = pwba symbolic specf arrays version
