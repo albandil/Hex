@@ -51,3 +51,5 @@ doc:
 
 docclean:
 	rm -rf html
+
+-include $(wildcard obj/*.dep)

@@ -91,3 +91,5 @@ $(SQLITEPPOBJ) : obj/%.o : libs/sqlitepp/%.cpp
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
 	ar cr $@ $^
+
+-include $(wildcard obj/*.dep)
