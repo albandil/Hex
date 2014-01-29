@@ -403,7 +403,7 @@ void InputFile::read (std::ifstream & inputfile)
             
             mis.push_back(read_int(inputfile));
             if (std::abs(mis[i]) > lis[i])
-                throw exception("Input error: Magnetic number greater than \"li\".\n");
+                throw exception("Input error: Magnetic quantum number greater than \"li\".\n");
             
             instates.push_back(std::make_tuple(ni,lis[i],mis[i]));
             
@@ -415,7 +415,7 @@ void InputFile::read (std::ifstream & inputfile)
         } catch (bool b) {
             
             // wildcard "*" found
-            for (int j = -lis[j]; j <= lis[i]; j++)
+            for (int j = -lis[i]; j <= lis[i]; j++)
             {
                 mis.push_back(j);
                 instates.push_back(std::make_tuple(ni,lis[i],j));

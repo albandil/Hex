@@ -61,8 +61,8 @@ class CommandLine
         
         // constructor
         CommandLine (int argc, char* argv[])
-            : zipcount(0), zipmax(-1), parallel(false), droptol(1e-15),
-              preconditioner(0), itinerary(StgNone), outofcore(false)
+            : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
+              droptol(1e-15), itinerary(StgNone), outofcore(false)
         {
             // get command line options
             parse(argc, argv);
