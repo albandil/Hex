@@ -67,7 +67,6 @@
 		<Unit filename="src/gauss.h" />
 		<Unit filename="src/hdffile.cpp" />
 		<Unit filename="src/hdffile.h" />
-		<Unit filename="src/hex.cpp" />
 		<Unit filename="src/input.cpp" />
 		<Unit filename="src/input.h" />
 		<Unit filename="src/itersolve.h" />
@@ -76,6 +75,7 @@
 			<Option compile="0" />
 			<Option link="0" />
 		</Unit>
+		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/matrix.h" />
 		<Unit filename="src/misc.h" />

@@ -56,7 +56,7 @@ LFLAGS = -fopenmp -fPIC $(LIBRARY)
 CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFLAGS) \
          -mtune=native -march=native
 
-FILES = amplitudes arrays gauss bspline hdffile hex input \
+FILES = amplitudes arrays gauss bspline hdffile main input \
 	matrix preconditioners radial slater specf version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))

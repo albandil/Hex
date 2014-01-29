@@ -37,8 +37,8 @@
 		<Unit filename="src/complex.h" />
 		<Unit filename="src/doc.h" />
 		<Unit filename="src/gausskronrod.h" />
+		<Unit filename="src/main.cpp" />
 		<Unit filename="src/misc.h" />
-		<Unit filename="src/pwba.cpp" />
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
 		<Unit filename="src/symbolic.cpp" />
