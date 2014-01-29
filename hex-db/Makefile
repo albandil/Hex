@@ -47,7 +47,7 @@ docclean:
 
 dist:
 	mkdir -p hex-db/libs
-	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-db/
+	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-db/
 	cp --recursive libs/sqlitepp hex-db/libs
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-db/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-db/Makefile

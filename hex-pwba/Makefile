@@ -11,7 +11,7 @@ CXX = g++
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
+CFLAGS = -Ofast -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
 LFLAGS = -lgsl -lgslcblas -lcln
 
 FILES = pwba symbolic specf arrays version
@@ -25,7 +25,7 @@ allclean: clean docclean distclean
 
 dist:
 	mkdir -p hex-pwba
-	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-pwba/
+	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-pwba/
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-pwba/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-pwba/Makefile
 	sed -i "s/\.\.\/media\///g" hex-pwba/Doxyfile

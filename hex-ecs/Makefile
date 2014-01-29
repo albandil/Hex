@@ -76,7 +76,7 @@ docclean:
 
 dist:
 	mkdir -p hex-ecs/libs
-	cp --recursive --dereference README Makefile Doxyfile ../media/hexe-small.gif src hex-ecs/
+	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-ecs/
 	cp --recursive libs/png++ hex-ecs/libs
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-ecs/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-ecs/Makefile
