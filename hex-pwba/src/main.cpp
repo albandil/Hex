@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
     }
     
     // write program logo
-    std::cout << logo() << "\n";
+    std::cout << logo_raw() << "\n";
     
     // atomic quantum numbers
     int Ni = strtol(argv[1], 0, 10);

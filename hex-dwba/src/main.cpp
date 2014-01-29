@@ -45,7 +45,7 @@ int main (int argc, char *argv[])
     }
     
     // draw package logo
-    std::cout << logo() << "\n";
+    std::cout << logo_raw() << "\n";
     
     // extract parameters
     int Ni = strtol(argv[1], 0, 10);

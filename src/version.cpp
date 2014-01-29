@@ -30,7 +30,7 @@ std::string logo ()
         "#     /  ___  /   | |/_/    / /\\ \\      \n"
         "#    / /   / /    \\_\\      / /  \\ \\   \n"
         "#                                         \n"
-        "#             UK MFF (c) 2013             \n"
+        "#             UK MFF (c) 2014             \n"
         "#                                         \n"
         "#          version hash: %s               \n"
         "#                                         \n",
@@ -49,7 +49,7 @@ std::string logo_raw ()
         "      /  ___  /   | |/_/    / /\\ \\      \n"
         "     / /   / /    \\_\\      / /  \\ \\   \n"
         "                                          \n"
-        "              UK MFF (c) 2013             \n"
+        "              UK MFF (c) 2014             \n"
         "                                          \n"
         "           version hash: %s               \n"
         "                                          \n",
