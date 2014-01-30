@@ -48,7 +48,7 @@ LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) \
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CFLAGS_RELEASE = -O3 -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
