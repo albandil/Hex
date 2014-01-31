@@ -97,7 +97,7 @@ bool SpinAsymetry::run (
     rArray dcs1 = differential_cross_section(db, ni,li,mi, nf,lf,mf, 0, E, angles * afactor);
     
     // compute spin asymetry
-    rArray asy = (dcs0 + dcs1) / (dcs0 + 3. * dcs1);
+    rArray asy = (dcs0 - dcs1) / (dcs0 + 3. * dcs1);
     
     // write out
     std::cout << logo() <<
