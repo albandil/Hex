@@ -29,7 +29,8 @@ FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes
+VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs \
+       stokes asy
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
