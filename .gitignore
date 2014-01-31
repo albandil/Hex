@@ -1,4 +1,5 @@
 *.gz
+*.bz2
 *.pdf
 *.dat
 *.gp

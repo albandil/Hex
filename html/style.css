@@ -49,6 +49,32 @@ table.logtable th, table.logtable td {
 	border-width: 1px;
 	border-color: black;
 }
+table.modules {
+	width: 80%;
+	margin: 20px;
+ 	border-collapse: collapse; 
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+}
+table.modules th, table.modules td {
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+}
+table.availdata {
+	width: 80%;
+	margin: 20px;
+ 	border-collapse: collapse; 
+	border-style: solid;
+	border-width: 0;
+	border-color: black;
+}
+table.availdata th, table.availdata td {
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+}
 div.nadpis {
 	text-align: left;
 	font-size: 60px;

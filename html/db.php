@@ -6,6 +6,9 @@
 		echo $_POST["hexoutput"];
 		exit();
 	}
+
+	// number of states to show in the table of available data (without ionization)
+	$states = 9;
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -18,61 +21,21 @@
 	
 	<link rel="icon" type="image/gif" href="hexe-small.gif" />
 	
+	<!-- Load stylesheet-->
 	<style type="text/css">
 		<!-- @import "style.css"; -->
 	</style>
 
-	<script>
-		function jsAvailClick()
-		{
-			if (document.getElementById("avail-more-1").style.display == "none")
-			{
-				// change the title text
-				document.getElementById("avail-link").innerHTML = "&#x25B2; Available data &#x25B2;"
-				
-				// display info
-				document.getElementById("avail-more-1").style.display = "block";
-				document.getElementById("avail-more-2").style.display = "block";
-				document.getElementById("avail-more-3").style.display = "block";
-			}
-			else
-			{
-				// change the title text
-				document.getElementById("avail-link").innerHTML = "&#x25BC; Available data &#x25BC;"
-				
-				// hide info
-				document.getElementById("avail-more-1").style.display = "none";
-				document.getElementById("avail-more-2").style.display = "none";
-				document.getElementById("avail-more-3").style.display = "none";
-			}
-		}
-		function jsContextClick()
-		{
-			if (document.getElementById("context-more-1").style.display == "none")
-			{
-				// change the title text
-				document.getElementById("context-link").innerHTML = "&#x25B2; Data context &#x25B2;"
-
-				// display info
-				document.getElementById("context-more-1").style.display = "block";
-			}
-			else
-			{
-				// change the title text
-				document.getElementById("context-link").innerHTML = "&#x25BC; Data context &#x25BC;"
-
-				// display info
-				document.getElementById("context-more-1").style.display = "none";
-			}
-		}
-		function jsEallClick()
-		{
-			document.getElementById("iEmin").disabled = !document.getElementById("iEmin").disabled;
-			document.getElementById("iEmax").disabled = !document.getElementById("iEmax").disabled;
-			document.getElementById("idE").disabled   = !document.getElementById("idE").disabled;
-		}
+	<!-- Copy value of $states [from PHP] to Nstates [JavaScript] -->
+	<script type = "text/javascript" language = "javascript">
+		<?php echo "Nstates = $states"; ?>
+	</script>
+	
+	<!-- Load external scripts -->
+	<script type = "text/javascript" language = "javascript" src = "db-scripts.js">
 	</script>
 
+	<!-- Setup MathJax -->
 	<script type="text/x-mathjax-config">
 		MathJax.Hub.Config({
 			extensions: ["tex2jax.js"],
@@ -81,10 +44,11 @@
 		});
 	</script>
 
+	<!-- Load MathJax -->
 	<script src="http://www.mathjax.org/mathjax/MathJax.js"></script>
 </head>
  
-<body>
+<body onload = "jsDataSet(); jsDataAngular();">
 
 	<div class = "grid">
 
@@ -179,9 +143,9 @@
 		<!-- initial atomic state -->
 		<div class = "text">Set initial atomic state(s):</div>
 		<center>
-			\(n_i\) = <input type = "text" title = "initial principal quantum number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>"/>
-			\(l_i\) = <input type = "text" title = "initial orbital quantum number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>"/>
-			\(m_i\) = <input type = "text" title = "initial magnetic quantum number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>"/>
+			\(n_i\) = <input type = "text" title = "initial principal quantum number" name = "ni" size = "3" value = "<?php echo (isset($_POST["ni"]) ? $_POST["ni"] : 1); ?>" required = "required"/>
+			\(l_i\) = <input type = "text" title = "initial orbital quantum number" name = "li" size = "3" value = "<?php echo (isset($_POST["li"]) ? $_POST["li"] : 0); ?>" required = "required"/>
+			\(m_i\) = <input type = "text" title = "initial magnetic quantum number" name = "mi" size = "3" value = "<?php echo (isset($_POST["mi"]) ? $_POST["mi"] : 0); ?>" required = "required"/>
 		</center>
 		
 		<!-- final tomic state -->
@@ -190,9 +154,9 @@
 			{
 				printf("\t\t<div class = \"text\">Set final atomic state(s):</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(n_f\\) = <input type = \"text\" title = \"final principal quantum number\" name = \"nf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
-				printf("\t\t\t\\(l_f\\) = <input type = \"text\" title = \"final orbital quantum number\" name = \"lf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
-				printf("\t\t\t\\(m_f\\) = <input type = \"text\" title = \"final magnetic quantum number\" name = \"mf\" size = \"3\" value = \"%s\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
+				printf("\t\t\t\\(n_f\\) = <input type = \"text\" title = \"final principal quantum number\" name = \"nf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["nf"]) ? $_POST["nf"] : "1");
+				printf("\t\t\t\\(l_f\\) = <input type = \"text\" title = \"final orbital quantum number\" name = \"lf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["lf"]) ? $_POST["lf"] : "0");
+				printf("\t\t\t\\(m_f\\) = <input type = \"text\" title = \"final magnetic quantum number\" name = \"mf\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["mf"]) ? $_POST["mf"] : "0");
 				printf("\t\t</center>\n");
 			}
 ?>
@@ -203,8 +167,8 @@
 			{
 				printf("\t\t<div class = \"text\">Set total quantum numbers:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-				printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+				printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+				printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 				printf("\t\t</center>\n");
 			}
 			else if (!isset($_POST["qty"]) or $_POST["qty"] == "ccs" or $_POST["qty"] == "xcs" or $_POST["qty"] == "tcs")
@@ -219,16 +183,16 @@
 				{
 					case "scatamp":
 					case "dcs":
-						printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
-						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(E\\) = <input type = \"text\" title = \"impact energy of the incoming electron\" name = \"E\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["E"]) ? $_POST["E"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "momtf":
-						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 					case "ics":
 					case "colls":
-						printf("\t\t\t\\(L\\) = <input type = \"text\" title = \"total orbital momentum of the two electrons\" name = \"L\" size = \"3\" value = \"%s\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
-						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
+						printf("\t\t\t\\(L\\) = <input type = \"text\" title = \"total orbital momentum of the two electrons\" name = \"L\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["L"]) ? $_POST["L"] : "");
+						printf("\t\t\t\\(S\\) = <input type = \"text\" title = \"total spin of the two electrons\" name = \"S\" size = \"3\" value = \"%s\" required = \"required\"/>\n", isset($_POST["S"]) ? $_POST["S"] : "");
 						break;
 				}
 				printf("\t\t</center>\n");
@@ -241,9 +205,9 @@
 			{
 				printf("\t\t<div class = \"text\">Set angular range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" title = \"smallest scattering angle\" name = \"thmin\" size = \"5\" value = \"%s\"/>\n", $_POST["thmin"]);
-				printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" title = \"largest scattering angle\" name = \"thmax\" size = \"5\" value = \"%s\"/>\n", $_POST["thmax"]);
-				printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" title = \"spacing between the scattering angles\" name = \"dth\" size = \"5\" value = \"%s\"/>\n", $_POST["dth"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{min}}\\) = <input type = \"text\" title = \"smallest scattering angle\" name = \"thmin\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["thmin"]);
+				printf("\t\t\t\\(\\theta_{\mathrm{max}}\\) = <input type = \"text\" title = \"largest scattering angle\" name = \"thmax\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["thmax"]);
+				printf("\t\t\t\\(\\Delta\\theta\\) = <input type = \"text\" title = \"spacing between the scattering angles\" name = \"dth\" size = \"5\" value = \"%s\" required = \"required\"/>\n", $_POST["dth"]);
 				printf("\t\t</center>\n");
 			}
 ?>
@@ -267,9 +231,9 @@
 				
 				printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set energy range:</div>\n");
 				printf("\t\t<center>\n");
-				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
-				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
-				printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\"$editstatus/>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
+				printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
+				printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
+				printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
 				printf("\t\t</center>\n");
 				
 				
@@ -371,7 +335,7 @@
 	</td><td valign = "top" width = "50%">
 
 	<div class = "sekce">Output:</div>
-	<div class = "text">This section contains a graphical preview of selected data.</div>
+	<div class = "text">This section contains a graphical preview of the selected data.</div>
 
 <?php
 		if (isset($_POST["qty"]) and (isset($_POST["view"]) or isset($_POST["download"])))
@@ -384,7 +348,8 @@
 			);
 			
 			// write to Gnuplot's standard input
-			fwrite($pipes2[0], "set terminal png size 500,300\n");
+// 			fwrite($pipes2[0], "set terminal svg mouse jsdir \"http://gnuplot.sourceforge.net/demo_svg_4.6/\" size 500,300\n"); // SVG
+			fwrite($pipes2[0], "set terminal png size 500,300\n"); // PNG
 			fwrite($pipes2[0], "unset key\n");
 			fwrite($pipes2[0], "set xlabel \"Ei [" . $strEunits . "]\"\n");
 			
@@ -426,68 +391,105 @@
 			// close the process
 			$gnuplot_return_value = proc_close($procgnuplot);
 			
-			// display the plot
+			// display the SVG plot
+// 			echo $gnuplot_out;
+			
+			// display the PNG plot
 			echo "\t<div class = \"output\"><img src=\"data:image/png;base64," . base64_encode($gnuplot_out) . "\"/></div>\n";
 			
-			// write text data
+			// display input data for debugging
 // 			echo "\t<div class = \"output\"><pre>$hexoutput</pre></div>\n";
 		}
 ?>
 
 	</td></tr><tr><td colspan="2" width = "100%">
-
+	
 		<div style="height: 1px; background-color: #880000; text-align: center">
 			<span class = "sekce" style = "text-align: center; position: relative; top: -10px; background: white;">
 				<a name = "avail-head"></a><a href = "#avail-head" id = "avail-link" onclick = "jsAvailClick()">&nbsp;&#x25BC; Available data &#x25BC;&nbsp;</a>
 			</span>
 		</div>
 		<br/>
-		<div class = "text" style = "display: none;" id = "avail-more-1">
-			This section contains a graphical representation of data stored in the database
-			at the moment. For every initial atomic state (vertical axis) the blue boxes
-			show energy intervals (horizontal axis) covered by the data. In the (hopefully
-			not so far) future all initial states will be covered completely with sufficient
-			precision. Until that time one can use this chart as a simple measure
-			of trusworthiness of the datasets. The darker the colour, the more partial waves
-			have been included in the computation. A very simple way of how to verify that a
-			particular chunk of energies has been computed with final precision is to compare
-			"complete" and "extrapolated" cross section. If these two cross sections match,
-			they ought to be reliable. The scattering amplitude may still not be converged,
-			though, even in that case. The comparison is being served by default when
-			the extrapolated cross section is requested: The resulting text file will
-			contain both the "extrapolated" (\(\sigma_x\)) and the "complete" (\(\sigma_c\))
-			cross section.
+		<div class = "text" style = "display:none;" id = "avail-more-1">
+			The simple table below ilustrates the current state of the contents
+			of the database. The rows of the table are different initial atomic
+			states (before the collision), the columns are different final
+			states. Select particular angular momenta from the drop-down menus,
+			pick a cell that corresponds to the principal quantum number and
+			the available data will be shown. The colours in the table represent
+			subjective rating of the data for the specific transition. White colour
+			stands for "no data at all". Dark colour means lots of angular momentum
+			transitions, for lots of energies. If you need some specific data
+			that are not present, do not hesitate to contact the author.
 		</div>
-		<div class = "output" style = "display: none;" id = "avail-more-2">
-			<img src = "avail.png" alt = "avail.png"/>
-		</div>
-		<div class = "text" style = "display: none;" id = "avail-more-3">
-			If your preview plot of a cross section contains a suspicious drop or rise,
-			it may be a consequence of insufficient partial wave count. For the technical
-			details on the computational settings that were used to produce the data see the
-			<a href = "database.html">database</a> page.
-		</div>
-
-	</td></tr><tr><td colspan="2" width = "100%">
-
-		<div style="height: 1px; background-color: #880000; text-align: center">
-			<span class = "sekce" style = "text-align: center; position: relative; top: -10px; background: white;">
-				<a name = "context-head"></a><a href = "#context-head" id = "context-link" onclick = "jsContextClick()">&nbsp;&#x25BC; Data in context &#x25BC;&nbsp;</a>
-			</span>
-		</div>
-		<br/>
-		<div class = "text" style = "display: none;" id = "context-more-1">
-			Under construction... 
-		</div>
-		<div class = "output" style = "display: none;" id = "context-more-2">
-			<img src = "empty.png" alt = "comparison"/>
-		</div>
-
+		
+		<center><table class = "availdata" id = "avail-more-2" style = "display:none;">
+			<colgroup>
+				<col/><col/>
+				<?php $W = 50./($states + 1); for ($i = 0; $i <= $states; $i++) echo "<col width=\"$W%\">"; ?>
+				<col/>
+			</colgroup>
+			<tr>
+				<td rowspan = "2" colspan = "2" style = "border-width:0;"></td>
+				<td colspan = "<?php echo ($states+1); ?>" align = "center" style = "border-width:0;">
+					\(n_f\)
+					<select id = "alf" title = "lf" onchange = "jsDataAngular()">
+						<option value = "s" selected = "selected">s</option>
+						<option value = "p">p</option>
+						<option value = "d">d</option>
+						<option value = "f">f</option>
+						<option value = "g">g</option>
+						<option value = "h">h</option>
+						<option value = "i">i</option>
+						<option value = "j">j</option>
+					</select>
+				</td>
+				<td style = "border-width:0;"></td>
+			</tr>
+			<tr>
+				<?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"head-f-$i\" bgcolor = \"#880000\" style = \"color: white;\">$i</td>"; ?>
+				<td bgcolor = "#880000" style = "color: white;">ion.</td>
+			</tr>
+			<tr>
+				<td rowspan = "<?php echo $states; ?>" align = "center" style = "border-width:0;">
+					\(n_i\)
+					<br/>
+					<select id = "ali" title = "li" onchange = "jsDataAngular()">
+						<option value = "s" selected = "selected">s</option>
+						<option value = "p">p</option>
+						<option value = "d">d</option>
+						<option value = "f">f</option>
+						<option value = "g">g</option>
+						<option value = "h">h</option>
+						<option value = "i">i</option>
+						<option value = "j">j</option>
+					</select>
+				</td>
+				<td id = "head-i-1" bgcolor = "#880000" style = "color: white;">1</td>
+				<?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"dat-1-$i\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>"; echo "\n"; ?>
+				<td id = "dat-1-0" onmouseover = "jsDataMOver(this)" onclick = "jsDataClick(this)"></td>
+				<td rowspan = "<?php echo $states; ?>" width = "40%" id = "datadescr" valign = "top">
+					<!-- notes, to be written by JS -->
+				</td>
+			</tr>
+<?php
+			for ($i = 2; $i <= $states; $i++)
+			{
+				echo "\t\t\t<tr>\n";
+				echo "\t\t\t\t<td id = \"head-i-$i\" bgcolor = \"#880000\" style = \"color: white;\">$i</td>";
+				for ($j = 1; $j <= $states; $j++)
+					echo "<td id = \"dat-$i-$j\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>";
+				echo "<td id = \"dat-$i-0\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>";
+				echo "\n\t\t\t</tr>\n";
+			}
+?>
+		</table></center>
+	
 	</td></tr></table>
 
 	</div> <!-- rám -->
 
-	<div class = "pata">Jakub Benda &copy; 2013</div>
+	<div class = "pata"><a href = "mailto:jakub.benda@seznam.cz?subject=Hex web">Jakub Benda</a> &copy; 2014</div>
 
 </body>
 
