@@ -27,8 +27,10 @@ function jsEallClick()
 	document.getElementById("iEmax").disabled = !document.getElementById("iEmax").disabled;
 	document.getElementById("idE").disabled   = !document.getElementById("idE").disabled;
 }
-function jsDataMOver(cur)
+function jsDataMOver()
 {
+	var cur = this;
+	
 	for (var i = 1; i <= Nstates; i++)
 	for (var j = 0; j <= Nstates; j++)
 	{
@@ -42,8 +44,10 @@ function jsDataMOver(cur)
 			elem.style.borderWidth = "1px";
 	}
 }
-function jsDataClick(cur)
+function jsDataClick()
 {
+	var cur = this;
+	
 	var li_list = document.getElementById("ali");
 	var lf_list = document.getElementById("alf");
 	var li = li_list.options[li_list.selectedIndex].value;
@@ -73,7 +77,7 @@ function jsDataAngular()
 	var strli = document.getElementById("ali").options[li].value;
 	var strlf = document.getElementById("alf").options[lf].value;
 	
-	jsDataClick(0);
+	jsDataClick();
 	
 	for (var i = 1; i <= Nstates; i++)
 	{
@@ -112,6 +116,22 @@ function jsDataAngular()
 function jsDataSet()
 {
 	var elem;
+	
+	//
+	// set attributes of the table cells
+	//
+	
+	for (var i = 1; i <= Nstates; i++)
+	for (var f = 0; f <= Nstates; f++)
+	{
+		elem = document.getElementById("dat-" + i + "-" + f);
+		elem.onmouseover = jsDataMOver;
+		elem.onclick = jsDataClick;
+	}
+	
+	//
+	// set data of the table cells
+	//
 	
 	// 	1s -> 1s
 	elem = document.getElementById("dat-1-1");

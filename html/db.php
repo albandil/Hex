@@ -28,7 +28,7 @@
 
 	<!-- Copy value of $states [from PHP] to Nstates [JavaScript] -->
 	<script type = "text/javascript" language = "javascript">
-		<?php echo "Nstates = $states"; ?>
+		<?php echo "Nstates = $states\n"; ?>
 	</script>
 	
 	<!-- Load external scripts -->
@@ -45,7 +45,8 @@
 	</script>
 
 	<!-- Load MathJax -->
-	<script src="http://www.mathjax.org/mathjax/MathJax.js"></script>
+	<!--http://www.mathjax.org/mathjax/MathJax.js-->
+	<script src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 </head>
  
 <body onload = "jsDataSet(); jsDataAngular();">
@@ -425,8 +426,8 @@
 		
 		<center><table class = "availdata" id = "avail-more-2" style = "display:none;">
 			<colgroup>
-				<col/><col/>
-				<?php $W = 50./($states + 1); for ($i = 0; $i <= $states; $i++) echo "<col width=\"$W%\">"; ?>
+				<col/>
+				<?php $W = 55/($states + 2); for ($i = 0; $i <= $states+1; $i++) echo "<col width=\"$W%\">"; ?>
 				<col/>
 			</colgroup>
 			<tr>
@@ -466,8 +467,8 @@
 					</select>
 				</td>
 				<td id = "head-i-1" bgcolor = "#880000" style = "color: white;">1</td>
-				<?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"dat-1-$i\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>"; echo "\n"; ?>
-				<td id = "dat-1-0" onmouseover = "jsDataMOver(this)" onclick = "jsDataClick(this)"></td>
+				<?php for ($i = 1; $i <= $states; $i++) echo "<td id = \"dat-1-$i\"></td>"; echo "\n"; ?>
+				<td id = "dat-1-0"></td>
 				<td rowspan = "<?php echo $states; ?>" width = "40%" id = "datadescr" valign = "top">
 					<!-- notes, to be written by JS -->
 				</td>
@@ -478,8 +479,8 @@
 				echo "\t\t\t<tr>\n";
 				echo "\t\t\t\t<td id = \"head-i-$i\" bgcolor = \"#880000\" style = \"color: white;\">$i</td>";
 				for ($j = 1; $j <= $states; $j++)
-					echo "<td id = \"dat-$i-$j\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>";
-				echo "<td id = \"dat-$i-0\" onmouseover = \"jsDataMOver(this)\" onclick = \"jsDataClick(this)\"></td>";
+					echo "<td id = \"dat-$i-$j\"></td>";
+				echo "<td id = \"dat-$i-0\"></td>";
 				echo "\n\t\t\t</tr>\n";
 			}
 ?>
