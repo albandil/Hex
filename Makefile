@@ -1,4 +1,4 @@
-SUBDIRS = hex-db hex-ecs hex-pwba hex-dwba utilities
+SUBDIRS = hex-ccc hex-db hex-ecs hex-pwba hex-dwba utilities
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -14,7 +14,8 @@ all clean allclean doc docclean : $(SUBDIRS)
 
 dist: $(SUBDIRS)
 	@mkdir -p release
-	cp hex-db/hex-db-$(GIT_COMMIT).tar.gz \
+	cp hex-ccc/hex-ccc-$(GIT_COMMIT).tar.gz \
+	   hex-db/hex-db-$(GIT_COMMIT).tar.gz \
 	   hex-dwba/hex-dwba-$(GIT_COMMIT).tar.gz \
 	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \
 	   hex-pwba/hex-pwba-$(GIT_COMMIT).tar.gz     release/
