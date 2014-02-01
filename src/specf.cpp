@@ -23,6 +23,14 @@
 //  Special functions                                                      //
 // ----------------------------------------------------------------------- //
 
+double pochhammer_up (double x, unsigned n)
+{
+    double prod = 1.;
+    while (n != 0)
+        prod *= x + (--n);
+    return prod;
+}
+
 cArray ric_jv(int lmax, Complex z)
 {
     // results

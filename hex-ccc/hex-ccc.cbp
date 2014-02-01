@@ -25,6 +25,8 @@
 			<Add option="-fexceptions" />
 			<Add option="-DNDEBUG" />
 			<Add option="-DNO_HDF" />
+			<Add option="-DNO_UMFPACK" />
+			<Add option="-DNO_PNG" />
 			<Add directory="../include" />
 		</Compiler>
 		<Linker>
@@ -35,10 +37,16 @@
 		<Unit filename="src/arrays.h" />
 		<Unit filename="src/arrithm.h" />
 		<Unit filename="src/complex.h" />
+		<Unit filename="src/doc.h" />
 		<Unit filename="src/hdffile.cpp" />
 		<Unit filename="src/hdffile.h" />
+		<Unit filename="src/lapack_subset.h" />
 		<Unit filename="src/main.cpp" />
+		<Unit filename="src/matrix.cpp" />
+		<Unit filename="src/matrix.h" />
 		<Unit filename="src/misc.h" />
+		<Unit filename="src/moments.cpp" />
+		<Unit filename="src/moments.h" />
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
 		<Unit filename="src/version.cpp" />

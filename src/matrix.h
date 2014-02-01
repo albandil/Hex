@@ -96,10 +96,32 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         // constructor
         ColMatrix ()
             : DenseMatrix<Type>() {}
+        ColMatrix (int size)
+            : DenseMatrix<Type>(size, size) {}
         ColMatrix (int rows, int cols)
             : DenseMatrix<Type>(rows, cols) {}
         ColMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
+        
+        explicit ColMatrix (DenseMatrix<Type> const & M)
+            : DenseMatrix<Type>(M) {}
+        
+        /**
+         * @brief Populator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element.
+         */
+        template <class Function> void populate (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // fill the matrix
+            for (int icol = 0; icol < this->cols(); icol++)
+            for (int irow = 0; irow < this->rows(); irow++)
+                *(ptr++) = f(irow,icol);
+        }
         
         /**
          * @brief Matrix transpose.
@@ -148,9 +170,6 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         Type operator() (int i, int j) const { return col(j)[i]; }
         Type & operator() (int i, int j) { return col(j)[i]; }
         //@}
-        
-    private:
-        
 };
 
 /**
@@ -166,12 +185,57 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         // constructor
         RowMatrix ()
             : DenseMatrix<Type>() {}
+        RowMatrix (int size)
+            : DenseMatrix<Type>(size, size) {}
         RowMatrix (int rows, int cols)
             : DenseMatrix<Type>(rows, cols) {}
         RowMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
         RowMatrix (ColMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
+        
+        explicit RowMatrix (DenseMatrix<Type> const & M)
+            : DenseMatrix<Type>(M) {}
+        
+        /**
+         * @brief Populator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element. Use functions with signature
+           @code
+               double (*) (int i, int j);
+           @endcode
+         */
+        template <class Function> void populate (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // fill the matrix
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                *(ptr++) = f(irow,icol);
+        }
+        
+        /**
+         * @brief Transformator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element. Use functions with signature
+           @code
+               void (*) (int i, int j, T& x);
+           @endcode
+         */
+        template <class Function> void transform (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // transform the matrix
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                f(irow,icol,*(ptr++));
+        }
         
         /**
          * @brief Matrix transpose.
@@ -220,6 +284,42 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         Type operator() (int i, int j) const { return row(i)[j]; }
         Type & operator() (int i, int j) { return row(i)[j]; }
         //@}
+        
+        /// Identity matrix.
+        static RowMatrix<Type> Eye (int size)
+        {
+            RowMatrix<Type> M (size, size);
+            
+            for (int i = 0; i < 0; i++)
+                M.data()[i * size + i] = Type(1);
+            
+            return M;
+        }
+        
+        // arithmetic operators
+        RowMatrix<Type> const & operator += (DenseMatrix<Type> const & A)
+        {
+            assert (this->rows() == A.rows());
+            assert (this->cols() == A.cols());
+            
+            this->data() += A.data();
+            
+            return *this;
+        }
+        RowMatrix<Type> const & operator -= (DenseMatrix<Type> const & A)
+        {
+            assert (this->rows() == A.rows());
+            assert (this->cols() == A.cols());
+            
+            this->data() -= A.data();
+            
+            return *this;
+        }
+        RowMatrix<Type> const & operator *= (Type x)
+        {
+            this->data() *= x;
+            return *this;
+        }
         
         /**
          * @brief Output to file.
@@ -315,6 +415,12 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             this->data() = new_data;
         }
 };
+
+template <class T> RowMatrix<T> operator + (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() += B.data(); return C; }
+template <class T> RowMatrix<T> operator - (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() -= B.data(); return C; }
+template <class T> RowMatrix<T> operator * (T x, RowMatrix<T> const & A) { RowMatrix<T> B(A); B.data() *= x; return B; }
+template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() *= x; return B; }
+template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() /= x; return B; }
 
 /**
  * @brief Dense matrix multiplication.

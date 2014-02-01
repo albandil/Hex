@@ -8,18 +8,18 @@ CPP = g++
 
 ##############################################################
 
-CFLAGS = -Wall -std=c++11 -fPIC
-LFLAGS = -lgsl -lgslcblas
+CFLAGS = -Wall -std=c++11 -fPIC -fopenmp
+LFLAGS =  -fopenmp -lgsl -lopenblas -lgslcblas
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays hdffile main specf version
+FILES = arrays hdffile main matrix moments specf version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
