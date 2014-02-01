@@ -47,42 +47,49 @@
 	<div class = "sekce">Hex-dwba</div>
 
 	<div class = "text">
-	This program computes the T-matrix from the first or second order of the
-	distorted wave Born approximation,
+	This program computes the T-matrix from the first second order of the
+	distorted wave Born approximation. The distorted wave Born approximation
+	of the first order (DWBA-1) is similar to the well-known plane wave
+	Born approximation. However, to speed up the convergence of the Born series
+	(of which we are using just a single term in the first-order computation),
+	part of the potential is excluded from the perurbative description and
+	solved precisely. The spliting is the following 
+    \[
+		V = W + U \,
+	\]
+	where \(V\) is the full potential felt by the projectile, \(U\) is
+	the so called "distorting potential" that will be solved precisely as
+	mentioned above and explained below. This splitting has two consequences:
 	</div>
 	
+	<div class = "text">
+	First of all, the free states are no longer free, so we cannot use
+	the plane waves. Instead, one receives a distorted waves as a solution
+	of the modified equation for partial waves
 	\[
-		T_{\mathrm{DWBA2}} = T_{\mathrm{DWBA1}} + DD + EE + (-1)^S (DE + ED) \ .
+		\left(
+            -\frac{1}{2}\frac{\mathrm{d}^2}{\mathrm{d}r^2}
+            +\frac{\ell(\ell+1)}{2r^2}
+            +U(r)
+		\right)\chi_{k\ell}(r) = E_{k}\chi_{k\ell}(r) \ .
 	\]
-
-	<div class = "text-noindent">
-	In the distorted wave approach the waves are no longer planar as in the
-	notorious <a href = "hex-pwba.html">PWBA</a>; they are influenced by the
-	potential. This is represented by replacement of plane waves by the
-	solutions of the distorted wave equation
 	</div>
-
+	
+	<div class = "text">
+	Secondly, the T-matrix receives two contributions now -- one from the
+	scattering term and one as a correction due to the redefinition of the
+	potentials. The result is the two-potential formula
 	\[
-		\left( -\frac{1}{2}\frac{\mathrm{d}^2}{\mathrm{d}r^2} + \frac{\ell(\ell+1)}{2r^2}
-		+ U(r) \right) \chi_\ell(k,r) = \frac{k^2}{2} \chi_\ell(k,r) \ ,
+		T = (N+1) \left<\chi_f^{(-)}\psi_f\right|V-U_f\left|\mathcal{A}\Psi_i^{(+)}\right>
+		+ \left<\chi_f^{(-)}\psi_f\right|U_f\left|\psi_i\beta_i\right> \ .
 	\]
-
-	<div class = "text-noindent">
-	where \(U(r)\) is the so-called <i>distorting potential</i>. The second-order
-	contribution to the T-matrix comes from four indistinguishable processes
-	which do or do not include exchange of particles before (\(*E\)) or after
-	(\(E*\)) the excitation to the intermediate state.
-	</div>
-
+    </div>
+	
 	<div class = "text">
 	For details see the <a href = "hex-dwba/index.html">Doxygen documentation</a>.
 	</div>
 
 	<div class = "sekce">External links</div>
-
-	<div class = "text-noindent">
-	[1] <a href = "http://iopscience.iop.org/0953-4075/24/17/021">Madison et al; J. Phys. B: At. Mol. Opt. Phys <b>24</b> (1991) 3861-3888.</a>
-	</div>
 
 	</div> <!-- rám -->
 
