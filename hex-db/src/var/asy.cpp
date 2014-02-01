@@ -93,11 +93,18 @@ bool SpinAsymetry::run (
     }
     
     // compute cross sections
-    rArray dcs0 = differential_cross_section(db, ni,li,mi, nf,lf,mf, 0, E, angles * afactor);
-    rArray dcs1 = differential_cross_section(db, ni,li,mi, nf,lf,mf, 0, E, angles * afactor);
+    rArray dcs0 = differential_cross_section (db, ni,li,mi, nf,lf,mf, 0, E, angles * afactor);
+    rArray dcs1 = differential_cross_section (db, ni,li,mi, nf,lf,mf, 1, E, angles * afactor);
     
     // compute spin asymetry
     rArray asy = (dcs0 - dcs1) / (dcs0 + 3. * dcs1);
+    
+    // substitute possible "nan"-s and "inf"-s by zeros
+    for (double & x : asy)
+    {
+        if (not std::isfinite(x))
+            x = 0.;
+    }
     
     // write out
     std::cout << logo() <<
@@ -108,7 +115,7 @@ bool SpinAsymetry::run (
                      << " ordered by angle in " << unit_name(Aunits) << "\n" <<
         "# θ\t dσ\n";
     for (size_t i = 0; i < angles.size(); i++)
-        std::cout << angles[i] << "\t" << asy[i] << "\n";
+        std::cout << angles[i] << "\t" << asy[i] << "\t" << dcs0[i] << "\t" << dcs1[i] << "\n";
     
     return true;
 }
