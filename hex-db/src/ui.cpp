@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
         argc, argv,
         "help", "h",     0, [ & ](std::string opt) -> bool { std::cout << HelpText; return true; },
         "new", "n",      0, [ & ](std::string opt) -> bool { create_new = true; return true; },
-        "database", "d", 1, [ & ](std::string opt) -> bool { dbname = opt; return true; },
+        "database", "D", 1, [ & ](std::string opt) -> bool { dbname = opt; return true; },
         "import", "i",   1, [ & ](std::string opt) -> bool { doimport = true; sqlfile = opt; return true; },
         "update", "u",   0, [ & ](std::string opt) -> bool { doupdate = true; return true; },
         "optimize", "o", 0, [ & ](std::string opt) -> bool { dooptimize = true; return true; },
