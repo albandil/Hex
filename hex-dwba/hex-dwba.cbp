@@ -21,7 +21,6 @@
 		</Build>
 		<Compiler>
 			<Add option="-std=c++11" />
-      <Add directory="../include" />
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 			<Add option="-DNDEBUG" />
@@ -29,7 +28,7 @@
 			<Add directory="../include" />
 		</Compiler>
 		<Linker>
-      <Add option="-static-libstdc++" />
+			<Add option="-static-libstdc++" />
 			<Add library="..\lib\libgsl.a" />
 		</Linker>
 		<Unit filename="src/arrays.cpp" />
