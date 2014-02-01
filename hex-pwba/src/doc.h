@@ -15,11 +15,15 @@
 
 /**
  * @mainpage
- * 
  * @author Jakub Benda, MFF UK
- * @date 12. 1. 2014
+ * @date 1. 2. 2014
+ * @section pwba Hex-pwba
  * 
- * @section Theory Theory
+ * Hex-pwba is a high-energy computational module of the Hex package. It
+ * implements the plane wave Born approximation, as described below. It is
+ * expected to produce trustworthy results for energies above several keV.
+ * 
+ * @subsection Theory Theory
  * 
  * Plane wave Born approximation of the first order (PWBA-1) is a perturbation
  * approach to computation of electron-atom scattering variables. The most
@@ -77,7 +81,7 @@
  * Here, \f$ G \f$ is the Gaunt's integral, \f$ \hat{j}_\ell \f$ the Riccati-Bessel
  * function of the \f$ \ell \f$-th order.
  * 
- * @section Method Method
+ * @subsection Method Method
  * 
  * The twodimensional integrals could be in principle directly numerically
  * evaluated, but a fasted alternative is implemented here, which is semi-analytical.
@@ -123,7 +127,7 @@
  *                     - \left(\frac{2}{x}\right)^{l-2i} \frac{(l-i)!}{i!} i {-1/2-i \choose l-2i+1 } \cos x \right\}\ .
  * @f]
  * 
- * @section Usage Usage
+ * @subsection Usage Usage
  * 
  * The program can be called from the command line as
  * \verbatim # ./pwba <ni> <li> <nf> <lf> <maxL> <Ei> <eps> \endverbatim
@@ -134,17 +138,24 @@
  * of last partial wave to the direct cross section has been smaller than eps-part
  * of current sum.
  * 
- * @section Requirements
+ * @subsection Requirements
  * 
  * You will need a modern C++ compiler to compile the program as for example
  * 
  * - GCC 4.8.1 or 
- * - Intel C++ compiler 14.0
+ * - Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
  * 
  * PWBA uses some free external libraries
  * 
- * - GSL (<a href="http://www.gnu.org/software/gsl/">http://www.gnu.org/software/gsl/</a>) and 
- * - CLN (<a href="???">???</a>)
+ * - GSL (<a href="http://www.gnu.org/software/gsl/">http://www.gnu.org/software/gsl/</a>)
+ * - CLN (<a href="http://www.ginac.de/CLN/">http://www.ginac.de/CLN/</a>)
+ * 
+ * The first is used for numerical integration and special and utitlity functions.
+ * The second is used for large-precision rational numbers that are necessary when working
+ * with analytic formulas. Both libraries are open-source and maintained. They can be
+ * downloaded free of charge and compiled on any Posix-compatible system. The compilation
+ * in Windows system can be done e.g. in the Code::Blocks IDE (that is not at all straightforward,
+ * though).
  */
 
 #endif

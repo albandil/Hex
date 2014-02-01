@@ -15,25 +15,22 @@
 
 /**
  * @mainpage
- * 
  * @author Jakub Benda, MFF UK
- * @date 12. 1. 2014
- * 
- * 
- * @section purpose Purpose
+ * @date 1. 2. 2014
+ * @section ecs Hex-ecs
  * 
  * Hex-ECS computes partial T-matrices for elastic, excitation and ionization
  * electron-hydrogen scattering. Together with the interface program Hex-DB
  * it offers the possibility of generating many scatterign quantities like
  * differential or integral cross sections.
  * 
- * @section libs Language and libraries
+ * @subsection libs Language and libraries
  * 
  * Hex is written in C++11 to make use of comfort of the modern C++ extensions,
  * so one may need a newer compiler. Tested compilers are:
  * 
  * - GCC 4.8.1
- * - Intel C++ Compiler 14.0
+ * - Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
  * 
  * Both worked with the same Makefile, just by setting the variable CPP to "g++"
  * or "icpc". The program also uses following external packages (tested versions
@@ -71,7 +68,7 @@
  * - Mozilla Firefox 24.0
  * - Konqueror 4.10.5
  * 
- * @section theory Theory
+ * @subsection theory Theory
  * 
  * Unknown scattering state, eigenfunction of the full system hamiltonian, is
  * split into two parts, asymptotic “incoming particle” state and the scattered
@@ -165,7 +162,7 @@
  * @f$ \Psi = \Psi_{\mathrm{sc}} + \Psi_{\mathrm{inc}} @f$ and @f$ \hat{H}\Psi = E\Psi @f$.
  * 
  * 
- * @section method Method
+ * @subsection method Method
  * 
  * All computations are done in time-independent way, and 
  * the exterior complex scaling is used instead of boundary condition fitting.
@@ -301,7 +298,7 @@
  * of scattering axis along the projectile moemntum, so that the angular
  * momentum projection is zero.
  * 
- * @section restrict ECS restrictions on potential
+ * @subsection restrict ECS restrictions on potential
  * 
  * Exterior complex scaling of right hand side poses a serious problem for typical
  * (not exponentially decreasing) potentials. One of the factors in the right hand
@@ -316,7 +313,7 @@
  *   as “<i>truncated</i> overlap matrices” in the source code.
  * 
  * 
- * @section amplitude Cross section
+ * @subsection amplitude Cross section
  * 
  * As was said above, the scattering amplitude is
  * 
@@ -346,7 +343,7 @@
  * and @f$ S[j]_i @f$ stand for (truncated) overlap integrals of the i-th B-spline and
  * the (final) hydrogenic or Riccatti-Bessel function.
  *
- * @section code Implementation in the code
+ * @subsection code Implementation in the code
  *
  * The code runs along the following outline:
  * - The program is initialized. Parameters from the command line are stored for later
