@@ -296,8 +296,8 @@ AddNewVariableClass(TripleDifferentialCrossSection);
 /// Create class for stokes parameters (stokes)
 AddNewVariableClass(StokesParameters);
 
-/// Create class for spin asymetry (asy)
-AddNewVariableClass(SpinAsymetry);
+/// Create class for spin asymmetry (asy)
+AddNewVariableClass(SpinAsymmetry);
 
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;

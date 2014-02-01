@@ -33,33 +33,33 @@ rArray differential_cross_section (
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-const std::string SpinAsymetry::Id = "asy";
-const std::string SpinAsymetry::Description = "Spin asymetry.";
-const std::vector<std::string> SpinAsymetry::Dependencies = {
+const std::string SpinAsymmetry::Id = "asy";
+const std::string SpinAsymmetry::Description = "Spin asymetry.";
+const std::vector<std::string> SpinAsymmetry::Dependencies = {
     "ni", "li", "mi", 
     "nf", "lf", "mf",
     "Ei", "theta"
 };
-const std::vector<std::string> SpinAsymetry::VecDependencies = { "theta" };
+const std::vector<std::string> SpinAsymmetry::VecDependencies = { "theta" };
 
-bool SpinAsymetry::initialize(sqlitepp::session & db) const
+bool SpinAsymmetry::initialize(sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & SpinAsymetry::SQL_CreateTable() const
+std::vector<std::string> const & SpinAsymmetry::SQL_CreateTable() const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-std::vector<std::string> const & SpinAsymetry::SQL_Update() const
+std::vector<std::string> const & SpinAsymmetry::SQL_Update() const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-bool SpinAsymetry::run (
+bool SpinAsymmetry::run (
     sqlitepp::session & db,
     std::map<std::string,std::string> const & sdata
 ) const {

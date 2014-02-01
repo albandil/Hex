@@ -31,7 +31,7 @@ VariableList::VariableList () :
         new IonizationAmplitude,
         new TripleDifferentialCrossSection,
         new StokesParameters,
-        new SpinAsymetry
+        new SpinAsymmetry
     })
 {
     

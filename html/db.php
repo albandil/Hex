@@ -88,7 +88,7 @@
 			<select name = "qty" title = "scattering quantity to compute" onchange = "this.form.submit()">
 				<option value = "scatamp" <?php if ($var == "scatamp") echo "selected = \"selected\""; ?> >scatering amplitude</option>
 				<option value = "dcs" <?php if ($var == "dcs") echo "selected = \"selected\""; ?> >differential cross section</option>
-				<option value = "asy" <?php if ($var == "asy") echo "selected = \"selected\""; ?> >spin asymetry</option>
+				<option value = "asy" <?php if ($var == "asy") echo "selected = \"selected\""; ?> >spin asymmetry</option>
 				<option value = "ics" <?php if ($var == "ics") echo "selected = \"selected\""; ?> >integral cross section</option>
 				<option value = "ccs" <?php if ($var == "ccs") echo "selected = \"selected\""; ?> >complete cross section</option>
 				<option value = "xcs" <?php if ($var == "xcs") echo "selected = \"selected\""; ?> >extrapolated cross section</option>
