@@ -36,6 +36,8 @@
 		<Unit filename="src/arrays.cpp" />
 		<Unit filename="src/arrays.h" />
 		<Unit filename="src/arrithm.h" />
+		<Unit filename="src/basis.cpp" />
+		<Unit filename="src/basis.h" />
 		<Unit filename="src/complex.h" />
 		<Unit filename="src/doc.h" />
 		<Unit filename="src/hdffile.cpp" />
@@ -47,6 +49,8 @@
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/moments.cpp" />
 		<Unit filename="src/moments.h" />
+		<Unit filename="src/potential.cpp" />
+		<Unit filename="src/potential.h" />
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
 		<Unit filename="src/version.cpp" />

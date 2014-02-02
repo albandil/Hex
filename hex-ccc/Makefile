@@ -19,7 +19,7 @@ CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays hdffile main matrix moments specf version
+FILES = arrays basis hdffile main matrix moments potential quadrature specf version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

@@ -18,7 +18,6 @@
 #include <gsl/gsl_integration.h>
 
 #include "arrays.h"
-#include "bspline.h"
 #include "gauss.h"
 #include "misc.h"
 
