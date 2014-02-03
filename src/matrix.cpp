@@ -1709,7 +1709,7 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
     // for all elements in the main diagonal
     if (triangle & diagonal)
     {
-        # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B)
+//        # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B)
         for (int ielem = 0; ielem < Nrows; ielem++)
             rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     }
