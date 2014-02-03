@@ -14,7 +14,7 @@ The program is written in C++11 and can be successfully compiled by the
 following compilers:
 
  * GCC 4.7.2
- * Intel C++ 14.0 (tested with GCC 4.7.2 headers only)
+ * Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.7.2 and 4.8.1 headers)
  
 There are several external libraries that are being used for some partial tasks.
 Here is the list of the libraries with versions that were used:
@@ -29,16 +29,13 @@ Here is the list of the libraries with versions that were used:
                 http://www.fftw.org/download.html
             Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
 
- * o2scl 0.912
-            Obtainable from
-                http://o2scl.sourceforge.net/
-            Used for interpolation. Note that higher versions are not compatible
-            with hex-dwba.
-
  * SQLite 3.7.14
             Obtainable from
                 http://www.sqlite.org/download.html
             Used for access to the database files.
+
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
 
 -------------
 Build and run

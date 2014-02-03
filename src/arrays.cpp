@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -131,4 +131,19 @@ template<> void write_array (NumberArray<double> grid, NumberArray<Complex> arra
     for (size_t i = 0; i < array.size(); i++)
         fout << grid[i] << "\t" << array[i].real() << "\t" << array[i].imag() << "\n";
     fout.close();
+}
+
+rArray threshold (const rArrayView a, double eps)
+{
+    rArray b(a.size());
+    
+    for (size_t i = 0; i < a.size(); i++)
+    {
+        if (std::abs(a[i]) > eps)
+        {
+            b[i] = a[i];
+        }
+    }
+    
+    return b;
 }

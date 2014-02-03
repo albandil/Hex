@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -437,7 +437,7 @@ StgExtract:
                     int ie  = i / (inp.maxell + 1);
                     int ell = i % (inp.maxell + 1);
                     
-                    if (finite(T_ell[i].real()) and finite(T_ell[i].imag()))
+                    if (std::isfinite(T_ell[i].real()) and std::isfinite(T_ell[i].imag()))
                     if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
                     {
                         fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
@@ -472,7 +472,7 @@ StgExtract:
                         double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * M_PI);
                         sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
                     }
-                    if (finite(sigma))
+                    if (std::isfinite(sigma))
                     {
                         ftxt << inp.Ei[ie] << "\t" << sigma << "\n";
                     }

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -58,7 +58,7 @@ rArray differential_cross_section(sqlitepp::session & db, int ni, int li, int mi
     double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
     
     // check if this is an allowed transition
-    if (not finite(ki) or not finite(kf))
+    if (not std::isfinite(ki) or not std::isfinite(kf))
         return dcs;
     
     int ell;

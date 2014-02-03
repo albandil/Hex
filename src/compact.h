@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -20,6 +20,8 @@
 #include "misc.h"
 
 /**
+ * @brief Compute limit.
+ * 
  * Limit
  * @f[
  *     \lim_{t \rightarrow x} F(t)
@@ -31,8 +33,8 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 {
     // initial position
     double x0;
-    if (x > 0.) x0 = finite(x) ? 0.5 * x :  1.;
-    if (x < 0.) x0 = finite(x) ? 0.5 * x : -1.;
+    if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
+    if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
 
     // function value
     FType f0 = F(x0), f;
@@ -65,7 +67,10 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
 }
 
 /**
- * An auxiliary interface class.
+ * @brief Compactification.
+ * 
+ * An auxiliary interface class. All other compactification classes
+ * are derived from this class.
  */
 template <typename FType> class ICompactification
 {
@@ -78,6 +83,8 @@ public:
 };
 
 /**
+ * @brief Compactification of a function from finite interval.
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formula is used:
@@ -102,7 +109,7 @@ public:
         double b
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
-        if (not finite(a) or not finite(b))
+        if (not std::isfinite(a) or not std::isfinite(b))
             throw exception("[CompactificationF] Interval has to be finite!");
     }
 
@@ -128,7 +135,7 @@ public:
     }
 
     /**
-     * Evaluate the compactified function.
+     * @brief Evaluate the compactified function.
      * @param t Value from the compactified interval [-1,1].
      */
     FType operator() (double t) const
@@ -142,6 +149,8 @@ private:
 };
 
 /**
+ * @brief Compactification of a function from (-∞,b] to (-1,1].
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
@@ -172,7 +181,7 @@ public:
     double scale (double x) const
     {
         assert (x <= B);
-        return finite(x) ? (x - B + L) / (x - B - L) : 1.;
+        return std::isfinite(x) ? (x - B + L) / (x - B - L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
@@ -215,6 +224,8 @@ private:
 };
 
 /**
+ * @brief Compactification of a function from [a,+∞) to [-1,1).
+ * 
  * Transform arbitrary function so that its definition range will
  * be @f$ t \in [-1,1] @f$, for original interval @f$ x \in [a,b] @f$. The
  * following formulas are used:
@@ -246,7 +257,7 @@ public:
     double scale (double x) const
     {
         assert (x >= A);
-        return finite(x) ? (x - A - L) / (x - A + L) : 1.;
+        return std::isfinite(x) ? (x - A - L) / (x - A + L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
@@ -289,10 +300,12 @@ private:
 };
 
 /**
+ * @brief Compactification multiplied by its jacobian.
+ * 
  * A wrapper around the compactification classes which returns function
  * value multiplied by the Jacobian of the compactification transformation.
  * It is meant for the use in integration, so that one can just call its
- * operator() interface.
+ * operator() interface instead of operator()*jacobian
  */
 template <class Functor, typename FType> class CompactIntegrand
 {
@@ -310,11 +323,11 @@ public:
         bool limit = true,
         double L = 1.0
     ) : Compactification(nullptr) {
-        if (finite(a) and finite(b))
+        if (std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationF<Functor,FType> (f, a, b);
-        else if (finite(a) and not finite(b))
+        else if (std::isfinite(a) and not std::isfinite(b))
             Compactification = new CompactificationR<Functor,FType> (f, a, limit, L);
-        else if (not finite(a) and finite(b))
+        else if (not std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
         else
             throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");

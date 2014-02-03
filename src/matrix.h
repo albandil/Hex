@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -23,13 +23,12 @@
 #include <png++/png.hpp>
 #endif
 
-#include <unistd.h>
 #include <umfpack.h>
 
 #include "arrays.h"
 #include "complex.h"
 
-// declaration of classes in order to enable them as return types
+// forward declaration of classes in order to enable them as return types
 // of other classes before proper definition
 template <class T> class RowMatrix;
 template <class T> class ColMatrix;
@@ -41,7 +40,12 @@ class SymDiaMatrix;
 /**
  * @brief DenseMatrix.
  * 
- * Base class for row- and column- oriented matrices.
+ * Base class for row- and column- oriented matrices. The data
+ * are stored in a one-dimensional array. The class has a basic
+ * data access interface; however, the main purpose is that it
+ * is the base class of the storage-order-specialized classes
+ * RowMatrix and ColMatrix. It is recommended to use the latter
+ * two when working with dense matrices.
  */
 template <class T> class DenseMatrix
 {
@@ -82,7 +86,8 @@ template <class T> class DenseMatrix
  * @brief Dense (column-oriented) matrix.
  * 
  * This class represents a generally non-symmetric dense matrix. It is
- * an encapsulation of the cArray class with some operators bundled to it.
+ * an encapsulation of the NumberArray class with some operators
+ * bundled to it.
  */
 template <class Type> class ColMatrix : public DenseMatrix<Type>
 {
@@ -91,12 +96,39 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         // constructor
         ColMatrix ()
             : DenseMatrix<Type>() {}
+        ColMatrix (int size)
+            : DenseMatrix<Type>(size, size) {}
         ColMatrix (int rows, int cols)
             : DenseMatrix<Type>(rows, cols) {}
         ColMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
         
-        // transpose
+        explicit ColMatrix (DenseMatrix<Type> const & M)
+            : DenseMatrix<Type>(M) {}
+        
+        /**
+         * @brief Populator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element.
+         */
+        template <class Function> void populate (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // fill the matrix
+            for (int icol = 0; icol < this->cols(); icol++)
+            for (int irow = 0; irow < this->rows(); irow++)
+                *(ptr++) = f(irow,icol);
+        }
+        
+        /**
+         * @brief Matrix transpose.
+         * 
+         * Return transposed matrix. The result is of the type RowMatrix,
+         * so that no reordering of the entries is necessary.
+         */
         RowMatrix<Type> T () const
         {
             return RowMatrix<Type>
@@ -107,7 +139,12 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
             );
         }
         
-        // column views
+        /**
+         * @brief Matrix column.
+         *
+         * Return shallow copy of the chosen matrix column.
+         */
+        //@{
         ArrayView<Type> col (int i)
         {
             return ArrayView<Type>
@@ -126,13 +163,13 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
                 this->rows()
             );
         }
+        //@}
         
-        // element access
+        /// Element access.
+        //@{
         Type operator() (int i, int j) const { return col(j)[i]; }
         Type & operator() (int i, int j) { return col(j)[i]; }
-        
-    private:
-        
+        //@}
 };
 
 /**
@@ -148,6 +185,8 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         // constructor
         RowMatrix ()
             : DenseMatrix<Type>() {}
+        RowMatrix (int size)
+            : DenseMatrix<Type>(size, size) {}
         RowMatrix (int rows, int cols)
             : DenseMatrix<Type>(rows, cols) {}
         RowMatrix (int rows, int cols, const ArrayView<Type> data)
@@ -155,7 +194,55 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         RowMatrix (ColMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
         
-        // transpose
+        explicit RowMatrix (DenseMatrix<Type> const & M)
+            : DenseMatrix<Type>(M) {}
+        
+        /**
+         * @brief Populator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element. Use functions with signature
+           @code
+               double (*) (int i, int j);
+           @endcode
+         */
+        template <class Function> void populate (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // fill the matrix
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                *(ptr++) = f(irow,icol);
+        }
+        
+        /**
+         * @brief Transformator.
+         * 
+         * This method accepts a function object that is called
+         * for every matrix element. Use functions with signature
+           @code
+               void (*) (int i, int j, T& x);
+           @endcode
+         */
+        template <class Function> void transform (Function f)
+        {
+            // pointer to data
+            Type * ptr = this->begin();
+            
+            // transform the matrix
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                f(irow,icol,*(ptr++));
+        }
+        
+        /**
+         * @brief Matrix transpose.
+         * 
+         * Return transposed matrix. The result is of the type ColMatrix,
+         * so that no reordering of the entries is necessary.
+         */
         ColMatrix<Type> T() const
         {
             return ColMatrix<Type>
@@ -166,8 +253,13 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             );
         }
         
-        // row views
-        ArrayView<Type> row(int i)
+        /**
+         * @brief Matrix row.
+         * 
+         * Return shallow copy of a matrix row.
+         */
+        //@{
+        ArrayView<Type> row (int i)
         {
             return ArrayView<Type>
             (
@@ -176,7 +268,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
                 this->cols()
             );
         }
-        const ArrayView<Type> row(int i) const
+        const ArrayView<Type> row (int i) const
         {
             return ArrayView<Type>
             (
@@ -185,12 +277,69 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
                 this->cols()
             );
         }
+        //@}
         
-        // element access
+        /// Element access.
+        //@{
         Type operator() (int i, int j) const { return row(i)[j]; }
         Type & operator() (int i, int j) { return row(i)[j]; }
+        //@}
         
-        // write to file
+        /// Identity matrix.
+        static RowMatrix<Type> Eye (int size)
+        {
+            RowMatrix<Type> M (size, size);
+            
+            for (int i = 0; i < 0; i++)
+                M.data()[i * size + i] = Type(1);
+            
+            return M;
+        }
+        
+        // arithmetic operators
+        RowMatrix<Type> const & operator += (DenseMatrix<Type> const & A)
+        {
+            assert (this->rows() == A.rows());
+            assert (this->cols() == A.cols());
+            
+            this->data() += A.data();
+            
+            return *this;
+        }
+        RowMatrix<Type> const & operator -= (DenseMatrix<Type> const & A)
+        {
+            assert (this->rows() == A.rows());
+            assert (this->cols() == A.cols());
+            
+            this->data() -= A.data();
+            
+            return *this;
+        }
+        RowMatrix<Type> const & operator *= (Type x)
+        {
+            this->data() *= x;
+            return *this;
+        }
+        
+        /**
+         * @brief Output to file.
+         * 
+         * Write matrix to a text file. The format is influenced by
+         * the "pre" and "pos" characters supplied to the routine.
+         * The "pre" string will be present on the beginning of every
+         * row of the matrix, the "pos" string on the end. For example,
+         * the call
+         * @code
+         *     RowMatrix (
+         *         2, 2, rArray({1., 2., -2., 1.})
+         *     ).write (std::cout, "[", "]")
+         * @endcode
+         * will result in the following output to the STDOUT:
+         * @verbatim
+         *     [ 1 2 ]
+         *     [-2 1 ]
+         * @endverbatim
+         */
         void write (std::ostream & out, std::string const & pre = "", std::string const & pos = "") const
         {
             // data pointer
@@ -209,10 +358,20 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         }
         
 #ifndef NO_PNG
+        /**
+         * @brief Plot to PNG file.
+         * 
+         * This will write PNG file data to a supplied stream. The data
+         * written are the gray-scale representation of the absolute
+         * values of the dense matrix entries.
+         * 
+         * @note This function uses PNG++ and can be disables if the macro
+         * NO_PNG is defined.
+         */
         void plot_abs (std::ofstream & out) const
         {
             // create empty gray-scale 1-bit image
-            png::image<png::gray_pixel_1> image (this->cols(), this->rows());
+            png::image<png::gray_pixel_16> image (this->cols(), this->rows());
             
             // skip empty matrix
             if (this->data().size() > 0)
@@ -256,6 +415,12 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             this->data() = new_data;
         }
 };
+
+template <class T> RowMatrix<T> operator + (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() += B.data(); return C; }
+template <class T> RowMatrix<T> operator - (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() -= B.data(); return C; }
+template <class T> RowMatrix<T> operator * (T x, RowMatrix<T> const & A) { RowMatrix<T> B(A); B.data() *= x; return B; }
+template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() *= x; return B; }
+template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() /= x; return B; }
 
 /**
  * @brief Dense matrix multiplication.
@@ -309,9 +474,9 @@ template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, Col
  * that can be used e.g. together with matrix-vector multiplication
  * routines (if implemented). The multiplication is done, then, as if
  * the other parts were zero. For example
- * @code
- *     y = A.dot(x, strict_upper | strict_lower)
- * @endcode
+   @code
+       y = A.dot(x, strict_upper | strict_lower)
+   @endcode
  * will multiply vector @c x as if the diagonal of @c A were zero.
  */
 typedef enum {
@@ -444,17 +609,28 @@ public:
     // Constructors
     
     CsrMatrix()
-        : m_(0), n_(0) {}
+        : m_(0), n_(0), name_() {}
     CsrMatrix(size_t m, size_t n)
-        : m_(m), n_(n) {}
+        : m_(m), n_(n), name_() {}
     CsrMatrix(CsrMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
     CsrMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
+        : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     
     // Destructor
     
     ~CsrMatrix() {}
+    
+    /**
+     * @brief Clear data.
+     */
+    void drop ()
+    {
+        m_ = n_ = 0;
+        p_.drop();
+        i_.drop();
+        x_.drop();
+    }
     
     /**
      * Ordinary matrix-vector product, \f$ A\cdot b \f$.
@@ -488,8 +664,11 @@ public:
     
 #ifndef NO_PNG
     /**
-    * PNG row data generator for use in \ref plot function.
-    */
+     * PNG row data generator for use in \ref plot function.
+     * 
+     * @note This class requires PNG++. It can be disabled if the macro
+     * NO_PNG is defined.
+     */
     class PngGenerator : public png::generator<png::gray_pixel_1,PngGenerator>
     {
         typedef png::generator<png::gray_pixel_1,PngGenerator> base_t;
@@ -511,42 +690,51 @@ public:
     };
 
     /**
-        * Save matrix structure as a black-and-white image.
-        * @param filename File name.
-        * @param threshold Largest absolute value represented by white colour.
-        */
+     * Save matrix structure as a black-and-white image.
+     * @param filename File name.
+     * @param threshold Largest absolute value represented by white colour.
+     */
     void plot (const char* filename, double threshold = 0.) const;
 #endif
 
 #ifndef NO_UMFPACK
     /**
-     * LU factorization
+     * @brief LU factorization object
+     * 
+     * This class is returned by the function CsrMatrix::factorize() and
+     * it provides some functions that can be used when solving equations with
+     * that LU factorization. Also, it is possible to store the decomposition
+     * to disk (link,save), destro the data (drop) and load later when needed
+     * (load). The most important function is "solve".
      */
     class LUft
     {
     public:
         
         /// Default constructor.
-        LUft () :
-            numeric_(0), matrix_(0), filename_(0), info_(UMFPACK_INFO) {}
+        LUft ()
+            : numeric_(nullptr), matrix_(nullptr), filename_(), info_(UMFPACK_INFO) {}
         
         /// Copy constructor.
-        LUft (LUft const & lu) :
-            numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
+        LUft (LUft const & lu)
+            : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft (const CsrMatrix* matrix, void* numeric) : 
-            numeric_(numeric), matrix_(matrix), filename_(0), info_(UMFPACK_INFO) {}
+        LUft (const CsrMatrix* matrix, void* numeric)
+            : numeric_(numeric), matrix_(matrix), filename_(), info_(UMFPACK_INFO) {}
         
+        /// Destructor.
         void free ()
         { 
-            if (numeric_ != 0)
-            {
-                umfpack_zl_free_numeric(&numeric_);
-                numeric_ = 0;
-            }
+            drop();
         }
         
+        /**
+         * @brief Size of the numerical data.
+         * 
+         * Return the number of bytes occupied by the stored elements
+         * of the LU-factorization. This doesn't contain any other structural data.
+         */
         size_t size () const
         {
             long lnz, unz, m, n, nz_udiag;
@@ -556,6 +744,15 @@ public:
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
         }
         
+        /**
+         * @brief Solve equations.
+         * 
+         * The parameter "b" is assumed to contain several right hand
+         * side vectors (their count is supplied as the optional parameter
+         * "eqs"). The results are stored in "x", which has the same size
+         * as "b".
+         */
+        //@{
         cArray solve (const cArrayView b, unsigned eqs = 1) const
         {
             // reserve space for the solution
@@ -567,7 +764,6 @@ public:
             // return the result
             return x;
         }
-        
         void solve (const cArrayView b, cArrayView x, int eqs = 1) const
         {
             // check sizes
@@ -581,22 +777,94 @@ public:
                 long status = umfpack_zl_solve (
                     UMFPACK_Aat,
                     matrix_->p_.data(), matrix_->i_.data(),
-                    reinterpret_cast<const double*>(matrix_->x_.data()), 0,
-                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), 0,
-                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), 0,
+                    reinterpret_cast<const double*>(matrix_->x_.data()), nullptr,
+                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), nullptr,
+                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), nullptr,
                     numeric_, nullptr, &info_[0]
                 );
                 
                 // check output
-                if (status != 0)
+                if (status != UMFPACK_OK)
                 {
                     std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << "\n";
                     umfpack_zl_report_status(0, status);
                 }
             }
         }
+        //@}
         
+        /**
+         * @brief Get info array.
+         * 
+         * Get UMFPACK "info" array.
+         */
         rArray const & info() const { return info_; }
+        
+        /**
+         * @brief Link to a disk file.
+         * 
+         * This function will set a filename that will be used if
+         * any of the functions @ref save or @ref load is used without
+         * a specific filename.
+         */
+        void link (std::string name) { filename_ = name; }
+        
+        /**
+         * @brief Save Numeric object to a disk file.
+         * 
+         * Stores the LU-factorization data in the native UMFPACK format
+         * to a disk file.
+         */
+        void save (std::string name) const
+        {
+            long err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
+            
+            if (err == UMFPACK_ERROR_invalid_Numeric_object)
+                throw exception ("[LUft::save] Invalid numeric object.");
+            
+            if (err == UMFPACK_ERROR_file_IO)
+                throw exception ("[LUft::save] I/O error.");
+        }
+        void save () const
+        {
+            save (filename_);
+        }
+        
+        /**
+         * @brief Load Numeric object from a disk file.
+         * 
+         * The expected format is the format of umfpack_zl_save_numeric.
+         */
+        //@{
+        void load (std::string name)
+        {
+            long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
+            
+            if (err == UMFPACK_ERROR_out_of_memory)
+                throw exception ("[LUft::load] Out of memory.");
+            
+            if (err == UMFPACK_ERROR_file_IO)
+                throw exception ("[LUft::save] I/O error.");
+        }
+        void load ()
+        {
+            load (filename_);
+        }
+        //@}
+        
+        /**
+         * @brief Free memory.
+         * 
+         * Release memory occupied by the LU-factorization numeric object.
+         */
+        void drop ()
+        {
+            if (numeric_ != nullptr)
+            {
+                umfpack_zl_free_numeric (&numeric_);
+                numeric_ = nullptr;
+            }
+        }
         
     private:
         
@@ -606,8 +874,8 @@ public:
         /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
         const CsrMatrix* matrix_;
         
-        /// (not used at the moment)
-        char* filename_;
+        /// Linked HDF file name.
+        std::string filename_;
         
         /// Set of status flags produced by UMFPACK.
         mutable rArray info_;
@@ -630,25 +898,40 @@ public:
 #endif
     
     /**
-     * Solve the Ax = b problem, where "b" can be a matrix. Uses UMFPACK.
+     * @brief Solve the Ax = b problem, where "b" can be a matrix.
+     * 
+     * Uses UMFPACK through the LUft::solve function.
+     * 
      * @param b Complex vector containing column-major ordered data; it may be
      *          a flattened matrix.
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve(const cArrayView b, size_t eqs = 1) const;
+    cArray solve (const cArrayView b, size_t eqs = 1) const;
+    
+    /**
+     * @brief Link to a disk file.
+     * 
+     * Set a default I/O file that will be used if any of the functions
+     * @ref hdfload or @ref hdfsave will be used without an explicit filename.
+     */
+    void link (std::string name);
     
     /**
      * Save matrix to HDF file.
-     * @param name Filename.
      */
-    bool hdfsave(const char* name) const;
+    //@{
+    bool hdfsave () const { return hdfsave(name_); }
+    bool hdfsave (std::string name) const;
+    //@}
     
     /**
      * Load matrix from HDF file.
-     * @param name Filename.
      */
-    bool hdfload(const char* name);
+    //@{
+    bool hdfload () { return hdfload(name_); }
+    bool hdfload (std::string name);
+    //@}
     
     /**
      * Element-wise access (const).
@@ -681,7 +964,7 @@ public:
      * “fast” arithmetic operators & and ^.
      * @return self
      */
-    CsrMatrix sparse_like(CsrMatrix const & B) const;
+    CsrMatrix sparse_like (CsrMatrix const & B) const;
     
     /**
      * Return dense array with diagonal elements of the matrix.
@@ -704,7 +987,7 @@ public:
      * won't be used or changed.
      * @param b Right-hand side.
      */
-    cArray upperSolve(cArrayView const & b) const;
+    cArray upperSolve (cArrayView const & b) const;
     
     /**
      * Solves lower triangular system of equations using backsubstitution.
@@ -712,7 +995,7 @@ public:
      * won't be used or changed.
      * @param b Right-hand side.
      */
-    cArray lowerSolve(cArrayView const & b) const;
+    cArray lowerSolve (cArrayView const & b) const;
     
     /**
      * Applies a user transformation on <b>nonzero</b> matrix elements.
@@ -721,7 +1004,7 @@ public:
      * Complex (*f) (size_t i, size_t j, Complex z);
      * @endcode
      */
-    template <class Functor> CsrMatrix nzTransform(Functor f) const
+    template <class Functor> CsrMatrix nzTransform (Functor f) const
     {
         // create output matrix
         CsrMatrix A = *this;
@@ -758,6 +1041,8 @@ private:
     lArray i_;
     cArray x_;
     
+    // linked HDF file
+    std::string name_;
 };
 
 
@@ -795,7 +1080,7 @@ public:
      * @param a Column-major ordered dense array with matrix elements.
      *          Only nonzero elements are copied into internal storage.
      */
-    template <class T> CooMatrix(size_t m, size_t n, T a) : m_(m), n_(n), sorted_(false)
+    template <class T> CooMatrix (size_t m, size_t n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
         size_t i = 0;
@@ -821,11 +1106,9 @@ public:
     }
     
     // Destructor
-    
     ~CooMatrix() {}
     
-    // Conversions
-    
+    /// Convert 1×1 matrix to a complex number.
     operator Complex () const
     {
         if (m_ == 1 and n_ == 1)
@@ -852,6 +1135,7 @@ public:
     lArray const & j() const { return j_; }
     cArray const & v() const { return x_; }
     
+    /// Index operator. Returns the existing value or zero.
     Complex operator() (size_t ix, size_t iy) const
     {
         for (size_t n = 0; n < i_.size(); n++)
@@ -861,7 +1145,7 @@ public:
     }
     
     /**
-     * Symmetrical band Populator
+     * @brief Symmetrical band populator.
      * 
      * Sets values in the specified band. If there are already some values,
      * these are added as independent (ijv)-triplets and thus summed together
@@ -872,7 +1156,7 @@ public:
      *  Complex (*) (long, long)
      * @endcode
      */
-    template <class Functor> CooMatrix& symm_populate_band(size_t d, Functor f)
+    template <class Functor> CooMatrix& symm_populate_band (size_t d, Functor f)
     {
         Complex val;
         
@@ -904,7 +1188,7 @@ public:
     }
     
     /**
-     * Full populator
+     * @brief Full populator.
      * 
      * Sets all values. The matrix can become easily dense!
      * @param f Object compatible with signature:
@@ -912,7 +1196,7 @@ public:
      *  Complex (*) (long, long)
      * @endcode
      */
-    template <class Functor> CooMatrix& populate(Functor f)
+    template <class Functor> CooMatrix& populate (Functor f)
     {
         Complex val;
         
@@ -951,10 +1235,12 @@ public:
     }
     
     /**
-     * Addition of an element to matrix. If an existing coordinated are used,
+     * @brief Addition of an element to matrix.
+     * 
+     * Adds a new element to the matrix. If an existing coordinates are used,
      * the numbers will be summed.
      */
-    void add(long i, long j, Complex v)
+    void add (long i, long j, Complex v)
     {
         i_.push_back(i);
         j_.push_back(j);
@@ -979,7 +1265,7 @@ public:
         return tr;
     }
     
-    // Addition.
+    /// Addition.
     CooMatrix& operator += (CooMatrix const & A)
     {
         assert(m_ == A.m_);
@@ -994,7 +1280,7 @@ public:
         return *this;
     }
     
-    // Subtraction.
+    /// Subtraction.
     CooMatrix& operator -= (CooMatrix const & A)
     {
         assert(m_ == A.m_);
@@ -1015,7 +1301,7 @@ public:
         return *this;
     }
     
-    // Element-wise multiplication by complex number.
+    /// Element-wise multiplication by complex number.
     CooMatrix& operator *= (Complex c)
     {
         long nz = i_.size();
@@ -1025,18 +1311,20 @@ public:
         return *this;
     }
     
-    // multiplication
+    /// SpMV multiplication.
     CooMatrix dot (const cArrayView B) const;
     
     /**
+     * @brief Double inner matrix-matrix product.
+     * 
      * Double inner matrix-matrix product, \f$ A : B \f$.
-     * \note Works only on sorted data.
+     * @note Works only on sorted data.
      * @param B Other matrix.
      */
-    Complex ddot(CooMatrix const & B) const;
+    Complex ddot (CooMatrix const & B) const;
     
     /**
-     * Matrix multiplication
+     * @brief SpMV multiplication.
      * @param B Dense column-major ordered 1D-array. It's row count
      *          is assumed to be equal to the column count of *this
      *          and the column count is computed from the size of the
@@ -1045,46 +1333,48 @@ public:
      */
     CooMatrix& operator *= (const cArrayView B);
     
-    // Element-wise divide by a complex number
+    /// Element-wise divide by a complex number.
     CooMatrix& operator /= (Complex c)
     {
         return *this *= 1./c;
     }
     
     /**
-     * Change dimension of the matrix.
-     * \warning No row/column index range checking.
+     * @brief Change dimension of the matrix.
+     * @warning No row/column index range checking.
      */
-    void resize(size_t m, size_t n)
+    void resize (size_t m, size_t n)
     {
         m_ = m;
         n_ = n;
     }
     
     /**
-     * Change matrix shape. Conserves volume, i.e. it holds
+     * @brief Change matrix shape.
+     * 
+     * Conserves volume, i.e. it holds
      * @f[
      *                m \cdot n = m_0 \cdot n_0
      * @f]
      * @param m New row count.
      * @param n New column coount.
      */
-    CooMatrix reshape(size_t m, size_t n) const;
+    CooMatrix reshape (size_t m, size_t n) const;
     
-    // Convert matrix to dense column-major ordered 1D-array.
-    cArray todense() const;
+    /// Convert matrix to dense column-major ordered 1D-array.
+    cArray todense () const;
     
-    // sort indices (by i_, then by j_)
+    /// Sort indices (by i_, then by j_)
     void sort();
     bool sorted() const { return sorted_; }
     
-    // Convert to CSC matrix.
+    /// Convert to CSC matrix.
     CscMatrix tocsc() const;
     
-    // Convert to CSR matrix.
+    /// Convert to CSR matrix.
     CsrMatrix tocsr() const;
     
-    // Convert to dense matrix of a given underlying type.
+    /// Convert to dense matrix of a given underlying type.
     template <typename DenseMatrixType> DenseMatrixType todense() const
     {
         DenseMatrixType M (rows(), cols());
@@ -1093,13 +1383,13 @@ public:
         return M;
     }
     
-    // Convert to dense matrix (row-ordered).
+    /// Convert to dense matrix (row-ordered).
     RowMatrix<Complex> torow() const
     {
         return todense<RowMatrix<Complex>>();
     }
     
-    // Convert to dense matrix (column-ordered).
+    /// Convert to dense matrix (column-ordered).
     ColMatrix<Complex> tocol() const
     {
         return todense<ColMatrix<Complex>>();
@@ -1115,20 +1405,22 @@ public:
     SymDiaMatrix todia(MatrixTriangle triangle = lower) const;
     
     /**
+     * @brief Solve matrix equation.
+     * 
      * Solve the Ax = b problem, where "b" can be a matrix.
      * @param b Complex vector containing column-major ordered data; it may be
      *          a flattened matrix.
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve(const cArrayView b, size_t eqs = 1) const
+    cArray solve (const cArrayView b, size_t eqs = 1) const
     {
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
     }
     
     /**
-     * Write the matrix data to a file.
+     * @brief Write the matrix data to a file.
      * 
      * @param filename Filename.
      * 
@@ -1139,17 +1431,17 @@ public:
      */
     void write(const char* filename) const;
     
-    // Shake the content, i.e. sum same element entries.
+    /// Shake the content, i.e. sum same element entries.
     CooMatrix shake() const;
     
     /**
-     * Save matrix to HDF file.
+     * @brief Save matrix to HDF file.
      * @param name Filename.
      */
     bool hdfsave(const char* name) const;
     
     /**
-     * Load matrix from HDF file.
+     * @brief Load matrix from HDF file.
      * @param name Filename.
      */
     bool hdfload(const char* name);
@@ -1225,9 +1517,9 @@ public:
      * @brief Plain symmetrical populator.
      *
      * Given a functor of the signature
-     * @code
-     *     Complex (*) (int, int);
-     * @endcode
+       @code
+           Complex (*) (int, int);
+       @endcode
      * the function will call the functor with row and column number of every
      * element that is to be set.
      * 
@@ -1266,8 +1558,14 @@ public:
 
     ~SymDiaMatrix() {}
     
-    // free all fields, set dimensions to zero
-    void clear () { *this = std::move(SymDiaMatrix()); }
+    /// Free all fields, set dimensions to zero.
+    void drop ()
+    {
+        n_ = 0;
+        elems_.drop();
+        idiag_.drop();
+        dptrs_.clear();
+    }
     
     //
     // Getters
@@ -1370,6 +1668,9 @@ public:
      * 
      * @param B Dense matrix. It is supposed to be stored by columns and to have
      *          dimensions n times k, where n is the column count of (*this) matrix.
+     *          Also, though only a view of the array is required, it is assumed
+     *          that B is actually rArray, i.e. that it is aligned with the alignment
+     *          2*sizeof(T).
      * @param triangle Whether to use only the upper or only the lower or both triangles
      *                 of the othwerwise symmetric matrix.
      */
@@ -1397,13 +1698,20 @@ public:
     
     /**
      * @brief Kronecker product.
-     *
+     * 
+     * Compute Kronecker product with other matrix.
      */
     SymDiaMatrix kron (SymDiaMatrix const & B) const;
 
     //
     // HDF interface
     //
+    
+    /// Link matrix to a disk file.
+    void link (std::string name);
+    
+    /// Return the name of the linked disk file.
+    std::string linkedto () const { return name_; }
     
     /**
      * @brief Load from file.
@@ -1412,7 +1720,10 @@ public:
      * 
      * @return True on successful read, false otherwise (mostly when doesn't exist).
      */
-    bool hdfload(const char* name);
+    //@{
+    bool hdfload () { return hdfload (name_); }
+    bool hdfload (std::string name);
+    //@}
     
     /**
      * @brief Save data to file.
@@ -1425,20 +1736,91 @@ public:
      * 
      * @return True on successful write, false otherwise.
      */
-    bool hdfsave(const char* name, bool docompress = false, int consec = 10) const;
+    //@{
+    bool hdfsave () const { return hdfsave (name_); }
+    bool hdfsave (std::string name, bool docompress = false, int consec = 10) const;
+    //@}
 
     //
     // Conversions to other formats
     //
     
+    /**
+     * @brief Zero-pad rows.
+     * 
+     * Pad rows with zeros as below:
+     * @f[
+     *      \left(
+     *           \matrix {
+     *               \ast & \ast &      &      &      \cr
+     *               \ast & \ast & \ast &      &      \cr
+     *               \ast & \ast & \ast & \ast &      \cr
+     *               \ast & \ast & \ast & \ast & \ast \cr
+     *                    & \ast & \ast & \ast & \ast \cr
+     *                    &      & \ast & \ast & \ast \cr
+     *                    &      &      & \ast & \ast \cr
+     *           }
+     *      \right)
+     *      \longrightarrow
+     *      \matrix {
+     *           0    & 0    & 0 \cr
+     *                & 0    & 0 \cr
+     *                &      & 0 \cr
+     *                &      & . \cr
+     *                &      & . \cr
+     *                &      & . \cr
+     *                &      & . \cr
+     *      }
+     *      \left(
+     *           \matrix {
+     *               \ast & \ast &      &      &      \cr
+     *               \ast & \ast & \ast &      &      \cr
+     *               \ast & \ast & \ast & \ast &      \cr
+     *               \ast & \ast & \ast & \ast & \ast \cr
+     *                    & \ast & \ast & \ast & \ast \cr
+     *                    &      & \ast & \ast & \ast \cr
+     *                    &      &      & \ast & \ast \cr
+     *           }
+     *      \right)
+     *      \matrix {
+     *           .    &      &      \cr
+     *           .    &      &      \cr
+     *           .    &      &      \cr
+     *           .    &      &      \cr
+     *           0    &      &      \cr
+     *           0    & 0    &      \cr
+     *           0    & 0    & 0    \cr
+     *      }
+     *      \longrightarrow
+     *      \matrix {
+     *          0    & 0    & 0    & \ast & \ast \cr
+     *          0    & 0    & \ast & \ast & \ast \cr
+     *          0    & \ast & \ast & \ast & \ast \cr
+     *          \ast & \ast & \ast & \ast & \ast \cr
+     *          \ast & \ast & \ast & \ast & 0    \cr
+     *          \ast & \ast & \ast & 0    & 0    \cr
+     *          \ast & \ast & 0    & 0    & 0    \cr
+     *      }
+     * @f]
+     * Then concatenate rows and return as a single array.
+     */
     cArray toPaddedRows () const;
+    
+    /**
+     * @brief Zero-pad columns.
+     * 
+     * Pad rows with zeros as in @ref toPaddedRows, then concatenate
+     * columns and return as a single array.
+     */
+    cArray toPaddedCols () const;
+    
+    /// Convert matrix part to CooMatrix.
     CooMatrix tocoo (MatrixTriangle triangle = both) const;
+    
+    /// Convert matrix part to RowMatrix.
     RowMatrix<Complex> torow (MatrixTriangle triangle = both) const;
     
-    //
-    // Output
-    //
-    
+    /// Output to a text stream.
     friend std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A);
     
 private:
@@ -1452,10 +1834,13 @@ private:
     
     // upper diagonal indices starting from zero
     iArray idiag_;
-public:
+    
+    // name of linked HDF file
+    std::string name_;
+    
     // diagonal data pointers
     std::vector<Complex*> dptrs_;
-private:
+    
     /** 
      * @brief Setup diagonal data pointers
      * 

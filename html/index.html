@@ -12,6 +12,58 @@
 	<style>
 		<!-- @import "style.css"; -->
 	</style>
+	
+	<script>
+		function setMod(mod,cur,str)
+		{
+			if (mod == cur)
+			{
+				mod.style.background = "#ECB489";
+				document.getElementById("moddescr").innerHTML = str;
+			}
+			else
+			{
+				mod.style.background = "#FFFFFF";
+			}
+		}
+		function jsColours(cur)
+		{
+			setMod (
+				document.getElementById("mod-ecs"), cur,
+				"A low-energy code that solves the full Schrödinger equation " +
+				"in the scattering form for two electrons in the proton field. " +
+				"The boundary conditions are avoided using the method of " +
+				"exterior complex scaling."
+			);
+			setMod (
+				document.getElementById("mod-dwba"), cur,
+				"One of the two high-energy codes. This one computes the " +
+				"scattering T-matrices using the first order of the distorted " +
+				"wave Born approximation."
+			);
+			setMod (
+				document.getElementById("mod-pwba"), cur,
+				"One of the two high-energy codes. This one computes the " +
+				"scattering T-matrices using the first order of the plane " +
+				"wave Born approximation."
+			);
+			setMod (
+				document.getElementById("mod-db"), cur,
+				"The database interface module. Data from the computational " +
+				"modules are stored in an intermediate SQLite database. This " +
+				"module can be used, then, to extract requested derived " +
+				"observable quantities, like cross sections of various correlation " +
+				"data"
+			);
+			setMod (
+				document.getElementById("mod-data"), cur,
+				"The database of the precomputed T-matrices, which is available " +
+				"through this web portal. Use the bottom link \"Go to web " +
+				"interface\" to access the data that have been computed by us " +
+				"up to this date."
+			);
+		}
+	</script>
 </head>
  
 <body>
@@ -39,29 +91,31 @@
 		This acronym actually covers several distinct things:
 	</div>
 
-	<ul>
-		<li>
-			low-energy scattering code implementing direct solution of Schrödinger equation
-			using exterior complex scaling workaround for boundary condition, a.k.a.
-			<a href = "hex-ecs.html">hex-ecs</a>,
-		</li>
-		<li>
-			intermediate-energy scattering code implementing first and second order of
-			distorted wave Born approximation, a.k.a. <a href = "hex-dwba.html">hex-dwba</a>,
-		</li>
-		<li>
-			high-energy scattering code implementing the first plane wave Born approximation,
-			a.k.a. <a href = "hex-pwba.html">hex-pwba</a>,
-		</li>
-		<li>
-			the <a href = "database.html">database</a> of T-matrices,
-			as computed by these two modules, and
-		</li>
-		<li>
-			the user interface (both CLI and Web), a.k.a. <a href = "hex-db.html">hex-db</a>,
-			which uses these data to compute derived scattering quantities.
-		</li>
-	</ul>
+	<div><center>
+		<table class = "modules">
+			<tr>
+				<td id = "mod-ecs" bgcolor = "#ECB489" onmouseover = "jsColours(this)">
+					<a href = "hex-ecs.html">Hex-ecs</a>
+				</td><td id = "mod-dwba" onmouseover = "jsColours(this)">
+					<a href = "hex-dwba.html">Hex-dwba</a>
+				</td><td id = "mod-pwba" onmouseover = "jsColours(this)">
+					<a href = "hex-pwba.html">Hex-pwba</a>
+				</td><td id = "mod-db" onmouseover = "jsColours(this)">
+					<a href = "hex-db.html">Hex-db</a>
+				</td><td id = "mod-data" onmouseover = "jsColours(this)">
+					<a href = "database.html">Database</a>
+				</td>
+			</tr>
+			<tr><td colspan = "5" bgcolor = "#ECB489">
+				<div class = "text" id = "moddescr">
+					A low-energy code that solves the full
+					Schrödinger equation in the scattering form for two electrons
+					in the proton field. The boundary conditions are avoided
+					using the method of exterior complex scaling.
+				</div>
+			</td></tr>
+		</table>
+	</center></div>
 	
 	<img src = "logo.png" style = "float:right;width:175px;margin-left:20px;margin-right:20px;"/>
 	
@@ -89,7 +143,7 @@
 	
 	</div> <!-- rám -->
 
-	<div class = "pata">Jakub Benda &copy; 2013</div>
+	<div class = "pata"><a href = "mailto:jakub.benda@seznam.cz?subject=Hex web">Jakub Benda</a> &copy; 2014</div>
 
 </body>
 

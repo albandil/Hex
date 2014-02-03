@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -80,6 +80,11 @@ template<> bool HDFFile::read<int>(std::string dataset, int* buffer, size_t leng
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
 }
 
+template<> bool HDFFile::read<unsigned int>(std::string dataset, unsigned int * buffer, size_t length) const
+{
+    return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
+}
+
 template<> bool HDFFile::read<long>(std::string dataset, long* buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_LONG));
@@ -103,6 +108,11 @@ template<> bool HDFFile::read<Complex>(std::string dataset, Complex* buffer, siz
 template<> bool HDFFile::write<int>(std::string dataset, int const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
+}
+
+template<> bool HDFFile::write<unsigned int>(std::string dataset, unsigned int const * buffer, size_t length)
+{
+    return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
 }
 
 template<> bool HDFFile::write<long>(std::string dataset, long const * buffer, size_t length)

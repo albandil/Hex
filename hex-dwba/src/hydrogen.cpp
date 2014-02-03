@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
  * \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -14,7 +14,6 @@
 #include <cmath>
 #include <cstddef>
 
-#include <o2scl/exception.h>
 #include <gsl/gsl_sf.h>
 
 #include "hydrogen.h"
@@ -131,25 +130,25 @@ namespace Hydrogen
         return 0.5 * (near + far);
     }
     
-    double evalBoundState(int n, int l, double r)
+    double evalBoundState (int n, int l, double r)
     {
-        double psi;
+        gsl_sf_result result;
         
-        try {
+        int err = gsl_sf_hydrogenicR_e(n, l, 1., r, &result);
             
-            psi = r*gsl_sf_hydrogenicR(n, l, 1., r);
-            
-        } catch (o2scl::exc_range_error e) {
-            
-            // probably due to the underflow error
+        if (err == GSL_EUNDRFLW)
             return 0.;
             
-        }
+        if (err == GSL_SUCCESS)
+            return r * result.val;
         
-        return psi;
+        throw exception (
+            "Evaluation of hydrogen bound state failed for n = %d, l = %d, r = %g\nError: %d %s\n",
+            n, l, r, err, gsl_strerror(err)
+        );
     }
     
-    double evalFreeState(double k, int l, double r, double sigma)
+    double evalFreeState (double k, int l, double r, double sigma)
     {
         // Coulomb wave is a regular solution
         if (r == 0.)
@@ -162,59 +161,43 @@ namespace Hydrogen
         double F, exp_F;
         
         // evaluate the function
-        try {
-            
-            gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
+        int err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
+        
+        // evaluation succeeded
+        if (err == GSL_SUCCESS)
             return norm * F;
             
-        } catch (std::exception e) {
-            
-            // evaluation failed
-            
-            if (k * r > 1)
-            {
-                // probably due to "iteration process out of control" for large radii
-                return coul_F_asy(l, k, r, (finite(sigma) ? sigma : coul_F_sigma(l,k)));
-            }
-            else
-            {
-                // some other problem
-                throw exception("Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\nMessage: %s\n", l, k, r, e.what());
-            }
-            
+        // evaluation failed            
+        if (k * r > 1)
+        {
+            // probably due to "iteration process out of control" for large radii
+            return coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k)));
         }
-    }
-    
-    double evalFreeStatePhase(double k, int l, double sigma)
-    {
-        return l * 0.5 * M_PI + (finite(sigma) ? sigma : coul_F_sigma(l,k));
-    }
-    
-    double evalSturmian(int n, int l, double r, double lambda)
-    {
-        double S;
         
-        try {
-            
-            S = n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
+        // some other problem
+        throw exception (
+            "Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\nError: %d %s\n",
+            l, k, r, err, gsl_strerror(err)
+        );
+    }
+    
+    double evalFreeStatePhase (double k, int l, double sigma)
+    {
+        return l * 0.5 * M_PI + (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
+    }
+    
+    double evalSturmian (int n, int l, double r, double lambda)
+    {
+        return n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
             * exp(-lambda*r) * pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
-            
-        } catch (o2scl::exc_range_error e) {
-            
-            // probably due to the underflow error
-            return 0.;
-            
-        }
-        
-        return S;
     }
     
-    double evalFreeState_asy(double k, int l, double r, double sigma)
+    double evalFreeState_asy (double k, int l, double r, double sigma)
     {
         return coul_F_asy(l,k,r,sigma);
     }
     
-    double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero)
+    double getFreeAsyZero (double k, int l, double Sigma, double eps, int max_steps, int nzero)
     {
         // find solution (r) of
         //    n*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
@@ -230,7 +213,7 @@ namespace Hydrogen
         return kr / k;
     }
     
-    double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, int ntop)
+    double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, int ntop)
     {
         // find solution (r) of
         //    (n+1/4)*2*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
@@ -246,10 +229,10 @@ namespace Hydrogen
         return kr / k;
     }
     
-    double getFreeFar(double k, int l, double Sigma, double eps, int max_steps)
+    double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
     {
         // precompute Coulomb shift
-        Sigma = finite(Sigma) ? Sigma : coul_F_sigma(l,k);
+        Sigma = std::isfinite(Sigma) ? Sigma : coul_F_sigma(l,k);
         
         //
         // hunt phase
@@ -306,26 +289,24 @@ namespace Hydrogen
         return idx_mid * M_PI;
     }
     
-}; // endof namespace Hydrogen
+} // endof namespace Hydrogen
 
-double HydrogenFunction::operator()(double r) const
+double HydrogenFunction::operator() (double r) const
 {
     // if too near, return simplified value
-    // 		if (r < 1e-5)
-    // 			return Hydrogen::getBoundN(n,l) * gsl_sf_pow_int(r,l+1);
+//     if (r < 1e-5)
+//         return Hydrogen::getBoundN(n,l) * gsl_sf_pow_int(r,l+1);
         
     // else compute precise value
     return Hydrogen::evalBoundState(n_, l_, r);
 }
 
-double HydrogenFunction::getTurningPoint() const
+double HydrogenFunction::getTurningPoint () const
 {
     // bound state
-//     if (n != 0)
+//     if (n_ != 0)
         return n_ * (n_ - sqrt(n_*n_ - l_*(l_+1.)));
     
     // free state
-//     else
 //         return sqrt(l*(l+1))/k;
 }
-

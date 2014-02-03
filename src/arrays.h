@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -13,7 +13,9 @@
 #ifndef HEX_ARRAYS
 #define HEX_ARRAYS
 
+#include <cassert>
 #include <complex>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -24,8 +26,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <assert.h>
-
 #ifndef NO_HDF
 #include "hdffile.h"
 #endif
@@ -33,17 +33,72 @@
 #include "complex.h"
 #include "misc.h"
 
+/**
+ * @brief Basic memory allocator.
+ * 
+ * Memory allocators are used by @ref Array -like classes for memory
+ * management: allocating and freeing of memory. PlainAllocator uses
+ * the usual C++ "new/delete" mechanism for manipulation of the memory.
+ */
 template <class T> class PlainAllocator
 {
     public:
-        static T * alloc (size_t n) { return new T[n](); }
-        static void free (T * ptr) { if (ptr != nullptr) delete [] ptr; }
+        
+        /**
+         * @brief Allocate array.
+         * 
+         * This method will allocate fields of the data type T.
+         * The elements will be constructed by the implicit constructor.
+         * @param n Number of items to allocate.
+         */
+        static T * alloc (size_t n)
+        {
+            return new T[n]();
+        }
+        
+        /**
+         * @brief Free array.
+         * 
+         * This method will deallocate memory pointed to by the pointer
+         * "ptr". It is expected that pointer has been previously
+         * retrieved from the function PlainAllocator::alloc. The pointer
+         * can have the value "nullptr"; in such a case nothing will
+         * be done.
+         */
+        static void free (T * ptr)
+        {
+            if (ptr != nullptr)
+                delete [] ptr;
+        }
 };
 
+#ifndef NO_ALIGN
+/**
+ * @brief Aligned memory allocator.
+ * 
+ * Memory allocators are used by @ref Array -like classes for memory
+ * management: allocating and freeing of memory. This particular class
+ * allocates aligned memory, i.e. every allocated block will begin at
+ * a memory address that is multiple of the size of the allocated type.
+ * Also, all items of the allocated array will be placed in memory-aligned
+ * locations. The alignment helps the system load the memory efficiently
+ * and the compiler can thus do some optimizations -- particularly the
+ * autovectorization, which can utilize SIMD instruction of the CPU and
+ * speed up the operation on the arrays.
+ */
 template <class T, size_t alignment = std::alignment_of<T>::value> class AlignedAllocator
 {
     public:
-        // allocate aligned memory
+        
+        /**
+         * @brief Allocate aligned memory.
+         * 
+         * Allocate array of "n" items of the type "T". The array will be
+         * aligned on the alignment given as the template parameter of the
+         * class. If the alignment were less than sizeof(void*), the alignment
+         * is changed to sizeof(void*) because smaller values are invalid
+         * anyway. The code uses system-dependent allocation functions.
+         */
         static T * alloc (size_t n)
         {
             // is there anything to allocate?
@@ -52,16 +107,16 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             
             // allocate the aligned memory; make sure there will be even number of elements
             // so that we can always use pairs
-            void* aligned_ptr = nullptr;
-            int err = posix_memalign (
-                &aligned_ptr,
-                std::max(alignment, sizeof(void*)),
-                (n + (n % 2)) * sizeof(T)
-            );
+            size_t bytes = (n + (n % 2)) * sizeof(T);
+            size_t align = std::max(alignment, sizeof(void*));
             
-            // check memory allocation success
-            if (err != 0)
-                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error (%d).", err);
+            // use standard function
+            void* aligned_ptr = nullptr;
+            int err = posix_memalign(&aligned_ptr, align, bytes);
+            
+            // check the return value
+            if (err != 0 or aligned_ptr == nullptr)
+                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error. Probably out of memory.");
             
             // get the number pointer
             T* ptr = reinterpret_cast<T*>(aligned_ptr);
@@ -73,19 +128,60 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             return ptr;
         }
         
-        // deallocate the memory
+        /**
+         * @brief Deallocate aligned memory.
+         * 
+         * Free the memory pointed to by the pointer "ptr". It is assumed
+         * that the pointer was obtained from the call to the function
+         * alloc of the same specialization of the class AlignedAllocator.
+         * Value "nullptr" is allowed; nothing will be done in that case.
+         */
         static void free (T * ptr)
         {
             if (ptr != nullptr)
-                ::free (ptr);
+                std::free (ptr);
         }
 };
+#endif
 
-template <class T, class Alloc = PlainAllocator<T>> class Array;
-template <class T, class Alloc = AlignedAllocator<T>> class NumberArray;
+// Forward declaration of Array (unaligned array of items).
+template <
+    class T,
+    class Alloc = PlainAllocator<T>
+> class Array;
+
+#ifndef NO_ALIGN
+// Forward declaration of NumberArray (aligned array of numbers).
+// - Align at least at multiples of sizeof(void*), but preferably on multiples
+//   of 2*sizeof(Complex). This should enable vectorization of Complex
+//   operations using AVX instruction, bacause two Complex numbers occupy
+//   2*2*64 = 256 bits, which is the size of AVX register.
+template <
+    class T,
+    class Alloc = AlignedAllocator <
+        T,
+        larger_of ( sizeof(void*), 2*sizeof(T) )
+    >
+> class NumberArray;
+#else
+// Forward declaration of NumberArray (unaligned array of numbers).
+template <
+    class T,
+    class Alloc = PlainAllocator<T>
+> class NumberArray;
+#endif
 
 /**
- * @brief Array shallow copy.
+ * @brief Array view.
+ * 
+ * This class holds a shallow copy of an array of items of type T.
+ * The view is represented by a pointer to the first item and by the total
+ * number of elements. It is offers a comfortable means for work with
+ * subarrays. Also, it is a base class for derived data types Array
+ * and CLArrayView, that add some advanced functionality to the plain
+ * pointer-and-size storage.
+ * 
+ * ArrayView neither allocates nor deallocates any memory.
  */
 template <class T> class ArrayView
 {
@@ -106,7 +202,7 @@ template <class T> class ArrayView
         
     public:
         
-        // empty constructor
+        // constructor
         ArrayView ()
             : N_(0), array_(nullptr) {}
         
@@ -137,7 +233,7 @@ template <class T> class ArrayView
         // destructor
         virtual ~ArrayView () {}
     
-        // assignments
+        /// Assignment operator.
         ArrayView<T> & operator = (const ArrayView<T> v)
         {
             if (v.size() != size())
@@ -149,7 +245,7 @@ template <class T> class ArrayView
             return *this;
         }
     
-        // element-wise access (non-const)
+        /// Element-wise access (non-const).
         T & operator[] (size_t i)
         {
 #ifdef NDEBUG
@@ -163,7 +259,7 @@ template <class T> class ArrayView
 #endif
         }
     
-        // element-wise access (const)
+        /// Element-wise access (const).
         T const & operator[] (size_t i) const
         {
 #ifdef NDEBUG
@@ -176,39 +272,35 @@ template <class T> class ArrayView
 #endif
         }
         
-        // getters
+        /// Length of the array (number of elements).
         size_t size () const { return N_; }
         
-        // data pointer
+        /// Pointer to the data.
+        //@{
         virtual T * data () { return array_; }
         virtual T const * data () const { return array_; }
+        //@}
     
         //
         // STL-like iterator interface
         //
         
-        iterator begin ()
-            { return data(); }
-        const_iterator begin () const
-            { return data(); }
-        iterator end ()
-            { return data() + size(); }
-        const_iterator end () const
-            { return data() + size(); }
-        T & front (int i = 0)
-            { return *(data() + i); }
-        T const & front (int i = 0) const
-            { return *(data() + i); }
-        T & back (int i = 0)
-            { return *(data() + size() - 1 - i); }
-        T const & back (int i = 0) const
-            { return *(data() + size() - 1 - i); }
+        iterator begin ()                   { return data(); }
+        const_iterator begin () const       { return data(); }
+        iterator end ()                     { return data() + size(); }
+        const_iterator end () const         { return data() + size(); }
+        T & front (int i = 0)               { return *(data() + i); }
+        T const & front (int i = 0) const   { return *(data() + i); }
+        T & back (int i = 0)                { return *(data() + size() - 1 - i); }
+        T const & back (int i = 0) const    { return *(data() + size() - 1 - i); }
         
-        // some other functions
+        /// Fill the array with a value.
         void fill (T x) { for (T & y : *this) y = x; }
+        
+        /// Check whether the size is equal to zero.
         bool empty () const { return size() == 0; }
         
-        // 2-norm, defined only for scalar NumberType
+        /// Two-norm (defined only for scalar data type).
         template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
         {
             double sqrnorm = 0.;
@@ -221,9 +313,15 @@ template <class T> class ArrayView
 /**
  * @brief A comfortable data array class.
  * 
- * Class Array is intended as a Hex's replacement for std::vector\<NumberType\>.
+ * Class Array is intended as a Hex's replacement for std::vector\<T\>.
  * Properties:
- * - basic iterator interface (members Array::begin(), Array::end()).
+ * - User specified allocator (given as the second template argument
+ *   of the class). See @ref PlainAllocator and @ref AlignedAllocator
+ *   for examples of such allocators. Allocator is expected to have two
+ *   static methods: void* alloc(size_t) that returns a pointer to new memory
+ *   chunk and void free() which deallocates the pointer.
+ * - Basic iterator interface simillar to STL containers -- methods begin(),
+ *   end(), and thus also the ability to appear in the range-based for loops.
  */
 template <class T, class Alloc> class Array : public ArrayView<T>
 {
@@ -236,7 +334,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
     
     public:
     
-        // default constructor, creates an empty array
+        // constructors, creates an empty array
         Array ()
             : ArrayView<T>() {}
         
@@ -287,8 +385,18 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             }
         }
         
-        // storage size
+        /// Return number of elements.
         size_t size () const { return ArrayView<T>::size(); }
+        
+        /**
+         * @brief Resize array.
+         * 
+         * The method will change the length of the array, most
+         * probably by reallocating the storage. The possible new
+         * elements will be initialized to T(0). The function is
+         * virtual, so that is can be safely overridden in the
+         * derived classes.
+         */
         virtual size_t resize (size_t n)
         {
             if (n == 0)
@@ -314,15 +422,17 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             return size();
         }
         
-        // element-wise access (non-const)
+        /// Element-wise access (non-const).
         inline T & operator[] (size_t i) { return ArrayView<T>::operator[](i); }
 
-        // element-wise access (const)
+        /// Element-wise access (const).
         inline T const & operator[] (size_t i) const { return ArrayView<T>::operator[](i); }
     
-        // data pointer
+        /// Data pointer.
+        //@{
         virtual T* data () { return ArrayView<T>::data(); }
         virtual T const * data () const { return ArrayView<T>::data(); }
+        //@}
     
         //
         // STL-like iterator interface
@@ -337,10 +447,17 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         T & back (int i = 0)               { return ArrayView<T>::back(i); }
         T const & back (int i = 0) const   { return ArrayView<T>::back(i); }
         
+        /**
+         * @brief Append an element to the end.
+         * 
+         * The function will append the element "a" to the end of the array.
+         * This will require allocation of a longer array and copy of the
+         * original elements to the new array (using the rvalue reference).
+         * The function is declared as virtual so that it can be safely
+         * overridden in derived classes.
+         */
         virtual void push_back (T const & a)
         {
-            // not very efficient... FIXME
-            
             T* new_array = Alloc::alloc (size() + 1);
             for (size_t i = 0; i < size(); i++)
                 new_array[i] = std::move(ArrayView<T>::array_[i]);
@@ -350,6 +467,16 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             ArrayView<T>::array_ = new_array;
         }
         
+        /**
+         * @brief Remove the last element from the array.
+         * 
+         * The last element of the array will be ignored, which is
+         * achieved by decrementing array length. The memory will not be
+         * deallocated to save processor time. For this reason, if an array
+         * is "erased" by subsequent calls to pop_back, it will still occupy
+         * the same memory as before. The deallocation will take place only
+         * on resize.
+         */
         virtual T pop_back ()
         {
             if (size() > 0)
@@ -358,6 +485,13 @@ template <class T, class Alloc> class Array : public ArrayView<T>
                 throw exception ("Array has no element to pop!");
         }
         
+        /**
+         * @brief Append more items.
+         * 
+         * The function appends a range of items to the end of the
+         * array. A reallocation takes place. The range is specified
+         * using input iterators.
+         */
         template <class InputIterator> void append (
             InputIterator first, InputIterator last
         ) {
@@ -371,6 +505,16 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             ArrayView<T>::array_ = new_array;
         }
         
+        /**
+         * @brief Insert item.
+         * 
+         * Function "insert" inserts new item "x" to the array
+         * at position pointed to by the iterator "it". Reallocation
+         * always taked place. If the iterator points to the end
+         * of the original array, the effect is the same as push_back.
+         * Otherwise, the items behind the iterator are shifted to
+         * make place for the new item.
+         */
         void insert (iterator it, T x)
         {
             // create new array (one element longer)
@@ -393,7 +537,8 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             ArrayView<T>::array_ = new_array;
         }
         
-        bool empty () const { return size() == 0; } 
+        /// Check that size equals to zero.
+        bool empty () const { return size() == 0; }
     
         //
         // assignment operators
@@ -445,10 +590,12 @@ template <class T, class Alloc> class Array : public ArrayView<T>
 /**
  * @brief A comfortable number array class.
  * 
- * Class NumberArray is intended as a Hex's replacement for std::vector\<NumberType\>.
+ * Class NumberArray is intended as a Hex's replacement for std::vector\<T\> for
+ * number type T.
  * Properties:
  * - correct memory alignment of the storage
  * - even number of allocated elements (zero padded) for the use in SSE accelerators
+ * - reserved storage reducing necessary reallocations
  * - basic iterator interface (members Array::begin(), Array::end()).
  * - HDF5 interface (ability to save and load to/from HDF5 data files)
  * - a collection of overloaded arithmetic operators (sum of two arrays,
@@ -468,47 +615,51 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         /// Allocated memory.
         size_t Nres_;
         
+        /// HDF file to store to / load from.
+        std::string name_;
+        
     public:
         
         // default constructor, creates an empty array
         NumberArray ()
-            : Array<T,Alloc>(), Nres_(size()) {}
+            : Array<T,Alloc>(), Nres_(size()), name_() {}
         
         // constructor, creates a length-n "x"-filled array
         NumberArray (size_t n, T x = 0)
-            : Array<T,Alloc>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // constructor, copies a length-n "array
         NumberArray (size_t n, T const * x)
-            : Array<T,Alloc>(n, x), Nres_(size()) {}
+            : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // copy constructor from ArrayView const lvalue reference
         NumberArray (ArrayView<T> const & a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from Array const lvalue reference
         NumberArray (NumberArray<T> const & a)
-            : Array<T,Alloc>((ArrayView<T> const &)a), Nres_(size()) {}
+            : Array<T,Alloc>((ArrayView<T> const &)a), Nres_(size()), name_() {}
         
         // copy constructor from std::vector
         NumberArray (std::vector<T> const & a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from initializer list
         NumberArray (std::initializer_list<T> a)
-            : Array<T,Alloc>(a), Nres_(size()) {}
+            : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from two forward iterators
         template <typename ForwardIterator> NumberArray (ForwardIterator i, ForwardIterator j)
-            : Array<T,Alloc>(i,j), Nres_(size()) {}
+            : Array<T,Alloc>(i,j), Nres_(size()), name_() {}
         
         // copy constructor from Array rvalue reference
         NumberArray (NumberArray<T> && a)
-            : Array<T,Alloc>()
+            : Array<T,Alloc>(), name_()
         {
             std::swap(ArrayView<T>::N_, a.ArrayView<T>::N_);
             std::swap(ArrayView<T>::array_, a.ArrayView<T>::array_);
             std::swap(Nres_,a.Nres_);
+            std::swap(name_, a.name_);
         }
         
         // destructor
@@ -518,11 +669,19 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             // ... do nothing here
         }
         
-        //
-        // storage size
-        //
-        
+        /// Item count.
         size_t size () const { return ArrayView<T>::size(); }
+        
+        /**
+         * @brief Resize array.
+         * 
+         * Set size of the array. If the new size is less than the
+         * reserved memory, the end of the array is just appropriately
+         * shifted. The "new" elements are not initialized.
+         * If the size is bigger than the reserve, the reallocation
+         * takes place and new elements are initialized to T(0).
+         * @return New size of the array.
+         */
         virtual size_t resize (size_t n)
         {
             if (n <= Nres_)
@@ -543,6 +702,16 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             return size();
         }
+        
+        /**
+         * @brief Reserve memory.
+         * 
+         * If the requested reserve size is greater than than the current
+         * reserve size, the memory is reallocated. Reserved memory allows
+         * fast push_back-s and similar operations, because no reallocation
+         * is necessary then.
+         * @return New reserve size.
+         */
         size_t reserve (size_t n)
         {
             if (n > Nres_)
@@ -562,24 +731,38 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return Nres_;
         }
         
-        // element-wise access (non-const)
+        /// Element-wise access (non-const).
         inline T & operator[] (size_t i) { return ArrayView<T>::operator[](i); }
         
-        // element-wise access (const)
+        /// Element-wise access (const).
         inline T const & operator[] (size_t i) const { return ArrayView<T>::operator[](i); }
         
-        //
-        // data pointer to the aligned memory
-        //
-        
+        /**
+         * @brief Data pointer.
+         * 
+         * Get pointer to the aligned memory. In the present implementation the
+         * pointer is filtered through the builtin function
+           @code
+              __builtin_assume_aligned(pointer, alignment)
+           @endcode
+         * to make the compiler (GCC) assume that the memory pointed to by the
+         * data pointer is specifically aligned.
+         * 
+         * @note It is not clear, however, if the state "assumed aligned" is
+         * preserved when passing the pointer as a return value. It may be
+         * necessary to filter the pointer through the builtin function just
+         * before the pointer is accessed. See e.g. SymDiaMatrix::dot function.
+         */
+        //@{
         virtual T * data ()
         {
-            return (T *)aligned_ptr(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
+            return ArrayView<T>::array_;
         }
         virtual T const * data () const
         {
-            return (T * const)aligned_ptr(ArrayView<T>::array_, std::max(alignof(T),sizeof(Complex)));
+            return ArrayView<T>::array_;
         }
+        //@}
         
         //
         // STL-like iterator interface
@@ -596,6 +779,12 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         T & back (int i = 0)               { return ArrayView<T>::back(i); }
         T const & back (int i = 0) const   { return ArrayView<T>::back(i); }
         
+        /**
+         * @brief Add element to end.
+         * 
+         * Appends a new element to the end of the array. If the reserved
+         * storage has sufficient size, no reallocation takes place.
+         */
         virtual void push_back (T const & a)
         {
             if (size() + 1 > Nres_)
@@ -621,11 +810,24 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             (*this)[ArrayView<T>::N_++] = a;
         }
         
+        /**
+         * @brief Remove the last element.
+         * 
+         * Calls Array::pop_back without any modification.
+         * @return Value of the removed element.
+         */
         T pop_back()
         {
             return Array<T,Alloc>::pop_back();
         }
         
+        /**
+         * @brief Append a range of values at end.
+         * 
+         * Takes the values specified by two iterators and appends them
+         * to the end of the array. If the reserved storage is large enough,
+         * no reallocation will take place.
+         */
         template <class InputIterator> void append (
             InputIterator first, InputIterator last
         ) {
@@ -648,18 +850,29 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 ArrayView<T>::array_ = new_array;
             }
             
+            // copy new elements
             for (InputIterator it = first; it != last; it++)
                 (*this)[ArrayView<T>::N_++] = *it;
         }
         
+        /// Check that size equals to zero.
         bool empty () const
         {
             return size() == 0;
         }
         
+        /// Fill array with zeros.
         void clear ()
         {
             memset(ArrayView<T>::array_, 0, size() * sizeof(T));
+        }
+        
+        /// Reset array: deallocate everything, resize to zero.
+        void drop ()
+        {
+            Nres_ = ArrayView<T>::N_ = 0;
+            Alloc::free (ArrayView<T>::array_);
+            ArrayView<T>::array_ = nullptr;
         }
         
         //
@@ -696,9 +909,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return *this;
         }
         
-        /**
-        * Complex conjugate.
-        */
+        /// Return complex conjugated array.
         NumberArray<T> conj () const
         {
             NumberArray<T> c = *this;
@@ -710,9 +921,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return c;
         }
         
-        /**
-        * Computes usual 2-norm.
-        */
+        /// Compute usual 2-norm.
         double norm () const
         {
             double ret = 0.;
@@ -725,7 +934,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
         
         /** 
-        * Applies a user transformation.
+        * @brief Apply a user transformation.
+        * 
+        * The functor "f" will be applied on every item and the resulting
+        * array is returned. It is expected that the return value of the functor
+        * is a number type, so that NumberArray can be used.
         */
         template <class Functor> auto transform (Functor f) -> NumberArray<decltype(f(T(0)))>
         {
@@ -735,9 +948,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return c;
         }
         
-        /**
-        * Returns a subarray.
-        */
+        /// Return a subarray using ArrayView.
         ArrayView<T> slice (size_t left, size_t right) const
         {
             assert (right >= left);
@@ -746,10 +957,12 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
         
         /**
-        * Converts contents to SQL-readable BLOB (hexadecimal text format)
-        * 
-        * @warning The data are stored in the endianness of the current machine.
-        */
+         * @brief Convert to SQL BLOB.
+         * 
+         * Converts contents to SQL-readable BLOB (hexadecimal text format)
+         * 
+         * @warning The data are stored in the endianness of the current machine.
+         */
         std::string toBlob () const
         {
             // get byte pointer
@@ -771,10 +984,12 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
         
         /**
-        * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
-        * 
-        * @warning The data are assumed to posess the endianness of the current machine.
-        */
+         * @brief Convert from SQL BLOB.
+         * 
+         * Decode string from SQL-readable BLOB (hexadecimal format) to correct binary array.
+         * 
+         * @warning The data are assumed to possess the endianness of the current machine.
+         */
         void fromBlob (std::string const & s)
         {
             if (data() != nullptr and size() != 0)
@@ -812,7 +1027,19 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 reinterpret_cast<char*>(data())[i] = byte;
             }
         }
-    
+        
+        /**
+         * @brief Link to HDF file.
+         * 
+         * In order to avoid repetitious specifying of the HDF filename,
+         * it is possible to link the array to a single file and then use
+         * @ref hdfload and @ref hdfsave functions without arguments.
+         */
+        void link (std::string name)
+        {
+            name_ = name;
+        }
+        
         /**
         * @brief Save array to HDF file.
         * 
@@ -827,7 +1054,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         * @param docompress Whether to apply a trivial compression (contract the repeated zeros).
         * @param consec Minimal consecutive occurences for compression.
         */
-        bool hdfsave (const char* name, bool docompress = false, int consec = 10) const
+        //@{
+        bool hdfsave (std::string name, bool docompress = false, int consec = 10) const
         {
 #ifndef NO_HDF
             // save to HDF file
@@ -870,11 +1098,19 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return false;
 #endif
         }
+        bool hdfsave () const
+        {
+            return hdfsave (name_);
+        }
+        //@}
         
         /**
-        * Load array from HDF file.
-        * @param name Filename.
-        */
+         * @brief Load array from HDF file.
+         * 
+         * See @ref hdfsave for the expected structure of the HDF file.
+         * @param name Filename.
+         */
+        //@{
         bool hdfload (std::string name)
         {
 #ifndef NO_HDF
@@ -922,8 +1158,21 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return false;
 #endif
         }
+        bool hdfload ()
+        {
+            return hdfload (name_);
+        }
+        //@}
         
-        // get compressed array
+        /**
+         * @brief Get compressed array.
+         * 
+         * Omit all consecutive occurences of zero (threshold number of consecutive
+         * occurences is specified in "consec") and save the start and (one after) end position
+         * of the zero blocks in the array to a new array conventionally called "zero_blocks".
+         * 
+         * @return Pair "zero_blocks", "compressed_array".
+         */
         std::tuple<NumberArray<int>,NumberArray<T>> compress (int consec) const
         {
             // compressed array
@@ -984,7 +1233,16 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return std::make_tuple(zero_blocks,carray);
         }
         
-        // get un-compressed array if compression info is supplied
+        /**
+         * @brief Decompress array.
+         * 
+         * This function will create a new array using self and the supplied
+         * compression info "zero_blocks". The parameter "zero_blocks" is expected
+         * to have an even count of items; every pair of items then specifies start
+         * and (one after) end position of a block of zeros in the decompressed
+         * array. The decompressed array is returned and the original array left
+         * intact.
+         */
         NumberArray<T> decompress (NumberArray<int> const & zero_blocks) const
         {
             if (zero_blocks.empty())
@@ -1030,9 +1288,10 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
 };
 
+// load array arithmetic operators
 #include "arrithm.h"
 
-// scalar product of two arrays.
+/// Scalar product of two arrays.
 template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
 {
     // get size; check if sizes match
@@ -1053,6 +1312,14 @@ template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
     return result;
 }
 
+/**
+ * @brief Outer product of two arrays.
+ * 
+ * Returns a new array with the following values:
+ * @f[
+ * a_1 b_1, a_1 b_2, \dots, a_1, b_n, a_2 b_1, \dots, a_m b_n
+ * @f]
+ */
 template <class T1, class T2> auto outer_product (
     const ArrayView<T1> a,
     const ArrayView<T2> b
@@ -1069,7 +1336,7 @@ template <class T1, class T2> auto outer_product (
     return c;
 }
 
-// output to text stream.
+/// Output to text stream.
 template <typename T> std::ostream & operator << (std::ostream & out, ArrayView<T> const & a)
 {
     out << "[";
@@ -1119,10 +1386,7 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
 template <typename T> NumberArray<T> logspace (T x0, T x1, size_t N)
 {
     if (x0 <= 0 or x1 <= 0 or x1 < x0)
-    {
-        std::cerr << "[logspace] It must be 0 < x1 <= x2 !\n";
-        abort();
-    }
+        throw exception ("[logspace] It must be 0 < x1 <= x2 !");
     
     NumberArray<T> grid(N);
     
@@ -1133,7 +1397,7 @@ template <typename T> NumberArray<T> logspace (T x0, T x1, size_t N)
         for (unsigned i = 0; i < N; i++)
             grid[i] = x0 * pow(x1 / x0, i / T(N - 1));
         
-        return grid;
+    return grid;
 }
 
 /**
@@ -1160,7 +1424,12 @@ template <typename NumberType> void write_array (
     const char* filename
 );
 
-
+/**
+ * @brief Write elements.
+ * 
+ * For all integers from 0 to m-1 call fetch(i) and save the results to
+ * a text file as a single column.
+ */
 template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
 {
     std::ofstream f(filename);
@@ -1182,9 +1451,9 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
  * @param n Column count.
  * @param filename Filename of the file to create/overwrite.
  * @param fetch Functor with interface
- *        @code
- *             double operator() (size_t, size_t);
- *        @endcode
+          @code
+               double operator() (size_t, size_t);
+          @endcode
  * @return Write success indicator (@c false for failure).
  */
 template <class Fetcher> bool write_2D_data (size_t m, size_t n, const char* filename, Fetcher fetch)
@@ -1263,11 +1532,7 @@ template <typename ...Params> rArray concatenate (rArray const & v1, Params ...p
 rArray abs (const cArrayView u);
 rArrays abs (cArrays const &u);
 
-// boolean aggregation
-bool all (const ArrayView<bool> v);
-bool any (const ArrayView<bool> v);
-
-// minimal element
+/// Minimal element of array.
 template <typename T> T min (const ArrayView<T> a)
 {
     T z = a.front();
@@ -1277,7 +1542,7 @@ template <typename T> T min (const ArrayView<T> a)
         return z;
 }
 
-// maximal element
+/// Maximal element of array.
 template <typename T> T max (const ArrayView<T> a)
 {
     T z = a.front();
@@ -1287,7 +1552,7 @@ template <typename T> T max (const ArrayView<T> a)
         return z;
 }
 
-// return per-element power
+/// Return per-element power.
 template <typename T> NumberArray<T> pow (NumberArray<T> const & u, double e)
 {
     NumberArray<T> v(u.size());
@@ -1300,6 +1565,8 @@ template <typename T> NumberArray<T> pow (NumberArray<T> const & u, double e)
     
     return v;
 }
+
+/// Return per-element power.
 template <typename T> Array<T> pow (Array<T> const & u, double e)
 {
     Array<T> v(u.size());
@@ -1312,6 +1579,8 @@ template <typename T> Array<T> pow (Array<T> const & u, double e)
     
     return v;
 }
+
+/// Return per-element square root.
 template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
 {
     size_t N = A.size();
@@ -1323,19 +1592,24 @@ template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
     return B;
 }
 
+/// Return per-element hypot.
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
+/// Return per-element atan2.
 NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B);
+/// Return per-element square of absolute value.
 NumberArray<double> sqrabs (NumberArray<Complex> const & A);
+/// Return per-element real part.
 NumberArray<double> realpart (NumberArray<Complex> const & A);
+/// Return per-element imag part.
 NumberArray<double> imagpart (NumberArray<Complex> const & A);
 
-// summation
+/// Sum elements in array.
 template <typename T> T sum (const ArrayView<T> v)
 {
     return std::accumulate(v.begin(), v.end(), T(0));
 }
 
-// summation of nested arrays
+/// Sum arrays.
 template <typename T> NumberArray<T> sums (const ArrayView<NumberArray<T>> v)
 {
     if (v.size() == 0)
@@ -1366,6 +1640,7 @@ Array<bool> operator == (const ArrayView<T> u, T x)
     return v;
 }
 
+/// Comparison of two arrays.
 template <typename T>
 Array<bool> operator == (const ArrayView<T> u, const ArrayView<T> v)
 {
@@ -1377,7 +1652,8 @@ Array<bool> operator == (const ArrayView<T> u, const ArrayView<T> v)
     return w;
 }
 
-inline bool all(const ArrayView<bool> B)
+/// Check that all values are "true".
+inline bool all (const ArrayView<bool> B)
 {
     bool ok = true;
     for (bool b : B)
@@ -1385,6 +1661,7 @@ inline bool all(const ArrayView<bool> B)
     return ok;
 }
 
+/// Check if any value is "true".
 inline bool any(const ArrayView<bool> B)
 {
     bool ok = false;
@@ -1468,9 +1745,7 @@ template <typename Tidx, typename Tval> void merge (
     arr1 = arr;
 }
 
-/**
- * Join elements from all subarrays.
- */
+/// Join elements from all subarrays.
 template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> arrays)
 {
     NumberArray<size_t> partial_sizes(arrays.size() + 1);
@@ -1493,9 +1768,7 @@ template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> array
     return res;
 }
 
-/**
- * Drop all redundant repetitions from sorted array.
- */
+/// Drop all redundant repetitions from sorted array.
 template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v, int n = 1)
 {
     // create output array
@@ -1549,15 +1822,21 @@ template <class T> void smoothen (ArrayView<T> v)
     }
 }
 
-/**
- * @brief Convert ArrayView<T> to a string.
- */
-template <class T> std::string to_string (const ArrayView<T> v)
+/// Convert ArrayView<T> to a string.
+template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 {
     std::ostringstream ss;
-    for (T const & x : v)
-        ss << x << " ";
+    for (size_t i = 0; i < v.size(); i++)
+    {
+        if (i == 0)
+            ss << v[i];
+        else
+            ss << sep << v[i];
+    }
     return ss.str();
 }
+
+/// Drop small elements of array (replace by zero).
+rArray threshold (const rArrayView a, double eps);
 
 #endif

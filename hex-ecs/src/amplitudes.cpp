@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -73,7 +73,7 @@ cArray computeLambda (
         double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : atof(HEX_RHO);
         
         // skip impact energies with undefined outgoing momentum
-        if (isnan(kf[ie]))
+        if (std::isnan(kf[ie]))
             continue;
         
         for (int n = 1; n <= samples; n++)
@@ -233,13 +233,13 @@ Chebyshev<double,Complex> fcheb(Bspline const & bspline, cArrayView const & PsiS
                 ddrho_Psi += ddr2_Psi * sin_alpha;
             
             /// DEBUG
-            if (not finite(F1F2))
+            if (not std::isfinite(F1F2))
                 std::cerr << "F1F2 = " << F1F2 << "\n";
-            if (not finite(std::abs(ddrho_Psi)))
+            if (not std::isfinite(std::abs(ddrho_Psi)))
                 std::cerr << "ddrho_Psi = " << ddrho_Psi << "\n";
-            if (not finite(std::abs(Psi)))
+            if (not std::isfinite(std::abs(Psi)))
                 std::cerr << "Psi = " << Psi << "\n";
-            if (not finite(ddrho_F1F2))
+            if (not std::isfinite(ddrho_F1F2))
                 std::cerr << "ddrho_F1F2 = " << ddrho_F1F2 << "\n";
             ///
             

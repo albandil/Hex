@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -15,31 +15,28 @@
 
 /**
  * @mainpage
- * 
  * @author Jakub Benda, MFF UK
- * @date 5. 11. 2013
- * 
- * 
- * @section purpose Purpose
+ * @date 1. 2. 2014
+ * @section ecs Hex-ecs
  * 
  * Hex-ECS computes partial T-matrices for elastic, excitation and ionization
  * electron-hydrogen scattering. Together with the interface program Hex-DB
  * it offers the possibility of generating many scatterign quantities like
  * differential or integral cross sections.
  * 
- * @section libs Language and libraries
+ * @subsection libs Language and libraries
  * 
  * Hex is written in C++11 to make use of comfort of the modern C++ extensions,
  * so one may need a newer compiler. Tested compilers are:
  * 
- * - GCC 4.7.2
- * - Intel C++ Compiler 14.0
+ * - GCC 4.8.1
+ * - Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
  * 
  * Both worked with the same Makefile, just by setting the variable CPP to "g++"
  * or "icpc". The program also uses following external packages (tested versions
  * are given in parentheses):
  * 
- * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.15):
+ * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.16):
  *   for Wigner coupling coefficients and some other special functions.
  * - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
  *   for sparse matrix manipulation and for a direct sparse system solver.
@@ -52,12 +49,12 @@
  * - MPI (OpenMPI 1.6): for parallelization at cluster.
  * 
  * The next libraries are optional:
- * - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.5):
+ * - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.8):
  *   Free BLAS implementation that can be compiled for a specific
  *   CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
  *   OpenBLAS is optional because SuiteSparse can be configured to use
  *   a different BLAS implementation.
- * - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <u>older</u>):
+ * - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <b>older</b>):
  *   PNG read/write interface, for debugging purposes. The code that references
  *   png++ can be excluded from compilation by the option -DNO_PNG.
  *   For convenience, this library is directly included in the source code of Hex-ecs.
@@ -71,7 +68,7 @@
  * - Mozilla Firefox 24.0
  * - Konqueror 4.10.5
  * 
- * @section theory Theory
+ * @subsection theory Theory
  * 
  * Unknown scattering state, eigenfunction of the full system hamiltonian, is
  * split into two parts, asymptotic “incoming particle” state and the scattered
@@ -165,7 +162,7 @@
  * @f$ \Psi = \Psi_{\mathrm{sc}} + \Psi_{\mathrm{inc}} @f$ and @f$ \hat{H}\Psi = E\Psi @f$.
  * 
  * 
- * @section method Method
+ * @subsection method Method
  * 
  * All computations are done in time-independent way, and 
  * the exterior complex scaling is used instead of boundary condition fitting.
@@ -301,7 +298,7 @@
  * of scattering axis along the projectile moemntum, so that the angular
  * momentum projection is zero.
  * 
- * @section restrict ECS restrictions on potential
+ * @subsection restrict ECS restrictions on potential
  * 
  * Exterior complex scaling of right hand side poses a serious problem for typical
  * (not exponentially decreasing) potentials. One of the factors in the right hand
@@ -316,7 +313,7 @@
  *   as “<i>truncated</i> overlap matrices” in the source code.
  * 
  * 
- * @section amplitude Cross section
+ * @subsection amplitude Cross section
  * 
  * As was said above, the scattering amplitude is
  * 
@@ -345,6 +342,51 @@
  * of the i-th B-spline and the (final) hydrogenic or Riccatti-Bessel function, and @f$ S[P]_i @f$
  * and @f$ S[j]_i @f$ stand for (truncated) overlap integrals of the i-th B-spline and
  * the (final) hydrogenic or Riccatti-Bessel function.
+ *
+ * @subsection code Implementation in the code
+ *
+ * The code runs along the following outline:
+ * - The program is initialized. Parameters from the command line are stored for later
+ *   use in the class CommandLine.
+ * - The optional multi-process parallel environment (MPI) is set up. All parallel
+ *   communication is mediated by the class Parallel. The parallelization by MPI
+ *   is used whenever the switch --mpi is present on the command line. The number of
+ *   processes (= "communicator rank") is given as an argument to the MPI launcher. E.g.
+     @verbatim
+         mpirun -np 4 hex-ecs --mpi
+     @endverbatim
+ * - Note that the parallelization by OpenMP is used always and does not use any classes,
+ *   nor does it depend on MPI in any way. The number of OpenMP threads is completely independent
+ *   on the communicator size and can be specified by the environment variable OMP_NUM_THREADS.
+ *   The number of threads on every machine used in the MPI network can be different.
+ * - From here on, all the steps are executed by every machine in the MPI scope.
+ * - The input file specified on the command line (--input/-i) is found and read. If the name
+ *   was not given on command line, the default "hex.inp" is used. If the file doesn't exist,
+ *   the program aborts. The values from the input file are contained in the object InputFile.
+ * - A B-spline basis is created according to the input (class Bspline).
+ * - A list of available angular states is assembled. The number of these states is restricted
+ *   by @f$ L @f$, @f$ \Pi @f$ and @f$ n_L @f$.
+ * - A preconditioner is selected in accord with the user's choice. It is stored only in the
+ *   form of a pointer to the base class PreconditionerBase, whose methods are reimplemented
+ *   in all derived classes (specific preconditioners). The constructor is called, which will
+ *   in all cases trigger also the computation of the radial integrals that are needed by
+ *   all preconditioners. The radial integrals are managed by the class RadialIntegrals.
+ * - For all impact energies:
+ *     - The preconditioner for the set of equations is updated for this energy (method "update").
+ *     - For all initial states:
+ *         - Check that at least some allowed angular states contribute to this combination
+ *           of @f$ L @f$, @f$ \Pi @f$, @f$ n_L @f$ and @f$ l_i @f$. If not, skip this inital state.
+ *         - Check that the solution for this initial state and this impact energy hasn't been
+ *           already computed. If it has been, skip this initial state.
+ *         - The B-spline expansion of the right hand side is computed (method "rhs" of the chosen
+ *           preconditioner class).
+ *         - Run the preconditioned conjugate gradients solver. If there already is a solution for the
+ *           previous energy, use it as an initial guess.
+ *         - Save the solution to disk.
+ * - For all initial and final states:
+ *     - Compute T-matrices for all available partial waves.
+ *     - Save the T-matrices to SQL files.
+ *     - Evaluate and print the integral cross sections.
  */
 
 #endif

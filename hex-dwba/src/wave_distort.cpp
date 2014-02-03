@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -13,9 +13,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
-
-#include <o2scl/ode_funct.h>
-#include <o2scl/ode_iv_solve.h>
 
 #include <gsl/gsl_sf.h>
 
@@ -67,19 +64,40 @@ DistortedWave DistortedWave::operator= (DistortedWave const& W)
     return *this;
 }
 
-int DistortedWave::derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+int derivs (double x, const double y[2], double dydx[2], void * data)
 {
+    // retype parameter
+    std::tuple<double,int,DistortingPotential const *> *pdata =
+        (std::tuple<double,int,DistortingPotential const *> *)data;
+    
+    // get individual sub-parameters
+    double kn = std::get<0>(*pdata);
+    int ln = std::get<1>(*pdata);
+    DistortingPotential const & U = *std::get<2>(*pdata);
+    
+    // compute derivatives
     dydx[0] = y[1];
     dydx[1] = (x == 0.) ? 0. : (-kn*kn + 2.*U(x) + ln*(ln+1)/(x*x)) * y[0];
-    return 0;
+    
+    return GSL_SUCCESS;
 }
 
-int DistortedWave::derivs0(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx)
+int derivs0 (double x, const double y[2], double dydx[2], void * data)
 {
+    // retype parameter
+    std::tuple<double,int,DistortingPotential const *> *pdata =
+        (std::tuple<double,int,DistortingPotential const *> *)data;
+    
+    // get individual sub-parameters
+    double kn = std::get<0>(*pdata);
+    int ln = std::get<1>(*pdata);
+    DistortingPotential const & U = *std::get<2>(*pdata);
+    
+    // compute derivatives
     dydx[0] = y[1];
     dydx[1] = (x == 0.) ? 0. : (-kn*kn + 2.*U(x)) * y[0] - 2*(ln+1)/x * y[1];
     
-    return 0;
+    return GSL_SUCCESS;
 }
 
 DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U)
@@ -119,24 +137,18 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
     }
     else
     {
+        // assemble data needed to compute the derivatives
+        std::tuple<double, int, DistortingPotential const *> data = std::make_tuple (kn, ln, &U);
+        
         //
         // solve in the classically forbidden region (if any)
         //
         
         // data arrays
-        o2scl::ovector x0g(samples0);
-        o2scl::omatrix y0g(samples0,2), y0pg(samples0,2), y0errg(samples0,2);
+        double x0g[samples0], y0g[samples0][2];
         
         if (ln > 0)
         {
-            // prepare derivative callback MFPTR-wrapper
-            o2scl::ode_funct_mfptr<DistortedWave> derivs0(this, &DistortedWave::derivs0);
-            
-            // prepare faster adaptive Cash-Karp Runge-Kutta stepper
-            o2scl::gsl_astep<decltype(derivs0)> adapt_stepper0;
-            o2scl::gsl_rkck_fast<2,decltype(derivs0)> stepper0;
-            adapt_stepper0.set_step(stepper0);
-            
             // create grid
             for (int i = 0; i < samples0; i++)
                 x0g[i] = h0 * i;
@@ -146,24 +158,15 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
             y0g[0][1] = -1./(ln+1);
             
             // solve the equation
-            solve2(x0g, samples0 + 1, h0, y0g, y0pg, y0errg, adapt_stepper0, derivs0, NORMALIZE_ON_OVERFLOW);
+            solve2 (x0g, samples0 + 1, h0, y0g, derivs0, &data, NORMALIZE_ON_OVERFLOW);
         }
         
         //
         // solve in the classically allowed region
         //
         
-        // prepare derivative callback MFPTR-wrapper
-        o2scl::ode_funct_mfptr<DistortedWave> derivs(this, &DistortedWave::derivs);
-        
-        // prepare faster adaptive Cash-Karp Runge-Kutta stepper
-        o2scl::gsl_astep<decltype(derivs)> adapt_stepper;
-        o2scl::gsl_rkck_fast<2,decltype(derivs)> stepper;
-        adapt_stepper.set_step(stepper);
-        
         // data arrays
-        o2scl::ovector xg(samples);
-        o2scl::omatrix yg(samples,2), ypg(samples,2), yerrg(samples,2);
+        double xg[samples], yg[samples][2];
         
         // create grid
         for (int i = 0; i < samples; i++)
@@ -184,7 +187,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         }
         
         // solve
-        solve2 (xg, samples + 1, h, yg, ypg, yerrg, adapt_stepper, derivs, NORMALIZE_ON_OVERFLOW);
+        solve2 (xg, samples + 1, h, yg, derivs, &data, NORMALIZE_ON_OVERFLOW);
         
         // values y0g[last] and yg[first] shoud be equal -- normalize the classically forbidden part (if any)
         if (ln > 0)
@@ -198,7 +201,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         // compute phase shift; use last point
         double R   = xg[samples-2];
         double val =  yg[samples-2][0];
-        double der = ypg[samples-2][0];
+        double der = yg[samples-2][1];
         double D = der / val;
         double pilhalf = M_PI * ln / 2.;
         double tg_delta = (kn * cos(kn*R - pilhalf) - D * sin(kn*R - pilhalf)) /

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -93,25 +93,6 @@ public:
     
     /// Near-zero asymptotic behaviour.
     std::pair<double,int> getZeroAsymptotic (double x) const;
-    
-    /**
-     * \brief Return derivatives from the distorted wave equation.
-     * 
-     * The defining differential equation can be recast into a set of two linear
-     * differential euqations of first order:
-     * \f[
-     *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}(k_n,r) = \phi_{l_n}'(k_n,r) \ ,
-     * \f]
-     * \f[
-     *     \frac{\mathrm{d}}{\mathrm{d}r} \phi_{l_n}'(k_n,r) = \left( \frac{l_n(l_n+1)}{r^2}
-     *     + 2U(r) - k^2 \right) \phi_{l_n}(k_n,r) \ .
-     * \f]
-     * This function computes vector \f$ ( \phi_{l_n}'(k_n, r), \phi_{l_n}''(k_n, r) ) \f$
-     * from the vector \f$ ( \phi_{l_n}(k_n, r), \phi_{l_n}'(k_n, r) ) \f$ and the independent
-     * coordinate \f$ x \f$.
-     */
-    int derivs(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
-    int derivs0(double x, size_t nv, const o2scl::ovector_base& y, o2scl::ovector_base& dydx);
     
     /// Export data to file using \ref write_array.
     void toFile(const char * filename) const { write_array(grid, array, filename); }

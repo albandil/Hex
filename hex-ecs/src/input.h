@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -23,34 +23,46 @@
 /**
  * @brief Command line parameters.
  * 
- * This class uses "getopt_long" for parsing of the command line.
- * The attributes are:
- * 
- * - inputfile: Alternative name for the input file. Default is "hex.inp".
- * - zipfile: A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
- * - zipcount: How many equidistant samples on each axis to use.
- * - zipmax: Radial cutoff for solution zipping useful if one is interested
- *               only in the near-origin behaviour.
- * - parallel: Whether to use OpenMPI.
- * - preconditioner: %Preconditioner to use. See \ref Preconditioners::AvailableTypes for available types.
- * - droptol: Drop tolerance for the iLU preconditioner.
- * - itinerary: Run only first stage (computation of the radial integrals).
+ * This class uses @ref ParseCommandLine for parsing of the command line.
+ * The information on valid switches can be retrieved by executing
+   @verbatim
+   hex-ecs --help
+   @endverbatim
+ * Some more general comments on the switches are in the above mentioned
+ * class.
  */
 class CommandLine
 {
     public:
         
+        /**
+         * @brief Stages of the computations.
+         *
+         * Different stages of the computations, used to reflect user's choice
+         * from the command line. The corresponding mapping is:
+         * <table>
+         * <tr><th>Command line option</th><th>Program itinerary</th></tr>
+         * <tr><td>(none)</td><td>StgRadial | StgSolve | StgExtract</td></tr>
+         * <tr><td>--stg-integ</td><td>StgRadial</td></tr>
+         * <tr><td>--stg-integ-solve</td><td>StgRadial | StgSolve</td></tr>
+         * <tr><td>--stg-extract</td><td>StgiExtract</td></tr>
+         * </table>
+         */
         typedef enum {
+            /// Do not start any intensive computations.
             StgNone    = 0x00,
+            /// Compute only the radial integrals necessary for the construction of the equations.
             StgRadial  = 0x01,
+            /// Solve the equations.
             StgSolve   = 0x02,
+            /// Extract the T-matrices.
             StgExtract = 0x04
         } HexEcsStg;
         
         // constructor
         CommandLine (int argc, char* argv[])
-            : zipcount(0), zipmax(-1), parallel(false), droptol(1e-15),
-              preconditioner(0), itinerary(StgNone)
+            : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
+              droptol(1e-15), itinerary(StgNone), outofcore(false)
         {
             // get command line options
             parse(argc, argv);
@@ -60,21 +72,39 @@ class CommandLine
                 itinerary = StgRadial | StgSolve | StgExtract;
         }
         
-        // get command line options
+        /// Read options from command line.
         void parse (int argc, char* argv[]);
         
         //
         // public attributes
         //
         
+        /// Alternative name for the input file. Default is "hex.inp".
         std::ifstream inputfile;
+        
+        /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
         std::string zipfile;
+        
+        /// How many equidistant samples on each axis to use.
         int  zipcount;
+        
+        /// Radial cutoff for solution zipping useful if one is interested only in the near-origin behaviour.
         double zipmax;
+        
+        /// Whether to use MPI.
         bool parallel;
-        double droptol;
+        
+        /// %Preconditioner to use. See \ref Preconditioners::AvailableTypes for available types.
         int preconditioner;
+        
+        /// Drop tolerance for the ILU preconditioner.
+        double droptol;
+        
+        /// Which parts of the computation to run.
         int itinerary;
+        
+        /// Whether to keep precomputed data only on disk and spare RAM.
+        bool outofcore;
 };
 
 /**

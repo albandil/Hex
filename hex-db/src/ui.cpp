@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -13,12 +13,12 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
-#include <getopt.h>
 
+#include "cmdline.h"
 #include "hex-db.h"
 #include "variables.h"
 
-std::string HelpText = 
+const std::string HelpText = 
     "Usage: hex-db [options]\n"
     "Options:\n"
     "  --help            Display this information.\n"
@@ -68,44 +68,6 @@ std::string HelpText =
     "depending on version of your shell.\n"
     "\n";
 
-bool SwitchInput (std::string argnam, std::string argpar)
-{
-    // we can get here only if there is no default callback
-    std::cerr << "ERROR: Uknown option --" << argnam << std::endl;
-    return false;
-}
-    
-template <typename DefaultCallback>
-bool SwitchInput (std::string argnam, std::string argpar, DefaultCallback defaultcallback)
-{
-    return defaultcallback(argnam, argpar) or SwitchInput(argnam, argpar);
-}
-
-template <typename Callback, typename ...Params>
-bool SwitchInput (std::string argnam, std::string argpar, std::string optname, int npar, Callback callback, Params ...p)
-{
-    // check optname
-    if (argnam != optname)
-        return SwitchInput(argnam, argpar, p...); // parse the rest
-    
-    // check parameter
-    if (npar > 0 and argpar.empty())
-    {
-        std::cerr << "ERROR: The option --" << argnam << " requires a parameter!" << std::endl;
-        return false;
-    }
-    if (npar == 0 and not argpar.empty())
-    {
-        std::cerr << "ERROR: The option --" << argnam << " uses no parameter!" << std::endl;
-        return false;
-    }
-    
-    // run the callback
-    callback(argpar);
-    
-    // successfully done
-    return true;
-}
 
 int main(int argc, char* argv[])
 {
@@ -128,143 +90,118 @@ int main(int argc, char* argv[])
     std::map<std::string,std::string> sdata;
     
     // for all argv-s
-    for (int i = 1; i < argc; i++)
-    {
-        std::string arg = argv[i];
-        
-        // remove leading dashes
-        while (arg.front() == '-')
-            arg.erase(0,1);
-        
-        // split at equation sign (if present)
-        std::string::iterator eq;
-        eq = std::find(arg.begin(), arg.end(), '=');
-        std::string argnam = arg.substr(0, eq - arg.begin());
-        std::string argpar;
-        if (eq != arg.end()) argpar = arg.substr(eq + 1 - arg.begin(), arg.end() - eq - 1);
-        
-        // if there is no equation sign, check if the next argument is parameter
-        if (eq == arg.end())
-        {
-            if (i+1 < argc and (strlen(argv[i+1]) == 1 or argv[i+1][0] != '-'))
+    ParseCommandLine
+    (
+        argc, argv,
+        "help", "h",     0, [ & ](std::string opt) -> bool { std::cout << HelpText; return true; },
+        "new", "n",      0, [ & ](std::string opt) -> bool { create_new = true; return true; },
+        "database", "D", 1, [ & ](std::string opt) -> bool { dbname = opt; return true; },
+        "import", "i",   1, [ & ](std::string opt) -> bool { doimport = true; sqlfile = opt; return true; },
+        "update", "u",   0, [ & ](std::string opt) -> bool { doupdate = true; return true; },
+        "optimize", "o", 0, [ & ](std::string opt) -> bool { dooptimize = true; return true; },
+        "avail", "a",    0, [ & ](std::string opt) -> bool { doavail = true; return true; },
+        "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
+        "vars", "v",     0, [ & ](std::string opt) -> bool {
+            std::cout << "(name)\t\t(description)" << std::endl;
+            for (Variable const * var : vlist)
+                std::cout << var->id() << "\t\t" << var->description() << std::endl;
+            return true;
+        },
+        "params", "p",   1, [ & ](std::string opt) -> bool {
+            VariableList::const_iterator it = std::find_if (
+                vlist.begin(),
+                vlist.end(),
+                [ & ](Variable* const & it) -> bool { return it->id() == opt; }
+            );
+            
+            if (it == vlist.end())
             {
-                argpar = argv[i+1];
-                i++;
+                std::cout << "No such variable \"" << opt << "\"\n";
             }
+            else
+            {
+                std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
+                for (std::string v : (*it)->deps())
+                    std::cout << v << " ";
+                std::cout << "\n\nof that one of the following can be read from the standard input:\n\n\t";
+                for (std::string v : (*it)->vdeps())
+                    std::cout << v << " ";
+                std::cout << "\n\n";
+            }
+            return true;
+        },
+        "Eunits", "", 1, [ & ](std::string opt) -> bool { 
+            if (opt == std::string("Ry"))
+                Eunits = eUnit_Ry;
+            else if (opt == std::string("a.u."))
+                Eunits = eUnit_au;
+            else if (opt == std::string("eV"))
+                Eunits = eUnit_eV;
+            else
+            {
+                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+                abort();
+            }
+            return true;
+        },
+        "Tunits", "", 1, [ & ](std::string opt) -> bool {
+            if (opt == std::string("a.u."))
+                Lunits = lUnit_au;
+            else if (opt == std::string("cgs"))
+                Lunits = lUnit_cgs;
+            else
+            {
+                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+                abort();
+            }
+            return true;
+        },
+        "Aunits", "", 1, [ & ](std::string opt) -> bool {
+            if (opt == std::string("deg"))
+                Aunits = aUnit_deg;
+            else if (opt == std::string("rad"))
+                Aunits = aUnit_rad;
+            else
+            {
+                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
+                abort();
+            }
+            return true;
+        },
+        /* default*/ [ & ](std::string arg, std::string par) -> bool {
+            // try to find it in the variable ids
+            for (const Variable* var : vlist)
+            {
+                if (var->id() == arg)
+                {
+                    // insert this id into ToDo list
+                    vars.push_back(arg);
+                    return true;
+                }
+            }
+            
+            // try to find it in the variable dependencies
+            for (const Variable* var : vlist)
+            {
+                std::vector<std::string> const & deps = var->deps();
+                if (std::find(deps.begin(), deps.end(), arg) != deps.end())
+                {
+                    // check parameter
+                    if (par.empty())
+                    {
+                        std::cerr << "ERROR: The option --" << arg << " requires a parameter!" << std::endl;
+                        return false;
+                    }
+                    
+                    // insert into scattering data list
+                    sdata[arg] = std::string(par);
+                    return true;
+                }
+            }
+
+            return false;
         }
-        
-        // switch option name
-        bool OK = SwitchInput ( argnam, argpar,
-            "help",     0, [ & ](std::string opt) -> void { std::cout << HelpText; },
-            "new",      0, [ & ](std::string opt) -> void { create_new = true; },
-            "database", 1, [ & ](std::string opt) -> void { dbname = opt; },
-            "import",   1, [ & ](std::string opt) -> void { doimport = true; sqlfile = opt; },
-            "update",   0, [ & ](std::string opt) -> void { doupdate = true; },
-            "optimize", 0, [ & ](std::string opt) -> void { dooptimize = true; },
-            "avail",    0, [ & ](std::string opt) -> void { doavail = true; },
-            "dump",     1, [ & ](std::string opt) -> void { dumpfile = opt; },
-            "vars",     0, [ & ](std::string opt) -> void {
-                std::cout << "(name)\t\t(description)" << std::endl;
-                for (Variable const * var : vlist)
-                    std::cout << var->id() << "\t\t" << var->description() << std::endl;
-            },
-            "params",   1, [ & ](std::string opt) -> void {
-                VariableList::const_iterator it = std::find_if (
-                    vlist.begin(),
-                    vlist.end(),
-                    [ & ](Variable* const & it) -> bool { return it->id() == opt; }
-                );
-                
-                if (it == vlist.end())
-                {
-                    std::cout << "No such variable \"" << opt << "\"\n";
-                }
-                else
-                {
-                    std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
-                    for (std::string v : (*it)->deps())
-                        std::cout << v << " ";
-                    std::cout << "\n\nof that one of the following can be read from the standard input:\n\n\t";
-                    for (std::string v : (*it)->vdeps())
-                        std::cout << v << " ";
-                    std::cout << "\n\n";
-                }
-            },
-            "Eunits",   1, [ & ](std::string opt) -> void { 
-                if (opt == std::string("Ry"))
-                    Eunits = eUnit_Ry;
-                else if (opt == std::string("a.u."))
-                    Eunits = eUnit_au;
-                else if (opt == std::string("eV"))
-                    Eunits = eUnit_eV;
-                else
-                {
-                    std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                    abort();
-                }
-            },
-            "Tunits",   1, [ & ](std::string opt) -> void {
-                if (opt == std::string("a.u."))
-                    Lunits = lUnit_au;
-                else if (opt == std::string("cgs"))
-                    Lunits = lUnit_cgs;
-                else
-                {
-                    std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                    abort();
-                }
-            },
-            "Aunits",   1, [ & ](std::string opt) -> void {
-                if (opt == std::string("deg"))
-                    Aunits = aUnit_deg;
-                else if (opt == std::string("rad"))
-                    Aunits = aUnit_rad;
-                else
-                {
-                    std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                    abort();
-                }
-            },
-            /* default*/ [ & ](std::string arg, std::string par) -> bool {
-                // try to find it in the variable ids
-                for (const Variable* var : vlist)
-                {
-                    if (var->id() == arg)
-                    {
-                        // insert this id into ToDo list
-                        vars.push_back(arg);
-                        return true;
-                    }
-                }
-                
-                // try to find it in the variable dependencies
-                for (const Variable* var : vlist)
-                {
-                    std::vector<std::string> const & deps = var->deps();
-                    if (std::find(deps.begin(), deps.end(), arg) != deps.end())
-                    {
-                        // check parameter
-                        if (par.empty())
-                        {
-                            std::cerr << "ERROR: The option --" << arg << " requires a parameter!" << std::endl;
-                            return false;
-                        }
-                        
-                        // insert into scattering data list
-                        sdata[arg] = std::string(par);
-                        return true;
-                    }
-                }
-                
-                // unable to match the option
-                return false;
-            }
-        );
-        
-        // chech result
-        if (not OK)
-            return EXIT_FAILURE;
-    }
+    );
     
     // open the database
     initialize(dbname.c_str());

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -27,7 +27,7 @@
  * 
  * Use something like:
  * @code
- * throw exception("[Error %d] Pointed has the value 0x%x!", id, ptr);
+ * throw exception("[Error %d] Pointer has the value 0x%x!", id, ptr);
  * @endcode
  * 
  * @note Hard limit 256 charasters.
@@ -63,6 +63,35 @@ private:
 /// Not-a-number
 #define Nan (std::numeric_limits<double>::quiet_NaN())
 
+/// Pi
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
+/// 2/Pi
+#ifndef M_2_PI
+    #define M_2_PI 0.63661977236758134308
+#endif
+
+/// square root of 2
+#ifndef M_SQRT2
+    #define M_SQRT2 1.41421356237309504880
+#endif
+
+// # define M_E           2.7182818284590452354   /* e */
+// # define M_LOG2E        1.4426950408889634074   /* log_2 e */
+// # define M_LOG10E       0.43429448190325182765  /* log_10 e */
+// # define M_LN2          0.69314718055994530942  /* log_e 2 */
+// # define M_LN10         2.30258509299404568402  /* log_e 10 */
+// # define M_PI           3.14159265358979323846  /* pi */
+// # define M_PI_2         1.57079632679489661923  /* pi/2 */
+// # define M_PI_4         0.78539816339744830962  /* pi/4 */
+// # define M_1_PI         0.31830988618379067154  /* 1/pi */
+// # define M_2_PI         0.63661977236758134308  /* 2/pi */
+// # define M_2_SQRTPI     1.12837916709551257390  /* 2/sqrt(pi) */
+// # define M_SQRT2        1.41421356237309504880  /* sqrt(2) */
+// # define M_SQRT1_2      0.70710678118654752440  /* 1/sqrt(2) */
+
 #include <algorithm> 
 #include <functional> 
 #include <cctype>
@@ -70,10 +99,9 @@ private:
 #include <type_traits>
 
 //
-// Restricted and aligned pointers.
+// Restricted pointers.
 //
 
-// restricted pointers
 #ifndef restrict
 #ifdef __GNUC__
     #define restrict __restrict
@@ -83,14 +111,14 @@ private:
 #endif
 #endif
 
-// memory alignment
-#ifndef alignof
-#ifdef __GNUC__
-    #define aligned_ptr(x,y) (__builtin_assume_aligned((x),(y)))
-#else
-    #define aligned_ptr(x,y) (x)
-    #warning "Don't know how to determine memory alignment. Using non-aligned pointers (may forbid vectorization and result in slower code)."
-#endif
+//
+// Memory alignment.
+// - supports intrinsic compiler optimization, mainly the usage of SIMD instructions (AVX etc.)
+// - enabled only for Linux systems (those ought to posess "posix_memalign", which is used)
+//
+
+#ifndef __linux__
+    #define NO_ALIGN
 #endif
 
 //
@@ -120,13 +148,13 @@ template <class T> struct is_scalar
 };
 
 // explicitly list all basic scalar types
-declareTypeAsScalar(int);
-declareTypeAsScalar(long);
-declareTypeAsScalar(float);
-declareTypeAsScalar(double); 
+declareTypeAsScalar(int)
+declareTypeAsScalar(long)
+declareTypeAsScalar(float)
+declareTypeAsScalar(double)
 
 //
-// Trimming.
+// White space trimming.
 //
 
 /// Trim from start.
@@ -199,6 +227,12 @@ template <typename T, class ...Params> T mmax (T x, Params ...p)
     return std::max(x, y);
 }
 
+/// Constant-expression max.
+template <class T> constexpr T const & larger_of (T const & a, T const & b)
+{
+    return (a > b) ? a : b;
+}
+
 /**
  * @brief printf-like formatting.
  * 
@@ -214,14 +248,14 @@ template <class ...Params> char const * format (Params ...p)
 /**
  * @brief Timing class.
  * 
- * The Timer class is a singleton that can be used for a comfortable computation of
+ * The Timer class can be used for a comfortable computation of
  * elapsed time. The usage would be:
  * @code
- *     Timer::timer().start();
+ *     Timer timer;
  * 
  *     // .. block ...
  * 
- *     std:cout << "Time = " << Timer::timer().stop() << "secs.\n";
+ *     std:cout << "Time = " << timer.elapsed() << "secs.\n";
  * @endcode
  */
 class Timer
@@ -229,20 +263,17 @@ class Timer
     public:
         
         /// Return object reference (singleton interface).
-        static Timer const & timer()
-        {
-            static Timer timer_;
-            return timer_;
-        }
+        Timer()
+            : start_(std::chrono::system_clock::now()) {}
         
         /// Start timer.
-        void start () const
+        void reset ()
         {
             start_ = std::chrono::system_clock::now();
         }
         
         /// Stop timer and return elapsed time in seconds.
-        int stop () const
+        int elapsed ()
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);

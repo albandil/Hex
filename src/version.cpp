@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -30,7 +30,7 @@ std::string logo ()
         "#     /  ___  /   | |/_/    / /\\ \\      \n"
         "#    / /   / /    \\_\\      / /  \\ \\   \n"
         "#                                         \n"
-        "#             UK MFF (c) 2013             \n"
+        "#             UK MFF (c) 2014             \n"
         "#                                         \n"
         "#          version hash: %s               \n"
         "#                                         \n",
@@ -49,7 +49,7 @@ std::string logo_raw ()
         "      /  ___  /   | |/_/    / /\\ \\      \n"
         "     / /   / /    \\_\\      / /  \\ \\   \n"
         "                                          \n"
-        "              UK MFF (c) 2013             \n"
+        "              UK MFF (c) 2014             \n"
         "                                          \n"
         "           version hash: %s               \n"
         "                                          \n",

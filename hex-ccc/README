@@ -1,0 +1,42 @@
+
+        / /   / /    __    \ \  / /
+       / /__ / /   / _ \    \ \/ /
+      /  ___  /   | |/_/    / /\ \
+     / /   / /    \_\      / /  \ \
+
+                 HEX-CCC
+
+------------
+Dependencies
+------------
+
+The program is written in C++11 and can be successfully compiled by the
+following compilers:
+
+ * GCC 4.8.1
+ * Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
+ 
+There are several external libraries that are being used for some partial tasks.
+Here is the list of the libraries with versions that were used:
+
+ * GSL 1.15
+            Obtainable from
+                http://www.gnu.org/software/gsl/
+            Used for special functions and some others.
+
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
+
+-------------
+Build and run
+-------------
+
+Once the needed libraries are present in the system include and library paths,
+all that is necessary to build the program is running "make" from this directory.
+
+> make
+
+This should create an executable "hex-ccc" in the subdirectory "bin/".
+
+If the external libraries are installed in non-standard locations, one needs to
+edit the Makefile accordingly.

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -169,8 +169,8 @@ bool ExtrapolatedCrossSection::run (
     
     // compute complete cross section
     rArray ccs = (energies[0] < 0) ? sigmafull : ((efactor * energies.front() < Eion) ? 
-        interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
-        interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline));
+        interpolate_real(Efull, sigmafull, energies * efactor, gsl_interp_linear) :
+        interpolate_real(Efull, sigmafull, energies * efactor, gsl_interp_cspline));
     
     // reshape arrays for compatible indexing by energies
     rArray dsigma0empty(dsigma0.size());    // zero-filled ghost
@@ -186,8 +186,8 @@ bool ExtrapolatedCrossSection::run (
     
     // interpolate
     rArray xcs = (energies[0] < 0) ? sigmafull : ((efactor * energies.front() < 1.) ? 
-        interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_linear) :
-        interpolate_real(Efull, sigmafull, energies * efactor, o2scl::itp_cspline));
+        interpolate_real(Efull, sigmafull, energies * efactor, gsl_interp_linear) :
+        interpolate_real(Efull, sigmafull, energies * efactor, gsl_interp_cspline));
     
     if (energies[0] < 0.)
     {

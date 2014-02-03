@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -14,83 +14,120 @@
 #define HEX_GAUSSKRONROD
 
 #include <cmath>
-#include <limits>
-#include <string>
 
-#include <o2scl/exception.h>
-#include <o2scl/gsl_inte_qag.h>
-#include <o2scl/gsl_inte_qagi.h>
-#include <o2scl/gsl_inte_qagil.h>
-#include <o2scl/gsl_inte_qagiu.h>
+#include <gsl/gsl_integration.h>
 
 #include "misc.h"
+#include "specf.h"
 
-/** \brief Numerical integrator
+/** @brief Numerical integrator
  *
  * The class is initialized by a lambda-function (= the integrand) and
- * serves as a QuadPack wrapper. The member function \ref integrate performs
- * the actual integration. The getters \ref result and \ref abserr return
+ * serves as a QuadPack wrapper. The member function @ref integrate performs
+ * the actual integration. The getters @ref result and @ref abserr return
  * the computed numbers.
  * 
  * For the initialization you will mostly want to use the structure
- * \code
+ * @code
  *     GaussKronrod<decltype(integrand)> Q(integrand);
- * \endcode
+ * @endcode
  */
-template <typename Functor> class GaussKronrod
+template <typename Functor> class GaussKronrod : public RadialFunction<double>
 {
     private:
-        Functor F;
-        double Result, AbsErr;
-        bool Ok;
-        std::string Status;
-        double eval(double x) { return F(x); }
-
-    public:
-        GaussKronrod(Functor f) : F(f) { Result = AbsErr = Nan; Ok = false; }
-        ~GaussKronrod() {}
         
-        /** \brief Compute the integral.
+        /// Integrated function.
+        Functor Integrand;
+        
+        /// Result of the last integration.
+        double Result;
+        
+        /// Estimation of the absolute error of the last integration.
+        double AbsErr;
+        
+        /// Whether the last integration succeeded.
+        bool Ok;
+        
+        /// Absolute tolerance of the integrator.
+        double EpsAbs;
+        
+        /// Relative tolerance of the integrator.
+        double EpsRel;
+        
+        /// Limit on subdivision.
+        size_t Limit;
+        
+        /// Integration workspace pointer.
+        gsl_integration_workspace * Workspace;
+        
+    public:
+        
+        // constructor
+        GaussKronrod (Functor f, size_t limit = 1000)
+            : Integrand(f), Result(Nan), AbsErr(Nan), Ok(false), EpsAbs(0.), EpsRel(1e-5),
+              Limit(limit), Workspace(gsl_integration_workspace_alloc(Limit)) {}
+        
+        // destructor
+        ~GaussKronrod()
+        {
+            gsl_integration_workspace_free(Workspace);
+        }
+        
+        // evaluate the integrand
+        inline double operator() (double x) const
+        {
+            return Integrand(x);
+        }
+        
+        /**
+         * @brief Evaluates radial function supplied in a pointer.
+         * 
+         * This function serves as a workaround for impossibility of passing pointer-to-member
+         * to the GSL routines.
+         */
+        static double eval (double x, void * ptr_radf)
+        {
+            return (*((RadialFunction<double>*) ptr_radf))(x);
+        }
+        
+        /** @brief Compute the integral.
          *
          * Performs the integration on a given interval. Uses specialized routines
-         * from the O₂scl library, which itself just wraps GSL (and that is, in this
-         * case, nothing than C-port of QuadPack).
+         * from GSL (that is, in this case, nothing than C-port of QuadPack).
          * 
          * You can compute improper integrals. For specifying "infinity" as
          * one or both bounds use either
          * 
-         * \code
+         * @code
          *     std::numeric_limits<double>::infinity()
-         * \endcode
+         * @endcode
          * 
          * for positive infinity or
          * 
-         * \code
+         * @code
          *     -std::numeric_limits<double>::infinity()
-         * \endcode
+         * @endcode
          * 
          * for negative infinity.
          * 
-         * \return The value of \ref Ok (i.e. whether the last integration has
+         * @return The value of "Ok" (i.e. whether the last integration has
          * been successful according to the library).
          */
-        bool integrate(double a, double b)
+        bool integrate (double a, double b)
         {
             // reset
             Result = AbsErr = Nan;
             Ok = true;
-            Status.clear();
             
             if (a == b) { return 0; }
             
-            if (isnan(a) || isnan(b))
+            if (std::isnan(a) || std::isnan(b))
             {
                 Ok = false;
-                Status = std::string("ERROR: Some of the integration bounds is not defined!");
                 return false;
             }
             
-            // otočíme znaménko
+            // check bounds order
             if (a > b)
             {
                 integrate(b, a);
@@ -98,49 +135,86 @@ template <typename Functor> class GaussKronrod
                 return Ok;
             }
             
-            // EvalPtr je ukazatel na členskou funkci Integrator::eval, kterou budeme posílat
-            // do knihovních funkcí.
-            o2scl::funct_mfptr<GaussKronrod<Functor>> EvalPtr(const_cast<GaussKronrod<Functor>*>(this), &GaussKronrod<Functor>::eval);
-            o2scl::inte<o2scl::funct_mfptr<GaussKronrod<Functor>>> *R = 0;
+            // setup integrand
+            gsl_function F;
+            F.function = &GaussKronrod::eval;
+            F.params = this;
             
-            // podle konečnosti mezí vybere správný integrátor
-            if (finite(a) && finite(b))          /* -∞ < a < b < +∞ */
-                R = new o2scl::gsl_inte_qag<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-            else if (finite(a) && !finite(b))    /* -∞ < a < b = +∞ */
-                R = new o2scl::gsl_inte_qagiu<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
-            else if (!finite(a) && finite(b))    /* -∞ = a < b < +∞ */
-                R = new o2scl::gsl_inte_qagil<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            // setup integrator
+            int err = GSL_SUCCESS, err1 = GSL_SUCCESS, err2 = GSL_SUCCESS;
+            double Result1, Result2, AbsErr1, AbsErr2;
+            
+            // use correct integrator
+            if (std::isfinite(a) and std::isfinite(b))          /* -∞ < a < b < +∞ */
+            {
+                err = gsl_integration_qag
+                (
+                    &F, a, b,
+                    EpsAbs, EpsRel, Limit,
+                    GSL_INTEG_GAUSS51,
+                    Workspace,
+                    &Result, &AbsErr
+                ); 
+            }
+            else if (std::isfinite(a) and not std::isfinite(b))    /* -∞ < a < b = +∞ */
+            {
+                err = gsl_integration_qagiu
+                (
+                    &F, a,
+                    EpsAbs, EpsRel, Limit,
+                    Workspace,
+                    &Result, &AbsErr
+                );
+            }
+            else if (not std::isfinite(a) and std::isfinite(b))    /* -∞ = a < b < +∞ */
+            {
+                err = gsl_integration_qagil
+                (
+                    &F, b,
+                    EpsAbs, EpsRel, Limit,
+                    Workspace,
+                    &Result, &AbsErr
+                );
+            }
             else                                 /* -∞ = a < b = +∞ */
-                R = new o2scl::gsl_inte_qagi<o2scl::funct_mfptr<GaussKronrod<Functor>>>;
+            {
+                err1 = gsl_integration_qagiu
+                (
+                    &F, a,
+                    EpsAbs, EpsRel, Limit,
+                    Workspace,
+                    &Result1, &AbsErr1
+                );
+                
+                err2 = gsl_integration_qagil
+                (
+                    &F, b,
+                    EpsAbs, EpsRel, Limit,
+                    Workspace,
+                    &Result2, &AbsErr2
+                );
+                
+                Result = Result1 + Result2;
+                AbsErr = AbsErr1 + AbsErr2;
+            }
             
-            // pozor! o2scl kope!
-            try
-            {
-                // provede integraci
-                R->integ_err(EvalPtr, a, b, Result, AbsErr);
-            }
-            catch (o2scl::exc_runtime_error e)
-            {
-                // Integrace se úplně nepovedla, ale pořád lepší než nic. Text výjimy
-                // uložíme a necháme uživatele, aby o adlším pokračování rozhodl sám.
-                Status = std::string(e.what());
-                Ok = false;
-            }
-            catch (o2scl::exc_exception e)
-            {
-                // totéž
-                Status = std::string(e.what());
-                Ok = false;
-            }
-            
-            delete R;
+            Ok = (err == GSL_SUCCESS and err1 == GSL_SUCCESS and err2 == GSL_SUCCESS);
             return Ok;
         }
         
-        const std::string& status() const { return Status; }    // text chybového hlášení
-        bool ok() const { return Ok; }                    // proběhla poslední integrace v pořádku?
-        double result() const { return Result; }        // výsledek poslední integrace
-        double abserr() const { return AbsErr; }        // a její absolutní chyba
+        //
+        // getters & setters
+        //
+        
+        bool ok() const { return Ok; }
+        double result() const { return Result; }
+        double error() const { return AbsErr; }
+        
+        void setEpsAbs (double epsabs) { EpsAbs = epsabs; }
+        void setEpsRel (double epsrel) { EpsRel = epsrel; }
+        
+        double epsabs () const { return EpsAbs; }
+        double epsrel () const { return EpsRel; }
 };
 
 #endif

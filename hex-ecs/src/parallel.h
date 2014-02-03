@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -23,7 +23,8 @@
  * @brief MPI info.
  * 
  * The class Parallel holds some useful MPI data, like the rank and size of the
- * communicator.
+ * communicator. This class should be used for all parallel communication using
+ * MPI.
  */
 class Parallel
 {

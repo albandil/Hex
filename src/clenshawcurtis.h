@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -25,6 +25,17 @@
 #include "compact.h"
 #include "misc.h"
 
+/**
+ * @brief Clenshaw-Curtis quadrature.
+ * 
+ * Clenshaw-Curtis integrator class. Constructor of the class accepts the
+ * function that will be integrated. The actual quadrature is done on the
+ * call to ClenshawCurtis::integrate. Clenshaw-Curtis quadrature evaluates
+ * the function in the Chebyshev nodes and uses sophisticated algorithm to
+ * extract the value of the quadrature. For more details see Numerical
+ * recipes (3rd ed.). The present implementation uses fast Fourier transform
+ * from FFTW for fast computation.
+ */
 template <class Functor, typename FType> class ClenshawCurtis
 {
 public:
@@ -92,7 +103,10 @@ public:
     inline bool throwall() const { return Throw; }
     
     /**
+     * @brief General integration.
+     * 
      * Clenshaw-Curtis quadrature, main interface.
+     * 
      * @param x1 Left bound (allowed infinite).
      * @param x2 Right bound (allowed infinite).
      * @param n On input, maximal subdivision for a single bisection. (No effect
@@ -105,11 +119,11 @@ public:
             return 0.;
         
         // if both bounds are infinite, call a specialized function
-        if (not finite(x1) and not finite(x2))
+        if (not std::isfinite(x1) and not std::isfinite(x2))
             return integrate_ii(n);
 
         // lower bound is infinite
-        if (not finite(x1))
+        if (not std::isfinite(x1))
         {
             // the compactified functor
             CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
@@ -129,7 +143,7 @@ public:
         }
 
         // upper bound is infinite
-        if (not finite(x2))
+        if (not std::isfinite(x2))
         {
             // the compactified functor
             CompactIntegrand<decltype(F),FType> G(F, x1, x2, Limit, L);
@@ -153,7 +167,10 @@ public:
     }
     
     /**
+     * @brief Finite integration.
+     * 
      * Clenshaw-Curtis quadrature for finite interval (a,b).
+     * 
      * @param x1 Left bound (allowed infinite).
      * @param x2 Right bound (allowed infinite).
      * @param n On output, evaluations needed for a converged result.
@@ -217,12 +234,12 @@ public:
                 {
                     fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
                     
-                    if (not finite(std::abs(fvals[k])))
+                    if (not std::isfinite(std::abs(fvals[k])))
                         throw exception("[%s] \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
-                if (not finite(std::abs(fvals[N])))
+                if (not std::isfinite(std::abs(fvals[N])))
                     throw exception("[%s] \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
             }
             else
@@ -233,7 +250,7 @@ public:
                 {
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
                     
-                    if (not finite(std::abs(fvals[k])))
+                    if (not std::isfinite(std::abs(fvals[k])))
                         throw exception("[%s] \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
                 }
                 fvals[N] = fvals_prev[N/2];
@@ -283,8 +300,8 @@ public:
                 
                 return FType(2. * (x2 - x1) / N) * sum;
             }
-            else if ( finite(std::abs(sum)) 
-                  and finite(std::abs(sum_prev)) 
+            else if ( std::isfinite(std::abs(sum)) 
+                  and std::isfinite(std::abs(sum_prev)) 
                   and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
             {
                 if (Verbose)
@@ -363,9 +380,11 @@ public:
     }
     
     /**
+     * @brief Improper integration.
+     * 
      * Clenshaw-Curtis quadrature for infinite-infinite interval (-∞,+∞).
-     * @param n On output, evaluations needed for 
-     *          converged result.
+     * 
+     * @param n On output, evaluations needed for converged result.
      */
     FType integrate_ii (int * n = nullptr) const
     {
@@ -392,7 +411,7 @@ public:
                 {
                     double x = i * M_PI / N;
                     fvals[i] = F(L / tan(x));
-                    if (not finite(std::abs(fvals[i])))
+                    if (not std::isfinite(std::abs(fvals[i])))
                         fvals[i] = 0;
                     weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
                 }
@@ -411,7 +430,7 @@ public:
                     {
                         double x = i * M_PI / N;
                         fvals[i] = F(L / tan(x));
-                        if (not finite(std::abs(fvals[i])))
+                        if (not std::isfinite(std::abs(fvals[i])))
                             fvals[i] = 0;
                         weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
                     }

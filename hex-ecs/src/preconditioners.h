@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -210,7 +210,7 @@ class NoPreconditioner : public PreconditionerBase
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : PreconditionerBase(), par_(par), inp_(inp), l1_l2_(ll),
+        ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
             s_bspline_(bspline), s_rad_(s_bspline_) {}
         
         virtual RadialIntegrals const & rad () const { return s_rad_; }
@@ -223,6 +223,9 @@ class NoPreconditioner : public PreconditionerBase
         
     protected:
         
+        // command line switches
+        CommandLine const & cmd_;
+        
         // parallel environment
         Parallel const & par_;
         
@@ -233,7 +236,7 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<std::pair<int,int>> const & l1_l2_;
         
         // diagonal blocks in DIA format (these will be used in matrix multiplication)
-        std::vector<SymDiaMatrix> dia_blocks_;
+        mutable std::vector<SymDiaMatrix> dia_blocks_;
         
         // B-spline environment for the solution
         Bspline s_bspline_;
@@ -280,8 +283,8 @@ class CGPreconditioner : public NoPreconditioner
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
         // inner CG callbacks
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const { q = dia_blocks_[iblock].dot(p); }
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
+        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
 };
 
 /**
@@ -317,15 +320,11 @@ class GPUCGPreconditioner : public NoPreconditioner
         // declare own definitions
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
-        // inner CG callbacks
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const { q = dia_blocks_[iblock].dot(p); }
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = r; }
-        
     private:
         
         // diagonal blocks
-        std::vector<CsrMatrix> csr_blocks_;
-        std::vector<cArray> block_;
+        mutable std::vector<CsrMatrix> csr_blocks_;
+        mutable std::vector<cArray> block_;
         
         // OpenCL environment
         cl_platform_id platform_;
@@ -334,11 +333,16 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_command_queue queue_;
         cl_program program_;
         
+        // size of a workgroup
+        size_t Nlocal_;
+        
         // computational kernels
         cl_kernel mmul_;
         cl_kernel amul_;
         cl_kernel axby_;
         cl_kernel vnrm_;
+        cl_kernel norm_;
+        cl_kernel spro_;
 };
 #endif
 
@@ -414,12 +418,12 @@ class SSORCGPreconditioner : public CGPreconditioner
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = SSOR_[iblock].upperSolve( SSOR_[iblock].dot( SSOR_[iblock].lowerSolve(r), diagonal ) ); }
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         
         // inverse diagonals for every block
-        std::vector<SymDiaMatrix> SSOR_;
+        mutable std::vector<SymDiaMatrix> SSOR_;
 };
 
 /**
@@ -455,7 +459,7 @@ class ILUCGPreconditioner : public CGPreconditioner
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = lu_[iblock].solve(r); }
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         
@@ -463,10 +467,10 @@ class ILUCGPreconditioner : public CGPreconditioner
         double droptol_;
         
         // diagonal CSR block for every coupled state
-        std::vector<CsrMatrix> csr_blocks_;
+        mutable std::vector<CsrMatrix> csr_blocks_;
         
         // LU decompositions of the CSR blocks
-        std::vector<CsrMatrix::LUft> lu_;
+        mutable std::vector<CsrMatrix::LUft> lu_;
 };
 
 /**

@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -20,11 +20,14 @@
 #include "dwba1.h"
 #include "hydrogen.h"
 #include "potential.h"
+#include "version.h"
 #include "wave_distort.h"
 
 int main (int argc, char *argv[])
 {
-    // 	gsl_set_error_handler_off();
+    // turn off GSL error jumps
+    gsl_set_error_handler_off();
+    
 #ifndef NO_HDF
     H5::Exception::dontPrint();
 #endif
@@ -40,6 +43,9 @@ int main (int argc, char *argv[])
         std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> [<rmax>]\n\n";
         exit(0);
     }
+    
+    // draw package logo
+    std::cout << logo_raw() << "\n";
     
     // extract parameters
     int Ni = strtol(argv[1], 0, 10);
@@ -137,7 +143,7 @@ int main (int argc, char *argv[])
                     {
                         double Gaunts_dir = Gaunt(lambda, Mi - Mf, li, 0, lf, Mi - Mf) * Gaunt(lambda, Mi - Mf, Lf, Mf, Li, Mi);
                         
-                        if (not finite(Gaunts_dir))
+                        if (not std::isfinite(Gaunts_dir))
                             throw exception ("Gaunt failure!\n");
                         
                         Tdir_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat * Gaunts_dir;
@@ -159,7 +165,7 @@ int main (int argc, char *argv[])
                     {
                         double Gaunts_exc = Gaunt(lambda, -Mf, Li, Mi, lf, Mi - Mf) * Gaunt(lambda, -Mf, Lf, Mf, li, 0);
                         
-                        if (not finite(Gaunts_exc))
+                        if (not std::isfinite(Gaunts_exc))
                             throw exception ("Gaunt failure!\n");
                         
                         Texc_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat * Gaunts_exc;

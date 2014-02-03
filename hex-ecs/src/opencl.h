@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -19,6 +19,13 @@
 
 #include "arrays.h"
 
+/**
+ * @brief OpenCL array wrapper.
+ *
+ * This class equips ArrayView<T> with an OpenCL context handle and
+ * provides several service methods for upload and download to / from
+ * the compute device (mostly GPU).
+ */
 template <class T> class CLArrayView : public ArrayView<T>
 {
     protected:
@@ -54,8 +61,6 @@ template <class T> class CLArrayView : public ArrayView<T>
             std::swap (ArrayView<T>::array_, v.ArrayView<T>::array_);
             std::swap (ArrayView<T>::N_,     v.ArrayView<T>::N_    );
             std::swap (cl_handle_,           v.cl_handle_          );
-            
-//             std::cout << "Init CLArrayView from CLArrayView&&.\n";
         }
         
         //
@@ -64,8 +69,6 @@ template <class T> class CLArrayView : public ArrayView<T>
         
         virtual ~CLArrayView ()
         {
-            // free GPU memory
-//             disconnect ();
         }
         
         //
@@ -122,7 +125,6 @@ template <class T> class CLArrayView : public ArrayView<T>
         
         cl_int EnqueueDownload (cl_command_queue queue)
         {
-//             std::cout << "EnqueueDownload of " << size() << " elements starting from " << data() << "\n";
             return clEnqueueReadBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
@@ -132,8 +134,26 @@ template <class T> class CLArrayView : public ArrayView<T>
         }
 };
 
+/**
+ * @brief OpenCL array wrapper.
+ *
+ * This class combines NumberArray<T> and CLArrayView<T>. It is a self-standing array of
+ * memory-aligned elements. The alignment is large by default so that the class can be used
+ * as the host-type memory within OpenCL. However, the aimed usage is this:
+ * - Create the array.
+ * - Fill the array with initial data.
+ * - Connect to the computing device (GPU) and upload the data.
+ * - Run computation on the compute device.
+ * - Download the resulting data back to RAM.
+ * - Disconnect from compute device.
+ * - Destruct the class.
+ */
+#ifndef NO_ALIGN
 #define CL_ALIGNMENT 4096
 template <class T, class Alloc = AlignedAllocator<T,CL_ALIGNMENT>> class CLArray : public CLArrayView<T>
+#else
+template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArrayView<T>
+#endif
 {
     public:
         

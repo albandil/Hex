@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -30,7 +30,8 @@ VariableList::VariableList () :
         new IonizationF,
         new IonizationAmplitude,
         new TripleDifferentialCrossSection,
-        new StokesParameters
+        new StokesParameters,
+        new SpinAsymmetry
     })
 {
     
@@ -43,7 +44,7 @@ VariableList::~VariableList ()
         delete var;
 }
 
-Variable const * const VariableList::get (std::string const & id) const
+Variable const * VariableList::get (std::string const & id) const
 {
     // search the list for a (pointer to a) variable with the correct ID
     std::vector<Variable*>::const_iterator it = std::find_if (

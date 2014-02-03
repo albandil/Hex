@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -248,8 +248,8 @@ bool IntegralCrossSection::run (
         
         // interpolate
         rArray ics = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
         
         // output
         for (size_t i = 0; i < energies.size(); i++)

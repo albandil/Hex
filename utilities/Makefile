@@ -1,14 +1,18 @@
-.PHONY: all clean doc
+.PHONY: all clean allclean doc docclean dist distclean
 
 SUBDIRS = stack f hdf2txt hdf2hdf chebeval
 
-default : all
+default:
+	make all
+
+allclean:
+	make clean
+
+all clean : $(SUBDIRS)
+
+doc dist distclean :
 
 $(SUBDIRS)::
+	@echo $@ $(MAKECMDGOALS)
 	+make -C $@ $(MAKECMDGOALS)
 	mkdir -p bin; cd bin; ln -fs ../$@/$@ .
-	
-all clean: $(SUBDIRS)
-
-doc:
-	

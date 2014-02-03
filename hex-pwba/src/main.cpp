@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -23,6 +23,7 @@
 #include "misc.h"
 #include "specf.h"
 #include "symbolic.h"
+#include "version.h"
 
 double compute_Idir (int li, int lf, int lam, int Ni, int Li, double ki, int Nf, int Lf, double kf)
 {
@@ -186,11 +187,17 @@ std::pair<double,double> cross_section (
 
 int main(int argc, char* argv[])
 {
+    // disable GSL error handler
+    gsl_set_error_handler_off();
+    
     if (argc != 8)
     {
         printf("\nUsage:\n\thex-pwba <ni> <li> <nf> <lf> <maxL> <Ei> <sigmaeps>\n\n");
         exit(0);
     }
+    
+    // write program logo
+    std::cout << logo_raw() << "\n";
     
     // atomic quantum numbers
     int Ni = strtol(argv[1], 0, 10);
@@ -251,7 +258,7 @@ int main(int argc, char* argv[])
     if (maxL >= maxl_limit)
     {
         std::cerr << "Warning: Partial wave limit " << maxl_limit
-                  << " reached for E = " << Ei << " Ry, the result may lack the desired presicion.\n";
+                  << " reached for E = " << Ei << " Ry, the result may lack the desired precision.\n";
     }
     
     //

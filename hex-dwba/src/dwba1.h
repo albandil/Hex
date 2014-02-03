@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -121,6 +121,6 @@ Complex computeExchange2e(
     int Ni, int Li, double ki, int li
 );
 
-}; // end of namespace DWBA1
+} // end of namespace DWBA1
 
 #endif

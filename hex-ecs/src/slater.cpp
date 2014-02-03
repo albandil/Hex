@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -165,7 +165,7 @@ Complex RadialIntegrals::computeR (
                 b <= iy and iy <= b + (int)order)
             {
                 Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
-                if (finite(lg.imag()))
+                if (std::isfinite(lg.imag()))
                     Rtr_Labcd_offdiag += std::exp (lg);
             }
             
@@ -174,7 +174,7 @@ Complex RadialIntegrals::computeR (
                 a <= iy and iy <= a + (int)order)
             {
                 Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
-                if (finite(lg.imag()))
+                if (std::isfinite(lg.imag()))
                     Rtr_Labcd_offdiag += std::exp (lg);
             }
         }

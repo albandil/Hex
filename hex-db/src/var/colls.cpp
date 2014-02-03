@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -133,8 +133,8 @@ bool CollisionStrength::run (
         
         // interpolate
         rArray interp = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, o2scl::itp_cspline);
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
             
         // compute collision strength
         rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;

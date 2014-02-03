@@ -5,7 +5,7 @@
  *                     /  ___  /   | |/_/    / /\ \                          *
  *                    / /   / /    \_\      / /  \ \                         *
  *                                                                           *
- *                         Jakub Benda (c) 2013                              *
+ *                         Jakub Benda (c) 2014                              *
  *                     Charles University in Prague                          *
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -129,6 +129,11 @@ inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArr
  *        @f[
  *                 \sum_{i = 1}^N x_i y_i \ .
  *        @f]
+ * @param compute_norm Functor compatible with signature
+ *        @code
+ *            double (*) (const TArrayView x)
+ *        @endcode
+ *        Computes the norm of the array.
  * 
  * @return Iteration count.
  */
@@ -159,7 +164,7 @@ unsigned cg_callbacks
              ComputeNorm compute_norm   = default_compute_norm
 )
 {
-    Timer::timer().start();
+    Timer timer;
     
     // compute norm of the right hand side
     double bnorm = compute_norm(b);
@@ -196,7 +201,7 @@ unsigned cg_callbacks
     unsigned k;
     for (k = 0; k < max_iterations; k++)
     {
-        int sec = Timer::timer().stop();
+        int sec = timer.elapsed();
         
         if (verbose)
         {
@@ -234,7 +239,7 @@ unsigned cg_callbacks
         
         // compute and check norm
         rnorm = compute_norm(r);
-        if (not finite(rnorm))
+        if (not std::isfinite(rnorm))
         {
             std::cout << "\t[cg] Oh my god... the norm of the solution is not finite. Something went wrong!\n";
             break;
