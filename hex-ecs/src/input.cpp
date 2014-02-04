@@ -172,6 +172,12 @@ void CommandLine::parse (int argc, char* argv[])
                 droptol = atof(optarg.c_str());
                 return true;
             },
+        "iteration-tolerance", "t", 1, [&](std::string optarg) -> bool
+            {
+                // iteration tolerance for terminating iteration solution
+                itertol = atof(optarg.c_str());
+                return true;
+            },
         "preconditioner", "p", 1, [&](std::string optarg) -> bool
             {
                 // preconditioner

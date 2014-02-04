@@ -719,7 +719,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         (
             rview,                  // rhs
             zview,                  // solution
-            1e-11,                  // tolerance
+            cmd_.itertol/10,        // tolerance
             0,                      // min. iterations
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
@@ -1004,7 +1004,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         (
             rsegment,               // rhs
             zsegment,               // solution to be filled
-            1e-11,                  // tolerance
+            cmd_.itertol,           // tolerance
             0,                      // min. iterations
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner

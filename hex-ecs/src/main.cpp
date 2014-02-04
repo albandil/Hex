@@ -291,13 +291,12 @@ int main (int argc, char* argv[])
             auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
             
             // custom conjugate gradients callback-based solver
-            double tolerance = 1e-10;
-            std::cout << "\tStart CG callback with tolerance " << tolerance << "\n";
+            std::cout << "\tStart CG callback with tolerance " << cmd.itertol << "\n";
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
                 chi,                      // right-hand side
                 current_solution,         // on input, the initial guess, on return, the solution
-                tolerance,                // requested precision, |A·x - b|² < ε·|b|²
+                cmd.itertol,              // requested precision, |A·x - b|² < ε·|b|²
                 0,                        // minimal iteration count
                 (inp.maxell+1) * Nspline, // maximal iteration count
                 apply_preconditioner,     // preconditioner callback

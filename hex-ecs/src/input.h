@@ -62,7 +62,7 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
-              droptol(1e-15), itinerary(StgNone), outofcore(false)
+              droptol(1e-15), itinerary(StgNone), outofcore(false), itertol(1e-10)
         {
             // get command line options
             parse(argc, argv);
@@ -105,6 +105,9 @@ class CommandLine
         
         /// Whether to keep precomputed data only on disk and spare RAM.
         bool outofcore;
+        
+        /// Tolerance for terminating iterative solution.
+        double itertol;
 };
 
 /**
