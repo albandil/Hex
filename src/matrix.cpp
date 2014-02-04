@@ -37,6 +37,48 @@ double SuiteSparse_time()
     
 #include "arrays.h"
 #include "matrix.h"
+#include "misc.h"
+
+//
+// Dense matrix routines
+//
+
+template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B)
+{
+    // check sanity
+    if (A.cols() != B.rows());
+        throw exception ("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+    
+    // create output matrix
+    RowMatrix<double> C (A.rows(), B.cols());
+    
+    // get sizes
+    int m = A.rows(), n = B.cols(), r = A.cols();
+    
+    // get restricted and aligned pointers for fast access
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+    double const * const restrict pA = (double*) __builtin_assume_aligned (A.data().data(), 2*sizeof(double));
+    double const * const restrict pB = (double*) __builtin_assume_aligned (B.data().data(), 2*sizeof(double));
+    double       * const restrict pC = (double*) __builtin_assume_aligned (C.data().data(), 2*sizeof(double));
+#else
+    double const * const restrict pA = A.data().data();
+    double const * const restrict pB = B.data().data();
+    double       * const restrict pC = C.data().data();
+#endif /* defined(__GNUC__) || defined(__INTEL_COMPILER) */
+    
+    // multiply
+    for (int i = 0; i < m; i++)
+    for (int j = 0; j < n; j++)
+    for (int k = 0; k < r; k++)
+        pC[i * n + j] += pA[i * r + k] * pB[j * r + k];
+    
+    // return result
+    return C;
+}
+
+//
+// Sparse matrix routines.
+//
 
 CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
 {

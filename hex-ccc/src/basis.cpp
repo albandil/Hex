@@ -188,6 +188,18 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
     }
 }
 
+double LaguerreBasis::basestate (int ell, int k, double r) const
+{
+    if (ell < 0 or ell > maxell_)
+        throw exception ("[LaguerreBasis::size] Can't access basis %d of %d.", ell, maxell_ + 1);
+        
+    if (k < 1 or k > expansions_[ell].cols())
+        throw exception ("[LaguerreBasis::size] Can't access orbital %d of %d.", k, expansions_[ell].rows());
+    
+    return sqrt(lambda_[ell]/pochhammer_up(k, 2 * ell + 2)) * pow(lambda_[ell] * r, ell + 1)
+           * exp(-lambda_[ell] * r / 2) * gsl_sf_laguerre_n(k - 1, 2 * ell + 1, lambda_[ell] * r);
+}
+
 int LaguerreBasis::size (int ell) const
 {
     if (ell < 0)
@@ -199,15 +211,23 @@ int LaguerreBasis::size (int ell) const
     return expansions_[ell].rows();
 }
 
+const RowMatrix< double >& LaguerreBasis::matrix (int ell) const
+{
+    if (ell < 0 or ell > maxell_)
+        throw exception ("[LaguerreBasis::size] Can't access basis %d of %d.", ell, maxell_ + 1);
+    
+    return expansions_[ell];
+}
+
 const rArrayView LaguerreBasis::orbital (int ell, int n) const
 {
     if (ell < 0 or ell > maxell_)
         throw exception ("[LaguerreBasis::size] Can't access basis %d of %d.", ell, maxell_ + 1);
     
-    if (n < 0 or n >= expansions_[ell].rows())
+    if (n < 1 or n > expansions_[ell].rows())
         throw exception ("[LaguerreBasis::size] Can't access orbital %d of %d.", n, expansions_[ell].rows());
     
-    return expansions_[ell].row(n);
+    return expansions_[ell].row(n-1);
 }
 
 double LaguerreBasis::energy (int ell, int n) const
@@ -215,8 +235,8 @@ double LaguerreBasis::energy (int ell, int n) const
     if (ell < 0 or ell > maxell_)
         throw exception ("[LaguerreBasis::size] Can't access basis %d of %d.", ell, maxell_ + 1);
     
-    if (n < 0 or n >= expansions_[ell].rows())
+    if (n < 1 or n > expansions_[ell].cols())
         throw exception ("[LaguerreBasis::size] Can't access orbital %d of %d.", n, expansions_[ell].rows());
     
-    return energies_[ell][n];
+    return energies_[ell][n-1];
 }

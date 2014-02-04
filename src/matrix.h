@@ -285,6 +285,34 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         Type & operator() (int i, int j) { return row(i)[j]; }
         //@}
         
+        /**
+         * @brief Bilinear form.
+         * 
+         * This function computes the scalar product
+         * @f[
+         *     u^T \mathsf{A} v \ .
+         * @f]
+         */
+        Type operator() (const ArrayView<Type> u, const ArrayView<Type> v) const
+        {
+            // return value
+            Type sum = 0;
+            
+            // pointer to matrix elements
+            Type const * restrict pA = this->data().data();
+            
+            // pointers to vector elements
+            Type const * const restrict pu = u.data();
+            Type const * const restrict pv = v.data();
+            
+            // for all elements
+            for (int i = 0; i < this->rows(); i++)
+            for (int j = 0; j < this->cols(); j++)
+                sum += pu[i] * (*(pA++)) * pv[j];
+            
+            return sum;
+        }
+        
         /// Identity matrix.
         static RowMatrix<Type> Eye (int size)
         {
@@ -421,6 +449,9 @@ template <class T> RowMatrix<T> operator - (RowMatrix<T> const & A, RowMatrix<T>
 template <class T> RowMatrix<T> operator * (T x, RowMatrix<T> const & A) { RowMatrix<T> B(A); B.data() *= x; return B; }
 template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() *= x; return B; }
 template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() /= x; return B; }
+
+// matrix multiplication
+template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, ColMatrix<T> const & B);
 
 /**
  * @brief Dense matrix multiplication.

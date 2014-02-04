@@ -34,11 +34,11 @@ QuadratureRule::QuadratureRule (LaguerreBasis const & basis, double E)
     // for all angular momenta of the basis
     for (int ell = 0; ell < basis.size(); ell++)
     {
-        // for all eigenstates of the basis
-        for (int n = 0; n < basis.size(ell); n++)
+        // for all angular momenta of the projectile (or propagator)
+        for (int l = 0; l < maxpell_; l++)
         {
-            // for all angular momenta of the projectile (or propagator)
-            for (int l = 0; l < maxpell_; l++)
+            // for all eigenstates of the basis
+            for (int n = 1; n <= basis.size(ell); n++)
             {
                 // compute the position of the singularity
                 double sgE = E - basis.energy(ell, n);

@@ -48,8 +48,29 @@ class PotentialMatrix
         
     private:
         
+        /// Basis.
+        LaguerreBasis const & basis_;
+        
+        /// Quadrature rule.
+        QuadratureRule const & quadrature_;
+        
         /// The (symmetrical) matrix of the potential.
         RowMatrix<double> matrix_;
+        
+        /**
+         * @brief Double integral @f$ I_{\mathrm{dir}} @f$.
+         */
+        double ComputeIdir (
+            int lambda,
+            int L, int i, int l, double k,
+            int Lp, int ip, int lp, double kp
+        ) const;
+        
+        double ComputeVdir (
+            int lambda,
+            int L, int N, int l, double k,
+            int Lp, int Np, int lp, double kp
+        ) const;
 };
 
 class MatrixEquation
@@ -65,86 +86,6 @@ class MatrixEquation
         // solve the equation
         rArray solve () const;
 };
-
-/**
- * @brief Compute the direct potential term.
- * 
- * This function will compute the direct potential by evaluating the double
- * integral
- * @f[
- *     I_{\mathrm{dir},NLkl,N'L'k'l'}^\lambda
- *     =
- *     \int\limits_0^\infty \int\limits_0^\infty
- *     P_{NL}(r_1) P_{N'L'}(r_1)
- *     \left(
- *         \frac{r_<^\lambda}{r_>^\lambda}
- *         -
- *         \frac{\delta_\lambda^0}{r_2}
- *     \right)
- *     \hat{j}_l(kr_2) \hat{j}_{l'}(k'r_2)
- *     \mathrm{d}r_1 \mathrm{d}r_2 \ .
- * @f]
- * Here @f$ \hat{j}_l(kr) @f$ is the Riccati-Bessel function and @f$ P_{NL}(r) @f$
- * is the atomic orbital obtained by diagonalization of the hydrogenic Hamiltonian.
- * The orbital is supplied as an array of expansion coefficients in the Laguerre basis.
- * 
- * @param basis The objects managing Laguerre basis for all angular momenta.
- * @param k Linear momentum of the projectile or propagator (initial).
- * @param kp Linear momentum of the projectile or propagator (final).
- * @param l Angular momentum of the projectile or propagator (initial).
- * @param lp Angular momentum of the projectile or propagator (final).
- * @param L Angular momentum of Laguerre basis to use (initial).
- * @param Lp Angular momentum of Laguerre basis to use (final).
- * @param PNL Expansion coefficients of the (initial) atomic orbital in the
- *            Laguerre basis with angular momentum L.
- * @param PNLp Expansion coefficients of the (initial) atomic orbital in the
- *            Laguerre basis with angular momentum Lp.
- */
-double compute_Vdir (
-    LaguerreBasis const & basis, int lambda,
-    double k, int l, rArray const & PNL, int L,
-    double kp, int lp, rArray const & PNLp, int Lp
-);
-
-/**
- * @brief Compute the exchange potential term.
- * 
- * This function will compute the exchange potential by evaluating the double
- * integral
- * @f[
- *     I_{\mathrm{dir},NLkl,N'L'k'l'}^\lambda
- *     =
- *     \int\limits_0^\infty \int\limits_0^\infty
- *     \hat{j}_l(kr_1) P_{N'L'}(r_1)
- *     \left(
- *         \frac{r_<^\lambda}{r_>^\lambda}
- *         -
- *         \frac{\delta_\lambda^0}{r_1}
- *     \right)
- *     P_{NL}(r_2) \hat{j}_{l'}(k'r_2)
- *     \mathrm{d}r_1 \mathrm{d}r_2 \ .
- * @f]
- * Here @f$ \hat{j}_l(kr) @f$ is the Riccati-Bessel function and @f$ P_{NL}(r) @f$
- * is the atomic orbital obtained by diagonalization of the hydrogenic Hamiltonian.
- * The orbital is supplied as an array of expansion coefficients in the Laguerre basis.
- * 
- * @param basis The objects managing Laguerre basis for all angular momenta.
- * @param k Linear momentum of the projectile or propagator (initial).
- * @param kp Linear momentum of the projectile or propagator (final).
- * @param l Angular momentum of the projectile or propagator (initial).
- * @param lp Angular momentum of the projectile or propagator (final).
- * @param L Angular momentum of Laguerre basis to use (initial).
- * @param Lp Angular momentum of Laguerre basis to use (final).
- * @param PNL Expansion coefficients of the (initial) atomic orbital in the
- *            Laguerre basis with angular momentum L.
- * @param PNLp Expansion coefficients of the (initial) atomic orbital in the
- *            Laguerre basis with angular momentum Lp.
- */
-double compute_Vexc (
-    LaguerreBasis const & basis, int lambda,
-    double k, int l, rArray const & PNL, int L,
-    double kp, int lp, rArray const & PNLp, int Lp
-);
 
 #endif /* HEX_CCC_POTENTIAL */
 

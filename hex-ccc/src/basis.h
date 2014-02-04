@@ -16,6 +16,27 @@
 #include "arrays.h"
 #include "matrix.h"
 
+/**
+ * @brief Hydrogen pseudostate basis.
+ * 
+ * This objects manages the basis of the hydrogen atom. The primary basis consists
+ * of a set of "Laguerre states" @f$ \xi_i^{(\ell)}(r) @f$ that are defined by
+ * @f[
+ *     \xi_i^{(\ell)}(r) = \sqrt{\frac{\lambda_\ell (k-1)!}{(2\ell + 1 + k)!}}
+ *     (\lambda_\ell r)^{\ell+1} \mathrm{e}^{-\lambda_\ell r/2}
+ *     L_{k-1}^{2\ell+2}(\lambda_\ell r) \ ,
+ * @f]
+ * where the screening constants @f$ \lambda_\ell @f$ are defined per angular
+ * momentum @f$ \ell @f$ and the indices @f$ i @f$ run from 1 to the size of
+ * the basis for a particular angular momentum @f$ N_\ell @f$. These states are
+ * orthonormal and of finite range proportional to @f$ \lambda_\ell @f$.
+ * 
+ * By diagonalization of the hydrogen hamiltonian the class creates a second
+ * set of states (eigenstate basis), where every state has a definite energy
+ * (eigenvalue of the hamiltonian). This eigenstate basis is used in the computation
+ * for expansion of the Green function and also for specification of the initial
+ * and final atomic states.
+ */
 class LaguerreBasis
 {
     public:
@@ -29,9 +50,27 @@ class LaguerreBasis
          * @param Nl For every allowed angular momentum ("maxell+1" numbers total)
          *           the size of the basis @f$ N_\ell @f$.
          * @param lambda For every angular momentum ("maxell+1" numbers total)
-         *               the screening constant @f$ \lamnda_\ell @f$.
+         *               the screening constant @f$ \lambda_\ell @f$.
          */
         LaguerreBasis (int maxell, iArray Nl, rArray lambda);
+        
+        /**
+         * @brief Evaluate Laguerre state.
+         * 
+         * Returns the value of the Laguerre state,
+         * @f[
+         *     \xi_i^{(\ell)}(r) = \sqrt{\frac{\lambda_\ell (k-1)!}{(2\ell + 1 + k)!}}
+         *     (\lambda_\ell r)^{\ell+1} \mathrm{e}^{-\lambda_\ell r/2}
+         *     L_{k-1}^{2\ell+2}(\lambda_\ell r) \ ,
+         * @f]
+         * where the screening constant @f$ \lambda_\ell @f$ is taken from the stored
+         * array of screening constants that have been previously used to initialize
+         * the object.
+         * @param ell Angular momentum of the state (0, 1, 2, ...).
+         * @param i Index if the state (1, 2, 3, ...).
+         * @param r Radius (equal to or greater than zero).
+         */
+        double basestate (int ell, int i, double r) const;
         
         /**
          * @brief Retrieve eigenenergy of an orbital.
@@ -42,6 +81,13 @@ class LaguerreBasis
          * @param n Index of the eigenstate.
          */
         double energy (int ell, int n) const;
+        
+        /**
+         * @brief Eigenstate matrix.
+         * 
+         * Return the whole matrix of eigenstates for a particular angular momentum.
+         */
+        RowMatrix<double> const & matrix (int ell) const;
         
         /**
          * @brief Retrieve expansion of an orbital.
