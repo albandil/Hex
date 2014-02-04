@@ -65,3 +65,21 @@ As soon as there are some data to import, one will run
 
 If the external libraries are installed in non-standard locations, one needs to
 edit the Makefile accordingly.
+
+-------------------
+Building on Windows
+-------------------
+
+The program has been successfully tested on Windows XP, 7 and 8. The compilation
+has been done in the Code::Blocks IDE (the project file *.cbp is included with
+the source code). It is necessary to install a full-featured MinGW compiler, though;
+the compiler bundled with Code::Blocks lacks necessary features.
+
+1) Download MinGW installer from SourceForge:
+http://sourceforge.net/projects/mingw/files/Installer/mingw-get-setup.exe/download
+
+2) Install C++ and Fortran compilers, OpenMP and Posix threads implementations.
+
+3) Download and install latest Code::Blocks (tested version was 13.12).
+
+4) In Code::Blocks IDE, set the full MinGW installation as the compiler to use.

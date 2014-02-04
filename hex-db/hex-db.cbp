@@ -7,33 +7,29 @@
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="Release">
-				<Option output="bin/Release/hex-db" prefix_auto="1" extension_auto="1" />
-				<Option object_output="obj/Release/" />
+				<Option output="bin/hex-db" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add option="-std=c++11" />
+					<Add option="-Wall" />
+					<Add option="-fexceptions" />
+					<Add option="-DNDEBUG" />
+					<Add option="-DNO_HDF" />
+					<Add directory="../win-include" />
+					<Add directory="libs" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add option="-static-libstdc++" />
+					<Add library="..\win-libraries\libfftw3.a" />
+					<Add library="..\win-libraries\libgsl.a" />
+					<Add library="..\win-libraries\libsqlite3.a" />
 				</Linker>
 			</Target>
 		</Build>
-		<Compiler>
-			<Add option="-std=c++11" />
-			<Add option="-Wall" />
-			<Add option="-fexceptions" />
-			<Add option="-DNDEBUG" />
-			<Add option="-DNO_HDF" />
-			<Add directory="../include" />
-			<Add directory="libs" />
-		</Compiler>
-		<Linker>
-			<Add option="-static-libstdc++" />
-			<Add library="..\lib\libfftw3.a" />
-			<Add library="..\lib\libgsl.a" />
-			<Add library="..\lib\libsqlite3.a" />
-		</Linker>
 		<Unit filename="libs/sqlitepp/binders.cpp" />
 		<Unit filename="libs/sqlitepp/binders.hpp" />
 		<Unit filename="libs/sqlitepp/converters.hpp" />
@@ -69,6 +65,7 @@
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
 		<Unit filename="src/ui.cpp" />
+		<Unit filename="src/var/asy.cpp" />
 		<Unit filename="src/var/ccs.cpp" />
 		<Unit filename="src/var/colls.cpp" />
 		<Unit filename="src/var/dcs.cpp" />

@@ -7,30 +7,26 @@
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="Release">
-				<Option output="bin/Release/hex-dwba" prefix_auto="1" extension_auto="1" />
-				<Option object_output="obj/Release/" />
+				<Option output="bin/hex-dwba" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add option="-std=c++11" />
+					<Add option="-Wall" />
+					<Add option="-fexceptions" />
+					<Add option="-DNDEBUG" />
+					<Add option="-DNO_HDF" />
+					<Add directory="../win-include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add option="-static-libstdc++" />
+					<Add library="../win-libraries/libgsl.a" />
 				</Linker>
 			</Target>
 		</Build>
-		<Compiler>
-			<Add option="-std=c++11" />
-			<Add option="-Wall" />
-			<Add option="-fexceptions" />
-			<Add option="-DNDEBUG" />
-			<Add option="-DNO_HDF" />
-			<Add directory="../include" />
-		</Compiler>
-		<Linker>
-			<Add option="-static-libstdc++" />
-			<Add library="..\lib\libgsl.a" />
-		</Linker>
 		<Unit filename="src/arrays.cpp" />
 		<Unit filename="src/arrays.h" />
 		<Unit filename="src/arrithm.h" />

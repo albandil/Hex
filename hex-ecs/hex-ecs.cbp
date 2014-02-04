@@ -7,49 +7,45 @@
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="Release">
-				<Option output="bin/Release/hex-ecs" prefix_auto="1" extension_auto="1" />
-				<Option object_output="obj/Release/" />
+				<Option output="bin/hex-ecs" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-O3" />
+					<Add option="-std=c++11" />
+					<Add option="-Wall" />
+					<Add option="-fexceptions" />
+					<Add option="-fopenmp" />
+					<Add option="-DNDEBUG" />
+					<Add option="-DNO_OPENCL" />
+					<Add option="-DNO_MPI" />
+					<Add option="-DNO_PNG" />
+					<Add directory="../win-include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add option="-static-libstdc++" />
+					<Add library="../win-libraries/libgsl.a" />
+					<Add library="../win-libraries/libumfpack.a" />
+					<Add library="../win-libraries/liblapack.a" />
+					<Add library="../win-libraries/libdlfcn.a" />
+					<Add library="../win-libraries/libcholmod.a" />
+					<Add library="../win-libraries/libccolamd.a" />
+					<Add library="../win-libraries/libamd.a" />
+					<Add library="../win-libraries/libcamd.a" />
+					<Add library="../win-libraries/libcolamd.a" />
+					<Add library="../win-libraries/libmetis.a" />
+					<Add library="../win-libraries/libgsl.a" />
+					<Add library="../win-libraries/libhdf5.a" />
+					<Add library="../win-libraries/libfftw3.a" />
+					<Add library="../win-libraries/libblas.a" />
+					<Add library="gfortran" />
+					<Add library="dl" />
+					<Add option="-fopenmp" />
 				</Linker>
 			</Target>
 		</Build>
-		<Compiler>
-			<Add option="-std=c++11" />
-			<Add option="-Wall" />
-			<Add option="-fexceptions" />
-			<Add option="-fopenmp" />
-			<Add option="-DNDEBUG" />
-			<Add option="-DNO_OPENCL" />
-			<Add option="-DNO_MPI" />
-			<Add option="-DNO_PNG" />
-			<Add directory="../include" />
-		</Compiler>
-		<Linker>
-      <Add option="-static-libstdc++" />
-			<Add library="..\lib\libgsl.a" />
-			<Add library="..\lib\libumfpack.a" />
-			<Add library="..\lib\liblapack.a" />
-			<Add library="..\lib\libdlfcn.a" />
-			<Add library="..\lib\libcholmod.a" />
-			<Add library="..\lib\libccolamd.a" />
-			<Add library="..\lib\libamd.a" />
-			<Add library="..\lib\libcamd.a" />
-			<Add library="..\lib\libcolamd.a" />
-			<Add library="..\lib\libmetis.a" />
-			<Add library="..\lib\libgsl.a" />
-			<Add library="..\lib\libhdf5.a" />
-      <Add library="..\lib\libfftw3.a" />
-      <Add library="..\lib\libblas.a" />
-      <Add library="gfortran" />
-      <Add library="dl" />
-			<Add option="-fopenmp" />
-		</Linker>
 		<Unit filename="src/amplitudes.cpp" />
 		<Unit filename="src/amplitudes.h" />
 		<Unit filename="src/arrays.cpp" />
