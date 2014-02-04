@@ -57,16 +57,12 @@
 
 	<div class = "text-noindent">
 	The initial and final states \( \Psi \) are taken as products of the atomic
-	(\(\psi\)) and projectile (\(\beta\)) function. The exchange is accounted
-	for by the (anti)symmetrization
-	</div>
-	
-	\[
-		\Psi(1,2) = \psi(1)\beta(2) + (-1)^S \beta(1)\psi(2) \ ,
-	\]
-
-	<div class = "text-noindent">
-	depending on the total spin.
+	(\(\psi\)) and projectile (\(\beta\)) function. The exchange interaction is
+	ignored in the present implementation, as it doesn't influence the cross
+	sections in the domain of validity of the method. Corresponding sections of the
+	code are, however, present in the sources (only commented out). The exchange
+	integrals are more computationally demanding, so their inclusion is considered
+	redundant.
 	</div>
 
 	<div class = "text">
