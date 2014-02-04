@@ -203,8 +203,9 @@ int main(int argc, char* argv[])
         }
     );
     
-    // open the database
-    initialize(dbname.c_str());
+    // open the database, if it is going to be used
+    if (create_new or doimport or doupdate or dooptimize or doavail or not dumpfile.empty() or not vars.empty())
+        initialize(dbname.c_str());
     
     // create new database if asked to
     if (create_new)
