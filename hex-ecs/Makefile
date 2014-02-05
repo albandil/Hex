@@ -11,8 +11,9 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd metis suitesparseconf
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
 
 # OpenMPI environment
-OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
-OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
+OPENMPIFLAGS = -DNO_MPI
+# OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
+# OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64
 
 # AMD OpenCL environment
 OPENCLFLAGS = -DNO_OPENCL
@@ -48,7 +49,7 @@ CFLAGS_RELEASE = -Ofast -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGI
 LFLAGS = -fopenmp -fPIC $(LIBRARY)
 
 # CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
+CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(PNGFLAGS)
 
 FILES = amplitudes arrays gauss bspline hdffile main input \
 	matrix preconditioners radial slater specf version
