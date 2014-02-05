@@ -15,7 +15,6 @@
 #include <gsl/gsl_sf.h>
 
 #include "basis.h"
-#include "lapack_subset.h"
 #include "matrix.h"
 #include "misc.h"
 #include "moments.h"

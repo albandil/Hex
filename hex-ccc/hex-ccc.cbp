@@ -41,7 +41,6 @@
 		<Unit filename="src/doc.h" />
 		<Unit filename="src/hdffile.cpp" />
 		<Unit filename="src/hdffile.h" />
-		<Unit filename="src/lapack_subset.h" />
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/matrix.h" />
