@@ -12,6 +12,8 @@
 
 #include <iostream>
 
+#include <gsl/gsl_sf.h>
+
 #include "basis.h"
 #include "lapack_subset.h"
 #include "matrix.h"
@@ -65,7 +67,7 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
         for (int k = 1; k <= Nl[ell]; k++)
         {
             // compute norm
-            Nkl[k] = sqrt(1./pochhammer_up(k, 2*ell + 2));
+            Nkl[k] = sqrt(1./gsl_sf_poch(k, 2*ell + 2));
             
             // partial sum of norm inverse squares
             Nkl_invsqrsum[k] = (k == 1) ? pow(Nkl[k],-2) : (Nkl_invsqrsum[k-1] + pow(Nkl[k],-2));
@@ -196,7 +198,7 @@ double LaguerreBasis::basestate (int ell, int k, double r) const
     if (k < 1 or k > expansions_[ell].cols())
         throw exception ("[LaguerreBasis::size] Can't access orbital %d of %d.", k, expansions_[ell].rows());
     
-    return sqrt(lambda_[ell]/pochhammer_up(k, 2 * ell + 2)) * pow(lambda_[ell] * r, ell + 1)
+    return sqrt(lambda_[ell]/gsl_sf_poch(k, 2 * ell + 2)) * pow(lambda_[ell] * r, ell + 1)
            * exp(-lambda_[ell] * r / 2) * gsl_sf_laguerre_n(k - 1, 2 * ell + 1, lambda_[ell] * r);
 }
 

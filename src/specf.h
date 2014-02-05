@@ -33,18 +33,6 @@
 /// Kronecker delta
 #define DELTA(a,b)       ((a) == (b) ? 1 : 0)
 
-/**
- * @brief Rising factorial.
- * 
- * Rising factorial, also called "Pochhammer function" and also known by many
- * other names. The definition is (for non-negative integer "n")
- * @f[
- *     x^{(n)} = \cases{1 & n = 0 \cr x(x+1)(x+2) \dots (x+n-1) & n > 0}
- * @f]
- * The product has always "n" terms (if n > 0).
- */
-double pochhammer_up (double x, unsigned n);
-
 //
 // Hydrogen radial orbital
 //

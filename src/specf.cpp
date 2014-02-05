@@ -23,14 +23,6 @@
 //  Special functions                                                      //
 // ----------------------------------------------------------------------- //
 
-double pochhammer_up (double x, unsigned n)
-{
-    double prod = 1.;
-    while (n != 0)
-        prod *= x + (--n);
-    return prod;
-}
-
 cArray ric_jv(int lmax, Complex z)
 {
     // results
@@ -63,7 +55,7 @@ cArray ric_jv(int lmax, Complex z)
             }
             else
             {
-                throw exception("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
+                throw exception ("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
             }
         }
         
