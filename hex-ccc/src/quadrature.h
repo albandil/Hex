@@ -13,6 +13,9 @@
 #ifndef HEX_CCC_QUADRATURE
 #define HEX_CCC_QUADRATURE
 
+#include <map>
+#include <tuple>
+
 #include <gsl/gsl_integration.h>
 
 #include "basis.h"
@@ -43,10 +46,10 @@ class QuadratureRule
          * of the whole array of the quadrature nodes. Otherwise it will return
          * a section of the nodes array that corresponds to the specification.
          * @param ell Angular momentum of the atomic electron (basis).
-         * @param n Index of the atomic state (eigenstate).
          * @param l Angular momentum of the projectile (or propagator).
+         * @param n Index of the atomic state (eigenstate).
          */
-        const rArrayView nodes (int ell = -1, int n = -1, int l = -1) const;
+        const rArrayView nodes (int ell = -1, int l = -1, int n = -1) const;
         
         /**
          * @brief Get shallow copy of the quadrature weights.
@@ -54,11 +57,11 @@ class QuadratureRule
          * If this function is called without arguments, it will return a view
          * of the whole array of the quadrature weights. Otherwise it will return
          * a section of the weights array that corresponds to the specification.
-         * * @param ell Angular momentum of the atomic electron (basis).
-         * @param n Index of the atomic state (eigenstate).
+         * @param ell Angular momentum of the atomic electron (basis).
          * @param l Angular momentum of the projectile (or propagator).
+         * @param n Index of the atomic state (eigenstate).
          */
-        const rArrayView weights (int ell = -1, int n = -1, int l = -1) const;
+        const rArrayView weights (int ell = -1, int l = -1, int n = -1) const;
         
     private:
         
@@ -88,6 +91,25 @@ class QuadratureRule
         
         /// Maximal projectile (or propagator) angular momentum. FIXME Move somewhere else.
         int maxpell_;
+        
+        /**
+         * @brief Index array.
+         * 
+         * This is an auxiliary dataset that contains indices of first quadrature
+         * node (or weight) in the storage array "nodes_" (or "weights_") for
+         * a particular set of quantum numbers @f$ (L, l, N) @f$. For example, if
+         * one needed to retrieve quadrature nodes for the combination of the
+         * quantum numbers (0, 0, 1), one would write
+           @code
+               nodes_.slice (
+                   indices_[std::make_tuple(0, 0, 1)],
+                   indices_[std::make_tuple(0, 0, 2)],
+               )
+           @endcode
+         * This particular slice is the start section of "nodes_", because no
+         * smaller quantum numbers can be specified.
+         */
+        std::map<std::tuple<int,int,int>,int> indices_;
         
         /**
          * @brief Quadrature point counts.

@@ -10,6 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <tuple>
+
 #include <gsl/gsl_integration.h>
 
 #include "basis.h"
@@ -27,9 +29,8 @@ QuadratureRule::QuadratureRule (LaguerreBasis const & basis, double E)
     // maximal projectile (or propagator) angular momentum
     maxpell_ = basis.size() - 1; // ( FIXME : equal to "maxell" now )
     
-    // get iterators
-    size_t inodes = 0;
-    size_t iweights = 0;
+    // get iterator
+    size_t pos = 0;
     
     // for all angular momenta of the basis
     for (int ell = 0; ell < basis.size(); ell++)
@@ -53,46 +54,54 @@ QuadratureRule::QuadratureRule (LaguerreBasis const & basis, double E)
                 // compute evaluation nodes and weights for the interval (0, k0-dk), if any
                 if (k0 != 0.)
                 {
+                    // add index
+                    indices_[std::make_tuple(ell, l, n)] = pos;
+                    
+                    // allocate space for next quadrature coefficients
                     npoints_.push_back(3 * order);
                     nodes_.resize(nodes_.size() + npoints_.back());
                     weights_.resize(weights_.size() + npoints_.back());
                     
                     linearWeightsAndNodes ( E, ell, n, t,
-                        rArrayView(order, nodes_.data() + inodes),
-                        rArrayView(order, weights_.data() + iweights),
+                        rArrayView(order, nodes_.data() + pos),
+                        rArrayView(order, weights_.data() + pos),
                         0., k0 - dk
                     );
-                    inodes += order; iweights += order;
+                    pos += order;
                     
                     // compute evaluation nodes and weights for the interval (k0-d0, k0+dk)
                     linearWeightsAndNodes ( E, ell, n, t,
-                        rArrayView(order, nodes_.data() + inodes),
-                        rArrayView(order, weights_.data() + iweights),
+                        rArrayView(order, nodes_.data() + pos),
+                        rArrayView(order, weights_.data() + pos),
                         k0 - dk, k0 + dk
                     );
-                    inodes += order; iweights += order;
+                    pos += order;
                     
                     // compute evaluation nodes and weights for the interval (sgE+dE, infty)
                     linearWeightsAndNodes ( E, ell, n, t,
-                        rArrayView(order, nodes_.data() + inodes),
-                        rArrayView(order, weights_.data() + iweights),
+                        rArrayView(order, nodes_.data() + pos),
+                        rArrayView(order, weights_.data() + pos),
                         k0 + dk, k0 + dk + Dk
                     );
-                    inodes += order; iweights += order;
+                    pos += order;
                 }
                 else
                 {
+                    // add index
+                    indices_[std::make_tuple(ell, l, n)] = pos;
+                    
+                    // allocate space for next quadrature coefficients
                     npoints_.push_back(3 * order);
                     nodes_.resize(nodes_.size() + npoints_.back());
                     weights_.resize(weights_.size() + npoints_.back());
                     
                     // compute evaluation nodes and weights for the interval (sgE+dE, infty)
                     linearWeightsAndNodes ( E, ell, n, t,
-                        rArrayView(order, nodes_.data() + inodes),
-                        rArrayView(order, weights_.data() + iweights),
+                        rArrayView(order, nodes_.data() + pos),
+                        rArrayView(order, weights_.data() + pos),
                         0., Dk
                     );
-                    inodes += order; iweights += order;
+                    pos += order;
                 }
             }
         }
@@ -135,18 +144,70 @@ void QuadratureRule::linearWeightsAndNodes (
     }
 }
 
-const rArrayView QuadratureRule::nodes (int ell, int n, int l) const
+const rArrayView QuadratureRule::nodes (int ell, int l, int n) const
 {
-    if (ell < 0)
-        return nodes_;
+    assert (ell < basis_.size());
+    assert (l < basis_.size()); // FIXME
+    assert (ell < 0 or n < basis_.size(ell));
+    assert (n != 0);
     
-    throw exception ("[QuadratureRule::nodes] Selection of segment not yet implemented.");
+    if (ell < 0)
+    {
+        return nodes_;
+    }
+    
+    else if (l < 0)
+    {
+        return nodes_.slice (
+            indices_.at(std::make_tuple(ell, 0, 1)),
+            (ell + 1 == basis_.size()) ? nodes_.size() : indices_.at(std::make_tuple(ell + 1, 0, 1))
+        );
+    }
+    
+    else if (n < 0)
+    {
+        return nodes_.slice (
+            indices_.at(std::make_tuple(ell, l, 1)),
+            (l + 1 == basis_.size()) ? nodes_.size() : indices_.at(std::make_tuple(ell, l + 1, 1)) // FIXME
+        );
+    }
+    
+    else return nodes_.slice (
+        indices_.at(std::make_tuple(ell, l, n)),
+        (n + 1 == basis_.size(ell)) ? nodes_.size() : indices_.at(std::make_tuple(ell, l, n + 1))
+    );
 }
 
-const rArrayView QuadratureRule::weights (int ell, int n, int l) const
+const rArrayView QuadratureRule::weights (int ell, int l, int n) const
 {
-    if (ell < 0)
-        return weights_;
+    assert (ell < basis_.size());
+    assert (l < basis_.size()); // FIXME
+    assert (ell < 0 or n < basis_.size(ell));
+    assert (n != 0);
     
-    throw exception ("[QuadratureRule::weights] Selection of segment not yet implemented.");
+    if (ell < 0)
+    {
+        return weights_;
+    }
+    
+    else if (l < 0)
+    {
+        return weights_.slice (
+            indices_.at(std::make_tuple(ell, 0, 1)),
+            (ell + 1 == basis_.size()) ? nodes_.size() : indices_.at(std::make_tuple(ell + 1, 0, 1))
+        );
+    }
+    
+    else if (n < 0)
+    {
+        return weights_.slice (
+            indices_.at(std::make_tuple(ell, l, 1)),
+            (l + 1 == basis_.size()) ? nodes_.size() : indices_.at(std::make_tuple(ell, l + 1, 1)) // FIXME
+        );
+    }
+    
+    else return weights_.slice (
+        indices_.at(std::make_tuple(ell, l, n)),
+        (n + 1 == basis_.size(ell)) ? nodes_.size() : indices_.at(std::make_tuple(ell, l, n + 1))
+    );
 }

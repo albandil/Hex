@@ -35,13 +35,13 @@ PotentialMatrix::PotentialMatrix (
     for (int L = 0; L < basis_.size(); L++)
     for (int N = 1; N <= basis_.size(L); N++)
     for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
-    for (double k : quadrature_.nodes(L, N, l))
+    for (double k : quadrature_.nodes(L, l, N))
     {
         // column iterations
         for (int Lp = 0; Lp < basis_.size(); Lp++)
         for (int Np = 1; Np <= basis_.size(Lp); Np++)
         for (int lp = 0; lp < basis_.size(); lp++) // FIXME : maxpell
-        for (double kp : quadrature_.nodes(Lp, Np, lp))
+        for (double kp : quadrature_.nodes(Lp, lp, Np))
         {
             // get lambda limits
             int lambdamin = 0; // TODO
@@ -182,8 +182,10 @@ double PotentialMatrix::ComputeVdir (
     // evaluate basic integrals
     RowMatrix<double> I (basis_.size(L), basis_.size(Lp));
     I.populate (
-        [&](int i, int ip) -> double {
-            return ComputeIdir (lambda, L, i, l, k, Lp, ip, lp, kp);
+        [&](int i, int ip) -> double
+        {
+            int N = i + 1, Np = ip + 1;
+            return ComputeIdir (lambda, L, N, l, k, Lp, Np, lp, kp);
         }
     );
     
