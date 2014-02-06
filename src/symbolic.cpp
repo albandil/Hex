@@ -15,8 +15,9 @@
 #include <complex>
 #include <cstdio>
 #include <cstdlib>
-#include <vector>
+#include <iostream>
 #include <limits>
+#include <vector>
 
 #include "complex.h"
 #include "misc.h"
@@ -27,7 +28,7 @@
 
 #include <cln/cln.h>
 
-cln::cl_RA Combination(cln::cl_RA const & alpha, int k)
+cln::cl_RA symbolic::combination (cln::cl_RA const & alpha, int k)
 {
     cln::cl_RA res = 1;
     for (int w = 0; w < k; w++)
@@ -35,18 +36,18 @@ cln::cl_RA Combination(cln::cl_RA const & alpha, int k)
     return res;
 }
 
-const char* gfname(unsigned i)
+const char* gfname (unsigned i)
 {
     static const char * const names[] = {"none", "sin", "cos"};
     return names[i];
 }
 
-SymbolicTerm operator + (SymbolicTerm const & A, SymbolicTerm const & B)
+symbolic::term symbolic::operator + (symbolic::term const & A, symbolic::term const & B)
 {
     if ((A.gf != B.gf) or (A.a != B.a) or (A.b != B.b) or (A.c != B.c))
         throw "Can't add non-simillar symbolic terms.";
     
-    SymbolicTerm S;
+    symbolic::term S;
     S.a = A.a;
     S.b = A.b;
     S.c = A.c;
@@ -66,14 +67,13 @@ SymbolicTerm operator + (SymbolicTerm const & A, SymbolicTerm const & B)
     return S;
 }
 
-// operators on XGE polynomials
-SymbolicPoly operator * (const SymbolicPoly& P, const SymbolicPoly& Q)
+symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly const & Q)
 {
-    SymbolicPoly product_poly;
+    symbolic::poly product_poly;
     
-    for (SymbolicTerm const & p : P) for (SymbolicTerm const & q : Q)
+    for (symbolic::term const & p : P) for (symbolic::term const & q : Q)
     {
-        SymbolicTerm product_term;
+        symbolic::term product_term;
         product_term.ki = p.ki * q.ki;
         product_term.kr = p.kr * q.kr;
         product_term.a = p.a + q.a;
@@ -164,10 +164,10 @@ SymbolicPoly operator * (const SymbolicPoly& P, const SymbolicPoly& Q)
     return product_poly;
 }
 
-SymbolicPoly operator - (const SymbolicPoly& P, const SymbolicPoly& Q)
+symbolic::poly symbolic::operator - (symbolic::poly const & P, symbolic::poly const & Q)
 {
     // copy P
-    SymbolicPoly difference = P;
+    symbolic::poly difference = P;
     
     // copy Q
     difference.insert(difference.end(), Q.begin(), Q.end());
@@ -181,10 +181,10 @@ SymbolicPoly operator - (const SymbolicPoly& P, const SymbolicPoly& Q)
     return difference;
 }
 
-SymbolicPoly operator + (const SymbolicPoly& P, const SymbolicPoly& Q)
+symbolic::poly symbolic::operator + (symbolic::poly const & P, symbolic::poly const & Q)
 {
     // copy P
-    SymbolicPoly difference = P;
+    symbolic::poly difference = P;
     
     // copy Q
     difference.insert(difference.end(), Q.begin(), Q.end());
@@ -194,17 +194,13 @@ SymbolicPoly operator + (const SymbolicPoly& P, const SymbolicPoly& Q)
     return difference;
 }
 
-/*
- * Associated Laguerre polynomial
- * Laguerre(k,s,x) := sum((-1)^j * (k!)^2 * x^(j-s) / ( (k-j)! * j! * (j-s)! ), j, s, k);
- */
-SymbolicPoly Laguerre(int k, int s)
+symbolic::poly symbolic::Laguerre (int k, int s)
 {
-    SymbolicPoly laguerre;
+    symbolic::poly laguerre;
     
     for (int j = s; j <= k; j++)
     {
-        SymbolicTerm term;
+        term term;
         term.kr = -cln::expt(cln::cl_I(-1),j) * cln::factorial(k) * cln::factorial(k) / (cln::factorial(k-j) * cln::factorial(j) * cln::factorial(j-s));
         term.a = j-s;
         term.gf = GF_NONE;
@@ -217,17 +213,13 @@ SymbolicPoly Laguerre(int k, int s)
     return laguerre;
 }
 
-/*
- * Hydrogen radial function normalization factor
- * sqrt((2/n)^3 * (n-l-1)! / (2*n*((n+l)!)^3));
- */
-SymbolicTerm HydrogenN(int n, int l)
+symbolic::term symbolic::HydrogenN (int n, int l)
 {
     // compute square of the normalization factor
     cln::cl_RA N2 = cln::expt(cln::cl_RA(2)/n,3) * cln::factorial(n-l-1) / (2*n*cln::expt(cln::factorial(n+l),3));
     
     // the factor itself
-    SymbolicTerm N;
+    symbolic::term N;
     
     // try to compute a precise (rational) square root and store it in N.kr
     if (not cln::sqrtp(N2, &N.kr))
@@ -239,37 +231,29 @@ SymbolicTerm HydrogenN(int n, int l)
     return N;
 }
 
-/*
- * Hydrogen radial function.
- * HydrogenP(n,l,r) := r * HydrogenN(n,l) * (2*r/n)^l * Laguerre(n+l,2*l+1,2*r/n) * exp(-r/n);
- */
-SymbolicPoly HydrogenP(int n, int l)
+symbolic::poly symbolic::HydrogenP (int n, int l)
 {
-    SymbolicPoly laguerre = Laguerre(n+l, 2*l+1);
-    for (SymbolicTerm & term : laguerre)
+    poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
+    for (term & term : laguerre)
         term.kr *= cln::expt(cln::cl_RA(2)/n, term.a);
     
-    SymbolicTerm rest;
+    term rest;
     rest.kr = cln::expt(cln::cl_RA(2)/n,l);
     rest.a = l+1;
     rest.gf = GF_NONE;
     rest.b = 0;
     rest.c = cln::cl_RA(1)/n;
     
-    return HydrogenN(n,l) * laguerre * rest;
+    return symbolic::HydrogenN(n,l) * laguerre * rest;
 }
 
-/*
- * Hydrogen sturmian function.
- * HydrogenS(n,l,λ,r) := n * n * HydrogenN(n,l) * (2*λ*r)^l * Laguerre(n+l,2*l+1,2*λ*r) * exp(-λ*r);
- */
-SymbolicPoly HydrogenS(int n, int l, cln::cl_RA lambda)
+symbolic::poly symbolic::HydrogenS (int n, int l, cln::cl_RA lambda)
 {
-    SymbolicPoly laguerre = Laguerre(n+l, 2*l+1);
-    for (SymbolicTerm & term : laguerre)
+    symbolic::poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
+    for (symbolic::term & term : laguerre)
         term.kr *= cln::expt(2*lambda, term.a);
     
-    SymbolicTerm rest;
+    symbolic::term rest;
     rest.kr = n * n * cln::expt(2*lambda,l);
     rest.a = l;
     rest.gf = GF_NONE;
@@ -287,15 +271,15 @@ SymbolicPoly HydrogenS(int n, int l, cln::cl_RA lambda)
  *                   i, 0, floor((l+1)/2)
  *                 );
  */
-SymbolicPoly RiccatiBessel(int l, double k)
+symbolic::poly symbolic::RiccatiBessel (int l, double k)
 {
-    SymbolicPoly ricj;
+    symbolic::poly ricj;
     
     for (int i = 0; i <= (l+1)/2; i++)
     {
-        SymbolicTerm term;
+        symbolic::term term;
         
-        cln::cl_RA comb = Combination(-cln::cl_RA(1)/2-i,l-2*i);
+        cln::cl_RA comb = symbolic::combination (-cln::cl_RA(1)/2-i,l-2*i);
         
         term.ki = pow(2/k, 1-2*i);
         term.kr = cln::factorial(l-i) / cln::factorial(i) * comb;
@@ -308,9 +292,9 @@ SymbolicPoly RiccatiBessel(int l, double k)
     
     for (int i = 1; i <= (l+1)/2; i++)
     {
-        SymbolicTerm term;
+        symbolic::term term;
         
-        cln::cl_RA comb = Combination(-cln::cl_RA(1)/2-i,l-2*i+1);
+        cln::cl_RA comb = symbolic::combination (-cln::cl_RA(1)/2-i,l-2*i+1);
         
         term.ki = pow(2/k, 1-2*i);
         term.kr = -cln::factorial(l-i) / cln::factorial(i) * i *  comb;
@@ -325,18 +309,15 @@ SymbolicPoly RiccatiBessel(int l, double k)
     return ricj;
 }
 
-/*
- * Integrals
- */
-SymbolicTerm integrate_full (SymbolicPoly const & P)
+symbolic::term symbolic::integrate_full (poly const & P)
 {
     // the resulting number
-    SymbolicTerm result;
+    symbolic::term result;
     result.ki = 1;
     result.kr = 0;
     
     // for all terms of the polynomial
-    for (SymbolicTerm const & p : P)
+    for (symbolic::term const & p : P)
     {
         if (p.a < -1 or (p.a == -1 and p.gf != GF_SIN))
             throw exception ("[Integral_xge_full] Divergent integral!");
@@ -348,7 +329,7 @@ SymbolicTerm integrate_full (SymbolicPoly const & P)
         }
         
         // computed integral of a term
-        SymbolicTerm integ;
+        symbolic::term integ;
         integ.ki = p.ki;
         
         // branch according to the goniometric function
@@ -376,19 +357,19 @@ SymbolicTerm integrate_full (SymbolicPoly const & P)
     return result;
 }
 
-SymbolicPoly integrate_inf(SymbolicPoly const & P)
+symbolic::poly symbolic::integrate_inf (symbolic::poly const & P)
 {
-    SymbolicPoly result;
+    symbolic::poly result;
     
-    for (SymbolicTerm const & p : P)
+    for (symbolic::term const & p : P)
     {
         for (int j = 0; j <= p.a; j++)
         {
             if (p.gf == GF_NONE)
             {
-                SymbolicTerm term;
+                symbolic::term term;
                 term.ki = p.ki;
-                 term.kr = p.kr * cln::factorial(p.a) * cln::expt(p.c, j - p.a - 1) / cln::factorial(j);
+                term.kr = p.kr * cln::factorial(p.a) * cln::expt(p.c, j - p.a - 1) / cln::factorial(j);
                 term.a = j;
                 term.gf = GF_NONE;
                 term.b = 0.;
@@ -397,7 +378,7 @@ SymbolicPoly integrate_inf(SymbolicPoly const & P)
             }
             else if (p.gf == GF_COS)
             {
-                SymbolicTerm term1, term2;
+                symbolic::term term1, term2;
                 term1.a = term2.a = j;
                 term1.b = term2.b = p.b;
                 term1.c = term2.c = p.c;
@@ -413,7 +394,7 @@ SymbolicPoly integrate_inf(SymbolicPoly const & P)
             }
             else if (p.gf == GF_SIN)
             {
-                SymbolicTerm term1, term2;
+                symbolic::term term1, term2;
                 term1.a = term2.a = j;
                 term1.b = term2.b = p.b;
                 term1.c = term2.c = p.c;
@@ -438,12 +419,12 @@ SymbolicPoly integrate_inf(SymbolicPoly const & P)
     return result;
 }
 
-SymbolicPoly integrate_low(SymbolicPoly const & P)
+symbolic::poly symbolic::integrate_low (symbolic::poly const & P)
 {
-    return integrate_full(P) - integrate_inf(P);
+    return symbolic::integrate_full(P) - symbolic::integrate_inf(P);
 }
 
-void SymbolicPoly::optimize()
+void symbolic::poly::optimize ()
 {
     // if nothing to optimize, return
     if (terms.empty())
@@ -453,15 +434,15 @@ void SymbolicPoly::optimize()
     std::sort (
         terms.begin(),
         terms.end(),
-        [ ] (SymbolicTerm const & T1, SymbolicTerm const & T2) -> bool {
+        [ ] (symbolic::term const & T1, symbolic::term const & T2) -> bool {
             return (T1.a > T2.a) or (T1.b > T2.b) or (T1.c > T2.c) or (T1.gf > T2.gf) or (T1.ki > T2.ki);
         }
     );
     
     // merge simillar terms
-    std::vector<SymbolicTerm> new_terms;
+    std::vector<symbolic::term> new_terms;
     new_terms.reserve(terms.size());
-    for (SymbolicTerm const & T : terms)
+    for (term const & T : terms)
     {
         if (new_terms.empty())
         {
@@ -470,7 +451,7 @@ void SymbolicPoly::optimize()
         }
         else
         {
-            SymbolicTerm & T0 = new_terms.back();
+            symbolic::term & T0 = new_terms.back();
             if (T0.a == T.a and T0.b == T.b and T0.c == T.c and T0.gf == T.gf and T0.ki == T.ki)
             {
                 // sum the two terms
@@ -492,7 +473,7 @@ void SymbolicPoly::optimize()
     terms = new_terms;
 }
 
-double eval (SymbolicPoly const & P, double r)
+double symbolic::eval (symbolic::poly const & P, double r)
 {
     double result = 0;        // evaluated symbolic polynomial P
     
@@ -505,7 +486,7 @@ double eval (SymbolicPoly const & P, double r)
     cln::cl_RA c = 0;        // c-coefficient
     double Exp = 1;            // evaluated exponential
     
-    for (SymbolicTerm const & p : P)
+    for (symbolic::term const & p : P)
     {
         // precompute goniometric functions
         if (p.b != b)
@@ -554,25 +535,26 @@ double eval (SymbolicPoly const & P, double r)
     return result;
 }
 
-void write (SymbolicPoly const & P)
+std::ostream & symbolic::poly::operator << (std::ostream & os) const
 {
-    for (SymbolicTerm const & p : P)
+    for (symbolic::term const & p : terms)
     {
         if (p.ki == 0 or p.kr == 0)
             continue;
         if (p.ki != 1 or p.kr != 1)
-            printf("%g", p.ki * cln::double_approx(p.kr));
+            os << p.ki * cln::double_approx(p.kr);
         if (p.a != 0)
-            printf(" r^%d", p.a);
+            os << " r^" << p.a;
         if (p.gf != GF_NONE)
-            printf(" %s(%gr)", gfname(p.gf), p.b);
+            os << " " << gfname(p.gf) << "(" << p.b << "r)";
         if (p.c == 1)
-            printf(" exp(-r)");
+            os << " exp(-r)";
         else if (p.c != 0)
-            printf(" exp(-%gr)", cln::double_approx(p.c));
+            os << " exp(-" << cln::double_approx(p.c) << "r)";
         
-        if (&p != &P.back())
-            printf(" + ");
+        if (&p != &terms.back())
+            os << " + ";
     }
-    printf("\n");
+    os << "\n";
+    return os;
 }

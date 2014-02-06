@@ -57,16 +57,16 @@ double compute_Idir (int li, int lf, int lam, int Ni, int Li, double ki, int Nf,
     else
     {
         // construct inner integrands
-        SymbolicPoly inner_integrand_1 = HydrogenP(Ni,Li) * HydrogenP(Nf,Lf);
-        SymbolicPoly inner_integrand_2 = HydrogenP(Ni,Li) * HydrogenP(Nf,Lf);
-        for (SymbolicTerm & term : inner_integrand_1)
+        symbolic::poly inner_integrand_1 = symbolic::HydrogenP(Ni,Li) * symbolic::HydrogenP(Nf,Lf);
+        symbolic::poly inner_integrand_2 = symbolic::HydrogenP(Ni,Li) * symbolic::HydrogenP(Nf,Lf);
+        for (symbolic::term & term : inner_integrand_1)
             term.a += -lam - 1;
-        for (SymbolicTerm & term : inner_integrand_2)
+        for (symbolic::term & term : inner_integrand_2)
             term.a += lam;
         
         // integrate
-        SymbolicPoly ii1 = integrate_inf(inner_integrand_1);
-        SymbolicPoly ii2 = integrate_low(inner_integrand_2);
+        symbolic::poly ii1 = symbolic::integrate_inf(inner_integrand_1);
+        symbolic::poly ii2 = symbolic::integrate_low(inner_integrand_2);
         
         auto outer_integrand = [ = ] (double x) -> double {
             
@@ -121,17 +121,17 @@ double compute_Iexc (int li, int lf, int lam, int Ni, int Li, double ki, int Nf,
     else
     {
         // construct inner integrands
-        SymbolicPoly inner_integrand_1 = RiccatiBessel(li,ki) * HydrogenP(Nf,Lf);
-        SymbolicPoly inner_integrand_2 = HydrogenP(Ni,Li) * RiccatiBessel(lf,kf);
+        symbolic::poly inner_integrand_1 = symbolic::RiccatiBessel(li,ki) * symbolic::HydrogenP(Nf,Lf);
+        symbolic::poly inner_integrand_2 = symbolic::HydrogenP(Ni,Li) * symbolic::RiccatiBessel(lf,kf);
         
-        for (SymbolicTerm& term : inner_integrand_1)
+        for (symbolic::term& term : inner_integrand_1)
             term.a += lam;
-        for (SymbolicTerm& term : inner_integrand_2)
+        for (symbolic::term& term : inner_integrand_2)
             term.a += lam;
         
         // integrate
-        SymbolicPoly ii1 = integrate_low(inner_integrand_1);
-        SymbolicPoly ii2 = integrate_low(inner_integrand_2);
+        symbolic::poly ii1 = symbolic::integrate_low(inner_integrand_1);
+        symbolic::poly ii2 = symbolic::integrate_low(inner_integrand_2);
         
         auto outer_integrand = [ = ] (double x) -> double {
             
