@@ -23,7 +23,13 @@
 
 namespace symbolic
 {
-    
+
+/// Rational number (CLN)
+typedef cln::cl_RA rational;
+
+/// Rational constant 1/2
+extern rational onehalf;
+
 /**
  * \brief Symbolic term structure
  * 
@@ -57,7 +63,7 @@ public:
      * 
      * Create a new symbolic term that will evaluate to a rational number.
      */
-    term(cln::cl_RA x) : ki(1), kr(x), a(0), gf(GF_NONE), b(0), c(0) {}
+    term(rational x) : ki(1), kr(x), a(0), gf(GF_NONE), b(0), c(0) {}
     
     //
     // data fields
@@ -67,7 +73,7 @@ public:
     double ki;
     
     /// constant rational multiplication factor
-    cln::cl_RA kr;
+    rational kr;
     
     /// exponent
     int a;
@@ -79,7 +85,7 @@ public:
     double b;
     
     /// exponential factor
-    cln::cl_RA c;
+    rational c;
     
 };
 
@@ -383,7 +389,7 @@ double eval (poly const & P, double r);
  *     \right) = \frac{n!}{k! (n-k)!} \ .
  * @f]
  */
-cln::cl_RA combination (cln::cl_RA const & alpha, int k);
+rational combination (rational const & alpha, int k);
 
 } // endof namespace symbolic
 

@@ -28,9 +28,11 @@
 
 #include <cln/cln.h>
 
-cln::cl_RA symbolic::combination (cln::cl_RA const & alpha, int k)
+symbolic::rational symbolic::onehalf = cln::cl_RA(1)/cln::cl_I(2);
+
+symbolic::rational symbolic::combination (symbolic::rational const & alpha, int k)
 {
-    cln::cl_RA res = 1;
+    symbolic::rational res = 1;
     for (int w = 0; w < k; w++)
         res *= (alpha - w) / (k - w);
     return res;
@@ -102,7 +104,7 @@ symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly co
         }
         else if (p.gf == GF_SIN and q.gf == GF_SIN)
         {
-            product_term.kr /= cln::cl_I(2);
+            product_term.kr *= symbolic::onehalf;
             product_term.gf = GF_COS;
             
             product_term.b = p.b - q.b;
@@ -110,7 +112,7 @@ symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly co
             if (product_poly.back().b == 0)
                 product_poly.back().gf = GF_NONE;
             
-            product_term.kr *= cln::cl_I(-1);
+            product_term.kr = -product_term.kr;
             product_term.b = p.b + q.b;
             product_poly.push_back(product_term);
             if (product_poly.back().b == 0)
@@ -118,7 +120,7 @@ symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly co
         }
         else if (p.gf == GF_SIN and q.gf == GF_COS)
         {
-            product_term.kr /= cln::cl_I(2);
+            product_term.kr *= symbolic::onehalf;
             product_term.gf = GF_SIN;
             
             product_term.b = p.b + q.b;
@@ -129,19 +131,19 @@ symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly co
         }
         else if (p.gf == GF_COS and q.gf == GF_SIN)
         {
-            product_term.kr /= cln::cl_I(2);
+            product_term.kr *= symbolic::onehalf;
             product_term.gf = GF_SIN;
             
             product_term.b = p.b + q.b;
             product_poly.push_back(product_term);
             
-            product_term.kr *= cln::cl_I(-1);
+            product_term.kr = -product_term.kr;
             product_term.b = p.b - q.b;
             product_poly.push_back(product_term);
         }
         else if (p.gf == GF_COS and q.gf == GF_COS)
         {
-            product_term.kr /= cln::cl_I(2);
+            product_term.kr *= symbolic::onehalf;
             product_term.gf = GF_COS;
             
             product_term.b = p.b + q.b;
@@ -174,7 +176,7 @@ symbolic::poly symbolic::operator - (symbolic::poly const & P, symbolic::poly co
     
     // invert signs in the copy of Q
     for (unsigned i = P.size(); i < difference.size(); i++)
-        difference[i].kr *= cln::cl_I(-1);
+        difference[i].kr = -difference[i].kr;
     
     // optimize and return
     difference.optimize();
@@ -216,7 +218,7 @@ symbolic::poly symbolic::Laguerre (int k, int s)
 symbolic::term symbolic::HydrogenN (int n, int l)
 {
     // compute square of the normalization factor
-    cln::cl_RA N2 = cln::expt(cln::cl_RA(2)/n,3) * cln::factorial(n-l-1) / (2*n*cln::expt(cln::factorial(n+l),3));
+    symbolic::rational N2 = cln::expt(symbolic::rational(2)/n,3) * cln::factorial(n-l-1) / (2*n*cln::expt(cln::factorial(n+l),3));
     
     // the factor itself
     symbolic::term N;
@@ -235,19 +237,19 @@ symbolic::poly symbolic::HydrogenP (int n, int l)
 {
     poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
     for (term & term : laguerre)
-        term.kr *= cln::expt(cln::cl_RA(2)/n, term.a);
+        term.kr *= cln::expt(symbolic::rational(2)/n, term.a);
     
     term rest;
-    rest.kr = cln::expt(cln::cl_RA(2)/n,l);
+    rest.kr = cln::expt(symbolic::rational(2)/n,l);
     rest.a = l+1;
     rest.gf = GF_NONE;
     rest.b = 0;
-    rest.c = cln::cl_RA(1)/n;
+    rest.c = symbolic::rational(1)/n;
     
     return symbolic::HydrogenN(n,l) * laguerre * rest;
 }
 
-symbolic::poly symbolic::HydrogenS (int n, int l, cln::cl_RA lambda)
+symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
 {
     symbolic::poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
     for (symbolic::term & term : laguerre)
@@ -279,7 +281,7 @@ symbolic::poly symbolic::RiccatiBessel (int l, double k)
     {
         symbolic::term term;
         
-        cln::cl_RA comb = symbolic::combination (-cln::cl_RA(1)/2-i,l-2*i);
+        symbolic::rational comb = symbolic::combination (-symbolic::rational(1)/2-i,l-2*i);
         
         term.ki = pow(2/k, 1-2*i);
         term.kr = cln::factorial(l-i) / cln::factorial(i) * comb;
@@ -294,7 +296,7 @@ symbolic::poly symbolic::RiccatiBessel (int l, double k)
     {
         symbolic::term term;
         
-        cln::cl_RA comb = symbolic::combination (-cln::cl_RA(1)/2-i,l-2*i+1);
+        symbolic::rational comb = symbolic::combination (-symbolic::rational(1)/2-i,l-2*i+1);
         
         term.ki = pow(2/k, 1-2*i);
         term.kr = -cln::factorial(l-i) / cln::factorial(i) * i *  comb;
@@ -483,7 +485,7 @@ double symbolic::eval (symbolic::poly const & P, double r)
     double Sin = 0;            // evaluates sine
     double Cos = 1;            // evaluated cosine
     
-    cln::cl_RA c = 0;        // c-coefficient
+    symbolic::rational c = 0;        // c-coefficient
     double Exp = 1;            // evaluated exponential
     
     for (symbolic::term const & p : P)
