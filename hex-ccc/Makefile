@@ -9,7 +9,7 @@ CPP = g++
 ##############################################################
 
 CFLAGS = -Wall -std=c++11 -fPIC -fopenmp
-LFLAGS =  -fopenmp -lgsl -lopenblas -lgslcblas
+LFLAGS =  -fopenmp -lgsl -lopenblas -lgslcblas -lcln
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -19,7 +19,7 @@ CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays basis hdffile main matrix moments potential quadrature specf version
+FILES = arrays basis hdffile main matrix moments potential quadrature specf symbolic version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

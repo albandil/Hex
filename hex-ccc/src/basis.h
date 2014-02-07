@@ -15,6 +15,7 @@
 
 #include "arrays.h"
 #include "matrix.h"
+#include "symbolic.h"
 
 /**
  * @brief Lapack DSYEV.
@@ -83,7 +84,25 @@ class LaguerreBasis
          * @param lambda For every angular momentum ("maxell+1" numbers total)
          *               the screening constant @f$ \lambda_\ell @f$.
          */
-        LaguerreBasis (int maxell, iArray Nl, rArray lambda);
+        LaguerreBasis (int maxell, const iArrayView Nl, const ArrayView<symbolic::rational> lambda);
+        
+        /**
+         * @brief Screening constants.
+         * Get screening constants.
+         */
+        //@{
+        ArrayView<symbolic::rational> rat_lambdas () const { return rat_lambda_; }
+        rArrayView lambdas () const { return lambda_; }
+        //@}
+        
+        /**
+         * @brief Screening constant.
+         * Get screening constant for a specific angular momentum.
+         */
+        //@{
+        symbolic::rational rat_lambda (int ell) const { return rat_lambda_[ell]; }
+        double lambda (int ell) const { return lambda_[ell]; }
+        //@}
         
         /**
          * @brief Evaluate Laguerre state.
@@ -147,7 +166,10 @@ class LaguerreBasis
         int maxell_;
         
         /// Screening constant of the bases.
+        //@{
+        Array<symbolic::rational> rat_lambda_;
         rArray lambda_;
+        //@}
         
         /**
          * @brief Eigenenergies.

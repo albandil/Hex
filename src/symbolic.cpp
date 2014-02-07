@@ -13,20 +13,15 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
-#include <cstdio>
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <vector>
 
+#include <cln/cln.h>
+
 #include "complex.h"
 #include "misc.h"
 #include "symbolic.h"
-
-#include <gsl/gsl_sf.h>
-#define fac(n) gsl_sf_fact(n)
-
-#include <cln/cln.h>
 
 symbolic::rational symbolic::onehalf = cln::cl_RA(1)/cln::cl_I(2);
 
@@ -263,6 +258,12 @@ symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
     rest.c = 1;
     
     return HydrogenN(n,l) * laguerre * rest;
+}
+
+symbolic::poly symbolic::LaguerreBasisFunction (int N, int L, symbolic::rational lambda)
+{
+    // TODO
+    return symbolic::poly();
 }
 
 /*

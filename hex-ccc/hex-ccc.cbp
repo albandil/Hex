@@ -37,6 +37,7 @@
 		<Unit filename="src/arrithm.h" />
 		<Unit filename="src/basis.cpp" />
 		<Unit filename="src/basis.h" />
+		<Unit filename="src/cmdline.h" />
 		<Unit filename="src/complex.h" />
 		<Unit filename="src/doc.h" />
 		<Unit filename="src/hdffile.cpp" />
@@ -53,6 +54,8 @@
 		<Unit filename="src/quadrature.h" />
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
+		<Unit filename="src/symbolic.cpp" />
+		<Unit filename="src/symbolic.h" />
 		<Unit filename="src/version.cpp" />
 		<Unit filename="src/version.h" />
 		<Extensions>

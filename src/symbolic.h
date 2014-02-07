@@ -27,6 +27,16 @@ namespace symbolic
 /// Rational number (CLN)
 typedef cln::cl_RA rational;
 
+/**
+ * @brief Construct a rational number.
+ * 
+ * Return a @ref rational object, representing the fraction "num"/"den".
+ */
+inline rational make_rational (int num, int den) { return rational(num)/cln::cl_I(den); }
+
+/// Convert rational to double.
+inline double double_approx (rational const & r) { return cln::double_approx(r); }
+
 /// Rational constant 1/2
 extern rational onehalf;
 
@@ -333,7 +343,7 @@ poly RiccatiBessel (int l, double k);
  * The screening parameter @f$ \lambda_L @f$ needs to be given as a CLN's rational
  * number. Here @f$ L_{N-1}^{2L+2} @f$ is the generalized Laguerre polynomial.
  */
-poly LaguerreBasisFunction (int N, int L, cln::cl_RA lambda);
+poly LaguerreBasisFunction (int N, int L, rational lambda);
 
 //
 // integrals

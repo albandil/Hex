@@ -13,16 +13,33 @@
 #include <cstdlib>
 #include <iostream>
 
+#include <gsl/gsl_errno.h>
+
 #include "arrays.h"
 #include "basis.h"
+#include "cmdline.h"
 #include "potential.h"
 #include "quadrature.h"
+#include "symbolic.h"
 #include "version.h"
 
 int main (int argc, char *argv[])
 {
     // write the program header
     std::cout << logo_raw();
+    
+    // turn off GSL and HDF exceptions
+    gsl_set_error_handler_off();
+    
+    // disable buffering of the standard output (-> immediate logging)
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    
+    // get input from command line
+    ParseCommandLine
+    (
+        argc, argv,
+        [&](std::string optname, std::string optarg) -> bool { return false; }
+    );
     
     //
     //  Initialization
@@ -40,8 +57,8 @@ int main (int argc, char *argv[])
     Nl.fill(30);
     
     // screening constants
-    rArray lambda (maxell + 1);
-    lambda.fill(2.);
+    Array<symbolic::rational> lambda (maxell + 1);
+    lambda.fill(symbolic::rational(2));
     
     //
     //  The main body of the computation

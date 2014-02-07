@@ -15,6 +15,7 @@
 #include "gausskronrod.h"
 #include "matrix.h"
 #include "potential.h"
+#include "symbolic.h"
 #include "specf.h"
 
 PotentialMatrix::PotentialMatrix (
@@ -30,36 +31,50 @@ PotentialMatrix::PotentialMatrix (
     // Precompute the potential matrix.
     //
     
+    // first of all assemble symbolic expressions for all basis states
+    // TODO
+    
     // row iterations
-//     # pragma omp parallel for collapse (8)
     for (int L = 0; L < basis_.size(); L++)
     for (int N = 1; N <= basis_.size(L); N++)
-    for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
-    for (double k : quadrature_.nodes(L, l, N))
     {
-        // column iterations
-        for (int Lp = 0; Lp < basis_.size(); Lp++)
-        for (int Np = 1; Np <= basis_.size(Lp); Np++)
-        for (int lp = 0; lp < basis_.size(); lp++) // FIXME : maxpell
-        for (double kp : quadrature_.nodes(Lp, lp, Np))
+        symbolic::poly psi = symbolic::LaguerreBasisFunction(N,L,basis_.rat_lambda(L));
+        
+        for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
+        for (double k : quadrature_.nodes(L, l, N))
         {
-            // get lambda limits
-            int lambdamin = 0; // TODO
-            int lambdamax = 0; // TODO
+            symbolic::poly jlk = symbolic::RiccatiBessel(l,k);
             
-            // for all multipoles
-            for (int lambda = lambdamin; lambda <= lambdamax; lambda++)
+            // column iterations
+            for (int Lp = 0; Lp < basis_.size(); Lp++)
+            for (int Np = 1; Np <= basis_.size(Lp); Np++)
             {
-                double f = 0; // TODO
-                matrix_(irow,icol) += f * ComputeVdir (lambda, L, N, l, k, Lp, Np, lp, kp);
+                symbolic::poly psip = symbolic::LaguerreBasisFunction(Np,Lp,basis_.rat_lambda(Lp));
+                
+                for (int lp = 0; lp < basis_.size(); lp++) // FIXME : maxpell
+                for (double kp : quadrature_.nodes(Lp, lp, Np))
+                {
+                    symbolic::poly jlkp = symbolic::RiccatiBessel(lp,kp);
+                    
+                    // get lambda limits
+                    int lambdamin = 0; // TODO
+                    int lambdamax = 0; // TODO
+                    
+                    // for all multipoles
+                    for (int lambda = lambdamin; lambda <= lambdamax; lambda++)
+                    {
+                        double f = 0; // TODO
+                        matrix_(irow,icol) += f * ComputeVdir (lambda, L, N, l, k, Lp, Np, lp, kp);
+                    }
+                    
+                    // move to next column of the matrix
+                    icol++;
+                }
             }
             
-            // move to next column of the matrix
-            icol++;
+            // move to next row of the matrix
+            irow++;
         }
-        
-        // move to next row of the matrix
-        irow++;
     }
 }
 
@@ -117,6 +132,8 @@ double PotentialMatrix::ComputeIdir (
         };
         GaussKronrod<decltype(integrand)> integrator(integrand);
         integrator.integrate(0., Inf);
+        if (not integrator.ok())
+            std::cerr << format("%d %d %d %g %d %d %d %g\n", L, i, l, k, Lp, ip, lp, kp);
         return integrator.result();
     }
     else

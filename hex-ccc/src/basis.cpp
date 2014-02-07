@@ -19,10 +19,19 @@
 #include "misc.h"
 #include "moments.h"
 #include "specf.h"
+#include "symbolic.h"
 
-LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
-    : maxell_(maxell), lambda_(lambda)
+LaguerreBasis::LaguerreBasis (int maxell, const iArrayView Nl, const ArrayView<symbolic::rational> rat_lambda)
+    : maxell_(maxell), rat_lambda_(rat_lambda)
 {
+    // sanity check
+    assert (rat_lambda_.size() == (unsigned)(maxell + 1));
+    
+    // evaluate lambdas
+    lambda_.resize(maxell + 1);
+    for (int ell = 0; ell <= maxell; ell++)
+        lambda_[ell] = symbolic::double_approx(rat_lambda_[ell]);
+    
     //
     // construct Hamiltonian matricex in the bases of Laguerre functions
     //
@@ -94,10 +103,10 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
                 x += 0.5 * Nkl[kmax] / Nkl[kmin];
             }
         );
-        D *= lambda[ell] * lambda[ell];
+        D *= lambda_[ell] * lambda_[ell];
         
         // compose Hamiltonian
-        expansions_[ell] = lambda[ell] * (lambda[ell]*0.5*(ell*(ell+1.))*Im2 - Im1);
+        expansions_[ell] = lambda_[ell] * (lambda_[ell]*0.5*(ell*(ell+1.))*Im2 - Im1);
         
         // multiply elements by normalization factors
         expansions_[ell].transform
@@ -136,15 +145,15 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
         
         // prepare workspace
         rArray workspace (1);
-        int worksize = -1, info = 0;
+        int worksize = -1, info = 0, n = Nl[ell];
         
         // get optimal workspace size
         dsyev_ (
             &jobz,
             &uplo,
-            &Nl[ell],
+            &n,
             expansions_[ell].data().data(),
-            &Nl[ell],
+            &n,
             energies_[ell].data(),
             workspace.data(),
             &worksize,
@@ -159,9 +168,9 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
         dsyev_ (
             &jobz,
             &uplo,
-            &Nl[ell],
+            &n,
             expansions_[ell].data().data(),
-            &Nl[ell],
+            &n,
             energies_[ell].data(),
             workspace.data(),
             &worksize,
@@ -170,7 +179,7 @@ LaguerreBasis::LaguerreBasis(int maxell, iArray Nl, rArray lambda)
         
         // write energies
         std::cout << "\tOrbital momentum   ℓ = " << ell << "\n";
-        std::cout << "\tScreening constant λ = " << lambda[ell] << "\n";
+        std::cout << "\tScreening constant λ = " << lambda_[ell] << "\n";
         std::cout << "\tBasis size         N = " << Nl[ell] << "\n";
         std::cout << "\tEigen-energies compared with hydrogen energies:\n";
         for (int n = 1; n < Nl[ell]; n++)
