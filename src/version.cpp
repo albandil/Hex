@@ -15,7 +15,7 @@
 #include "misc.h"
 
 #ifndef GIT_COMMIT
-#define GIT_COMMIT "(unknown)"
+#define GIT_COMMIT ""
 #endif
 
 char const * commit_hash = GIT_COMMIT;
@@ -32,7 +32,7 @@ std::string logo ()
         "#                                         \n"
         "#             UK MFF (c) 2014             \n"
         "#                                         \n"
-        "#          version hash: %s               \n"
+        "#          version: 1.01 %s               \n"
         "#                                         \n",
         
         commit_hash
@@ -51,7 +51,7 @@ std::string logo_raw ()
         "                                          \n"
         "              UK MFF (c) 2014             \n"
         "                                          \n"
-        "           version hash: %s               \n"
+        "           version: 1.01 %s               \n"
         "                                          \n",
         
         commit_hash
