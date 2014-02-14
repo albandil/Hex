@@ -10,7 +10,7 @@ $(SUBDIRS)::
 	+make -C $@ $(MAKECMDGOALS)
 	mkdir -p bin; cd bin; ln -fs ../$@/bin/* .; cd ..
 	
-all clean allclean doc docclean : $(SUBDIRS)
+all clean allclean doc docclean distclean : $(SUBDIRS)
 
 dist: $(SUBDIRS)
 	@mkdir -p release
@@ -20,5 +20,3 @@ dist: $(SUBDIRS)
 	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \
 	   hex-pwba/hex-pwba-$(GIT_COMMIT).tar.gz     release/
 
-distclean : $(SUBDIRS)
-	rm -rf release
