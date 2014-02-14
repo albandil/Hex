@@ -33,11 +33,11 @@ dist:
 	rm -rf hex-pwba/
 
 distclean:
-	rm -rf hex-dwba hex-dwba-*.tar.gz
+	rm -rf hex-pwba hex-pwba-*.tar.gz
 
 bin/hex-pwba: $(OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $(LFLAGS) $^ -o $@
+	$(CXX) $^ $(LFLAGS) -o $@
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
