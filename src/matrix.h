@@ -750,14 +750,39 @@ public:
         LUft (LUft const & lu)
             : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
         
+        /// Move constructor.
+        LUft (LUft && lu)
+            : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) { lu.numeric_ = nullptr; }
+        
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft (const CsrMatrix* matrix, void* numeric)
             : numeric_(numeric), matrix_(matrix), filename_(), info_(UMFPACK_INFO) {}
         
         /// Destructor.
-        void free ()
-        { 
+        ~LUft ()
+        {
+            drop ();
+        }
+        
+        /**
+         * @brief Transfer data from another factorization object.
+         * 
+         * Move contents of another LUft object to this one. If there are already some
+         * data in this object, delete them.
+         */
+        void transfer (LUft && lu)
+        {
+            // clean this object
             drop();
+            
+            // transfer data
+            numeric_  = lu.numeric_;
+            matrix_   = lu.matrix_;
+            filename_ = lu.filename_;
+            info_     = lu.info_;
+            
+            // clean source
+            lu.numeric_  = nullptr;
         }
         
         /**
@@ -910,6 +935,9 @@ public:
         
         /// Set of status flags produced by UMFPACK.
         mutable rArray info_;
+        
+        // Disable bitwise copy
+        LUft const & operator= (LUft const &);
     };
 
     /**
@@ -1704,8 +1732,9 @@ public:
      *          2*sizeof(T).
      * @param triangle Whether to use only the upper or only the lower or both triangles
      *                 of the othwerwise symmetric matrix.
+     * @param parallelize Whether to use OpenMP to parallelize the SpMV operation.
      */
-    cArray dot (const cArrayView B, MatrixTriangle triangle = both) const;
+    cArray dot (const cArrayView B, MatrixTriangle triangle = both, bool parallelize = false) const;
     
     /**
      * @brief Back-substitution (lower).

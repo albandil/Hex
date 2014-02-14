@@ -509,7 +509,7 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
     
     // release unused data
     umfpack_zl_free_symbolic(&Symbolic);
-    return LUft(this, Numeric);
+    return LUft (this, Numeric);
 }
 #endif
 
@@ -520,13 +520,12 @@ cArray CsrMatrix::solve (const cArrayView b, size_t eqs) const
     assert(m_ == n_);
     
     // compute the LU factorization
-    LUft luft = factorize();
+    LUft luft ( std::move(factorize()) );
     
     // solve the equations
     cArray solution = luft.solve(b, eqs);
     
-    // cleanup and return
-    luft.free();
+    // return
     return solution;
 }
 #endif
@@ -1751,7 +1750,7 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
     // for all elements in the main diagonal
     if (triangle & diagonal)
     {
-//        # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B)
+       # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B) if (parallelize)
         for (int ielem = 0; ielem < Nrows; ielem++)
             rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     }
@@ -1775,13 +1774,13 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
         // for all elements of the current diagonal
         if (triangle & strict_upper)
         {
-//             # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
+            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag) if (parallelize)
             for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem]         += rp_elems_[ielem] * rp_B[ielem + idiag];
         }
         if (triangle & strict_lower)
         {
-//             # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag)
+            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag) if (parallelize)
             for (int ielem = 0; ielem < Nelem; ielem++)
                 rp_res[ielem + idiag] += rp_elems_[ielem] * rp_B[ielem];
         }

@@ -62,7 +62,8 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
-              droptol(1e-15), itinerary(StgNone), outofcore(false), itertol(1e-10)
+              droptol(1e-15), itinerary(StgNone), outofcore(false), itertol(1e-10),
+              parallel_dot(false), parallel_block(true)
         {
             // get command line options
             parse(argc, argv);
@@ -108,6 +109,12 @@ class CommandLine
         
         /// Tolerance for terminating iterative solution.
         double itertol;
+        
+        /// Whether to use OpenMP parallelization in SymDiaMatrix::dot
+        bool parallel_dot;
+        
+        /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
+        bool parallel_block;
 };
 
 /**

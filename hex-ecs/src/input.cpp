@@ -112,6 +112,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
                     "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
+                    "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
+                    "\t--no-parallel-block             enable simultaneous preconditioning of multiple blocks by OpenMP                \n"
                     "                                                                                                                  \n"
                 ;
                 exit(0);
@@ -196,6 +198,18 @@ void CommandLine::parse (int argc, char* argv[])
                 }
                 std::cout << "\n";
                 exit (0);
+            },
+        "parallel-dot", "", 0, [&](std::string optarg) -> bool
+            {
+                // parallelize SpMV
+                parallel_dot = true;
+                return true;
+            },
+        "no-parallel-block", "", 0, [&](std::string optarg) -> bool
+            {
+                // un-parallelize preconditioning
+                parallel_block = false;
+                return true;
             },
         
         [&] (std::string optname, std::string optarg) -> bool

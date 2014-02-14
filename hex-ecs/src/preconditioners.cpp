@@ -407,7 +407,7 @@ void NoPreconditioner::update (double E)
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     
     // setup diagonal blocks
-    # pragma omp parallel for
+    # pragma omp parallel for if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         int l1 = l1_l2_[ill].first;
@@ -609,7 +609,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
     
     // multiply "p" by the matrix of the system
-    # pragma omp parallel for schedule (dynamic,1) collapse(2)
+    # pragma omp parallel for schedule (dynamic,1) collapse(2) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
     for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
     if (par_.isMyWork(ill))
@@ -639,7 +639,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             }
             
             // use the diagonal block for multiplication
-            q_contrib += dia_blocks_[ill].dot(p_block);
+            q_contrib += dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot);
             
             if (cmd_.outofcore)
             {
@@ -671,7 +671,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
 //                 }
                 
 //                 q_contrib -= Complex(f) * ref_R_tr_dia.dot(p_block);
-                q_contrib -= Complex(f) * s_rad_.R_tr_dia(lambda).dot(p_block);
+                q_contrib -= Complex(f) * s_rad_.R_tr_dia(lambda).dot(p_block, both, cmd_.parallel_dot);
                 
                 // unload two-electron integrals if necessary
 //                 if (cmd_.outofcore)
@@ -703,7 +703,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     
-    # pragma omp parallel for schedule (dynamic, 1)
+    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create segment views
@@ -742,7 +742,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     }
     
     // multiply
-    q = dia_blocks_[iblock].dot(p);
+    q = dia_blocks_[iblock].dot(p, both, cmd_.parallel_dot);
     
     if (cmd_.outofcore)
     {
@@ -1177,8 +1177,12 @@ void ILUCGPreconditioner::update (double E)
         // create CSR block
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
-        // factorize the block
-        lu_[ill] = csr_blocks_[ill].factorize(droptol_);
+        // factorize the block and store it in lu_[ill] (transfer data)
+        lu_[ill].transfer (
+            std::move (
+                csr_blocks_[ill].factorize(droptol_)
+            )
+        );
         
         // time usage
         int secs = timer.elapsed();
