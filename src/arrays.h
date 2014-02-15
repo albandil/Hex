@@ -339,7 +339,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             : ArrayView<T>() {}
         
         // constructor, creates a length-n "x"-filled array
-        Array (size_t n, T x = 0)
+        Array (size_t n, T x = T(0))
             : ArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < size(); i++) (*this)[i] = x; }
         
         // constructor, copies a length-n "array
@@ -625,7 +625,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             : Array<T,Alloc>(), Nres_(size()), name_() {}
         
         // constructor, creates a length-n "x"-filled array
-        NumberArray (size_t n, T x = 0)
+        NumberArray (size_t n, T x = T(0))
             : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // constructor, copies a length-n "array
@@ -1406,8 +1406,8 @@ template <typename T> NumberArray<T> logspace (T x0, T x1, size_t N)
  * @param array The array to write.
  * @param filename Name of the file to create/overwrite.
  */
-template <typename NumberType> void write_array (
-    NumberArray<NumberType> array,
+template <class T> void write_array (
+    const ArrayView<T> array,
     const char* filename
 );
 
@@ -1418,9 +1418,9 @@ template <typename NumberType> void write_array (
  * @param array The array to write.
  * @param filename Name of the file to create/overwrite.
  */
-template <typename NumberType> void write_array (
-    NumberArray<double> grid,
-    NumberArray<NumberType> array,
+template <class T1, class T2> void write_array (
+    const ArrayView<T1> grid,
+    const ArrayView<T2> array,
     const char* filename
 );
 

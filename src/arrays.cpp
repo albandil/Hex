@@ -101,7 +101,7 @@ NumberArray<double> imagpart (NumberArray<Complex> const & A)
     return B;
 }
 
-template<> void write_array (NumberArray<double> array, const char* filename)
+template<> void write_array (const ArrayView<double> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -109,7 +109,7 @@ template<> void write_array (NumberArray<double> array, const char* filename)
     fout.close();
 }
 
-template<> void write_array (NumberArray<double> grid, NumberArray<double> array, const char* filename)
+template<> void write_array (const ArrayView<double> grid, const ArrayView<double> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -117,7 +117,7 @@ template<> void write_array (NumberArray<double> grid, NumberArray<double> array
     fout.close();
 }
 
-template<> void write_array (NumberArray<Complex> array, const char* filename)
+template<> void write_array (const ArrayView<Complex> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
@@ -125,7 +125,7 @@ template<> void write_array (NumberArray<Complex> array, const char* filename)
     fout.close();
 }
 
-template<> void write_array (NumberArray<double> grid, NumberArray<Complex> array, const char* filename)
+template<> void write_array (const ArrayView<double> grid, const ArrayView<Complex> array, const char* filename)
 {
     std::ofstream fout(filename);
     for (size_t i = 0; i < array.size(); i++)
