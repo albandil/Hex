@@ -1719,7 +1719,7 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
     return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle) const
+cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool parallelize) const
 {
     // check dimensions
     if ((int)B.size() != n_)
