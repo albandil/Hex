@@ -30,7 +30,9 @@
  * throw exception("[Error %d] Pointer has the value 0x%x!", id, ptr);
  * @endcode
  * 
- * @note Hard limit 256 charasters.
+ * @note The behaviour of the function "snprintf" that is used in the constructor
+ *       is expected to follow C99 specification, i.e. that it returns the needed
+ *       size of the output buffer when called as snprinf(nullptr,0,format,_args_).
  */
 class exception : public std::exception
 {
@@ -39,7 +41,20 @@ public:
     /// Constructor.
     template <class ...Params> exception (Params ...p)
     {
-        snprintf(message, 256, p...);
+        // get requested size
+        int size = snprintf(nullptr, 0, p...);
+        
+        // allocate buffer
+        message = new char [size + 1];
+        
+        // printf to the allocated storage
+        snprintf(message, size + 1, p...);
+    }
+    
+    /// Destructor.
+    virtual ~exception() noexcept
+    {
+        delete [] message;
     }
     
     /// Return pointer to the exception text.
@@ -51,7 +66,7 @@ public:
 private:
     
     /// Text of the exception.
-    char message[256];
+    char * message;
 };
 
 //
