@@ -60,6 +60,9 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
         /// Integration workspace pointer.
         gsl_integration_workspace * Workspace;
         
+        /// Status information.
+        std::string Status;
+        
     public:
         
         // constructor
@@ -154,7 +157,8 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     GSL_INTEG_GAUSS51,
                     Workspace,
                     &Result, &AbsErr
-                ); 
+                );
+                Status = gsl_strerror(err);
             }
             else if (std::isfinite(a) and not std::isfinite(b))    /* -∞ < a < b = +∞ */
             {
@@ -165,6 +169,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     Workspace,
                     &Result, &AbsErr
                 );
+                Status = gsl_strerror(err);
             }
             else if (not std::isfinite(a) and std::isfinite(b))    /* -∞ = a < b < +∞ */
             {
@@ -175,6 +180,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     Workspace,
                     &Result, &AbsErr
                 );
+                Status = gsl_strerror(err);
             }
             else                                 /* -∞ = a < b = +∞ */
             {
@@ -196,6 +202,8 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                 
                 Result = Result1 + Result2;
                 AbsErr = AbsErr1 + AbsErr2;
+                
+                Status = std::string(gsl_strerror(err)) + std::string("\n") + std::string(gsl_strerror(err));
             }
             
             Ok = (err == GSL_SUCCESS and err1 == GSL_SUCCESS and err2 == GSL_SUCCESS);
@@ -209,6 +217,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
         bool ok() const { return Ok; }
         double result() const { return Result; }
         double error() const { return AbsErr; }
+        std::string const & status() const { return Status; }
         
         void setEpsAbs (double epsabs) { EpsAbs = epsabs; }
         void setEpsRel (double epsrel) { EpsRel = epsrel; }
