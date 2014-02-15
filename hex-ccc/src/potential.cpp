@@ -24,37 +24,77 @@ PotentialMatrix::PotentialMatrix (
     int J, int S, int Pi
 ) : basis_(basis), quadrature_(quadrature), matrix_(quadrature.nodes().size())
 {
+    //
+    // Setup hydrogen radial orbitals.
+    //
+    
+    Array<Array<symbolic::poly>> P(basis_.size());
+    Array<Array<symbolic::term>> Nsqr(basis_.size());
+    
+    for (int L = 0; L < basis_.size(); L++)
+    {
+        P[L].resize(basis_.size(L));
+        Nsqr[L].resize(basis_.size(L));
+        
+        for (int N = 1; N <= basis_.size(L); N++)
+        {
+            // get hydrogen function and its squared normalization factor
+            P[L][N-1] = symbolic::LaguerreBasisFunction(N,L,basis_.rat_lambda(L));
+            Nsqr[L][N-1] = symbolic::LaguerreBasisFunctionNsqr(N,L,basis_.rat_lambda(L));
+        }
+    }
+    
+    //
+    // Setup Riccati-Bessel functions.
+    //
+    
+    Array<Array<Array<Array<symbolic::poly>>>> j(basis_.size());
+    
+    for (int L = 0; L < basis_.size(); L++)
+    {
+        j[L].resize(basis_.size()); // FIXME : maxpell
+        
+        for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
+        {
+            j[L][l].resize(basis_.size(L));
+            
+            for (int N = 1; N <= basis_.size(L); N++)
+            {
+                const rArrayView k = quadrature_.nodes(L, l, N);
+                j[L][l][N-1].resize(k.size());
+                
+                for (unsigned ik = 0; ik < k.size(); ik++)
+                    j[L][l][N-1][ik] = symbolic::RiccatiBessel(l,k[ik]);
+            }
+        }
+    }
+    
+    //
+    // Precompute the potential matrix in Laguerre basis.
+    //
+    
     // matrix indices
     size_t irow = 0, icol = 0;
     
-    //
-    // Precompute the potential matrix.
-    //
-    
-    // first of all assemble symbolic expressions for all basis states
-    // TODO
-    
     // row iterations
     for (int L = 0; L < basis_.size(); L++)
+    for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
     for (int N = 1; N <= basis_.size(L); N++)
     {
-        symbolic::poly psi = symbolic::LaguerreBasisFunction(N,L,basis_.rat_lambda(L));
-        
-        for (int l = 0; l < basis_.size(); l++) // FIXME : maxpell
-        for (double k : quadrature_.nodes(L, l, N))
+        const rArrayView k = quadrature_.nodes(L, l, N);
+        for (unsigned ik = 0; ik < k.size(); ik++)
         {
-            symbolic::poly jlk = symbolic::RiccatiBessel(l,k);
-            
             // column iterations
             for (int Lp = 0; Lp < basis_.size(); Lp++)
+            for (int lp = 0; lp < basis_.size(); lp++) // FIXME : maxpell
             for (int Np = 1; Np <= basis_.size(Lp); Np++)
             {
-                symbolic::poly psip = symbolic::LaguerreBasisFunction(Np,Lp,basis_.rat_lambda(Lp));
-                
-                for (int lp = 0; lp < basis_.size(); lp++) // FIXME : maxpell
-                for (double kp : quadrature_.nodes(Lp, lp, Np))
+                const rArrayView kp = quadrature_.nodes(Lp, lp, Np);
+                for (unsigned ikp = 0; ikp < kp.size(); ikp++)
                 {
-                    symbolic::poly jlkp = symbolic::RiccatiBessel(lp,kp);
+                    // the matrix is symmetrical, so we can skip the lower half
+                    if (irow > icol)
+                        continue;
                     
                     // get lambda limits
                     int lambdamin = 0; // TODO
@@ -64,18 +104,46 @@ PotentialMatrix::PotentialMatrix (
                     for (int lambda = lambdamin; lambda <= lambdamax; lambda++)
                     {
                         double f = 0; // TODO
-                        matrix_(irow,icol) += f * ComputeVdir (lambda, L, N, l, k, Lp, Np, lp, kp);
+                        
+                        std::cout << "Double integral\n"
+                                  << "   L = " << L  << " l = " << l  << " N = " << N  << " k = "  << k[ik]   << "\n"
+                                  << "   L'= " << Lp << " l'= " << lp << " N'= " << Np << " k' = " << kp[ikp] << "\n"
+                                  << "   j : " << j[L][l][N-1][ik] << "\n"
+                                  << "   j': " << j[Lp][lp][Np-1][ikp] << "\n"
+                                  << "   P : " << P[L][N-1] << "\n"
+                                  << "   P': " << P[Lp][Np-1] << "\n";
+                                  
+                        double integral = ComputeIdir (
+                            lambda,
+                            j[L][l][N-1][ik],
+                            j[Lp][lp][Np-1][ikp],
+                            P[L][N-1],
+                            P[Lp][Np-1]
+                        );
+                        
+                        std::cout << " -> result " << integral << "\n";
+                        
+                        matrix_(irow,icol) += f * integral;
                     }
+                    
+                    // mirror the element across the diagonal
+                    matrix_(icol,irow) = matrix_(irow,icol);
                     
                     // move to next column of the matrix
                     icol++;
                 }
             }
-            
+        
             // move to next row of the matrix
             irow++;
         }
     }
+    
+    //
+    // Transform the matrix to eigenstates.
+    //
+    
+    // TODO
 }
 
 RowMatrix<double> const & PotentialMatrix::matrix () const
@@ -96,6 +164,95 @@ rArray MatrixEquation::solve() const
     return rArray();
 }
 
+double PotentialMatrix::ComputeIdir (
+    int lambda,
+    symbolic::poly const & j,
+    symbolic::poly const & jp,
+    symbolic::poly const & P,
+    symbolic::poly const & Pp
+){
+    if (lambda == 0)
+    {
+        //          ∞
+        //         ⌠             ⎛1   1⎞
+        //  φ(x) = |  P(y) P'(y) ⎜- - -⎟ dy
+        //         ⌡             ⎝y   x⎠
+        //        x
+        
+        // second term
+        symbolic::poly integrand = P * Pp;
+        symbolic::poly integral_2 = symbolic::integrate_inf(integrand);
+        for (symbolic::term & p : integral_2)
+        {
+            p.a--;
+            p.kr = -p.kr;
+        }
+        
+        // first term
+        for (symbolic::term & p : integrand)
+        {
+            p.a--;
+        }
+        symbolic::poly integral_1 = symbolic::integrate_inf(integrand);
+        symbolic::poly integral = integral_1 + integral_2;
+        
+        //          ∞
+        //         ⌠
+        //  Idir = |  j(x) j'(x) φ(x) dx
+        //         ⌡
+        //        0
+        
+        integrand = integral * j * jp;
+        return symbolic::integrate_full(integrand).todouble();
+    }
+    else
+    {
+        //          ∞
+        //         ⌠              -λ-1
+        //  φ(x) = |  P(y) P'(y) y     dy
+        //         ⌡
+        //        x
+        
+        symbolic::poly iintegrand_1 = P * Pp;
+        for (symbolic::term & p : iintegrand_1)
+        {
+            p.a -= lambda + 1;
+        }
+        symbolic::poly phi = symbolic::integrate_inf(iintegrand_1);
+        
+        //          x
+        //         ⌠              λ
+        //  ψ(x) = |  P(y) P'(y) y  dy
+        //         ⌡
+        //        0
+        
+        symbolic::poly iintegrand_2 = P * Pp;
+        for (symbolic::term & p : iintegrand_2)
+        {
+            p.a += lambda;
+        }
+        symbolic::poly psi = symbolic::integrate_low(iintegrand_2);
+        
+        //          ∞
+        //         ⌠             ⎛      λ          -λ-1⎞
+        //  Idir = |  j(x) j'(x) ⎜φ(x) x  +  ψ(x) x    ⎟ dx
+        //         ⌡             ⎝                     ⎠
+        //        0
+        
+        for (symbolic::term & p : phi)
+        {
+            p.a += lambda;
+        }
+        for (symbolic::term & p : psi)
+        {
+            p.a -= lambda + 1;
+        }
+        symbolic::poly integrand = j * jp * (phi + psi);
+        return symbolic::integrate_full(integrand).todouble();
+    }
+}
+
+/*
 double PotentialMatrix::ComputeIdir (
     int lambda,
     int L, int i, int l, double k,
@@ -128,12 +285,22 @@ double PotentialMatrix::ComputeIdir (
             iintegrator.integrate(0., r1);
             
             // return result
-            return xi * xip * iintegrator.result();
+            double xxx = xi * xip * iintegrator.result();
+            std::cout << xxx << std::endl;
+            return xxx;
         };
         GaussKronrod<decltype(integrand)> integrator(integrand);
         integrator.integrate(0., Inf);
+        
         if (not integrator.ok())
-            std::cerr << format("%d %d %d %g %d %d %d %g\n", L, i, l, k, Lp, ip, lp, kp);
+        {
+            throw exception
+            (
+                "ComputeIdir failed (%g) for L=%d i=%d l=%d k=%g Lp=%d ip=%d lp=%d kp=%g\nStatus: %s",
+                 integrator.result(), L, i, l, k, Lp, ip, lp, kp, integrator.status().c_str()
+            );
+        }
+        
         return integrator.result();
     }
     else
@@ -213,3 +380,4 @@ double PotentialMatrix::ComputeVdir (
     // sum expansions using bilinear form
     return I (P,Pp);
 }
+*/

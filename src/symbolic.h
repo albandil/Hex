@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <vector>
+
 #include <cln/cln.h>
 
 #define GF_NONE   0
@@ -57,32 +58,47 @@ class term
 {
 public:
     
-    //
-    // constructors
-    //
-    
     /**
      * @brief Default constructor.
      * 
      * Create a new symbolic term that will evaluate to zero.
      */
-    term() : ki(1), kr(0), a(0), gf(GF_NONE), b(0), c(0) {}
+    term () : ki(1), kr(0), a(0), gf(GF_NONE), b(0), c(0) {}
     
     /**
-     * @brief Constructo from fraction.
+     * @brief Construct from fraction.
      * 
      * Create a new symbolic term that will evaluate to a rational number.
      */
-    term(rational x) : ki(1), kr(x), a(0), gf(GF_NONE), b(0), c(0) {}
+    term (rational x) : ki(1), kr(x), a(0), gf(GF_NONE), b(0), c(0) {}
+    
+    /**
+     * @brief Conversion to plain number.
+     * 
+     * Returns the double representation of the term if all symbolic
+     * factors are equal to 1. Otherwise throws an exception.
+     */
+    double todouble() const;
+    
+    /**
+     * @brief Ordering function.
+     * 
+     * This function is ised in std::sort for ordering of terms. The ordering
+     * is done according to multiple fields. In decreasing order of importance
+     * those fields are: power, frequency, scale, goniometric function and
+     * finally the irrational factor. The ordering is descending, so largest numbers
+     * come first.
+     */
+    static bool ordering (term const & a, term const & b);
     
     //
     // data fields
     //
     
-    /// constant irrational multiplication factor
+    /// positive (!) irrational multiplication factor
     double ki;
     
-    /// constant rational multiplication factor
+    /// rational multiplication factor
     rational kr;
     
     /// exponent
@@ -179,6 +195,7 @@ public:
      */
     void optimize();
     
+    
     //
     // std::vector-like interface
     //
@@ -213,8 +230,18 @@ public:
      * k x^a exp(bx) cos(cx)
      * </pre>
      */
-    std::ostream & operator << (std::ostream & os) const;
+    friend std::ostream & operator << (std::ostream & os, poly const & P);
 };
+
+/**
+ * @brief Write to string.
+ */
+std::string tostring (poly const & P);
+
+/**
+ * @brief Write to stream.
+ */
+std::ostream & operator << (std::ostream & os, poly const & P);
 
 /**
  * @brief Symbolic addition.
@@ -251,6 +278,11 @@ poly operator - (poly const & P, poly const & Q);
 poly operator * (poly const & P, poly const & Q);
 
 /**
+ * @brief Division by a rational number.
+ */
+poly operator / (poly const & P, rational const & q);
+
+/**
  * @brief Associated laguerre polynomial.
  * 
  * Return the symbolic representation of the associated Laguerre polynomial.
@@ -259,6 +291,8 @@ poly operator * (poly const & P, poly const & Q);
  * @f]
  */
 poly Laguerre (int k, int s);
+
+poly AssociatedLaguerre (int n, int a);
 
 /**
  * @brief Hydrogen radial function normalization factor.
@@ -272,7 +306,17 @@ poly Laguerre (int k, int s);
 term HydrogenN (int n, int l);
 
 /**
- * @brief Hydrogen radial function.
+ * @brief Un-normalized hydrogen radial function.
+ * 
+ * Return the symbolic representation of the hydrogen radial function,
+ * @f[
+ *     \pi_{nl}(r) = \frac{ P_{nl}(r) }{ N_{nl} } = r \left(\frac{2r}{n}\right)^l L_{n+l}^{2l+1}(2r/n) \exp(-r/n) \ ,
+ * @f]
+ */
+poly HydrogenNP (int n, int l);
+
+/**
+ * @brief Normalized hydrogen radial function.
  * 
  * Return the symbolic representation of the hydrogen radial function,
  * @f[
@@ -345,6 +389,8 @@ poly RiccatiBessel (int l, double k);
  */
 poly LaguerreBasisFunction (int N, int L, rational lambda);
 
+rational LaguerreBasisFunctionNsqr (int N, int L, rational lambda);
+
 //
 // integrals
 //
@@ -356,8 +402,31 @@ poly LaguerreBasisFunction (int N, int L, rational lambda);
  * (which is actually the indefinite integral subtracted from the definite integral
  * from zero to infinity),
  * @f[
- *     \int_x^\infty f(x') \mathrm{d}x' \ .
+ *     \int_x^\infty f(t) \mathrm{d}t \ .
  * @f]
+ * The following identities are used:
+ * <center>
+ * <table border = "0">
+ * <tr>
+ *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \mathrm{e}^{-ct} \mathrm{d}t @f$</td>
+ *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \frac{a!}{c^{a+1}} \sum_{j = 0}^a \frac{c^j}{j!} @f$</td>
+ *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \cos bt \,\mathrm{e}^{-ct} \mathrm{d}t @f$</td>
+ *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) - \mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx\right) @f$</td>
+ *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R}, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \sin bt \,\mathrm{e}^{-ct} \mathrm{d}t @f$</td>
+ *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \left[\mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) + \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx \right)\right]\; \mathrm{sign}\;b\qquad @f$</td>
+ *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R} \setminus \{0\}, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * </table>
+ * </center>
  */
 poly integrate_inf (poly const & P);
 
@@ -367,8 +436,9 @@ poly integrate_inf (poly const & P);
  * Returns a symbolic reprezentation of the semi-definite integral from zero to "x"
  * (which is actually the indefinite integral),
  * @f[
- *     \int_0^x f(x') \mathrm{d}x' \ .
+ *     \int_0^x f(t) \mathrm{d}t \ .
  * @f]
+ * This integral is computes simply as a difference of the results of @ref integrate_full and @ref integrate_inf.
  */
 poly integrate_low (poly const & P);
 
@@ -377,7 +447,42 @@ poly integrate_low (poly const & P);
  * 
  * Integrate the function represented as a symbolic polynomial from 0 to inifinity.
  * The result is returned as a single term with the multiplicative constant set to
- * the value of the integral.
+ * the value of the integral. The following identities are used:
+ * <center>
+ * <table width = "0" border = "0">
+ * <tr>
+ *     <td width = "0" align = "right">@f$ \displaystyle \int_0^\infty x^a \mathrm{e}^{-cx} \mathrm{d}x @f$</td>
+ *     <td width = "0">@f$ \displaystyle \ =\  @f$</td>
+ *     <td>@f$ \displaystyle \frac{a!}{c^{a+1}} @f$</td>
+ *     <td align = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td align = "right">@f$ \displaystyle \int_0^\infty x^a \sin bx\; \mathrm{e}^{-cx} \mathrm{d}x @f$</td>
+ *     <td>@f$ \displaystyle \ =\  @f$</td>
+ *     <td>@f$ \displaystyle \mathrm{Im}\,\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \mathrm{sign}\; b \qquad @f$</td>
+ *     <td align = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R} \setminus \{0\}, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td align = "right">@f$ \displaystyle \int_0^\infty x^a \cos bx\; \mathrm{e}^{-cx} \mathrm{d}x @f$</td>
+ *     <td>@f$ \displaystyle \ =\  @f$</td>
+ *     <td>@f$ \displaystyle \mathrm{Re}\,\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} @f$</td>
+ *     <td align = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R}, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td align = "right">@f$ \displaystyle \int_0^\infty \frac{1}{x} \sin bx\; \mathrm{e}^{-cx} \mathrm{d}x @f$</td>
+ *     <td>@f$ \displaystyle \ = \ @f$</td>
+ *     <td>@f$ \displaystyle \left(\frac{\pi}{2} - \arctan \frac{c}{b}\right) \mathrm{sign}\;b @f$</td>
+ *     <td align = "left">@f$ \displaystyle (b \in \mathbb{R} \setminus \{0\}, c \in \mathbb{R}_0^+) @f$</td>
+ * </tr>
+ * <tr>
+ *     <td align = "right">@f$ \displaystyle \int_0^\infty \frac{1}{x} (1 - \cos bx)\; \mathrm{e}^{-cx} \mathrm{d}x @f$</td>
+ *     <td>@f$ \displaystyle \ =\  @f$</td>
+ *     <td>@f$ \displaystyle \frac{1}{2} \ln \left(1 + \frac{b^2}{c^2}\right) @f$</td>
+ *     <td align = "left">@f$ \displaystyle (b \in \mathbb{R}, c \in \mathbb{R}^+) @f$</td>
+ * </tr>
+ * </table>
+ * </center>
+ * The value @f$ b = 0 @f$ results in zero integral for integrands containing sine.
  */
 term integrate_full (poly const & P);
 

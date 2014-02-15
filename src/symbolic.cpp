@@ -11,13 +11,15 @@
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
-#include <complex>
 #include <iostream>
 #include <limits>
+#include <set>
 #include <vector>
 
 #include <cln/cln.h>
+#include <gsl/gsl_sf.h>
 
 #include "complex.h"
 #include "misc.h"
@@ -59,6 +61,13 @@ symbolic::term symbolic::operator + (symbolic::term const & A, symbolic::term co
     {
         S.ki = A.ki * cln::double_approx(A.kr) + B.ki * cln::double_approx(B.kr);
         S.kr = 1;
+        
+        // leave ki positive
+        if (S.ki < 0)
+        {
+            S.ki = -S.ki;
+            S.kr = -S.kr;
+        }
     }
     
     return S;
@@ -181,14 +190,26 @@ symbolic::poly symbolic::operator - (symbolic::poly const & P, symbolic::poly co
 symbolic::poly symbolic::operator + (symbolic::poly const & P, symbolic::poly const & Q)
 {
     // copy P
-    symbolic::poly difference = P;
+    symbolic::poly sum = P;
     
     // copy Q
-    difference.insert(difference.end(), Q.begin(), Q.end());
+    sum.insert(sum.end(), Q.begin(), Q.end());
     
     // optimize and return
-    difference.optimize();
-    return difference;
+    sum.optimize();
+    return sum;
+}
+
+symbolic::poly symbolic::operator / (symbolic::poly const & P, symbolic::rational const & q)
+{
+    // copy P
+    symbolic::poly result = P;
+    
+    // divide by rational quotient
+    for (symbolic::term & p : result)
+        p.kr /= q;
+    
+    return result;
 }
 
 symbolic::poly symbolic::Laguerre (int k, int s)
@@ -197,7 +218,7 @@ symbolic::poly symbolic::Laguerre (int k, int s)
     
     for (int j = s; j <= k; j++)
     {
-        term term;
+        symbolic::term term;
         term.kr = -cln::expt(cln::cl_I(-1),j) * cln::factorial(k) * cln::factorial(k) / (cln::factorial(k-j) * cln::factorial(j) * cln::factorial(j-s));
         term.a = j-s;
         term.gf = GF_NONE;
@@ -208,6 +229,30 @@ symbolic::poly symbolic::Laguerre (int k, int s)
     
     laguerre.optimize();
     return laguerre;
+}
+
+symbolic::poly symbolic::AssociatedLaguerre (int n, int a)
+{
+    symbolic::poly asslaguerre;
+    
+    for (int i = 0; i <= n; i++)
+    {
+        symbolic::term term;
+        term.ki = 1.;
+        term.kr = cln::binomial(n + a, n - i) / cln::factorial(i);
+        term.a = i;
+        term.gf = GF_NONE;
+        term.b = 0;
+        term.c = 0;
+        
+        if (i % 2 != 0)
+            term.kr = -term.kr;
+        
+        asslaguerre.push_back(term);
+    }
+    
+    asslaguerre.optimize();
+    return asslaguerre;
 }
 
 symbolic::term symbolic::HydrogenN (int n, int l)
@@ -228,7 +273,7 @@ symbolic::term symbolic::HydrogenN (int n, int l)
     return N;
 }
 
-symbolic::poly symbolic::HydrogenP (int n, int l)
+symbolic::poly symbolic::HydrogenNP (int n, int l)
 {
     poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
     for (term & term : laguerre)
@@ -241,7 +286,12 @@ symbolic::poly symbolic::HydrogenP (int n, int l)
     rest.b = 0;
     rest.c = symbolic::rational(1)/n;
     
-    return symbolic::HydrogenN(n,l) * laguerre * rest;
+    return laguerre * rest;
+}
+
+symbolic::poly symbolic::HydrogenP (int n, int l)
+{
+    return symbolic::HydrogenN(n,l) * symbolic::HydrogenNP(n,l);
 }
 
 symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
@@ -262,8 +312,24 @@ symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
 
 symbolic::poly symbolic::LaguerreBasisFunction (int N, int L, symbolic::rational lambda)
 {
-    // TODO
-    return symbolic::poly();
+    poly laguerre = symbolic::AssociatedLaguerre(N-1, 2*L+2);
+    for (term & term : laguerre)
+        term.kr *= cln::expt(lambda, term.a);
+    
+    symbolic::term rest;
+    rest.ki = 1.;
+    rest.kr = cln::expt(lambda,L+1);
+    rest.a = L+1;
+    rest.gf = GF_NONE;
+    rest.b = 0;
+    rest.c = lambda/2;
+    
+    return laguerre * rest;
+}
+
+symbolic::rational symbolic::LaguerreBasisFunctionNsqr (int N, int L, symbolic::rational lambda)
+{
+    return lambda * cln::factorial(N-1) / cln::factorial(N+2*L+1);
 }
 
 /*
@@ -319,38 +385,108 @@ symbolic::term symbolic::integrate_full (poly const & P)
     result.ki = 1;
     result.kr = 0;
     
+    // excluded terms
+    std::set<int> exclude;
+    
     // for all terms of the polynomial
-    for (symbolic::term const & p : P)
+    for (unsigned i = 0; i < P.size(); i++)
     {
-        if (p.a < -1 or (p.a == -1 and p.gf != GF_SIN))
-            throw exception ("[Integral_xge_full] Divergent integral!");
+        // skip excluded terms (those have been already integrated)
+        if (exclude.find(i) != exclude.end())
+            continue;
         
+        // get term reference
+        symbolic::term const & p = P[i];
+        
+        // check if it has integrable sine-singularity
         if (p.a == -1 and p.gf == GF_SIN)
         {
             result.ki = result.ki * cln::double_approx(result.kr) + p.ki * cln::double_approx(p.kr) * (M_PI/2 - atan(cln::double_approx(p.c)/p.b));
             result.kr = 1;
+            
+            // leave ki positive
+            if (result.ki < 0)
+            {
+                result.ki = -result.ki;
+                result.kr = -result.kr;
+            }
+            
+            continue;
+        }
+        
+        // check if it has integrable cosine-singularity
+        if (p.a == -1 and p.gf == GF_COS)
+        {
+            // Integral of this term on its own is divergent. But, when combined with a compatible term that contains
+            // no goniometric function and has the opposite sign, the overall integral of those two terms is finite
+            // due to compensation near zero: (cos(x) - 1) -> O(x²) -> 0.
+            
+            // find the compatible term; it must be further due to descending ordering by goniometric function
+            unsigned icompat = 0;
+            for (unsigned j = i + 1; j < P.size(); j++)
+            {
+                if (P[j].a == p.a and P[j].c == p.c and P[j].gf == GF_NONE and P[j].ki == p.ki and P[j].kr == -p.kr)
+                {
+                    icompat = j;
+                    break;
+                }
+            }
+            
+            // if there is a compatible term
+            if (icompat > i)
+            {
+                // add the other term to already used terms
+                exclude.insert(icompat);
+                
+                // add the integral
+                double bc = p.b / cln::double_approx(p.c);
+                result.ki = result.ki * cln::double_approx(result.kr) + p.ki * cln::double_approx(p.kr) * 0.5 * log(1. + bc*bc);
+                result.kr = 1;
+                
+                // leave ki positive
+                if (result.ki < 0)
+                {
+                    result.ki = -result.ki;
+                    result.kr = -result.kr;
+                }
+            }
+            
+            continue;
+        }
+        
+        // check if it is convergent at all
+        if (p.a < 0)
+        {
+            throw exception
+            (
+                "[symbolic::integrate_full] Integral of \"%s\" is divergent.\nThe full integrand: %s",
+                tostring(p).c_str(),
+                tostring(P).c_str()
+            );
         }
         
         // computed integral of a term
         symbolic::term integ;
-        integ.ki = p.ki;
         
         // branch according to the goniometric function
         if (p.gf == GF_NONE)
         {
-            integ.kr = p.kr * cln::factorial(p.a) * cln::expt(p.c, -p.a-1);
+            integ.ki = p.ki;
+            integ.kr = p.kr * cln::factorial(p.a) / cln::expt(p.c, p.a + 1);
         }
         else if (p.gf == GF_SIN)
         {
-            integ.kr = p.kr * cln::factorial(p.a) * cln::rational(cln::imagpart(cln::expt(cln::complex(p.c,-p.b), -p.a-1)));
+            integ.ki = p.ki * gsl_sf_fact(p.a) * std::pow(Complex(cln::double_approx(p.c),-p.b), -p.a-1).imag();
+            integ.kr = p.kr;
         }
         else if (p.gf == GF_COS)
         {
-            integ.kr = p.kr * cln::factorial(p.a) * cln::rational(cln::realpart(cln::expt(cln::complex(p.c,-p.b), -p.a-1)));
+            integ.ki = p.ki * gsl_sf_fact(p.a) * std::pow(Complex(cln::double_approx(p.c),-p.b), -p.a-1).real();
+            integ.kr = p.kr;
         }
         else
         {
-            throw exception ("[Integral_xge_full] Unknown goniom. function.");
+            throw exception ("[symbolic::integrate_full] Unknown goniom. function.");
         }
         
         // add to result
@@ -364,15 +500,20 @@ symbolic::poly symbolic::integrate_inf (symbolic::poly const & P)
 {
     symbolic::poly result;
     
+    // for all terms in the poly
     for (symbolic::term const & p : P)
     {
-        for (int j = 0; j <= p.a; j++)
+        // a!/j! = a(a-1)(a-2)...(j+2)(j+1)
+        symbolic::rational afac_over_jfac = 1;
+        
+        // for all terms in the sum
+        for (int j = p.a; j >= 0; j--)
         {
             if (p.gf == GF_NONE)
             {
                 symbolic::term term;
                 term.ki = p.ki;
-                term.kr = p.kr * cln::factorial(p.a) * cln::expt(p.c, j - p.a - 1) / cln::factorial(j);
+                term.kr = p.kr * afac_over_jfac * cln::expt(p.c, j - p.a - 1);
                 term.a = j;
                 term.gf = GF_NONE;
                 term.b = 0.;
@@ -385,14 +526,14 @@ symbolic::poly symbolic::integrate_inf (symbolic::poly const & P)
                 term1.a = term2.a = j;
                 term1.b = term2.b = p.b;
                 term1.c = term2.c = p.c;
-                term1.ki = term2.ki = p.ki;
+                term1.kr = term2.kr = p.kr;
                 
                 term1.gf = GF_COS;
-                term1.kr = p.kr * cln::factorial(p.a) * cln::rational(cln::realpart(cln::expt(cln::complex(p.c,-p.b), j-p.a-1))) / cln::factorial(j);
+                term1.ki = p.ki * cln::double_approx(afac_over_jfac) * std::pow(Complex(cln::double_approx(p.c),-p.b), j-p.a-1).real();
                 result.push_back(term1);
                 
                 term2.gf = GF_SIN;
-                term2.kr = -p.kr * cln::factorial(p.a) * cln::rational(cln::imagpart(cln::expt(cln::complex(p.c,-p.b), j-p.a-1))) / cln::factorial(j);
+                term2.ki = -p.ki * cln::double_approx(afac_over_jfac) * std::pow(Complex(cln::double_approx(p.c),-p.b), j-p.a-1).imag();
                 result.push_back(term2);
             }
             else if (p.gf == GF_SIN)
@@ -401,20 +542,22 @@ symbolic::poly symbolic::integrate_inf (symbolic::poly const & P)
                 term1.a = term2.a = j;
                 term1.b = term2.b = p.b;
                 term1.c = term2.c = p.c;
-                term1.ki = term2.ki = p.ki;
+                term1.kr = term2.kr = p.kr;
                 
                 term1.gf = GF_COS;
-                term1.kr = p.kr * cln::factorial(p.a) * cln::rational(cln::imagpart(cln::expt(cln::complex(p.c,-p.b), j-p.a-1))) / cln::factorial(j);
+                term1.ki = p.ki * cln::double_approx(afac_over_jfac) * std::pow(Complex(cln::double_approx(p.c),-p.b), j-p.a-1).imag();
                 result.push_back(term1);
                 
                 term2.gf = GF_SIN;
-                term2.kr = p.kr * cln::factorial(p.a) * cln::rational(cln::realpart(cln::expt(cln::complex(p.c,-p.b), j-p.a-1))) / cln::factorial(j);
+                term2.ki = p.ki * cln::double_approx(afac_over_jfac) * std::pow(Complex(cln::double_approx(p.c),-p.b), j-p.a-1).real();
                 result.push_back(term2);
             }
             else
             {
-                throw exception ("[Integral_xge_full] Unknown goniom. function.");
+                throw exception ("[symbolic::integrate_inf] Unknown goniom. function.");
             }
+            
+            afac_over_jfac *= symbolic::rational(j);
         }
     }
     
@@ -424,7 +567,37 @@ symbolic::poly symbolic::integrate_inf (symbolic::poly const & P)
 
 symbolic::poly symbolic::integrate_low (symbolic::poly const & P)
 {
-    return symbolic::integrate_full(P) - symbolic::integrate_inf(P);
+    symbolic::poly result = symbolic::integrate_full(P) - symbolic::integrate_inf(P);
+    result.optimize();
+    return result;
+}
+
+bool symbolic::term::ordering (symbolic::term const & u, symbolic::term const & v)
+{
+    // Determine if this is the correct strict ordering.
+    
+    // descending powers
+    if (u.a > v.a)  return true;
+    if (u.a == v.a) return false;
+    
+    // descending frequency
+    if (u.b > v.b)  return true;
+    if (u.b == v.b) return false;
+    
+    // descending scale factor
+    if (u.c > v.c)  return true;
+    if (u.c == v.c) return false;
+    
+    // descending irrational factor
+    if (u.ki > v.ki)  return true;
+    if (u.ki == v.ki) return false;
+    
+    // descending id of goniometric function
+    if (u.gf > v.gf)  return true;
+    if (u.gf == v.gf) return false;
+    
+    // the terms differ just by rational factor
+    return false;
 }
 
 void symbolic::poly::optimize ()
@@ -434,13 +607,7 @@ void symbolic::poly::optimize ()
         return;
     
     // sort terms: descending powers
-    std::sort (
-        terms.begin(),
-        terms.end(),
-        [ ] (symbolic::term const & T1, symbolic::term const & T2) -> bool {
-            return (T1.a > T2.a) or (T1.b > T2.b) or (T1.c > T2.c) or (T1.gf > T2.gf) or (T1.ki > T2.ki);
-        }
-    );
+    std::sort (terms.begin(), terms.end(), symbolic::term::ordering);
     
     // merge simillar terms
     std::vector<symbolic::term> new_terms;
@@ -451,6 +618,11 @@ void symbolic::poly::optimize ()
         {
             // insert new term at the beginning
             new_terms.push_back(T);
+        }
+        else if (T.ki == 0. or T.kr == 0)
+        {
+            // skip zero terms
+            continue;
         }
         else
         {
@@ -538,26 +710,75 @@ double symbolic::eval (symbolic::poly const & P, double r)
     return result;
 }
 
-std::ostream & symbolic::poly::operator << (std::ostream & os) const
+double symbolic::term::todouble () const
 {
-    for (symbolic::term const & p : terms)
+    if (a == 0 and gf == GF_NONE and c == 0)
+        return ki * symbolic::double_approx(kr);
+    
+    throw exception ("Cannot convert \"%s\" to double.", symbolic::tostring(*this).c_str());    
+}
+
+std::string symbolic::tostring (symbolic::poly const & P)
+{
+    std::ostringstream os;
+    os << P;
+    return os.str();
+}
+
+std::ostream & symbolic::operator << (std::ostream & os, symbolic::poly const & P)
+{
+    if (P.size() == 0)
+        os << "0";
+    
+    for (unsigned i = 0; i < P.size(); i++)
     {
-        if (p.ki == 0 or p.kr == 0)
-            continue;
-        if (p.ki != 1 or p.kr != 1)
-            os << p.ki * cln::double_approx(p.kr);
-        if (p.a != 0)
-            os << " r^" << p.a;
-        if (p.gf != GF_NONE)
-            os << " " << gfname(p.gf) << "(" << p.b << "r)";
-        if (p.c == 1)
-            os << " exp(-r)";
-        else if (p.c != 0)
-            os << " exp(-" << cln::double_approx(p.c) << "r)";
+        // write zero (expect only one term)
+        if (P[i].ki == 0 or P[i].kr == 0)
+        {
+            os << "0";
+            break;
+        }
         
-        if (&p != &terms.back())
-            os << " + ";
+        // write numerical factor
+        {
+            // use sign only for the first term
+            double x = P[i].ki * cln::double_approx(P[i].kr);
+            if (x < 0)
+                os << " - ";
+            if (i > 0 and x > 0)
+                os << " + ";
+            if (std::abs(x) != 1 or (P[i].a == 0 and P[i].gf == GF_NONE and P[i].c == 0))
+                os << std::abs(x);
+        }
+        
+        // write power
+        if (P[i].a != 0)
+        {
+            if (P[i].a == 1)
+                os << " r";
+            else
+                os << " r^" << P[i].a;
+        }
+        
+        // write goniometric function
+        if (P[i].gf != GF_NONE)
+        {
+            os << " " << gfname(P[i].gf) << "(";
+            if (P[i].b != 1)
+                os << P[i].b;
+            os << "r)";
+        }
+        
+        // write exponential
+        if (P[i].c == 1)
+        {
+            os << " exp(-r)";
+        }
+        else if (P[i].c != 0)
+        {
+            os << " exp(-" << cln::double_approx(P[i].c) << "r)";
+        }
     }
-    os << "\n";
+    
     return os;
 }

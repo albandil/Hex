@@ -62,6 +62,13 @@ class PotentialMatrix
          */
         double ComputeIdir (
             int lambda,
+            symbolic::poly const & j,
+            symbolic::poly const & jp,
+            symbolic::poly const & P,
+            symbolic::poly const & Pp
+        );
+        /*double ComputeIdir (
+            int lambda,
             int L, int i, int l, double k,
             int Lp, int ip, int lp, double kp
         ) const;
@@ -70,7 +77,7 @@ class PotentialMatrix
             int lambda,
             int L, int N, int l, double k,
             int Lp, int Np, int lp, double kp
-        ) const;
+        ) const;*/
 };
 
 class MatrixEquation
