@@ -82,6 +82,12 @@ int main (int argc, char* argv[])
     // display logo
     std::cout << logo_raw();
     
+    // echo command line
+    std::cout << "Command line used:\n\t";
+    for (int iarg = 1; iarg < argc; iarg++)
+        std::cout << argv[iarg] << " ";
+    std::cout << "\n";
+    
     // turn off GSL and HDF exceptions
     gsl_set_error_handler_off();
     H5::Exception::dontPrint();
