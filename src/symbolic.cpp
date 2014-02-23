@@ -619,7 +619,7 @@ void symbolic::poly::optimize ()
             // insert new term at the beginning
             new_terms.push_back(T);
         }
-        else if (T.ki == 0. or T.kr == 0)
+        else if (T.ki == 0. or T.kr == 0 or (T.gf == GF_SIN and T.b == 0))
         {
             // skip zero terms
             continue;

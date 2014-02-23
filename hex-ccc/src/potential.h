@@ -15,6 +15,7 @@
 
 #include "arrays.h"
 #include "basis.h"
+#include "gauss.h"
 #include "quadrature.h"
 
 class PotentialMatrix
@@ -57,27 +58,25 @@ class PotentialMatrix
         /// The (symmetrical) matrix of the potential.
         RowMatrix<double> matrix_;
         
+        
+        GaussLegendre<double> g_;
+        
         /**
          * @brief Double integral @f$ I_{\mathrm{dir}} @f$.
          */
-        double ComputeIdir (
-            int lambda,
-            symbolic::poly const & j,
-            symbolic::poly const & jp,
-            symbolic::poly const & P,
-            symbolic::poly const & Pp
-        );
-        /*double ComputeIdir (
+        double ComputeIdir
+        (
             int lambda,
             int L, int i, int l, double k,
             int Lp, int ip, int lp, double kp
         ) const;
         
-        double ComputeVdir (
+        double ComputeJdir
+        (
             int lambda,
-            int L, int N, int l, double k,
-            int Lp, int Np, int lp, double kp
-        ) const;*/
+            symbolic::poly const & xi, int l, double k,
+            symbolic::poly const & xip, int lp, double kp
+        ) const;
 };
 
 class MatrixEquation
@@ -85,7 +84,8 @@ class MatrixEquation
     public:
         
         // constructor
-        MatrixEquation (
+        MatrixEquation
+        (
             QuadratureRule const & quadrature,
             PotentialMatrix const & potential
         );
