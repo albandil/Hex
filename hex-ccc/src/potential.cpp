@@ -12,7 +12,7 @@
 
 #include "arrays.h"
 #include "basis.h"
-#include "gauss.h"
+// #include "gauss.h"
 #include "gausskronrod.h"
 #include "matrix.h"
 #include "potential.h"
@@ -24,7 +24,7 @@ PotentialMatrix::PotentialMatrix
     LaguerreBasis const & basis,
     QuadratureRule const & quadrature,
     int J, int S, int Pi
-) : basis_(basis), quadrature_(quadrature), matrix_(quadrature.nodes().size()), g_()
+) : basis_(basis), quadrature_(quadrature), matrix_(quadrature.nodes().size())/*, g_()*/
 {
     //
     // Precompute symbolic representation of the Laguerre states.
@@ -459,18 +459,24 @@ double PotentialMatrix::ComputeJdir
         symbolic::poly integral_1 = symbolic::integrate_inf(iintegrand);
         symbolic::poly integral = integral_1 + integral_2;
         
+        // split the integrand into exponentially decreasing part and the remainder
+        symbolic::poly short_range_integral, long_range_integral;
+        symbolic::term expc = symbolic::expm(xi[0].c + xip[0].c);
+        symbolic::collect (integral, expc, short_range_integral, long_range_integral);
+        
         //          ∞
         //         ⌠
-        //  Idir = |  j(x) j'(x) φ(x) dx
+        //  Idir = |  j(x) j'(x) φ(x) dx    (short range)
         //         ⌡
         //        0
         
+        // integrate short-range (exponentially decreasing) part
         auto integrand = [&](double x) -> double
         {
             double j = ric_j(l,k*x);
             double jp = ric_j(lp,kp*x);
             
-            return symbolic::eval(integral, x) * j * jp;
+            return symbolic::eval(short_range_integral, x) * symbolic::eval(expc, x) * j * jp;
         };
         
         GaussKronrod<decltype(integrand)> Q(integrand);
@@ -485,7 +491,17 @@ double PotentialMatrix::ComputeJdir
             );
         }
         
-        return Q.result();
+        //          ∞                                           ∞       1/2
+        //         ⌠              -λ                           ⌠  ⎛ πx ⎞                               -λ
+        //  Idir = |  j(x) j'(x) x   dx    (long range)     =  |  ⎜----⎟    J     (kx)  J      (k'x)  x   dx
+        //         ⌡                                           ⌡  ⎝2kk'⎠     l+1/2       l'+1/2
+        //        0                                           0
+        
+        // integrate long-range part (containing just a multipole and the Riccati-Bessel functions)
+        // TODO
+        double long_result = 0.;
+        
+        return Q.result() + long_result;
     }
     else
     {

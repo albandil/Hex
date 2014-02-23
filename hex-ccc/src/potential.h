@@ -15,7 +15,7 @@
 
 #include "arrays.h"
 #include "basis.h"
-#include "gauss.h"
+// #include "gauss.h"
 #include "quadrature.h"
 
 class PotentialMatrix
@@ -59,7 +59,7 @@ class PotentialMatrix
         RowMatrix<double> matrix_;
         
         
-        GaussLegendre<double> g_;
+//         GaussLegendre<double> g_;
         
         /**
          * @brief Double integral @f$ I_{\mathrm{dir}} @f$.

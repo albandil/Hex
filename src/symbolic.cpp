@@ -73,6 +73,46 @@ symbolic::term symbolic::operator + (symbolic::term const & A, symbolic::term co
     return S;
 }
 
+symbolic::term symbolic::operator / (symbolic::term const & A, symbolic::term const & B) throw (exception)
+{
+    symbolic::term S = A;
+    
+    if (A.gf == B.gf and A.b == B.b)
+    {
+        S.gf = GF_NONE;
+    }
+    else if (B.gf != GF_NONE)
+    {
+        throw exception
+        (
+            "Can't divide non-similar symbolic terms %s and %s.",
+            symbolic::tostring(A).c_str(),
+            symbolic::tostring(B).c_str()
+        );
+    }
+    
+    S.ki /= B.ki;
+    S.kr /= B.kr;
+    S.a -= B.a;
+    S.c -= B.c;
+    
+    return S;
+}
+
+symbolic::term symbolic::expm (symbolic::rational c)
+{
+    symbolic::term p;
+    
+    p.ki = 1.;
+    p.kr = 1;
+    p.a = 0;
+    p.gf = GF_NONE;
+    p.b = 0.;
+    p.c = c;
+    
+    return p;
+}
+
 symbolic::poly symbolic::operator * (symbolic::poly const & P, symbolic::poly const & Q)
 {
     symbolic::poly product_poly;
@@ -781,4 +821,22 @@ std::ostream & symbolic::operator << (std::ostream & os, symbolic::poly const & 
     }
     
     return os;
+}
+
+void symbolic::collect (symbolic::poly const & P, symbolic::term const & p, symbolic::poly & Q, symbolic::poly & R)
+{
+    Q.clear();
+    R.clear();
+    
+    for (symbolic::term const & q : P)
+    {
+        bool exp_match = (p.c == 0 or q.c == p.c);
+        bool sin_match = (p.gf != GF_SIN or q.gf == GF_SIN);
+        bool cos_match = (p.gf != GF_COS or q.gf == GF_COS);
+        
+        if (exp_match and sin_match and cos_match)
+            Q.push_back(q/p);
+        else
+            R.push_back(q);
+    }
 }
