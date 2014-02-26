@@ -563,6 +563,7 @@ void InputFile::read (std::ifstream & inputfile)
     std::cout << "lowest energy: " << Ei.front() << "\n";
     std::cout << "highest energy: " << Ei.back() << "\n";
     std::cout << "total enegies: " << Ei.size() << "\n";
+    std::cout << "full energy list: " << Ei << "\n";
     
     try {
         B = read_dbl(inputfile);

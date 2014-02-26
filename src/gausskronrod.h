@@ -90,7 +90,8 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
          */
         static double eval (double x, void * ptr_radf)
         {
-            return (*((RadialFunction<double>*) ptr_radf))(x);
+            RadialFunction<double> const & f = (* static_cast<RadialFunction<double> const *>(ptr_radf));
+            return f(x);
         }
         
         /** @brief Compute the integral.
@@ -101,15 +102,15 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
          * You can compute improper integrals. For specifying "infinity" as
          * one or both bounds use either
          * 
-         * @code
-         *     std::numeric_limits<double>::infinity()
-         * @endcode
+          @code
+              std::numeric_limits<double>::infinity()
+          @endcode
          * 
          * for positive infinity or
          * 
-         * @code
-         *     -std::numeric_limits<double>::infinity()
-         * @endcode
+          @code
+              -std::numeric_limits<double>::infinity()
+          @endcode
          * 
          * for negative infinity.
          * 

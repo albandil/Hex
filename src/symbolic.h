@@ -18,6 +18,8 @@
 
 #include <cln/cln.h>
 
+#include "misc.h"
+
 #define GF_NONE   0
 #define GF_SIN    1
 #define GF_COS    2
@@ -126,6 +128,26 @@ public:
 term operator + (term const & A, term const & B);
 
 /**
+ * @brief Symbolic division.
+ * 
+ * This will try to compute a factor of two symbolic terms. Because the result has to
+ * be a symbolic term defined above, only a subset of possible divisions is allowed:
+ * The goniometric functions can either be identical in both terms or the second term
+ * has to contain none goniometric function. If this is violated, the function will throw.
+ */
+term operator / (term const & A, term const & B) throw (exception);
+
+/**
+ * @brief Symbolic exponential.
+ * 
+ * Construct a symbolic term containing just the exponential function.
+ * @f[
+ *     \exp(-cx)
+ * @f]
+ */
+term expm (rational c);
+
+/**
  * \brief Sum of symbolic terms.
  * 
  * This class holds a representation of a polynomial as an array of symbolic
@@ -215,6 +237,8 @@ public:
     inline size_t size() const { return terms.size(); }
     inline term & operator [] (size_t i) { return terms[i]; }
     inline term const & operator [] (size_t i) const { return terms[i]; }
+    
+    void clear () { terms.clear(); }
     
     //
     // stream output
@@ -493,6 +517,24 @@ term integrate_full (poly const & P);
  * done term after term and the results are summed afterwards.
  */
 double eval (poly const & P, double r);
+
+/**
+ * @brief Collect common term.
+ * 
+ * Split polynomial into two polynomials that do or do not contain the given factor in the terms.
+ * One of the following terms is expected: exp(-cx), sin(bx), cos(bx), sin(bx)exp(-cx),
+ * cos(bx)exp(-cx). Other terms than those listed cannot be collected.
+ * 
+ * The resulting splitting has the form
+ * @f[
+ *     P(x) = p(x)Q(x) + R(x)
+ * @f]
+ * @param P The original polynomial.
+ * @param p Factor to be collected.
+ * @param Q Collected terms with @f$ p(x) @f$ factored out.
+ * @param R The uncollected terms.
+ */
+void collect (poly const & P, term const & p, poly & Q, poly & R);
 
 /**
  * @brief Binomial coefficient.
