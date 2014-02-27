@@ -16,6 +16,7 @@
 #include "gausskronrod.h"
 #include "matrix.h"
 #include "potential.h"
+#include "romberg.h"
 #include "symbolic.h"
 #include "specf.h"
 
@@ -91,8 +92,9 @@ PotentialMatrix::PotentialMatrix
                             continue;
                         
                         // compute the direct double integral
-//                         double integral = ComputeIdir (lambda, L, i, l, k[ik], Lp, ip, lp, kp[ikp]);
-                        double integral = ComputeJdir (lambda, xi[L][i-1], l, k[ik], xi[Lp][ip-1], lp, kp[ikp]) * sqrt(xiNsqr[L][i-1] * xiNsqr[Lp][ip-1]);
+                        double integral = ComputeIdir_Romberg (lambda, L, i, l, k[ik], Lp, ip, lp, kp[ikp]);
+//                         double integral = ComputeIdir_nested (lambda, L, i, l, k[ik], Lp, ip, lp, kp[ikp]);
+//                         double integral = ComputeIdir_semisymbolic (lambda, xi[L][i-1], l, k[ik], xi[Lp][ip-1], lp, kp[ikp]) * sqrt(xiNsqr[L][i-1] * xiNsqr[Lp][ip-1]);
                         
                         // add contribution of this multipole to the matrix
                         matrix_(irow,icol) += f * integral;
@@ -140,7 +142,7 @@ rArray MatrixEquation::solve () const
 }
 
 /*
-double PotentialMatrix::ComputeIdir
+double PotentialMatrix::ComputeIdir_symbolic
 (
     int lambda,
     symbolic::poly const & j,
@@ -232,7 +234,7 @@ double PotentialMatrix::ComputeIdir
 */
 
 /*
-double PotentialMatrix::ComputeIdir
+double PotentialMatrix::ComputeIdir_Duff
 (
     int lambda,
     int L, int i, int l, double k,
@@ -326,7 +328,7 @@ double PotentialMatrix::ComputeIdir
 }
 */
 
-double PotentialMatrix::ComputeIdir
+double PotentialMatrix::ComputeIdir_nested
 (
     int lambda,
     int L, int i, int l, double k,
@@ -425,7 +427,7 @@ double PotentialMatrix::ComputeIdir
     }
 }
 
-double PotentialMatrix::ComputeJdir
+double PotentialMatrix::ComputeIdir_semisymbolic
 (
     int lambda,
     symbolic::poly const & xi, int l, double k,
@@ -486,8 +488,8 @@ double PotentialMatrix::ComputeJdir
         {
             std::cerr << format
             (
-                "ComputeJdir failed for λ=%d, xi=%s, l=%d, k=%g, xip=%s, lp=%d, kp=%g (\"%s\").\n",
-                lambda, symbolic::tostring(xi).c_str(), l, k, symbolic::tostring(xip).c_str(), lp, k, Q.status().c_str()
+                "ComputeIdir failed for λ=%d, xi=%s, l=%d, k=%g, xip=%s, lp=%d, kp=%g (\"%s\").\n",
+                lambda, symbolic::tostring(xi).c_str(), l, k, symbolic::tostring(xip).c_str(), lp, kp, Q.status().c_str()
             );
         }
         
@@ -565,11 +567,102 @@ double PotentialMatrix::ComputeJdir
         {
             std::cerr << format
             (
-                "ComputeJdir failed for λ=%d, xi=%s, l=%d, k=%g, xip=%s, lp=%d, kp=%g (\"%s\").\n",
-                lambda, symbolic::tostring(xi).c_str(), l, k, symbolic::tostring(xip).c_str(), lp, k, Q.status().c_str()
+                "ComputeIdir failed for λ=%d, xi=%s, l=%d, k=%g, xip=%s, lp=%d, kp=%g (\"%s\").\n",
+                lambda, symbolic::tostring(xi).c_str(), l, k, symbolic::tostring(xip).c_str(), lp, kp, Q.status().c_str()
             );
         }
         
         return Q.result();
+    }
+}
+
+double PotentialMatrix::ComputeIdir_Romberg
+(
+    int lambda,
+    int L, int i, int l, double k,
+    int Lp, int ip, int lp, double kp
+) const
+{
+    if (lambda == 0)
+    {
+        //
+        // r1 > r2
+        //
+        
+        double skew = 2;
+        auto integrand = [&](double u, double v) -> double
+        {
+            if (u <= v)
+                return 0.;
+            
+            double r1 = skew * u / (1. - u);
+            double r2 = skew * v / (1. - v);
+            
+            double xi  = basis_.basestate(L, i, r1);
+            double xip = basis_.basestate(Lp, ip, r1);
+            
+            double j = ric_j(l,k*r2);
+            double jp = ric_j(lp,kp*r2);
+            
+            return skew * skew * (1./r1 - 1./r2) * xi * xip * j * jp / ((1.-u)*(1.-u)*(1.-v)*(1.-v));
+        };
+        
+        UnitSquareRomberg<double,decltype(integrand)> R(integrand);
+        R.setEpsAbs(1e-10);
+        R.setEpsRel(1e-5);
+        R.setMinLevel(3);
+        R.setMaxLevel(10);
+        R.setMaxRombLevel(1);
+        R.integrate();
+        
+        if (not R.ok())
+        {
+            std::cerr << format
+            (
+                "ComputeIdir failed for λ=%d, L=%d, i=%d, l=%d, k=%g, Lp=%d, ip=%d, lp=%d, kp=%g (\"%s\").\n",
+                lambda, L, i, l, k, Lp, ip, lp, kp, R.status().c_str()
+            );
+        }
+        
+        return R.result();
+    }
+    else
+    {
+        double skew = 2;
+        auto integrand = [&](double u, double v) -> double
+        {
+            double r1 = skew * u / (1. - u);
+            double r2 = skew * v / (1. - v);
+            
+            double rmin = std::min(r1,r2);
+            double rmax = std::max(r1,r2);
+            
+            double xi  = basis_.basestate(L, i, r1);
+            double xip = basis_.basestate(Lp, ip, r1);
+            
+            double j = ric_j(l,k*r2);
+            double jp = ric_j(lp,kp*r2);
+            
+            return skew * skew * pow(rmin/rmax,lambda)/rmax * xi * xip * j * jp / ((1.-u)*(1.-u)*(1.-v)*(1.-v));
+        };
+        
+        UnitSquareRomberg<double,decltype(integrand)> R(integrand);
+        R.setEpsAbs(1e-10);
+        R.setEpsRel(1e-5);
+        R.setMinLevel(3);
+        R.setMaxLevel(10);
+        R.setMaxRombLevel(1);
+        R.integrate();
+        
+        if (not R.ok())
+        {
+            std::cerr << format
+            (
+                "ComputeIdir failed for λ=%d, L=%d, i=%d, l=%d, k=%g, Lp=%d, ip=%d, lp=%d, kp=%g (\"%s\").\n",
+                lambda, L, i, l, k, Lp, ip, lp, kp, R.status().c_str()
+            );
+        }
+        
+        return R.result();
     }
 }

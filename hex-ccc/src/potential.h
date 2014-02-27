@@ -64,19 +64,26 @@ class PotentialMatrix
         /**
          * @brief Double integral @f$ I_{\mathrm{dir}} @f$.
          */
-        double ComputeIdir
+        //@{
+        double ComputeIdir_nested
         (
             int lambda,
             int L, int i, int l, double k,
             int Lp, int ip, int lp, double kp
         ) const;
-        
-        double ComputeJdir
+        double ComputeIdir_Romberg
+        (
+            int lambda,
+            int L, int i, int l, double k,
+            int Lp, int ip, int lp, double kp
+        ) const;
+        double ComputeIdir_semisymbolic
         (
             int lambda,
             symbolic::poly const & xi, int l, double k,
             symbolic::poly const & xip, int lp, double kp
         ) const;
+        //@}
 };
 
 class MatrixEquation

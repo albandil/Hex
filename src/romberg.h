@@ -50,11 +50,14 @@ class UnitSquareRomberg
         // absolute tolerance
         double epsabs_;
         
-        // maximal subdivision limit (0 = no evaluations)
+        // minimal subdivision limit
+        unsigned minlevel_;
+        
+        // maximal subdivision limit (0 = no evaluations; overrides minlevel_)
         unsigned maxlevel_;
         
         // maximal Romberg aggregation limit (0 = no Romberg)
-        unsigned maxestlevel_;
+        unsigned maxromblevel_;
         
         // whether to print diagnostic information
         bool verbose_;
@@ -79,11 +82,12 @@ class UnitSquareRomberg
             Functor f,
             double epsrel = 1e-5,
             double epsabs = 1e-10,
+            unsigned minlevel = 0,
             unsigned maxlevel = 10,
-            unsigned maxestlevel = 10,
+            unsigned maxromblevel = 1,
             bool verbose = false
         ) : f_(f), epsrel_(epsrel), epsabs_(epsabs), maxlevel_(maxlevel),
-            maxestlevel_(maxestlevel), verbose_(verbose), result_(0),
+            maxromblevel_(maxromblevel), verbose_(verbose), result_(0),
             ok_(true), status_()
         {
             // do nothing
@@ -99,11 +103,14 @@ class UnitSquareRomberg
         double epsabs () const { return epsabs_; }
         void setEpsAbs (double eps) { epsabs_ = eps; }
         
-        unsigned maxLevel () const { return maxlevel_; }
-        void setMaxLevel (unsigned maxlevel) { maxlevel_ = maxlevel; }
+        unsigned minLevel () const { return minlevel_; }
+        void setMinLevel (unsigned level) { minlevel_ = level; }
         
-        unsigned maxRombLevel () const { return maxestlevel_; }
-        void setMaxRombLevel (unsigned maxestlevel) { maxestlevel_ = maxestlevel; }
+        unsigned maxLevel () const { return maxlevel_; }
+        void setMaxLevel (unsigned level) { maxlevel_ = level; }
+        
+        unsigned maxRombLevel () const { return maxromblevel_; }
+        void setMaxRombLevel (unsigned level) { maxromblevel_ = level; }
         
         bool verbose () const { return verbose_; }
         void setVerbose (double v) const { verbose_ = v; }
@@ -152,7 +159,7 @@ class UnitSquareRomberg
                 integrals.push_back(suma * h * h);
                 
                 // update Romberg table
-                romberg[level].resize(std::min(level,maxestlevel_) + 1);
+                romberg[level].resize(std::min(level,maxromblevel_) + 1);
                 romberg[level][0] = integrals.back();
                 if (verbose_) std::cout << std::setw(13) << std::left << h << integrals.back() << " ";
                 for (unsigned icol = 1; icol < romberg[level].size(); icol++)
@@ -165,7 +172,7 @@ class UnitSquareRomberg
                 
                 // compare estimates
                 double Delta = std::abs(romberg[level].back() - romberg[level-1].back());
-                if (Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back()))
+                if ((Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back())) and level >= minlevel_)
                 {
                     ok_ = true;
                     status_ = "";
