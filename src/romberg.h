@@ -13,6 +13,8 @@
 #ifndef HEX_ROMBERG
 #define HEX_ROMBERG
 
+#include "arrays.h"
+
 /**
  * @brief Two-dimensional Romberg integration.
  * 
@@ -113,7 +115,7 @@ class UnitSquareRomberg
         void setMaxRombLevel (unsigned level) { maxromblevel_ = level; }
         
         bool verbose () const { return verbose_; }
-        void setVerbose (double v) const { verbose_ = v; }
+        void setVerbose (double v) { verbose_ = v; }
         
         bool ok () const { return ok_; }
         T result () const { return result_; }
@@ -154,6 +156,67 @@ class UnitSquareRomberg
                 for (unsigned ix = 1; ix < n; ix++)
                 for (unsigned iy = 1; iy < n; iy++)
                     suma += f_ (h*ix,h*iy);
+                
+                // store integral estimate
+                integrals.push_back(suma * h * h);
+                
+                // update Romberg table
+                romberg[level].resize(std::min(level,maxromblevel_) + 1);
+                romberg[level][0] = integrals.back();
+                if (verbose_) std::cout << std::setw(13) << std::left << h << integrals.back() << " ";
+                for (unsigned icol = 1; icol < romberg[level].size(); icol++)
+                {
+                    T scale = (1 << (2*icol));
+                    romberg[level][icol] = (scale * romberg[level][icol-1] - romberg[level-1][icol-1]) / (scale - 1);
+                    if (verbose_) std::cout << std::setw(13) << std::left << romberg[level][icol] << " ";
+                }
+                if (verbose_) std::cout << std::endl;
+                
+                // compare estimates
+                double Delta = std::abs(romberg[level].back() - romberg[level-1].back());
+                if ((Delta < epsabs_ or Delta < epsrel_ * std::abs(romberg[level].back())) and level >= minlevel_)
+                {
+                    ok_ = true;
+                    status_ = "";
+                    result_ = romberg[level].back();
+                    return ok_;
+                }
+            }
+            
+            ok_ = false;
+            status_ = "Subdivision limit reached.";
+            result_ = romberg.back().back();
+            return ok_;
+        }
+        
+        bool integrate_extern ()
+        {
+            // successive estimates
+            std::vector<T> integrals(maxlevel_ + 1);
+            integrals.push_back(0.);
+            
+            // edge
+            T h = 1.;
+            
+            // number of cells per dimension
+            unsigned n = 1;
+            
+            // setup Romberg table
+            std::vector<std::vector<T>> romberg(maxlevel_ + 1);
+            romberg[0].push_back(0.);
+            
+            // initialize output
+            if (verbose_) std::cout << std::setw(13) << std::left << 1. << romberg[0][0] << std::endl;
+            
+            // for all subdivisions
+            for (unsigned level = 1; level <= maxlevel_; level++)
+            {
+                // update geometry
+                h /= 2;
+                n *= 2;
+                
+                // evaluate function at all internal points (use supplied function
+                T suma = f_ (h * linspace(1u, n-1, n-1));
                 
                 // store integral estimate
                 integrals.push_back(suma * h * h);

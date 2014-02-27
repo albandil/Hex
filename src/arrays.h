@@ -940,7 +940,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         * array is returned. It is expected that the return value of the functor
         * is a number type, so that NumberArray can be used.
         */
-        template <class Functor> auto transform (Functor f) -> NumberArray<decltype(f(T(0)))>
+        template <class Functor> auto transform (Functor f) const -> NumberArray<decltype(f(T(0)))>
         {
             NumberArray<decltype(f(T(0)))> c(size());
             for (size_t i = 0; i < size(); i++)

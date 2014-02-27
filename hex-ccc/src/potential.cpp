@@ -590,30 +590,39 @@ double PotentialMatrix::ComputeIdir_Romberg
         //
         
         double skew = 2;
-        auto integrand = [&](double u, double v) -> double
+        auto kernel = [&](rArray const & u) -> double
         {
-            if (u <= v)
-                return 0.;
+            // get subgrid size
+            unsigned n = u.size();
             
-            double r1 = skew * u / (1. - u);
-            double r2 = skew * v / (1. - v);
+            // unscale coordinates
+            rArray x = u.transform([&](double t) -> double { return skew * t / (1.-t); });
             
-            double xi  = basis_.basestate(L, i, r1);
-            double xip = basis_.basestate(Lp, ip, r1);
+            // precompute radial functions
+            rArray xi  = x.transform ([&](double r) -> double { return basis_.basestate(L, i, r);   });
+            rArray xip = x.transform ([&](double r) -> double { return basis_.basestate(Lp, ip, r); });
+            rArray j   = x.transform ([&](double r) -> double { return ric_j(l, k*r);               });
+            rArray jp  = x.transform ([&](double r) -> double { return ric_j(lp, kp*r);             });
             
-            double j = ric_j(l,k*r2);
-            double jp = ric_j(lp,kp*r2);
+            // sum of evaluations
+            double suma = 0.;
             
-            return skew * skew * (1./r1 - 1./r2) * xi * xip * j * jp / ((1.-u)*(1.-u)*(1.-v)*(1.-v));
+            // evaluate integrand on the carthesian product x × x
+            for (unsigned ir1 = 0; ir1 < n; ir1++)
+            for (unsigned ir2 = 0; ir2 < ir1; ir2++)
+                suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*(1./x[ir1] - 1./x[ir2]) / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
+            
+            // returh the aggregated result
+            return skew * skew * suma;
         };
         
-        UnitSquareRomberg<double,decltype(integrand)> R(integrand);
+        UnitSquareRomberg<double,decltype(kernel)> R(kernel);
         R.setEpsAbs(1e-10);
         R.setEpsRel(1e-5);
         R.setMinLevel(3);
         R.setMaxLevel(10);
         R.setMaxRombLevel(1);
-        R.integrate();
+        R.integrate_extern();
         
         if (not R.ok())
         {
@@ -629,30 +638,43 @@ double PotentialMatrix::ComputeIdir_Romberg
     else
     {
         double skew = 2;
-        auto integrand = [&](double u, double v) -> double
+        auto kernel = [&](rArray const & u) -> double
         {
-            double r1 = skew * u / (1. - u);
-            double r2 = skew * v / (1. - v);
+            // get subgrid size
+            unsigned n = u.size();
             
-            double rmin = std::min(r1,r2);
-            double rmax = std::max(r1,r2);
+            // unscale coordinates
+            rArray x = u.transform([&](double t) -> double { return skew * t / (1.-t); });
             
-            double xi  = basis_.basestate(L, i, r1);
-            double xip = basis_.basestate(Lp, ip, r1);
+            // precompute radial functions
+            rArray xi  = x.transform ([&](double r) -> double { return basis_.basestate(L, i, r);   });
+            rArray xip = x.transform ([&](double r) -> double { return basis_.basestate(Lp, ip, r); });
+            rArray j   = x.transform ([&](double r) -> double { return ric_j(l, k*r);               });
+            rArray jp  = x.transform ([&](double r) -> double { return ric_j(lp, kp*r);             });
             
-            double j = ric_j(l,k*r2);
-            double jp = ric_j(lp,kp*r2);
+            // sum of evaluations
+            double suma = 0.;
             
-            return skew * skew * pow(rmin/rmax,lambda)/rmax * xi * xip * j * jp / ((1.-u)*(1.-u)*(1.-v)*(1.-v));
+            // evaluate integrand on the carthesian product x × x
+            for (unsigned ir1 = 0; ir1 < n; ir1++)
+            {
+                for (unsigned ir2 = 0; ir2 < ir1; ir2++)
+                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*pow(x[ir2]/x[ir1],lambda)/x[ir1] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
+                for (unsigned ir2 = ir1; ir2 < n; ir2++)
+                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*pow(x[ir1]/x[ir2],lambda)/x[ir2] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
+            }
+            
+            // returh the aggregated result
+            return skew * skew * suma;
         };
         
-        UnitSquareRomberg<double,decltype(integrand)> R(integrand);
+        UnitSquareRomberg<double,decltype(kernel)> R(kernel);
         R.setEpsAbs(1e-10);
         R.setEpsRel(1e-5);
         R.setMinLevel(3);
         R.setMaxLevel(10);
         R.setMaxRombLevel(1);
-        R.integrate();
+        R.integrate_extern();
         
         if (not R.ok())
         {
