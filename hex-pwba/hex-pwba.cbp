@@ -35,10 +35,11 @@
 		<Unit filename="src/gausskronrod.h" />
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/misc.h" />
+		<Unit filename="src/radial.cpp" />
+		<Unit filename="src/radial.h" />
+		<Unit filename="src/romberg.h" />
 		<Unit filename="src/specf.cpp" />
 		<Unit filename="src/specf.h" />
-		<Unit filename="src/symbolic.cpp" />
-		<Unit filename="src/symbolic.h" />
 		<Unit filename="src/version.cpp" />
 		<Unit filename="src/version.h" />
 		<Extensions>
