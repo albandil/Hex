@@ -152,7 +152,7 @@ int main (int argc, char* argv[])
                         Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
                     );
                     
-                    sigma_singlet += sqrabs(T_singlet)/(4.*M_PI*M_PI);
+                    sigma_singlet += 0.25*sqrabs(T_singlet)/(4.*M_PI*M_PI);
                 }
                 
                 if (abs(T_triplet) != 0.)
@@ -163,7 +163,7 @@ int main (int argc, char* argv[])
                         Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
                     );
                     
-                    sigma_triplet += sqrabs(T_triplet)/(4.*M_PI*M_PI);
+                    sigma_triplet += 0.75*sqrabs(T_triplet)/(4.*M_PI*M_PI);
                 }
             }
             
