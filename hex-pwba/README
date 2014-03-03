@@ -47,7 +47,7 @@ test run can be executed in the following way:
 The last line of output will contain the following entries:
  1,2) initial state (ni=1, li=0)
  3,4) final state (nf=1, lf=0)
- 5) partial wave angular momentum (L)
+ 5) partial wave angular momentum (L=0)
  6) impact energy (Ei=4 [Ry])
 
 The output contains

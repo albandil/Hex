@@ -40,7 +40,7 @@ int main (int argc, char *argv[])
     if (argc != 7 and argc != 8)
     {
         std::cout << "\nUsage:\n";
-        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <Ei> <sigmaeps> [<rmax>]\n\n";
+        std::cout << "\thex-dwba <ni> <li> <nf> <lf> <L> <Ei> [<rmax>]\n\n";
         exit(0);
     }
     
@@ -52,22 +52,16 @@ int main (int argc, char *argv[])
     int Li = strtol(argv[2], 0, 10);
     int Nf = strtol(argv[3], 0, 10);
     int Lf = strtol(argv[4], 0, 10);
-    double Ei = strtod(argv[5], 0);
+    int L = strtol(argv[5], 0, 10);
+    double Ei = strtod(argv[6], 0);
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(Ni*Ni) + 1./(Nf*Nf));
-    double sigmaeps = strtod(argv[6], 0);
     double rmax = (argc == 8) ? strtod(argv[7], 0) : -1.;
     
     int MM = (2*Li+1)*(2*Lf+1);		// m⟶m"transition count
     
     cArrays Tdir;
     cArrays Texc;
-    
-    // accelerators: if a per-lf contribution decays under "accelerator_eps",
-    // such term will not be computed anymore for higher lf-contributions
-    double accelerator_eps = 1e-8;
-    bool compute_Tdir = true;
-    bool compute_Texc = true;
     
     // initial and final atomic state
     HydrogenFunction psii(Ni, Li);
@@ -77,7 +71,7 @@ int main (int argc, char *argv[])
     DistortingPotential Uf(Nf,rmax);
     DistortingPotential Ui(Ni,rmax);
     
-    for (int lf = 0; ; lf++)
+    for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
     {
         cArray Tdir_lf(MM), Texc_lf(MM);
         
@@ -87,7 +81,7 @@ int main (int argc, char *argv[])
         DistortedWave chif(kf,lf,Ui);
         
         // direct 1e
-        if (Ni == Nf and Li == Lf and compute_Tdir)
+        if (Ni == Nf and Li == Lf)
         {
             Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
             
@@ -98,7 +92,7 @@ int main (int argc, char *argv[])
                     Tdir_lf[(Mi+Li)*(2*Lf+1)+Mf+Lf] += tmat;
         }
         
-        for (int li = 0; ; li++)
+        for (int li = std::abs(Li - L); li <= Li + L; li++)
         {
             // conserve angular momentum
             if (li < lf - Li - Lf)
@@ -118,7 +112,7 @@ int main (int argc, char *argv[])
             DistortedWave chii(ki,li,Ui);
             
             // exchange 1e
-            if (Li == lf and Lf == li and compute_Texc)
+            if (Li == lf and Lf == li)
             {
                 Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
                 
@@ -130,7 +124,6 @@ int main (int argc, char *argv[])
             }
             
             // direct 2e
-            if (compute_Tdir)
             for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); lambda <= std::min(Li+Lf,li+lf); lambda++)
             {
                 Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
@@ -152,7 +145,6 @@ int main (int argc, char *argv[])
             }
                 
             // exchange 2e
-            if (compute_Texc)
             for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
             {
                 Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
@@ -177,37 +169,11 @@ int main (int argc, char *argv[])
         // update T-matrices
         Tdir.push_back(Tdir_lf);
         Texc.push_back(Texc_lf);
-        
-        // convergence check
-        rArray sigma_singlet_lf = pow(abs(Tdir_lf + Texc_lf), 2);
-        rArray sigma_triplet_lf = pow(abs(Tdir_lf - Texc_lf), 2);
-        rArray sigma_singlet = sums(pow(abs(Tdir + Texc), 2));
-        rArray sigma_triplet = sums(pow(abs(Tdir - Texc), 2));
-        rArray relcng_singlet = sigma_singlet_lf/sigma_singlet;
-        rArray relcng_triplet = sigma_triplet_lf/sigma_triplet;
-        std::cout << "\tδ (singlet) = " << relcng_singlet << "\n";
-        std::cout << "\tδ (triplet) = " << relcng_triplet << "\n";
-        if (std::max(max(relcng_singlet), max(relcng_triplet)) < sigmaeps)
-            break;
-        
-        // update regulators ("do not unnecessarily refine epsilons")
-        double Td_contrib = std::max(max(abs(Tdir_lf)/sigma_singlet), max(abs(Tdir_lf)/sigma_triplet));
-        double Te_contrib = std::max(max(abs(Texc_lf)/sigma_singlet), max(abs(Texc_lf)/sigma_triplet));
-        if (compute_Tdir and Td_contrib < accelerator_eps)
-        {
-            compute_Tdir = false;
-            std::cout << "\tAbandoning Tdir part of DWBA-1\n";
-        }
-        if (compute_Texc and Te_contrib < accelerator_eps)
-        {
-            compute_Texc = false;
-            std::cout << "\tAbandoning Texc part of DWBA-1\n";
-        }
     }
     
     // write SQL
     std::ostringstream oss;
-    oss << Ni << "_" << Li << "-" << Nf << "_" << Lf << "-" << Ei << ".sql";
+    oss << Ni << "_" << Li << "-" << Nf << "_" << Lf << "-" << Ei << "-" << L << ".sql";
     std::ofstream fsql(oss.str().c_str());
     fsql << "BEGIN TRANSACTION;\n";
     for (int Mi = -Li; Mi <= Li; Mi++)
@@ -216,8 +182,6 @@ int main (int argc, char *argv[])
     {
         Complex tdir = Tdir[ell][(Mi+Li)*(2*Lf+1)+Mf+Lf];
         Complex texc = Texc[ell][(Mi+Li)*(2*Lf+1)+Mf+Lf];
-        
-        int L = 0; // ??? FIXME consistent with hex-ecs ???
         
         for (int S = 0; S <= 1; S++)
         {
@@ -236,7 +200,7 @@ int main (int argc, char *argv[])
         
     // extract integral cross section for all transitions
     double sumsumsigma = 0;
-    std::cout << "\n" << Ei << "\t";
+    std::cout << "\n" << Ei << " " << L << " ";
     for (int Mi = -Li; Mi <= Li; Mi++)
     {
         double sumsigma = 0;

@@ -47,26 +47,31 @@ This should create an executable "hex-dwba" in the subdirectory "bin/". A simple
 test run can be executed in the following way:
 
 > mkdir test ; cd test                 # create a subdirectory for the test run
-> ../bin/hex-dwba 1 0 1 0 4. 1e-5      # run simple computation H(1s)->H(1s) 4Ry
+> ../bin/hex-dwba 1 0 1 0 0 4. 1000    # run simple computation H(1s)->H(1s) 4Ry
 
 The last line of output will contain the following entries:
- 1) impact energy (4 Ry)
- 2) cross sections
- 3) partial wave count
+ 1,2) initial state (ni=1, li=0)
+ 3,4) final state (nf=1, lf=0)
+ 5) partial wave angular momentum (L=0)
+ 6) impact energy (Ei=4 [Ry])
+ 7) [optional] radial grid length (rmax=1000 [a0])
 
-The cross sections are given in the following order
-
-  For mi = -li, ..., li
-  {
-    For mf = -lf, ..., lf
+The output contains
+ a) The impact energy Ei
+ b) The angular momentum L
+ b) The cross sections, which are given in the following order
+    For mi = -li, ..., li
     {
-      WRITE sigma(mi,mf)
+      For mf = -lf, ..., lf
+      {
+        WRITE sigma(mi,mf)
+      }
+      WRITE Sum[mf] { sigma(mi,mf) }
     }
-    WRITE Sum[mf] { sigma(mi,mf) }
-  }
-  WRITE Sum[mi,mf] { sigma(mi,mf) }
+    WRITE Sum[mi,mf] { sigma(mi,mf) }
 
-In our case mi = mf = li = lf = 0, so there are three identical numbers.
+For the example run above, the (last) output is the following set of numbers (apart from the SQL file):
+4 0 1.57145 1.57145 1.57145
 
 If the libraries are installed in non-standard locations, one needs to edit the
 Makefile accordingly.
