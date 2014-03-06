@@ -128,7 +128,7 @@ class UnitSquareRomberg
         bool integrate ()
         {
             // successive estimates
-            std::vector<T> integrals(maxlevel_ + 1);
+            std::vector<T> integrals(1);
             integrals.push_back(0.);
             
             // edge
@@ -138,15 +138,19 @@ class UnitSquareRomberg
             unsigned n = 1;
             
             // setup Romberg table
-            std::vector<std::vector<T>> romberg(maxlevel_ + 1);
+            std::vector<std::vector<T>> romberg(1);
             romberg[0].push_back(0.);
             
             // initialize output
             if (verbose_) std::cout << std::setw(13) << std::left << 1. << romberg[0][0] << std::endl;
             
             // for all subdivisions
-            for (unsigned level = 1; level <= maxlevel_; level++)
+            for (unsigned level = 1; maxlevel_ == 0 or level <= maxlevel_; level++)
             {
+                // extend storage
+                integrals.push_back(0);
+                romberg.push_back(std::vector<T>());
+                
                 // update geometry
                 h /= 2;
                 n *= 2;
@@ -184,7 +188,7 @@ class UnitSquareRomberg
             }
             
             ok_ = false;
-            status_ = "Subdivision limit reached.";
+            status_ = format("Subdivision limit (%d) reached.", maxlevel_);
             result_ = romberg.back().back();
             return ok_;
         }
@@ -192,7 +196,7 @@ class UnitSquareRomberg
         bool integrate_extern ()
         {
             // successive estimates
-            std::vector<T> integrals(maxlevel_ + 1);
+            std::vector<T> integrals(1);
             integrals.push_back(0.);
             
             // edge
@@ -202,15 +206,19 @@ class UnitSquareRomberg
             unsigned n = 1;
             
             // setup Romberg table
-            std::vector<std::vector<T>> romberg(maxlevel_ + 1);
+            std::vector<std::vector<T>> romberg(1);
             romberg[0].push_back(0.);
             
             // initialize output
             if (verbose_) std::cout << std::setw(13) << std::left << 1. << romberg[0][0] << std::endl;
             
             // for all subdivisions
-            for (unsigned level = 1; level <= maxlevel_; level++)
+            for (unsigned level = 1; maxlevel_ == 0 or level <= maxlevel_; level++)
             {
+                // extend storage
+                integrals.push_back(0);
+                romberg.push_back(std::vector<T>());
+                
                 // update geometry
                 h /= 2;
                 n *= 2;
@@ -245,7 +253,7 @@ class UnitSquareRomberg
             }
             
             ok_ = false;
-            status_ = "Subdivision limit reached.";
+            status_ = format("Subdivision limit (%d) reached.", maxlevel_);
             result_ = romberg.back().back();
             return ok_;
         }

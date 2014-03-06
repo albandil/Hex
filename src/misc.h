@@ -295,6 +295,14 @@ class Timer
             return secs.count();
         }
         
+        /// Stop timer and return elapsed time in seconds.
+        int milliseconds ()
+        {
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
+            std::chrono::milliseconds secs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
+            return secs.count();
+        }
+        
     private:
         
         /// Start time.

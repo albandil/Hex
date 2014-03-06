@@ -18,9 +18,7 @@
 #include <gsl/gsl_sf.h>
 
 #include "arrays.h"
-#include "complex.h"
-#include "radial.h"
-#include "misc.h"
+#include "pwba.h"
 #include "specf.h"
 #include "version.h"
 
@@ -29,9 +27,41 @@ int main (int argc, char* argv[])
     // disable GSL error handler
     gsl_set_error_handler_off();
     
-    if (argc != 7)
+    // disable buffering of the standard output (-> immediate logging)
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    
+    // parse command line
+    bool direct = true, exchange = true;
+    std::vector<const char*> params;
+    for (int iarg = 1; iarg < argc; iarg++)
     {
-        printf("\nUsage:\n\thex-pwba <ni> <li> <nf> <lf> <L> <Ei>\n\n");
+        // dashes introduce options
+        if (argv[iarg][0] == '-')
+        {
+            // erase all leading dashes
+            std::string param = argv[iarg];
+            while (param.size() != 0 and param.front() == '-')
+                param.erase(param.begin());
+            
+            // compare with known switches
+            if (param == std::string("nodirect"))
+                direct = false;
+            else if (param == std::string("noexchange"))
+                exchange = false;
+            else
+                throw exception ("Unknown option \"%s\".", argv[iarg]);
+        }
+        
+        // otherwise it is a number paramater
+        else
+        {
+            params.push_back(argv[iarg]);
+        }
+    }
+    
+    if (params.size() != 6)
+    {
+        printf("\nUsage:\n\thex-pwba [--nodirect] [--noexchange] <ni> <li> <nf> <lf> <L> <Ei>\n\n");
         exit(0);
     }
     
@@ -39,91 +69,30 @@ int main (int argc, char* argv[])
     std::cout << logo_raw() << "\n";
     
     // atomic quantum numbers
-    int Ni = strtol(argv[1], 0, 10);
-    int Li = strtol(argv[2], 0, 10);
-    int Nf = strtol(argv[3], 0, 10);
-    int Lf = strtol(argv[4], 0, 10);
-    int L = strtol(argv[5], 0, 10);
+    int Ni = strtol(params[0], 0, 10);
+    int Li = strtol(params[1], 0, 10);
+    int Nf = strtol(params[2], 0, 10);
+    int Lf = strtol(params[3], 0, 10);
+    int L  = strtol(params[4], 0, 10);
     
     // energy of the projectile
-    double Ei = strtod(argv[6], 0);    // Ry
+    double Ei = strtod(params[5], 0);    // Ry
     double ki = sqrt(Ei);
     double Ef = Ei - 1./(Ni*Ni) + 1./(Nf*Nf);
     double kf = sqrt(Ef);
     
-    /* 
-     * Computes all contributions to the T-matrix for the specified total angular
-     * momentum L. The contributions depend on all such "li" and "lf" that
-     * the following conditions must be satisfied:
-     *    |li - Li| <= L <= li + Li
-     *    |lf - Lf| <= L <= lf + Lf
-     * This results in the following bounds on "li" and "lf":
-     *    |Li - L| <= li <= Li + L
-     *    |Lf - L| <= lf <= Li + L
-     */
-    
     // computed partial T-matrices
-    cArrays Tdir((2*Li+1)*(2*Lf+1)), Texc((2*Li+1)*(2*Lf+1));
+    cArrays Tdir, Texc;
     
-    // for all outgoing partial waves
-    for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
-    {
-        // add new T-matrix for this outgoing partial wave
-        for (cArray & T : Tdir)
-            T.push_back(0.);
-        for (cArray & T : Texc)
-            T.push_back(0.);
-        
-        // for all incoming partial waves
-        for (int li = std::abs(Li - L); li <= Li + L; li++)
-        {
-            // get multipole bounds
-            int minlambda = std::min
-            (
-                std::max(abs(Lf-Li), abs(lf-li)),   // direct T lowest contribution
-                std::max(abs(lf-Li), abs(Lf-li))    // exchange T lowest contribution
-            );
-            int maxlambda = std::max
-            (
-                std::min(Li+Lf, lf+li),   // direct T highest contribution
-                std::min(lf+Li, Lf+li)    // exchange T highest contribution
-            );
-            
-            // for all multipoles
-            for (int lam = minlambda; lam <= maxlambda; lam++)
-            {
-                // compute the needed radial integrals
-                double Vdir = compute_Idir (li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
-                double Vexc = compute_Iexc (li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
-                
-                // compute complex prefactor
-                Complex prefactor = pow((2*M_PI),3) * 8./(ki*kf)*pow(Complex(0.,1.),li-lf)/(2.*lam+1)*sqrt((2*li+1)/(4*M_PI));
-                
-                // for all projections of the initial/final angular momentum
-                for (int Mi = -Li; Mi <= Li; Mi++)
-                for (int Mf = -Lf; Mf <= Lf; Mf++)
-                {
-                    // compute index in the array of T-matrices
-                    int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
-                    
-                    // compute angular integrals (Gaunt coefficients)
-                    double Gaunts_dir = Gaunt(Li,Mi,lam,Mf-Mi,Lf,Mf) * Gaunt(lam,Mf-Mi,lf,Mi-Mf,li,0);
-                    double Gaunts_exc = Gaunt(li,0,lam,Mf,Lf,Mf) * Gaunt(lam,Mf,lf,Mi-Mf,Li,Mi);
-                    
-                    // add the T-matrix contributions
-                    Tdir[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_dir * Vdir;
-                    Texc[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_exc * Vexc;
-                }
-            }
-        }
-    }
+    // main computational routine
+    pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
     
     //
-    // write the T-matrices
+    // write the T-matrices, sum cross sections
     //
     
     char sqlname[50];
-    sprintf(sqlname, "pwba-%d-%d-%d-%d-E%g.sql", Ni, Li, Nf, Lf, Ei);
+    sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
     std::ofstream out(sqlname);
     out << "BEGIN TRANSACTION;\n";
     
