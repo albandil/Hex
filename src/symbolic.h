@@ -27,6 +27,14 @@
 namespace symbolic
 {
 
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                             * 
+ *                              Rational numbers                               *
+ *                                                                             * 
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 /// Rational number (CLN)
 typedef cln::cl_RA rational;
 
@@ -42,6 +50,14 @@ inline double double_approx (rational const & r) { return cln::double_approx(r);
 
 /// Rational constant 1/2
 extern rational onehalf;
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                             * 
+ *                              Symbolic polynomials                           *
+ *                                                                             * 
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 
 /**
  * \brief Symbolic term structure
@@ -258,6 +274,32 @@ public:
 };
 
 /**
+ * @brief Evaluate the polynomial.
+ * 
+ * Evaluate the polynomial for a given value of the variable. The evaluation is
+ * done term after term and the results are summed afterwards.
+ */
+double eval (poly const & P, double r);
+
+/**
+ * @brief Collect common term.
+ * 
+ * Split polynomial into two polynomials that do or do not contain the given factor in the terms.
+ * One of the following terms is expected: exp(-cx), sin(bx), cos(bx), sin(bx)exp(-cx),
+ * cos(bx)exp(-cx). Other terms than those listed cannot be collected.
+ * 
+ * The resulting splitting has the form
+ * @f[
+ *     P(x) = p(x)Q(x) + R(x)
+ * @f]
+ * @param P The original polynomial.
+ * @param p Factor to be collected.
+ * @param Q Collected terms with @f$ p(x) @f$ factored out.
+ * @param R The uncollected terms.
+ */
+void collect (poly const & P, term const & p, poly & Q, poly & R);
+
+/**
  * @brief Write to string.
  */
 std::string tostring (poly const & P);
@@ -306,23 +348,61 @@ poly operator * (poly const & P, poly const & Q);
  */
 poly operator / (poly const & P, rational const & q);
 
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                             * 
+ *                              Special functions                              *
+ *                                                                             * 
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
 /**
- * @brief Associated laguerre polynomial.
+ * @brief Associated Laguerre polynomial.
  * 
  * Return the symbolic representation of the associated Laguerre polynomial.
  * @f[
- *      L_k^{(s)}(x) = \sum_{j = s}^k (-1)^j \frac{(k!)^2 x^{j-s}}{(k-j)! j! (j-s)! } \ .
+ *      L_k^{s}(x) = \sum_{j = s}^k (-1)^{j+1} \frac{(k!)^2 x^{j-s}}{(k-j)! j! (j-s)! } \ .
  * @f]
+ * The associated Laguerre polynomials can be used to compute the hydrogen
+ * wave function
+ * @f[
+ *      \psi_{nlm}(\mathbf{r})
+ *      =
+ *      \sqrt{\left(\frac{2Z}{a_0n}\right)^3 \frac{(n-l-1)!}{2n(n+l)!^3}}
+ *      \left(\frac{2Zr}{na_0}\right)^l L_{n+l}^{2l+1}(2Zr/na_0) \mathrm{e}^{-Zr/na_0}
+ *      Y_{lm}(\hat{\mathbf{r}}) \ .
+ * @f]
+ * Note the different normalization factor than in the expression with
+ * the generalized Laguerre polynomials (see symbolic::GeneralizedLaguerre).
  */
-poly Laguerre (int k, int s);
+poly AssociatedLaguerre (int k, int s);
 
-poly AssociatedLaguerre (int n, int a);
+/**
+ * @brief Generalized Laguerre polynomial.
+ * 
+ * Return the symbolic representation of the generalized Laguerre polynomial.
+ * @f[
+ *      L_n^{(\alpha)}(x) = \sum_{j = 0}^n (-1)^j {n+\alpha \choose n-j} \frac{x^j}{j!} \ .
+ * @f]
+ * The generalized Laguerre polynomials can be used to compute the hydrogen
+ * wave function
+ * @f[
+ *      \psi_{nlm}(\mathbf{r})
+ *      =
+ *      \sqrt{\left(\frac{2Z}{a_0n}\right)^3 \frac{(n-l-1)!}{2n(n+l)!}}
+ *      \left(\frac{2Zr}{na_0}\right)^l L_{n-l-1}^{(2l+1)}(2Zr/na_0) \mathrm{e}^{-Zr/na_0}
+ *      Y_{lm}(\hat{\mathbf{r}}) \ .
+ * @f]
+ * Note the different normalization factor than in the expression with
+ * the associated Laguerre polynomials (see symbolic::AssociatedLaguerre).
+ */
+poly GeneralizedLaguerre (int n, int a);
 
 /**
  * @brief Hydrogen radial function normalization factor.
  * 
  * Return the symbolic representation of the hydrogen radial function normalization
- * factor,
+ * factor compatible with symbolic::AssociatedLaguerre,
  * @f[
  *     N_{nl} = \sqrt{\left(\frac{2}{n}\right)^3\frac{(n-l-1)!}{2n (n+l)!^3}} \ .
  * @f]
@@ -332,7 +412,8 @@ term HydrogenN (int n, int l);
 /**
  * @brief Un-normalized hydrogen radial function.
  * 
- * Return the symbolic representation of the hydrogen radial function,
+ * Return the symbolic representation of the hydrogen radial function that uses
+ * symbolic::AssociatedLaguerre,
  * @f[
  *     \pi_{nl}(r) = \frac{ P_{nl}(r) }{ N_{nl} } = r \left(\frac{2r}{n}\right)^l L_{n+l}^{2l+1}(2r/n) \exp(-r/n) \ ,
  * @f]
@@ -346,9 +427,11 @@ poly HydrogenNP (int n, int l);
  * @f[
  *     P_{nl}(r) = r N_{nl} \left(\frac{2r}{n}\right)^l L_{n+l}^{2l+1}(2r/n) \exp(-r/n) \ ,
  * @f]
- * where the constant @f$ N_{nl} @f$ is computed by @ref HydrogenN. Alternative formula
- * uses the <i>generalized</i> Laguerre polynomial @f$ L_{n-l-1}^{(2l+1)}(x) @f$;
- * however, the resulting expressions are identical.
+ * where the constant @f$ N_{nl} @f$ is computed by @ref HydrogenN ans the function
+ * @f$ L_{n+l}^{2l+1} @f$ stands for the associated Laguerre polynomial (see definition
+ * in symbolic::AssociatedLaguerre). Alternative formula uses the generalized Laguerre
+ * polynomial @f$ L_{n-l-1}^{(2l+1)}(x) @f$; the resulting expressions differ only in the
+ * normalization factor.
  */
 poly HydrogenP (int n, int l);
 
@@ -362,9 +445,29 @@ poly HydrogenP (int n, int l);
  * where the constant @f$ N_{nl} @f$ is computed by @ref HydrogenN. As in @ref HydrogenP
  * do not interchange the associated Laguerre polynomial @f$ L_{n+l}^{2l+1} @f$ (used here)
  * and the generalized Laguerre polynomial @f$ L_{n-l-1}^{(2l+1)} @f$ used by other authors.
- * The formulas are identical, nevertheless.
+ * The formulas are identical when an appropriate normalization constant is used (see
+ * symbolic::AssociatedLaguerre and symbolic::GeneralizedLaguerre).
  */
 poly HydrogenS (int n, int l, cln::cl_RA lambda);
+
+/**
+ * @brief Return basis Laguerre orbital.
+ * 
+ * Return the symbolic reprezentation of the requested Laguerre basis orbital.
+ * The orbital is defined by the expression
+ * @f[
+ *     \xi_N^{(L)}(x) = \sqrt{\frac{\lambda_L (N-1)!}{(2L + N - 1)!}}
+ *     (\lambda_L x)^{L + 1} \exp(-\lambda_L x/2) L_{N-1}^{(2L+2)}(\lambda_L x)
+ * @f]
+ * The screening parameter @f$ \lambda_L @f$ needs to be given as a CLN's rational
+ * number. Here @f$ L_{N-1}^{2L+2} @f$ is the generalized Laguerre polynomial.
+ */
+poly LaguerreBasisFunction (int N, int L, rational lambda);
+
+/**
+ * @brief Squared normalization factor.
+ */
+rational LaguerreBasisFunctionNsqr (int N, int L, rational lambda);
 
 /**
  * @brief Riccati-Bessel function.
@@ -400,24 +503,24 @@ poly HydrogenS (int n, int l, cln::cl_RA lambda);
 poly RiccatiBessel (int l, double k);
 
 /**
- * @brief Return basis Laguerre orbital.
+ * @brief Binomial coefficient.
  * 
- * Return the symbolic reprezentation of the requested Laguerre basis orbital.
- * The orbital is defined by the expression
+ * Return the exact rational representation of the binomial coefficient.
  * @f[
- *     \xi_N^{(L)}(x) = \sqrt{\frac{\lambda_L (N-1)!}{(2L + N - 1)!}}
- *     (\lambda_L x)^{L + 1} \exp(-\lambda_L x/2) L_{N-1}^{(2L+2)}(\lambda_L x)
+ *     \left(
+ *         \matrix{n \cr k}
+ *     \right) = \frac{n!}{k! (n-k)!} \ .
  * @f]
- * The screening parameter @f$ \lambda_L @f$ needs to be given as a CLN's rational
- * number. Here @f$ L_{N-1}^{2L+2} @f$ is the generalized Laguerre polynomial.
  */
-poly LaguerreBasisFunction (int N, int L, rational lambda);
+rational combination (rational const & alpha, int k);
 
-rational LaguerreBasisFunctionNsqr (int N, int L, rational lambda);
 
-//
-// integrals
-//
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
+ *                                                                             * 
+ *                            Symbolic integration                             *
+ *                                                                             * 
+\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 
 /**
  * @brief Integrate to infinity.
@@ -434,19 +537,19 @@ rational LaguerreBasisFunctionNsqr (int N, int L, rational lambda);
  * <tr>
  *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \mathrm{e}^{-ct} \mathrm{d}t @f$</td>
  *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
- *     <td width = "0" align = "left">@f$ \displaystyle \frac{a!}{c^{a+1}} \sum_{j = 0}^a \frac{c^j}{j!} @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \frac{a!}{c^{a+1}} \mathrm{e}^{-cx} \sum_{j = 0}^a \frac{c^j}{j!} @f$</td>
  *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, c \in \mathbb{R}^+) @f$</td>
  * </tr>
  * <tr>
  *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \cos bt \,\mathrm{e}^{-ct} \mathrm{d}t @f$</td>
  *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
- *     <td width = "0" align = "left">@f$ \displaystyle \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) - \mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx\right) @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \mathrm{e}^{-cx} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) - \mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \mathrm{e}^{-cx} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx\right) @f$</td>
  *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R}, c \in \mathbb{R}^+) @f$</td>
  * </tr>
  * <tr>
  *     <td width = "0" align = "right">@f$ \displaystyle \int_x^\infty t^a \sin bt \,\mathrm{e}^{-ct} \mathrm{d}t @f$</td>
  *     <td width = "0">@f$ \displaystyle \ =\ @f$</td>
- *     <td width = "0" align = "left">@f$ \displaystyle \left[\mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) + \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx \right)\right]\; \mathrm{sign}\;b\qquad @f$</td>
+ *     <td width = "0" align = "left">@f$ \displaystyle \left[\mathrm{Im}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \mathrm{e}^{-cx} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \cos bx\right) + \mathrm{Re}\;\left(\frac{a!}{(c-\mathrm{i}|b|)^{a+1}} \mathrm{e}^{-cx} \sum_{j = 0}^a \frac{(c-\mathrm{i}|b|)^j}{j!} \sin bx \right)\right]\; \mathrm{sign}\;b\qquad @f$</td>
  *     <td width = "0" slign = "left">@f$ \displaystyle (a \in \mathbb{Z}_0^+, b \in \mathbb{R} \setminus \{0\}, c \in \mathbb{R}^+) @f$</td>
  * </tr>
  * </table>
@@ -509,44 +612,6 @@ poly integrate_low (poly const & P);
  * The value @f$ b = 0 @f$ results in zero integral for integrands containing sine.
  */
 term integrate_full (poly const & P);
-
-/**
- * @brief Evaluate the polynomial.
- * 
- * Evaluate the polynomial for a given value of the variable. The evaluation is
- * done term after term and the results are summed afterwards.
- */
-double eval (poly const & P, double r);
-
-/**
- * @brief Collect common term.
- * 
- * Split polynomial into two polynomials that do or do not contain the given factor in the terms.
- * One of the following terms is expected: exp(-cx), sin(bx), cos(bx), sin(bx)exp(-cx),
- * cos(bx)exp(-cx). Other terms than those listed cannot be collected.
- * 
- * The resulting splitting has the form
- * @f[
- *     P(x) = p(x)Q(x) + R(x)
- * @f]
- * @param P The original polynomial.
- * @param p Factor to be collected.
- * @param Q Collected terms with @f$ p(x) @f$ factored out.
- * @param R The uncollected terms.
- */
-void collect (poly const & P, term const & p, poly & Q, poly & R);
-
-/**
- * @brief Binomial coefficient.
- * 
- * Return the exact rational representation of the binomial coefficient.
- * @f[
- *     \left(
- *         \matrix{n \cr k}
- *     \right) = \frac{n!}{k! (n-k)!} \ .
- * @f]
- */
-rational combination (rational const & alpha, int k);
 
 } // endof namespace symbolic
 

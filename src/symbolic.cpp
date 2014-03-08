@@ -252,18 +252,23 @@ symbolic::poly symbolic::operator / (symbolic::poly const & P, symbolic::rationa
     return result;
 }
 
-symbolic::poly symbolic::Laguerre (int k, int s)
+symbolic::poly symbolic::AssociatedLaguerre (int k, int s)
 {
     symbolic::poly laguerre;
     
     for (int j = s; j <= k; j++)
     {
         symbolic::term term;
-        term.kr = -cln::expt(cln::cl_I(-1),j) * cln::factorial(k) * cln::factorial(k) / (cln::factorial(k-j) * cln::factorial(j) * cln::factorial(j-s));
+        term.ki = 1.;
+        term.kr = cln::factorial(k) * cln::factorial(k) / (cln::factorial(k-j) * cln::factorial(j) * cln::factorial(j-s));
         term.a = j-s;
         term.gf = GF_NONE;
         term.b = 0;
         term.c = 0;
+        
+        if (j % 2 == 0)
+            term.kr = -term.kr;
+        
         laguerre.push_back(term);
     }
     
@@ -271,21 +276,21 @@ symbolic::poly symbolic::Laguerre (int k, int s)
     return laguerre;
 }
 
-symbolic::poly symbolic::AssociatedLaguerre (int n, int a)
+symbolic::poly symbolic::GeneralizedLaguerre (int n, int a)
 {
     symbolic::poly asslaguerre;
     
-    for (int i = 0; i <= n; i++)
+    for (int j = 0; j <= n; j++)
     {
         symbolic::term term;
         term.ki = 1.;
-        term.kr = cln::binomial(n + a, n - i) / cln::factorial(i);
-        term.a = i;
+        term.kr = cln::binomial(n + a, n - j) / cln::factorial(j);
+        term.a = j;
         term.gf = GF_NONE;
         term.b = 0;
         term.c = 0;
         
-        if (i % 2 != 0)
+        if (j % 2 != 0)
             term.kr = -term.kr;
         
         asslaguerre.push_back(term);
@@ -315,7 +320,7 @@ symbolic::term symbolic::HydrogenN (int n, int l)
 
 symbolic::poly symbolic::HydrogenNP (int n, int l)
 {
-    poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
+    poly laguerre = symbolic::AssociatedLaguerre(n+l, 2*l+1);
     for (term & term : laguerre)
         term.kr *= cln::expt(symbolic::rational(2)/n, term.a);
     
@@ -336,7 +341,7 @@ symbolic::poly symbolic::HydrogenP (int n, int l)
 
 symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
 {
-    symbolic::poly laguerre = symbolic::Laguerre(n+l, 2*l+1);
+    symbolic::poly laguerre = symbolic::AssociatedLaguerre(n+l, 2*l+1);
     for (symbolic::term & term : laguerre)
         term.kr *= cln::expt(2*lambda, term.a);
     
@@ -352,7 +357,7 @@ symbolic::poly symbolic::HydrogenS (int n, int l, symbolic::rational lambda)
 
 symbolic::poly symbolic::LaguerreBasisFunction (int N, int L, symbolic::rational lambda)
 {
-    poly laguerre = symbolic::AssociatedLaguerre(N-1, 2*L+2);
+    poly laguerre = symbolic::GeneralizedLaguerre(N-1, 2*L+2);
     for (term & term : laguerre)
         term.kr *= cln::expt(lambda, term.a);
     
