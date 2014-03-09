@@ -123,15 +123,25 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
             Result = AbsErr = Nan;
             Ok = true;
             
-            if (a == b) { return 0; }
+            // skip empty intervals
+            if (a == b)
+            {
+                Ok = true;
+                Result = 0;
+                Status = "";
+                return Ok;
+            }
             
-            if (std::isnan(a) || std::isnan(b))
+            // 
+            if (std::isnan(a) or std::isnan(b))
             {
                 Ok = false;
+                Result = Nan;
+                Status = "Some of the bounds is not finite.";
                 return false;
             }
             
-            // check bounds order
+            // check order of bounds
             if (a > b)
             {
                 integrate(b, a);
@@ -159,7 +169,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     Workspace,
                     &Result, &AbsErr
                 );
-                Status = gsl_strerror(err);
+                Status = (err != GSL_SUCCESS ? gsl_strerror(err) : "");
             }
             else if (std::isfinite(a) and not std::isfinite(b))    /* -∞ < a < b = +∞ */
             {
@@ -170,7 +180,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     Workspace,
                     &Result, &AbsErr
                 );
-                Status = gsl_strerror(err);
+                Status = (err != GSL_SUCCESS ? gsl_strerror(err) : "");
             }
             else if (not std::isfinite(a) and std::isfinite(b))    /* -∞ = a < b < +∞ */
             {
@@ -181,7 +191,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                     Workspace,
                     &Result, &AbsErr
                 );
-                Status = gsl_strerror(err);
+                Status = (err != GSL_SUCCESS ? gsl_strerror(err) : "");
             }
             else                                 /* -∞ = a < b = +∞ */
             {
@@ -204,7 +214,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
                 Result = Result1 + Result2;
                 AbsErr = AbsErr1 + AbsErr2;
                 
-                Status = std::string(gsl_strerror(err)) + std::string("\n") + std::string(gsl_strerror(err));
+                Status = (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS ? std::string(gsl_strerror(err1)) + std::string(" & ") + std::string(gsl_strerror(err2)) : std::string());
             }
             
             Ok = (err == GSL_SUCCESS and err1 == GSL_SUCCESS and err2 == GSL_SUCCESS);
