@@ -16,7 +16,11 @@
 class MultipolePotential
 {
     public:
-        MultipolePotential (int lambda, int Na, int La, int Nb, int Lb);
+      
+        MultipolePotential (int lambda, int Na,    int La, int Nb,    int Lb);
+        MultipolePotential (int lambda, double Ka, int La, int Nb,    int Lb);
+        MultipolePotential (int lambda, double Ka, int La, double Kb, int Lb);
+        
         double operator() (double x);
 };
 

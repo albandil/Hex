@@ -21,4 +21,12 @@ Complex Idir_nBound
     int Ni, int Li, int li, double ki
 );
 
+Complex Idir_nFree
+(
+    int lambdaf, int lambdai,
+    int Nf, int Lf, int lf, double kf,
+    double Kn, int Ln, int ln, double kn,
+    int Ni, int Li, int li, double ki
+);
+
 #endif
