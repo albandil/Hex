@@ -28,7 +28,8 @@
 #include "specf.h"
 #include "matrix.h"
 
-cArray computeLambda (
+cArray computeLambda
+(
     Bspline const & bspline,
     rArray const & kf, rArray const & ki,
     int maxell, int L, int Spin, int Pi,
@@ -36,7 +37,8 @@ cArray computeLambda (
     rArray const & Ei, int lf,
     cArray const & Pf_overlaps,
     std::vector<std::pair<int,int>> const & coupled_states
-) {
+)
+{
     // shorthands
     unsigned Nenergy = kf.size();                // energy count
     Complex const * const t = &(bspline.t(0));   // B-spline knots
@@ -60,7 +62,9 @@ cArray computeLambda (
         #pragma omp critical
         {
             if (not solution.hdfload(oss.str().c_str()))
+            {
                 throw exception ("Failed to load \"%s\"\n", oss.str().c_str());
+            }
         }
         
         // The cross section oscillates, so we will do some averaging
@@ -82,13 +86,12 @@ cArray computeLambda (
             double eval_r = R0 - wavelength * n / samples;
             
             // determine knot
-            int eval_knot = std::lower_bound (
+            int eval_knot = std::lower_bound
+            (
                 t,
                 t + Nknot,
                 Complex(eval_r, 0.),
-                [](Complex a, Complex b) -> bool {
-                    return a.real() < b.real();
-                }
+                [](Complex a, Complex b) -> bool { return a.real() < b.real(); }
             ) - t;
             
             // evaluate j and dj at far radius for all angular momenta up to maxell
@@ -118,7 +121,7 @@ cArray computeLambda (
                 Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
                 
             // we need "P_overlaps" to have a 'dot' method
-            CooMatrix Sp(Nspline, 1, Pf_overlaps.begin());
+            CooMatrix Sp (Nspline, 1, Pf_overlaps.begin());
             
             // compute radial factor
             #pragma omp parallel for
@@ -141,7 +144,7 @@ cArray computeLambda (
     return rads;
 }
 
-Chebyshev<double,Complex> fcheb(Bspline const & bspline, cArrayView const & PsiSc, double kmax, int l1, int l2)
+Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & PsiSc, double kmax, int l1, int l2)
 {
     // shorthands
     Complex const * const t = &(bspline.t(0));   // B-spline knots
@@ -154,8 +157,8 @@ Chebyshev<double,Complex> fcheb(Bspline const & bspline, cArrayView const & PsiS
      double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : atof(HEX_RHO);
     
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
-    auto fLSl1l2k1k2 = [&](double k1) -> Complex {
-        
+    auto fLSl1l2k1k2 = [&](double k1) -> Complex
+    {
         if (k1 == 0 or k1*k1 >= kmax*kmax)
             return 0.;
         
@@ -277,10 +280,12 @@ Chebyshev<double,Complex> fcheb(Bspline const & bspline, cArrayView const & PsiS
     return CB;
 }
 
-cArrays computeXi (
+cArrays computeXi
+(
     Bspline const & bspline, int maxell, int L, int Spin, int Pi, int ni, int li, int mi, 
     rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states
-){
+)
+{
     // resize and clear the output storage for integral cross sections
     ics.resize(Ei.size());
     ics.clear();
