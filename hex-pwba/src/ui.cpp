@@ -110,9 +110,14 @@ int main (int argc, char* argv[])
             
             for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
             {
-                Complex T_singlet = Tdir[idx][lf-std::abs(Lf - L)] + Texc[idx][lf-std::abs(Lf - L)];
-                Complex T_triplet = Tdir[idx][lf-std::abs(Lf - L)] - Texc[idx][lf-std::abs(Lf - L)];
+                // compute parity of the partial wave
+                double parity = ((L + Lf + lf) % 2 == 0 ? 1 : -1);
                 
+                // assemble T-matrices for singlet and triplet
+                Complex T_singlet = Tdir[idx][lf-std::abs(Lf - L)] + parity * Texc[idx][lf-std::abs(Lf - L)];
+                Complex T_triplet = Tdir[idx][lf-std::abs(Lf - L)] - parity * Texc[idx][lf-std::abs(Lf - L)];
+                
+                // output SQL batch commands for singlet and triplet
                 if (abs(T_singlet) != 0.)
                 {
                     out << format
@@ -123,7 +128,6 @@ int main (int argc, char* argv[])
                     
                     sigma_singlet += 0.25*sqrabs(T_singlet)/(4.*M_PI*M_PI);
                 }
-                
                 if (abs(T_triplet) != 0.)
                 {
                     out << format
@@ -136,7 +140,7 @@ int main (int argc, char* argv[])
                 }
             }
             
-            double sigma = sigma_singlet + sigma_triplet;
+            double sigma = kf/ki * (sigma_singlet + sigma_triplet);
             std::cout << sigma << " ";
             sumsigma += sigma;
         }
