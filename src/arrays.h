@@ -828,9 +828,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
          * to the end of the array. If the reserved storage is large enough,
          * no reallocation will take place.
          */
-        template <class InputIterator> void append (
+        template <class InputIterator> void append
+        (
             InputIterator first, InputIterator last
-        ) {
+        )
+        {
             if (size() + last - first > (int)Nres_)
             {
                 // raise the capacity
@@ -1561,7 +1563,7 @@ template <typename T> NumberArray<T> pow (NumberArray<T> const & u, double e)
     auto iv = v.begin();
     
     while (iu != u.end())
-        *(iv++) = pow(*(iu++), e);
+        *(iv++) = std::pow(*(iu++), e);
     
     return v;
 }
@@ -1575,7 +1577,7 @@ template <typename T> Array<T> pow (Array<T> const & u, double e)
     auto iv = v.begin();
     
     while (iu != u.end())
-        *(iv++) = pow(*(iu++), e);
+        *(iv++) = std::pow(*(iu++), e);
     
     return v;
 }
@@ -1587,7 +1589,43 @@ template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
     NumberArray<T> B (N);
     
     for (size_t i = 0; i < N; i++)
-        B[i] = sqrt(A[i]);
+        B[i] = std::sqrt(A[i]);
+    
+    return B;
+}
+
+/// Return per-element sine.
+template <class T> NumberArray<T> sin (NumberArray<T> const & A)
+{
+    size_t N = A.size();
+    NumberArray<T> B (N);
+    
+    for (size_t i = 0; i < N; i++)
+        B[i] = std::sin(A[i]);
+    
+    return B;
+}
+
+/// Return per-element arcsine.
+template <class T> NumberArray<T> asin (NumberArray<T> const & A)
+{
+    size_t N = A.size();
+    NumberArray<T> B (N);
+    
+    for (size_t i = 0; i < N; i++)
+        B[i] = std::asin(A[i]);
+    
+    return B;
+}
+
+/// Return per-element cosine.
+template <class T> NumberArray<T> cos (NumberArray<T> const & A)
+{
+    size_t N = A.size();
+    NumberArray<T> B (N);
+    
+    for (size_t i = 0; i < N; i++)
+        B[i] = std::cos(A[i]);
     
     return B;
 }

@@ -37,7 +37,7 @@
 // Hydrogen radial orbital
 //
 
-inline double hydro_P(unsigned n, unsigned l, double z)
+inline double hydro_P (unsigned n, unsigned l, double z)
 {
     return z * gsl_sf_hydrogenicR(n, l, 1, z);
 }
@@ -479,5 +479,21 @@ double Gaunt(int l1, int m1, int l2, int m2, int l, int m);
  * are less than or equal to "maxell" and compose the total angular momentum @f$ L @f$.
  */
 int triangle_count(int L, int maxell);
+
+/**
+ * @brief The hypergeometric function @f$ {}_2F_1 @f$.
+ * 
+ * Evaluates the Gauss hypergeometric function
+ * @f[
+ *     {}_2F_1(a,b;c;x)
+ * @f]
+ * for arbitrary real argument @f$ x @f$. It uses the routine gsl_sf_hyperg_2F1 from
+ * GSL library, which is defined for |x| < 1. Using the transformations Abramowitz & Stegun
+ * 15.3.3-9 the hypergeometric function is transformed so that is can be evaluated by
+ * the library function.
+ * 
+ * @todo Document transformations.
+ */
+double Hyper2F1 (double a, double b, double c, double x);
 
 #endif
