@@ -33,6 +33,15 @@
 /// Kronecker delta
 #define DELTA(a,b)       ((a) == (b) ? 1 : 0)
 
+namespace special
+{
+namespace constant
+{
+    const double pi_half = 1.57079632679489661923;
+    const double sqrt_half = 0.70710678118654752440;
+}; // end of namespace "special::constant"
+}; // end of namespace "special"
+
 //
 // Hydrogen radial orbital
 //
@@ -40,6 +49,16 @@
 inline double hydro_P (unsigned n, unsigned l, double z)
 {
     return z * gsl_sf_hydrogenicR(n, l, 1, z);
+}
+
+inline double hydro_F (double k, unsigned l, double z)
+{
+    gsl_sf_result F, G, Fp, Gp;
+    double expF, expG;
+    
+    gsl_sf_coulomb_wave_FG_e (-1./k, k*z, l, 0, &F, &Fp, &G, &Gp, &expF, &expG);
+    
+    return special::constant::pi_half * special::constant::sqrt_half * F.val;
 }
 
 /** Hydrogen radial function (radius-multiplied)

@@ -63,6 +63,10 @@ class BesselNodeIntegrator1D
         
         bool integrate (double a, double b)
         {
+            // set parcel integrator accuracy to one order more
+            Q_.setEpsAbs(0.1 * epsabs_);
+            Q_.setEpsRel(0.1 * epsrel_);
+            
             // overall integral
             double integral = 0;
             
@@ -107,7 +111,7 @@ class BesselNodeIntegrator1D
                     return ok_;
                 }
                 
-                std::cout << "integrating node : " << rmin << " to " << rmax << " : " << Q_.result() << std::endl;
+//                 std::cout << "integrating node : " << rmin << " to " << rmax << " : " << Q_.result() << std::endl;
                 
                 // update result
                 integral += Q_.result();
@@ -336,6 +340,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
+            Qi.setEpsAbs(0);
             
             // integrate and check success
             if (not Qi.integrate(r2,Inf))
@@ -356,8 +361,10 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
+        R.setEpsAbs(0);
         R.integrate(0, Inf);
         
+        std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();
     }
     else
@@ -376,10 +383,6 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         
         // compute the product of the polynomials
         symbolic::poly PP = Lagi * Lagf;
-        
-        std::cout << PP << std::endl;
-        std::cout << Normi << std::endl;
-        std::cout << Normf << std::endl;
         
         // factor in the argument of the exponential
         double c = 1./Ni + 1./Nf;
@@ -423,8 +426,6 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 
                 // sum both contributions
                 integral = (int_low + int_high) * symbolic::double_approx(p.kr);
-                
-//                 std::cout << "p: " << p << " : " << (int_low + int_high) * symbolic::double_approx(p.kr) << std::endl;
             }
             
             return Normi * Normf * integral * ric_j(li,ki*r) * ric_j(lf,kf*r);
@@ -439,6 +440,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         R.integrate (0, Inf);
         std::cout << "Integral: " << R.result() << std::endl;
         
+        std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();
     }
 }
@@ -494,58 +496,11 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             );
         }
         
+        std::cout << "\tIexc = " << Q.result() << std::endl;
         return Q.result();
     }
     else
     {
-        /*
-        auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r2) -> double
-        {
-            // inner integrand
-            auto iintegrand1 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double { return hydro_P(Ni,Li,r1) * ric_j(lf,kf*r1) * std::pow(r1/r2,lambda); };
-            auto iintegrand2 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double { return hydro_P(Ni,Li,r1) * ric_j(lf,kf*r1) * std::pow(r2/r1,lambda+1); };
-            
-            // inner integrator
-            GaussKronrod<decltype(iintegrand1)> Q1 (iintegrand1);
-            GaussKronrod<decltype(iintegrand2)> Q2 (iintegrand2);
-            
-            // integrate and check success
-            if (not Q1.integrate(0.,r2))
-            {
-                throw exception
-                (
-                    "compute_Iexc (inner1) failed for λ=%d, Ni=%d, Li=%d, ki=%g, li=%d, Nf=%d, Lf=%d, kf=%g, lf=%d, r2=%g (\"%s\").\n\tresult = %g\n",
-                    lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Q1.status().c_str(), Q1.result()
-                );
-            }
-            if (not Q2.integrate(r2,Inf))
-            {
-                throw exception
-                (
-                    "compute_Iexc (inner2) failed for λ=%d, Ni=%d, Li=%d, ki=%g, li=%d, Nf=%d, Lf=%d, kf=%g, lf=%d, r2=%g (\"%s\").\n\tresult = %g\n",
-                    lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, r2, Q2.status().c_str(), Q2.result()
-                );
-            }
-            
-            return (Q1.result() + Q2.result()) / r2 * ric_j(li,ki*r2) * hydro_P(Nf,Lf,r2);
-        };
-        
-        // outer integrator
-        GaussKronrod<decltype(integrand)> Q(integrand);
-        
-        // integrate and check success
-        if (not Q.integrate(0.,Inf))
-        {
-            throw exception
-            (
-                "compute_Iexc (outer) failed for λ=%d, Ni=%d, Li=%d, ki=%g, li=%d, Nf=%d, Lf=%d, kf=%g, lf=%d (\"%s\").\n\tresult = %g",
-                lambda, Ni, Li, ki, li, Nf, Lf, kf, lf, Q.status().c_str(), Q.result()
-            );
-        }
-        
-        return Q.result();
-        */
-        
         // r1 < r2
         auto integrand1 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r2) -> double
         {
@@ -610,6 +565,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             );
         }
         
+        std::cout << "\tIexc = " << Q1.result() + Q2.result() << std::endl;
         return Q1.result() + Q2.result();
     }
 }

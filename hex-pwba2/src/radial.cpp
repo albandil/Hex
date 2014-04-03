@@ -29,6 +29,54 @@ Complex Idir_nBound
     MultipolePotential Vfn (lambdaf, Nf, Lf, Nn, Ln);
     MultipolePotential Vni (lambdai, Nn, Ln, Ni, Li);
     
+//     auto Vfn = [&](double r2) -> double
+//     {
+//         if (lambdaf == 0)
+//         {
+//             auto integrand = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * (1./r1 - 1./r2) * hydro_P(Nn,Ln,r1) ; };
+//             GaussKronrod<decltype(integrand)> Q(integrand);
+//             Q.integrate(r2, Inf);
+//             
+//             return Q.result();
+//         }
+//         else
+//         {
+//             auto integrand1 = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * hydro_P(Nn,Ln,r1) * std::pow(r1/r2,lambdaf); };
+//             GaussKronrod<decltype(integrand1)> Q1(integrand1);
+//             Q1.integrate(0., r2);
+//             
+//             auto integrand2 = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * hydro_P(Nn,Ln,r1) * std::pow(r2/r1,lambdaf+1); };
+//             GaussKronrod<decltype(integrand2)> Q2(integrand2);
+//             Q2.integrate(r2, Inf);
+//             
+//             return (Q1.result() + Q2.result()) / r2;
+//         }
+//     };
+//     
+//     auto Vni = [&](double r2) -> double
+//     {
+//         if (lambdaf == 0)
+//         {
+//             auto integrand = [&](double r1) -> double { return hydro_P(Nn,Ln,r1) * (1./r1 - 1./r2) * hydro_P(Ni,Li,r1) ; };
+//             GaussKronrod<decltype(integrand)> Q(integrand);
+//             Q.integrate(r2, Inf);
+//             
+//             return Q.result();
+//         }
+//         else
+//         {
+//             auto integrand1 = [&](double r1) -> double { return hydro_P(Nn,Ln,r1) * hydro_P(Ni,Li,r1) * std::pow(r1/r2,lambdaf); };
+//             GaussKronrod<decltype(integrand1)> Q1(integrand1);
+//             Q1.integrate(0., r2);
+//             
+//             auto integrand2 = [&](double r1) -> double { return hydro_P(Nn,Ln,r1) * hydro_P(Ni,Li,r1) * std::pow(r2/r1,lambdaf+1); };
+//             GaussKronrod<decltype(integrand2)> Q2(integrand2);
+//             Q2.integrate(r2, Inf);
+//             
+//             return (Q1.result() + Q2.result()) / r2;
+//         }
+//     };
+    
     // setup the integral
     auto integrand_re = [&](double r2) -> double
     {
@@ -149,8 +197,56 @@ Complex Idir_nFree
 )
 {
     // construct potentials
-    MultipolePotential Vfn (lambdaf, Nf, Lf, Kn, Ln);
-    MultipolePotential Vni (lambdai, Nn, Ln, Ki, Li);
+//     MultipolePotential Vfn (lambdaf, Nf, Lf, Kn, Ln);
+//     MultipolePotential Vni (lambdai, Kn, Ln, Ni, Li);
+    
+    auto Vfn = [&](double r2) -> double
+    {
+        if (lambdaf == 0)
+        {
+            auto integrand = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * (1./r1 - 1./r2) * hydro_F(Kn,Ln,r1) ; };
+            GaussKronrod<decltype(integrand)> Q(integrand);
+            Q.integrate(r2, Inf);
+            
+            return Q.result();
+        }
+        else
+        {
+            auto integrand1 = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * hydro_F(Kn,Ln,r1) * std::pow(r1/r2,lambdaf); };
+            GaussKronrod<decltype(integrand1)> Q1(integrand1);
+            Q1.integrate(0., r2);
+            
+            auto integrand2 = [&](double r1) -> double { return hydro_P(Nf,Lf,r1) * hydro_F(Kn,Ln,r1) * std::pow(r2/r1,lambdaf+1); };
+            GaussKronrod<decltype(integrand2)> Q2(integrand2);
+            Q2.integrate(r2, Inf);
+            
+            return (Q1.result() + Q2.result()) / r2;
+        }
+    };
+    
+    auto Vni = [&](double r2) -> double
+    {
+        if (lambdaf == 0)
+        {
+            auto integrand = [&](double r1) -> double { return hydro_F(Kn,Ln,r1) * (1./r1 - 1./r2) * hydro_P(Ni,Li,r1) ; };
+            GaussKronrod<decltype(integrand)> Q(integrand);
+            Q.integrate(r2, Inf);
+            
+            return Q.result();
+        }
+        else
+        {
+            auto integrand1 = [&](double r1) -> double { return hydro_F(Kn,Ln,r1) * hydro_P(Ni,Li,r1) * std::pow(r1/r2,lambdaf); };
+            GaussKronrod<decltype(integrand1)> Q1(integrand1);
+            Q1.integrate(0., r2);
+            
+            auto integrand2 = [&](double r1) -> double { return hydro_F(Kn,Ln,r1) * hydro_P(Ni,Li,r1) * std::pow(r2/r1,lambdaf+1); };
+            GaussKronrod<decltype(integrand2)> Q2(integrand2);
+            Q2.integrate(r2, Inf);
+            
+            return (Q1.result() + Q2.result()) / r2;
+        }
+    };
     
     // setup the integral
     auto integrand_re = [&](double r2) -> double

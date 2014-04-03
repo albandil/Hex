@@ -143,7 +143,7 @@ int main (int argc, char *argv[])
                     }
                 }
             }
-                
+            
             // exchange 2e
             for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
             {

@@ -12,13 +12,17 @@
 
 #include <iostream>
 
+#include <gsl/gsl_errno.h>
+
 #include "complex.h"
 #include "radial.h"
 #include "version.h"
 
-int main (void)
+int main (int argc, char* argv[])
 {
     std::cout << logo() << std::endl;
+    
+    gsl_set_error_handler_off();
     
     Complex I = Idir_nBound
     (
