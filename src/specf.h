@@ -35,11 +35,141 @@
 
 namespace special
 {
+
 namespace constant
 {
-    const double pi_half = 1.57079632679489661923;
-    const double sqrt_half = 0.70710678118654752440;
+    
+const double pi_half = 1.57079632679489661923;
+const double sqrt_half = 0.70710678118654752440;
+    
 }; // end of namespace "special::constant"
+
+namespace integral
+{
+
+/**
+ * @brief Compute integral of the confluent hypergeometric function.
+ * 
+ * The function template will return the scaled value of the indefinite integral
+ * @f[
+ *     I(a,b,c,u,v;z) = \frac{1}{x^{a+1}} \int x^a \mathrm{e}^{bx}
+ *     {}_1\!F_1\left(\matrix{u \cr v}\Big|\,cx\right)
+ *     \mathrm{d}x \ .
+ * @f]
+ * The series representation, which is used here, is obtained by
+ * a term-by-term integration. The result is
+ * @f[
+ *     I(a,b,c,u,v;z) = \sum_{k=0}^\infty \frac{1}{a+1+k}
+ *     \sum_{n=0}^k \frac{(u)_n}{(v)_n} \frac{(bx)^{k-n}}{(k-n)!}
+ *     \frac{(cx)^n}{n!} \ .
+ * @f]
+ * This is an analytic function in all arguments except for @f$ a \in \mathbb{Z}^- @f$.
+ * 
+ * The function also accepts optional arguments that govern the precision
+ * and the maximal number of iterations (terms of the outer sum).
+ * Due to the template character the arguments "a", "b", "c", "u", "v" and "z"
+ * are expected to be either all real or all complex.
+ * The result has the corresponding type as well.
+ */
+template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double epsrel = 1e-10, unsigned maxiter = 1000)
+{
+    // last added term and up-to-now sum of terms
+    T term = 1. / (a + 1.);
+    T bfactor = 1.;
+    T suma = term;
+    
+    // auxiliary variables
+    T c_over_b = c / b;
+    
+    // the outer sum
+    for (unsigned n = 1; std::abs(term) > epsrel * std::abs(suma); n++)
+    {
+        // compute the inner sum
+        T iterm = 1, isum = 0;
+        for (unsigned k = 0; k <= n; k++)
+        {
+            // update the inner sum
+            isum += iterm;
+            
+            // update term for the next k
+            iterm *= (u + T(k)) / (v + T(k)) * ((n - k) / (k + 1.)) * c_over_b;
+        }
+        
+        // update the term and the outer sum
+        bfactor *= b * x / T(n);
+        term = bfactor * isum / (a + T(n + 1));
+        suma += term;
+        
+        std::cout << "n = " << n << std::endl;
+        std::cout << "\tisum = " << isum << std::endl;
+        std::cout << "\tbfac = " << bfactor << std::endl;
+        std::cout << "\tterm = " << term << std::endl;
+        std::cout << "\tsuma = " << suma << std::endl;
+        
+        // check if we run out of allowed iterations
+        if (n == maxiter)
+        {
+            throw exception
+            (
+                "Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",
+                maxiter
+            );
+        }
+    }
+    
+    // return the result
+    return suma;
+}
+// template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double epsrel = 1e-10, unsigned maxiter = 1000)
+// {
+//     // last added term and up-to-now sum of terms
+//     T term = 1. / (a + 1.);
+//     T suma = term;
+//     
+//     // arrays containing (bx)^k/k! and (cx)^k/k!
+//     NumberArray<T> bterms = { T(1) };
+//     NumberArray<T> cterms = { T(1) };
+//     
+//     // the outer sum
+//     for (unsigned k = 1; std::abs(term) > epsrel * std::abs(suma); k++)
+//     {
+//         // add new term of Taylor expansion of exponential
+//         T x_over_k = x / T(k);
+//         bterms.push_back (bterms.back() * b * x_over_k);
+//         cterms.push_back (cterms.back() * c * x_over_k);
+//         
+//         // compute the inner sum
+//         T poch = 1, isum = 0;
+//         for (unsigned n = 0; n <= k; n++)
+//         {
+//             // update the inner sum
+//             isum += poch * bterms[k-n] * cterms[n];
+//             
+//             // update Pochhammer symbols for next n
+//             poch *= (u + T(n)) / (v + T(n));
+//         }
+//         
+//         // update the term and the outer sum
+//         term = isum / (a + T(k + 1));
+//         suma += term;
+//         
+//         // check if we run out of allowed iterations
+//         if (k == maxiter)
+//         {
+//             throw exception
+//             (
+//                 "Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",
+//                 maxiter
+//             );
+//         }
+//     }
+//     
+//     // return the result
+//     return suma;
+// }
+
+};
+
 }; // end of namespace "special"
 
 //

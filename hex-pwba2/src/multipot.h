@@ -13,6 +13,8 @@
 #ifndef HEX_PWBA2_MULTIPOT
 #define HEX_PWBA2_MULTIPOT
 
+#include "arrays.h"
+
 /**
  * @brief Multipole potential.
  * 
@@ -39,6 +41,7 @@ class MultipolePotential
         MultipolePotential (int lambda, int Na,    int La, int Nb,    int Lb);
         MultipolePotential (int lambda, double Ka, int La, int Nb,    int Lb);
         MultipolePotential (int lambda, int Na,    int La, double Kb, int Lb);
+        MultipolePotential (int lambda, double Ka, int La, double Kb, int Lb);
         
         // evaluate the potential
         double operator() (double x);
@@ -48,20 +51,29 @@ class MultipolePotential
         {
             bound_bound,
             free_bound,
-            bound_free
+            bound_free,
+            free_free
         }
-        type;
+        Type;
         
     private:
         
+        // which type
+        Type type_;
+        
         // multipole moment (transferred angular momentum)
-        int lambda;
+        int lambda_;
         
         // final or initial bound state quantum numbers
-        int Na, La, Nb, Lb;
+        int Na_, La_, Nb_, Lb_;
         
         // final or initial free state wavenumbers
-        double Ka, Kb;
+        double Ka_, Kb_;
+        
+        // specific variables
+        double c_;
+        rArray coefs_;
+        double norm_;
 };
 
 #endif
