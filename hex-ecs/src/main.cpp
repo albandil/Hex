@@ -18,7 +18,6 @@
 #include <tuple>
 
 #include <gsl/gsl_errno.h>
-#include <H5Cpp.h>
 
 #include "amplitudes.h"
 #include "arrays.h"
@@ -80,13 +79,15 @@ int main (int argc, char* argv[])
     //
     
     // display logo
-    std::cout << logo_raw();
+    std::cout << logo_raw() << std::endl;
+    std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
     
     // echo command line
-    std::cout << "Command line used:\n\t";
+    std::cout << "Command line used:" << std::endl;
+    std::cout << "\t";
     for (int iarg = 1; iarg < argc; iarg++)
         std::cout << argv[iarg] << " ";
-    std::cout << "\n";
+    std::cout << std::endl;
     
     // turn off GSL and HDF exceptions
     gsl_set_error_handler_off();
@@ -106,7 +107,7 @@ int main (int argc, char* argv[])
     {
         cmd.inputfile.open("hex.inp");
         if (not cmd.inputfile.good())
-            throw exception("Input error: Cannot open the file \"hex.inp\".\n");
+            throw exception("Input error: Cannot open the file \"hex.inp\".");
     }
     
     // get input from input file
@@ -115,7 +116,7 @@ int main (int argc, char* argv[])
     // is there something to compute?
     if (inp.Ei.empty() or inp.instates.empty() or inp.outstates.empty())
     {
-        std::cout << "Nothing to compute.\n";
+        std::cout << "Nothing to compute." << std::endl;
         exit(0);
     }
     // --------------------------------------------------------------------- //
@@ -143,7 +144,7 @@ int main (int argc, char* argv[])
     
     // Setup angular data -------------------------------------------------- //
     //
-    std::cout << "Setting up the coupled angular states...\n";
+    std::cout << "Setting up the coupled angular states..." << std::endl;
     
     // coupled angular momentum pairs
     std::vector<std::pair<int,int>> coupled_states;
@@ -165,7 +166,8 @@ int main (int argc, char* argv[])
         std::cout << "\n";
     }
     
-    std::cout << "\t-> The matrix of the set contains " << coupled_states.size() << " diagonal blocks.\n";
+    std::cout << "\t-> The matrix of the set contains " << coupled_states.size()
+              << " diagonal blocks." << std::endl;
     
     // skip if there is nothing to compute
     if (coupled_states.empty())
@@ -187,7 +189,7 @@ int main (int argc, char* argv[])
     // skip stage 2 if told so
     if (not (cmd.itinerary & CommandLine::StgSolve))
     {
-        std::cout << "Skipped solution of the equation.\n";
+        std::cout << "Skipped solution of the equation." << std::endl;
         goto StgExtract;
     }
     
@@ -209,7 +211,7 @@ int main (int argc, char* argv[])
         std::cout << "\nSolving the system for Ei[" << ie << "] = " << inp.Ei[ie] << " ("
                   << int(trunc(ie * 100. / inp.Ei.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
-                  << " CG iterations per energy)\n";
+                  << " CG iterations per energy)" << std::endl;
         
         cArray current_solution, previous_solution;
         
@@ -240,7 +242,7 @@ int main (int argc, char* argv[])
         }
         if (all_done)
         {
-            std::cout << "\tAll solutions for Ei[" << ie << "] = " << inp.Ei[ie] << " loaded.\n";
+            std::cout << "\tAll solutions for Ei[" << ie << "] = " << inp.Ei[ie] << " loaded." << std::endl;
             continue;
         }
         
@@ -275,7 +277,7 @@ int main (int argc, char* argv[])
             prec->rhs(chi, ie, instate);
             if (chi.norm() == 0.)
             {
-                std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings).\n";
+                std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings)." << std::endl;
                 computations_done++;
                 continue;
             }
@@ -297,7 +299,7 @@ int main (int argc, char* argv[])
             auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
             
             // custom conjugate gradients callback-based solver
-            std::cout << "\tStart CG callback with tolerance " << cmd.itertol << "\n";
+            std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
                 chi,                      // right-hand side
@@ -330,7 +332,7 @@ StgExtract:
     // skip stage 3 if told so
     if (not (cmd.itinerary & CommandLine::StgExtract))
     {
-        std::cout << "Skipped extraction of amplitudes.\n";
+        std::cout << "Skipped extraction of amplitudes." << std::endl;
         goto End;
     }
     
@@ -351,19 +353,22 @@ StgExtract:
     fsql.setf(std::ios_base::scientific);
     
     // write header
-    fsql << "BEGIN TRANSACTION;\n";
+    fsql << "BEGIN TRANSACTION;" << std::endl;
     
     //
     // Extract the cross sections
     //
     
-    std::cout << "\nExtracting T-matrices...\n";
+    std::cout << std::endl << "Extracting T-matrices..." << std::endl;
     
     std::vector<std::tuple<int,int,int,int,int>> transitions;
     for (auto instate  : inp.instates)
     for (auto outstate : inp.outstates)
-        transitions.push_back (
-            std::make_tuple (
+    {
+        transitions.push_back
+        (
+            std::make_tuple
+            (
                 inp.Spin,
                 /*li*/ std::get<1>(instate),
                 /*mi*/ std::get<2>(instate),
@@ -371,6 +376,7 @@ StgExtract:
                 /*lf*/ std::get<1>(outstate)
             )
         );
+    }
     
     int finished = 0;
     
@@ -451,7 +457,7 @@ StgExtract:
                              << inp.L  << "," << Spin << ","
                              << inp.Ei[ie] << "," << ell << "," 
                              << T_ell[i].real() << "," << T_ell[i].imag()
-                             << ");\n";
+                             << ");" << std::endl;
                     }
                 }
                 
@@ -467,7 +473,7 @@ StgExtract:
 
                 std::ofstream ftxt(sigmaname.str().c_str());
                 
-                ftxt << "# Ei [Ry] sigma [a0^2]\n";
+                ftxt << "# Ei [Ry] sigma [a0^2]" << std::endl;
                 for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
                 {
                     double sigma = 0.;
@@ -492,7 +498,8 @@ StgExtract:
             //
             
             rArray ics;
-            cArrays data = std::move (
+            cArrays data = std::move
+            (
                 computeXi(bspline, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, ics, coupled_states)
             );
             
@@ -505,7 +512,7 @@ StgExtract:
                      << inp.L  << "," << Spin << ","
                      << inp.Ei[ie] << "," << coupled_states[ill].first << ","
                      << coupled_states[ill].second << ","
-                     << data[ie * coupled_states.size() + ill].toBlob() << ");\n";
+                     << data[ie * coupled_states.size() + ill].toBlob() << ");" << std::endl;
             }
             
             // print ionization cross section
@@ -521,13 +528,13 @@ StgExtract:
                   << " %        ";
     }
     
-    fsql << "COMMIT;\n";
+    fsql << "COMMIT;" << std::endl;
     fsql.close();
 }
 
 End:
 {
-    std::cout << "\nDone.\n\n";
+    std::cout << std::endl << "Done." << std::endl << std::endl;
 }    
     return 0;
 }
