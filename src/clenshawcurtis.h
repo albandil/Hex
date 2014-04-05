@@ -201,7 +201,7 @@ public:
         std::vector<Complex> fvals_prev, fvals, ftraf;
         
         // integral approximation
-        FType sum = 0, sum_prev = Nan;
+        FType sum = 0, sum_prev = special::constant::Nan;
         
         // get nesting limit
         int maxN = gsl_sf_pow_int(2,NNest);
@@ -395,7 +395,7 @@ public:
         std::vector<double> weights, weights_prev;
 
         // previous integral
-        FType sum_prev = Nan;
+        FType sum_prev = special::constant::Nan;
 
         // main loop
         for (int N = 2; ; N *= 2)

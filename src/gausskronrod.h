@@ -67,8 +67,9 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
         
         // constructor
         GaussKronrod (Functor f, size_t limit = 1000)
-            : Integrand(f), Result(Nan), AbsErr(Nan), Ok(false), EpsAbs(0.), EpsRel(1e-5),
-              Limit(limit), Workspace(gsl_integration_workspace_alloc(Limit)) {}
+            : Integrand(f), Result(special::constant::Nan), AbsErr(special::constant::Nan),
+              Ok(false), EpsAbs(0.), EpsRel(1e-5), Limit(limit),
+              Workspace(gsl_integration_workspace_alloc(Limit)) {}
         
         // destructor
         ~GaussKronrod()
@@ -120,7 +121,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
         bool integrate (double a, double b)
         {
             // reset
-            Result = AbsErr = Nan;
+            Result = AbsErr = special::constant::Nan;
             Ok = true;
             
             // skip empty intervals
@@ -136,7 +137,7 @@ template <typename Functor> class GaussKronrod : public RadialFunction<double>
             if (std::isnan(a) or std::isnan(b))
             {
                 Ok = false;
-                Result = Nan;
+                Result = special::constant::Nan;
                 Status = "Some of the bounds is not finite.";
                 return false;
             }

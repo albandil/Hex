@@ -16,6 +16,7 @@
 
 #include "arrays.h"
 #include "gausskronrod.h"
+#include "hydrogen.h"
 #include "radial.h"
 #include "romberg.h"
 #include "specf.h"
@@ -336,14 +337,14 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
         {
             // inner integrand
-            auto iintegrand = [Ni,Li,Nf,Lf,r2](double r1) -> double { return hydro_P(Ni,Li,r1) * hydro_P(Nf,Lf,r1) * (1./r1 - 1./r2); };
+            auto iintegrand = [Ni,Li,Nf,Lf,r2](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * Hydrogen::P(Nf,Lf,r1) * (1./r1 - 1./r2); };
             
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
             Qi.setEpsAbs(0);
             
             // integrate and check success
-            if (not Qi.integrate(r2,Inf))
+            if (not Qi.integrate(r2,special::constant::Inf))
             {
                 throw exception
                 (
@@ -362,7 +363,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
         R.setEpsAbs(0);
-        R.integrate(0, Inf);
+        R.integrate(0, special::constant::Inf);
         
         std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();
@@ -437,7 +438,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
-        R.integrate (0, Inf);
+        R.integrate (0, special::constant::Inf);
         std::cout << "Integral: " << R.result() << std::endl;
         
         std::cout << "\tIdir = " << R.result() << std::endl;
@@ -465,13 +466,13 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
         {
             // inner integrand
-            auto iintegrand = [Ni,Li,kf,lf,r2](double r1) -> double { return hydro_P(Ni,Li,r1) * ric_j(lf,kf*r1) * (1./r1 - 1./r2); };
+            auto iintegrand = [Ni,Li,kf,lf,r2](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * ric_j(lf,kf*r1) * (1./r1 - 1./r2); };
             
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
             
             // integrate and check success
-            if (not Qi.integrate(r2,Inf))
+            if (not Qi.integrate(r2,special::constant::Inf))
             {
                 throw exception
                 (
@@ -480,14 +481,14 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 );
             }
             
-            return Qi.result() * ric_j(li,ki*r2) * hydro_P(Nf,Lf,r2);
+            return Qi.result() * ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
         
         // outer integrator
         GaussKronrod<decltype(integrand)> Q(integrand);
         
         // integrate and check success
-        if (not Q.integrate(0.,Inf))
+        if (not Q.integrate(0.,special::constant::Inf))
         {
             throw exception
             (
@@ -505,7 +506,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         auto integrand1 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r2) -> double
         {
             // inner integrand
-            auto iintegrand1 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double { return hydro_P(Ni,Li,r1) * ric_j(lf,kf*r1) * std::pow(r1/r2,lambda); };
+            auto iintegrand1 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * ric_j(lf,kf*r1) * std::pow(r1/r2,lambda); };
             
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand1),GaussKronrod<decltype(iintegrand1)>> Qi1 (iintegrand1, kf, lf);
@@ -520,11 +521,11 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 );
             }
             
-            return Qi1.result() / r2 * ric_j(li,ki*r2) * hydro_P(Nf,Lf,r2);
+            return Qi1.result() / r2 * ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
         
         BesselNodeIntegrator1D<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1 (integrand1, ki, li);
-        if (not Q1.integrate(0.,Inf))
+        if (not Q1.integrate(0.,special::constant::Inf))
         {
             throw exception
             (
@@ -537,7 +538,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         auto integrand2 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r1) -> double
         {
             // inner integrand
-            auto iintegrand2 = [Nf,Lf,ki,li,r1,lambda](double r2) -> double { return hydro_P(Nf,Lf,r2) * ric_j(li,ki*r2) * std::pow(r2/r1,lambda); };
+            auto iintegrand2 = [Nf,Lf,ki,li,r1,lambda](double r2) -> double { return Hydrogen::P(Nf,Lf,r2) * ric_j(li,ki*r2) * std::pow(r2/r1,lambda); };
             
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand2),GaussKronrod<decltype(iintegrand2)>> Qi2 (iintegrand2, ki, li);
@@ -552,11 +553,11 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                 );
             }
             
-            return Qi2.result() / r1 * ric_j(lf,kf*r1) * hydro_P(Ni,Li,r1);
+            return Qi2.result() / r1 * ric_j(lf,kf*r1) * Hydrogen::P(Ni,Li,r1);
         };
         
         BesselNodeIntegrator1D<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2 (integrand2, kf, lf);
-        if (not Q2.integrate(0.,Inf))
+        if (not Q2.integrate(0.,special::constant::Inf))
         {
             throw exception
             (

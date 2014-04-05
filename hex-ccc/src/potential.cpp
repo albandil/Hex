@@ -482,7 +482,7 @@ double PotentialMatrix::ComputeIdir_semisymbolic
         };
         
         GaussKronrod<decltype(integrand)> Q(integrand);
-        Q.integrate(0., Inf);
+        Q.integrate(0., special::constant::Inf);
         
         if (not Q.ok())
         {
@@ -561,7 +561,7 @@ double PotentialMatrix::ComputeIdir_semisymbolic
             return symbolic::eval(phipsi, x) * j * jp;
         };
         GaussKronrod<decltype(integrand)> Q(integrand);
-        Q.integrate(0., Inf);
+        Q.integrate(0., special::constant::Inf);
         
         if (not Q.ok())
         {

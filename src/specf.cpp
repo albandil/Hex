@@ -19,11 +19,7 @@
 #include "specf.h"
 #include "complex.h"
 
-// ----------------------------------------------------------------------- //
-//  Special functions                                                      //
-// ----------------------------------------------------------------------- //
-
-cArray ric_jv(int lmax, Complex z)
+cArray ric_jv (int lmax, Complex z)
 {
     // results
     cArray eval(lmax+1);
@@ -35,7 +31,8 @@ cArray ric_jv(int lmax, Complex z)
         int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
         
         // check that all evaluations are finite
-        bool all_finite = std::all_of (
+        bool all_finite = std::all_of
+        (
             ev.begin(),
             ev.end(),
             [](double x) -> bool { return std::isfinite(x); }
@@ -51,7 +48,9 @@ cArray ric_jv(int lmax, Complex z)
                 // => use zero-asymptotic form DLMF §10.52.1 jn(z) ~ z^n / (2n + 1)!!
                 ev[0] = 1;
                 for (int n = 1; n <= lmax; n++)
+                {
                     ev[n] = ev[n-1] * z.real() / (2*n+1);
+                }
             }
             else
             {
@@ -67,7 +66,7 @@ cArray ric_jv(int lmax, Complex z)
     }
     
     // shorthand
-    Complex inv_z = Complex(1.)/z;
+    Complex inv_z = 1. / z;
     
     // evaluate all angular momenta up to lmax
     for (int l = 0; l <= lmax; l++)
@@ -83,12 +82,12 @@ cArray ric_jv(int lmax, Complex z)
     return eval;
 }
 
-Complex ric_j(int l, Complex z)
+Complex ric_j (int l, Complex z)
 {
     return ric_jv(l, z).back();
 }
 
-cArray dric_jv(int lmax, Complex z)
+cArray dric_jv (int lmax, Complex z)
 {
     // evaluate first the Riccati-Bessel functions themselves
     cArray eval = ric_jv(lmax, z);
@@ -113,7 +112,7 @@ cArray dric_jv(int lmax, Complex z)
     return deval;
 }
 
-Complex dric_j(int l, Complex z)
+Complex dric_j (int l, Complex z)
 {
     return dric_jv(l, z).back();
 }
@@ -147,7 +146,7 @@ static double* ak[6][5] = {
 
 static unsigned max_table_n = 5;
 
-Complex hydro_P_table(unsigned n, unsigned l, Complex z)
+Complex hydro_P_table (unsigned n, unsigned l, Complex z)
 {
     // slater-type poly term count
     int terms = n - l;
@@ -164,7 +163,7 @@ Complex hydro_P_table(unsigned n, unsigned l, Complex z)
     return sum * pow(z, l + 1) * exp(-z/double(n));
 }
 
-Complex dhydro_P_table(unsigned n, unsigned l, Complex z)
+Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
 {
     // slater-type poly term count
     int terms = n - l;
@@ -185,7 +184,7 @@ Complex dhydro_P_table(unsigned n, unsigned l, Complex z)
  * Laguerre polynomial
  * Laguerre(k,s,x) := sum((-1)^j * (k!)^2 * x^(j-s) / ( (k-j)! * j! * (j-s)! ), j, s, k);
  */
-Complex associated_laguerre_poly(int k, int s, Complex z)
+Complex associated_laguerre_poly (int k, int s, Complex z)
 {
     // value of the polynomial to be returned
     Complex val = 0;
@@ -204,7 +203,7 @@ Complex associated_laguerre_poly(int k, int s, Complex z)
  * Derivative of Laguerre polynomial
  * DLaguerre(k,s,x) := sum((-1)^j * (k!)^2 * x^(j-s-1) / ( (k-j)! * j! * (j-s-1)! ), j, s+1, k);
  */
-Complex der_associated_laguerre_poly(int k, int s, Complex z)
+Complex der_associated_laguerre_poly (int k, int s, Complex z)
 {
     // value of the polynomial to be returned
     Complex val = 0;
@@ -223,7 +222,7 @@ Complex der_associated_laguerre_poly(int k, int s, Complex z)
  * Hydrogen radial function normalization factor
  * sqrt((2/n)^3 * (n-l-1)! / (2*n*((n+l)!)^3));
  */
-double hydrogen_wfn_normalization(int n, int l)
+double hydrogen_wfn_normalization (int n, int l)
 {
     return sqrt(pow(2./n,3) * fac(n-l-1) / (2*n*pow(fac(n+l),3)));
 }
@@ -232,7 +231,7 @@ double hydrogen_wfn_normalization(int n, int l)
  * Hydrogen radial function.
  * HydrogenP(n,l,r) := r * HydrogenN(n,l) * (2*r/n)^l * Laguerre(n+l,2*l+1,2*r/n) * exp(-r/n);
  */
-Complex hydro_P(unsigned n, unsigned l, Complex z)
+Complex hydro_P (unsigned n, unsigned l, Complex z)
 {
     // this is faster
     if (n <= max_table_n)
@@ -251,7 +250,7 @@ Complex hydro_P(unsigned n, unsigned l, Complex z)
  * 					z * DLaguerre(n+l,2*l+1,2*r/n)
  *              ) * exp(-r/n)
  */
-Complex dhydro_P(unsigned n, unsigned l, Complex z)
+Complex dhydro_P (unsigned n, unsigned l, Complex z)
 {
     // this is faster
     if (n <= max_table_n)
@@ -265,7 +264,7 @@ Complex dhydro_P(unsigned n, unsigned l, Complex z)
 }
 
 
-Complex sphY(int l, int m, double theta, double phi)
+Complex sphY (int l, int m, double theta, double phi)
 {
     if (l < abs(m))
         return 0.;
@@ -297,7 +296,7 @@ void clipang (double & theta, double & phi)
     phi = fmod(phi, 2*M_PI);
 }
 
-Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
+Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
 {
     // NOTE This is very strange... To get the expected results one has to clip the
     //      angles to the 0..π and 0..2π intervals, respectively, and to include
@@ -316,7 +315,7 @@ Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double 
     return YY;
 }
 
-int coul_F_michel(int l, double k, double r, double& F, double& Fp)
+int coul_F_michel (int l, double k, double r, double& F, double& Fp)
 {
     // initialize parameters
     double eta = -1/k;
@@ -361,7 +360,7 @@ int coul_F_michel(int l, double k, double r, double& F, double& Fp)
     return GSL_ERROR_SELECT_2(err, errp);
 }
 
-int coul_F(int l, double k, double r, double& F, double& Fp)
+int coul_F (int l, double k, double r, double& F, double& Fp)
 {
     if (r < 0.)
         return GSL_EDOM;
@@ -411,7 +410,7 @@ int coul_F(int l, double k, double r, double& F, double& Fp)
     return err;
 }
 
-double coul_F_sigma(int l, double k)
+double coul_F_sigma (int l, double k)
 {
     // 	return arg(gamma(Complex(l+1,-1./k)));
     
@@ -424,7 +423,7 @@ double coul_F_sigma(int l, double k)
     return arg.val;
 }
 
-double coul_F_asy(int l, double k, double r, double sigma)
+double coul_F_asy (int l, double k, double r, double sigma)
 {
     if (std::isfinite(sigma))
         return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + sigma);
@@ -599,7 +598,7 @@ double computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
 }
 
-inline long double dfact(long double x)
+inline long double dfact (long double x)
 {
     if (x < 0)
         return 0.;
@@ -615,7 +614,7 @@ inline long double dfact(long double x)
     return prod;
 }
 
-double ClebschGordan(int __j1, int __m1, int __j2, int __m2, int __J, int __M)
+double ClebschGordan (int __j1, int __m1, int __j2, int __m2, int __J, int __M)
 {
     if((__m1 + __m2) != __M) return 0.;
     if(abs(__m1) > __j1) return 0;
@@ -666,7 +665,7 @@ double ClebschGordan(int __j1, int __m1, int __j2, int __m2, int __J, int __M)
     return sqrtl(A)*sum;           
 }
 
-double Gaunt(int l1, int m1, int l2, int m2, int l, int m)
+double Gaunt (int l1, int m1, int l2, int m2, int l, int m)
 {
     // dictionary
     static std::map<std::tuple<int,int,int,int,int,int>,double> dict;
@@ -685,7 +684,7 @@ double Gaunt(int l1, int m1, int l2, int m2, int l, int m)
     return dict[key];
 }
 
-int triangle_count(int L, int maxl)
+int triangle_count (int L, int maxl)
 {
     int n = 0;
     

@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "misc.h"
+#include "specf.h"
 
 /**
  * @brief Compute limit.
@@ -44,9 +45,9 @@ template <class Functor, typename FType> FType lim (Functor F, double x, int * n
     for (i = 0; n == nullptr or i <= *n; i++)
     {
         // advance x0
-        if (x == Inf)
+        if (x == special::constant::Inf)
             x0 *= 2.;
-        else if (x == -Inf)
+        else if (x == -special::constant::Inf)
             x0 *= 2.;
         else
             x0 = 0.5 * (x + x0);
@@ -188,7 +189,7 @@ public:
     double unscale (double t) const
     {
         assert(std::abs(t) <= 1.);
-        return (t == 1.) ? Inf : B - L * (1. + t) / (1. - t);
+        return (t == 1.) ? special::constant::Inf : B - L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
@@ -207,9 +208,9 @@ public:
         if (t == 1.)
         {
             if (Limit)
-                return lim<decltype(F),FType>(F, Inf);
+                return lim<decltype(F),FType>(F, special::constant::Inf);
             else
-                return F(Inf);
+                return F(special::constant::Inf);
         }
         else
         {
@@ -264,7 +265,7 @@ public:
     double unscale (double t) const
     {
         assert(std::abs(t) <= 1.);
-        return (t == 1.) ? Inf : A + L * (1. + t) / (1. - t);
+        return (t == 1.) ? special::constant::Inf : A + L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
@@ -283,9 +284,9 @@ public:
         if (t == 1.)
         {
             if (Limit)
-                return lim<decltype(F),FType>(F,Inf);
+                return lim<decltype(F),FType>(F,special::constant::Inf);
             else
-                return F(Inf);
+                return F(special::constant::Inf);
         }
         else
         {
@@ -319,7 +320,7 @@ public:
     CompactIntegrand (
         Functor f,
         double a = 0.,
-        double b = Inf,
+        double b = special::constant::Inf,
         bool limit = true,
         double L = 1.0
     ) : Compactification(nullptr) {

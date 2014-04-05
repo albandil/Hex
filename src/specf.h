@@ -14,6 +14,8 @@
 #define HEX_SPECF
 
 #include <cmath>
+
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_sf.h>
 
 /// factorial
@@ -38,10 +40,33 @@ namespace special
 
 namespace constant
 {
-    
-const double pi_half = 1.57079632679489661923;
-const double sqrt_half = 0.70710678118654752440;
-    
+
+const double e              = M_E; // e
+
+const double pi             = M_PI; // π
+const double pi_half        = M_PI_2; // π/2
+const double pi_quart       = M_PI_4; // π/4
+const double pi_sqrt        = M_SQRTPI; // √π
+const double pi_inv         = M_1_PI; // 1/π
+const double pi_two_inv     = M_2_PI; // 2/π
+const double pi_two_invsqrt = M_2_SQRTPI; // 2/√π
+
+const double sqrt_two       = M_SQRT2; // √2
+const double sqrt_three     = M_SQRT3; // √3
+const double sqrt_half      = M_SQRT1_2; // 1/√2
+
+const double log2e          = M_LOG2E;  // log₂ e
+const double log10e         = M_LOG10E; // log e
+const double ln2            = M_LN2; // ln 2
+const double ln10           = M_LN10; // ln 10
+const double lnpi           = M_LNPI; // ln π
+
+const double euler          = M_EULER; // γ
+
+// other special numbers
+const double Inf = std::numeric_limits<double>::infinity();
+const double Nan = std::numeric_limits<double>::quiet_NaN();
+
 }; // end of namespace "special::constant"
 
 namespace integral
@@ -70,6 +95,8 @@ namespace integral
  * Due to the template character the arguments "a", "b", "c", "u", "v" and "z"
  * are expected to be either all real or all complex.
  * The result has the corresponding type as well.
+ * 
+ * @note This method fails in inexact arithmetic.
  */
 template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double epsrel = 1e-10, unsigned maxiter = 1000)
 {
@@ -100,12 +127,6 @@ template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double eps
         term = bfactor * isum / (a + T(n + 1));
         suma += term;
         
-        std::cout << "n = " << n << std::endl;
-        std::cout << "\tisum = " << isum << std::endl;
-        std::cout << "\tbfac = " << bfactor << std::endl;
-        std::cout << "\tterm = " << term << std::endl;
-        std::cout << "\tsuma = " << suma << std::endl;
-        
         // check if we run out of allowed iterations
         if (n == maxiter)
         {
@@ -120,76 +141,10 @@ template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double eps
     // return the result
     return suma;
 }
-// template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double epsrel = 1e-10, unsigned maxiter = 1000)
-// {
-//     // last added term and up-to-now sum of terms
-//     T term = 1. / (a + 1.);
-//     T suma = term;
-//     
-//     // arrays containing (bx)^k/k! and (cx)^k/k!
-//     NumberArray<T> bterms = { T(1) };
-//     NumberArray<T> cterms = { T(1) };
-//     
-//     // the outer sum
-//     for (unsigned k = 1; std::abs(term) > epsrel * std::abs(suma); k++)
-//     {
-//         // add new term of Taylor expansion of exponential
-//         T x_over_k = x / T(k);
-//         bterms.push_back (bterms.back() * b * x_over_k);
-//         cterms.push_back (cterms.back() * c * x_over_k);
-//         
-//         // compute the inner sum
-//         T poch = 1, isum = 0;
-//         for (unsigned n = 0; n <= k; n++)
-//         {
-//             // update the inner sum
-//             isum += poch * bterms[k-n] * cterms[n];
-//             
-//             // update Pochhammer symbols for next n
-//             poch *= (u + T(n)) / (v + T(n));
-//         }
-//         
-//         // update the term and the outer sum
-//         term = isum / (a + T(k + 1));
-//         suma += term;
-//         
-//         // check if we run out of allowed iterations
-//         if (k == maxiter)
-//         {
-//             throw exception
-//             (
-//                 "Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",
-//                 maxiter
-//             );
-//         }
-//     }
-//     
-//     // return the result
-//     return suma;
-// }
 
 };
 
 }; // end of namespace "special"
-
-//
-// Hydrogen radial orbital
-//
-
-inline double hydro_P (unsigned n, unsigned l, double z)
-{
-    return z * gsl_sf_hydrogenicR(n, l, 1, z);
-}
-
-inline double hydro_F (double k, unsigned l, double z)
-{
-    gsl_sf_result F, G, Fp, Gp;
-    double expF, expG;
-    
-    gsl_sf_coulomb_wave_FG_e (-1./k, k*z, l, 0, &F, &Fp, &G, &Gp, &expF, &expG);
-    
-    return special::constant::pi_half * special::constant::sqrt_half * F.val;
-}
 
 /** Hydrogen radial function (radius-multiplied)
  * Evaluate hydrogen radial function (radius-multiplied) for complex argument
@@ -514,7 +469,7 @@ int coul_F (int l, double k, double r, double & F, double & Fp);
  * @param r Radial coordinate.
  * @param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double coul_F_asy(int l, double k, double r, double sigma = Nan);
+double coul_F_asy(int l, double k, double r, double sigma = special::constant::Nan);
 
 /**
  * @brief Coulomb phase shift.
