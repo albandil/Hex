@@ -11,10 +11,10 @@ CXX = g++
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -g -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
-LFLAGS = -g -lgsl -lgslcblas -lcln
+CFLAGS = -O3 -fopenmp -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
+LFLAGS = -O3 -fopenmp -lgsl -lgslcblas -lcln
 
-FILES = arrays main multipot radial specf symbolic version
+FILES = arrays hydrogen main multipot radial specf symbolic version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

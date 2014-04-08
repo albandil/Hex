@@ -73,6 +73,14 @@ namespace integral
 {
 
 /**
+ * @brief Trapezoidal integration.
+ */
+template <class T> T trapz (double h, NumberArray<T> const & y)
+{
+   return h * (sum(y) - 0.5 * (y.front() + y.back()));
+}
+
+/**
  * @brief Compute integral of the confluent hypergeometric function.
  * 
  * The function template will return the scaled value of the indefinite integral
@@ -142,7 +150,28 @@ template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double eps
     return suma;
 }
 
-};
+/**
+ * @brief Romberg integration.
+ */
+template <class T> NumberArray<T> romberg (const ArrayView<T> y)
+{
+    NumberArray<T> z = y;
+    unsigned N = y.size();
+    
+    T scale = 1;
+    for (unsigned log4scale = 1; log4scale < N; log4scale++)
+    {
+        scale *= 4;
+        for (unsigned j = log4scale; j < N; j++)
+        {
+            z[j] = (scale * z[j] - z[j-1]) / (scale - T(1));
+        }
+    }
+    
+    return z;
+}
+
+}; // end of namespace "special::integral"
 
 }; // end of namespace "special"
 

@@ -944,9 +944,12 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         */
         template <class Functor> auto transform (Functor f) const -> NumberArray<decltype(f(T(0)))>
         {
-            NumberArray<decltype(f(T(0)))> c(size());
-            for (size_t i = 0; i < size(); i++)
+            size_t n = size();
+            NumberArray<decltype(f(T(0)))> c(n);
+            
+            for (size_t i = 0; i < n; i++)
                 c[i] = f((*this)[i]);
+            
             return c;
         }
         
@@ -1408,7 +1411,8 @@ template <typename T> NumberArray<T> logspace (T x0, T x1, size_t N)
  * @param array The array to write.
  * @param filename Name of the file to create/overwrite.
  */
-template <class T> void write_array (
+template <class T> void write_array
+(
     const ArrayView<T> array,
     const char* filename
 );
@@ -1420,7 +1424,8 @@ template <class T> void write_array (
  * @param array The array to write.
  * @param filename Name of the file to create/overwrite.
  */
-template <class T1, class T2> void write_array (
+template <class T1, class T2> void write_array
+(
     const ArrayView<T1> grid,
     const ArrayView<T2> array,
     const char* filename

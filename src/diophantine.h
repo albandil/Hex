@@ -97,6 +97,8 @@ class BesselNodeIntegrator
                 rmin = std::max (a, rmin);
                 rmax = std::min (rmax, b);
                 
+//                 std::cout << "integrating node : " << rmin << " to " << rmax << std::flush;
+                
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
                 {
@@ -106,7 +108,7 @@ class BesselNodeIntegrator
                     return ok_;
                 }
                 
-                std::cout << "integrating node : " << rmin << " to " << rmax << " : " << Q_.result() << std::endl;
+//                 std::cout << " : " << Q_.result() << std::endl;
                 
                 // update result
                 integral += Q_.result();

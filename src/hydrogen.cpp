@@ -132,6 +132,10 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
 
 double P (unsigned n, unsigned l, double r)
 {
+    // bound orbital is a regular solution
+    if (r == 0.)
+        return 0.;
+    
     // compute the radial function by GSL
     gsl_sf_result R;
     int err = gsl_sf_hydrogenicR_e(n, l, 1, r, &R);
