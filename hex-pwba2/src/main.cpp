@@ -31,6 +31,89 @@ rArray interpolate_bound_bound_potential
     int Na, int La, int Nb, int Lb
 )
 {
+    // output array
+    unsigned N = x.size();
+    rArray V (N);
+    
+    // combined exponential factor
+    double c = 1./Na + 1./Nb;
+    
+    // combined normalization factor
+    double Norm = std::sqrt
+    (
+        std::pow(2./Na,3) * gsl_sf_fact(Na-La-1) / (2 * Na * gsl_sf_fact(Na + La)) *
+        std::pow(2./Nb,3) * gsl_sf_fact(Nb-Lb-1) / (2 * Nb * gsl_sf_fact(Nb + Lb))
+    );
+    
+    if (lambda == 0)
+    {
+        auto potential = [&](double y) -> double
+        {
+            if (y == 0.)
+                return 0;
+            
+            // for all terms of product of Laguerre polynomials
+            double suma1 = 0, suma2 = 0;
+            for (int ia = 0; ia <= Na - La - 1; ia++)
+            for (int ib = 0; ib <= Nb - Lb - 1; ib++)
+            {
+                double afactor = (ia % 2 == 0 ? 1. : -1.) * std::pow(2./Na,La+ia) * gsl_sf_choose(Na+La,Na-La-1-ia) / gsl_sf_fact(ia);
+                double bfactor = (ib % 2 == 0 ? 1. : -1.) * std::pow(2./Nb,Lb+ib) * gsl_sf_choose(Nb+Lb,Nb-Lb-1-ib) / gsl_sf_fact(ib);
+                int rpower1 = La + 1 + Lb + 1 + ia + ib - 1;
+                int rpower2 = La + 1 + Lb + 1 + ia + ib;
+                double integral1 = gsl_sf_gamma(rpower1 + 1) * gsl_sf_gamma_inc_Q(rpower1 + 1, c*y);
+                double integral2 = gsl_sf_gamma(rpower2 + 1) * gsl_sf_gamma_inc_Q(rpower2 + 1, c*y);
+                suma1 += afactor * bfactor * integral1 / std::pow(c, rpower1 + 1);
+                suma2 += afactor * bfactor * integral2 / std::pow(c, rpower2 + 1);
+            }
+            
+            return suma1 - suma2 / y;
+        };
+        
+        # pragma omp parallel for
+        for (unsigned i = 0; i < N; i++)
+            V[i] = Norm * potential(x[i]);
+    }
+    else
+    {
+        auto potential = [&](double y) -> double
+        {
+            if (y == 0.)
+                return 0;
+            
+            // for all terms of product of Laguerre polynomials
+            double suma1 = 0, suma2 = 0;
+            for (int ia = 0; ia <= Na - La - 1; ia++)
+            for (int ib = 0; ib <= Nb - Lb - 1; ib++)
+            {
+                double afactor = (ia % 2 == 0 ? 1. : -1.) * std::pow(2./Na,La+ia) * gsl_sf_choose(Na+La,Na-La-1-ia) / gsl_sf_fact(ia);
+                double bfactor = (ib % 2 == 0 ? 1. : -1.) * std::pow(2./Nb,Lb+ib) * gsl_sf_choose(Nb+Lb,Nb-Lb-1-ib) / gsl_sf_fact(ib);
+                int rpower1 = La + 1 + Lb + 1 + ia + ib + lambda;
+                int rpower2 = La + 1 + Lb + 1 + ia + ib - lambda - 1;
+                double integral1 = gsl_sf_gamma(rpower1 + 1) * gsl_sf_gamma_inc_P(rpower1 + 1, c*y);
+                double integral2 = gsl_sf_gamma(rpower2 + 1) * gsl_sf_gamma_inc_Q(rpower2 + 1, c*y);
+                suma1 += afactor * bfactor * integral1 / std::pow(c, rpower1 + 1);
+                suma2 += afactor * bfactor * integral2 / std::pow(c, rpower2 + 1);
+            }
+            
+            return suma1 * std::pow(y, -lambda-1) + suma2 * std::pow(y, lambda);
+        };
+        
+        # pragma omp parallel for
+        for (unsigned i = 0; i < N; i++)
+            V[i] = Norm * potential(x[i]);
+    }
+    
+    return V;
+}
+
+rArray interpolate_bound_bound_potential_1
+(
+    rArray const & x,
+    int lambda,
+    int Na, int La, int Nb, int Lb
+)
+{
     unsigned N = x.size();
     rArray V (N);
     
@@ -762,6 +845,7 @@ int main (int argc, char* argv[])
             
             for (int ell = 0; ell <= nL; ell++)
             for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
+//             for (int Ln = ell + L + Pi; Ln >= ell; Ln--)
             {
                 int ln = 2 * ell + L + Pi - Ln;
                 std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
