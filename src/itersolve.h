@@ -201,7 +201,7 @@ unsigned cg_callbacks
     unsigned k;
     for (k = 0; k < max_iterations; k++)
     {
-        int sec = timer.elapsed();
+        int sec = timer.seconds();
         
         if (verbose)
         {

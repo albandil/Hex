@@ -1185,7 +1185,7 @@ void ILUCGPreconditioner::update (double E)
         );
         
         // time usage
-        int secs = timer.elapsed();
+        int secs = timer.seconds();
         
         // print info
         std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60

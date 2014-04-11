@@ -253,20 +253,28 @@ class Timer
             start_ = std::chrono::system_clock::now();
         }
         
-        /// Stop timer and return elapsed time in seconds.
-        int elapsed ()
+        /// Return elapsed time in seconds.
+        unsigned seconds ()
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
             return secs.count();
         }
         
-        /// Stop timer and return elapsed time in seconds.
-        int milliseconds ()
+        /// Return elapsed time in milliseconds.
+        unsigned milliseconds ()
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
-            std::chrono::milliseconds secs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
-            return secs.count();
+            std::chrono::milliseconds misecs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
+            return misecs.count();
+        }
+        
+        /// Return elapsed time in microseconds.
+        unsigned microseconds ()
+        {
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
+            std::chrono::microseconds musecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start_);
+            return musecs.count();
         }
         
     private:

@@ -330,10 +330,6 @@ double Idir_forbidden
     double suma = 0;
     
     // index "d" runs across the contours x - y = konst
-    # pragma omp parallel for default (none) \
-        firstprivate(N, h, fpart, ipart) \
-        shared (iscaled_n, kscaled_n) \
-        reduction(+:suma)
     for (unsigned d = 0; d < N/2; d++)
     {
         // contribution of these contours
@@ -356,7 +352,12 @@ double Idir_forbidden
         }
         
         // add properly scaled contribution
-        suma += std::exp(-h*d) * contrib;
+        contrib *= std::exp(-h*d);
+        suma += contrib;
+        
+        // check convergence (do not blindly integrate everything)
+        if (std::abs(contrib) < 1e-10 * std::abs(suma))
+            break;
     }
     
     return suma * h * h;
@@ -395,7 +396,7 @@ Complex Idir_nBound_allowed
         
         std::cout << format
         (
-            "\t\tIdir_nBound_allowed [%d %d] i (%d %d %g %d) n (%d %d %g %d) f (%d %d %g %d) : (%g,%g)",
+            "\t\ttransfer [%d %d] initial (%d %d, %g %d), intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
@@ -438,7 +439,7 @@ Complex Idir_nBound_forbidden
         
         std::cout << format
         (
-            "\t\tIdir_nBound_forbidden [%d %d] i (%d %d %g %d) n (%d %d %g %d) f (%d %d %g %d) : (%g,%g)",
+            "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kappan, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
@@ -481,7 +482,7 @@ Complex Idir_nFree_allowed
         
         std::cout << format
         (
-            "\t\tIdir_nFree_allowed [%d %d] i (%d %d %g %d) n (%g %d %g %d) f (%d %d %g %d) : (%g,%g)",
+            "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
@@ -524,7 +525,7 @@ Complex Idir_nFree_forbidden
         
         std::cout << format
         (
-            "\t\tIdir_nFree_forbidden [%d %d] i (%d %d %g %d) n (%g %d %g %d) f (%d %d %g %d) : (%g,%g)",
+            "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kappan, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
