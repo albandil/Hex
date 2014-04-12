@@ -45,6 +45,7 @@ rArray interpolate_bound_bound_potential
         std::pow(2./Nb,3) * gsl_sf_fact(Nb-Lb-1) / (2 * Nb * gsl_sf_fact(Nb + Lb))
     );
     
+    // compute the integrals (symbolically)
     if (lambda == 0)
     {
         auto potential = [&](double y) -> double
@@ -107,96 +108,6 @@ rArray interpolate_bound_bound_potential
     return V;
 }
 
-rArray interpolate_bound_bound_potential_1
-(
-    rArray const & x,
-    int lambda,
-    int Na, int La, int Nb, int Lb
-)
-{
-    unsigned N = x.size();
-    rArray V (N);
-    
-    if (lambda == 0)
-    {
-        auto potential = [&](double y) -> double
-        {
-            if (y == 0.)
-                return 0;
-            
-            auto integrand = [&](double x) -> double
-            {
-                return Hydrogen::P(Na,La,x) * (1./x - 1./y) * Hydrogen::P(Nb,Lb,x);
-            };
-            
-            GaussKronrod<decltype(integrand)> Q(integrand);
-            Q.integrate(y, x.back());
-            if (not Q.ok())
-            {
-                throw exception
-                (
-                    "Bound-bound potential V[0]{%d,%d->%d,%d} integration failed for r = %g (\"%s\").",
-                    Na, La, Nb, Lb, y, Q.status().c_str()
-                );
-            }
-            
-            return Q.result();
-        };
-        
-        # pragma omp parallel for
-        for (unsigned i = 0; i < N; i++)
-            V[i] = potential(x[i]);
-    }
-    else
-    {
-        auto potential = [&](double y) -> double
-        {
-            if (y == 0.)
-                return 0;
-            
-            auto integrand1 = [&](double x) -> double
-            {
-                return Hydrogen::P(Na,La,x) * std::pow(x/y,lambda) * Hydrogen::P(Nb,Lb,x);
-            };
-            
-            GaussKronrod<decltype(integrand1)> Q1(integrand1);
-            Q1.integrate(0., y);
-            if (not Q1.ok())
-            {
-                throw exception
-                (
-                    "Bound-bound potential V[%d]{%d,%d->%d,%d} [0,%g] integration failed (\"%s\").",
-                    lambda, Na, La, Nb, Lb, y, Q1.status().c_str()
-                );
-            }
-            
-            auto integrand2 = [&](double x) -> double
-            {
-                return Hydrogen::P(Na,La,x) * std::pow(y/x,lambda+1) * Hydrogen::P(Nb,Lb,x);
-            };
-            
-            GaussKronrod<decltype(integrand2)> Q2(integrand2);
-            Q2.integrate(y, x.back());
-            if (not Q2.ok())
-            {
-                throw exception
-                (
-                    "Bound-bound potential V[%d]{%d,%d->%d,%d} [%g,inf] integration failed (\"%s\").",
-                    lambda, Na, La, Nb, Lb, y, Q2.status().c_str()
-                );
-            }
-            
-            return (Q1.result() + Q2.result()) / y;
-        };
-        
-        # pragma omp parallel for
-        for (unsigned i = 0; i < N; i++)
-            V[i] = potential(x[i]);
-    }
-    
-    return V;
-}
-
 rArray interpolate_bound_free_potential
 (
     rArray const & x,
@@ -204,22 +115,49 @@ rArray interpolate_bound_free_potential
     int Na, int La, double Kb, int Lb
 )
 {
+    // array of bound-free potential evaluations
     unsigned N = x.size();
     rArray V (N);
     
+    // precompute Coulomb zeros within the range of "x"
+    int nzeros = Kb * x.back() / (2 * special::constant::pi); // initial guess
+    rArray zeros;
+    do
+    {
+        // double the necessary zero count
+        nzeros *= 2;
+        zeros.resize(nzeros);
+        
+        // compute zeros of the Coulomb function
+        special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
+        zeros /= Kb;
+    }
+    while (zeros.back() < x.back());
+    
+    // add the classical turning point for non-S-waves to ease the integration
+    if (Lb != 0)
+    {
+        nzeros++;
+        zeros.push_front((std::sqrt(1 + Kb*Kb*Lb*Lb)-1)/(Kb*Kb));
+    }
+    
+    // compute the integrals
     if (lambda == 0)
     {
         auto potential = [&](double y) -> double
         {
+            // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
             if (y == 0.)
                 return 0;
             
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ = 0
             auto integrand = [&](double x) -> double
             {
                 return Hydrogen::P(Na,La,x) * (1./x - 1./y) * Hydrogen::F(Kb,Lb,x);
             };
             
-            BesselNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,Kb,Lb);
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros);
             Q.integrate(y, x.back());
             if (not Q.ok())
             {
@@ -229,10 +167,10 @@ rArray interpolate_bound_free_potential
                     Na, La, Kb, Lb, y, Q.status().c_str()
                 );
             }
-            
             return Q.result();
         };
         
+        // evaluate potential in all grid points
         # pragma omp parallel for
         for (unsigned i = 0; i < N; i++)
             V[i] = potential(x[i]);
@@ -241,15 +179,18 @@ rArray interpolate_bound_free_potential
     {
         auto potential = [&](double y) -> double
         {
+            // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
             if (y == 0.)
                 return 0;
             
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
             auto integrand1 = [&](double x) -> double
             {
                 return Hydrogen::P(Na,La,x) * std::pow(x/y,lambda) * Hydrogen::F(Kb,Lb,x);
             };
             
-            BesselNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,Kb,Lb);
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,zeros);
             Q1.integrate(0., y);
             if (not Q1.ok())
             {
@@ -260,12 +201,14 @@ rArray interpolate_bound_free_potential
                 );
             }
             
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
             auto integrand2 = [&](double x) -> double
             {
                 return Hydrogen::P(Na,La,x) * std::pow(y/x,lambda+1) * Hydrogen::F(Kb,Lb,x);
             };
             
-            BesselNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,Kb,Lb);
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros);
             Q2.integrate(y, x.back());
             if (not Q2.ok())
             {
@@ -279,11 +222,13 @@ rArray interpolate_bound_free_potential
             return (Q1.result() + Q2.result()) / y;
         };
         
+        // evaluate potential in all grid points
         # pragma omp parallel for
         for (unsigned i = 0; i < N; i++)
             V[i] = potential(x[i]);
     }
     
+    // return the array of evaluations
     return V;
 }
 
