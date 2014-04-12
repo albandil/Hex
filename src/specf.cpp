@@ -19,6 +19,91 @@
 #include "specf.h"
 #include "complex.h"
 
+#ifndef NO_LAPACK
+/**
+ * @brief Lapack routine: Eigenvalues, eigenvectors of a symmetric tridiagonal matrix.
+ * 
+ * DSTEV computes the eigenvalues and, optionally, the left and/or right
+ * eigenvectors of other matrices.
+ * 
+ * @param jobz 'N' for eigenvalues only, 'V' also eigenvectors.
+ * @param n Order of the matrix.
+ * @param d On entry, the N diagonal elements of the tridiagonal matrix A.
+ *          On exit, if INFO = 0, the eigenvalues in ascending order.
+ * @param e On entry, the (n-1) subdiagonal elements of the tridiagonal
+ *          matrix A, stored in elements 1 to N-1 of E. On exit, the contents
+ *          of E are destroyed.
+ * @param z If JOBZ = 'V', then if INFO = 0, Z contains the orthonormal
+ *          eigenvectors of the matrix A, with the i-th column of Z
+ *          holding the eigenvector associated with D(i).
+ *          If JOBZ = 'N', then Z is not referenced.
+ * @param ldz The leading dimension of the array Z.  LDZ >= 1, and if
+ *            JOBZ = 'V', LDZ >= max(1,N).
+ * @param work If JOBZ = 'N', WORK is not referenced.
+ * @param info = 0:  successful exit; 
+ *             < 0:  if INFO = -i, the i-th argument had an illegal value; 
+ *             > 0:  if INFO = i, the algorithm failed to converge; i
+ *                   off-diagonal elements of E did not converge to zero.
+ */
+extern "C" void dstev_
+(
+    char * jobz,
+    int * n,
+    double * d,
+    double * e,
+    double * z,
+    int * ldz,
+    double * work,
+    int * info
+);
+
+int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel)
+{
+    // auxiliary variables
+    int info, ldz = 1;
+    char jobz = 'N';
+    
+    // memory array
+    double oldzeros[nzeros];
+    for (int i = 0; i < nzeros; i++)
+        oldzeros[i] = 0;
+    
+    // for different sizes of the tridiagonal matrix
+    for (int n = nzeros; ; n *= 2)
+    {
+        // compose diagonal
+        double d[n];
+        for (int i = 1; i <= n; i++)
+            d[i-1] = -eta / ((L+i)*(L+i+1));
+        
+        // compose subdiagonal
+        double e[n-1];
+        for (int i = 1; i <= n-1; i++)
+            e[i-1] = std::sqrt((L+i+1)*(L+i+1)+eta*eta) / ((L+i+1)*std::sqrt((2*(L+i)+1)*(2*(L+i)+3)));
+        
+        // calculate eigenvalues
+        dstev_(&jobz, &n, &d[0], &e[0], nullptr, &ldz, nullptr, &info);
+        
+        // check status information
+        if (info < 0)
+            throw exception ("Illegal value to DSTEV in coulomb_zeros (argument %d).", -info);
+        if (info > 0)
+            throw exception ("DSTEV failed to converge (%d offdiagonal elements).", info);
+        
+        // compute new zeros
+        for (int i = 0; i < nzeros; i++)
+        {
+            oldzeros[i] = zeros[i];
+            zeros[i] = 1./d[n-1-i];
+        }
+        
+        // check that the last zero's shift is within tolerance
+        if (std::abs(zeros[nzeros-1]-oldzeros[nzeros-1]) < epsrel * std::abs(zeros[nzeros-1]))
+            return n;
+    }
+}
+#endif /* NO_LAPACK */
+
 cArray ric_jv (int lmax, Complex z)
 {
     // results

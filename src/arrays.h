@@ -780,6 +780,51 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         T const & back (int i = 0) const   { return ArrayView<T>::back(i); }
         
         /**
+         * @brief Add element to beginning.
+         * 
+         * Prepends a new element to the start of the array. If the reserved
+         * storage has sufficient size, no reallocation takes place.
+         * The whole array has to be shifted by one element in any case.
+         */
+        virtual void push_front (T const & a)
+        {
+            // can we just whift the whole data?
+            if (size() + 1 <= Nres_)
+            {
+                // shift data by one element
+                for (size_t i = size(); i > 0; i--)
+                    (*this)[i] = (*this)[i-1];
+                
+                // set the new front element
+                (*this)[0] = a;
+                
+                // update size of the array
+                ArrayView<T>::N_++;
+            }
+            else
+            {
+                // reset storage size
+                Nres_ = 2 * std::max<size_t>(1, Nres_);
+                
+                // reallocate
+                T* new_array = Alloc::alloc(Nres_);
+                
+                // copy original data
+                memcpy(new_array + 1, data(), size() * sizeof(T));
+                
+                // destroy original array
+                if (data() != nullptr)
+                    Alloc::free (ArrayView<T>::array_);
+                
+                // use new array
+                ArrayView<T>::array_ = new_array;
+                
+                // set the new front element
+                (*this)[0] = a;
+            }
+        }
+        
+        /**
          * @brief Add element to end.
          * 
          * Appends a new element to the end of the array. If the reserved
@@ -1358,7 +1403,18 @@ template <typename T> std::ostream & operator << (std::ostream & out, ArrayView<
 }
 
 /**
- * Generate uniform grid
+ * @brief Generate uniform grid.
+ * 
+ * Return a uniform array
+ * @f[
+ *      a_1, a_2, a_3, \dots, a_n,
+ * @f]
+ * where @f$ a_1 @f$ is equal to "start", @f$ a_n @f$ is equal to "end"
+ * and @f$ n @f$ is equal to "samples". For consecutive elements it holds
+ * @f[
+ *      a_{k+1} - a_k = \frac{a_n - a_1}{n - 1} \ .
+ * @f]
+ * 
  * @param start Left boundary and first sample for "samples" > 0.
  * @param end Right boundary and last sample for "samples" > 1.
  * @param samples Sample count.
@@ -1368,7 +1424,9 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
     NumberArray<T> space(samples);
     
     if (samples == 0)
+    {
         return space;
+    }
     
     if (samples == 1)
     {
@@ -1377,31 +1435,93 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
     }
     
     for (unsigned i = 0; i < samples; i++)
+    {
         space[i] = start + ((end - start) * T(i)) / T(samples - 1);
+    }
     
     return space;
 }
 
 /**
- * Generate logarithmic grid
+ * @brief Generate logarithmic grid.
+ * 
+ * Return a uniformly diverging array
+ * @f[
+ *      a_1, a_2, a_3, \dots, a_n,
+ * @f]
+ * where @f$ a_1 @f$ is equal to "start", @f$ a_n @f$ is equal to "end"
+ * and @f$ n @f$ is equal to "samples". For consecutive elements it holds
+ * @f[
+ *      \frac{a_{k+1}}{a_k} = q = \left(\frac{a_n}{a_1}\right)^{1/(n-1)} \ .
+ * @f]
+ * 
  * @param x0 Left boundary and first sample for "samples" > 0.
  * @param x1 Right boundary and last sample for "samples" > 1.
- * @param N Sample count.
+ * @param samples Sample count.
  */
-template <typename T> NumberArray<T> logspace (T x0, T x1, size_t N)
+template <typename T> NumberArray<T> logspace (T x0, T x1, size_t samples)
 {
     if (x0 <= 0 or x1 <= 0 or x1 < x0)
         throw exception ("[logspace] It must be 0 < x1 <= x2 !");
     
-    NumberArray<T> grid(N);
+    NumberArray<T> grid(samples);
     
-    if (N == 1)
+    if (samples == 0)
+    {
+        return grid;
+    }
+    
+    if (samples == 1)
+    {
         grid[0] = x0;
+        return grid;
+    }
     
-    if (N > 1)
-        for (unsigned i = 0; i < N; i++)
-            grid[i] = x0 * pow(x1 / x0, i / T(N - 1));
+    for (unsigned i = 0; i < samples; i++)
+    {
+        grid[i] = x0 * pow(x1 / x0, i / T(samples - 1));
+    }
         
+    return grid;
+}
+
+/**
+ * @brief Generate geometric grid.
+ * 
+ * Return a geometrically increasing array
+ * @f[
+ *      a_1, a_2, a_3, \dots, a_n,
+ * @f]
+ * where @f$ a_1 @f$ is equal to "start", @f$ a_n @f$ is equal to "end"
+ * and @f$ n @f$ is equal to "samples". For consecutive elements it holds
+ * @f[
+ *      \frac{a_{k+1} - a_{k}}{a_k - a_{k-1}} = q \ .
+ * @f]
+ * Altogether is
+ * @f[
+ *      a_k = a_1 + (a_n - a_1) \frac{1-q^{k-1}}{1-q^{n-1}}
+ * @f]
+ */
+template <typename T> NumberArray<T> geomspace (T x0, T x1, size_t samples, double q)
+{
+    NumberArray<T> grid(samples);
+    
+    if (samples == 0)
+    {
+        return grid;
+    }
+    
+    if (samples == 1)
+    {
+        grid[0] = x0;
+        return grid;
+    }
+    
+    for (unsigned i = 0; i < samples; i++)
+    {
+        grid[i] = x0 + (x1 - x0) * (1. - std::pow(q,i)) / (1. - std::pow(q,samples));
+    }
+    
     return grid;
 }
 

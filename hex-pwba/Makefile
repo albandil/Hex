@@ -11,7 +11,7 @@ CXX = g++
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -g -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
+CFLAGS = -g -Wall -std=c++11 -DNO_HDF -DNO_LAPACK -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
 LFLAGS = -g -lgsl -lgslcblas -lcln
 
 FILES = arrays hydrogen pwba radial specf symbolic ui version

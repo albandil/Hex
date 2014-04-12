@@ -73,11 +73,25 @@ namespace integral
 {
 
 /**
- * @brief Trapezoidal integration.
+ * @brief Uniform trapezoidal integration.
  */
 template <class T> T trapz (double h, NumberArray<T> const & y)
 {
-   return h * (sum(y) - 0.5 * (y.front() + y.back()));
+    return h * (sum(y) - 0.5 * (y.front() + y.back()));
+}
+
+/**
+ * @brief Non-uniform trapezoidal integration.
+ */
+template <class T> T trapz (NumberArray<T> const & x, NumberArray<T> const & y)
+{
+    assert (x.size() == y.size());
+    
+    T sum = 0;
+    for (unsigned i = 1; i < x.size(); i++)
+        sum += 0.5 * (y[i] + y[i-1]) * (x[i] - x[i-1]);
+    
+    return sum;
 }
 
 /**
@@ -172,6 +186,19 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
 }
 
 }; // end of namespace "special::integral"
+
+/**
+ * @brief Get zeros of the Coulomb wave function @f$ F_L(-1/k,kr) @f$.
+ * 
+ * Calculates given number of leading zeros of the Coulomb wave function
+ * @f$ F_L(\eta,\rho) @f$, where @f$ \eta = -1/k @f$ and @f$ \rho = kr @f$.
+ * 
+ * The method used comes from Ikebe Y.: <i>The zeros of regular Coulomb wave
+ * functions and of their derivatives</i>, Math. Comp. <b>29</b>, 131 (1975)
+ * 878-887. It uses eigenvalues of a special tridiagonal matrix. The eigenvalues
+ * are computed using the standard Lapack function DSTEV .
+ */
+int coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel = 1e-8);
 
 }; // end of namespace "special"
 

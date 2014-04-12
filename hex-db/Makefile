@@ -13,8 +13,8 @@ LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lfftw3
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -DNO_HDF -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)

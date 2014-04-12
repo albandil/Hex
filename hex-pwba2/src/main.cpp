@@ -134,12 +134,8 @@ rArray interpolate_bound_free_potential
     }
     while (zeros.back() < x.back());
     
-    // add the classical turning point for non-S-waves to ease the integration
-    if (Lb != 0)
-    {
-        nzeros++;
-        zeros.push_front((std::sqrt(1 + Kb*Kb*Lb*Lb)-1)/(Kb*Kb));
-    }
+    // the classical turning point for non-S-waves
+    double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
     
     // compute the integrals
     if (lambda == 0)
@@ -157,7 +153,7 @@ rArray interpolate_bound_free_potential
             };
             
             // integrate per node of the Coulomb function (precomputed before)
-            FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros);
+            FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros,rt);
             Q.integrate(y, x.back());
             if (not Q.ok())
             {
@@ -190,7 +186,7 @@ rArray interpolate_bound_free_potential
             };
             
             // integrate per node of the Coulomb function (precomputed before)
-            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,zeros);
+            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,zeros,rt);
             Q1.integrate(0., y);
             if (not Q1.ok())
             {
@@ -208,7 +204,7 @@ rArray interpolate_bound_free_potential
             };
             
             // integrate per node of the Coulomb function (precomputed before)
-            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros);
+            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros,rt);
             Q2.integrate(y, x.back());
             if (not Q2.ok())
             {
@@ -790,7 +786,6 @@ int main (int argc, char* argv[])
             
             for (int ell = 0; ell <= nL; ell++)
             for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
-//             for (int Ln = ell + L + Pi; Ln >= ell; Ln--)
             {
                 int ln = 2 * ell + L + Pi - Ln;
                 std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
@@ -959,6 +954,7 @@ int main (int argc, char* argv[])
     }
     
     std::cout << "Tdir = " << Tdir << std::endl;
+    std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
     
     return 0;
 }
