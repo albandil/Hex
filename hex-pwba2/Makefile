@@ -19,9 +19,12 @@ SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-all: bin/hex-pwba2
+all: pollversion bin/hex-pwba2
 
 allclean: clean docclean distclean
+
+pollversion:
+	@touch src/version.cpp
 
 dist:
 	mkdir -p hex-pwba2
