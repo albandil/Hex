@@ -98,11 +98,22 @@ class NodeIntegrator
                         break;
                     }
                     
+                    // check hopelessness
+                    if (estimate == 0 and integral == 0)
+                    {
+                        // this is probably hopeless...
+                        break;
+                    }
+                    
                     // update estimate and go to the next iteration
                     integral = estimate;
                 }
                 prevR = r1;
             }
+            
+            // check if the classically forbidden region was the only one to integrate
+            if (prevR == b)
+                return integral;
             
             // for all integration parcels (nodes of the Bessel function)
             for (int inode = 1; inode < limit_; inode++)

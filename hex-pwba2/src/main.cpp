@@ -15,6 +15,7 @@
 
 #include <gsl/gsl_errno.h>
 
+#include "cmdline.h"
 #include "complex.h"
 #include "radial.h"
 #include "version.h"
@@ -650,7 +651,7 @@ void parse_input_file
     std::ifstream inf (filename);
     
     // check if file exists
-    if (inf.bad())
+    if (not inf.good())
         throw exception ("Can't open input file \"%s\".", filename);
     std::cout << "Reading input file \"" << filename << "\"." << std::endl << std::endl;
     
@@ -668,96 +669,20 @@ void parse_input_file
     maxlevel_forbidden = read_next<int>(inf);
 }
 
-int main (int argc, char* argv[])
+namespace PWBA2
 {
-    // print program logo
-    std::cout << logo_raw() << std::endl;
-    std::cout << "=== Plane wave second Born approximation ===" << std::endl << std::endl;
-    
-    // disable fatal GSL errors
-    gsl_set_error_handler_off();
-    
-    // grid parameters
-    int N;
-    double Rmax;
-    
-    // quantum numbers
-    int Pi, L, maxNn, nL;
-    int Ni, Li, Nf, Lf;
-    double Ei, Enmax;
-    int maxlevel_allowed;
-    int maxlevel_forbidden;
-    
-    parse_input_file
-    (
-        "pwba2.inp",
-        L, Pi,
-        Ni, Li, Nf, Lf, Ei,
-        Rmax, N,
-        maxNn, nL, Enmax,
-        maxlevel_allowed, maxlevel_forbidden
-    );
-    
-    // compute other variables from input
-    double ki = std::sqrt(Ei);
-    double Etot = ki*ki - 1./(Ni*Ni);
-    rArray grid = linspace(0., Rmax, N);
-    
-    // echo input data
-    std::cout << "Quantum state parameters:" << std::endl;
-    std::cout << "\t- total angular momentum: L = " << L << std::endl;
-    std::cout << "\t- total parity: Π = " << Pi << std::endl;
-    std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
-    std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
-    std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
-    std::cout << "\t- total energy: Etot = " << Etot << std::endl;
-    std::cout << std::endl;
-    std::cout << "Grid parameters:" << std::endl;
-    std::cout << "\t- grid length: Rmax = " << Rmax << std::endl;
-    std::cout << "\t- grid total samples: N = " << N << std::endl;
-    std::cout << "\t- grid spacing: h = " << Rmax / N << std::endl;
-    std::cout << std::endl;
-    std::cout << "Intermediate atomic states:" << std::endl;
-    std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
-    std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
-    std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
-    std::cout << "\t- how many allowed to integrate: " << maxlevel_allowed << std::endl;
-    std::cout << "\t- how many forbidden to integrate: " << maxlevel_forbidden << std::endl;
-    
-    for (int ell = 0; ell <= nL; ell++)
-    {
-        std::cout << "\t- angular momenta [" << ell << "]: ";
-        for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
-        {
-            int ln = 2 * ell + L + Pi - Ln;
-            std::cout << "(" << Ln << "," << ln << ") ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-    
-    // final energy
-    double ef = ki*ki - 1./(Ni*Ni) + 1./(Nf*Nf);
-    
-    // check energy
-    if (ef < 0)
-    {
-        std::cout << "Excitation from Ni = " << Ni << " to Nf = " << Nf << " is not possible at given energy.";
-        return 1;
-    }
-    
-    // check grid spacing
-    double min_wavelength = 2 * special::constant::pi / std::sqrt(Enmax);
-    std::cout << "There are " << min_wavelength / (Rmax / N) << " grid samples per shortest wavelength." << std::endl;
-    if (Rmax / N > min_wavelength / 10)
-        std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
-    std::cout << std::endl;
-    
-    // final momentum
-    double kf = std::sqrt(ef);
-    
-    // outgoing electron partial T-matrices
+cArrays PartialWave_direct
+(
+    rArray grid,
+    int L, int Pi,
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf,
+    int nL, int maxNn, double Enmax,
+    int maxlevel_allowed, int maxlevel_forbidden
+)
+{
     cArrays Tdir;
+    double Etot = ki*ki - 1./(Ni*Ni);
     
     // compute all angular contributions to the T-matrix
     for (int lf = std::abs(L - Lf); lf <= L + Lf; lf++)
@@ -784,10 +709,11 @@ int main (int argc, char* argv[])
                 continue;
             }
             
-            for (int ell = 0; ell <= nL; ell++)
-            for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
+//             for (int ell = 0; ell <= nL; ell++)
+//             for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
             {
-                int ln = 2 * ell + L + Pi - Ln;
+                int Ln = 26, ln = 29;
+//                 int ln = 2 * ell + L + Pi - Ln;
                 std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
                 
                 // sum over bound states
@@ -953,8 +879,236 @@ int main (int argc, char* argv[])
         Tdir.push_back(Tdir_lf / (ki * kf));
     }
     
+    return Tdir;
+}
+
+cArrays FullTMatrix_direct
+(
+    rArray grid,
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf,
+    int maxNn, int maxLn, double maxEn,
+    int maxlevel_allowed, int maxlevel_forbidden
+)
+{
+    cArray Tdir;
+    
+    // for all bound intermediate states
+    std::cout << "\tBound intermediate states" << std::endl;
+    for (int Nn = 1; Nn <= maxNn; Nn++)
+    for (int Ln = 0; Ln <= std::min(maxLn, Nn-1); Ln++)
+    {
+        // compute energy of the intermediate projectile state
+        Complex en = ki*ki - 1./(Ni*Ni) + 1./(Nn*Nn);
+        
+        // get momentum of the projectile in the intermediate state
+        Complex kn = std::sqrt(en);
+    }
+    
+    // for all free intermediate states
+    // TODO
+    
+    return cArrays ({ Tdir });
+}
+
+}; // end of namespace "PWBA2"
+
+const std::string sample_input =
+    "# ------------------------\n"
+    "# Quantum state numbers\n"
+    "# ------------------------\n"
+    "\n"
+    "# L  Pi\n"
+    "  0  0\n"
+    "\n"
+    "# initial state\n"
+    "# ni li\n"
+    "   1  0\n"
+    "\n"
+    "# final state\n"
+    "# nf lf\n"
+    "   1  0\n"
+    "\n"
+    "# impact energy\n"
+    "# Ei\n"
+    "   4\n"
+    "\n"
+    "# ------------------------\n"
+    "# Grid parameters\n"
+    "# ------------------------\n"
+    "\n"
+    "# maximal radius\n"
+    "# Rmax\n"
+    "   100\n"
+    "\n"
+    "# linear samples\n"
+    "# N\n"
+    "  1000\n"
+    "\n"
+    "# ------------------------\n"
+    "# Intermediate states\n"
+    "# ------------------------\n"
+    "\n"
+    "# maximal quantum numbers\n"
+    "# maxNn  nL     maxEn\n"
+    "  8       3     20\n"
+    "\n"
+    "# continuum integration samples\n"
+    "# allowed forbidden\n"
+    "  64      32\n";
+
+
+int main (int argc, char* argv[])
+{
+    // print program logo
+    std::cout << logo_raw() << std::endl;
+    std::cout << "=== Plane wave second Born approximation ===" << std::endl << std::endl;
+    
+    // disable fatal GSL errors
+    gsl_set_error_handler_off();
+    
+    // parse command line
+    bool partial_wave = false;
+    ParseCommandLine
+    (
+        argc, argv,
+        
+        "example", "e", 0, [&](std::string optarg) -> bool
+            {
+                std::cout << "Writing sample input file to \"example.inp\".\n\n";
+                
+                // produce sample input file
+                std::ofstream out("example.inp");
+                if (out.bad())
+                    throw exception ("Error: Cannot write to \"example.inp\"\n");
+                
+                out << sample_input;
+                    
+                out.close();
+                exit(0);
+            },
+        "help", "h", 0, [](std::string optarg) -> bool
+            {
+                // print usage information
+                std::cout << "\n"
+                    "Available switches (short forms in parentheses):                                                                  \n"
+                    "                                                                                                                  \n"
+                    "\t--example                 (-e)  create sample input file                                                        \n"
+                    "\t--help                    (-h)  display this help                                                               \n"
+                    "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
+                    "                                                                                                                  \n"
+                ;
+                exit(0);
+            },
+        "partial-wave", "w", 0, [&](std::string optarg) -> bool
+            {
+                // compute only contribution of a single partial wave
+                partial_wave = true;
+                return true;
+            },
+        
+        [](std::string opt, std::string optarg) -> bool
+            {
+                throw exception
+                (
+                    "Unknown option \"%s\" with argument \"%s\".",
+                    opt.c_str(), optarg.c_str()
+                );
+            }
+    );
+    
+    // grid parameters
+    int N;
+    double Rmax;
+    
+    // quantum numbers
+    int Pi, L, maxNn, nL;
+    int Ni, Li, Nf, Lf;
+    double Ei, Enmax;
+    int maxlevel_allowed;
+    int maxlevel_forbidden;
+    
+    parse_input_file
+    (
+        "pwba2.inp",
+        L, Pi,
+        Ni, Li, Nf, Lf, Ei,
+        Rmax, N,
+        maxNn, nL, Enmax,
+        maxlevel_allowed, maxlevel_forbidden
+    );
+    
+    // compute other variables from input
+    double ki = std::sqrt(Ei);
+    double Etot = ki*ki - 1./(Ni*Ni);
+    rArray grid = linspace(0., Rmax, N);
+    
+    // echo input data
+    std::cout << "Quantum state parameters:" << std::endl;
+    std::cout << "\t- total angular momentum: L = " << L << (partial_wave ? " (not used)" : "") << std::endl;
+    std::cout << "\t- total parity: Π = " << Pi << (partial_wave ? " (not used)" : "") << std::endl;
+    std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
+    std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
+    std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
+    std::cout << "\t- total energy: Etot = " << Etot << std::endl;
+    std::cout << std::endl;
+    std::cout << "Grid parameters:" << std::endl;
+    std::cout << "\t- grid length: Rmax = " << Rmax << std::endl;
+    std::cout << "\t- grid total samples: N = " << N << std::endl;
+    std::cout << "\t- grid spacing: h = " << Rmax / N << std::endl;
+    std::cout << std::endl;
+    std::cout << "Intermediate atomic states:" << std::endl;
+    std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
+    std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
+    std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
+    std::cout << "\t- how many allowed to integrate: " << maxlevel_allowed << std::endl;
+    std::cout << "\t- how many forbidden to integrate: " << maxlevel_forbidden << std::endl;
+    
+    if (partial_wave)
+    {
+        // write all intermediate states' angular momenta pairs
+        for (int ell = 0; ell <= nL; ell++)
+        {
+            std::cout << "\t- angular momenta [" << ell << "]: ";
+            for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
+            {
+                int ln = 2 * ell + L + Pi - Ln;
+                std::cout << "(" << Ln << "," << ln << ") ";
+            }
+            std::cout << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    
+    // final energy
+    double ef = ki*ki - 1./(Ni*Ni) + 1./(Nf*Nf);
+    
+    // check energy
+    if (ef < 0)
+    {
+        std::cout << "Excitation from Ni = " << Ni << " to Nf = " << Nf << " is not possible at given energy.";
+        return 1;
+    }
+    
+    // final momentum
+    double kf = std::sqrt(ef);
+    
+    // check grid spacing
+    double min_wavelength = 2 * special::constant::pi / std::sqrt(Enmax);
+    std::cout << "There are " << min_wavelength / (Rmax / N) << " grid samples per shortest wavelength." << std::endl;
+    if (Rmax / N > min_wavelength / 10)
+        std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
+    std::cout << std::endl;
+    
+    // outgoing electron partial T-matrices
+    cArrays Tdir =
+        partial_wave ?
+        PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, maxlevel_allowed, maxlevel_forbidden) :
+        PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, maxlevel_allowed, maxlevel_forbidden);
+    
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
+    std::cout << std::endl;
     
     return 0;
 }

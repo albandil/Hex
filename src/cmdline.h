@@ -171,7 +171,7 @@ template <class Callback, class ...Params> bool HandleSwitch
  *         "help", "h", 0, [](std::string optarg) -> bool { std::cout << "Help.\n"; return true; },
  *         "sleep", "s", 1, [](std::string optarg) -> bool { sleep(atoi(optarg.c_str())); return true; },
  *         ...
- *         [](std::string opt, std::string optarg) -> bool { std::cout << "Unknown option \"" << opt << "\" with argument \"" << optarg << "\"\n"; }
+ *         [](std::string opt, std::string optarg) -> bool { std::cout << "Unknown option \"" << opt << "\" with argument \"" << optarg << "\"\n"; return false; }
  *     );
  * @endcode
  * 
