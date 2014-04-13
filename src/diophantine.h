@@ -42,9 +42,7 @@ class NodeIntegrator
         
         NodeIntegrator (Functor f)
             : Q_(f),  f_(f), result_(0), ok_(true), status_(),
-              epsabs_(1e-8), epsrel_(1e-5), limit_(1000)
-        {
-        }
+              epsabs_(1e-8), epsrel_(1e-6), limit_(1000) {}
         
         double result () const { return result_; }
         bool ok () const { return ok_; }
@@ -71,13 +69,16 @@ class NodeIntegrator
             double prevR = 0;
             
             // start by integrating in the classically forbidden region (if any)
-            double rt = turningPoint();
-            if (rt != 0 and a < rt and b > rt)
+            double rt = this->turningPoint();
+            if (rt != 0 and a < rt)
             {
+                double r0 = a;
+                double r1 = std::min(rt,b);
+                
                 double quotient = 0.75; // FIXME variable ?
                 for (int samples = 8; ; samples *= 2)
                 {
-                    rArray grid = geomspace(a,rt,samples,quotient);
+                    rArray grid = geomspace(r0,r1,samples,quotient);
                     rArray eval = grid.transform(f_);
                     double estimate = special::integral::trapz(grid, eval);
                     
@@ -100,7 +101,7 @@ class NodeIntegrator
                     // update estimate and go to the next iteration
                     integral = estimate;
                 }
-                prevR = rt;
+                prevR = r1;
             }
             
             // for all integration parcels (nodes of the Bessel function)
@@ -122,8 +123,6 @@ class NodeIntegrator
                 rmin = std::max (a, rmin);
                 rmax = std::min (rmax, b);
                 
-//                 std::cout << "integrating node : " << rmin << " to " << rmax << std::flush;
-                
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
                 {
@@ -132,8 +131,6 @@ class NodeIntegrator
                     result_ = integral;
                     return ok_;
                 }
-                
-//                 std::cout << " : " << Q_.result() << std::endl;
                 
                 // update result
                 integral += Q_.result();
