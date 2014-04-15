@@ -17,13 +17,11 @@
 
 #include "cmdline.h"
 #include "complex.h"
-#include "radial.h"
-#include "version.h"
-
 #include "diophantine.h"
 #include "gausskronrod.h"
 #include "hydrogen.h"
 #include "specf.h"
+#include "version.h"
 
 rArray interpolate_bound_bound_potential
 (
@@ -640,7 +638,7 @@ template <class T> T read_next (std::ifstream & f)
 
 void parse_input_file
 (
-    const char * filename,
+    std::ifstream & inf,
     int & L, int & Pi,
     int & Ni, int & Li, int & Nf, int & Lf, double & Ei,
     double & Rmax, int & N,
@@ -648,13 +646,6 @@ void parse_input_file
     int & maxlevel_allowed, int & maxlevel_forbidden
 )
 {
-    std::ifstream inf (filename);
-    
-    // check if file exists
-    if (not inf.good())
-        throw exception ("Can't open input file \"%s\".", filename);
-    std::cout << "Reading input file \"" << filename << "\"." << std::endl << std::endl;
-    
     // read all data
     L = read_next<int>(inf);  Pi = read_next<int>(inf);
     Ni = read_next<int>(inf); Li = read_next<int>(inf);
@@ -709,11 +700,10 @@ cArrays PartialWave_direct
                 continue;
             }
             
-//             for (int ell = 0; ell <= nL; ell++)
-//             for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
+            for (int ell = 0; ell <= nL; ell++)
+            for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
             {
-                int Ln = 26, ln = 29;
-//                 int ln = 2 * ell + L + Pi - Ln;
+                int ln = 2 * ell + L + Pi - Ln;
                 std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
                 
                 // sum over bound states
@@ -903,6 +893,8 @@ cArrays FullTMatrix_direct
         
         // get momentum of the projectile in the intermediate state
         Complex kn = std::sqrt(en);
+        
+        // TODO
     }
     
     // for all free intermediate states
@@ -967,6 +959,9 @@ int main (int argc, char* argv[])
     // disable fatal GSL errors
     gsl_set_error_handler_off();
     
+    // input file
+    std::ifstream inputfile;
+    
     // parse command line
     bool partial_wave = false;
     ParseCommandLine
@@ -995,10 +990,20 @@ int main (int argc, char* argv[])
                     "                                                                                                                  \n"
                     "\t--example                 (-e)  create sample input file                                                        \n"
                     "\t--help                    (-h)  display this help                                                               \n"
+                    "\t--input <filename>        (-i)  use custom input file                                                           \n"
                     "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
                     "                                                                                                                  \n"
                 ;
                 exit(0);
+            },
+        "input", "i", 1, [&](std::string optarg) -> bool
+            {
+                // set custom input file
+                inputfile.open(optarg);
+                if (not inputfile.good())
+                    throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                std::cout << "Using input file \"" << optarg << "\"." << std::endl << std::endl;
+                return true;
             },
         "partial-wave", "w", 0, [&](std::string optarg) -> bool
             {
@@ -1017,6 +1022,16 @@ int main (int argc, char* argv[])
             }
     );
     
+    // check input file
+    if (not inputfile.is_open())
+    {
+        const char * filename = "pwba2.inp";
+        std::cout << "Using input file \"" << filename << "\"." << std::endl << std::endl;
+        inputfile.open(filename);
+        if (not inputfile.good())
+            throw exception ("Error: Input file \"%s\" not found.\n", filename);
+    }
+    
     // grid parameters
     int N;
     double Rmax;
@@ -1028,9 +1043,10 @@ int main (int argc, char* argv[])
     int maxlevel_allowed;
     int maxlevel_forbidden;
     
+    // parse input file
     parse_input_file
     (
-        "pwba2.inp",
+        inputfile,
         L, Pi,
         Ni, Li, Nf, Lf, Ei,
         Rmax, N,
@@ -1045,8 +1061,8 @@ int main (int argc, char* argv[])
     
     // echo input data
     std::cout << "Quantum state parameters:" << std::endl;
-    std::cout << "\t- total angular momentum: L = " << L << (partial_wave ? " (not used)" : "") << std::endl;
-    std::cout << "\t- total parity: Π = " << Pi << (partial_wave ? " (not used)" : "") << std::endl;
+    std::cout << "\t- total angular momentum: L = " << L << (partial_wave ? "" : " (not used)") << std::endl;
+    std::cout << "\t- total parity: Π = " << Pi << (partial_wave ? "" : " (not used)") << std::endl;
     std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
     std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
     std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
