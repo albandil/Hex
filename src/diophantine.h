@@ -62,8 +62,10 @@ class NodeIntegrator
         
         bool integrate (double a, double b)
         {
-            // overall integral
-            double integral = 0;
+            // initialize
+            ok_ = true;
+            status_ = "";
+            result_ = 0;
             
             // end of previous integration parcel
             double prevR = 0;
@@ -92,28 +94,29 @@ class NodeIntegrator
                     }
                     
                     // check convergence
-                    if (std::abs(estimate - integral) < epsrel_ * std::abs(estimate))
+                    if (std::abs(estimate - result_) < epsrel_ * std::abs(estimate))
                     {
-                        integral = estimate;
+                        result_ = estimate;
                         break;
                     }
                     
                     // check hopelessness
-                    if (estimate == 0 and integral == 0)
+                    if (estimate == 0 and result_ == 0)
                     {
                         // this is probably hopeless...
                         break;
                     }
                     
                     // update estimate and go to the next iteration
-                    integral = estimate;
+                    result_ = estimate;
                 }
+                
                 prevR = r1;
             }
             
             // check if the classically forbidden region was the only one to integrate
             if (prevR == b)
-                return integral;
+                return ok_;
             
             // for all integration parcels (nodes of the Bessel function)
             for (int inode = 1; inode < limit_; inode++)
@@ -139,22 +142,18 @@ class NodeIntegrator
                 {
                     ok_ = false;
                     status_ = format("Node integrator failed on <%g,%g>: %s", rmin, rmax, Q_.status().c_str());
-                    result_ = integral;
                     return ok_;
                 }
                 
                 // update result
-                integral += Q_.result();
+                result_ += Q_.result();
                 prevR = rmax;
                 
                 // check convergence
-                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or std::abs(Q_.result()) < epsrel_ * std::abs(integral))
+                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or std::abs(Q_.result()) < epsrel_ * std::abs(result_))
                     break;
             }
             
-            ok_ = true;
-            result_ = integral;
-            status_ = "";
             return ok_;
         }
 };
