@@ -46,7 +46,7 @@ public:
      */ 
     ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
         Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
-        vName("ClenshawCurtis_ff"), Throw(true) {}
+        vName("[ClenshawCurtis_ff]"), Throw(true) {}
     
     /// Get relative tolerance.
     inline double eps() const { return EpsRel; }
@@ -87,7 +87,7 @@ public:
     /// Get recurrence flag.
     inline bool Rec() const { return Recurrence; }
     
-    /// Set limit flag.
+    /// Set recurrence flag.
     inline void setRec(bool recurrence) { Recurrence = recurrence; }
     
     /// Get verbose flag.
@@ -217,7 +217,8 @@ public:
             ftraf.resize(2*N);
             
             // create plan
-            fftw_plan plan = fftw_plan_dft_1d (
+            fftw_plan plan = fftw_plan_dft_1d
+            (
                 2*N,
                 reinterpret_cast<fftw_complex*>(&fvals[0]),
                 reinterpret_cast<fftw_complex*>(&ftraf[0]),
@@ -235,12 +236,12 @@ public:
                     fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("[%s] \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
+                        throw exception("%s \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
                 if (not std::isfinite(std::abs(fvals[N])))
-                    throw exception("[%s] \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
+                    throw exception("%s \"%g\" when evaluating function at -1.", vName.c_str(), fvals[N]);
             }
             else
             {
@@ -251,7 +252,7 @@ public:
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("[%s] \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
+                        throw exception("%s \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
                 }
                 fvals[N] = fvals_prev[N/2];
             }
@@ -280,7 +281,7 @@ public:
             }
             else
             {
-                throw exception("[%s] Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
+                throw exception("%s Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
             }
             
             // sum the quadrature rule
@@ -290,13 +291,13 @@ public:
             
             // echo debug information
             if (Verbose)
-                std::cout << "[" << vName << "] N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
+                std::cout << vName << " N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
             
             // check for convergence
             if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
             {
                 if (Verbose)
-                    std::cout << "[" << vName << "] Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
+                    std::cout << vName << " Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
                 
                 return FType(2. * (x2 - x1) / N) * sum;
             }
@@ -305,7 +306,7 @@ public:
                   and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
             {
                 if (Verbose)
-                    std::cout << "[" << vName << "] EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
+                    std::cout << vName << " EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
                 
                 return FType(0.);
             }
@@ -326,11 +327,11 @@ public:
         {
             if (Throw)
             {
-                throw exception("[%s] Insufficient evaluation limit %d", vName.c_str(), maxN);
+                throw exception("%s Insufficient evaluation limit %d", vName.c_str(), maxN);
             }
             else
             {
-                std::cout << "[" << vName << "] WARNING: Insufficient evaluation limit " << maxN << ".\n";
+                std::cout << vName << " WARNING: Insufficient evaluation limit " << maxN << ".\n";
                 return FType(2. * (x2 - x1) / maxN) * sum;
             }
         }
@@ -343,7 +344,7 @@ public:
         if (std::abs(x2-x1) < EpsAbs)
         {
             if (Verbose)
-                std::cout << "[" << vName << "] Interval smaller than " << EpsAbs << "\n";
+                std::cout << vName << " Interval smaller than " << EpsAbs << "\n";
             return 0;
         }
         
@@ -351,15 +352,16 @@ public:
         if (NStack == 0)
         {
             if (Verbose)
-                std::cout << "[" << vName << "] Bisection inhibited due to internal stack limit.\n";
+                std::cout << vName << " Bisection inhibited due to internal stack limit.\n";
             return FType(2. * (x2 - x1) / maxN) * sum;
         }
         
         if (Verbose)
-            std::cout << "[" << vName << "] Bisecting to ("
+        {
+            std::cout << vName << " Bisecting to ("
                       << x1 << "," << (x2+x1)/2 << ") and ("
                       << (x2+x1)/2 << "," << x2 << ")\n";
-        
+        }
         
         // the actual bisection - also the attributes of the class need to be modified
         

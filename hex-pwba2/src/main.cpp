@@ -15,6 +15,7 @@
 
 #include <gsl/gsl_errno.h>
 
+#include "clenshawcurtis.h"
 #include "cmdline.h"
 #include "complex.h"
 #include "diophantine.h"
@@ -124,7 +125,7 @@ rArray interpolate_bound_free_potential
     do
     {
         // double the necessary zero count
-        nzeros *= 2;
+        nzeros = 2 * (1 + nzeros);
         zeros.resize(nzeros);
         
         // compute zeros of the Coulomb function
@@ -153,6 +154,7 @@ rArray interpolate_bound_free_potential
             
             // integrate per node of the Coulomb function (precomputed before)
             FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros,rt);
+            Q.setEpsAbs(0);
             Q.integrate(y, x.back());
             if (not Q.ok())
             {
@@ -166,7 +168,7 @@ rArray interpolate_bound_free_potential
         };
         
         // evaluate potential in all grid points
-        # pragma omp parallel for
+        # pragma omp parallel for schedule (dynamic)
         for (unsigned i = 0; i < N; i++)
             V[i] = potential(x[i]);
     }
@@ -186,6 +188,7 @@ rArray interpolate_bound_free_potential
             
             // integrate per node of the Coulomb function (precomputed before)
             FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,zeros,rt);
+            Q1.setEpsAbs(0);
             Q1.integrate(0., y);
             if (not Q1.ok())
             {
@@ -204,6 +207,7 @@ rArray interpolate_bound_free_potential
             
             // integrate per node of the Coulomb function (precomputed before)
             FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros,rt);
+            Q2.setEpsAbs(0);
             Q2.integrate(y, x.back());
             if (not Q2.ok())
             {
@@ -218,7 +222,7 @@ rArray interpolate_bound_free_potential
         };
         
         // evaluate potential in all grid points
-        # pragma omp parallel for
+        # pragma omp parallel for schedule (dynamic)
         for (unsigned i = 0; i < N; i++)
             V[i] = potential(x[i]);
     }
@@ -308,10 +312,17 @@ Complex Idir_allowed
     size_t N = grid.size();
     double h = grid.back() / N;
     
-    rArray inner_lower = Vni * jn * ji;
-    rArray inner_higher_re = Vni * yn * ji;
-    rArray inner_higher_im = inner_lower;
+    rArray inner_lower(N), inner_higher_re(N), inner_higher_im(N);
     
+    # pragma omp parallel for
+    for (size_t i = 1; i < N; i++)
+    {
+        inner_lower[i] = Vni[i] * jn[i] * ji[i];
+        inner_higher_im[i] = inner_lower[i];
+        inner_higher_re[i] = Vni[i] * yn[i] * ji[i];
+    }
+    
+    // this is not parallelizable...
     for (size_t i = 1; i < N; i++)
     {
         // forward partial sum for low integral
@@ -322,18 +333,17 @@ Complex Idir_allowed
         inner_higher_im[N-i-1] += inner_higher_im[N-i];
     }
     
-    rArray inner_lower_re = inner_lower * yn * h;
-    rArray inner_lower_im = inner_lower * jn * h;
-    inner_higher_re *= jn * h;
-    inner_higher_im *= jn * h;
+    rArray outer_re(N), outer_im(N);
+    double sum_outer_re = 0, sum_outer_im = 0;
     
-    rArray outer_re = inner_lower_re + inner_higher_re;
-    rArray outer_im = inner_lower_im + inner_higher_im;
+    # pragma omp parallel for reduction (+:sum_outer_re,sum_outer_im)
+    for (size_t i = 1; i < N; i++)
+    {
+        sum_outer_re += Vfn[i] * jf[i] * (inner_lower[i] * yn[i] + inner_higher_re[i] * jn[i]);
+        sum_outer_im += Vfn[i] * jf[i] * (inner_lower[i] * jn[i] + inner_higher_im[i] * jn[i]);
+    }
     
-    outer_re *= Vfn * jf;
-    outer_im *= Vfn * jf;
-    
-    return Complex (sum(outer_re) * h, sum(outer_im) * h);
+    return Complex (sum_outer_re, sum_outer_im) * h * h;
 }
 
 double Idir_forbidden
@@ -742,114 +752,72 @@ cArrays PartialWave_direct
                     }
                 }
                 
+                //
                 // integrate over allowed free states (Kn^2 < ki^2 - 1/Ni^2)
-                cArray allowed_integrals = { 0. };
-                cArray allowed_contributions = { 0. };
-                for (int Nlevel = 2; Nlevel <= maxlevel_allowed; Nlevel *= 2)
+                //
+                
+                if (maxlevel_allowed != 0)
                 {
-                    std::cout << "\n\tAllowed intermediate states (n = " << Nlevel << ")" << std::endl;
-                    
-                    // get energy samples for this level
-                    double H = std::min(Enmax,Etot) / Nlevel;
-                    rArray allowed_energies = linspace (0., std::min(Enmax,Etot), Nlevel + 1);
-                    
-                    // for all samples
-                    for (int ie = 1; ie <= Nlevel; ie++)
+                    std::cout << "\n\tAllowed intermediate states" << std::endl;
+                    auto allowed_energy_contribution = [&](double En) -> Complex
                     {
-                        // skip those already computed
-                        if (ie % 2 == 0)
-                            continue;
+                        if (En == 0 or En == Etot)
+                            return 0.;
                         
-                        // get energy and momentum of the intermediate hydrogen continuum state
-                        double En = allowed_energies[ie];
+                        // get momentum of the intermediate hydrogen continuum state
                         double Kn = std::sqrt(En);
-                        
+                            
                         // get momentum of the projectile
                         double kn = std::sqrt(ki*ki - 1./(Ni*Ni) - En);
                         
                         // compute the radial integral
-                        Complex I = Idir_nFree_allowed
+                        return En * Idir_nFree_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kn, ln,
                             Ni, Li, ki, li
                         ) * (-2. / kn);
-                        
-                        // insert the contribution
-                        allowed_contributions.insert (allowed_contributions.begin() + ie, En * I);
-                    }
-                    
-                    // integrate
-                    allowed_integrals.push_back(special::integral::trapz(H, allowed_contributions));
-                    
-                    std::cout << "\t\tsum: " << allowed_integrals.back() << ", romberg: " << special::integral::romberg(allowed_integrals).back() << std::endl;
-                    
-                    // check convergence
-                    const double eps = 1e-6;
-                    if (allowed_integrals.size() > 1)
-                    {
-                        if (std::abs(allowed_integrals.back(0)) < eps * std::abs(allowed_integrals.back(1)))
-                            break;
-                    }
+                    };
+                    ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
+                    CCa.setVerbose(true, "\t\tcc");
+                    CCa.setEps(1e-5); // relative tolerance
+//                     CCa.setSubdiv(6); // evaluation points
+//                     CCa.setStack(5);  // subdivision limit
+                    Tdir_lf_li += CCa.integrate(0., std::min(Enmax, Etot));
                 }
                 
-                Tdir_lf_li += allowed_integrals.back();
-                
+                //
                 // integrate over forbidden free states (Kn^2 > ki^2 - 1/Ni^2)
-                cArray forbidden_integrals = { 0. };
-                cArray forbidden_contributions = { 0. };
-                if (Etot < Enmax)
-                for (int Nlevel = 2; Nlevel <= maxlevel_forbidden; Nlevel *= 2)
+                //
+                
+                if (maxlevel_forbidden != 0 and Etot < Enmax)
                 {
-                    std::cout << "\n\tForbidden intermediate states (n = " << Nlevel << ")" << std::endl;
-                    
-                    // get energy samples for this level
-                    double H = (Enmax - Etot) / Nlevel;
-                    rArray forbidden_energies = linspace (Etot, Enmax, Nlevel + 1);
-                    
-                    // for all samples
-                    for (int ie = 1; ie <= Nlevel; ie++)
+                    std::cout << "\n\tForbidden intermediate states" << std::endl;
+                    auto forbidden_energy_contribution = [&](double En) -> Complex
                     {
-                        // skip those already computed
-                        if (ie % 2 == 0)
-                            continue;
+                        if (En == Etot)
+                            return 0.;
                         
-                        // get energy and momentum of the intermediate hydrogen continuum state
-                        double En = forbidden_energies[ie];
+                        // get momentum of the intermediate hydrogen continuum state
                         double Kn = std::sqrt(En);
                         
                         // get momentum of the projectile
                         double kappan = std::sqrt(En - ki*ki + 1./(Ni*Ni));
                         
                         // compute the radial integral
-                        Complex I = Idir_nFree_forbidden
+                        return En * Idir_nFree_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kappan, ln,
                             Ni, Li, ki, li
                         ) * (-2. / kappan);
-                        
-                        // insert the contribution
-                        forbidden_contributions.insert (forbidden_contributions.begin() + ie, En * I);
-                    }
-                    
-                    // integrate
-                    forbidden_integrals.push_back(special::integral::trapz(H, forbidden_contributions));
-                    
-                    std::cout << "\t\tsum: " << forbidden_integrals.back() << ", romberg: " << special::integral::romberg(forbidden_integrals).back() << std::endl;
-                    
-                    // check convergence
-                    const double eps = 1e-6;
-                    if (allowed_integrals.size() > 1)
-                    {
-                        if (std::abs(forbidden_integrals.back(0)) < eps * std::abs(forbidden_integrals.back(1)))
-                            break;
-                    }
+                            
+                    };
+                    ClenshawCurtis<decltype(forbidden_energy_contribution),Complex> CCf(forbidden_energy_contribution);
+                    Tdir_lf_li += CCf.integrate(Etot, Enmax);
                 }
-                
-                Tdir_lf_li += forbidden_integrals.back();
             }
             
             Complex factor = std::pow(Complex(0.,1.),li-lf) * std::pow(4*special::constant::pi, 1.5) * std::sqrt(2*li + 1.);
@@ -945,9 +913,9 @@ const std::string sample_input =
     "# maxNn  nL     maxEn\n"
     "  8       3     20\n"
     "\n"
-    "# continuum integration samples\n"
+    "# continuum integration\n"
     "# allowed forbidden\n"
-    "  64      32\n";
+    "  1       1\n";
 
 
 int main (int argc, char* argv[])
@@ -1077,8 +1045,8 @@ int main (int argc, char* argv[])
     std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
     std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
     std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
-    std::cout << "\t- how many allowed to integrate: " << maxlevel_allowed << std::endl;
-    std::cout << "\t- how many forbidden to integrate: " << maxlevel_forbidden << std::endl;
+    std::cout << "\t- integrate allowed states: " << (maxlevel_allowed == 0 ? "no" : "yes") << std::endl;
+    std::cout << "\t- integrate forbidden states: " << (maxlevel_forbidden == 0 ? "no" : "yes") << std::endl;
     
     if (partial_wave)
     {

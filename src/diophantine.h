@@ -148,7 +148,7 @@ class NodeIntegrator
                 prevR = rmax;
                 
                 // check convergence
-                if (std::abs(Q_.result()) < epsabs_ or std::abs(Q_.result()) < epsrel_ * std::abs(integral))
+                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or std::abs(Q_.result()) < epsrel_ * std::abs(integral))
                     break;
             }
             

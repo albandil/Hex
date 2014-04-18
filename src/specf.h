@@ -95,6 +95,24 @@ template <class T> T trapz (NumberArray<T> const & x, NumberArray<T> const & y)
 }
 
 /**
+ * @brief Uniform Simpson integration.
+ */
+template <class T> T simpson (double h, NumberArray<T> const & y)
+{
+    if (y.size() % 2 != 0)
+        throw exception ("You need to use even number of grid points for Simpson integration.");
+    
+    T sum1 = 0, sum2 = 0;
+    
+    for (int i = 1; i < y.size(); i += 2)
+        sum1 += y[i];
+    for (int i = 2; i < y.size() - 1; i += 2)
+        sum2 += y[i];
+    
+    return h * (y.front() + 4. * sum1 + 2. * sum2 + y.back()) / 3.;
+}
+
+/**
  * @brief Compute integral of the confluent hypergeometric function.
  * 
  * The function template will return the scaled value of the indefinite integral
