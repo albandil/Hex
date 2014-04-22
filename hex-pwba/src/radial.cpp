@@ -19,7 +19,7 @@
 #include "hydrogen.h"
 #include "radial.h"
 #include "romberg.h"
-#include "specf.h"
+#include "special.h"
 #include "symbolic.h"
 
 template <class Functor, class Integrator>

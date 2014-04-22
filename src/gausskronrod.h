@@ -18,7 +18,7 @@
 #include <gsl/gsl_integration.h>
 
 #include "misc.h"
-#include "specf.h"
+#include "special.h"
 
 /** @brief Numerical integrator
  *

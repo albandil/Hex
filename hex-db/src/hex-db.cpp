@@ -24,7 +24,7 @@
 #include "arrays.h"
 #include "complex.h"
 #include "hex-db.h"
-#include "specf.h"
+#include "special.h"
 #include "interpolate.h"
 #include "variables.h"
 

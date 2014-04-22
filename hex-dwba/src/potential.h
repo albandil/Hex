@@ -15,7 +15,7 @@
 
 #include "arrays.h"
 #include "hydrogen.h"
-#include "specf.h"
+#include "special.h"
 
 /**
  * @brief U polynomial coefficients.

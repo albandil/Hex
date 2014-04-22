@@ -18,7 +18,7 @@
 #include <iostream>
 
 #include "misc.h"
-#include "specf.h"
+#include "special.h"
 
 /**
  * @brief Compute limit.

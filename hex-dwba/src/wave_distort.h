@@ -17,7 +17,7 @@
 
 #include "complex.h"
 #include "potential.h"
-#include "specf.h"
+#include "special.h"
 
 /**
  * \brief Distorted wave information.

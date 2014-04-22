@@ -19,7 +19,7 @@
 #include <gsl/gsl_sf.h>
 
 #include "misc.h"
-#include "specf.h"
+#include "special.h"
 
 template <class Functor, class Integrator>
 class NodeIntegrator
@@ -273,7 +273,7 @@ class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         double k_;
         int l_;
         
-        const rArrayView zeros_;
+        const rArray zeros_;
         double rt_;
 };
 

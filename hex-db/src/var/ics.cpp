@@ -131,6 +131,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
             "S  INTEGER, "
             "Ei DOUBLE PRECISION, "
             "sigma DOUBLE PRECISION, "
+            "sigmaB DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
         ")"
     };

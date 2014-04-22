@@ -10,28 +10,33 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include "../../src/special.h"
-#include "../../src/special.cpp"
+#ifndef HEX_PWBA2_H
+#define HEX_PWBA2_H
 
-#include <iostream>
+#include "arrays.h"
 
-int main (int argc, char* argv[])
+namespace PWBA2
 {
-	if (argc != 7)
-	{
-		std::cout << "\nUsage:\n\t./f <lambda> <l1> <l2> <l1p> <l2p> <L>\n\n";
-		exit(0);
-	}
-	
-	int lambda = atoi(argv[1]);
-	int l1 = atoi(argv[2]);
-	int l2 = atoi(argv[3]);
-	int l1p = atoi(argv[4]);
-	int l2p = atoi(argv[5]);
-	int L = atoi(argv[6]);
-	
-	std::cout << "f[" << lambda << "](" << l1 << "," << l2 << "," << l1p << ","
-	          << l2p << ") = " << computef(lambda,l1,l2,l1p,l2p,L) << "\n";
-	
-	return 0;
-}
+    
+    cArrays PartialWave_direct
+    (
+        rArray grid,
+        int L, int Pi,
+        int Ni, int Li, double ki,
+        int Nf, int Lf, double kf,
+        int nL, int maxNn, double Enmax,
+        int maxlevel_allowed, int maxlevel_forbidden
+    );
+    
+    cArrays FullTMatrix_direct
+    (
+        rArray grid,
+        int Ni, int Li, double ki,
+        int Nf, int Lf, double kf,
+        int maxNn, int maxLn, double maxEn,
+        int maxlevel_allowed, int maxlevel_forbidden
+    );
+    
+}; /* namespace PWBA2 */
+
+#endif

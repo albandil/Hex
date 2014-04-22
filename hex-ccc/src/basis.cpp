@@ -18,7 +18,7 @@
 #include "matrix.h"
 #include "misc.h"
 #include "moments.h"
-#include "specf.h"
+#include "special.h"
 #include "symbolic.h"
 
 LaguerreBasis::LaguerreBasis (int maxell, const iArrayView Nl, const ArrayView<symbolic::rational> rat_lambda)

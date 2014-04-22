@@ -63,7 +63,7 @@ CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFL
          -mtune=native -march=native
 
 FILES = amplitudes arrays gauss bspline hdffile main input \
-	matrix preconditioners radial slater specf version
+	matrix preconditioners radial slater special version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))

@@ -25,7 +25,7 @@
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
 #include "radial.h"
-#include "specf.h"
+#include "special.h"
 #include "matrix.h"
 
 cArray computeLambda

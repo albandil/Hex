@@ -18,7 +18,7 @@
 
 #include "hydrogen.h"
 #include "misc.h"
-#include "specf.h"
+#include "special.h"
 
 namespace Hydrogen
 {

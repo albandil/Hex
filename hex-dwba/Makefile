@@ -23,7 +23,7 @@ LIBRARY = -lrt -lgsl -lgslcblas $(HDFLIBS)
 CXXFLAGS = $(CXXRILIS)
 LFLAGS = -fPIC $(LIBRARY)
 
-FILES = arrays dwba1 hdffile hydrogen main potential specf \
+FILES = arrays dwba1 hdffile hydrogen main potential special \
         version wave_distort
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))

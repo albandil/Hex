@@ -13,7 +13,7 @@
 #include "arrays.h"
 #include "complex.h"
 #include "radial.h"
-#include "specf.h"
+#include "special.h"
 
 void pwba
 (

@@ -16,7 +16,7 @@
 #include "dwba1.h"
 #include "hydrogen.h"
 #include "gausskronrod.h"
-#include "specf.h"
+#include "special.h"
 #include "wave_distort.h"
 
 namespace DWBA1

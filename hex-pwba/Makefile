@@ -14,7 +14,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 CFLAGS = -g -Wall -std=c++11 -DNO_HDF -DNO_LAPACK -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
 LFLAGS = -g -lgsl -lgslcblas -lcln
 
-FILES = arrays hydrogen pwba radial specf symbolic ui version
+FILES = arrays hydrogen pwba radial special symbolic ui version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

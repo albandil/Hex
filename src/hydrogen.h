@@ -15,7 +15,7 @@
 
 #include <vector>
 
-#include "specf.h"
+#include "special.h"
 
 /// Default range parameter in the Sturmian functions.
 #define DEFAULT_LAMBDA      1

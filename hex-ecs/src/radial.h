@@ -22,7 +22,7 @@
 #include "gauss.h"
 #include "input.h"
 #include "parallel.h"
-#include "specf.h"
+#include "special.h"
 #include "matrix.h"
 
 class weightEdgeDamp

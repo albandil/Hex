@@ -16,7 +16,7 @@
 #include <gsl/gsl_sf.h>
 
 #include "arrays.h"
-#include "specf.h"
+#include "special.h"
 #include "complex.h"
 
 #ifndef NO_LAPACK

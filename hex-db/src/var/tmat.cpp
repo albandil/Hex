@@ -50,6 +50,8 @@ std::vector<std::string> const & TMatrix::SQL_CreateTable() const
             "ell INTEGER, "
             "Re_T_ell DOUBLE PRECISION, "
             "Im_T_ell DOUBLE PRECISION, "
+            "Re_TBorn_ell DOUBLE PRECISION, "
+            "Im_TBorn_ell DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
         ")"
     };

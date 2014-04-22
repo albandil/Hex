@@ -18,7 +18,7 @@
 #include "potential.h"
 #include "romberg.h"
 #include "symbolic.h"
-#include "specf.h"
+#include "special.h"
 
 PotentialMatrix::PotentialMatrix
 (

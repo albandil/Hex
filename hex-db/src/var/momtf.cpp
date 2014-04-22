@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "../specf.h"
+#include "../special.h"
 #include "../interpolate.h"
 #include "../variables.h"
 #include "../version.h"

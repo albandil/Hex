@@ -17,7 +17,7 @@
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../chebyshev.h"
-#include "../specf.h"
+#include "../special.h"
 #include "../variables.h"
 #include "../vec3d.h"
 #include "../version.h"

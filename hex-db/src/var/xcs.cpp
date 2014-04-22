@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "../interpolate.h"
-#include "../specf.h"
+#include "../special.h"
 #include "../variables.h"
 #include "../version.h"
 

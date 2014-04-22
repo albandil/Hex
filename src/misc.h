@@ -17,7 +17,9 @@
 #include <chrono>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <limits>
 
 /**
@@ -187,6 +189,7 @@ template <class T> int signum (T x)
 }
 
 /// Many-argument "min" function.
+//@{
 template <typename T> T mmin (T x)
 {
     return x;
@@ -196,8 +199,10 @@ template <typename T, class ...Params> T mmin (T x, Params ...p)
     T y = mmin(p...);
     return std::min(x, y);
 }
+//@}
 
 /// Many-argument "max" function.
+//@{
 template <typename T> T mmax (T x)
 {
     return x;
@@ -207,6 +212,7 @@ template <typename T, class ...Params> T mmax (T x, Params ...p)
     T y = mmax(p...);
     return std::max(x, y);
 }
+//@}
 
 /// Constant-expression max.
 template <class T> constexpr T const & larger_of (T const & a, T const & b)
@@ -217,7 +223,12 @@ template <class T> constexpr T const & larger_of (T const & a, T const & b)
 /**
  * @brief printf-like formatting.
  * 
- * @note Hard limit 1024 characters.
+ * This function takes an arbitrary number of parameters. It is expected that
+ * the first one is the formatting string (printf-like syntax). All the
+ * arguments are sent to snprintf without change. This functions returns
+ * a pointer to a static character string.
+ * 
+ * @note The maximal size of the string is hard-coded to 1024 characters.
  */
 template <class ...Params> char const * format (Params ...p)
 {
@@ -227,17 +238,124 @@ template <class ...Params> char const * format (Params ...p)
 }
 
 /**
+ * @brief Conversion of string to a type.
+ * 
+ * This is a generic template function that is used to convert a text entry to
+ * the specified data type. This generic form is used only if there is no specialization
+ * for the given data type. The default action is an error message, then.
+ * See the specializations of this function for different types.
+ */
+template <class T> T string_to (std::string str)
+{
+    throw exception
+    (
+        "Conversion to \"%s\" not implemented.", typeid(T).name()
+    );
+}
+
+/**
+ * @brief Conversion of a string to integer number.
+ * 
+ * This function will return an integer value of the text given as argument.
+ * The library routine "strtol" is used. If the conversion fails, the
+ * function throws an exception.
+ */
+template <> inline int string_to (std::string str)
+{
+    // convert to int
+    char* tail; long val = strtol (str.c_str(), &tail, 10);
+    
+    // throw or return
+    if (*tail != 0x0)
+        throw exception ("The string \"%s\" cannot be converted to integer number.", str.c_str());
+    else
+        return val;
+}
+
+/**
+ * @brief Conversion of a string to floating-point number.
+ * 
+ * This function will return a floating-point value of the text given as argument.
+ * The library routine "strtod" is used. If the conversion fails, the
+ * function throws an exception.
+ */
+template <> inline double string_to (std::string str)
+{
+    // convert to float
+    char* tail; double val = strtod (str.c_str(), &tail);
+    
+    // throw or return
+    if (*tail != 0x0)
+        throw exception ("The string \"%s\" cannot be converted to real number.", str.c_str());
+    else
+        return val;
+}
+
+/**
+ * @brief Read next entry from input stream.
+ * 
+ * Given an input stream and a template parameter the function "read_next" will
+ * scan the stream for the next entry and try to interpret next input as the correct type.
+ * The characters between a hash symbol (#) and a newline are ignored (i.e. '#' introduces
+ * comments). If the read word is equal to asterisk, the "true" boolean value is trown.
+ * If an error occurs, @ref exception is thrown. Otherwise the converted data is returned.
+ * 
+   @code
+       // example usage
+       std::ifstream inputfile("input.txt");
+       double x = read_next<double>(inputfile);
+   @endcode
+ */
+template <class T> T read_next (std::ifstream & f)
+{
+    // text buffer
+    std::string s;
+    
+    // while there is something in the file
+    while (not f.eof())
+    {
+        // read string (it won't start with white character)
+        f >> s;
+        
+        // check length (skip empty reads)
+        if (s.size() == 0)
+            continue;
+        
+        // check if it is a beginning of a comment
+        if (s.front() == '#')
+        {
+            // get the rest of the line
+            std::getline(f, s);
+            continue;
+        }
+        
+        // otherwise exit the loop (a valid entry was found)
+        break;
+    }
+    
+    // check for special character; exit if found
+    if (s == "*")
+        throw true;
+    
+    // convert entry to type T
+    T val = string_to<T>(s.c_str());
+    
+    // return
+    return val;
+}
+
+/**
  * @brief Timing class.
  * 
  * The Timer class can be used for a comfortable computation of
  * elapsed time. The usage would be:
- * @code
- *     Timer timer;
- * 
- *     // .. block ...
- * 
- *     std:cout << "Time = " << timer.elapsed() << "secs.\n";
- * @endcode
+   @code
+       Timer timer;
+   
+       // .. block ...
+   
+       std:cout << "Time = " << timer.seconds() << "secs.\n";
+   @endcode
  */
 class Timer
 {

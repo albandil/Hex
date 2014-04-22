@@ -19,7 +19,7 @@
 
 #include "arrays.h"
 #include "pwba.h"
-#include "specf.h"
+#include "special.h"
 #include "version.h"
 
 int main (int argc, char* argv[])
