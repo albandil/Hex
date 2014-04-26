@@ -218,6 +218,111 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
  */
 int coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel = 1e-8);
 
+/**
+ * @brief Faa di Bruno partitioning.
+ * 
+ * The Faa di Bruno partitioning is computed by looping over possible n-tuples
+ * @f[
+ *     (m_1, m_2, \dots, m_n)
+ * @f]
+ * of integers and by picking only such that satisfy the Faa di Bruno's
+ * sum condition
+ * @f[
+ *     1 m_1 + 2 m_2 + \dots + n m_n = n \ .
+ * @f]
+ * The initial trial partitioning is a zero tuple
+ * @f[
+ *     (0, 0, \dots, 0)
+ * @f]
+ * and the further tuples are constructed by incrementing a corresponding
+ * multidigit number, that has a number system varying with the position.
+ * The number system base for the left-most (least significant) position
+ * is @f$ n + 1 @f$, for the next position it is @f$ \lceil (n + 1)/2 \rceil @f$, for the next
+ * it is @f$ \lceil (n + 1)/3 \rceil @f$, etc. For example, if @f$ n = 4 @f$, the increments
+ * are
+ * @f[
+ *     (0, 0, 0, 0), (1, 0, 0, 0), (2, 0, 0, 0), (3, 0, 0, 0), \mathbf{(4, 0, 0, 0)},
+ * @f]
+ * @f[
+ *     (0, 1, 0, 0), (1, 1, 0, 0), (2, 1, 0, 0), \mathbf{(3, 1, 0, 0)}, (4, 1, 0, 0),
+ * @f]
+ * @f[
+ *     (0, 2, 0, 0), (1, 2, 0, 0), \mathbf{(2, 2, 0, 0)}, (3, 2, 0, 0), (4, 2, 0, 0),
+ * @f]
+ * @f[
+ *     (0, 0, 1, 0), \mathbf{(1, 0, 1, 0)}, (2, 0, 1, 0), (3, 0, 1, 0), (4, 0, 1, 0),
+ * @f]
+ * @f[
+ *     (0, 1, 1, 0), (1, 1, 1, 0), (2, 1, 1, 0), (3, 1, 1, 0), (4, 1, 1, 0),
+ * @f]
+ * @f[
+ *     (0, 2, 1, 0), (1, 2, 1, 0), (2, 2, 1, 0), (3, 2, 1, 0), (4, 2, 1, 0),
+ * @f]
+ * @f[
+ *     \mathbf{(0, 0, 0, 1)}, \ \mathrm{etc.}
+ * @f]
+ * Here, the number system are 5, 3, 2 and 2. Only those tuples in bold
+ * satisfy the sum condition and will be returned.
+ * 
+ * This function is needed by the generalized @ref chain_rule.
+ * 
+ * @todo Cache results.
+ */
+std::vector<std::vector<int>> FdB_partition (int n);
+
+/**
+ * @brief Chain rule for n-th derivative.
+ * 
+ * This function implements the Faa di Bruno's formula for
+ * n-th derivative of a nested function,
+ * @f[
+ *     \frac{\mathrm{d}^n}{\mathrm{d}^n x} f(g(x)) =
+ *     \sum \frac{n!}{m_1! 1!^{m_1} m_2! 2!^{m_2} \dots m_n! n!^{m_n}}
+ *     f^{(m_1+m_2+\dots+m_n)}(g(x))
+ *     \prod_{j=1}^n \left(g^{(j)}(x)\right)^{m_j} \ .
+ * @f]
+ * The sum runs over all n-tuples @f$ (m_1, \dots, m_n) @f$ that
+ * satisfy the Faa di Bruno's sum condition
+ * @f[
+ *     1 m_1 + 2 m_2 + \dots + n m_n = n \ .
+ * @f]
+ * Those n-tuples are retrieved from the function @ref FdB_partition.
+ */
+template <class T, class OuterFunctionDerivative, class InnerFunctionDerivative> T chain_rule
+(
+    OuterFunctionDerivative Df,
+    InnerFunctionDerivative Dg,
+    int n,
+    double x
+)
+{
+    // no derivative : evaluate the function
+    if (n == 0)
+        return Df(0,Dg(0,x));
+    
+    // first and higher derivative : use the Faa di Bruno formula
+    T suma = 0, term = 0;
+    for (std::vector<int> & counts : FdB_partition(n))
+    {
+        // evaluate derivative of "f"
+        if ((term = Df(std::accumulate(counts.begin(), counts.end(), 0),Dg(0,x))) == 0)
+            continue;
+        
+        // evaluate all derivatives of "g"
+        for (int j = 1; j <= n; j++)
+        {
+            term *= std::pow(Dg(j,x) / gsl_sf_fact(j), counts[j-1]) / gsl_sf_fact(counts[j-1]);
+            
+            if (term == 0)
+                break;
+        }
+        
+        // update the sum
+        suma += term;
+    }
+    return gsl_sf_fact(n) * suma;
+}
+
 }; // end of namespace "special"
 
 /** Hydrogen radial function (radius-multiplied)

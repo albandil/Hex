@@ -43,7 +43,7 @@ cArrays PWBA2::PartialWave_direct
             continue;
         }
         
-        std::cout << "---------- lf = " << lf << " ----------" << std::endl << std::endl;
+        std::cout << std::endl << "---------- lf = " << lf << " ----------" << std::endl << std::endl;
         
         cArray Tdir_lf ((2*Li+1)*(2*Lf+1));
         

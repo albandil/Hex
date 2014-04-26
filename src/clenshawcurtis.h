@@ -190,7 +190,8 @@ public:
         }
         
         // scaled F
-        auto f = [&](double x) -> FType {
+        auto f = [&](double x) -> FType
+        {
             return F(x1 + 0.5 * (1.0 + x) * (x2 - x1));
         };
         

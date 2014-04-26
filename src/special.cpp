@@ -817,3 +817,36 @@ double Hyper2F1 (double a, double b, double c, double x)
              + std::pow(-x,-b)*std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(a-b) - gsl_sf_lngamma(a) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(b-c+1,b,b-a+1,w);
     }
 }
+
+std::vector<std::vector<int>> FdB_partition (int n)
+{
+    // all conformant partitionings
+    std::vector<std::vector<int>> partgs;
+    
+    // current partitioning (possibly violating the condition)
+    std::vector<int> partg(n, 0);
+    
+    do
+    {
+        // increment the partitioning
+        for (int digit = 0; digit < n; digit++)
+        {
+            if ((digit + 1) * (++partg[digit]) <= n)
+                break;
+            else
+                partg[digit] = 0;
+        }
+        
+        // compute Faa di Bruno sum
+        int suma = 0;
+        for (int i = 0; i < n; i++)
+            suma += (i + 1) * partg[i];
+        
+        // check the condition
+        if (suma == n)
+            partgs.push_back(partg);
+    }
+    while (partg.back() == 0); // stop at the partitioning (0,0,...,1)
+    
+    return partgs;
+}
