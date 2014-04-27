@@ -10,6 +10,9 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <gsl/gsl_interp.h>
+#include <gsl/gsl_spline.h>
+
 #include "arrays.h"
 #include "complex.h"
 #include "gausskronrod.h"
@@ -318,6 +321,7 @@ Complex Idir_allowed
     }
     
     // forward partial trapezoidal sum (for low integral)
+    /*
     double prev = 0., curr = inner_lower[1];
     inner_lower[0] = 0.;
     inner_lower[1] = 0.5 * (curr + prev);
@@ -326,8 +330,19 @@ Complex Idir_allowed
         prev = curr; curr = inner_lower[i];
         inner_lower[i] = inner_lower[i-1] + 0.5 * (curr + prev);
     }
+    */
+    {
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), inner_lower.data(), N);
+        
+        # pragma omp parallel for
+        for (size_t i = 0; i < N; i++)
+            inner_lower[i] = gsl_spline_eval_integ (spline, grid.front(), grid[i], acc);
+    }
     
     // reverse partial trapezoidal sums (for high integral)
+    /*
     double prevRe = inner_higher_re[N-1], currRe = inner_higher_re[N-2];
     double prevIm = inner_higher_im[N-1], currIm = inner_higher_im[N-2];
     inner_higher_re[N-1] = 0.; inner_higher_re[N-2] = 0.5 * (currRe + prevRe);
@@ -339,15 +354,52 @@ Complex Idir_allowed
         inner_higher_re[N-i-1] = inner_higher_re[N-i] + 0.5 * (currRe + prevRe);
         inner_higher_im[N-i-1] = inner_higher_im[N-i] + 0.5 * (currIm + prevIm);
     }
+    */
+    {
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), inner_higher_re.data(), N);
+        
+        # pragma omp parallel for
+        for (size_t i = 0; i < N; i++)
+            inner_higher_re[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
+    }
+    {
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), inner_higher_im.data(), N);
+        
+        # pragma omp parallel for
+        for (size_t i = 0; i < N; i++)
+            inner_higher_im[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
+    }
     
     rArray outer_re(N), outer_im(N);
     double sum_outer_re = 0, sum_outer_im = 0;
     
+    /*
     # pragma omp parallel for reduction (+:sum_outer_re,sum_outer_im)
     for (size_t i = 1; i < N; i++)
     {
         sum_outer_re += Vfn[i] * jf[i] * (inner_lower[i] * yn[i] + inner_higher_re[i] * jn[i]);
         sum_outer_im += Vfn[i] * jf[i] * (inner_lower[i] * jn[i] + inner_higher_im[i] * jn[i]);
+    }
+    */
+    outer_re = Vfn * jf * (inner_lower * yn + inner_higher_re * jn);
+    outer_im = Vfn * jf * (inner_lower * jn + inner_higher_im * jn);
+    {
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), outer_re.data(), N);
+        
+        sum_outer_re = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
+    }
+    {
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), outer_im.data(), N);
+        
+        sum_outer_im = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
     }
     
     return Complex (sum_outer_re, sum_outer_im) * h * h;
