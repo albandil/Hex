@@ -106,6 +106,82 @@ rArray interpolate_bound_bound_potential
     return V;
 }
 
+rArray interpolate_bound_free_potential_1
+(
+    rArray const & x,
+    int lambda,
+    int Na, int La, double Kb, int Lb
+)
+{
+    // array of bound-free potential evaluations
+    unsigned N = x.size();
+    rArray V (N);
+    
+    // precompute both free and bound state
+    rArray P (N), F(N);
+    # pragma omp parallel for
+    for (int i = 1; i < N; i++)
+    {
+        P[i] = Hydrogen::P(Na,La,x[i]);
+        F[i] = Hydrogen::F(Kb,Lb,x[i]);
+    }
+    
+    // compute the integrals
+    if (lambda == 0)
+    {
+        rArray integrand1(N), integrand2(N);
+        # pragma omp parallel for
+        for (int i = 1; i < N; i++)
+        {
+            integrand1[i] = P[i] * F[i] / x[i];
+            integrand2[i] = P[i] * F[i];
+        }
+        
+        gsl_interp_accel * acc1 = gsl_interp_accel_alloc ();
+        gsl_spline * spline1 = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline1, x.data(), integrand1.data(), N);
+        
+        gsl_interp_accel * acc2 = gsl_interp_accel_alloc ();
+        gsl_spline * spline2 = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline2, x.data(), integrand2.data(), N);
+        
+        # pragma omp parallel for schedule (dynamic)
+        for (size_t i = 1; i < N; i++)
+        {
+            V[i] = gsl_spline_eval_integ (spline1, x[i], x.back(), acc1)
+                 - gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) / x[i];
+        }
+    }
+    else
+    {
+        rArray integrand1(N), integrand2(N);
+        # pragma omp parallel for
+        for (int i = 1; i < N; i++)
+        {
+            integrand1[i] = P[i] * F[i] * std::pow(x[i],lambda);
+            integrand2[i] = P[i] * F[i] * std::pow(x[i],-lambda-1);
+        }
+        
+        gsl_interp_accel * acc1 = gsl_interp_accel_alloc ();
+        gsl_spline * spline1 = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline1, x.data(), integrand1.data(), N);
+        
+        gsl_interp_accel * acc2 = gsl_interp_accel_alloc ();
+        gsl_spline * spline2 = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline2, x.data(), integrand2.data(), N);
+        
+        # pragma omp parallel for schedule (dynamic)
+        for (size_t i = 1; i < N; i++)
+        {
+            V[i] = gsl_spline_eval_integ (spline1, 0., x[i], acc1) * std::pow(x[i],-lambda-1)
+                 + gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) * std::pow(x[i],lambda);
+        }
+    }
+    
+    // return the array of evaluations
+    return V;
+}
+
 rArray interpolate_bound_free_potential
 (
     rArray const & x,
@@ -402,7 +478,8 @@ Complex Idir_allowed
         sum_outer_im = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
     }
     
-    return Complex (sum_outer_re, sum_outer_im) * h * h;
+//     return Complex (sum_outer_re, sum_outer_im) * h * h;
+    return Complex (sum_outer_re, sum_outer_im);
 }
 
 double Idir_forbidden
