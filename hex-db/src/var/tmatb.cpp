@@ -19,25 +19,25 @@
 #include "../variables.h"
 #include "../version.h"
 
-const std::string TMatrix::Id = "tmat";
-const std::string TMatrix::Description = "T-matrix.";
-const std::vector<std::string> TMatrix::Dependencies = {
+const std::string TMatrixB::Id = "tmatb";
+const std::string TMatrixB::Description = "Born T-matrix.";
+const std::vector<std::string> TMatrixB::Dependencies = {
     "ni", "li", "mi", 
     "nf", "lf", "mf",
     "L", "S",
     "Ei", "ell"
 };
-const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
+const std::vector<std::string> TMatrixB::VecDependencies = { "Ei" };
 
-bool TMatrix::initialize (sqlitepp::session & db) const
+bool TMatrixB::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & TMatrix::SQL_CreateTable () const
+std::vector<std::string> const & TMatrixB::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + TMatrix::Id + "' ("
+        "CREATE TABLE '" + TMatrixB::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -56,13 +56,13 @@ std::vector<std::string> const & TMatrix::SQL_CreateTable () const
     return cmd;
 }
 
-std::vector<std::string> const & TMatrix::SQL_Update () const
+std::vector<std::string> const & TMatrixB::SQL_Update () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-bool TMatrix::run
+bool TMatrixB::run
 (
     sqlitepp::session & db,
     std::map<std::string,std::string> const & sdata,
@@ -104,7 +104,7 @@ bool TMatrix::run
     
     // create query statement
     sqlitepp::statement st(db);
-    st << "SELECT Ei, Re_T_ell, Im_T_ell FROM " + TMatrix::Id + " "
+    st << "SELECT Ei, Re_T_ell, Im_T_ell FROM " + TMatrixB::Id + " "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "

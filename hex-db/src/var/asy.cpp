@@ -23,7 +23,8 @@
 
 
 /* * * * * * * * * * * * * * External prototypes * * * * * * * * * * * * * * */
-rArray differential_cross_section (
+rArray differential_cross_section
+(
     sqlitepp::session & db,
     int ni, int li, int mi,
     int nf, int lf, int mf,
@@ -42,28 +43,30 @@ const std::vector<std::string> SpinAsymmetry::Dependencies = {
 };
 const std::vector<std::string> SpinAsymmetry::VecDependencies = { "theta" };
 
-bool SpinAsymmetry::initialize(sqlitepp::session & db) const
+bool SpinAsymmetry::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & SpinAsymmetry::SQL_CreateTable() const
+std::vector<std::string> const & SpinAsymmetry::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-std::vector<std::string> const & SpinAsymmetry::SQL_Update() const
+std::vector<std::string> const & SpinAsymmetry::SQL_Update () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-bool SpinAsymmetry::run (
+bool SpinAsymmetry::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double afactor = change_units(Aunits, aUnit_rad);

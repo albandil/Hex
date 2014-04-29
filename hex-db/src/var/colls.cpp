@@ -34,23 +34,25 @@ bool CollisionStrength::initialize(sqlitepp::session & db) const
     return true;
 }
 
-std::vector<std::string> const & CollisionStrength::SQL_CreateTable() const
+std::vector<std::string> const & CollisionStrength::SQL_CreateTable () const
 {
     static std::vector<std::string> cmd;
     return cmd;
 }
 
-std::vector<std::string> const & CollisionStrength::SQL_Update() const
+std::vector<std::string> const & CollisionStrength::SQL_Update () const
 {
     static std::vector<std::string> cmd;
     return cmd;
 }
 
-bool CollisionStrength::run (
+bool CollisionStrength::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
 //     double lfactor = change_units(lUnit_au, Lunits);

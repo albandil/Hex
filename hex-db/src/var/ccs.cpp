@@ -28,12 +28,12 @@ const std::vector<std::string> CompleteCrossSection::Dependencies = {
 };
 const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 
-bool CompleteCrossSection::initialize(sqlitepp::session & db) const
+bool CompleteCrossSection::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable () const
 {
     static std::vector<std::string> cmd = {
         "CREATE TABLE '" + CompleteCrossSection::Id + "' ("
@@ -52,7 +52,7 @@ std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable() const
     return cmd;
 }
     
-std::vector<std::string> const & CompleteCrossSection::SQL_Update() const
+std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
 {
     static std::vector<std::string> cmd = {
         "INSERT OR REPLACE INTO '" + CompleteCrossSection::Id + "' "
@@ -64,11 +64,13 @@ std::vector<std::string> const & CompleteCrossSection::SQL_Update() const
     return cmd;
 }
 
-bool CompleteCrossSection::run (
+bool CompleteCrossSection::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);

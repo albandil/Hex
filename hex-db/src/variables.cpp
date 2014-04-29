@@ -19,6 +19,7 @@
 VariableList::VariableList () :
     list ({
         new TMatrix,
+        new TMatrixB,
         new ScatteringAmplitude,
         new DifferentialCrossSection,
         new IntegralCrossSection,
@@ -28,6 +29,7 @@ VariableList::VariableList () :
         new MomentumTransfer,
         new TotalCrossSection,
         new IonizationF,
+        new BornFullTMatrix,
         new IonizationAmplitude,
         new TripleDifferentialCrossSection,
         new StokesParameters,

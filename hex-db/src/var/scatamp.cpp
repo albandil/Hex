@@ -33,78 +33,16 @@ bool ScatteringAmplitude::initialize(sqlitepp::session & db) const
     return true;
 }
 
-std::vector<std::string> const & ScatteringAmplitude::SQL_Update() const
+std::vector<std::string> const & ScatteringAmplitude::SQL_Update () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable() const
+std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
-}
-
-cArray Born_direct_scattering_amplitude (int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
-{
-    // form-factors for all given angles
-    cArray ffactor (angles.size());
-    
-    // initial momentum
-    if (E < 0)
-        return ffactor;
-    double ki = sqrt(E);
-    
-    // final momentum
-    if (E < 1./(ni*ni) - 1./(nf*nf))
-        return ffactor;
-    double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
-    
-    // transferred momentum for all given angles
-    rArray qsqr = ki*ki + kf*kf - 2.*ki*kf*cos(angles);
-    rArray q = sqrt(qsqr);
-    rArray zeta = asin(kf * sin(angles) / q);
-    
-    // for all transferred angular momenta
-    int lmin = std::abs(li-lf), lmax = li+lf;
-    for (int l = lmin; l <= lmax; l++)
-    {
-        // for all transferred linear momenta
-        for (int iang = 0; iang < (int)angles.size(); iang++)
-        {
-            // radial integral
-            double g = 0;
-            
-            // for all terms of the Laguerre polynomials
-            for (int i = 0; i < ni - li - 1; i++)
-            for (int f = 0; f < nf - lf - 1; f++)
-            {
-                double k = q[iang];       // transferred linear momentum
-                double sign = (((i + f) % 2 == 0) ? 1 : -1);
-                double factor = sqrt(0.5 * M_PI / k) * 0.25 * std::pow(2./ni,li+2+i) * std::pow(2./nf,lf+2+f) *
-                    std::sqrt(gsl_sf_fact(ni-li-1)*gsl_sf_fact(ni+li)*gsl_sf_fact(nf-lf-1)*gsl_sf_fact(nf+lf)) /
-                    (gsl_sf_fact(ni-li-1-i)*gsl_sf_fact(2*li+1+i)*gsl_sf_fact(nf-lf-1-f)*gsl_sf_fact(2*lf+1+f)*
-                    gsl_sf_fact(i)*gsl_sf_fact(f));
-                double a = -1./nf -1./ni; // exponent from exp(-ar)
-                double b = li+lf+1.5+i+f; // exponent from r^b
-                double n = l + 0.5;       // Bessel function degree
-                double hyper = Hyper2F1(0.5*(b+n+1), 0.5*(b+n+2), n+1, -(k*k)/(a*a));
-                double integral = std::pow(0.5*k,n) * std::exp(gsl_sf_lngamma(b+n+1) - gsl_sf_lngamma(n+1) - (b+n+1)*log(a)) * hyper;
-                
-                g += sign * factor * integral;
-            }
-            
-            // add contribution to the whole form-factor
-            ffactor[iang] += 4 * M_PI * std::pow(Complex(0.,1.),l) * Gaunt(li,mi,lf,mf,l,mi-mf) * sphY(l,mi-mf,zeta[iang],0) * g;
-        }
-    }
-    
-    // add "no scattering" contribution in elastic case
-    if (ni == nf and li == lf and mi == mf)
-        ffactor -= 1.;
-    
-    // return the result
-    return -2. * ffactor / qsqr;
 }
 
 cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
@@ -195,11 +133,13 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
     return amplitudes;
 }
 
-bool ScatteringAmplitude::run (
+bool ScatteringAmplitude::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);

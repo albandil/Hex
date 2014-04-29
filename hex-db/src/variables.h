@@ -175,9 +175,11 @@ public:
     virtual bool initialize (sqlitepp::session & db) const = 0;
     
     /// write out requested data
-    virtual bool run (
+    virtual bool run
+    (
         sqlitepp::session & db,
-        std::map<std::string,std::string> const & params
+        std::map<std::string,std::string> const & params,
+        bool subtract_born
     ) const = 0;
 };
 
@@ -234,31 +236,36 @@ private:
 { \
     public: \
 \
-        bool initialize(sqlitepp::session & db) const; \
+        bool initialize (sqlitepp::session & db) const; \
 \
         static const std::string Id; \
-        std::string const & id() const { return Id; } \
+        std::string const & id () const { return Id; } \
 \
         static const std::string Description; \
-        std::string const & description() const { return Description; } \
+        std::string const & description () const { return Description; } \
 \
         static const std::vector<std::string> Dependencies; \
-        std::vector<std::string> const & deps() const { return Dependencies; } \
+        std::vector<std::string> const & deps () const { return Dependencies; } \
 \
         static const std::vector<std::string> VecDependencies; \
-        std::vector<std::string> const & vdeps() const { return VecDependencies; } \
+        std::vector<std::string> const & vdeps () const { return VecDependencies; } \
 \
-        std::vector<std::string> const & SQL_CreateTable() const; \
-        std::vector<std::string> const & SQL_Update() const; \
+        std::vector<std::string> const & SQL_CreateTable () const; \
+        std::vector<std::string> const & SQL_Update () const; \
 \
-        bool run ( \
+        bool run \
+        ( \
             sqlitepp::session & db, \
-            std::map<std::string,std::string> const & params \
+            std::map<std::string,std::string> const & params, \
+            bool subtract_born \
         ) const; \
 };
 
 /// Create class for T-matrix (tmat)
 AddNewVariableClass(TMatrix);
+
+/// Create class for Born T-matrix (tmatb)
+AddNewVariableClass(TMatrixB);
 
 /// Create class for scattering amplitude (scatamp)
 AddNewVariableClass(ScatteringAmplitude);
@@ -286,6 +293,9 @@ AddNewVariableClass(TotalCrossSection);
 
 /// Create class for ionization amplitude radial part (ionf)
 AddNewVariableClass(IonizationF);
+
+/// Create class for the angle dependent full second Born T-matrix (bornf)
+AddNewVariableClass(BornFullTMatrix);
 
 /// Create class for ionization amplitude (ionamp)
 AddNewVariableClass(IonizationAmplitude);

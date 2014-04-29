@@ -19,52 +19,51 @@
 #include "../arrays.h"
 #include "../interpolate.h"
 #include "../chebyshev.h"
+#include "../special.h"
 #include "../variables.h"
 #include "../vec3d.h"
 #include "../version.h"
 
-const std::string IonizationF::Id = "ionf";
-const std::string IonizationF::Description = "Ionization amplitude radial part.";
-const std::vector<std::string> IonizationF::Dependencies = {
+const std::string BornFullTMatrix::Id = "bornf";
+const std::string BornFullTMatrix::Description = "Full second Born T-matrix (angle dependent).";
+const std::vector<std::string> BornFullTMatrix::Dependencies = {
     "ni", "li", "mi", 
-    "L", "S",
-    "Ei", "l1", "l2",
-    "Eshare"
+    "nf", "lf", "mf", 
+    "Ei", "theta"
 };
-const std::vector<std::string> IonizationF::VecDependencies = { "Eshare" };
+const std::vector<std::string> BornFullTMatrix::VecDependencies = { "theta" };
 
-bool IonizationF::initialize (sqlitepp::session & db) const
+bool BornFullTMatrix::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & IonizationF::SQL_CreateTable () const
+std::vector<std::string> const & BornFullTMatrix::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + IonizationF::Id + "' ("
+        "CREATE TABLE '" + BornFullTMatrix::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
-            "L  INTEGER, "
-            "S  INTEGER, "
+            "nf INTEGER, "
+            "lf INTEGER, "
+            "mf INTEGER, "
             "Ei DOUBLE PRECISION, "
-            "l1 INTEGER, "
-            "l2 INTEGER, "
             "cheb BLOB, "
-            "PRIMARY KEY (ni,li,mi,L,S,Ei,l1,l2)"
+            "PRIMARY KEY (ni,li,mi,nf,lf,mf,Ei)"
         ")"
     };
     
     return cmd;
 }
 
-std::vector<std::string> const & IonizationF::SQL_Update () const
+std::vector<std::string> const & BornFullTMatrix::SQL_Update () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-bool IonizationF::run
+bool BornFullTMatrix::run
 (
     sqlitepp::session & db,
     std::map<std::string,std::string> const & sdata,
@@ -79,18 +78,17 @@ bool IonizationF::run
     int ni = As<int>(sdata, "ni", Id);
     int li = As<int>(sdata, "li", Id);
     int mi = As<int>(sdata, "mi", Id);
-    int  L = As<int>(sdata,  "L", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    int l1 = As<int>(sdata, "l1", Id);
-    int l2 = As<int>(sdata, "l2", Id);
+    int nf = As<int>(sdata, "nf", Id);
+    int lf = As<int>(sdata, "lf", Id);
+    int mf = As<int>(sdata, "mf", Id);
     double Ei = As<double>(sdata, "Ei", Id) * efactor;
     
-    // read energy sharing (in user units)
-    rArray Eshare;
+    // read scattering angle (in user units)
+    rArray angles;
     try {
-        Eshare.push_back(As<double>(sdata, "Eshare", Id));
+        angles.push_back(As<double>(sdata, "theta", Id));
     } catch (std::exception e) {
-        Eshare = readStandardInput<double>();
+        angles = readStandardInput<double>();
     }
     
     // energy and encoded Chebyshev approximation
@@ -99,20 +97,18 @@ bool IonizationF::run
     
     // create query statement
     sqlitepp::statement st(db);
-    st << "SELECT Ei, QUOTE(cheb) FROM " + IonizationF::Id + " "
+    st << "SELECT Ei, QUOTE(cheb) FROM " + BornFullTMatrix::Id + " "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
-          "  AND  L = :L  "
-          "  AND  S = :S  "
-          "  AND l1 = :l1 "
-          "  AND l2 = :l2 "
+          "  AND nf = :nf "
+          "  AND lf = :lf "
+          "  AND mf = :mf "
           "ORDER BY Ei ASC",
           
        sqlitepp::into(E), sqlitepp::into(blob),
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-       sqlitepp::use(L), sqlitepp::use(S),
-       sqlitepp::use(l1), sqlitepp::use(l2);
+       sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
     
     // get Chebyshev expansions
     rArray E_arr;
@@ -131,9 +127,9 @@ bool IonizationF::run
         (
             Chebyshev<double,Complex>
             (
-                cb,                   // expansion coefficients
-                0.,                   // lowest energy
-                sqrt(E - 1./(ni*ni))  // highest energy
+                cb,                         // expansion coefficients
+                0.,                         // smallest angle
+                special::constant::pi_half  // largest angle
             )
         );
     }
@@ -142,41 +138,35 @@ bool IonizationF::run
     if (E_arr.empty())
         return true;
     
-    // for all energy shares
-    cArray f_out(Eshare.size());
-    for (size_t i = 0; i < Eshare.size(); i++)
+    // for all angles
+    cArray T_out(angles.size());
+    for (size_t i = 0; i < angles.size(); i++)
     {
-        // initialize k₁ and k₂ so that
-        //   1) (k₁)² + (k₂)² = Ei
-        //   2) (k₁)² / (k₂)² = Eshare / (1 - Eshare)
-        rArray k1 = sqrt((E_arr - 1./(ni*ni)) * Eshare[i]);
-        rArray k2 = sqrt((E_arr - 1./(ni*ni)) * (1 - Eshare[i]));
-        
-        // for all impact energies evaluate the radial part
-        cArray f0(E_arr.size());
+        // for all impact energies evaluate the T-matrix
+        cArray Ti(E_arr.size());
         for (size_t ie = 0; ie < E_arr.size(); ie++)
-            f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
+            Ti[ie] = cheb_arr[ie].clenshaw(angles[i], cheb_arr[ie].tail(1e-8));
         
         // interpolate
-        f_out[i] = interpolate(E_arr, f0, { Ei })[0];
+        T_out[i] = interpolate(E_arr, Ti, { Ei })[0];
     }
     
     // write out
     std::cout << logo() <<
-        "# Ionization amplitudes (radial part) in " << unit_name(Lunits) << " for\n" <<
+        "# Born T-matrix in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     L = " << L << ", S = " << S << ", ℓ₁ = " << l1 << ", ℓ₂ = " << l2 << "\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "# and impact energy\n" <<
         "#     Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
-        "# ordered by energy share " << 
+        "# ordered by angle in " << unit_name(Aunits) <<
         "# \n" <<
-        "# Eshare\t Re f\t Im f\n";
-    for (size_t i = 0; i < Eshare.size(); i++)
+        "# angle\t Re TB\t Im TB\n";
+    for (size_t i = 0; i < angles.size(); i++)
     {
         std::cout << 
-            Eshare[i] << "\t" << 
-            f_out[i].real()*lfactor << "\t" <<
-            f_out[i].imag()*lfactor << "\n";
+            angles[i] << "\t" << 
+            T_out[i].real()*lfactor << "\t" <<
+            T_out[i].imag()*lfactor << "\n";
     }
     
     return true;

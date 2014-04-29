@@ -28,7 +28,7 @@
 // custom function for evaluation of square root within a SQL statement
 //
 
-void db_sqrt(sqlite3_context* pdb, int n, sqlite3_value** val)
+void db_sqrt (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     sqlite3_result_double(pdb, sqrt(sqlite3_value_double(*val)));
 }
@@ -38,7 +38,7 @@ void db_sqrt(sqlite3_context* pdb, int n, sqlite3_value** val)
 // expansion of the ionization amplitude
 //
 
-void db_ioncs(sqlite3_context* pdb, int n, sqlite3_value** val)
+void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
     // get blob data as text; reinterpret_cast is save as we are using
     // the low ASCII only
@@ -82,13 +82,14 @@ const std::vector<std::string> IntegralCrossSection::Dependencies = {
 };
 const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 
-bool IntegralCrossSection::initialize(sqlitepp::session & db) const
+bool IntegralCrossSection::initialize (sqlitepp::session & db) const
 {
     //
     // define SQRT function
     //
     
-    sqlite3_create_function (
+    sqlite3_create_function
+    (
         db.impl(),
         "sqrt",
         1,              // pass single argument
@@ -103,7 +104,8 @@ bool IntegralCrossSection::initialize(sqlitepp::session & db) const
     // define Gauss-Chebyshev integration of squared Chebyshev expansion
     //
     
-    sqlite3_create_function (
+    sqlite3_create_function
+    (
         db.impl(),
         "ioncs",
         1,              // pass single argument
@@ -117,7 +119,7 @@ bool IntegralCrossSection::initialize(sqlitepp::session & db) const
     return true;
 }
 
-std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
         "CREATE TABLE '" + IntegralCrossSection::Id + "' ("
@@ -131,7 +133,6 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
             "S  INTEGER, "
             "Ei DOUBLE PRECISION, "
             "sigma DOUBLE PRECISION, "
-//             "sigmaB DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
         ")"
     };
@@ -139,7 +140,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable() const
     return cmd;
 }
 
-std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
+std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
 {
     static const std::vector<std::string> cmd = {
         
@@ -163,11 +164,13 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update() const
     return cmd;
 }
 
-bool IntegralCrossSection::run (
+bool IntegralCrossSection::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);

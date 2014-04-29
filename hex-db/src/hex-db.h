@@ -22,20 +22,23 @@
 #include "interfaces.h"
 
 /// Energy units
-enum eUnit {
+enum eUnit
+{
     eUnit_Ry,    // Rydberg (13.605692 eV, default)
     eUnit_au,    // Hartree (2 Ry)
     eUnit_eV    // electron-Volt
 };
 
 /// Output (length) units
-enum lUnit {
+enum lUnit
+{
     lUnit_au,    // atomic units (Bohr radius a₀=5.29x10⁻⁹ cm)
     lUnit_cgs    // centimeters (1 cm = (1cm/a₀) a₀)
 };
 
 // Angular units
-enum aUnit {
+enum aUnit
+{
     aUnit_deg,    // degrees
     aUnit_rad    // radians
 };
@@ -48,9 +51,11 @@ extern aUnit Aunits;
 /**
  * Run the computations.
  */
-int run (
+int run
+(
     std::vector<std::string> const & vars,
-    std::map<std::string,std::string> const & sdata
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
 );
 
 #endif

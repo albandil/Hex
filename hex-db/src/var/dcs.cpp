@@ -32,24 +32,24 @@ const std::vector<std::string> DifferentialCrossSection::Dependencies = {
 };
 const std::vector<std::string> DifferentialCrossSection::VecDependencies = { "theta" };
 
-bool DifferentialCrossSection::initialize(sqlitepp::session & db) const
+bool DifferentialCrossSection::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & DifferentialCrossSection::SQL_CreateTable() const
+std::vector<std::string> const & DifferentialCrossSection::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-std::vector<std::string> const & DifferentialCrossSection::SQL_Update() const
+std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
 }
 
-rArray differential_cross_section(sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
+rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
 {
     // the scattering amplitudes
     rArray dcs(angles.size());
@@ -121,11 +121,13 @@ rArray differential_cross_section(sqlitepp::session & db, int ni, int li, int mi
     return dcs * kf * (2.*S + 1.) / (16 * M_PI * M_PI * ki);
 }
 
-bool DifferentialCrossSection::run (
+bool DifferentialCrossSection::run
+(
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const {
-    
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
+) const
+{
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);

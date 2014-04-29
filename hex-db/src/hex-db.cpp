@@ -300,9 +300,11 @@ void dump (const char* dumpfile)
     }
 }
 
-int run (
+int run
+(
     std::vector<std::string> const & vars,
-    std::map<std::string,std::string> const & sdata
+    std::map<std::string,std::string> const & sdata,
+    bool subtract_born
 )
 {
     // for all requested variables (mostly there will be just one)
@@ -319,7 +321,7 @@ int run (
         }
         
         // try to compute the results
-        if (not var->run(db, sdata))
+        if (not var->run(db, sdata, subtract_born))
         {
             // this can easily happen
             throw exception ("Computation of \"%s\" failed.", varname.c_str());

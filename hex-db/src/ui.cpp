@@ -29,6 +29,7 @@ const std::string HelpText =
     "  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
     "  --optimize        Execute VACUUM command, i.e. minimize the occupied space.\n"
     "  --avail           Print out available data.\n"
+    "  --subtract-born   Use second Born subtraction for faster partial wave convergence (needs Born data).\n"
     "  --<var>           Compute/retrieve scattering variable <var>.\n"
     "  --vars            Display all available scattering variables.\n"
     "  --<param> <val>   Set scattering parameter <param> to the value <val>.\n"
@@ -82,6 +83,7 @@ int main(int argc, char* argv[])
     std::string dbname = "hex.db", sqlfile, dumpfile;
     bool create_new = false, doupdate = false, doimport = false;
     bool dooptimize = false, doavail = false;
+    bool subtract_born = false;
     
     // scattering variables to compute
     std::vector<std::string> vars;
@@ -123,13 +125,14 @@ int main(int argc, char* argv[])
                 std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
                 for (std::string v : (*it)->deps())
                     std::cout << v << " ";
-                std::cout << "\n\nof that one of the following can be read from the standard input:\n\n\t";
+                std::cout << "\n\nof which one of the following can be read from the standard input:\n\n\t";
                 for (std::string v : (*it)->vdeps())
                     std::cout << v << " ";
                 std::cout << "\n\n";
             }
             return true;
         },
+        "subtract-born", "B", 0, [ & ](std::string opt) -> bool { subtract_born = true; return true; },
         "Eunits", "", 1, [ & ](std::string opt) -> bool { 
             if (opt == std::string("Ry"))
                 Eunits = eUnit_Ry;
@@ -236,5 +239,5 @@ int main(int argc, char* argv[])
         return 0;
     
     // retrieve all requested data
-    return run (vars, sdata);
+    return run (vars, sdata, subtract_born);
 }
