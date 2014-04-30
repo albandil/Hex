@@ -485,7 +485,7 @@ int coul_F (int l, double k, double r, double& F, double& Fp)
     }
     
     // if the precision is insufficent, use uniform approximation
-    // 	if (err == GSL_ELOSS)
+    //  if (err == GSL_ELOSS)
     {
         err = coul_F_michel(l, k, r, F, Fp);
         return err;
@@ -497,7 +497,7 @@ int coul_F (int l, double k, double r, double& F, double& Fp)
 
 double coul_F_sigma (int l, double k)
 {
-    // 	return arg(gamma(Complex(l+1,-1./k)));
+    // return arg(gamma(Complex(l+1,-1./k)));
     
     gsl_sf_result lnr, arg;
     int err = gsl_sf_lngamma_complex_e(l+1, -1/k, &lnr, &arg);
@@ -510,10 +510,9 @@ double coul_F_sigma (int l, double k)
 
 double coul_F_asy (int l, double k, double r, double sigma)
 {
-    if (std::isfinite(sigma))
-        return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + sigma);
-    else
-        return sqrt(M_2_PI)/k * sin(k*r - 0.5*l*M_PI + log(2*k*r)/k + coul_F_sigma(l,k));
+    sigma = (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
+    
+    return std::sin(k*r - l*special::constant::pi_half + std::log(2.*k*r)/k + sigma);
 }
 
 bool makes_triangle (int two_j1, int two_j2, int two_j3)
@@ -630,13 +629,15 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
     double d4 = logdelta (two_j2, two_j4, two_j6);
     
     // determine sum bounds
-    int kmin = mmax (
+    int kmin = mmax
+    (
         two_j1 + two_j2 + two_j3,
         two_j1 + two_j5 + two_j6,
         two_j2 + two_j4 + two_j6,
         two_j3 + two_j4 + two_j5
     ) / 2;
-    int kmax = mmin (
+    int kmax = mmin
+    (
         two_j1 + two_j2 + two_j4 + two_j5,
         two_j1 + two_j3 + two_j4 + two_j6,
         two_j2 + two_j3 + two_j5 + two_j6
@@ -647,7 +648,8 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
     for (int k = kmin; k <= kmax; k++)
     {
         // compute the new term
-        double Term = exp (
+        double Term = std::exp
+        (
               d1 + d2 + d3 + d4
             + lgamma (2 + k)
             - lgamma (1 + k + (- two_j1 - two_j2 - two_j3) / 2)

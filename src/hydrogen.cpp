@@ -166,25 +166,28 @@ double F (double k, int l, double r, double sigma)
     if (r == 0.)
         return 0.;
     
-    //normalization
+    // normalization
     double norm = special::constant::sqrt_two / (k * special::constant::pi_sqrt);
     
     // some local variables
-    double F, exp_F;
+    double F, exp_F, Fp;
+    int err;
     
     // evaluate the function
-    int err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F);
-    
-    // evaluation succeeded
-    if (err == GSL_SUCCESS)
+    if ((err = gsl_sf_coulomb_wave_F_array (l, 0, -1./k, k*r, &F, &exp_F)) == GSL_SUCCESS)
         return norm * F;
-        
-    // evaluation failed            
-    if (k * r > 1)
-    {
-        // probably due to "iteration process out of control" for large radii
-        return coul_F_asy (l, k, r, (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k)));
-    }
+    
+//     // evaluation failed in asymptotic region ?
+//     if (k * r > 1)
+//     {
+//         // probably due to "iteration process out of control" for large radii
+//         return norm * coul_F_asy (l, k, r, (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k)));
+//     }
+//     
+//     // evaluation failed in classically forbidden region
+    // -> use uniform WKB approximation by Michel
+    if ((err = coul_F_michel (l, k, r, F, Fp)) == GSL_SUCCESS)
+        return norm * F;
     
     // some other problem
     throw exception
