@@ -50,8 +50,7 @@ std::vector<std::string> const & TripleDifferentialCrossSection::SQL_Update () c
 bool TripleDifferentialCrossSection::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units

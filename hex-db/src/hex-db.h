@@ -54,8 +54,7 @@ extern aUnit Aunits;
 int run
 (
     std::vector<std::string> const & vars,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 );
 
 #endif

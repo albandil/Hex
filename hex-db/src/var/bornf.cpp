@@ -66,8 +66,7 @@ std::vector<std::string> const & BornFullTMatrix::SQL_Update () const
 bool BornFullTMatrix::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units

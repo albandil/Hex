@@ -30,7 +30,7 @@
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
  */
-double change_units(eUnit A, eUnit B);
+double change_units (eUnit A, eUnit B);
 
 /**
  * @brief Lengths units change.
@@ -38,7 +38,7 @@ double change_units(eUnit A, eUnit B);
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
  */
-double change_units(lUnit A, lUnit B);
+double change_units (lUnit A, lUnit B);
 
 /**
  * @brief Angular units change.
@@ -46,28 +46,28 @@ double change_units(lUnit A, lUnit B);
  * Returns factor that can be used to transform from the unit system A
  * to the unit system B.
  */
-double change_units(aUnit A, aUnit B);
+double change_units (aUnit A, aUnit B);
 
 /**
  * @brief Energy unit name.
  * 
  * Return energy unit name as string.
  */
-std::string unit_name(eUnit u);
+std::string unit_name (eUnit u);
 
 /**
  * @brief Length unit name.
  * 
  * Return length unit name as string.
  */
-std::string unit_name(lUnit u);
+std::string unit_name (lUnit u);
 
 /**
  * @brief Length unit name.
  * 
  * Return length unit name as string.
  */
-std::string unit_name(aUnit u);
+std::string unit_name (aUnit u);
 
 /**
  * Write out std::pair.
@@ -91,7 +91,7 @@ inline std::istream & operator >> (std::istream & is, std::pair<vec3d,vec3d> & p
 /**
  * Read data from standard input.
  */
-template<typename T> std::vector<T> readStandardInput()
+template<typename T> std::vector<T> readStandardInput ()
 {
     std::vector<T> data;
     
@@ -118,7 +118,8 @@ template<typename T> std::vector<T> readStandardInput()
  * @param name Identification of the calling authority for use in error
  *             message if the entry is not find.
  */
-template <typename T> T As (
+template <typename T> T As
+(
     std::map<std::string,std::string> const & dict,
     std::string const & keyword,
     std::string const & name
@@ -178,8 +179,7 @@ public:
     virtual bool run
     (
         sqlitepp::session & db,
-        std::map<std::string,std::string> const & params,
-        bool subtract_born
+        std::map<std::string,std::string> const & params
     ) const = 0;
 };
 
@@ -256,16 +256,12 @@ private:
         bool run \
         ( \
             sqlitepp::session & db, \
-            std::map<std::string,std::string> const & params, \
-            bool subtract_born \
+            std::map<std::string,std::string> const & params \
         ) const; \
 };
 
 /// Create class for T-matrix (tmat)
 AddNewVariableClass(TMatrix);
-
-/// Create class for Born T-matrix (tmatb)
-AddNewVariableClass(TMatrixB);
 
 /// Create class for scattering amplitude (scatamp)
 AddNewVariableClass(ScatteringAmplitude);

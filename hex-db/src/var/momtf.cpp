@@ -48,8 +48,7 @@ std::vector<std::string> const & MomentumTransfer::SQL_Update () const
 bool MomentumTransfer::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units
@@ -169,7 +168,7 @@ bool MomentumTransfer::run
         // update momentum transfer
         merge (eta_energies, eta, *pE, factor * abs((*pT) * (*pTp).conj()));
     }
-    eta *= 1. / (4. * M_PI * M_PI);
+    eta *= 1. / std::pow(2 * special::constant::pi, 2);
     
     // write header
     std::cout << logo() <<
@@ -179,7 +178,7 @@ bool MomentumTransfer::run
         "#     S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n" <<
-        "# E\t η\n";
+        "# E\tη\n";
     
     if (energies[0] < 0.)
     {
@@ -190,7 +189,7 @@ bool MomentumTransfer::run
     else
     {
         // interpolate
-        eta = interpolate(eta_energies, eta, energies * efactor);
+        eta = interpolate (eta_energies, eta, energies * efactor);
         
         // output
         for (size_t i = 0; i < energies.size(); i++)

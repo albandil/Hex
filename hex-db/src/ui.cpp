@@ -29,7 +29,6 @@ const std::string HelpText =
     "  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
     "  --optimize        Execute VACUUM command, i.e. minimize the occupied space.\n"
     "  --avail           Print out available data.\n"
-    "  --subtract-born   Use second Born subtraction for faster partial wave convergence (needs Born data).\n"
     "  --<var>           Compute/retrieve scattering variable <var>.\n"
     "  --vars            Display all available scattering variables.\n"
     "  --<param> <val>   Set scattering parameter <param> to the value <val>.\n"
@@ -47,16 +46,16 @@ const std::string HelpText =
     "   > seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
     "\n"
     "   # retrieve momentum transfer:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtf      --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   # retrieve integral cross section:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ics        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   # retrieve sum integral cross section:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ccs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n"
     "\n"
     "   # retrieve collision strength:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --colls      --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   #retrieve total cross section:\n"
     "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --tcs        --ni=1 --li=0 --mi=0\n"
@@ -83,7 +82,6 @@ int main(int argc, char* argv[])
     std::string dbname = "hex.db", sqlfile, dumpfile;
     bool create_new = false, doupdate = false, doimport = false;
     bool dooptimize = false, doavail = false;
-    bool subtract_born = false;
     
     // scattering variables to compute
     std::vector<std::string> vars;
@@ -103,14 +101,17 @@ int main(int argc, char* argv[])
         "optimize", "o", 0, [ & ](std::string opt) -> bool { dooptimize = true; return true; },
         "avail", "a",    0, [ & ](std::string opt) -> bool { doavail = true; return true; },
         "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
-        "vars", "v",     0, [ & ](std::string opt) -> bool {
+        "vars", "v",     0, [ & ](std::string opt) -> bool
+        {
             std::cout << "(name)\t\t(description)" << std::endl;
             for (Variable const * var : vlist)
                 std::cout << var->id() << "\t\t" << var->description() << std::endl;
             return true;
         },
-        "params", "p",   1, [ & ](std::string opt) -> bool {
-            VariableList::const_iterator it = std::find_if (
+        "params", "p",   1, [ & ](std::string opt) -> bool
+        {
+            VariableList::const_iterator it = std::find_if
+            (
                 vlist.begin(),
                 vlist.end(),
                 [ & ](Variable* const & it) -> bool { return it->id() == opt; }
@@ -132,8 +133,8 @@ int main(int argc, char* argv[])
             }
             return true;
         },
-        "subtract-born", "B", 0, [ & ](std::string opt) -> bool { subtract_born = true; return true; },
-        "Eunits", "", 1, [ & ](std::string opt) -> bool { 
+        "Eunits", "", 1, [ & ](std::string opt) -> bool
+        { 
             if (opt == std::string("Ry"))
                 Eunits = eUnit_Ry;
             else if (opt == std::string("a.u."))
@@ -147,7 +148,8 @@ int main(int argc, char* argv[])
             }
             return true;
         },
-        "Tunits", "", 1, [ & ](std::string opt) -> bool {
+        "Tunits", "", 1, [ & ](std::string opt) -> bool
+        {
             if (opt == std::string("a.u."))
                 Lunits = lUnit_au;
             else if (opt == std::string("cgs"))
@@ -159,7 +161,8 @@ int main(int argc, char* argv[])
             }
             return true;
         },
-        "Aunits", "", 1, [ & ](std::string opt) -> bool {
+        "Aunits", "", 1, [ & ](std::string opt) -> bool
+        {
             if (opt == std::string("deg"))
                 Aunits = aUnit_deg;
             else if (opt == std::string("rad"))
@@ -171,7 +174,8 @@ int main(int argc, char* argv[])
             }
             return true;
         },
-        /* default*/ [ & ](std::string arg, std::string par) -> bool {
+        /* default*/ [ & ](std::string arg, std::string par) -> bool
+        {
             // try to find it in the variable ids
             for (const Variable* var : vlist)
             {
@@ -206,6 +210,17 @@ int main(int argc, char* argv[])
         }
     );
     
+    // check that the requested filename is available
+    if (create_new)
+    {
+        std::ifstream f (dbname.c_str());
+        if (f.good())
+        {
+            std::cout << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
+            exit(0);
+        }
+    }
+    
     // open the database, if it is going to be used
     if (create_new or doimport or doupdate or dooptimize or doavail or not dumpfile.empty() or not vars.empty())
         initialize(dbname.c_str());
@@ -239,5 +254,5 @@ int main(int argc, char* argv[])
         return 0;
     
     // retrieve all requested data
-    return run (vars, sdata, subtract_born);
+    return run (vars, sdata);
 }

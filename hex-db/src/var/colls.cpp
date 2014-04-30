@@ -49,8 +49,7 @@ std::vector<std::string> const & CollisionStrength::SQL_Update () const
 bool CollisionStrength::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units
@@ -68,8 +67,8 @@ bool CollisionStrength::run
     int  S = As<int>(sdata, "S", Id);
     
     // energies and cross sections
-    double E, sigma;
-    rArray energies, E_arr, sigma_arr;
+    double E, sigma, sigmab;
+    rArray energies, E_arr, sigma_arr, sigmab_arr;
     
     // get energy / energies
     try {
@@ -85,7 +84,7 @@ bool CollisionStrength::run
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, sigma, sigmab FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -95,7 +94,7 @@ bool CollisionStrength::run
             "  AND  L = :L  "
             "  AND  S = :S  "
             "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma),
+        sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmab),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(L), sqlitepp::use(S);
@@ -105,6 +104,7 @@ bool CollisionStrength::run
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
+        sigmab_arr.push_back(sigmab);
     }
     
     // write header
@@ -115,7 +115,7 @@ bool CollisionStrength::run
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n" <<
-        "# E\t Ω\n";
+        "# E\tΩ\tΩBorn\n";
     
     // terminate if no data
     if (E_arr.size() == 0)
@@ -125,11 +125,15 @@ bool CollisionStrength::run
     {
         // negative energy indicates full output
         for (size_t i = 0; i < E_arr.size(); i++)
-            std::cout << E_arr[i] / efactor << "\t" << E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigma_arr[i] << "\n";
+        {
+            double Omega = E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigma_arr[i];
+            double OmegaB = E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigmab_arr[i];
+            
+            std::cout << E_arr[i] / efactor << "\t" << Omega << "\t" << OmegaB << "\n";
+        }
     }
     else
     {
-        
         // threshold for ionization
         double Eion = 1./(ni*ni);
         
@@ -137,13 +141,17 @@ bool CollisionStrength::run
         rArray interp = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-            
+        rArray interpB = (efactor * energies.front() < Eion) ? 
+            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_linear) :
+            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_cspline);
+        
         // compute collision strength
         rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
+        rArray omegasB = energies * (2*L+1) * (2*S+1) * interpB * efactor;
         
         // output
         for (size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << omegas[i] << "\n";
+            std::cout << energies[i] << "\t" << omegas[i] << "\t" << omegasB[i] << "\n";
     }
     
     return true;

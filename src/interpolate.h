@@ -29,11 +29,15 @@
  */
 template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray<T> const & y0, rArray const & x)
 {
-//     if (x0.size() == 0)
-//         throw exception ("Nothing to interpolate.\n");
+    assert(x0.size() == y0.size());
     
-    if (x0.size() < 2)
-        return y0;
+    // return 0 if the array to interpolate is empty
+    if (x0.size() == 0)
+        return NumberArray<T>(x.size(), T(0));
+    
+    // return the source element if the array to interpolate contains just the one element
+    if (x0.size() == 1)
+        return NumberArray<T>(x.size(), y0[0]);
     
     // output array
     NumberArray<T> y(x.size());
@@ -96,11 +100,15 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
  */
 inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, const gsl_interp_type * interpolation)
 {
-//     if (x0.size() == 0)
-//         throw exception ("Nothing to interpolate.\n");
+    assert(x0.size() == y0.size());
     
-    if (x0.size() < 2)
-        return y0;
+    // return 0 if the array to interpolate is empty
+    if (x0.size() == 0)
+        return rArray(x.size(), 0.);
+    
+    // return the source element if the array to interpolate contains just the one element
+    if (x0.size() == 1)
+        return rArray(x.size(), y0[0]);
     
     // setup the interpolator
     gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());

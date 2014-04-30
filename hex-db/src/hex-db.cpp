@@ -36,7 +36,7 @@ eUnit Eunits = eUnit_Ry;
 lUnit Lunits = lUnit_au;
 aUnit Aunits = aUnit_deg;
 
-void initialize(const char* dbname)
+void initialize (const char* dbname)
 {
     // open database
     db.open(dbname);
@@ -51,7 +51,7 @@ void initialize(const char* dbname)
         var->initialize(db);
 }
 
-void create_new_database()
+void create_new_database ()
 {
     // create tables
     for (const Variable* var : vlist)
@@ -95,31 +95,43 @@ void import (const char* sqlname)
         exit(-1);
     }
     
-    // input line number
-    int line = 0;
+    // line numbers (current and total)
+    std::cout << "Counting lines..." << std::endl;
+    unsigned line = 0, lines = std::count
+    (
+        std::istreambuf_iterator<char>(is),
+        std::istreambuf_iterator<char>(),
+        '\n'
+    );
     
-    do {
-        
+    // reset file to the beginning
+    is.clear();
+    is.seekg(0);
+    
+    do
+    {
         // query statement
         sqlitepp::statement st(db);
         
+        std::cout << "\rImporting data... " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
+        
         // read line from input stream
         std::string cmd, cmd1;
-        getline(is, cmd);
+        std::getline (is, cmd);
         
         // skip empty lines
         if (cmd.size() == 0)
             continue;
         
         // for all statements on this line
-        do {
-            
+        do
+        {
             // position of semicolon
-            int semicolon = std::find(cmd.begin(), cmd.end(), ';') - cmd.begin();
+            unsigned semicolon = std::find(cmd.begin(), cmd.end(), ';') - cmd.begin();
             
             // split string
             cmd1 = cmd.substr(0, semicolon);
-            cmd = cmd.substr(semicolon + 1, std::string::npos);
+            cmd = (semicolon == cmd.size() ? "" : cmd.substr(semicolon + 1, std::string::npos));
             
             // trim spaces
             cmd1 = trim(cmd1);
@@ -138,42 +150,49 @@ void import (const char* sqlname)
                 exit(-1);
                 
             }
-            
-        } while (cmd.size() > 0);
+        }
+        while (cmd.size() > 0);
         
         // move on to the next line
         line++;
-        
-    } while (not is.eof());
+    }
+    while (not is.eof());
+    
+    std::cout << "\rThe SQL batch file has been successfully imported." << std::endl;
 }
 
 void update ()
 {
     for (const Variable* var : vlist)
-    for (std::string const & cmd : var->SQL_Update())
     {
-        sqlitepp::statement st(db);
-    
-        if (cmd.size() == 0)
-            continue;
-    
-        st << cmd;
+        std::cout << "Updating " << var->id() << "..." << std::endl;
         
-        try {
+        for (std::string const & cmd : var->SQL_Update())
+        {
+            sqlitepp::statement st(db);
             
-            st.exec();
+            if (cmd.size() == 0)
+                continue;
             
-        } catch (sqlitepp::exception & e) {
+            st << cmd;
             
-            std::cerr << "ERROR: Update failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-            std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-            exit(-1);
-            
+            try {
+                
+                st.exec();
+                
+            } catch (sqlitepp::exception & e) {
+                
+                std::cerr << "ERROR: Update failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+                std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
+                exit(-1);
+                
+            }
         }
     }
+    std::cout << "The database has been successfully updated." << std::endl;
 }
 
-void optimize()
+void optimize ()
 {
     sqlitepp::statement st(db);
     st << "VACUUM";
@@ -189,7 +208,7 @@ void optimize()
     }
 }
 
-void avail()
+void avail ()
 {
     std::cout << "\"--avail\" not implemented yet. Use the following code directly in sqlite3:\n";
     std::cout << "\n";
@@ -303,8 +322,7 @@ void dump (const char* dumpfile)
 int run
 (
     std::vector<std::string> const & vars,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 )
 {
     // for all requested variables (mostly there will be just one)
@@ -321,7 +339,7 @@ int run
         }
         
         // try to compute the results
-        if (not var->run(db, sdata, subtract_born))
+        if (not var->run(db, sdata))
         {
             // this can easily happen
             throw exception ("Computation of \"%s\" failed.", varname.c_str());

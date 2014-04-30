@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "../interpolate.h"
+#include "../chebyshev.h"
 #include "../special.h"
 #include "../variables.h"
 #include "../version.h"
@@ -47,7 +48,7 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
 
 cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
 {
-    cArray amplitudes(angles.size());
+    cArray amplitudes(angles.size()), amplitudesb(angles.size()), bornf(angles.size());
     
     // total angular momentum projection (given by axis orientation)
     int M = mi;
@@ -68,6 +69,10 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(S);
     st3.exec();
+    
+    //
+    // sum the partial wave contributions for exact and Born partial waves
+    //
     
     // for all total angular momenta
     for (int L = M; L <= max_L; L++)
@@ -94,11 +99,12 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         for (int ell = abs(M - mf); ell <= max_ell; ell++)
         {
             // get all relevant lines from database
-            double __Ei, __Re_T_ell, __Im_T_ell;
+            double Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell;
             rArray db_Ei;
-            cArray db_T_ell;
+            cArray db_T_ell, db_TBorn_ell;
+            std::string cheb;
             sqlitepp::statement st2(db);
-            st2 << "SELECT Ei, Re_T_ell, Im_T_ell FROM " + TMatrix::Id + " "
+            st2 << "SELECT Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell FROM " + TMatrix::Id + " "
                    "WHERE ni = :ni "
                    "  AND li = :li "
                    "  AND mi = :mi "
@@ -109,35 +115,87 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
                    "  AND  L = :L  "
                    "  AND  S = :S  "
                    "ORDER BY Ei ASC",
-                sqlitepp::into(__Ei), sqlitepp::into(__Re_T_ell), sqlitepp::into(__Im_T_ell),
+                sqlitepp::into(Ei),
+                sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
+                sqlitepp::into(Re_TBorn_ell), sqlitepp::into(Im_TBorn_ell),
                 sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
                 sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
                 sqlitepp::use(ell), sqlitepp::use(L), sqlitepp::use(S);
             while ( st2.exec() )
             {
-                db_Ei.push_back(__Ei);
-                db_T_ell.push_back(Complex(__Re_T_ell, __Im_T_ell));
+                db_Ei.push_back(Ei);
+                db_T_ell.push_back(Complex(Re_T_ell, Im_T_ell));
+                db_TBorn_ell.push_back(Complex(Re_TBorn_ell, Im_TBorn_ell));
             }
             
+            // skip empty queries
             if (db_Ei.size() == 0)
                 continue;
             
             // update value of "f"
-            Complex Tmatrix = interpolate(db_Ei, db_T_ell, {E})[0];
-            
+            Complex Tmatrix  = interpolate(db_Ei, db_T_ell, {E})[0];
+            Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
             for (size_t i = 0; i < angles.size(); i++)
-                amplitudes[i] += -1./(2.*M_PI) * Tmatrix * sphY(ell, abs(M-mf), angles[i], 0.);
+            {
+                Complex Y = -0.5*special::constant::pi_inv * sphY(ell, abs(M-mf), angles[i], 0.);
+                
+                amplitudes[i]  += Tmatrix  * Y;
+                amplitudesb[i] += Tmatrixb * Y;
+            }
         }
     }
     
-    return amplitudes;
+    //
+    // load angle-dependent un-expanded Born T-matrix
+    //
+    
+    rArray db_Ei;
+    std::vector<Chebyshev<double,Complex>> db_bornf;
+    double Ei;
+    std::string cheb;
+    sqlitepp::statement st4(db);
+    st4 << "SELECT Ei, cheb FROM " + BornFullTMatrix::Id + " "
+           "WHERE ni = :ni "
+           "  AND li = :li "
+           "  AND mi = :mi "
+           "  AND nf = :nf "
+           "  AND lf = :lf "
+           "  AND mf = :mf ",
+        sqlitepp::into(Ei), sqlitepp::into(cheb),
+        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
+        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+    while ( st4.exec() )
+    {
+        // add new energy
+        db_Ei.push_back(Ei);
+        
+        // decode Chebyshev expansion
+        cArray coeffs;
+        coeffs.fromBlob(cheb);
+        db_bornf.push_back(Chebyshev<double,Complex>(coeffs, -1., 1.));
+    }
+    for (size_t i = 0; i < angles.size(); i++)
+    {
+        // evaluate all energies for this angle
+        cArray TE (db_Ei.size());
+        for (unsigned j = 0; j < db_Ei.size(); j++)
+            TE[i] = db_bornf[i].clenshaw(std::cos(angles[i]), db_bornf[i].tail(1e-10));
+        
+        // interpolate
+        bornf[i] = -0.5*special::constant::pi_inv * (TE.size() > 0 ? interpolate(db_Ei, TE, { E })[0] : 0.);
+    }
+    
+    //
+    // return corrected expansion
+    //
+    
+    return bornf + (amplitudes - amplitudesb);
 }
 
 bool ScatteringAmplitude::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units

@@ -133,6 +133,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
             "S  INTEGER, "
             "Ei DOUBLE PRECISION, "
             "sigma DOUBLE PRECISION, "
+            "sigmaB DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
         ")"
     };
@@ -148,7 +149,8 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi, nf, lf, mf, L, S, Ei, "
-                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell+Im_T_ell*Im_T_ell)/157.91367 " // 16π²
+                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell + Im_T_ell*Im_T_ell)/157.91367, " // 16π²
+                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_TBorn_ell*Re_TBorn_ell + Im_TBorn_ell*Im_TBorn_ell)/157.91367 " // 16π²
             "FROM " + TMatrix::Id + " "
             "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
             "GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei",
@@ -157,7 +159,8 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
-                "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
+                "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)), "
+                "0 " // Born T-matrix (to be implemented in future)
             "FROM " + IonizationF::Id + " "
             "GROUP BY ni, li, mi, L, S, Ei"
     };
@@ -167,8 +170,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
 bool IntegralCrossSection::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units
@@ -186,8 +188,8 @@ bool IntegralCrossSection::run
     int  S = As<int>(sdata, "S", Id);
     
     // energies and cross sections
-    double E, sigma;
-    rArray energies, E_arr, sigma_arr;
+    double E, sigma, sigmaB;
+    rArray energies, E_arr, sigma_arr, sigmaB_arr;
     
     // get energy / energies
     try {
@@ -203,7 +205,7 @@ bool IntegralCrossSection::run
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, sigma, sigmaB FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -213,7 +215,7 @@ bool IntegralCrossSection::run
             "  AND  L = :L  "
             "  AND  S = :S  "
             "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma),
+        sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmaB),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(L), sqlitepp::use(S);
@@ -223,6 +225,7 @@ bool IntegralCrossSection::run
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
+        sigmaB_arr.push_back(sigmaB);
     }
     
     // write header
@@ -233,7 +236,7 @@ bool IntegralCrossSection::run
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n" <<
-        "# E\t σ\n";
+        "# E\tσ\tσBorn\n";
     
     // terminate if no data
     if (E_arr.empty())
@@ -250,14 +253,17 @@ bool IntegralCrossSection::run
         // threshold for ionization
         double Eion = 1./(ni*ni);
         
-        // interpolate
+        // interpolate (linear below ionization threshold, cspline above)
         rArray ics = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
+        rArray icsB = (efactor * energies.front() < Eion) ? 
+            interpolate_real(E_arr, sigmaB_arr, energies * efactor, gsl_interp_linear) :
+            interpolate_real(E_arr, sigmaB_arr, energies * efactor, gsl_interp_cspline);
         
         // output
         for (size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\n";
+            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << "\n";
     }
     
     return true;

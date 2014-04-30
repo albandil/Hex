@@ -17,6 +17,7 @@
 
 #include <sqlitepp/sqlitepp.hpp>
 
+#include "../chebyshev.h"
 #include "../interpolate.h"
 #include "../special.h"
 #include "../variables.h"
@@ -52,7 +53,7 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
 rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
 {
     // the scattering amplitudes
-    rArray dcs(angles.size());
+    rArray dcs (angles.size());
     
     double ki = sqrt(E);
     double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
@@ -62,13 +63,17 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
         return dcs;
     
     int ell;
-    double Ei, sum_Re_T_ell, sum_Im_T_ell;
+    double Ei, sum_Re_T_ell, sum_Im_T_ell, sum_Re_TBorn_ell, sum_Im_TBorn_ell;
     rArrays E_ell;
-    cArrays T_E_ell;
+    cArrays T_E_ell, Tb_E_ell;
+    
+    //
+    // load partial wave contributions
+    //
     
     // sum over L
     sqlitepp::statement st(db);
-    st << "SELECT ell, Ei, SUM(Re_T_ell), SUM(Im_T_ell) "
+    st << "SELECT ell, Ei, SUM(Re_T_ell), SUM(Im_T_ell), SUM(Re_TBorn_ell), SUM(Im_TBorn_ell) "
           "FROM " + TMatrix::Id + " "
           "WHERE ni = :ni "
           "  AND li = :li "
@@ -81,6 +86,7 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
           "ORDER BY ell ASC, Ei ASC",
         sqlitepp::into(ell), sqlitepp::into(Ei),
         sqlitepp::into(sum_Re_T_ell), sqlitepp::into(sum_Im_T_ell),
+        sqlitepp::into(sum_Re_TBorn_ell), sqlitepp::into(sum_Im_TBorn_ell),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(S);
@@ -92,40 +98,93 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
         {
             E_ell.push_back(rArray());
             T_E_ell.push_back(cArray());
+            Tb_E_ell.push_back(cArray());
         }
         
         E_ell[ell].push_back(Ei);
         T_E_ell[ell].push_back(Complex(sum_Re_T_ell,sum_Im_T_ell));
+        Tb_E_ell[ell].push_back(Complex(sum_Re_TBorn_ell,sum_Im_TBorn_ell));
     }
     
     // terminate if no data
     if (E_ell.empty())
         return dcs;
     
-    // for all angles
-    for (int i = 0; i < (int)angles.size(); i++)
+    //
+    // load angle dependent Born T-matrices
+    //
+    
+    std::string cheb;
+    rArray E_arr;
+    std::vector<Chebyshev<double,Complex>> bornT_arr;
+    sqlitepp::statement stb(db);
+    stb << "SELECT Ei, cheb FROM " + BornFullTMatrix::Id + " "
+           "WHERE ni = :ni "
+           "  AND li = :li "
+           "  AND mi = :mi "
+           "  AND nf = :nf "
+           "  AND lf = :lf "
+           "  AND mf = :mf "
+           "ORDER BY Ei ASC",
+        sqlitepp::into(Ei), sqlitepp::into(cheb),
+        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
+        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+    while (stb.exec())
     {
-        rArray e;    // energies
-        cArray f;    // cross sections
+        // add new energy
+        E_arr.push_back(Ei);
         
-        // for all projectile angular momenta sum arrays
+        // decode Chebyshev expansion
+        cArray coeffs;
+        coeffs.fromBlob(cheb);
+        bornT_arr.push_back(Chebyshev<double,Complex>(coeffs, -1, 1));
+    }
+    
+    //
+    // compute corrected cross sections
+    //
+    
+    // for all angles
+    for (unsigned i = 0; i < angles.size(); i++)
+    {
+        rArray e;       // energies
+        cArray f,fb,fB; // amplitudes
+        
+        // for all projectile angular momenta : sum partial wave arrays
         for (int l = 0; l < (int)E_ell.size(); l++)
-            merge (e, f, E_ell[l], T_E_ell[l] * sphY(l,mi-mf,angles[i],0));
+        {
+            Complex Y = sphY(l,mi-mf,angles[i],0);
+            merge (e, f, E_ell[l], T_E_ell[l] * Y);
+            merge (e, fb, E_ell[l], Tb_E_ell[l] * Y);
+        }
         
-        // intepolate energies for unnormalized differential cross section
-        if (not e.empty())
-            dcs[i] = interpolate(e, sqrabs(f), {E})[0];
+        // skip empty cases
+        if (e.empty())
+            continue;
+        
+        // also, determine the angle-dependent Born T-matrix
+        cArray fB0;
+        double cosTheta = std::cos(angles[i]);
+        
+        // evaluate Chebyshev expansions for this angle
+        for (unsigned j = 0; j < E_arr.size(); j++)
+            fB0.push_back(bornT_arr[j].clenshaw(cosTheta, bornT_arr[j].tail(1e-8)));
+        
+        // interpolate angle-dependent Born T-matrices to partial wave energies ('e')
+        fB = interpolate(E_arr, fB0, e);
+        
+        // intepolate corrected differential cross section
+        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { E })[0];
     }
     
     // normalize
-    return dcs * kf * (2.*S + 1.) / (16 * M_PI * M_PI * ki);
+    return dcs * kf * (2 * S + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
 }
 
 bool DifferentialCrossSection::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units

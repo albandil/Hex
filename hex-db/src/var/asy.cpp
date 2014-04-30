@@ -63,8 +63,7 @@ std::vector<std::string> const & SpinAsymmetry::SQL_Update () const
 bool SpinAsymmetry::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units

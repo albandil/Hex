@@ -50,8 +50,7 @@ std::vector<std::string> const & IonizationAmplitude::SQL_Update () const
 bool IonizationAmplitude::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units
@@ -124,8 +123,10 @@ bool IonizationAmplitude::run
         cb.fromBlob(blob); 
         
         // save Chebyshev expansion
-        cheb_arr.back().push_back (
-            Chebyshev<double,Complex> (
+        cheb_arr.back().push_back
+        (
+            Chebyshev<double,Complex>
+            (
                 cb,                   // expansion coefficients
                 0.,                   // lowest energy
                 sqrt(E - 1./(ni*ni))  // highest energy

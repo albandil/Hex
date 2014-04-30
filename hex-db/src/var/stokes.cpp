@@ -71,8 +71,7 @@ std::vector<std::string> const & StokesParameters::SQL_Update () const
 bool StokesParameters::run
 (
     sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
+    std::map<std::string,std::string> const & sdata
 ) const
 {
     // manage units
