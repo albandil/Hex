@@ -435,7 +435,7 @@ StgExtract:
                     int ie  = i / (inp.maxell + 1);
                     int ell = i % (inp.maxell + 1);
                     
-                    T_ell[i] = Lambda[mf+lf][i] * 4. * M_PI / kf[ie] * pow(Complex(0.,1.), -ell)
+                    T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * pow(Complex(0.,1.), -ell)
                                     * ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
                 }
                 
@@ -479,8 +479,8 @@ StgExtract:
                     double sigma = 0.;
                     for (int ell = 0; ell <= inp.maxell; ell++)
                     {
-                        double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / (2 * M_PI);
-                        double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * M_PI);
+                        double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / (2 * special::constant::pi);
+                        double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * special::constant::pi);
                         sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
                     }
                     if (std::isfinite(sigma))

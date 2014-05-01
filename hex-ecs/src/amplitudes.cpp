@@ -70,7 +70,7 @@ cArray computeLambda
         // The cross section oscillates, so we will do some averaging
         // As recommended by Bartlett, we will compute several amplitudes
         // separated by π/(n*kf[ie]) near the R₀ turning point.
-        double wavelength = M_PI / kf[ie];
+        double wavelength = special::constant::pi / kf[ie];
         char const * HEX_RHO = getenv("HEX_RHO");
         char const * HEX_SAMPLES = getenv("HEX_SAMPLES");
         int samples = (HEX_SAMPLES == nullptr) ? 10 : atoi(HEX_SAMPLES);
@@ -169,7 +169,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         auto integrand = [&](double alpha) -> Complex {
             
             // precompute projectors
-            double cos_alpha = (alpha == 0.5 * M_PI) ? 0. : cos(alpha);
+            double cos_alpha = (alpha == special::constant::pi_half) ? 0. : cos(alpha);
             double sin_alpha = sin(alpha);
             
             // precompute coordinates
@@ -253,7 +253,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         // integrator
         ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
         Q.setEps(1e-6);
-        Complex res = 2. * rho * Q.integrate(0., 0.5 * M_PI) / sqrt(M_PI);
+        Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::pi_sqrt;
         
         return res;
         
@@ -332,7 +332,7 @@ cArrays computeXi
             int n;
             auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
             ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-            double cs = integrator.integrate(0, 0.25 * M_PI, &n) / sqrt(Ei[ie]);
+            double cs = integrator.integrate(0, special::constant::pi_quart, &n) / sqrt(Ei[ie]);
             
             std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
             ics[ie] += cs;

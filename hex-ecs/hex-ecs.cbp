@@ -82,8 +82,8 @@
 		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/slater.cpp" />
-		<Unit filename="src/specf.cpp" />
-		<Unit filename="src/specf.h" />
+		<Unit filename="src/special.cpp" />
+		<Unit filename="src/special.h" />
 		<Unit filename="src/version.cpp" />
 		<Unit filename="src/version.h" />
 		<Extensions>

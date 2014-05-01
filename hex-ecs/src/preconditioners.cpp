@@ -521,7 +521,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
             int Sign = ((inp_.Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*M_PI*(2*l+1)) / Complex(inp_.ki[ie]); 
+            Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*special::constant::pi*(2*l+1)) / Complex(inp_.ki[ie]); 
             prefactor *= ClebschGordan(li,mi,l,0,inp_.L,mi);
             if (prefactor == 0.)
                 continue;

@@ -22,6 +22,7 @@
 
 #include "arrays.h"
 #include "misc.h"
+#include "special.h"
 
 /**
  * @brief Chebyshev approximation.
@@ -280,7 +281,7 @@ public:
      */
     static Tin root (int N, int k, Tin x1 = 0., Tin x2 = 1.)
     {
-        return x1 + 0.5 * (1. + cos(M_PI * (k + 0.5) / N)) * (x2 - x1);
+        return x1 + 0.5 * (1. + cos(special::constant::pi * (k + 0.5) / N)) * (x2 - x1);
     }
     
     /**
@@ -317,7 +318,7 @@ public:
      */
     inline static double node (int k, int N)
     {
-        return cos(M_PI * (k + 0.5) / N);
+        return cos(special::constant::pi * (k + 0.5) / N);
     }
     
 private:
@@ -369,7 +370,7 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     fftw_plan plan = fftw_plan_r2r_1d (N, &fvals[0], &C[0], FFTW_REDFT10, 0);
     
     // evaluate nodes and function
-    double pi_over_N = M_PI / N;
+    double pi_over_N = special::constant::pi / N;
     for (int k = 0; k < N; k++)
     {
         double xk = cos(pi_over_N * (k + 0.5));
@@ -413,7 +414,7 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     );
     
     // evaluate nodes and function
-    double pi_over_N = M_PI / N;
+    double pi_over_N = special::constant::pi / N;
     for (int k = 0; k < N; k++)
     {
         double xk = cos(pi_over_N * (k + 0.5));

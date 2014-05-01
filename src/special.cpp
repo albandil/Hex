@@ -331,9 +331,9 @@ Complex hydro_P (unsigned n, unsigned l, Complex z)
 /*
  * Derivative of hydrogen radial function.
  * DP(n,l,r) := HydrogenN(n,l) * (2*r/n)^l * (
- * 					(l+1-z/n) * Laguerre(n+l,2*l+1,2*r/n) +
- * 					z * DLaguerre(n+l,2*l+1,2*r/n)
- *              ) * exp(-r/n)
+ *   (l+1-z/n) * Laguerre(n+l,2*l+1,2*r/n) +
+ *    z * DLaguerre(n+l,2*l+1,2*r/n)
+ *    ) * exp(-r/n)
  */
 Complex dhydro_P (unsigned n, unsigned l, Complex z)
 {
@@ -362,23 +362,23 @@ void clipang (double & theta, double & phi)
     if (theta < 0.)
     {
         // rotate plane
-        phi += M_PI;
+        phi += special::constant::pi;
         theta = -theta;
     }
     
     // clip theta to (0,2π)
-    theta = fmod(theta, 2 * M_PI);
+    theta = fmod(theta, 2 * special::constant::pi);
     
     // clip theta to (0,π)
-    if (theta > M_PI)
+    if (theta > special::constant::pi)
     {
         // rotate plane
-        phi += M_PI;
-        theta = 2 * M_PI - theta;
+        phi += special::constant::pi;
+        theta = 2 * special::constant::pi - theta;
     }
     
     // clip phi to (0,2π) FIXME (won't work for phi < 0)
-    phi = fmod(phi, 2*M_PI);
+    phi = fmod(phi, 2*special::constant::pi);
 }
 
 Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
@@ -438,8 +438,8 @@ int coul_F_michel (int l, double k, double r, double& F, double& Fp)
     int errp = gsl_sf_airy_Ai_deriv_e(ai_arg, GSL_PREC_DOUBLE, &aip);
     
     // evaluate the Coulomb wave function and its derivative
-    F = sqrt(M_PI)*pow(rho_t,1./6)/sqrt(phip) * ai.val;
-    Fp = sqrt(M_PI)*pow(rho_t,-5./6)*(0.5*pow(phip,-1.5)*phipp * ai.val - sqrt(phip)*aip.val*pow(rho_t,2./3));
+    F = special::constant::pi_sqrt * pow(rho_t,1./6)/sqrt(phip) * ai.val;
+    Fp = special::constant::pi_sqrt * pow(rho_t,-5./6)*(0.5*pow(phip,-1.5)*phipp * ai.val - sqrt(phip)*aip.val*pow(rho_t,2./3));
     
     // return corresponding GSL error
     return GSL_ERROR_SELECT_2(err, errp);
@@ -765,7 +765,7 @@ double Gaunt (int l1, int m1, int l2, int m2, int l, int m)
         return dict[key];
     
     // compute the value and store it to the dictionary
-    dict[key] = sqrt((2*l1+1)*(2*l2+1) / (4*M_PI*(2*l+1))) *
+    dict[key] = sqrt((2*l1+1)*(2*l2+1) / (4*special::constant::pi*(2*l+1))) *
     ClebschGordan(l1, m1, l2, m2, l, m) *
     ClebschGordan(l1,  0, l2,  0, l, 0);
     return dict[key];

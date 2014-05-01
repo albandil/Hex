@@ -231,7 +231,7 @@ public:
             if (coefs.empty())
             {
                 // evaluate f everywhere
-                double pi_over_N = M_PI / N;
+                double pi_over_N = special::constant::pi / N;
                 for (int k = 0; k < N; k++)
                 {
                     fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
@@ -247,7 +247,7 @@ public:
             else
             {
                 // evaluate just the new half, recycle older evaluations
-                double pi_over_N = M_PI / N;
+                double pi_over_N = special::constant::pi / N;
                 for (int k = 0; k < N; k++)
                 {
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
@@ -412,7 +412,7 @@ public:
                 // compute all values
                 for (int i = 1; i <= N - 1; i++)
                 {
-                    double x = i * M_PI / N;
+                    double x = i * special::constant::pi / N;
                     fvals[i] = F(L / tan(x));
                     if (not std::isfinite(std::abs(fvals[i])))
                         fvals[i] = 0;
@@ -431,7 +431,7 @@ public:
                     }
                     else
                     {
-                        double x = i * M_PI / N;
+                        double x = i * special::constant::pi / N;
                         fvals[i] = F(L / tan(x));
                         if (not std::isfinite(std::abs(fvals[i])))
                             fvals[i] = 0;
@@ -447,7 +447,7 @@ public:
             if (std::abs(sum - FType(2.) * sum_prev) < EpsRel * std::abs(sum))
             {
                 if (n != nullptr) *n = N;
-                return FType(L * M_PI / N) * sum;
+                return FType(L * special::constant::pi / N) * sum;
             }
 
             // save precomputed values
