@@ -151,6 +151,9 @@ rArray interpolate_bound_free_potential_1
             V[i] = gsl_spline_eval_integ (spline1, x[i], x.back(), acc1)
                  - gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) / x[i];
         }
+        
+        gsl_spline_free (spline1); gsl_interp_accel_free (acc1);
+        gsl_spline_free (spline2); gsl_interp_accel_free (acc2);
     }
     else
     {
@@ -176,6 +179,9 @@ rArray interpolate_bound_free_potential_1
             V[i] = gsl_spline_eval_integ (spline1, 0., x[i], acc1) * std::pow(x[i],-lambda-1)
                  + gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) * std::pow(x[i],lambda);
         }
+        
+        gsl_spline_free(spline1); gsl_interp_accel_free (acc1);
+        gsl_spline_free(spline2); gsl_interp_accel_free (acc2);
     }
     
     // return the array of evaluations
@@ -415,6 +421,9 @@ Complex Idir_allowed
         # pragma omp parallel for
         for (size_t i = 0; i < N; i++)
             inner_lower[i] = gsl_spline_eval_integ (spline, grid.front(), grid[i], acc);
+        
+        gsl_spline_free (spline);
+        gsl_interp_accel_free (acc);
     }
     
     // reverse partial trapezoidal sums (for high integral)
@@ -439,6 +448,9 @@ Complex Idir_allowed
         # pragma omp parallel for
         for (size_t i = 0; i < N; i++)
             inner_higher_re[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
+        
+        gsl_spline_free (spline);
+        gsl_interp_accel_free (acc);
     }
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
@@ -448,6 +460,9 @@ Complex Idir_allowed
         # pragma omp parallel for
         for (size_t i = 0; i < N; i++)
             inner_higher_im[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
+        
+        gsl_spline_free (spline);
+        gsl_interp_accel_free (acc);
     }
     
     rArray outer_re(N), outer_im(N);
@@ -469,6 +484,9 @@ Complex Idir_allowed
         gsl_spline_init (spline, grid.data(), outer_re.data(), N);
         
         sum_outer_re = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
+        
+        gsl_spline_free (spline);
+        gsl_interp_accel_free (acc);
     }
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
@@ -476,6 +494,9 @@ Complex Idir_allowed
         gsl_spline_init (spline, grid.data(), outer_im.data(), N);
         
         sum_outer_im = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
+        
+        gsl_spline_free (spline);
+        gsl_interp_accel_free (acc);
     }
     
 //     return Complex (sum_outer_re, sum_outer_im) * h * h;
