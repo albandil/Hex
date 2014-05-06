@@ -56,7 +56,7 @@ void db_bornICS (sqlite3_context* pdb, int n, sqlite3_value** val)
     int tail = CB.tail(1e-10);
     auto fsqr = [&](double cosTheta) -> double { return sqrabs(CB.clenshaw(cosTheta, tail)); };
     ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-    double result = integrator.integrate(-1, 1);
+    double result = 2 * special::constant::pi * integrator.integrate(-1, 1);
     
     // use result of the integration
     sqlite3_result_double(pdb, result);
