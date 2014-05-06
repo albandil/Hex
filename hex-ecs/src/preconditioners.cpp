@@ -1126,8 +1126,10 @@ void SSORCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z)
         SSOR_[iblock].hdfload();
     }
     
-    z = SSOR_[iblock].upperSolve (
-            SSOR_[iblock].dot (
+    z = SSOR_[iblock].upperSolve
+    (
+            SSOR_[iblock].dot
+            (
                 SSOR_[iblock].lowerSolve(r),
                 diagonal
             )
@@ -1178,8 +1180,10 @@ void ILUCGPreconditioner::update (double E)
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
         // factorize the block and store it in lu_[ill] (transfer data)
-        lu_[ill].transfer (
-            std::move (
+        lu_[ill].transfer
+        (
+            std::move
+            (
                 csr_blocks_[ill].factorize(droptol_)
             )
         );

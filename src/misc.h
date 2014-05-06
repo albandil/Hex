@@ -13,14 +13,19 @@
 #ifndef HEX_MISC
 #define HEX_MISC
 
-#include <exception>
-#include <chrono>
-#include <complex>
+#include <algorithm> 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
+#include <chrono>
+#include <complex>
+#include <exception>
 #include <fstream>
+#include <functional> 
 #include <limits>
+#include <locale>
+#include <iostream>
+#include <type_traits>
 
 /**
  * @brief Exception class.
@@ -71,14 +76,9 @@ private:
     char * message;
 };
 
-#include <algorithm> 
-#include <functional> 
-#include <cctype>
-#include <locale>
-#include <type_traits>
-
 //
 // Restricted pointers.
+// - allow some compiler optimizations on arrays
 //
 
 #ifndef restrict
@@ -86,7 +86,7 @@ private:
     #define restrict __restrict
 #else
     #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code will be slow."
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
 #endif
 #endif
 
@@ -102,41 +102,47 @@ private:
 
 //
 // List all complex types.
+// - used in the list of scalar types below
+// - by default, a type is NOT complex
+// - only std::complex<T> is an exception from that rule
 //
 
-template <class T>
-struct is_complex { static const bool value = false; };
-template<> template <class T>
-struct is_complex<std::complex<T>> { static const bool value = true; };
+template <class T> struct is_complex { static const bool value = false; };
+
+#define declareTypeAsComplex(T) \
+    template <> struct is_complex<T> { static const bool value = true; }
+#define declareTemplateTypeAsComplex(TT) \
+    template <> template <class T> struct is_complex<TT<T>> { static const bool value = true; }
+
+declareTemplateTypeAsComplex(std::complex);
 
 //
-// List all scalar types variables.
+// List all scalar types.
+// - necessary for blocking some scalar array functions for non-scalar types (see arrays.h)
+// - by default, a type is not scalar if it is not complex
+// - explicitly list all other basic types considered "scalar"
 //
 
-#define declareTypeAsScalar(T)                                                \
-                                                                              \
-template <> struct is_scalar<T>                                               \
-{                                                                             \
-    static const bool value = true;                                           \
-};
+template <class T> struct is_scalar { static const bool value = is_complex<T>::value; };
 
-// declare general type as non-scalar (if not complex)
-template <class T> struct is_scalar
-{
-    static const bool value = is_complex<T>::value;
-};
+#define declareTypeAsScalar(T) \
+    template <> struct is_scalar<T> { static const bool value = true; }
 
-// explicitly list all basic scalar types
-declareTypeAsScalar(int)
-declareTypeAsScalar(long)
-declareTypeAsScalar(float)
-declareTypeAsScalar(double)
+declareTypeAsScalar(int);
+declareTypeAsScalar(long);
+declareTypeAsScalar(float);
+declareTypeAsScalar(double);
 
 //
 // White space trimming.
 //
 
-/// Trim from start.
+/**
+ * @brief Trim from start.
+ * 
+ * Removes all leading white-space characters. The classification is
+ * done by the function std::isspace.
+ */
 static inline std::string & ltrim (std::string & s)
 {
     s.erase
@@ -152,7 +158,12 @@ static inline std::string & ltrim (std::string & s)
     return s;
 }
 
-/// Trim from end.
+/**
+ * @brief Trim from end.
+ * 
+ * Removes all trailing white-space characters. The classification is
+ * done by the function std::isspace.
+ */
 static inline std::string & rtrim (std::string & s)
 {
     s.erase
@@ -167,7 +178,12 @@ static inline std::string & rtrim (std::string & s)
     return s;
 }
 
-/// Trim from both ends.
+/**
+ * @brief Trim both ends.
+ * 
+ * Removes white-space characters from the beginning and end.
+ * The routine calls @ref ltrim and @ref rtrim.
+ */
 static inline std::string & trim (std::string & s)
 {
     return ltrim(rtrim(s));
@@ -177,7 +193,12 @@ static inline std::string & trim (std::string & s)
 // Miscellaneous functions.
 //
 
-/// Signum function.
+/**
+ * @brief Signum function.
+ * 
+ * This function returns the sign of the argument or zero if the argument
+ * is zero.
+ */
 template <class T> int signum (T x)
 {
     if (x < T(0))
@@ -188,7 +209,13 @@ template <class T> int signum (T x)
         return 1;
 }
 
-/// Many-argument "min" function.
+/**
+ * @brief Many-argument "min" function.
+ * 
+ * This function returns the smallest of the arguments. There can be
+ * arbitrary number of arguments. The comparison is done by std::min
+ * function.
+ */
 //@{
 template <typename T> T mmin (T x)
 {
@@ -201,7 +228,13 @@ template <typename T, class ...Params> T mmin (T x, Params ...p)
 }
 //@}
 
-/// Many-argument "max" function.
+/**
+ * @brief Many-argument "max" function.
+ * 
+ * This function returns the largest of the arguments. There can be
+ * arbitrary number of arguments. The comparison is done by std::max
+ * function.
+ */
 //@{
 template <typename T> T mmax (T x)
 {
@@ -214,7 +247,16 @@ template <typename T, class ...Params> T mmax (T x, Params ...p)
 }
 //@}
 
-/// Constant-expression max.
+/**
+ * @brief Constant-expression max.
+ * 
+ * This is a plain comparison
+   @code
+   (a > b) ? a : b
+   @endcode
+ * However, it is marked as "constexpr" to allow its evaluation at compile
+ * time. This is used somewhere in the code.
+ */
 template <class T> constexpr T const & larger_of (T const & a, T const & b)
 {
     return (a > b) ? a : b;

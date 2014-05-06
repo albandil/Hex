@@ -120,7 +120,7 @@ rArray interpolate_bound_free_potential_1
     // precompute both free and bound state
     rArray P (N), F(N);
     # pragma omp parallel for
-    for (int i = 1; i < N; i++)
+    for (unsigned i = 1; i < N; i++)
     {
         P[i] = Hydrogen::P(Na,La,x[i]);
         F[i] = Hydrogen::F(Kb,Lb,x[i]);
@@ -131,7 +131,7 @@ rArray interpolate_bound_free_potential_1
     {
         rArray integrand1(N), integrand2(N);
         # pragma omp parallel for
-        for (int i = 1; i < N; i++)
+        for (unsigned i = 1; i < N; i++)
         {
             integrand1[i] = P[i] * F[i] / x[i];
             integrand2[i] = P[i] * F[i];
@@ -146,7 +146,7 @@ rArray interpolate_bound_free_potential_1
         gsl_spline_init (spline2, x.data(), integrand2.data(), N);
         
         # pragma omp parallel for schedule (dynamic)
-        for (size_t i = 1; i < N; i++)
+        for (unsigned i = 1; i < N; i++)
         {
             V[i] = gsl_spline_eval_integ (spline1, x[i], x.back(), acc1)
                  - gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) / x[i];
@@ -159,7 +159,7 @@ rArray interpolate_bound_free_potential_1
     {
         rArray integrand1(N), integrand2(N);
         # pragma omp parallel for
-        for (int i = 1; i < N; i++)
+        for (unsigned i = 1; i < N; i++)
         {
             integrand1[i] = P[i] * F[i] * std::pow(x[i],lambda);
             integrand2[i] = P[i] * F[i] * std::pow(x[i],-lambda-1);
@@ -174,7 +174,7 @@ rArray interpolate_bound_free_potential_1
         gsl_spline_init (spline2, x.data(), integrand2.data(), N);
         
         # pragma omp parallel for schedule (dynamic)
-        for (size_t i = 1; i < N; i++)
+        for (unsigned i = 1; i < N; i++)
         {
             V[i] = gsl_spline_eval_integ (spline1, 0., x[i], acc1) * std::pow(x[i],-lambda-1)
                  + gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) * std::pow(x[i],lambda);
@@ -390,7 +390,6 @@ Complex Idir_allowed
 )
 {
     size_t N = grid.size();
-    double h = grid.back() / N;
     
     rArray inner_lower(N), inner_higher_re(N), inner_higher_im(N);
     
@@ -402,17 +401,7 @@ Complex Idir_allowed
         inner_higher_re[i] = Vni[i] * yn[i] * ji[i];
     }
     
-    // forward partial trapezoidal sum (for low integral)
-    /*
-    double prev = 0., curr = inner_lower[1];
-    inner_lower[0] = 0.;
-    inner_lower[1] = 0.5 * (curr + prev);
-    for (size_t i = 2; i < N; i++)
-    {
-        prev = curr; curr = inner_lower[i];
-        inner_lower[i] = inner_lower[i-1] + 0.5 * (curr + prev);
-    }
-    */
+    // low integral
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
@@ -426,20 +415,7 @@ Complex Idir_allowed
         gsl_interp_accel_free (acc);
     }
     
-    // reverse partial trapezoidal sums (for high integral)
-    /*
-    double prevRe = inner_higher_re[N-1], currRe = inner_higher_re[N-2];
-    double prevIm = inner_higher_im[N-1], currIm = inner_higher_im[N-2];
-    inner_higher_re[N-1] = 0.; inner_higher_re[N-2] = 0.5 * (currRe + prevRe);
-    inner_higher_im[N-1] = 0.; inner_higher_im[N-2] = 0.5 * (currIm + prevIm);
-    for (size_t i = 2; i < N; i++)
-    {
-        prevRe = currRe; currRe = inner_higher_re[N-i-1];
-        prevIm = currIm; currIm = inner_higher_im[N-i-1];
-        inner_higher_re[N-i-1] = inner_higher_re[N-i] + 0.5 * (currRe + prevRe);
-        inner_higher_im[N-i-1] = inner_higher_im[N-i] + 0.5 * (currIm + prevIm);
-    }
-    */
+    // high integral
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
@@ -468,16 +444,10 @@ Complex Idir_allowed
     rArray outer_re(N), outer_im(N);
     double sum_outer_re = 0, sum_outer_im = 0;
     
-    /*
-    # pragma omp parallel for reduction (+:sum_outer_re,sum_outer_im)
-    for (size_t i = 1; i < N; i++)
-    {
-        sum_outer_re += Vfn[i] * jf[i] * (inner_lower[i] * yn[i] + inner_higher_re[i] * jn[i]);
-        sum_outer_im += Vfn[i] * jf[i] * (inner_lower[i] * jn[i] + inner_higher_im[i] * jn[i]);
-    }
-    */
     outer_re = Vfn * jf * (inner_lower * yn + inner_higher_re * jn);
     outer_im = Vfn * jf * (inner_lower * jn + inner_higher_im * jn);
+    
+    // outer integral (real and imaginary)
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
@@ -499,7 +469,6 @@ Complex Idir_allowed
         gsl_interp_accel_free (acc);
     }
     
-//     return Complex (sum_outer_re, sum_outer_im) * h * h;
     return Complex (sum_outer_re, sum_outer_im);
 }
 

@@ -117,26 +117,29 @@ template <class T> T simpson (double h, NumberArray<T> const & y)
  * 
  * The function template will return the scaled value of the indefinite integral
  * @f[
- *     I(a,b,c,u,v;z) = \frac{1}{x^{a+1}} \int x^a \mathrm{e}^{bx}
+ *     I(a,b,c,u,v;x) = \frac{1}{x^{a+1}} \int x^a \mathrm{e}^{bx}
  *     {}_1\!F_1\left(\matrix{u \cr v}\Big|\,cx\right)
  *     \mathrm{d}x \ .
  * @f]
- * The series representation, which is used here, is obtained by
- * a term-by-term integration. The result is
+ * The series representation used here, is obtained by
+ * a term-by-term integration of the combined series of the hypergeometric
+ * function and the exponential. After a change of summation indices, the result is
  * @f[
- *     I(a,b,c,u,v;z) = \sum_{k=0}^\infty \frac{1}{a+1+k}
- *     \sum_{n=0}^k \frac{(u)_n}{(v)_n} \frac{(bx)^{k-n}}{(k-n)!}
- *     \frac{(cx)^n}{n!} \ .
+ *     I(a,b,c,u,v;x) = \sum_{n=0}^\infty \frac{1}{a+1+n}
+ *     \sum_{k=0}^n \frac{(u)_k}{(v)_k} \frac{(bx)^{n-k}}{(n-k)!}
+ *     \frac{(cx)^k}{k!}
+ *     =
+ *     \sum_{n=0}^\infty \frac{1}{a+1+n} \frac{(bx)^n}{n!}
+ *     \sum_{k=0}^n \frac{(u)_k}{(v)_k} {n \choose k}
+ *     \frac{c^k}{b^k} \ .
  * @f]
  * This is an analytic function in all arguments except for @f$ a \in \mathbb{Z}^- @f$.
  * 
  * The function also accepts optional arguments that govern the precision
  * and the maximal number of iterations (terms of the outer sum).
- * Due to the template character the arguments "a", "b", "c", "u", "v" and "z"
- * are expected to be either all real or all complex.
- * The result has the corresponding type as well.
  * 
- * @note This method fails in inexact arithmetic.
+ * @note This method requires high precision (more than the conventional double precision)
+ * due to strong subtraction in the alternating sums.
  */
 template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double epsrel = 1e-10, unsigned maxiter = 1000)
 {
