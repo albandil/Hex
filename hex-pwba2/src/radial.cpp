@@ -519,29 +519,38 @@ double Idir_forbidden
     unsigned N = grid.size();
     double h = grid.back() / N;
     
-    rArray fpart = jf * Vfn;
-    rArray ipart = ji * Vni;
+    rArray fpart(N),  ipart(N);
+    
+    # pragma omp parallel for firstprivate (N)
+    for (unsigned i = 0; i < N; i++)
+    {
+        fpart[i] = jf[i] * Vfn[i];
+        ipart[i] = ji[i] * Vni[i];
+    }
     
     double suma = 0;
+    unsigned last_diagonal = N/2;
     
     // index "d" runs across the contours x - y = konst
-    for (unsigned d = 0; d < N/2; d++)
+    // TODO : parallelize using OpenMP
+    // TODO : use spline integration along and across the diagonals
+    for (unsigned d = 0; d < last_diagonal; d++)
     {
         // contribution of these contours
         double contrib = 0;
         
         if (d == 0)
         {
-            // index "i" runs along the diagonal i = x = y
+            // index "i" runs along the diagonal [x,y] = [i,i]
             for (unsigned i = 0; i < N; i++)
                 contrib += fpart[i] * ipart[i] * iscaled_n[i] * kscaled_n[i];
         }
         else
         {
-            // index "i" runs along the contour i = x = y + d
+            // index "i" runs along the contour [x,y] = [i,i-d]
             for (unsigned i = d; i < N; i++)
                 contrib += fpart[i-d] * ipart[i] * iscaled_n[i-d] * kscaled_n[i];
-            // index "i" runs along the contour i = x = y - d
+            // index "i" runs along the contour [x,y] = [i,i+d]
             for (unsigned i = 0; i < N - d; i++)
                 contrib += fpart[i+d] * ipart[i] * iscaled_n[i] * kscaled_n[i+d];
         }
@@ -552,7 +561,7 @@ double Idir_forbidden
         
         // check convergence (do not blindly integrate everything)
         if (std::abs(contrib) < 1e-10 * std::abs(suma))
-            break;
+            last_diagonal = d;
     }
     
     return suma * h * h;

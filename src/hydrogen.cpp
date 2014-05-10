@@ -22,7 +22,84 @@
 
 namespace Hydrogen
 {
+
+CarthesianBoundWaveFunction::CarthesianBoundWaveFunction (int N, int L, int M)
+    : N_(N), L_(L), M_(M)
+{
+    // compute product of norms (radial × angular)
+    norm_ = std::sqrt
+    (
+        std::pow(2./N,3) * gsl_sf_fact(N-L-1) / (2 * N * gsl_sf_fact(N+L))
+        * (2*L+1) / (4 * special::constant::pi)
+        * gsl_sf_fact(L - std::abs(M)) / gsl_sf_fact(L + std::abs(M))
+    ) * std::pow(1./N,L);
     
+    // for all terms of the Laguerre polynomial
+    for (int i = 0; i <= N - L - 1; i++)
+    {
+        double Nfactor = (i % 2 == 0 ? 1. : -1.) * std::pow(2./N,i) * gsl_sf_choose(N+L,N-L-1-i) / gsl_sf_fact(i);
+        
+        // for all terms of the z-dependent angular factor
+        for (int k = 0; k <= (L - std::abs(M))/2; k++)
+        {
+            double Lfactor = (k % 2 == 0 ? 1. : -1.) * gsl_sf_choose(L,k) * gsl_sf_choose(2*L-2*k,L)
+                                * gsl_sf_fact(L-2*k) / gsl_sf_fact(L-2*k-M);
+            
+            // for all terms of the x,y-dependent angular factor
+            for (int p = 0; p <= std::abs(M); p++)
+            {
+                Complex Mfactor = gsl_sf_choose(std::abs(M),p);
+                
+                if (M > 0) // (-1)^m * (Am + i*Bm)
+                {
+                    Mfactor *= (std::abs(M) % 2 == 0 ? 1. : -1.) * std::pow(Complex(0.,1.),std::abs(M)-p);
+                }
+                
+                if (M < 0) // Am - i * Bm
+                {
+                    Mfactor *= std::pow(Complex(0.,1.),p-std::abs(M));
+                }
+                
+                std::cout << "i = " << i << ", k = " << k << ", p = " << p << std::endl;
+                
+                // append new term to the list of terms
+                Term term;
+                term.c = Nfactor * Lfactor * Mfactor;
+                term.n = i + 2*k;
+                term.u = p;
+                term.v = std::abs(M) - p;
+                term.w = L - 2*k - std::abs(M);
+                terms_.push_back(term);
+            }
+        }
+    }
+}
+
+CarthesianBoundWaveFunction::~CarthesianBoundWaveFunction ()
+{
+    
+}
+
+Complex CarthesianBoundWaveFunction::operator() (double x, double y, double z) const
+{
+    Complex result = 0;
+    double r = std::sqrt(x*x+y*y+z*z);
+    
+    for (Term const & T : terms_)
+    {
+        Complex term = T.c;
+        
+        if (T.u != 0) term *= std::pow(x,T.u);
+        if (T.v != 0) term *= std::pow(y,T.v);
+        if (T.w != 0) term *= std::pow(z,T.w);
+        if (T.n != 0) term *= std::pow(r,T.n);
+        
+        result += term;
+    }
+    
+    return result * std::exp(-r / N_);
+}
+
 double lastZeroBound (int n, int l)
 {
     // all Laguerre(r) roots are less or equal to

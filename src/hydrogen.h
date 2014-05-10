@@ -31,7 +31,57 @@
  */
 namespace Hydrogen
 {
-    
+
+/**
+ * @brief Hydrogen bound wave function in Carthesian coordinates.
+ */
+class CarthesianBoundWaveFunction
+{
+    public:
+        
+        CarthesianBoundWaveFunction (int N, int L, int M);
+        
+        ~CarthesianBoundWaveFunction ();
+        
+        /**
+         * @brief Term of the multidimensional hydrogen bound function.
+         * 
+         * Term in the form
+         * @f[
+         *     c x^u y^v z^w r^n
+         * @f]
+         */
+        typedef struct
+        {
+            Complex c;
+            unsigned u, v, w, n;
+        }
+        Term;
+        
+        /**
+         * @brief Evaluate the function.
+         * 
+         * Evaluates the hydrogen function at @f$ \mathbf{r} = (x,y,z) @f$.
+         */
+        Complex operator() (double x, double y, double z) const;
+        
+        /**
+         * @brief Access the overall normalization factor.
+         */
+        double norm () const { return norm_; }
+        
+        /**
+         * @brief Access the list of terms.
+         */
+        std::vector<Term> const & terms () const { return terms_; }
+        
+    private:
+        
+        int N_, L_, M_;
+        double norm_;
+        std::vector<Term> terms_;
+};
+
 /**
  * @brief Hydrogen bound radial orbital.
  * 

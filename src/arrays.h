@@ -231,7 +231,7 @@ template <class T> class ArrayView
             : ArrayView() { std::swap(N_, r.N_); std::swap(array_, r.array_); }
         
         // destructor
-        virtual ~ArrayView () {}
+        ~ArrayView () {}
     
         /// Assignment operator.
         ArrayView<T> & operator = (const ArrayView<T> v)
@@ -1571,6 +1571,8 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
 }
 
 /**
+ * @brief Write 2D data to file.
+ * 
  * Write 2D data to file. To allow maximum flexibility, only extensions
  * of the data are passed to the function and a functor that will be
  * repeatedly called with coordinate pair for new data element.
@@ -1599,6 +1601,22 @@ template <class Fetcher> bool write_2D_data (size_t m, size_t n, const char* fil
     
     return true;
 }
+
+/**
+ * @brief Write 3D dataset to a VTK file.
+ * 
+ * Write 3D dataset to a VTK file. This file can be easily diplayed by the
+ * free program ParaView. The expected ordering of elements is
+ * @f$ f(x,y,z) @f$ = f[x*ny*nz + y*nz + z].
+ */
+void writeVTK
+(
+    std::ofstream & out,
+    const ArrayView<Complex> f,
+    const ArrayView<double> xgrid,
+    const ArrayView<double> ygrid,
+    const ArrayView<double> zgrid
+);
 
 //
 // aliases
