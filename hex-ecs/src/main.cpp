@@ -51,7 +51,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         throw exception("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
-    grid = linspace(0., cmd.zipmax, cmd.zipcount);
+    grid = linspace (0., cmd.zipmax, cmd.zipcount);
     
     // for all coupled angular momentum pairs
     for (unsigned ill = 0; ill < ll.size(); ill++)
@@ -64,11 +64,15 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         
         // write to file
         std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
-        bspline.writeVTK (
+        writeVTK
+        (
             out,
-            sol.slice (ill * N, (ill + 1) * N),
-            grid,
-            grid
+            bspline.zip
+            (
+                sol.slice (ill * N, (ill + 1) * N),
+                grid, grid
+            ),
+            grid, grid, rArray({0.})
         );
     }
 }

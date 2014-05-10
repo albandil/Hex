@@ -67,7 +67,7 @@ class Bspline
          * @param k       B-spline order.
          * @param r       Coordinate (independent variable).
          */
-        Complex bspline(int i, int iknot, int k, Complex r) const;
+        Complex bspline (int i, int iknot, int k, Complex r) const;
         
         /**
          * @brief Evaluate derivative of a B-spline.
@@ -81,7 +81,7 @@ class Bspline
          * @param k       B-spline order.
          * @param r       Coordinate (independent variable).
          */
-        Complex dspline(int i, int iknot, int k, Complex r) const;
+        Complex dspline (int i, int iknot, int k, Complex r) const;
         
         /** 
          * @brief B-spline.
@@ -89,7 +89,7 @@ class Bspline
          * Vectorized interface to the bspline function.
          * For parameters description see @ref bspline.
          */
-        void B(int i, int iknot, int n, const Complex* x, Complex* y) const;
+        void B (int i, int iknot, int n, const Complex* x, Complex* y) const;
         
         /**
          * @brief Derivative of a B-spline.
@@ -97,7 +97,7 @@ class Bspline
          * Vectorized interface to the dspline function.
          * For parameters description see @ref bspline.
          */
-        void dB(int i, int iknot, int n, const Complex* x, Complex* y) const;
+        void dB (int i, int iknot, int n, const Complex* x, Complex* y) const;
         
         /**
          * @brief Apply the ECS transformation.
@@ -144,11 +144,6 @@ class Bspline
         cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
         
         /**
-         * @brief Zip 2D expansion to VTK.
-         */
-        void writeVTK (std::ofstream & out, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
-        
-        /**
          * @brief Get knot index for coordinate.
          * 
          * Finds knot (interval @f$ \left< t_i,t_{i+1} \right> @f$) for 'x'.
@@ -166,7 +161,7 @@ class Bspline
          * @endcode
          * though the results are the same.
          */
-        Complex eval(const cArrayView coeff, double x) const;
+        Complex eval (const cArrayView coeff, double x) const;
         
         /**
          * @brief Evaluate 2D B-spline expansion.
@@ -178,7 +173,7 @@ class Bspline
          * @endcode
          * though the results are the same.
          */
-        Complex eval(const cArrayView coeff, double x, double y) const;
+        Complex eval (const cArrayView coeff, double x, double y) const;
         
         // getters
         
@@ -186,31 +181,31 @@ class Bspline
         inline Complex const & t (int i) const { return *(t_ + i); }
         
         /// Number of B-splines.
-        inline int Nspline() const { return Nspline_; }
+        inline int Nspline () const { return Nspline_; }
         
         /// Number of knots.
-        inline int Nknot() const { return Nknot_; }
+        inline int Nknot () const { return Nknot_; }
         
         /// Number of real knots.
-        inline int Nreknot() const { return Nreknot_; }
+        inline int Nreknot () const { return Nreknot_; }
         
         /// B-spline order.
-        inline int order() const { return order_; }
+        inline int order () const { return order_; }
         
         /// End of real grid.
-        inline double R0() const { return R0_; };
+        inline double R0 () const { return R0_; };
         
         /// End of complex grid (real, unrotated).
-        inline double Rmax() const { return Rmax_; };
+        inline double Rmax () const { return Rmax_; };
         
         /// ECS rotation angle.
-        inline double ECStheta() const { return theta_; }
+        inline double ECStheta () const { return theta_; }
         
         /// real knots
-        inline rArray const & rknots() const { return rknots_; }
+        inline rArray const & rknots () const { return rknots_; }
         
         /// complex knots
-        inline rArray const & cknots() const { return cknots_; }
+        inline rArray const & cknots () const { return cknots_; }
     
     private:
     

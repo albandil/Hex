@@ -1117,7 +1117,7 @@ void SSORCGPreconditioner::update (double E)
     }
 }
 
-void SSORCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+void SSORCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     if (cmd_.outofcore)
     {
@@ -1215,7 +1215,7 @@ void ILUCGPreconditioner::update (double E)
     }
 }
 
-void ILUCGPreconditioner::CG_prec(int iblock, const cArrayView r, cArrayView z) const
+void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     if (cmd_.outofcore)
     {
