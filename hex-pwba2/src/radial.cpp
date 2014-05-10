@@ -205,6 +205,7 @@ rArray interpolate_bound_free_potential
 {
     // array of bound-free potential evaluations
     unsigned N = x.size();
+    double rmax = x.back();
     rArray V (N);
     
     // precompute Coulomb zeros within the range of "x"
@@ -228,16 +229,16 @@ rArray interpolate_bound_free_potential
     // compute the integrals
     if (lambda == 0)
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N)
+        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,rt,rmax)
         {
-            auto potential = [&](double y) -> double
+            auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros](double y) -> double
             {
                 // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
                 if (y == 0.)
                     return 0;
                 
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ = 0
-                auto integrand = [&](double x) -> double
+                auto integrand = [Na,La,y,Kb,Lb](double x) -> double
                 {
                     return Hydrogen::P(Na,La,x) * (1./x - 1./y) * Hydrogen::F(Kb,Lb,x);
                 };
@@ -245,7 +246,7 @@ rArray interpolate_bound_free_potential
                 // integrate per node of the Coulomb function (precomputed before)
                 FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros,rt);
                 Q.setEpsAbs(0);
-                Q.integrate(y, x.back());
+                Q.integrate(y, rmax);
                 if (not Q.ok())
                 {
                     throw exception
@@ -265,16 +266,16 @@ rArray interpolate_bound_free_potential
     }
     else
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,lambda)
+        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,lambda,rt,rmax)
         {
-            auto potential = [&](double y) -> double
+            auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x](double y) -> double
             {
-                // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
+                // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
                 if (y == 0.)
                     return 0;
                 
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
-                auto integrand1 = [&](double x) -> double
+                auto integrand1 = [Na,La,Kb,Lb,lambda,y](double x) -> double
                 {
                     return Hydrogen::P(Na,La,x) * std::pow(x/y,lambda) * Hydrogen::F(Kb,Lb,x);
                 };
@@ -301,7 +302,7 @@ rArray interpolate_bound_free_potential
                 // integrate per node of the Coulomb function (precomputed before)
                 FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros,rt);
                 Q2.setEpsAbs(0);
-                Q2.integrate(y, x.back());
+                Q2.integrate(y, rmax);
                 if (not Q2.ok())
                 {
                     throw exception
@@ -415,52 +416,65 @@ Complex Idir_allowed
         inner_higher_re[i] = Vni[i] * yn[i] * ji[i];
     }
     
+    //
     // low integral
+    //
+    
+    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, grid.data(), inner_lower.data(), N);
+    
     # pragma omp parallel firstprivate (N)
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
-        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-        gsl_spline_init (spline, grid.data(), inner_lower.data(), N);
         
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_lower[i] = gsl_spline_eval_integ (spline, grid.front(), grid[i], acc);
         
-        gsl_spline_free (spline);
         gsl_interp_accel_free (acc);
     }
+    gsl_spline_free (spline);
     
+    //
     // high integral
+    //
+    
+    spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, grid.data(), inner_higher_re.data(), N);
+    
     # pragma omp parallel firstprivate (N)
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
-        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-        gsl_spline_init (spline, grid.data(), inner_higher_re.data(), N);
         
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_higher_re[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
         
-        gsl_spline_free (spline);
         gsl_interp_accel_free (acc);
     }
+    gsl_spline_free (spline);
+    
+    spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, grid.data(), inner_higher_im.data(), N);
+    
     # pragma omp parallel firstprivate (N)
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
-        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-        gsl_spline_init (spline, grid.data(), inner_higher_im.data(), N);
         
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_higher_im[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
         
-        gsl_spline_free (spline);
         gsl_interp_accel_free (acc);
     }
+    gsl_spline_free (spline);
     
     double sum_outer_re = 0, sum_outer_im = 0;
     
+    //
     // outer integral (real and imaginary)
+    //
+    
     # pragma omp parallel sections
     {
         # pragma omp section
