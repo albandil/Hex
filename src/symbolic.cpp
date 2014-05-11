@@ -23,6 +23,7 @@
 
 #include "complex.h"
 #include "misc.h"
+#include "special.h"
 #include "symbolic.h"
 
 symbolic::rational symbolic::onehalf = cln::cl_RA(1)/cln::cl_I(2);
@@ -446,7 +447,7 @@ symbolic::term symbolic::integrate_full (poly const & P)
         // check if it has integrable sine-singularity
         if (p.a == -1 and p.gf == GF_SIN)
         {
-            result.ki = result.ki * cln::double_approx(result.kr) + p.ki * cln::double_approx(p.kr) * (M_PI/2 - atan(cln::double_approx(p.c)/p.b));
+            result.ki = result.ki * cln::double_approx(result.kr) + p.ki * cln::double_approx(p.kr) * (special::constant::pi_half - atan(cln::double_approx(p.c)/p.b));
             result.kr = 1;
             
             // leave ki positive

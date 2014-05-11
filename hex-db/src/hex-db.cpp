@@ -96,7 +96,7 @@ void import (const char* sqlname)
     }
     
     // line numbers (current and total)
-    std::cout << "Counting lines..." << std::endl;
+    std::cout << "Counting lines..." << std::flush;
     unsigned line = 0, lines = std::count
     (
         std::istreambuf_iterator<char>(is),
@@ -113,7 +113,7 @@ void import (const char* sqlname)
         // query statement
         sqlitepp::statement st(db);
         
-        std::cout << "\rImporting data... " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
+        std::cout << "\rImporting data...  " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
         
         // read line from input stream
         std::string cmd, cmd1;
@@ -165,7 +165,7 @@ void update ()
 {
     for (const Variable* var : vlist)
     {
-        std::cout << "Updating " << var->id() << "..." << std::endl;
+        std::cout << "\rUpdating " << var->id() << "...      " << std::flush;
         
         for (std::string const & cmd : var->SQL_Update())
         {
@@ -189,7 +189,7 @@ void update ()
             }
         }
     }
-    std::cout << "The database has been successfully updated." << std::endl;
+    std::cout << "\rThe database has been successfully updated." << std::endl;
 }
 
 void optimize ()

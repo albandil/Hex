@@ -17,48 +17,51 @@
 #include "cmdline.h"
 #include "hex-db.h"
 #include "variables.h"
+#include "version.h"
 
 const std::string HelpText = 
-    "Usage: hex-db [options]\n"
+    "Usage:\n"
+    "\thex-db [options]\n"
+    "\n"
     "Options:\n"
-    "  --help            Display this information.\n"
-    "  --new             Create new database.\n"
-    "  --database <name> Use database <name> instead of the default \"hex.db\".\n"
-    "  --import <file>   Import SQL batch file.\n"
-    "  --dump <file>     Export all contents as a SQL batch file.\n"
-    "  --update          Update derived quantities e.g. after manual import using \"sqlite3\".\n"
-    "  --optimize        Execute VACUUM command, i.e. minimize the occupied space.\n"
-    "  --avail           Print out available data.\n"
-    "  --<var>           Compute/retrieve scattering variable <var>.\n"
-    "  --vars            Display all available scattering variables.\n"
-    "  --<param> <val>   Set scattering parameter <param> to the value <val>.\n"
-    "  --params <var>    Display all available scattering parameters for variable <var>.\n"
-    "  --Eunits <Eunits> Set units for energy: Ry, a.u. or eV.\n"
-    "  --Tunits <Tunits> Set units for output: a.u. or cgs.\n"
-    "  --Aunits <Aunits> Set units for angles: deg or rad.\n"
+    "\t--help             Display this information.\n"
+    "\t--new              Create new database.\n"
+    "\t--database <name>  Use database <name> instead of the default \"hex.db\".\n"
+    "\t--import <file>    Import SQL batch file.\n"
+    "\t--dump <file>      Export all contents as a SQL batch file.\n"
+    "\t--update           Update derived quantities e.g. after manual import using \"sqlite3\".\n"
+    "\t--optimize         Execute VACUUM command, i.e. minimize the occupied space.\n"
+    "\t--avail            Print out available data.\n"
+    "\t--<var>            Compute/retrieve scattering variable <var>.\n"
+    "\t--vars             Display all available scattering variables.\n"
+    "\t--<param> <val>    Set scattering parameter <param> to the value <val>.\n"
+    "\t--params <var>     Display all available scattering parameters for variable <var>.\n"
+    "\t--Eunits <Eunits>  Set units for energy: Ry, a.u. or eV (default: Ry).\n"
+    "\t--Tunits <Tunits>  Set units for output: a.u. or cgs (default: a.u.).\n"
+    "\t--Aunits <Aunits>  Set units for angles: deg or rad (default: deg).\n"
     "\n"
     "Usage examples:\n"
     "\n"
     "   # retrieve scattering amplitude\n"
-    "   > seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
+    "   > seq 0 180             | hex-db --database=\"hex.db\" --scatamp --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
     "\n"
     "   # retrieve differential cross section:\n"
-    "   > seq 0.01 0.01 3.14    | hex-db --database=\"hex.db\" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
+    "   > seq 0 180             | hex-db --database=\"hex.db\" --dcs     --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0 --E=0.75\n"
     "\n"
     "   # retrieve momentum transfer:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtf      --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --momtf   --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   # retrieve integral cross section:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ics        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ics     --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   # retrieve sum integral cross section:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ccs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --ccs     --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0\n"
     "\n"
     "   # retrieve collision strength:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --colls      --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --colls   --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0\n"
     "\n"
     "   #retrieve total cross section:\n"
-    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --tcs        --ni=1 --li=0 --mi=0\n"
+    "   > seq 0.650 0.001 0.850 | hex-db --database=\"hex.db\" --tcs     --ni=1 --li=0 --mi=0\n"
     "\n"
     "\nOn some locales a decimal comma is used instead of decimal point (e.g. on native Czech systems).\n"
     "This is not compatible with raw C/C++, one has to turn off the locale by executing\n"
@@ -68,14 +71,20 @@ const std::string HelpText =
     "depending on version of your shell.\n"
     "\n";
 
+void print_help_and_exit()
+{
+    std::cout << logo_raw() << std::endl;
+    std::cout << "=== Database interface program ===" << std::endl;
+    std::cout << std::endl << HelpText;
+    exit(0);
+}
 
 int main(int argc, char* argv[])
 {
     // if no parameters are given, print usage and return
     if (argc == 1)
     {
-        std::cout << HelpText;
-        return EXIT_SUCCESS;
+        print_help_and_exit();
     }
     
     // program parameters
@@ -93,7 +102,7 @@ int main(int argc, char* argv[])
     ParseCommandLine
     (
         argc, argv,
-        "help", "h",     0, [ & ](std::string opt) -> bool { std::cout << HelpText; return true; },
+        "help", "h",     0, [ & ](std::string opt) -> bool { print_help_and_exit(); return true; },
         "new", "n",      0, [ & ](std::string opt) -> bool { create_new = true; return true; },
         "database", "D", 1, [ & ](std::string opt) -> bool { dbname = opt; return true; },
         "import", "i",   1, [ & ](std::string opt) -> bool { doimport = true; sqlfile = opt; return true; },

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 
+#include "special.h"
 #include "variables.h"
 #include "vec3d.h"
 #include "version.h"
@@ -114,11 +115,11 @@ double change_units (aUnit A, aUnit B)
     
     // transform to radians
     if (A == aUnit_deg)
-        ufactor *= M_PI / 180;
+        ufactor *= special::constant::pi / 180;
     
     // transform from radians
     if (B == aUnit_deg)
-        ufactor *= 180 / M_PI;
+        ufactor *= 180 / special::constant::pi;
     
     return ufactor;
 }

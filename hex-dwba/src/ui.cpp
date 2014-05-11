@@ -23,7 +23,7 @@
 
 std::string help_text =
     "Usage:\n"
-    "\thex-dwba [options] <ni> <li> <nf> <lf> <L> <Ei>\n"
+    "\thex-dwba [options] <ni> <li> <nf> <lf> <Ei> <L> [<rmax>]\n"
     "\n"
     "Available options:\n"
     "\t--help           display this help\n"
@@ -106,7 +106,7 @@ int main (int argc, char *argv[])
     // add default rmax
     params.push_back("-1");
     
-    if (params.size() != 7)
+    if (params.size() < 7)
     {
         std::cout << std::endl << help_text << std::endl;
         exit(0);
@@ -117,27 +117,46 @@ int main (int argc, char *argv[])
     int Li = strtol(params[1], 0, 10);
     int Nf = strtol(params[2], 0, 10);
     int Lf = strtol(params[3], 0, 10);
-    int L  = strtol(params[4], 0, 10);
     
     // energy of the projectile
-    double Ei = strtod(params[5], 0);    // Ry
-    double ki = sqrt(Ei);
+    double Ei = strtod(params[4], 0);    // Ry
+    double ki = std::sqrt(Ei);
     double Ef = Ei - 1./(Ni*Ni) + 1./(Nf*Nf);
-    double kf = sqrt(Ef);
+    double kf = std::sqrt(Ef);
+    
+    // total angular momentum
+    int L  = strtol(params[5], 0, 10);
     
     // grid size
     double rmax = strtod(params[6], 0);
     
+    std::cout << "Total quantum numbers" << std::endl;
+    std::cout << "\ttotal L = " << L << std::endl << std::endl;
+    std::cout << "Initial quantum numbers" << std::endl;
+    std::cout << "\thydrogen Ni = " << Ni << std::endl;
+    std::cout << "\thydrogen Li = " << Li << std::endl;
+    std::cout << "\tprojectile ki = " << ki << std::endl << std::endl;
+    std::cout << "Final quantum numbers" << std::endl;
+    std::cout << "\thydrogen Nf = " << Nf << std::endl;
+    std::cout << "\thydrogen Lf = " << Lf << std::endl;
+    std::cout << "\tprojectile kf = " << kf << std::endl << std::endl;
+    std::cout << "Numerical settings" << std::endl;
+    if (rmax > 0)
+        std::cout << "\tgrid rmax = " << rmax << std::endl;
+    else
+        std::cout << "\tgrid rmax = auto" << std::endl;
+    std::cout << std::endl << std::endl;
+    
     // computed partial T-matrices
     cArrays Tdir, Texc;
+    
+    std::cout << "Running the computation..." << std::endl << std::endl;
     
     // main computational routine
     if (distort)
         dwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, rmax, direct, exchange);
     else
         pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
-    
-    std::cout << "Done." << std::endl << std::endl;
     
     //
     // write the T-matrices, sum cross sections
@@ -187,7 +206,7 @@ int main (int argc, char *argv[])
                 {
                     out << format
                     (
-                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
+                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
                         Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
                     );
                     
@@ -197,7 +216,7 @@ int main (int argc, char *argv[])
                 {
                     out << format
                     (
-                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
+                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
                         Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
                     );
                     
@@ -217,6 +236,8 @@ int main (int argc, char *argv[])
     
     out << "COMMIT;" << std::endl;
     out.close();
-        
+    
+    std::cout << std::endl << "Done." << std::endl << std::endl;
+    
     return 0;
 }

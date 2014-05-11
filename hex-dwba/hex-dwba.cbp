@@ -18,12 +18,15 @@
 					<Add option="-fexceptions" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_HDF" />
+					<Add option="-DNO_LAPACK" />
 					<Add directory="../win-include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
 					<Add option="-static-libstdc++" />
+         				<Add library="../win-libraries/libfftw3.a" />
 					<Add library="../win-libraries/libgsl.a" />
+          				<Add library="../win-libraries/libcln.a" />
 				</Linker>
 			</Target>
 		</Build>
@@ -32,20 +35,27 @@
 		<Unit filename="src/arrithm.h" />
 		<Unit filename="src/complex.h" />
 		<Unit filename="src/doc.h" />
-		<Unit filename="src/dwba1.cpp" />
-		<Unit filename="src/dwba1.h" />
+		<Unit filename="src/dwba.cpp" />
+		<Unit filename="src/dwba.h" />
 		<Unit filename="src/gausskronrod.h" />
 		<Unit filename="src/hdffile.cpp" />
 		<Unit filename="src/hdffile.h" />
 		<Unit filename="src/hydrogen.cpp" />
 		<Unit filename="src/hydrogen.h" />
-		<Unit filename="src/main.cpp" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/ode.h" />
 		<Unit filename="src/potential.cpp" />
 		<Unit filename="src/potential.h" />
-		<Unit filename="src/specf.cpp" />
-		<Unit filename="src/specf.h" />
+    		<Unit filename="src/pwba.cpp" />
+		<Unit filename="src/pwba.h" />
+    		<Unit filename="src/radial.cpp" />
+		<Unit filename="src/radial.h" />
+    		<Unit filename="src/romberg.h" />
+		<Unit filename="src/special.cpp" />
+		<Unit filename="src/special.h" />
+    		<Unit filename="src/symbolic.cpp" />
+		<Unit filename="src/symbolic.h" />
+		<Unit filename="src/ui.cpp" />
 		<Unit filename="src/version.cpp" />
 		<Unit filename="src/version.h" />
 		<Unit filename="src/wave_distort.cpp" />

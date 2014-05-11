@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "../arrays.h"
+#include "../special.h"
 #include "../variables.h"
 #include "../version.h"
 
@@ -140,8 +141,8 @@ bool StokesParameters::run
     
     // compute derived parameters
     rArray P1 = 2. * lambda - 1.;
-    rArray P2 = 2 * M_SQRT2 * R;
-    rArray P3 = -2 * M_SQRT2 * I;
+    rArray P2 = 2 * special::constant::sqrt_two * R;
+    rArray P3 = -2 * special::constant::sqrt_two * I;
     rArray Pl = hypot(P1, P2);
     rArray gamma = 0.5 * atan2(P2, P1);
     rArray Pplus = hypot(Pl, P3);
