@@ -22,6 +22,7 @@
 #include <exception>
 #include <fstream>
 #include <functional> 
+#include <iomanip>
 #include <limits>
 #include <locale>
 #include <iostream>
@@ -441,6 +442,63 @@ class Timer
         
         /// Start time.
         mutable std::chrono::system_clock::time_point start_;
+};
+
+/**
+ * @brief Output table.
+ */
+class OutputTable
+{
+    public:
+        
+        OutputTable ();
+        
+        template <class ...Params> void setWidths (Params ...p)
+        {
+            // if the item count changed, reset the alignment as well
+            if (widths_.size() != sizeof...(p))
+                alignment_ = std::vector<int>(sizeof...(p),0);
+            
+            // clear old widths
+            widths_.clear();
+            
+            // set new widths
+            append_(widths_, p...);
+        }
+        
+        template <class ...Params> void setAlignment (Params ...p)
+        {
+            alignment_.clear();
+            append_(alignment_, p...);
+        }
+        
+        template <int i> void write (std::ofstream & out) { out << std::endl; }
+        template <int i = 0, class T, class ...Params> void write (std::ofstream & out, T item, Params ...p)
+        {
+            // use field width and alignment (if available)
+            if (i < widths_.size())
+                out << std::setw(alignment_[i]);
+            if (i < alignment_.size())
+                out << (alignment_[i] % 2 == 0 ? std::left : std::right);
+            
+            // write the item
+            out << item;
+            
+            // write the rest of the items
+            write (out, p...);
+        }
+        
+    private:
+        
+        std::vector<int> widths_;
+        std::vector<int> alignment_;
+        
+        template <class Vector> void append_ (Vector v) {}
+        template <class Vector, class ...Params> void append_ (Vector v, unsigned w, Params ...p)
+        {
+            v.push_back(w);
+            append_(v, p...);
+        }
 };
 
 #endif

@@ -57,11 +57,11 @@ double DistortingPotential::operator () (double x) const
     
     // disallow distorsion by free states
     if (k_ != 0)
-        throw exception ("U not implemented for k != 0.");
+        throw exception ("Distorting potential not implemented for k != 0.");
     
     // stop if not enough precomputed coefficients
     if (n_ >= (int)Ucoeffs.size())
-        throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
+        throw exception ("Distorting potential not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
     
     // get correct polynomial coefficients
     rArray const & coeffs = Ucoeffs[n_];
@@ -75,7 +75,7 @@ double DistortingPotential::operator () (double x) const
 
 double DistortingPotential::plusMonopole (double x) const
 {
-    // in origin returm true asymptotic
+    // in origin return true asymptotic
     if (x == 0.)
         return getConstant();
     
@@ -91,11 +91,11 @@ double DistortingPotential::getConstant () const
     
     // disallow distorsion by free states
     if (k_ != 0)
-        throw exception ("U not implemented for k != 0.");
+        throw exception ("Distorting potential not implemented for k != 0.");
     
     // stop if not enough precomputed coefficients
     if (n_ >= (int)Ucoeffs.size())
-        throw exception ("U not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
+        throw exception ("Distorting potential not implemented for n = %d > %d.", n_, Ucoeffs.size() - 1);
     
     // return the x -> 0 limiting value withou the monopole term
     return Ucoeffs[n_].back();

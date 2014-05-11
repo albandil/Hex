@@ -334,14 +334,14 @@ template <class T, class OuterFunctionDerivative, class InnerFunctionDerivative>
  * @param l Orbital quantum number.
  * @param z Radius: real or complex argument.
  */
-Complex hydro_P(unsigned n, unsigned l, Complex z);
+Complex hydro_P (unsigned n, unsigned l, Complex z);
 
 /** Derivative of Pnl.
  * @param n
  * @param l
  * @param z
  */
-Complex dhydro_P(unsigned n, unsigned l, Complex z);
+Complex dhydro_P (unsigned n, unsigned l, Complex z);
 
 //
 // Ricatti-Bessel functions.
@@ -367,7 +367,7 @@ Complex dhydro_P(unsigned n, unsigned l, Complex z);
  * @param n Degree of the Riccati-Bessel function.
  * @param z Complex argument.
  */
-Complex ric_j(int n, Complex z);
+Complex ric_j (int n, Complex z);
 
 /**
  * Vectorized interface for \ref ric_j.
@@ -377,14 +377,14 @@ Complex ric_j(int n, Complex z);
  * @param lmax Angular momentum limit.
  * @param z Complex argument.
  */
-cArray ric_jv(int lmax, Complex z);
+cArray ric_jv (int lmax, Complex z);
 
 /** Derivative of Riccati-Bessel function
  * 
  * @param n Degree of the function.
  * @param z Complex argument.
  */
-Complex dric_j(int n, Complex z);
+Complex dric_j (int n, Complex z);
 
 /**
  * Vectorized interface for \ref dric_j.
@@ -394,7 +394,7 @@ Complex dric_j(int n, Complex z);
  * @param lmax Angular momentum limit.
  * @param z Complex argument.
  */
-cArray dric_jv(int lmax, Complex z);
+cArray dric_jv (int lmax, Complex z);
 
 /**
  * @brief Ricatti-Bessel function of the first kind, @f$ \hat{j}_n(x) @f$.
@@ -526,12 +526,12 @@ inline Complex ric_h_plus (int n, double x)
 /**
  * @brief Spherical harmonic function.
  */
-Complex sphY(int l, int m, double theta, double phi);
+Complex sphY (int l, int m, double theta, double phi);
 
 /**
  * @brief Bi-polar spherical harmonic function.
  */
-Complex sphBiY(int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2);
+Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2);
 
 /**
  * @brief Base class for radial functions.
@@ -547,7 +547,7 @@ public:
 /**
  * @brief Derivative of Ricatti-Bessel function of the first kind, @f$ \hat{j}_n'(x) @f$.
  */
-inline double dric_j(int n, double x)
+inline double dric_j (int n, double x)
 {
     if (n == 0)
         return cos(x);
@@ -558,7 +558,7 @@ inline double dric_j(int n, double x)
 /**
  * @brief Derivative of Ricatti-Bessel function of the second kind, @f$ \hat{y}_n'(x) @f$.
  */
-inline double dric_n(int n, double x)
+inline double dric_n (int n, double x)
 {
     if (n == 0)
         return sin(x);
@@ -569,7 +569,7 @@ inline double dric_n(int n, double x)
 /**
  * @brief Derivative of the modified Ricatti-Bessel function of the second kind, @f$ \hat{i}_n'(x) @f$.
  */
-inline double dric_i(int n, double x)
+inline double dric_i (int n, double x)
 {
     if (n == 0)
         return cosh(x);
@@ -580,7 +580,7 @@ inline double dric_i(int n, double x)
 /**
  * @brief Derivative of the modified Ricatti-Bessel function of the second kind, @f$ \hat{k}_n'(x) @f$.
  */
-inline double dric_k(int n, double x)
+inline double dric_k (int n, double x)
 {
     if (n == 0)
         return -exp(-x);
@@ -591,7 +591,7 @@ inline double dric_k(int n, double x)
 /**
  * @brief Derivative of scaled modified Ricatti-Bessel function of the second kind, @f$ (\mathrm{e}^{-x} \hat{i}_n(x))' @f$.
  */
-inline double dric_i_scaled(int n, double x)
+inline double dric_i_scaled (int n, double x)
 {
     if (n == 0)
         return exp(-2*x);
@@ -602,7 +602,7 @@ inline double dric_i_scaled(int n, double x)
 /**
  * @brief Scaled derivative of modified Ricatti-Bessel function of the second kind, @f$ (\mathrm{e}^x \hat{k}_n(x)) @f$.
  */
-inline double dric_k_scaled(int n, double x)
+inline double dric_k_scaled (int n, double x)
 {
     if (n == 0)
         return 0;
@@ -632,7 +632,7 @@ inline Complex dric_h_plus (int n, double x)
  * @param F Output reference for resulting value.
  * @param Fp Output reference for resulting derivative.
  */
-int coul_F_michel(int l, double k, double r, double& F, double& Fp);
+int coul_F_michel (int l, double k, double r, double& F, double& Fp);
 
 /**
  * @brief Evaluate Coulomb wave function (and its derivative).
@@ -651,14 +651,14 @@ int coul_F (int l, double k, double r, double & F, double & Fp);
  * @param r Radial coordinate.
  * @param sigma Optionally, the precomputed Coulomb phase shift.
  */
-double coul_F_asy(int l, double k, double r, double sigma = special::constant::Nan);
+double coul_F_asy (int l, double k, double r, double sigma = special::constant::Nan);
 
 /**
  * @brief Coulomb phase shift.
  * @param l Angular momentum.
  * @param k Wavenumber.
  */
-double coul_F_sigma(int l, double k);
+double coul_F_sigma (int l, double k);
 
 /**
  * @brief Check triangle inequality.
@@ -748,7 +748,7 @@ double computef (int lambda, int l1, int l2, int l1p, int l2p, int L);
  * integer (not half-integer) angular momenta.
  * [Otherwise one needs to correct the signs.]
  */
-double ClebschGordan(int l1, int m1, int l2, int m2, int L, int M);
+double ClebschGordan (int l1, int m1, int l2, int m2, int L, int M);
 
 /**
  * @brief Gaunt's integral.
@@ -758,13 +758,13 @@ double ClebschGordan(int l1, int m1, int l2, int m2, int L, int M);
  * \int_{4\pi} Y_{l_1m_1} Y_{l_2m_2} Y^{\ast}_{lm} \mathrm{d}\Omega \ .
  * @f]
  */
-double Gaunt(int l1, int m1, int l2, int m2, int l, int m);
+double Gaunt (int l1, int m1, int l2, int m2, int l, int m);
 
 /**
  * Compute number of angular momenta pairs @f$ \ell_1 @f$ and @f$ \ell_2 @f$ that
  * are less than or equal to "maxell" and compose the total angular momentum @f$ L @f$.
  */
-int triangle_count(int L, int maxell);
+int triangle_count (int L, int maxell);
 
 /**
  * @brief The hypergeometric function @f$ {}_2F_1 @f$.

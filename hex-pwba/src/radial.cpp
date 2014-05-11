@@ -439,7 +439,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
         R.integrate (0, special::constant::Inf);
-        std::cout << "Integral: " << R.result() << std::endl;
+//         std::cout << "Integral: " << R.result() << std::endl;
         
         std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();

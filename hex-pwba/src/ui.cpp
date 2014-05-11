@@ -22,13 +22,33 @@
 #include "special.h"
 #include "version.h"
 
+std::string help_text =
+    "Usage:\n"
+    "\thex-pwba [options] <ni> <li> <nf> <lf> <L> <Ei>\n"
+    "\n"
+    "Available options:\n"
+    "\t--help           display this help\n"
+    "\t--nodirect       skip computation of direct T-matrix\n"
+    "\t--noexchange     skip computation of exchange T-matrix\n";
+
 int main (int argc, char* argv[])
 {
+    // write program logo
+    std::cout << logo_raw() << std::endl;
+    std::cout << "=== Plane wave first Born approximation ===" << std::endl << std::endl;
+    
+    // echo command line
+    std::cout << "Command line used:" << std::endl;
+    std::cout << "\t";
+    for (int iarg = 0; iarg < argc; iarg++)
+        std::cout << argv[iarg] << " ";
+    std::cout << std::endl << std::endl;
+    
     // disable GSL error handler
     gsl_set_error_handler_off();
     
     // disable buffering of the standard output (-> immediate logging)
-    setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     
     // parse command line
     bool direct = true, exchange = true;
@@ -44,12 +64,23 @@ int main (int argc, char* argv[])
                 param.erase(param.begin());
             
             // compare with known switches
-            if (param == std::string("nodirect"))
+            if (param == std::string("help"))
+            {
+                std::cout << std::endl << help_text << std::endl;
+                exit (0);
+            }
+            else if (param == std::string("nodirect"))
+            {
                 direct = false;
+            }
             else if (param == std::string("noexchange"))
+            {
                 exchange = false;
+            }
             else
+            {
                 throw exception ("Unknown option \"%s\".", argv[iarg]);
+            }
         }
         
         // otherwise it is a number paramater
@@ -61,12 +92,9 @@ int main (int argc, char* argv[])
     
     if (params.size() != 6)
     {
-        printf("\nUsage:\n\thex-pwba [--nodirect] [--noexchange] <ni> <li> <nf> <lf> <L> <Ei>\n\n");
+        std::cout << std::endl << help_text << std::endl;
         exit(0);
     }
-    
-    // write program logo
-    std::cout << logo_raw() << "\n";
     
     // atomic quantum numbers
     int Ni = strtol(params[0], 0, 10);
@@ -86,6 +114,7 @@ int main (int argc, char* argv[])
     
     // main computational routine
     pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
+    std::cout << "Done." << std::endl << std::endl;
     
     //
     // write the T-matrices, sum cross sections
@@ -97,8 +126,18 @@ int main (int argc, char* argv[])
     out << "BEGIN TRANSACTION;\n";
     
     double sumsumsigma = 0.;
-    std::cout << "# E, L, sigma ..." << std::endl;
-    std::cout << Ei << " " << L << " ";
+    std::cout << std::endl << "Cross sections for mi -> mf transitions (and sums)" << std::endl;
+    std::cout << std::setw(5) << "E" << std::setw(5) << "L";
+    for (int Mi = -Li; Mi <= Li; Mi++)
+    {
+        for (int Mf = -Lf; Mf <= Lf; Mf++)
+        {
+            std::cout << std::setw(15) << format("%d -> %d", Mi, Mf);
+        }
+        std::cout << std::setw(15) << format("%d -> Sumf", Mi);
+    }   
+    std::cout << std::setw(15) << "Sumi -> Sumf" << std::endl;
+    std::cout << std::setw(5) << Ei << std::setw(5) << L;
     
     for (int Mi = -Li; Mi <= Li; Mi++)
     {
@@ -141,16 +180,16 @@ int main (int argc, char* argv[])
             }
             
             double sigma = kf/ki * (sigma_singlet + sigma_triplet);
-            std::cout << sigma << " ";
+            std::cout << std::setw(15) << sigma;
             sumsigma += sigma;
         }
         
-        std::cout << sumsigma << " ";
+        std::cout << std::setw(15) << sumsigma;
         sumsumsigma += sumsigma;
     }
-    std::cout << sumsumsigma << std::endl;
+    std::cout << std::setw(15) << sumsumsigma << std::endl;
     
-    out << "COMMIT;\n";
+    out << "COMMIT;" << std::endl;
     out.close();
     
     return EXIT_SUCCESS;

@@ -27,7 +27,7 @@ void pwba
     // allocate memory
     Tdir.resize((2*Li+1)*(2*Lf+1));
     Texc.resize((2*Li+1)*(2*Lf+1));
-
+    
     // for all outgoing partial waves
     for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
     {
@@ -63,7 +63,7 @@ void pwba
                     // compute angular integrals (Gaunt coefficients)
                     double Gaunts_dir = Gaunt(Li,Mi,lam,Mf-Mi,Lf,Mf) * Gaunt(lam,Mf-Mi,lf,Mi-Mf,li,0);
                     
-                    std::cout << "Gaunts_dir = " << Gaunts_dir << std::endl;
+//                     std::cout << "Gaunts_dir = " << Gaunts_dir << std::endl;
                     
                     // add the T-matrix contributions
                     Tdir[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_dir * Vdir;
@@ -93,7 +93,7 @@ void pwba
                     // compute angular integrals (Gaunt coefficients)
                     double Gaunts_exc = Gaunt(li,0,lam,Mf,Lf,Mf) * Gaunt(lam,Mf,lf,Mi-Mf,Li,Mi);
                     
-                    std::cout << "Gaunts_exc = " << Gaunts_exc << std::endl;
+//                     std::cout << "Gaunts_exc = " << Gaunts_exc << std::endl;
                     
                     // add the T-matrix contributions
                     Texc[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_exc * Vexc;
