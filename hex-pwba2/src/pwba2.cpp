@@ -190,6 +190,68 @@ cArrays PWBA2::PartialWave_direct
     return Tdir;
 }
 
+Complex W_1s (double kx, double ky, double kz, double px, double py, double pz)
+{
+    double alpha = 1;
+    double k2 = kx*kx + ky*ky + kz*kz, k = std::sqrt(k2);
+    double p2 = px*px + py*py + pz*pz, p = std::sqrt(p2);
+    
+    if (k == 0)
+        return 0.;
+    
+    Complex i_over_k (0.,1/k);
+    Complex A (k2 + alpha*alpha - p2, -2*alpha*p);
+    double B = alpha*alpha + (kx-px)*(kx-px) + (ky-py)*(ky-py) + (kz-pz)*(kz-pz);
+    Complex A_B = A/B;
+    
+    //           d   |
+    // evaluate -- I |
+    //          dα   |α=1
+    
+    Complex dA_da (2*alpha, -2*p);
+    double dB_da = 2 * alpha;
+    Complex dI_da = std::pow(A_B,i_over_k) * (i_over_k / (A*B) * dA_da - (i_over_k+1.) / (B*B) * dB_da);
+    
+    return -dI_da / special::constant::pi_sqrt;
+}
+
+Complex W_2s (double kx, double ky, double kz, double px, double py, double pz)
+{
+    double alpha = 0.5;
+    double k2 = kx*kx + ky*ky + kz*kz, k = std::sqrt(k2);
+    double p2 = px*px + py*py + pz*pz, p = std::sqrt(p2);
+    
+    if (k == 0)
+        return 0.;
+    
+    Complex i_over_k (0.,1/k);
+    Complex A = k2 + std::pow(Complex(alpha,-p), 2);
+    Complex B = alpha*alpha + std::pow(kx-px,2) + std::pow(ky-py,2) + std::pow(kz-pz,2);
+    
+    //           d   |
+    // evaluate -- I |
+    //          dα   |α=1/2
+    
+    Complex dA_da (2*alpha, -2*p);
+    Complex dB_da = 2*alpha;
+    Complex dI_da = i_over_k * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k+1.) * dA_da
+                  -(i_over_k+1.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+2.) * dB_da;
+    
+    //           d²   |
+    // evaluate --  I |
+    //          dα²   |α=1/2
+    
+    Complex d2A_da2 = 2;
+    Complex d2B_da2 = 2;
+    Complex d2I_da2 = i_over_k * (i_over_k-1.) * std::pow(A,i_over_k-2.) / std::pow(B,i_over_k+1.) * dA_da * dA_da
+                    - 2. * i_over_k * (i_over_k+1.) * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k) * dA_da * dB_da
+                    + i_over_k * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k-1.) * d2A_da2
+                    + (i_over_k+1.) * (i_over_k+2.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+3.) * dB_da * dB_da
+                    - (i_over_k+1.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+2.) * d2B_da2;
+    
+    return (-dI_da - 0.5*d2I_da2) / std::sqrt(8. * special::constant::pi);
+}
+
 cArrays PWBA2::FullTMatrix_direct
 (
     rArray grid,
@@ -199,24 +261,52 @@ cArrays PWBA2::FullTMatrix_direct
     int maxlevel_allowed, int maxlevel_forbidden
 )
 {
-    cArray Tdir;
+    double Etot = 0.5 * ki * ki - 0.5 / (Ni * Ni);
+    Complex Eplus (Etot, 1e-5);
+    double En = 0.5 * Etot;
+    double qn = std::sqrt(2 * En);
     
-    // for all bound intermediate states
-    std::cout << "\tBound intermediate states" << std::endl;
-    for (int Nn = 1; Nn <= maxNn; Nn++)
-    for (int Ln = 0; Ln <= std::min(maxLn, Nn-1); Ln++)
+    double qx  = 0,  qy  = 0,  qz  = qn;
+    double kix = ki, kiy = 0,  kiz = 0;
+    double kfx = 0,  kfy = kf, kfz = 0;
+    
+    rArray kxgrid = linspace<double>(-2.5,2.5,101);
+    rArray kygrid = linspace<double>(-2.5,2.5,101);
+    rArray kzgrid = linspace<double>(-2.5,2.5,101);
+    cArray Wi (kxgrid.size() * kygrid.size() * kzgrid.size());
+    cArray Wf (kxgrid.size() * kygrid.size() * kzgrid.size());
+    cArray Green (kxgrid.size() * kygrid.size() * kzgrid.size());
+    
+    for (unsigned ix = 0; ix < kxgrid.size()-1; ix++)
+    for (unsigned iy = 0; iy < kygrid.size()-1; iy++)
+    for (unsigned iz = 0; iz < kzgrid.size()-1; iz++)
     {
-        // compute energy of the intermediate projectile state
-        Complex en = ki*ki - 1./(Ni*Ni) + 1./(Nn*Nn);
+        double knx = 0.5*(kxgrid[ix]+kxgrid[ix+1]);
+        double kny = 0.5*(kygrid[iy]+kygrid[iy+1]);
+        double knz = 0.5*(kzgrid[iz]+kzgrid[iz+1]);
         
-        // get momentum of the projectile in the intermediate state
-        Complex kn = std::sqrt(en);
+        Wi[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = W_1s(kix-knx, kiy-kny, kiz-knz, qx, qy, qz)
+            / ( std::pow(kix-knx,2) + std::pow(kiy-kny,2) + std::pow(kiz-knz,2) );
         
-        // TODO
+        Wf[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = W_1s(kfx-knx, kfy-kny, kfz-knz, qx, qy, qz)
+            / ( std::pow(kfx-knx,2) + std::pow(kfy-kny,2) + std::pow(kfz-knz,2) );
+        
+        Green[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = 1.
+            / (Eplus - 0.5*(qx*qx+qy*qy+qz*qz) - 0.5*(knx*knx+kny*kny+knz*knz));
     }
     
-    // for all free intermediate states
-    // TODO
+    cArray result = Green * Wi * Wf;
+    for (Complex & x : result)
+    {
+        if (not std::isfinite(x.real()) or not std::isfinite(x.imag()))
+            x = 0.;
+    }
+    std::ofstream vtk ("integrand.vtk");
+    writeVTK_cells (vtk, result, kxgrid, kygrid, kzgrid);
+    vtk.close();
     
-    return cArrays ({ Tdir });
+    throw exception
+    (
+        "Computation of the full T-matrix element is not implemented yet."
+    );
 }

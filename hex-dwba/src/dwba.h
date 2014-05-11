@@ -13,8 +13,44 @@
 #ifndef HEX_DWBA_DWBA1
 #define HEX_DWBA_DWBA1
 
-#include "complex.h"
+#include "arrays.h"
 #include "potential.h"
+
+/**
+ * @brief Distorted-wave Born approximation.
+ * 
+ * This function computes all contributions to the T-matrix for the specified
+ * total angular momentum L in the Born approximation of the first-order.
+ * The contributions depend on all such "li" and "lf" that
+ * the following conditions must be satisfied:
+ *    |li - Li| <= L <= li + Li
+ *    |lf - Lf| <= L <= lf + Lf
+ * This results in the following bounds on "li" and "lf":
+ *    |Li - L| <= li <= Li + L
+ *    |Lf - L| <= lf <= Lf + L
+ * 
+ * @param Ni Initial atomic state.
+ * @param Li Initial atomic state.
+ * @param Nf Final atomic state.
+ * @param Lf Final atomic state.
+ * @param ki Initial projectile momentum.
+ * @param kf Final projectile momentum.
+ * @param L Total angular momentum.
+ * @param Tdir List of direct scattering T-matrices for all allowed "lf".
+ * @param Texc List of exchange scattering T-matrices for all allowed "lf".
+ * @param rmax Maximal grid radius.
+ * @param direct Whether to compute direct scattering contributions.
+ * @param exchange Whether to compute exhange scattering contributions.
+ */
+void dwba
+(
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf,
+    int L,
+    cArrays & Tdir, cArrays & Texc,
+    double rmax,
+    bool direct = true, bool exchange = true
+);
 
 /**
  * Namespace members compute contributions to the first order of the distorted
@@ -34,7 +70,8 @@ namespace DWBA1
  * \param l Partial wave (outgoing angular momentum).
  * \param k Initial (= final) wavenumber.
  */
-Complex computeDirect1e(
+Complex computeDirect1e
+(
     DistortingPotential const& U,
     int l, double k
 );
@@ -63,7 +100,8 @@ Complex computeDirect1e(
  * \param ki Initial projectile wave number.
  * \param li Initial projectile partial wave.
  */
-Complex computeDirect2e(
+Complex computeDirect2e
+(
     const DistortingPotential& U, int lambda,
     int Nf, int Lf, double kf, int lf,
     int Ni, int Li, double ki, int li
@@ -85,7 +123,8 @@ Complex computeDirect2e(
  * \param Lf Final atomic orbital quantum number.
  * \param kf Final projectile wavenumber.
  */
-Complex computeExchange1e(
+Complex computeExchange1e
+(
     DistortingPotential const& U,
     int Ni, int Li, double ki,
     int Nf, int Lf, double kf
@@ -115,7 +154,8 @@ Complex computeExchange1e(
  * \param ki Initial projectile wave number.
  * \param li Initial projectile partial wave.
  */
-Complex computeExchange2e(
+Complex computeExchange2e
+(
     const DistortingPotential& U, int lambda,
     int Nf, int Lf, double kf, int lf,
     int Ni, int Li, double ki, int li

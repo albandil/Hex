@@ -17,13 +17,13 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CXXDEBUG = -g -fPIC -std=c++11 -Wall -DNO_LAPACK $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNO_LAPACK $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
-LIBRARY = -lrt -lgsl -lgslcblas $(HDFLIBS)
+LIBRARY = -lrt -lgsl -lgslcblas $(HDFLIBS) -lcln
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
 LFLAGS = -fPIC $(LIBRARY)
 
-FILES = arrays dwba1 hdffile hydrogen main potential special \
+FILES = arrays dwba hdffile hydrogen potential pwba radial special symbolic ui \
         version wave_distort
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))

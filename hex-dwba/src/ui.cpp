@@ -10,32 +10,32 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <complex>
 #include <cstdio>
-#include <cstdlib>
-#include <vector>
+#include <iostream>
+#include <sstream>
 
 #include <gsl/gsl_sf.h>
 
 #include "arrays.h"
+#include "dwba.h"
 #include "pwba.h"
-#include "special.h"
 #include "version.h"
 
 std::string help_text =
     "Usage:\n"
-    "\thex-pwba [options] <ni> <li> <nf> <lf> <L> <Ei>\n"
+    "\thex-dwba [options] <ni> <li> <nf> <lf> <L> <Ei>\n"
     "\n"
     "Available options:\n"
     "\t--help           display this help\n"
+    "\t--nodistort      compute only plane wave Born approximation\n"
     "\t--nodirect       skip computation of direct T-matrix\n"
     "\t--noexchange     skip computation of exchange T-matrix\n";
 
-int main (int argc, char* argv[])
+int main (int argc, char *argv[])
 {
-    // write program logo
-    std::cout << logo_raw() << std::endl;
-    std::cout << "=== Plane wave first Born approximation ===" << std::endl << std::endl;
+    // draw package logo
+    std::cout << logo_raw() << "\n";
+    std::cout << "=== Distorted wave first Born approximation ===" << std::endl << std::endl;
     
     // echo command line
     std::cout << "Command line used:" << std::endl;
@@ -44,14 +44,19 @@ int main (int argc, char* argv[])
         std::cout << argv[iarg] << " ";
     std::cout << std::endl << std::endl;
     
-    // disable GSL error handler
+    // turn off GSL error jumps
     gsl_set_error_handler_off();
     
-    // disable buffering of the standard output (-> immediate logging)
-    std::setvbuf(stdout, nullptr, _IONBF, 0);
+#ifndef NO_HDF
+    H5::Exception::dontPrint();
+#endif
+    
+    // disable STDOUT/STDERR buffering
+    std::setvbuf(stdout, 0, _IONBF, 0);
+    std::setvbuf(stderr, 0, _IONBF, 0);
     
     // parse command line
-    bool direct = true, exchange = true;
+    bool distort = true, direct = true, exchange = true;
     std::vector<const char*> params;
     for (int iarg = 1; iarg < argc; iarg++)
     {
@@ -69,12 +74,19 @@ int main (int argc, char* argv[])
                 std::cout << std::endl << help_text << std::endl;
                 exit (0);
             }
+            else if (param == std::string("nodistort"))
+            {
+                std::cout << "Computing plane wave Born approximation." << std::endl;
+                distort = false;
+            }
             else if (param == std::string("nodirect"))
             {
+                std::cout << "Not computing direct contribution." << std::endl;
                 direct = false;
             }
             else if (param == std::string("noexchange"))
             {
+                std::cout << "Not computing exchange contribution." << std::endl;
                 exchange = false;
             }
             else
@@ -89,8 +101,12 @@ int main (int argc, char* argv[])
             params.push_back(argv[iarg]);
         }
     }
+    std::cout << std::endl;
     
-    if (params.size() != 6)
+    // add default rmax
+    params.push_back("-1");
+    
+    if (params.size() != 7)
     {
         std::cout << std::endl << help_text << std::endl;
         exit(0);
@@ -109,11 +125,18 @@ int main (int argc, char* argv[])
     double Ef = Ei - 1./(Ni*Ni) + 1./(Nf*Nf);
     double kf = sqrt(Ef);
     
+    // grid size
+    double rmax = strtod(params[6], 0);
+    
     // computed partial T-matrices
     cArrays Tdir, Texc;
     
     // main computational routine
-    pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
+    if (distort)
+        dwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, rmax, direct, exchange);
+    else
+        pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
+    
     std::cout << "Done." << std::endl << std::endl;
     
     //
@@ -121,7 +144,10 @@ int main (int argc, char* argv[])
     //
     
     char sqlname[50];
-    sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
+    if (distort)
+        sprintf(sqlname, "dwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
+    else
+        sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
     std::ofstream out(sqlname);
     out << "BEGIN TRANSACTION;\n";
     
@@ -191,6 +217,6 @@ int main (int argc, char* argv[])
     
     out << "COMMIT;" << std::endl;
     out.close();
-    
-    return EXIT_SUCCESS;
+        
+    return 0;
 }

@@ -13,7 +13,7 @@
 #include "arrays.h"
 #include "complex.h"
 #include "potential.h"
-#include "dwba1.h"
+#include "dwba.h"
 #include "hydrogen.h"
 #include "gausskronrod.h"
 #include "special.h"
@@ -22,7 +22,7 @@
 namespace DWBA1
 {
 
-Complex computeDirect1e(DistortingPotential const& U, int l, double k)
+Complex computeDirect1e (DistortingPotential const& U, int l, double k)
 {
     // get distorted wave
     DistortedWave chi_kl(k,l,U);
@@ -213,3 +213,127 @@ Complex computeExchange2e
 }
 
 } // end of namespace DWBA1
+
+void dwba
+(
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf,
+    int L,
+    cArrays & Tdir, cArrays & Texc,
+    double rmax, bool direct, bool exchange
+)
+{
+    // m⟶m' transition count
+    int MM = (2*Li+1)*(2*Lf+1);
+    
+    // allocate memory
+    Tdir.resize(MM);
+    Texc.resize(MM);
+    
+    // initial and final atomic state
+    HydrogenFunction psii(Ni, Li);
+    HydrogenFunction psif(Nf, Lf);
+    
+    // distorting potentials
+    DistortingPotential Uf(Nf,rmax);
+    DistortingPotential Ui(Ni,rmax);
+    
+    for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
+    {
+        // add new T-matrix for this outgoing partial wave
+        for (cArray & T : Tdir)
+            T.push_back(0.);
+        for (cArray & T : Texc)
+            T.push_back(0.);
+        
+        std::cout << "lf = " << lf << std::endl;
+        
+        DistortedWave chif(kf,lf,Ui);
+        
+        // direct 1e
+        if (Ni == Nf and Li == Lf)
+        {
+            Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
+            
+            std::cout << "\tdirect 1e = " << tmat << std::endl;
+            
+            for (int Mi = -Li; Mi <= Li; Mi++)
+            for (int Mf = -Lf; Mf <= Lf; Mf++)
+                Tdir[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat;
+        }
+        
+        for (int li = std::abs(Li - L); li <= Li + L; li++)
+        {
+            // conserve angular momentum
+            if (li < lf - Li - Lf)
+                continue;
+            
+            // conserve angular momentum
+            if (li > lf + Li + Lf)
+                break;
+            
+            // conserve parity
+            if ((li + Li) % 2 != (lf + Lf) % 2)
+                continue;
+            
+            std::cout << "\tli = " << li << std::endl;
+            
+            cArray DD_lf_li(MM), DE_lf_li(MM), ED_lf_li(MM), EE_lf_li(MM);
+            DistortedWave chii(ki,li,Ui);
+            
+            // exchange 1e
+            if (Li == lf and Lf == li)
+            {
+                Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
+                
+                std::cout << "\t\texchange 1e = " << tmat << std::endl;
+                
+                for (int Mi = -Li; Mi <= Li; Mi++)
+                    for (int Mf = -Lf; Mf <= Lf; Mf++)
+                        Texc[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += (Mf == 0) ? tmat : 0.;
+            }
+            
+            // direct 2e
+            for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); lambda <= std::min(Li+Lf,li+lf); lambda++)
+            {
+                Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
+                
+                std::cout << "\t\tdirect 2e = " << tmat << std::endl;
+                
+                for (int Mi = -Li; Mi <= Li; Mi++)
+                {
+                    for (int Mf = -Lf; Mf <= Lf; Mf++)
+                    {
+                        double Gaunts_dir = Gaunt(lambda, Mi - Mf, li, 0, lf, Mi - Mf) * Gaunt(lambda, Mi - Mf, Lf, Mf, Li, Mi);
+                        
+                        if (not std::isfinite(Gaunts_dir))
+                            throw exception ("Gaunt failure!\n");
+                        
+                        Tdir[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * Gaunts_dir;
+                    }
+                }
+            }
+            
+            // exchange 2e
+            for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
+            {
+                Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
+                
+                std::cout << "\t\texchange 2e = " << tmat << std::endl;
+                
+                for (int Mi = -Li; Mi <= Li; Mi++)
+                {
+                    for (int Mf = -Lf; Mf <= Lf; Mf++)
+                    {
+                        double Gaunts_exc = Gaunt(lambda, -Mf, Li, Mi, lf, Mi - Mf) * Gaunt(lambda, -Mf, Lf, Mf, li, 0);
+                        
+                        if (not std::isfinite(Gaunts_exc))
+                            throw exception ("Gaunt failure!\n");
+                        
+                        Texc[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * Gaunts_exc;
+                    }
+                }
+            }
+        } /* for li */
+    } /* for lf */
+}
