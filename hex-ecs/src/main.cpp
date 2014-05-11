@@ -460,8 +460,8 @@ StgExtract:
                              << nf << "," << lf << "," << mf << ","
                              << inp.L  << "," << Spin << ","
                              << inp.Ei[ie] << "," << ell << "," 
-                             << T_ell[i].real() << "," << T_ell[i].imag()
-                             << ");" << std::endl;
+                             << T_ell[i].real() << "," << T_ell[i].imag() << ","
+                             << "0, 0);" << std::endl;
                     }
                 }
                 
