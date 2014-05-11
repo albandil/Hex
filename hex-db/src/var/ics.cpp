@@ -30,7 +30,7 @@
 
 void db_sqrt (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
-    sqlite3_result_double(pdb, sqrt(sqlite3_value_double(*val)));
+    sqlite3_result_double(pdb, std::sqrt(sqlite3_value_double(*val)));
 }
 
 //
@@ -64,7 +64,7 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     int tail = CB.tail(1e-10);
     auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(sin(beta), tail)); };
     ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-    double result = integrator.integrate(0, 0.25 * M_PI);
+    double result = integrator.integrate(0, special::constant::pi_quart);
     
     // use result of the integration
     sqlite3_result_double(pdb, result);

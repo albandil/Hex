@@ -175,7 +175,7 @@ bool CompleteCrossSection::run
     
     // compose query
     sqlitepp::statement stb(db);
-    stb << "SELECT Ei, borncs(cheb) FROM " + BornFullTMatrix::Id + " "
+    stb << "SELECT Ei, sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*borncs(cheb)/39.478418 FROM " + BornFullTMatrix::Id + " " // 4π²
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
