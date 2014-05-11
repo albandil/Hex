@@ -133,7 +133,7 @@ template<> void write_array (const ArrayView<double> grid, const ArrayView<Compl
     fout.close();
 }
 
-void writeVTK
+void writeVTK_points
 (
     std::ofstream & out,
     const cArrayView ev,
@@ -143,44 +143,99 @@ void writeVTK
 )
 {
     // array lengths
-    int nx = xgrid.size();
-    int ny = ygrid.size();
-    int nz = zgrid.size();
-    int N = nx * ny * nz;
+    unsigned nx = xgrid.size();
+    unsigned ny = ygrid.size();
+    unsigned nz = zgrid.size();
+    unsigned N = nx * ny * nz;
+    
+    assert (ev.size() == N);
     
     // write VTK header
-    out << "# vtk DataFile Version 3.0\n";
-    out << "Wave function\n";
-    out << "ASCII\n";
-    out << "DATASET RECTILINEAR_GRID\n";
-    out << "DIMENSIONS " << nx << " " << ny << " " << nz << "\n";
-    out << "X_COORDINATES " << nx << " float\n";
-    out << to_string(xgrid) << "\n";
-    out << "Y_COORDINATES " << ny << " float\n";
-    out << to_string(ygrid) << "\n";
-    out << "Z_COORDINATES " << nz << " float\n";
-    out << to_string(zgrid) << "\n";
-    out << "POINT_DATA " << N << "\n";
-    out << "FIELD wavefunction 2\n";
+    out << "# vtk DataFile Version 3.0" << std::endl;
+    out << "Wave function" << std::endl;
+    out << "ASCII" << std::endl;
+    out << "DATASET RECTILINEAR_GRID" << std::endl;
+    out << "DIMENSIONS " << nx << " " << ny << " " << nz << std::endl;
+    out << "X_COORDINATES " << nx << " float" << std::endl;
+    out << to_string(xgrid) << std::endl;
+    out << "Y_COORDINATES " << ny << " float" << std::endl;
+    out << to_string(ygrid) << std::endl;
+    out << "Z_COORDINATES " << nz << " float" << std::endl;
+    out << to_string(zgrid) << std::endl;
+    out << "POINT_DATA " << N << std::endl;
+    out << "FIELD wavefunction 2" << std::endl;
     
     // save real part
-    out << "realpart 1 " << N << " float\n";
-    for (int i = 0; i < nx; i++)
+    out << "Re 1 " << N << " float" << std::endl;
+    for (unsigned i = 0; i < nx; i++)
     {
-        for (int j = 0; j < ny; j++)
-        for (int k = 0; k < nz; k++)
+        for (unsigned j = 0; j < ny; j++)
+        for (unsigned k = 0; k < nz; k++)
             out << ev[(i * ny + j) * nz + k].real() << " ";
-        out << "\n";
+        out << std::endl;
     }
     
     // save imaginary part
-    out << "imagpart 1 " << N << " float\n";
-    for (int i = 0; i < nx; i++)
+    out << "Im 1 " << N << " float" << std::endl;
+    for (unsigned i = 0; i < nx; i++)
     {
-        for (int j = 0; j < ny; j++)
-        for (int k = 0; k < nz; k++)
+        for (unsigned j = 0; j < ny; j++)
+        for (unsigned k = 0; k < nz; k++)
             out << ev[(i * ny + j) * nz + k].imag() << " ";
-        out << "\n";
+        out << std::endl;
+    }
+}
+
+void writeVTK_cells
+(
+    std::ofstream & out,
+    const cArrayView ev,
+    const rArrayView xgrid,
+    const rArrayView ygrid,
+    const rArrayView zgrid
+)
+{
+    // point counts, cell counts
+    unsigned px = xgrid.size(), cx = px - 1;
+    unsigned py = ygrid.size(), cy = py - 1;
+    unsigned pz = zgrid.size(), cz = pz - 1;
+    unsigned N = cx * cy * cz;
+    
+    assert (ev.size() == N);
+    
+    // write VTK header
+    out << "# vtk DataFile Version 3.0" << std::endl;
+    out << "Wave function" << std::endl;
+    out << "ASCII" << std::endl;
+    out << "DATASET RECTILINEAR_GRID" << std::endl;
+    out << "DIMENSIONS " << px << " " << py << " " << pz << std::endl;
+    out << "X_COORDINATES " << px << " float" << std::endl;
+    out << to_string(xgrid) << std::endl;
+    out << "Y_COORDINATES " << py << " float" << std::endl;
+    out << to_string(ygrid) << std::endl;
+    out << "Z_COORDINATES " << pz << " float" << std::endl;
+    out << to_string(zgrid) << std::endl;
+    out << "CELL_DATA " << N << std::endl;
+    out << "FIELD wavefunction 2" << std::endl;
+    
+    // save real part
+    out << "Re 1 " << N << " float" << std::endl;
+    for (unsigned i = 0; i < cx; i++)
+    {
+        for (unsigned j = 0; j < cy; j++)
+        for (unsigned k = 0; k < cz; k++)
+            out << ev[(i * py + j) * pz + k].real() << " ";
+        out << std::endl;
+    }
+    
+    // save imaginary part
+    out << "Im 1 " << N << " float" << std::endl;
+    for (unsigned i = 0; i < cx; i++)
+    {
+        for (unsigned j = 0; j < cy; j++)
+        for (unsigned k = 0; k < cz; k++)
+            out << ev[(i * py + j) * pz + k].imag() << " ";
+        out << std::endl;
     }
 }
 

@@ -64,7 +64,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         
         // write to file
         std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
-        writeVTK
+        writeVTK_points
         (
             out,
             bspline.zip
@@ -89,9 +89,9 @@ int main (int argc, char* argv[])
     // echo command line
     std::cout << "Command line used:" << std::endl;
     std::cout << "\t";
-    for (int iarg = 1; iarg < argc; iarg++)
+    for (int iarg = 0; iarg < argc; iarg++)
         std::cout << argv[iarg] << " ";
-    std::cout << std::endl;
+    std::cout << std::endl << std::endl;
     
     // turn off GSL and HDF exceptions
     gsl_set_error_handler_off();
