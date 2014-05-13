@@ -11,8 +11,8 @@ CXX = g++
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -g -O3 -fopenmp -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN
-LFLAGS = -g -O3 -fopenmp -lgsl -lgslcblas -lfftw3 -llapack
+CFLAGS = -g -O3 -fopenmp -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN $(shell gsl-config --cflags)
+LFLAGS = -g -O3 -fopenmp $(shell gsl-config --libs) -lfftw3 -llapack
 
 FILES = arrays hydrogen pwba2 radial special ui version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
