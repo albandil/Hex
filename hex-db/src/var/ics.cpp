@@ -122,7 +122,7 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db) const
 std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + IntegralCrossSection::Id + "' ("
+        "CREATE TABLE IF NOT EXISTS '" + IntegralCrossSection::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -133,7 +133,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
             "S  INTEGER, "
             "Ei DOUBLE PRECISION, "
             "sigma DOUBLE PRECISION, "
-            "sigmaB DOUBLE PRECISION, "
+            "sigmaB DOUBLE PRECISION DEFAULT 0, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
         ")"
     };

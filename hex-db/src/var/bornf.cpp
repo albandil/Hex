@@ -41,7 +41,7 @@ bool BornFullTMatrix::initialize (sqlitepp::session & db) const
 std::vector<std::string> const & BornFullTMatrix::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + BornFullTMatrix::Id + "' ("
+        "CREATE TABLE IF NOT EXISTS '" + BornFullTMatrix::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "

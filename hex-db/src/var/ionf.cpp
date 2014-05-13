@@ -41,7 +41,7 @@ bool IonizationF::initialize (sqlitepp::session & db) const
 std::vector<std::string> const & IonizationF::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + IonizationF::Id + "' ("
+        "CREATE TABLE IF NOT EXISTS '" + IonizationF::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "

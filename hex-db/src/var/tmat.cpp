@@ -37,7 +37,7 @@ bool TMatrix::initialize (sqlitepp::session & db) const
 std::vector<std::string> const & TMatrix::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE '" + TMatrix::Id + "' ("
+        "CREATE TABLE IF NOT EXISTS '" + TMatrix::Id + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -50,8 +50,8 @@ std::vector<std::string> const & TMatrix::SQL_CreateTable () const
             "ell INTEGER, "
             "Re_T_ell DOUBLE PRECISION, "
             "Im_T_ell DOUBLE PRECISION, "
-            "Re_TBorn_ell DOUBLE PRECISION, "
-            "Im_TBorn_ell DOUBLE PRECISION, "
+            "Re_TBorn_ell DOUBLE PRECISION DEFAULT 0, "
+            "Im_TBorn_ell DOUBLE PRECISION DEFAULT 0, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
         ")"
     };
