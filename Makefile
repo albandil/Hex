@@ -1,4 +1,4 @@
-SUBDIRS = hex-ccc hex-db hex-ecs hex-pwba hex-dwba utilities
+SUBDIRS = hex-ccc hex-db hex-ecs hex-pwba2 hex-dwba utilities
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -18,5 +18,5 @@ dist: $(SUBDIRS)
 	   hex-db/hex-db-$(GIT_COMMIT).tar.gz \
 	   hex-dwba/hex-dwba-$(GIT_COMMIT).tar.gz \
 	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \
-	   hex-pwba/hex-pwba-$(GIT_COMMIT).tar.gz     release/
+	   hex-pwba2/hex-pwba2-$(GIT_COMMIT).tar.gz     release/
 

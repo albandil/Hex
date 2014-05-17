@@ -109,9 +109,9 @@ int main (int argc, char* argv[])
     // check input file
     if (not cmd.inputfile.is_open())
     {
-        cmd.inputfile.open("hex.inp");
+        cmd.inputfile.open("ecs.inp");
         if (not cmd.inputfile.good())
-            throw exception("Input error: Cannot open the file \"hex.inp\".");
+            throw exception("Input error: Cannot open the file \"ecs.inp\".");
     }
     
     // get input from input file

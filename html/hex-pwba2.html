@@ -47,26 +47,23 @@
 	<div class = "sekce">Hex-pwba</div>
 
 	<div class = "text">
-	This program computes the T-matrix from the basic first order Born
+	This program computes the T-matrix from the basic second order Born
 	approximation,
 	</div>
 	
 	\[
-		T = -4\pi^2 \left<\Psi_f\right| H_{\mathrm{full}} - H_{\mathrm{free}} \left|\Psi_i\right> \ .
+		T = -4\pi^2 \left<\Psi_f\right| V + VGV \left|\Psi_i\right> \ .
 	\]
 
 	<div class = "text-noindent">
 	The initial and final states \( \Psi \) are taken as products of the atomic
 	(\(\psi\)) and projectile (\(\beta\)) function. The exchange interaction is
 	ignored in the present implementation, as it doesn't influence the cross
-	sections in the domain of validity of the method. Corresponding sections of the
-	code are, however, present in the sources (only commented out). The exchange
-	integrals are more computationally demanding, so their inclusion is considered
-	redundant.
+	sections in the domain of validity of the method. 
 	</div>
 
 	<div class = "text">
-	For details see the <a href = "hex-pwba/index.html">Doxygen documentation</a>.
+	For details see the <a href = "hex-pwba2/index.html">Doxygen documentation</a>.
 	</div>
 
 	</div> <!-- rám -->

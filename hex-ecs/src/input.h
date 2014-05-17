@@ -25,9 +25,9 @@
  * 
  * This class uses @ref ParseCommandLine for parsing of the command line.
  * The information on valid switches can be retrieved by executing
-   @verbatim
-   hex-ecs --help
-   @endverbatim
+ * <pre>
+ * hex-ecs --help
+ * </pre>
  * Some more general comments on the switches are in the above mentioned
  * class.
  */
@@ -43,9 +43,9 @@ class CommandLine
          * <table>
          * <tr><th>Command line option</th><th>Program itinerary</th></tr>
          * <tr><td>(none)</td><td>StgRadial | StgSolve | StgExtract</td></tr>
-         * <tr><td>--stg-integ</td><td>StgRadial</td></tr>
-         * <tr><td>--stg-integ-solve</td><td>StgRadial | StgSolve</td></tr>
-         * <tr><td>--stg-extract</td><td>StgiExtract</td></tr>
+         * <tr><td>\--stg-integ</td><td>StgRadial</td></tr>
+         * <tr><td>\--stg-integ-solve</td><td>StgRadial | StgSolve</td></tr>
+         * <tr><td>\--stg-extract</td><td>StgiExtract</td></tr>
          * </table>
          */
         typedef enum {
