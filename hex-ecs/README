@@ -29,6 +29,8 @@ Here is the list of the libraries with versions that were used:
             Needed, obtainable from 
                 http://www.hdfgroup.org/HDF5/release/obtain5.html
             Used for intermediate output of results.
+            The C++ version of the library is used. If custom-compiling, use
+                ./configure --enable-cxx
 
  * UMFPACK 5.6.1
             Needed, obtainable as a part of SuiteSparse from 

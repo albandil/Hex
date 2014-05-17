@@ -25,6 +25,8 @@ Here is the list of the libraries with versions that were used:
             Optional, obtainable from 
                 http://www.hdfgroup.org/HDF5/release/obtain5.html
             Used for intermediate output of results.
+            The C++ version of the library is used. If custom-compiling, use
+                ./configure --enable-cxx
 
  * GSL 1.15
             Needed, obtainable from
@@ -35,6 +37,9 @@ Here is the list of the libraries with versions that were used:
             Needen, obtainable from
                 http://www.ginac.de/CLN/
             Used for arbitrary-precision rational arithmetic in the plane wave method.
+            When custom-compiling, on some systems it may be necessary to comment out
+            some time-related function declarations, which are already (and incompatibly)
+            declared in system headers.
 
 Some or all of the libraries may be present in precompiled form in the repositories
 of the Linux distribution used.
