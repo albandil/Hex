@@ -1,25 +1,55 @@
 .PHONY: all clean allclean dist distclean doc docclean
 
-##############################################################
-# Editable part
 
-CPP = g++
-# CPP = icpc
+################################################################################
+# Editable section                                                             #
 
-##############################################################
+# ---------------------------------------------------------------------------- #
+# Compiler and linker + flags                                                  #
+# ---------------------------------------------------------------------------- #
+
+CXX = g++
 
 CFLAGS = -Wall -std=c++11 -fPIC -fopenmp
-LFLAGS =  -fopenmp -lgsl -lopenblas -lgslcblas -lcln
+LFLAGS = -fopenmp
+
+# ---------------------------------------------------------------------------- #
+# Lapack                                                                       #
+# ---------------------------------------------------------------------------- #
+
+LAPACKFLAGS =
+LAPACKLIBS = -lopenblas
+
+# ---------------------------------------------------------------------------- #
+# GSL                                                                          #
+# ---------------------------------------------------------------------------- #
+
+GSLFLAGS = $(shell gsl-config --cflags)
+GSLLIBS = $(shell gsl-config --libs)
+
+# ---------------------------------------------------------------------------- #
+# CLN                                                                          #
+# ---------------------------------------------------------------------------- #
+
+CLNFLAGS =
+CLNLIBS = -lcln
+                                                                               #
+################################################################################
+
+
+CFLAGS += $(GSLFLAGS) $(CLNFLAGS) $(LAPACKFLAGS)
+LFLAGS += $(GSLLIBS) $(CLNLIBS) $(LAPACKLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DNO_UMFPACK -DNO_PNG -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DNO_UMFPACK -DNO_PNG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays basis hdffile main matrix moments potential quadrature special symbolic version
+FILES = arrays basis hdffile main matrix moments potential \
+        quadrature special symbolic version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
@@ -58,6 +88,6 @@ bin/hex-ccc: $(OBJECTS)
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 -include $(wildcard obj/*.dep)

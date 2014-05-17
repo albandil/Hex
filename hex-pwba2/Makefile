@@ -1,18 +1,59 @@
 .PHONY: all clean allclean doc docclean pollversion dist distclean
 
-##############################################################
-# Editable part
 
-# compiler executable
+################################################################################
+# Editable section                                                             #
+
+# ---------------------------------------------------------------------------- #
+# Compiler and linker + flags                                                  #
+# ---------------------------------------------------------------------------- #
+
 CXX = g++
-# CXX = icpc
-                                                             #
-##############################################################
+
+CFLAGS = -Wall -std=c++11 -fPIC -fopenmp
+LFLAGS = -fopenmp
+
+# ---------------------------------------------------------------------------- #
+# GSL                                                                          #
+# ---------------------------------------------------------------------------- #
+
+GSLFLAGS = $(shell gsl-config --cflags)
+GSLLIBS = $(shell gsl-config --libs)
+
+# ---------------------------------------------------------------------------- #
+# CLN                                                                          #
+# ---------------------------------------------------------------------------- #
+
+CLNFLAGS =
+CLNLIBS = -lcln
+
+# ---------------------------------------------------------------------------- #
+# FFTW                                                                         #
+# ---------------------------------------------------------------------------- #
+
+FFTWFLAGS = 
+FFTWLIBS = -lfftw3
+
+# ---------------------------------------------------------------------------- #
+# Lapack                                                                       #
+# ---------------------------------------------------------------------------- #
+
+LAPACKFLAGS = 
+LAPACKLIBS = -lopenblas
+                                                                               #
+################################################################################
+
+
+CFLAGS += $(GSLFLAGS) $(CLNFLAGS) $(LAPACKFLAGS) $(FFTWFLAGS)
+LFLAGS += $(GSLLIBS) $(CLNLIBS) $(LAPACKLIBS) $(FFTWLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS = -g -O3 -fopenmp -Wall -std=c++11 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG -DNO_ALIGN $(shell gsl-config --cflags)
-LFLAGS = -g -O3 -fopenmp $(shell gsl-config --libs) -lfftw3 -llapack
+CXXRILIS = $(CFLAGS) -O3 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
+CXXDEBUG = $(CFLAGS) -g -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+
+CXXFLAGS = $(CXXDEBUG)
+# CXXFLAGS = $(CXXRILIS)
 
 FILES = arrays hydrogen pwba2 radial special ui version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
@@ -32,7 +73,7 @@ dist:
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-pwba2/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-pwba2/Makefile
 	sed -i "s/\.\.\/media\///g" hex-pwba2/Doxyfile
-	tar --create --gzip --file=hex-pwba-$(GIT_COMMIT).tar.gz hex-pwba2
+	tar --create --gzip --file=hex-pwba2-$(GIT_COMMIT).tar.gz hex-pwba2
 	rm -rf hex-pwba2/
 
 distclean:
@@ -44,7 +85,7 @@ bin/hex-pwba2: $(OBJECTS)
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDENCIES) bin/pwba2

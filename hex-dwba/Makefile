@@ -1,27 +1,52 @@
 .PHONY: all clean allclean doc docclean pollversion dist distclean
 
-##############################################################
-# Editable part
+
+################################################################################
+# Editable section                                                             #
+
+# ---------------------------------------------------------------------------- #
+# Compiler and linker + flags                                                  #
+# ---------------------------------------------------------------------------- #
 
 CXX = g++
-# CXX = icpc
 
-# HDF library
+CFLAGS = -Wall -std=c++11 -fPIC
+LFLAGS = 
+
+# ---------------------------------------------------------------------------- #
+# HDF (optional, use -DNO_HDF to omit)                                         #
+# ---------------------------------------------------------------------------- #
+
 HDFFLAGS = -DNO_HDF
-# HDFINCLUDE = 
 # HDFLIBS = -lhdf5 -lhdf5_cpp
-                                                              #
-###############################################################
+
+# ---------------------------------------------------------------------------- #
+# GSL                                                                          #
+# ---------------------------------------------------------------------------- #
+
+GSLFLAGS = $(shell gsl-config --cflags)
+GSLLIBS = $(shell gsl-config --libs)
+
+# ---------------------------------------------------------------------------- #
+# CLN                                                                          #
+# ---------------------------------------------------------------------------- #
+
+CLNFLAGS =
+CLNLIBS = -lcln
+                                                                               #
+################################################################################
+
+
+CFLAGS += $(HDFFLAGS) $(GSLFLAGS) $(CLNFLAGS)
+LFLAGS += $(HDFLIBS) $(GSLLIBS) $(CLNLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXDEBUG = -g -fPIC -std=c++11 -Wall -DNO_LAPACK $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXRILIS = -O3 -fPIC -std=c++11 -Wall -DNO_LAPACK $(HDFINCLUDE) $(HDFFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
-LIBRARY = -lrt -lgsl -lgslcblas $(HDFLIBS) -lcln
+CXXRILIS = $(CFLAGS) -O3 -DNDEBUG -DNO_LAPACK -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -g -DNO_LAPACK -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
-LFLAGS = -fPIC $(LIBRARY)
 
 FILES = arrays dwba hdffile hydrogen potential pwba radial special symbolic ui \
         version wave_distort

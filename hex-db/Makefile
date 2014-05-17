@@ -1,15 +1,51 @@
 .PHONY: all exe lib clean allclean doc docclean dist distclean
 
-##############################################################
-# Editable part
 
-CPP = g++
-# CPP = icpc
+################################################################################
+# Editable section                                                             #
 
-##############################################################
+# ---------------------------------------------------------------------------- #
+# Compiler and linker + flags                                                  #
+# ---------------------------------------------------------------------------- #
 
-CFLAGS = -Wall -std=c++11 -I $(shell pwd)/libs -fPIC
-LFLAGS = -L $(shell pwd)/libs -lsqlitepp -lsqlite3 -lgsl -lgslcblas -lfftw3
+CXX = g++
+
+CFLAGS = -Wall -std=c++11 -fPIC 
+LFLAGS = 
+
+# ---------------------------------------------------------------------------- #
+# SQLite3                                                                      #
+# ---------------------------------------------------------------------------- #
+
+SQLITEFLAGS =
+SQLITELIBS = -lsqlite3
+
+# ---------------------------------------------------------------------------- #
+# SQLite++ (bundled)                                                           #
+# ---------------------------------------------------------------------------- #
+
+SQLITEPPFLAGS = -I$(shell pwd)/libs
+SQLITEPPLIBS = -L$(shell pwd)/libs -lsqlitepp
+
+# ---------------------------------------------------------------------------- #
+# GSL                                                                          #
+# ---------------------------------------------------------------------------- #
+
+GSLFLAGS = $(shell gsl-config --cflags)
+GSLLIBS = $(shell gsl-config --libs) 
+
+# ---------------------------------------------------------------------------- #
+# FFTW                                                                         #
+# ---------------------------------------------------------------------------- #
+
+FFTWFLAGS = 
+FFTWLIBS = -lfftw3 
+                                                                               #
+################################################################################
+
+
+CFLAGS += $(SQLITEFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
+LFLAGS += $(SQLITELIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -70,25 +106,25 @@ lib: bin/hex-db.so
 
 bin/hex-db: obj/ui.o $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
-	$(CPP) $^ $(LFLAGS) -o $@
+	$(CXX) $^ $(LFLAGS) -o $@
 
 bin/hex-db.so: $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
-	$(CPP) $^ $(LFLAGS) -fPIC -shared -o $@
+	$(CXX) $^ $(LFLAGS) -fPIC -shared -o $@
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 obj/%.o: src/var/%.cpp
 	@mkdir -p $(@D)
-	$(CPP) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # -----------------------------------------------------------------------------
 # SQLite++ library
 
 $(SQLITEPPOBJ) : obj/%.o : libs/sqlitepp/%.cpp
-	$(CPP) -Ilibs -O2 -fPIC -c $^ -o $@
+	$(CXX) -Ilibs -O2 -fPIC -c $^ -o $@
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
 	ar cr $@ $^

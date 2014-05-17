@@ -1,0 +1,40 @@
+
+        / /   / /    __    \ \  / /
+       / /__ / /   / _ \    \ \/ /
+      /  ___  /   | |/_/    / /\ \
+     / /   / /    \_\      / /  \ \
+
+                 HEX-DWBA
+
+------------
+Dependencies
+------------
+
+The program is written in C++11 and can be successfully compiled by the
+following compilers:
+
+ * GCC 4.8.1
+ * Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
+ 
+There are several external libraries that are being used for some partial tasks.
+Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
+Makefile and the library link is removed from LIBRARY variable in Makefile.
+Here is the list of the libraries with versions that were used:
+
+ * GSL 1.15
+            Needed, obtainable from
+                http://www.gnu.org/software/gsl/
+            Used for special functions and some others.
+            
+ * FFTW 3.3.3
+            Needed, obtainable from
+                http://www.fftw.org/download.html
+            Used for Chebyshev expansion and Gauss-Chebyshev quadrature.
+
+Some or all of the libraries may be present in precompiled form in the repositories
+of the Linux distribution used.
+
+-------------
+Build and run
+-------------
+

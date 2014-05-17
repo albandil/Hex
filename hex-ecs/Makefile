@@ -1,66 +1,114 @@
 .PHONY: all doc docclean clean allclean pollversion dist distclean
 
-###################################################################################
-# Editable section
 
-# Compiler executable
+################################################################################
+# Editable section                                                             #
+
+# ---------------------------------------------------------------------------- #
+# Compiler and linker + flags                                                  #
+# ---------------------------------------------------------------------------- #
+
 CXX = g++
-# CXX = icpc
 
-# Suite Sparse environment
+CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
+LFLAGS = -fopenmp -fPIC
+
+# ---------------------------------------------------------------------------- #
+# Suite Sparse environment                                                     #
+# ---------------------------------------------------------------------------- #
+
 SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
-# - for repository release
-# SUITESPARSEINCLUDE = -I/usr/include/suitesparse
-# SUITESPARSEDEPS = 
-# - for custom build
-SUITESPARSEINCLUDE =
-SUITESPARSEDEPS = -lmetis -lsuitesparseconfig -lopenblas
-SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) $(SUITESPARSEDEPS)
 
-# OpenMPI environment
+# - for repository release
+# SUITESPARSEFLAGS = -I/usr/include/suitesparse
+# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
+
+# - for custom build
+SUITESPARSEFLAGS =
+SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
+                  -lmetis -lsuitesparseconfig -lopenblas
+
+# ---------------------------------------------------------------------------- #
+# OpenMPI environment (optional, use -DNO_MPI to omit)                         #
+# ---------------------------------------------------------------------------- #
+
 OPENMPIFLAGS = -DNO_MPI
-# OPENMPIINCLUDE = -I/usr/lib64/mpi/gcc/openmpi/include
+OPENMPILIBS =
+
+# - for repository release
+# OPENMPIFLAGS = -I/usr/lib64/mpi/gcc/openmpi/include
 # OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64 -lmpi -lmpi_cxx
 
-# OpenCL environment
+# ---------------------------------------------------------------------------- #
+# OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
+# ---------------------------------------------------------------------------- #
+
 OPENCLFLAGS = -DNO_OPENCL
-# AMD
-# OPENCLINCLUDE = -I/opt/AMDAPP/include
-# OPENCLLIBS = -lOpenCL
-# Intel
-# OPENCLINCLUDE = -I/opt/intel/opencl-1.2-3.1.1.11385/include
-# OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
-# NVidia
-# OPENCLINCLUDE = -I/usr/include/nvidia-current/
+
+# - for AMD OpenCL
+# OPENCLFLAGS = -I/opt/AMDAPP/include
 # OPENCLLIBS = -lOpenCL
 
-# Lapack
+# - for Intel OpenCL
+# OPENCLFLAGS = -I/opt/intel/opencl-1.2-3.1.1.11385/include
+# OPENCLLIBS = -L/opt/intel/opencl-1.2-3.1.1.11385/lib64 -lOpenCL
+
+# - for NVidia OpenCL
+# OPENCLFLAGS = -I/usr/include/nvidia-current/
+# OPENCLLIBS = -lOpenCL
+
+# ---------------------------------------------------------------------------- #
+# HDF                                                                          #
+# ---------------------------------------------------------------------------- #
+
+HDFFLAGS = 
+HDFLIBS = -lhdf5_cpp -lhdf5
+
+# ---------------------------------------------------------------------------- #
+# GSL                                                                          #
+# ---------------------------------------------------------------------------- #
+
+GSLFLAGS = $(shell gsl-config --cflags)
+GSLLIBS = $(shell gsl-config --libs)
+
+# ---------------------------------------------------------------------------- #
+# FFTW                                                                         #
+# ---------------------------------------------------------------------------- #
+
+FFTWFLAGS = 
+FFTWLIBS = -lfftw3
+
+# ---------------------------------------------------------------------------- #
+# Lapack (optional, use -DNO_LAPACK to omit)                                   #
+# ---------------------------------------------------------------------------- #
+
 LAPACKFLAGS = -DNO_LAPACK
-# LAPACKINCLUDE =
 # LAPACKLIBS = -lgfortran -llapack
 
-# PNG++
-PNGFLAGS = -DNO_PNG
-# PNGPPINCLUDE = -I./libs
-# PNGPPLIBS = -lpng
-                                                                                    #
-#####################################################################################
+# ---------------------------------------------------------------------------- #
+# PNG++ (optional, use -DNO_PNG to omit)                                       #
+# ---------------------------------------------------------------------------- #
 
-INCLUDE = $(OPENMPIINCLUDE) $(OPENCLINCLUDE) $(LAPACKINCLUDE) $(PNGPPINCLUDE) $(SUITESPARSEINCLUDE)
-LIBRARY = $(SUITESPARSELIBS) $(OPENMPILIBS) \
-	-lrt -lhdf5_cpp -lhdf5 -lgsl -lgslcblas -lpthread \
-	-lm -lfftw3 $(OPENMPILIBS) $(OPENCLLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+PNGPPFLAGS = -DNO_PNG
+# PNGPPFLAGS = -I./libs
+# PNGPPLIBS = -lpng
+                                                                               #
+################################################################################
+
+
+CFLAGS += $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
+          $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
+
+LFLAGS += $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
+          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CFLAGS_DEBUG = -g -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CFLAGS_RELEASE = -O3 -fopenmp -Wall -std=c++11 -fPIC $(INCLUDE) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = -g $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = -O3 $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-LFLAGS = -fopenmp -fPIC $(LIBRARY)
-
-# CFLAGS = $(CFLAGS_DEBUG) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFLAGS)
-CFLAGS = $(CFLAGS_RELEASE) $(LAPACKFLAGS) $(PNGFLAGS) $(OPENCLFLAGS) $(OPENMPIFLAGS) \
-         -mtune=native -march=native
+# CXXFLAGS = $(CXXDEBUG)
+CXXFLAGS = $(CXXRILIS)
 
 FILES = amplitudes arrays gauss bspline hdffile main input \
 	matrix preconditioners radial slater special version
@@ -104,7 +152,7 @@ bin/hex-ecs: $(OBJECTS)
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 src/kernels_cl.c: src/kernels.cl
 	xxd -i src/kernels.cl | tail -n+2 | head -n-2 > src/kernels_cl.c
