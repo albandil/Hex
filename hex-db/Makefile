@@ -124,7 +124,7 @@ obj/%.o: src/var/%.cpp
 # SQLite++ library
 
 $(SQLITEPPOBJ) : obj/%.o : libs/sqlitepp/%.cpp
-	$(CXX) -Ilibs -O2 -fPIC -c $^ -o $@
+	$(CXX) $(SQLITEFLAGS) -Ilibs -O2 -fPIC -c $^ -o $@
 
 $(SQLITEPP) : $(SQLITEPPOBJ)
 	ar cr $@ $^
