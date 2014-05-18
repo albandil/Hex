@@ -219,15 +219,21 @@ int main(int argc, char* argv[])
         }
     );
     
-    // check that the requested filename is available
-    if (create_new)
+    // is the requested filename is available?
+    std::ifstream f (dbname.c_str());
+    bool exists = f.good();
+    f.close();
+    
+    if (create_new and exists)
     {
-        std::ifstream f (dbname.c_str());
-        if (f.good())
-        {
-            std::cout << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
-            exit(0);
-        }
+        std::cerr << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
+        exit(-1);
+    }
+    
+    if (not create_new and not exists)
+    {
+        std::cerr << "The file \"" << dbname << "\" does not exist. Please create a new database first or use existing one." << std::endl;
+        exit(-1);
     }
     
     // open the database, if it is going to be used
