@@ -21,7 +21,8 @@
 #include <complex>
 #include <exception>
 #include <fstream>
-#include <functional> 
+#include <functional>
+#include <ios>
 #include <iomanip>
 #include <limits>
 #include <locale>
@@ -446,55 +447,109 @@ class Timer
 
 /**
  * @brief Output table.
+ * 
+ * This class enables table-formatted output. An example code is
+ * @code
+ * std::ofstream file ("output.txt");
+ * OutputTable table (file);
+ * table.setWidth (5, 5);
+ * table.setAlign (OutputTable::left, OutputTable::right);
+ * table.write ("abc", "xyz");
+ * table.write (10, 17.5);
+ * table.write (" x", "xx");
+ * @endcode
+ * The resulting output will be
+ * @code
+ * abc    xyz
+ * 10    17.5
+ *  x      xx
+ * @endcode
  */
 class OutputTable
 {
     public:
         
-        OutputTable ();
+        OutputTable (std::ostream & out = std::cout) : out_(out.rdbuf()) {}
         
-        template <class ...Params> void setWidths (Params ...p)
+        typedef enum
         {
-            // if the item count changed, reset the alignment as well
-            if (widths_.size() != sizeof...(p))
-                alignment_ = std::vector<int>(sizeof...(p),0);
-            
+            none = 0,
+            left = 1,
+            center = 2, // not implemented yet
+            right = 3
+        } align;
+        
+        void setStream (std::ostream & out)
+        {
+            out_.rdbuf(out.rdbuf());
+        }
+        
+        template <class ...Params> void setWidth (Params ...p)
+        {
             // clear old widths
-            widths_.clear();
+            width_.clear();
             
             // set new widths
-            append_(widths_, p...);
+            append_(width_, p...);
         }
         
         template <class ...Params> void setAlignment (Params ...p)
         {
+            // clear old alignments
             alignment_.clear();
+            
+            // set new alignments
             append_(alignment_, p...);
         }
         
-        template <int i> void write (std::ofstream & out) { out << std::endl; }
-        template <int i = 0, class T, class ...Params> void write (std::ofstream & out, T item, Params ...p)
+        template <int i> void write ()
         {
-            // use field width and alignment (if available)
-            if (i < widths_.size())
-                out << std::setw(alignment_[i]);
-            if (i < alignment_.size())
-                out << (alignment_[i] % 2 == 0 ? std::left : std::right);
+            out_ << std::endl;
+        }
+        
+        template <int i = 0, class T, class ...Params> void write (T item, Params ...p)
+        {
+            // use field width and alignment
+            int width = (i < width_.size() ? width_[i] : width_.back());
+            int alignment = (i < alignment_.size() ? alignment_[i] : alignment_.back());
+            
+            out_ << std::setw(width);
+            
+            switch (alignment)
+            {
+                case none:
+                    break;
+                case left:
+                    out_ << std::left;
+                    break;
+                case center:
+                    throw exception ("[OutputTable] Item centering not implemented yet!");
+                    break;
+                case right:
+                    out_ << std::right;
+                    break;
+            }
             
             // write the item
-            out << item;
+            out_ << item;
             
             // write the rest of the items
-            write (out, p...);
+            write<i+1>(p...);
         }
         
     private:
         
-        std::vector<int> widths_;
-        std::vector<int> alignment_;
+        std::vector<int> width_;
+        std::vector<align> alignment_;
         
-        template <class Vector> void append_ (Vector v) {}
-        template <class Vector, class ...Params> void append_ (Vector v, unsigned w, Params ...p)
+        std::ostream out_;
+        
+        template <class T> void append_ (std::vector<T> & v)
+        {
+            // do nothing
+        }
+        
+        template <class T, class ...Params> void append_ (std::vector<T> & v, T w, Params ...p)
         {
             v.push_back(w);
             append_(v, p...);
