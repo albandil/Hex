@@ -81,6 +81,10 @@ test run can be executed in the following way:
 If the libraries are installed in non-standard locations, one needs to edit the
 Makefile accordingly.
 
+The HTML documentation can be extracted from the code by the program Doxygen:
+
+> doxygen
+
 -------------------
 Building on Windows
 -------------------

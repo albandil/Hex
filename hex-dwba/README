@@ -86,6 +86,10 @@ For the example run above, the (last) output is the following set of numbers (ap
 If the libraries are installed in non-standard locations, one needs to edit the
 Makefile accordingly.
 
+The HTML documentation can be extracted from the code by the program Doxygen:
+
+> doxygen
+
 -------------------
 Building on Windows
 -------------------
