@@ -106,96 +106,6 @@ rArray interpolate_bound_bound_potential
     return V;
 }
 
-rArray interpolate_bound_free_potential_1
-(
-    rArray const & x,
-    int lambda,
-    int Na, int La, double Kb, int Lb
-)
-{
-    // array of bound-free potential evaluations
-    unsigned N = x.size();
-    rArray V (N);
-    
-    // precompute both free and bound state
-    rArray P (N), F(N);
-    # pragma omp parallel for
-    for (unsigned i = 1; i < N; i++)
-    {
-        P[i] = Hydrogen::P(Na,La,x[i]);
-        F[i] = Hydrogen::F(Kb,Lb,x[i]);
-    }
-    
-    // compute the integrals
-    if (lambda == 0)
-    {
-        rArray integrand1(N), integrand2(N);
-        
-        # pragma omp parallel
-        {
-            # pragma omp for
-            for (unsigned i = 1; i < N; i++)
-            {
-                integrand1[i] = P[i] * F[i] / x[i];
-                integrand2[i] = P[i] * F[i];
-            }
-            
-            gsl_interp_accel * acc1 = gsl_interp_accel_alloc ();
-            gsl_spline * spline1 = gsl_spline_alloc (gsl_interp_cspline, N);
-            gsl_spline_init (spline1, x.data(), integrand1.data(), N);
-            
-            gsl_interp_accel * acc2 = gsl_interp_accel_alloc ();
-            gsl_spline * spline2 = gsl_spline_alloc (gsl_interp_cspline, N);
-            gsl_spline_init (spline2, x.data(), integrand2.data(), N);
-            
-            # pragma omp for schedule (dynamic)
-            for (unsigned i = 1; i < N; i++)
-            {
-                V[i] = gsl_spline_eval_integ (spline1, x[i], x.back(), acc1)
-                    - gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) / x[i];
-            }
-            
-            gsl_spline_free (spline1); gsl_interp_accel_free (acc1);
-            gsl_spline_free (spline2); gsl_interp_accel_free (acc2);
-        }
-    }
-    else
-    {
-        rArray integrand1(N), integrand2(N);
-        
-        # pragma omp parallel
-        {
-            # pragma omp for
-            for (unsigned i = 1; i < N; i++)
-            {
-                integrand1[i] = P[i] * F[i] * std::pow(x[i],lambda);
-                integrand2[i] = P[i] * F[i] * std::pow(x[i],-lambda-1);
-            }
-            
-            gsl_interp_accel * acc1 = gsl_interp_accel_alloc ();
-            gsl_spline * spline1 = gsl_spline_alloc (gsl_interp_cspline, N);
-            gsl_spline_init (spline1, x.data(), integrand1.data(), N);
-            
-            gsl_interp_accel * acc2 = gsl_interp_accel_alloc ();
-            gsl_spline * spline2 = gsl_spline_alloc (gsl_interp_cspline, N);
-            gsl_spline_init (spline2, x.data(), integrand2.data(), N);
-            
-            # pragma omp for schedule (dynamic)
-            for (unsigned i = 1; i < N; i++)
-            {
-                V[i] = gsl_spline_eval_integ (spline1, 0., x[i], acc1) * std::pow(x[i],-lambda-1)
-                    + gsl_spline_eval_integ (spline2, x[i], x.back(), acc2) * std::pow(x[i],lambda);
-            }
-            
-            gsl_spline_free(spline1); gsl_interp_accel_free (acc1);
-            gsl_spline_free(spline2); gsl_interp_accel_free (acc2);
-        }
-    }
-    
-    // return the array of evaluations
-    return V;
-}
-
 rArray interpolate_bound_free_potential
 (
     rArray const & x,
@@ -206,7 +116,16 @@ rArray interpolate_bound_free_potential
     // array of bound-free potential evaluations
     unsigned N = x.size();
     double rmax = x.back();
-    rArray V (N);
+    rArray V(N);
+    
+    // Coulomb function scaled by hydrogen orbital
+    rArray PF(N);
+    for (unsigned i = 0; i < N; i++)
+    {
+        PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
+    }
+    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, x.data(), PF.data(), N);
     
     // precompute Coulomb zeros within the range of "x"
     int nzeros = Kb * x.back() / (2 * special::constant::pi); // initial guess
@@ -229,18 +148,21 @@ rArray interpolate_bound_free_potential
     // compute the integrals
     if (lambda == 0)
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,rt,rmax)
+        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,rt,rmax,spline)
         {
-            auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros](double y) -> double
+            // setup accelerator for value search (for every thread)
+            gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+            
+            auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros,spline,&acc](double y) -> double
             {
                 // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
                 if (y == 0.)
                     return 0;
                 
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ = 0
-                auto integrand = [Na,La,y,Kb,Lb](double x) -> double
+                auto integrand = [Na,La,y,Kb,Lb,spline,&acc](double x) -> double
                 {
-                    return Hydrogen::P(Na,La,x) * (1./x - 1./y) * Hydrogen::F(Kb,Lb,x);
+                    return gsl_spline_eval(spline, x, acc) * (y - x) / (y * x);
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
@@ -266,18 +188,21 @@ rArray interpolate_bound_free_potential
     }
     else
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,lambda,rt,rmax)
+        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,lambda,rt,rmax,spline)
         {
-            auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x](double y) -> double
+            // setup accelerator for value search (for every thread)
+            gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+            
+            auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x,spline,&acc](double y) -> double
             {
                 // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
                 if (y == 0.)
                     return 0;
                 
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
-                auto integrand1 = [Na,La,Kb,Lb,lambda,y](double x) -> double
+                auto integrand1 = [Na,La,Kb,Lb,lambda,y,spline,&acc](double x) -> double
                 {
-                    return Hydrogen::P(Na,La,x) * std::pow(x/y,lambda) * Hydrogen::F(Kb,Lb,x);
+                    return gsl_spline_eval(spline, x, acc) * std::pow(x/y,lambda);
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
@@ -296,7 +221,7 @@ rArray interpolate_bound_free_potential
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
                 auto integrand2 = [&](double x) -> double
                 {
-                    return Hydrogen::P(Na,La,x) * std::pow(y/x,lambda+1) * Hydrogen::F(Kb,Lb,x);
+                    return gsl_spline_eval(spline, x, acc) * std::pow(y/x,lambda+1);
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
