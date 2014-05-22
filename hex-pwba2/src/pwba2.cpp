@@ -63,6 +63,13 @@ cArrays PWBA2::PartialWave_direct
             {
                 int ln = 2 * ell + L + Pi - Ln;
                 
+                // conserve parity
+                if ((L + Ln + ln) % 2 != Pi)
+                {
+                    std::cout << "\tSkipping ln = " << ln << " due to parity conservation." << std::endl;
+                    continue;
+                }
+                
                 std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
                 
                 // sum over bound states

@@ -518,6 +518,10 @@ Complex Idir_nBound_allowed
         double ff = computef(lambdaf, Li, li, Ln, ln, L);
         double fi = computef(lambdai, Ln, ln, Li, li, L);
         
+        // skip non-contributing transfers
+        if (ff == 0. or fi == 0.)
+            continue;
+        
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
         rArray Vfn = std::move(interpolate_bound_bound_potential(grid, lambdaf, Nf, Lf, Nn, Ln));
@@ -560,6 +564,10 @@ Complex Idir_nBound_forbidden
     {
         double ff = computef(lambdaf, Li, li, Ln, ln, L);
         double fi = computef(lambdai, Ln, ln, Li, li, L);
+        
+        // skip non-contributing transfers
+        if (ff == 0. or fi == 0.)
+            continue;
         
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
@@ -604,6 +612,10 @@ Complex Idir_nFree_allowed
         double ff = computef(lambdaf, Li, li, Ln, ln, L);
         double fi = computef(lambdai, Ln, ln, Li, li, L);
         
+        // skip non-contributing transfers
+        if (ff == 0. or fi == 0.)
+            continue;
+        
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
         rArray Vfn = std::move(interpolate_bound_free_potential(grid, lambdaf, Nf, Lf, Kn, Ln));
@@ -646,6 +658,10 @@ Complex Idir_nFree_forbidden
     {
         double ff = computef(lambdaf, Li, li, Ln, ln, L);
         double fi = computef(lambdai, Ln, ln, Li, li, L);
+        
+        // skip non-contributing transfers
+        if (ff == 0. or fi == 0.)
+            continue;
         
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
