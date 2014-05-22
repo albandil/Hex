@@ -251,6 +251,9 @@ rArray interpolate_bound_free_potential
         }
     }
     
+    // free allocated memory
+    gsl_spline_free(spline);
+    
     // return the array of evaluations
     return V;
 }
