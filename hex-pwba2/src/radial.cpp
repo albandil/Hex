@@ -184,6 +184,8 @@ rArray interpolate_bound_free_potential
             # pragma omp for schedule (dynamic)
             for (unsigned i = 0; i < N; i++)
                 V[i] = potential(x[i]);
+            
+            gsl_interp_accel_free(acc);
         }
     }
     else
@@ -244,6 +246,8 @@ rArray interpolate_bound_free_potential
             # pragma omp for schedule (dynamic)
             for (unsigned i = 0; i < N; i++)
                 V[i] = potential(x[i]);
+            
+            gsl_interp_accel_free(acc);
         }
     }
     
