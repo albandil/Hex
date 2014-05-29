@@ -251,7 +251,7 @@ void dwba
         DistortedWave chif(kf,lf,Ui);
         
         // direct 1e
-        if (Ni == Nf and Li == Lf)
+        if (Ni == Nf and Li == Lf and direct)
         {
             Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
             
@@ -282,7 +282,7 @@ void dwba
             DistortedWave chii(ki,li,Ui);
             
             // exchange 1e
-            if (Li == lf and Lf == li)
+            if (Li == lf and Lf == li and exchange)
             {
                 Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
                 
@@ -294,7 +294,7 @@ void dwba
             }
             
             // direct 2e
-            for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); lambda <= std::min(Li+Lf,li+lf); lambda++)
+            for (int lambda = std::max(abs(Li-Lf),abs(li-lf)); direct and lambda <= std::min(Li+Lf,li+lf); lambda++)
             {
                 Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
                 
@@ -315,7 +315,7 @@ void dwba
             }
             
             // exchange 2e
-            for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); lambda <= std::min(Li+lf,li+Lf); lambda++)
+            for (int lambda = std::max(abs(Li-lf),abs(li-Lf)); exchange and lambda <= std::min(Li+lf,li+Lf); lambda++)
             {
                 Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
                 
