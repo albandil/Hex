@@ -96,7 +96,7 @@ void import (const char* sqlname)
     }
     
     // line numbers (current and total)
-    unsigned line = 0, lines;
+    unsigned line = 0, lines = 0;
     if (std::string(sqlname) != std::string("-"))
     {
         std::cout << "Counting lines..." << std::flush;
