@@ -1,6 +1,6 @@
 .PHONY: all clean allclean doc docclean dist distclean
 
-SUBDIRS = stack f hdf2txt hdf2hdf chebeval
+SUBDIRS = stack special hdf2txt hdf2hdf chebeval
 
 default:
 	make all
