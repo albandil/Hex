@@ -701,19 +701,19 @@ inline long double dfact (long double x)
     return prod;
 }
 
-double ClebschGordan (int __j1, int __m1, int __j2, int __m2, int __J, int __M)
+double ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int in_M)
 {
-    if((__m1 + __m2) != __M) return 0.;
-    if(abs(__m1) > __j1) return 0;
-    if(abs(__m2) > __j2) return 0;
+    if((in_m1 + in_m2) != in_M) return 0.;
+    if(abs(in_m1) > in_j1) return 0;
+    if(abs(in_m2) > in_j2) return 0;
            
     // convert to pure integers (each 2*spin)
-    int j1 = (int)(2.*__j1);
-    int m1 = (int)(2.*__m1);
-    int j2 = (int)(2.*__j2);
-    int m2 = (int)(2.*__m2);
-    int J = (int)(2.*__J);
-    int M = (int)(2.*__M);
+    int j1 = (int)(2.*in_j1);
+    int m1 = (int)(2.*in_m1);
+    int j2 = (int)(2.*in_j2);
+    int m2 = (int)(2.*in_m2);
+    int J = (int)(2.*in_J);
+    int M = (int)(2.*in_M);
     
     long double n0,n1,n2,n3,n4,n5,d0,d1,d2,d3,d4,A,exp;
     int nu = 0;
@@ -732,7 +732,8 @@ double ClebschGordan (int __j1, int __m1, int __j2, int __m2, int __J, int __M)
         nu++;
     }
     
-    if (sum == 0) return 0;
+    if (sum == 0)
+        return 0;
     
     n0 = J+1;
     n1 = dfact((double) (J+j1-j2)/2);
@@ -749,26 +750,26 @@ double ClebschGordan (int __j1, int __m1, int __j2, int __m2, int __J, int __M)
     
     A = ((long double) (n0*n1*n2*n3*n4*n5))/((long double) (d0*d1*d2*d3*d4));
     
-    return sqrtl(A)*sum;           
+    return std::sqrt(A)*sum;
 }
 
 double Gaunt (int l1, int m1, int l2, int m2, int l, int m)
 {
+    typedef std::tuple<int,int,int,int,int,int> TKey;
+    
     // dictionary
-    static std::map<std::tuple<int,int,int,int,int,int>,double> dict;
+    static std::map<TKey,double> dict;
     
     // dictionary key
-    std::tuple<int,int,int,int,int,int> key = std::make_tuple(l1,m1,l2,m2,l,m);
+    TKey key = std::make_tuple(l1,m1,l2,m2,l,m);
     
     // try to find this Gaunt's coefficient in the dictionary
     if (dict.find(key) != dict.end())
         return dict[key];
     
     // compute the value and store it to the dictionary
-    dict[key] = sqrt((2*l1+1)*(2*l2+1) / (4*special::constant::pi*(2*l+1))) *
-    ClebschGordan(l1, m1, l2, m2, l, m) *
-    ClebschGordan(l1,  0, l2,  0, l, 0);
-    return dict[key];
+    return dict[key] = sqrt((2*l1+1)*(2*l2+1) / (4*special::constant::pi*(2*l+1))) *
+        ClebschGordan(l1, m1, l2, m2, l, m) * ClebschGordan(l1,  0, l2,  0, l, 0);
 }
 
 int triangle_count (int L, int maxl)
