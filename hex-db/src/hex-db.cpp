@@ -96,24 +96,31 @@ void import (const char* sqlname)
     }
     
     // line numbers (current and total)
-    std::cout << "Counting lines..." << std::flush;
-    unsigned line = 0, lines = std::count
-    (
-        std::istreambuf_iterator<char>(is),
-        std::istreambuf_iterator<char>(),
-        '\n'
-    );
+    unsigned line = 0, lines;
+    if (std::string(sqlname) != std::string("-"))
+    {
+        std::cout << "Counting lines..." << std::flush;
+        lines = std::count
+        (
+            std::istreambuf_iterator<char>(is),
+            std::istreambuf_iterator<char>(),
+            '\n'
+        );
+        
+        // reset file to the beginning
+        is.clear();
+        is.seekg(0);
+    }
     
-    // reset file to the beginning
-    is.clear();
-    is.seekg(0);
+    std::cout << "Importing data...  " << std::flush;
     
     do
     {
         // query statement
         sqlitepp::statement st(db);
         
-        std::cout << "\rImporting data...  " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
+        if (lines > 0)
+            std::cout << "\rImporting data...  " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
         
         // read line from input stream
         std::string cmd, cmd1;
