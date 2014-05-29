@@ -224,7 +224,7 @@ void writeVTK_cells
     {
         for (unsigned j = 0; j < cy; j++)
         for (unsigned k = 0; k < cz; k++)
-            out << ev[(i * py + j) * pz + k].real() << " ";
+            out << ev[(i * cy + j) * cz + k].real() << " ";
         out << std::endl;
     }
     
@@ -234,7 +234,7 @@ void writeVTK_cells
     {
         for (unsigned j = 0; j < cy; j++)
         for (unsigned k = 0; k < cz; k++)
-            out << ev[(i * py + j) * pz + k].imag() << " ";
+            out << ev[(i * cy + j) * cz + k].imag() << " ";
         out << std::endl;
     }
 }
