@@ -19,6 +19,8 @@
 #include "special.h"
 #include "wave_distort.h"
 
+using special::constant::pi;
+
 namespace DWBA1
 {
 
@@ -44,7 +46,7 @@ Complex computeDirect1e (DistortingPotential const& U, int l, double k)
     Q2.integrate(0., special::constant::Inf);
     
     // return the result
-    return pow(4*M_PI,2) * sqrt((2*l+1)/(4*M_PI)) / (k*k) * 
+    return pow(4*pi,2) * sqrt((2*l+1)/(4*pi)) / (k*k) * 
         (Q1.result() - Q2.result() * chi_kl.getPhasef()) * chi_kl.getPhasef();
 }
 
@@ -80,8 +82,8 @@ Complex computeExchange1e
     Complex phasef(cos(phase),sin(phase));
     
     // return the result
-    return -pow(4*M_PI,2) * phasef * pow(Complex(0.,1.), Lf-Li) * 
-        sqrt((2*Lf+1)/(4*M_PI)) * Q1.result() * Q2.result() / (ki*kf);
+    return -pow(4*pi,2) * phasef * pow(Complex(0.,1.), Lf-Li) * 
+        sqrt((2*Lf+1)/(4*pi)) * Q1.result() * Q2.result() / (ki*kf);
 }
 
 Complex computeDirect2e
@@ -145,8 +147,8 @@ Complex computeDirect2e
     Complex phasef(cos(phase),sin(phase));
     
     // return the result
-    return pow(4*M_PI,3) * phasef * pow(Complex(0.,1.),li-lf) * 
-        sqrt((2*li+1)/(4*M_PI)) / (2.*lambda+1.) * Q.result() / (ki*kf);
+    return pow(4*pi,2) * phasef * pow(Complex(0.,1.),li-lf) * 
+        sqrt((2*li+1)/(4*pi)) * Q.result() / (ki*kf);
 }
 
 Complex computeExchange2e
@@ -208,8 +210,8 @@ Complex computeExchange2e
     Complex phasef(cos(phase),sin(phase));
     
     // return the result
-    return pow(4*M_PI,3) * phasef * pow(Complex(0.,1.),li-lf) * 
-        sqrt((2*li+1)/(4*M_PI)) / (2.*lambda+1.) * Q.result() / (ki*kf);
+    return pow(4*pi,2) * phasef * pow(Complex(0.,1.),li-lf) * 
+        sqrt((2*li+1)/(4*pi)) * Q.result() / (ki*kf);
 }
 
 } // end of namespace DWBA1
@@ -304,12 +306,12 @@ void dwba
                 {
                     for (int Mf = -Lf; Mf <= Lf; Mf++)
                     {
-                        double Gaunts_dir = Gaunt(lambda, Mi - Mf, li, 0, lf, Mi - Mf) * Gaunt(lambda, Mi - Mf, Lf, Mf, Li, Mi);
+                        double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lambda,Lf,lf,Li,li,L);
                         
-                        if (not std::isfinite(Gaunts_dir))
+                        if (not std::isfinite(ang))
                             throw exception ("Gaunt failure!\n");
                         
-                        Tdir[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * Gaunts_dir;
+                        Tdir[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * ang;
                     }
                 }
             }
@@ -325,12 +327,12 @@ void dwba
                 {
                     for (int Mf = -Lf; Mf <= Lf; Mf++)
                     {
-                        double Gaunts_exc = Gaunt(lambda, -Mf, Li, Mi, lf, Mi - Mf) * Gaunt(lambda, -Mf, Lf, Mf, li, 0);
+                        double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lambda,lf,Lf,Li,li,L);
                         
-                        if (not std::isfinite(Gaunts_exc))
+                        if (not std::isfinite(ang))
                             throw exception ("Gaunt failure!\n");
                         
-                        Texc[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * Gaunts_exc;
+                        Texc[(Mi+Li)*(2*Lf+1)+Mf+Lf][lf-std::abs(Lf - L)] += tmat * ang;
                     }
                 }
             }

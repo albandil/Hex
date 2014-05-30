@@ -51,13 +51,13 @@ void pwba
             //
             
             // for all multipoles
-            for (int lam = std::max(std::abs(Lf-Li), std::abs(lf-li)); lam <= std::min(Li+Lf, lf+li); lam++)
+            for (int lam = std::max(std::abs(Lf-Li), std::abs(lf-li)); direct and lam <= std::min(Li+Lf, lf+li); lam++)
             {
                 // compute the needed radial integrals
-                double Vdir = direct ? compute_Idir (li, lf, lam, Ni, Li, ki, Nf, Lf, kf) : 0.;
+                double Vdir = compute_Idir (li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
                 
                 // compute complex prefactor
-                Complex prefactor = std::pow(4*pi,3)/(ki*kf)*std::pow(Complex(0.,1.),li-lf)/(2.*lam+1)*std::sqrt((2*li+1)/(4*pi));
+                Complex prefactor = std::pow(4*pi,2)/(ki*kf) * std::pow(Complex(0.,1.),li-lf) * std::sqrt((2*li+1)/(4*pi));
                 
                 // for all projections of the initial/final angular momentum
                 for (int Mi = -Li; Mi <= Li; Mi++)
@@ -67,10 +67,10 @@ void pwba
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
                     
                     // compute angular integrals (Gaunt coefficients)
-                    double Gaunts_dir = Gaunt(Li,Mi,lam,Mf-Mi,Lf,Mf) * Gaunt(lam,Mf-Mi,lf,Mi-Mf,li,0);
+                    double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lam,Lf,lf,Li,li,L);
                     
                     // add the T-matrix contributions
-                    Tdir[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_dir * Vdir;
+                    Tdir[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vdir;
                 }
             }
             
@@ -79,13 +79,13 @@ void pwba
             //
             
             // for all multipoles
-            for (int lam = std::max(std::abs(lf-Li), std::abs(Lf-li)); lam <= std::min(lf+Li, Lf+li); lam++)
+            for (int lam = std::max(std::abs(lf-Li), std::abs(Lf-li)); exchange and lam <= std::min(lf+Li, Lf+li); lam++)
             {
                 // compute the needed radial integrals
-                double Vexc = exchange ? compute_Iexc (li, lf, lam, Ni, Li, ki, Nf, Lf, kf) : 0.;
+                double Vexc = compute_Iexc (li, lf, lam, Ni, Li, ki, Nf, Lf, kf);
                 
                 // compute complex prefactor
-                Complex prefactor = std::pow(4*pi,3)/(ki*kf)*std::pow(Complex(0.,1.),li-lf)/(2.*lam+1)*std::sqrt((2*li+1)/(4*pi));
+                Complex prefactor = std::pow(4*pi,2)/(ki*kf)*std::pow(Complex(0.,1.),li-lf)*std::sqrt((2*li+1)/(4*pi));
                 
                 // for all projections of the initial/final angular momentum
                 for (int Mi = -Li; Mi <= Li; Mi++)
@@ -95,10 +95,10 @@ void pwba
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
                     
                     // compute angular integrals (Gaunt coefficients)
-                    double Gaunts_exc = Gaunt(li,0,lam,Mf,Lf,Mf) * Gaunt(lam,Mf,lf,Mi-Mf,Li,Mi);
+                    double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lam,lf,Lf,Li,li,L);
                     
                     // add the T-matrix contributions
-                    Texc[idx][lf-std::abs(Lf - L)] += prefactor * Gaunts_exc * Vexc;
+                    Texc[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vexc;
                 }
             }
         }
