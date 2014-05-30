@@ -22,6 +22,8 @@
 #include "special.h"
 #include "symbolic.h"
 
+using special::constant::Inf;
+
 template <class Functor, class Integrator>
 class BesselNodeIntegrator1D
 {
@@ -155,7 +157,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             Qi.setEpsAbs(0);
             
             // integrate and check success
-            if (not Qi.integrate(r2,special::constant::Inf))
+            if (not Qi.integrate(r2,Inf))
             {
                 throw exception
                 (
@@ -174,7 +176,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
         R.setEpsAbs(0);
-        R.integrate(0, special::constant::Inf);
+        R.integrate(0,Inf);
         
         std::cout << "\tIdir = " << R.result() << std::endl;
         return R.result();
@@ -249,7 +251,7 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         
         // outer integrator
         BesselNodeIntegrator1D<decltype(integrand),GaussKronrod<decltype(integrand)>> R(integrand, k, l);
-        R.integrate (0, special::constant::Inf);
+        R.integrate (0,Inf);
 //         std::cout << "Integral: " << R.result() << std::endl;
         
         std::cout << "\tIdir = " << R.result() << std::endl;
@@ -283,7 +285,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
             
             // integrate and check success
-            if (not Qi.integrate(r2,special::constant::Inf))
+            if (not Qi.integrate(r2,Inf))
             {
                 throw exception
                 (
@@ -299,7 +301,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         GaussKronrod<decltype(integrand)> Q(integrand);
         
         // integrate and check success
-        if (not Q.integrate(0.,special::constant::Inf))
+        if (not Q.integrate(0.,Inf))
         {
             throw exception
             (
@@ -336,7 +338,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         };
         
         BesselNodeIntegrator1D<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1 (integrand1, ki, li);
-        if (not Q1.integrate(0.,special::constant::Inf))
+        if (not Q1.integrate(0.,Inf))
         {
             throw exception
             (
@@ -368,7 +370,7 @@ double compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double ki, int 
         };
         
         BesselNodeIntegrator1D<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2 (integrand2, kf, lf);
-        if (not Q2.integrate(0.,special::constant::Inf))
+        if (not Q2.integrate(0.,Inf))
         {
             throw exception
             (

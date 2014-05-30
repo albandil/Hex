@@ -19,7 +19,10 @@
 #include "arrays.h"
 #include "dwba.h"
 #include "pwba.h"
+#include "special.h"
 #include "version.h"
+
+using special::constant::pi;
 
 std::string help_text =
     "Usage:\n"
@@ -55,7 +58,10 @@ int main (int argc, char *argv[])
     std::setvbuf(stdout, 0, _IONBF, 0);
     std::setvbuf(stderr, 0, _IONBF, 0);
     
+    //
     // parse command line
+    //
+    
     bool distort = true, direct = true, exchange = true;
     std::vector<const char*> params;
     for (int iarg = 1; iarg < argc; iarg++)
@@ -124,119 +130,168 @@ int main (int argc, char *argv[])
     double Ef = Ei - 1./(Ni*Ni) + 1./(Nf*Nf);
     double kf = std::sqrt(Ef);
     
-    // total angular momentum
-    int L  = strtol(params[5], 0, 10);
+    // total angular momentum; can be set as range (e.g. "0-10")
+    Range<int> Ls (params[5]);
     
     // grid size
     double rmax = strtod(params[6], 0);
     
+    //
+    // print input information
+    //
+    
     std::cout << "Total quantum numbers" << std::endl;
-    std::cout << "\ttotal L = " << L << std::endl << std::endl;
-    std::cout << "Initial quantum numbers" << std::endl;
-    std::cout << "\thydrogen Ni = " << Ni << std::endl;
-    std::cout << "\thydrogen Li = " << Li << std::endl;
-    std::cout << "\tprojectile ki = " << ki << std::endl << std::endl;
-    std::cout << "Final quantum numbers" << std::endl;
-    std::cout << "\thydrogen Nf = " << Nf << std::endl;
-    std::cout << "\thydrogen Lf = " << Lf << std::endl;
-    std::cout << "\tprojectile kf = " << kf << std::endl << std::endl;
-    std::cout << "Numerical settings" << std::endl;
-    if (rmax > 0)
-        std::cout << "\tgrid rmax = " << rmax << std::endl;
+    if (Ls.first == Ls.last)
+        std::cout << "\ttotal L = "   << Ls.first << std::endl << std::endl;
     else
-        std::cout << "\tgrid rmax = auto" << std::endl;
+        std::cout << "\ttotal L = "   << Ls.first << " ... " << Ls.last << std::endl << std::endl;
+    std::cout << "Initial quantum numbers"  << std::endl;
+    std::cout << "\thydrogen Ni = "   << Ni << std::endl;
+    std::cout << "\thydrogen Li = "   << Li << std::endl;
+    std::cout << "\tprojectile ki = " << ki << std::endl << std::endl;
+    std::cout << "Final quantum numbers"    << std::endl;
+    std::cout << "\thydrogen Nf = "   << Nf << std::endl;
+    std::cout << "\thydrogen Lf = "   << Lf << std::endl;
+    std::cout << "\tprojectile kf = " << kf << std::endl << std::endl;
+    if (distort)
+    {
+        std::cout << "Numerical settings" << std::endl;
+        if (rmax > 0)
+            std::cout << "\tgrid rmax = " << rmax << std::endl;
+        else
+            std::cout << "\tgrid rmax = auto" << std::endl;
+    }
     std::cout << std::endl << std::endl;
     
-    // computed partial T-matrices
-    cArrays Tdir, Texc;
+    //
+    // main computational routine
+    //
     
     std::cout << "Running the computation..." << std::endl << std::endl;
     
-    // main computational routine
-    if (distort)
-        dwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, rmax, direct, exchange);
-    else
-        pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir, Texc, direct, exchange);
+    // computed partial T-matrices
+    std::vector<cArrays> Tdir, Texc;
+    
+    // for all total angular momenta
+    for (int L = Ls.first; L <= Ls.last; L++)
+    {
+        // add space for new T-matrices
+        Tdir.push_back({});
+        Texc.push_back({});
+        
+        // compute the T-matrices
+        if (distort)
+            dwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir.back(), Texc.back(), rmax, direct, exchange);
+        else
+            pwba (Ni, Li, ki, Nf, Lf, kf, L, Tdir.back(), Texc.back(), direct, exchange);
+    }
     
     //
     // write the T-matrices, sum cross sections
     //
     
+    // create the SQL batch file
     char sqlname[50];
     if (distort)
-        sprintf(sqlname, "dwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
+        std::sprintf(sqlname, "dwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
     else
-        sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, L, Ei);
+        std::sprintf(sqlname, "pwba-%d-%d-%d-%d-L%d-E%g.sql", Ni, Li, Nf, Lf, Ls.last, Ei);
     std::ofstream out(sqlname);
     out << "BEGIN TRANSACTION;\n";
     
-    double sumsumsigma = 0.;
+    // write header to stdout
     std::cout << std::endl << "Cross sections for mi -> mf transitions (and sums)" << std::endl;
-    std::cout << std::setw(5) << "E" << std::setw(5) << "L";
+    std::cout << std::setw(5) << std::right << "E" << std::setw(5) << "L" << "    ";
     for (int Mi = -Li; Mi <= Li; Mi++)
     {
         for (int Mf = -Lf; Mf <= Lf; Mf++)
         {
-            std::cout << std::setw(15) << format("%d -> %d", Mi, Mf);
+            std::cout << std::left << std::setw(15) << format("%d -> %d", Mi, Mf);
         }
-        std::cout << std::setw(15) << format("%d -> Sumf", Mi);
+        std::cout << std::left << std::setw(15) << format("%d -> Sumf", Mi);
     }   
-    std::cout << std::setw(15) << "Sumi -> Sumf" << std::endl;
-    std::cout << std::setw(5) << Ei << std::setw(5) << L;
+    std::cout << std::left << std::setw(15) << "Sumi -> Sumf" << std::endl;
     
-    for (int Mi = -Li; Mi <= Li; Mi++)
+    // for all L write T-matrices and cross sections
+    for (int L = Ls.first; L <= Ls.last; L++)
     {
-        double sumsigma = 0.;
-        for (int Mf = -Lf; Mf <= Lf; Mf++)
+        std::cout << std::right << std::setw(5) << Ei << std::setw(5) << L << "    ";
+        
+        // summed cross section for [Ni,Li,*] -> [Nf,Lf,*]
+        double sumsumsigma = 0.;
+        
+        // for all initial magnetic sublevels
+        for (int Mi = -Li; Mi <= Li; Mi++)
         {
-            int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
-            double sigma_singlet = 0., sigma_triplet = 0.;
+            // summed cross section for [Ni,Li,Mi] -> [Nf,Lf,*]
+            double sumsigma = 0.;
             
-            for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
+            // for all final sublevels
+            for (int Mf = -Lf; Mf <= Lf; Mf++)
             {
-                // compute parity of the partial wave
-                double parity = ((L + Lf + lf) % 2 == 0 ? 1 : -1);
+                // array index
+                int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
                 
-                // assemble T-matrices for singlet and triplet
-                Complex T_singlet = Tdir[idx][lf-std::abs(Lf - L)] + parity * Texc[idx][lf-std::abs(Lf - L)];
-                Complex T_triplet = Tdir[idx][lf-std::abs(Lf - L)] - parity * Texc[idx][lf-std::abs(Lf - L)];
+                // cross section for [Ni,Li,Mi] -> [Nf,Lf,Mf]
+                double sigma_singlet = 0., sigma_triplet = 0.;
                 
-                // output SQL batch commands for singlet and triplet
-                if (T_singlet != 0.)
+                // for all outgoing partial waves
+                for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
                 {
-                    out << format
-                    (
-                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
-                        Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
-                    );
+                    // compute parity of the partial wave
+                    double parity = ((L + Lf + lf) % 2 == 0 ? 1 : -1);
                     
-                    sigma_singlet += 0.25*sqrabs(T_singlet)/(4.*M_PI*M_PI);
-                }
-                if (T_triplet != 0.)
-                {
-                    out << format
-                    (
-                        "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
-                        Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
-                    );
+                    // assemble T-matrices for singlet and triplet
+                    Complex T_singlet = Tdir[L-Ls.first][idx][lf-std::abs(Lf-L)] + parity * Texc[L-Ls.first][idx][lf-std::abs(Lf-L)];
+                    Complex T_triplet = Tdir[L-Ls.first][idx][lf-std::abs(Lf-L)] - parity * Texc[L-Ls.first][idx][lf-std::abs(Lf-L)];
                     
-                    sigma_triplet += 0.75*sqrabs(T_triplet)/(4.*M_PI*M_PI);
+                    // update cross sections
+                    sigma_singlet += sqrabs(T_singlet);
+                    sigma_triplet += sqrabs(T_triplet);
+                    
+                    // output SQL batch commands for singlet and triplet
+                    if (T_singlet != 0.)
+                    {
+                        out << format
+                        (
+                            "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                            Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
+                        );
+                    }
+                    if (T_triplet != 0.)
+                    {
+                        out << format
+                        (
+                            "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                            Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
+                        );
+                    }
                 }
+                
+                // compute the cross section and write it to stdout
+                double sigma = kf/ki * (sigma_singlet + 3*sigma_triplet) / (16*pi*pi);
+                std::cout << std::setw(15) << std::left << sigma;
+                
+                // update the sum
+                sumsigma += sigma;
             }
             
-            double sigma = kf/ki * (sigma_singlet + sigma_triplet);
-            std::cout << std::setw(15) << sigma;
-            sumsigma += sigma;
+            // write the summed cross section to stdout
+            std::cout << std::setw(15) << std::left << sumsigma;
+            
+            // update the sum of sums
+            sumsumsigma += sumsigma;
         }
         
-        std::cout << std::setw(15) << sumsigma;
-        sumsumsigma += sumsigma;
+        // write the sum of sums
+        std::cout << std::setw(15) << sumsumsigma << std::endl;
     }
-    std::cout << std::setw(15) << sumsumsigma << std::endl;
     
+    // finish writing the SQL batch file
     out << "COMMIT;" << std::endl;
     out.close();
     
+    // finish the program
     std::cout << std::endl << "Done." << std::endl << std::endl;
     
     return 0;

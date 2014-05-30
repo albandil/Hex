@@ -556,4 +556,50 @@ class OutputTable
         }
 };
 
+/**
+ * @brief Range class.
+ * 
+ * This class holds a pair of values - the first and last one. It can be initialized
+ * by a string in the form "&lt;first&gt;-&lt;last&gt;".
+ */
+template <class T> class Range
+{
+    public:
+        
+        // the first element of the range
+        T first;
+        
+        // the last element of the range
+        T last;
+        
+        // constructor
+        Range (std::string Lin)
+        {
+            // find separator ('-')
+            std::string::const_iterator sep = std::find(Lin.begin(),Lin.end(),'-');
+            
+            // check if the separator was found
+            if (sep != Lin.end())
+            {
+                // split the string at the separator
+                std::string strfirst = Lin.substr(0,sep-Lin.end());
+                std::string strlast  = Lin.substr(sep-Lin.begin()+1,Lin.end()-sep-1);
+                
+                // convert portions to the correct type
+                std::istringstream infirst(strfirst), inlast(strlast);
+                if (!(infirst >> first)) throw exception ("\"%s\" is not a number.", strfirst.c_str());
+                if (!(inlast >> last)) throw exception ("\"%s\" is not a number.", strlast.c_str());
+            }
+            else
+            {
+                // convert whole string to the correct type
+                std::istringstream in(Lin);
+                if (!(in >> first)) throw exception ("\"%s\" is not a number.", Lin.c_str());
+                
+                // the first and last element is the same
+                last = first;
+            }
+        }
+};
+
 #endif

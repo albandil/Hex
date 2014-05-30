@@ -240,6 +240,8 @@ void dwba
     DistortingPotential Uf(Nf,rmax);
     DistortingPotential Ui(Ni,rmax);
     
+    std::cout << "L = " << L << std::endl;
+    
     for (int lf = std::abs(Lf - L); lf <= Lf + L; lf++)
     {
         // add new T-matrix for this outgoing partial wave
@@ -248,8 +250,6 @@ void dwba
         for (cArray & T : Texc)
             T.push_back(0.);
         
-        std::cout << "lf = " << lf << std::endl;
-        
         DistortedWave chif(kf,lf,Ui);
         
         // direct 1e
@@ -257,7 +257,7 @@ void dwba
         {
             Complex tmat = DWBA1::computeDirect1e(Uf,lf,ki);
             
-            std::cout << "\tdirect 1e = " << tmat << std::endl;
+            std::cout << "\tlf = " << lf << ", li = " << lf << " : direct 1e = " << tmat << std::endl;
             
             for (int Mi = -Li; Mi <= Li; Mi++)
             for (int Mf = -Lf; Mf <= Lf; Mf++)
@@ -278,8 +278,6 @@ void dwba
             if ((li + Li) % 2 != (lf + Lf) % 2)
                 continue;
             
-            std::cout << "\tli = " << li << std::endl;
-            
             cArray DD_lf_li(MM), DE_lf_li(MM), ED_lf_li(MM), EE_lf_li(MM);
             DistortedWave chii(ki,li,Ui);
             
@@ -288,7 +286,7 @@ void dwba
             {
                 Complex tmat = DWBA1::computeExchange1e(Uf, Ni, Li, ki, Nf, Lf, kf);
                 
-                std::cout << "\t\texchange 1e = " << tmat << std::endl;
+                std::cout << "\tlf = " << lf << ", li = " << li << " : exchange 1e = " << tmat << std::endl;
                 
                 for (int Mi = -Li; Mi <= Li; Mi++)
                     for (int Mf = -Lf; Mf <= Lf; Mf++)
@@ -300,7 +298,7 @@ void dwba
             {
                 Complex tmat = DWBA1::computeDirect2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
                 
-                std::cout << "\t\tdirect 2e = " << tmat << std::endl;
+                std::cout << "\tlf = " << lf << ", li = " << li << ", λ = " << lambda << " : direct 2e = " << tmat << std::endl;
                 
                 for (int Mi = -Li; Mi <= Li; Mi++)
                 {
@@ -321,7 +319,7 @@ void dwba
             {
                 Complex tmat = DWBA1::computeExchange2e(Uf, lambda, Nf, Lf, kf, lf, Ni, Li, ki, li);
                 
-                std::cout << "\t\texchange 2e = " << tmat << std::endl;
+                std::cout << "\tlf = " << lf << ", li = " << li << ", λ = " << lambda << " : exchange 2e = " << tmat << std::endl;
                 
                 for (int Mi = -Li; Mi <= Li; Mi++)
                 {
