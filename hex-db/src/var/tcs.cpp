@@ -82,7 +82,7 @@ bool TotalCrossSection::run
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sum(sigma), sum(sigmaB) FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, sum(sigma), sum(sigmaB) FROM " + CompleteCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
