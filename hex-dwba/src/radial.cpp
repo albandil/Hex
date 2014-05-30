@@ -413,14 +413,14 @@ double compute_Idir (int li, int lf, int lambda, int Ni, int Li, double ki, int 
                     int_high = gsl_sf_pow_int(r,lambda) * gsl_sf_pow_int(c,lambda-p.a) * res.val;
                 
                 // compute the low integral
-                int err_low = gsl_sf_gamma_inc_P_e (p.a + lambda - 1, c * r, &res);
-                double scale = gsl_sf_gamma (p.a + lambda - 1);
+                int err_low = gsl_sf_gamma_inc_P_e (p.a + lambda + 1, c * r, &res);
+                double scale = gsl_sf_gamma (p.a + lambda + 1);
                 if (err_low != GSL_SUCCESS)
                 {
                     throw exception
                     (
                         "Unable to evaluate scaled complementary incomplete gamma-function P(%d,%g) - %s.",
-                        p.a + lambda - 1, c * r, gsl_strerror(err_low)
+                        p.a + lambda + 1, c * r, gsl_strerror(err_low)
                     );
                 }
                 double int_low = gsl_sf_pow_int(r,-lambda-1) * gsl_sf_pow_int(c,-p.a-lambda-1) * res.val * scale;
