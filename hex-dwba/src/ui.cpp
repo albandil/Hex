@@ -152,10 +152,10 @@ int main (int argc, char *argv[])
     std::cout << "Final quantum numbers"    << std::endl;
     std::cout << "\thydrogen Nf = "   << Nf << std::endl;
     std::cout << "\thydrogen Lf = "   << Lf << std::endl;
-    std::cout << "\tprojectile kf = " << kf << std::endl << std::endl;
+    std::cout << "\tprojectile kf = " << kf << std::endl;
     if (distort)
     {
-        std::cout << "Numerical settings" << std::endl;
+        std::cout << "\nNumerical settings" << std::endl;
         if (rmax > 0)
             std::cout << "\tgrid rmax = " << rmax << std::endl;
         else

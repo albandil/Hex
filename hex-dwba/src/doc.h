@@ -25,7 +25,7 @@
  * it can be also run in the plane wave mode (if the option <code>\--nodistort</code>
  * is used). The full usage scheme is
  * <pre>
- * hex-dwba [--nodistort] [--nodirect] [--noexchange] <ni> <li> <nf> <lf> <Ei> <L> [<rmax>]
+ * hex-dwba [--nodistort] [--nodirect] [--noexchange] &lt;ni&gt; &lt;li&gt; &lt;nf&gt; &lt;lf&gt; &lt;Ei&gt; &lt;L&gt; [&lt;rmax&gt;]
  * </pre>
  * where the options allow to skip some contributions (direct/exchange) and the number
  * parameters are: the initial and final atomic quantum numbers, impact energy,

@@ -48,7 +48,7 @@ CXXDEBUG = $(CFLAGS) -g -DNO_LAPACK -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays dwba hdffile hydrogen potential pwba radial special symbolic ui \
+FILES = arrays dwba hdffile hydrogen potential pwba special symbolic ui \
         version wave_distort
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))

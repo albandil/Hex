@@ -49,4 +49,23 @@ void pwba
     bool direct = true, bool exchange = true
 );
 
+namespace PWBA1
+{
+
+double compute_Idir
+(
+    int li, int lf, int lambda,
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf
+);
+
+double compute_Iexc
+(
+    int li, int lf, int lambda,
+    int Ni, int Li, double ki,
+    int Nf, int Lf, double kf
+);
+
+}; /* namespace PWBA1 */
+
 #endif /* HEX_PWBA */
