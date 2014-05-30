@@ -281,8 +281,10 @@ void dump (const char* dumpfile)
         "quote(S) || ',' || "
         "quote(Ei) || ',' || "
         "quote(ell) || ',' || "
-        "quote(Re_t_ell) || ',' || "
-        "quote(Im_T_ell) || ')' FROM " + TMatrix::Id + ";";
+        "quote(Re_T_ell) || ',' || "
+        "quote(Im_T_ell) || ',' || "
+        "quote(Re_TBorn_ell) || ',' || "
+        "quote(Im_TBorn_ell) || ')' FROM " + TMatrix::Id + ";";
     
     try {
         

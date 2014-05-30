@@ -96,7 +96,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         st1.exec();
         
         // for all outgoing partial waves
-        for (int ell = abs(M - mf); ell <= max_ell; ell++)
+        for (int ell = std::abs(M - mf); ell <= max_ell; ell++)
         {
             // get all relevant lines from database
             double Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell;
@@ -137,7 +137,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
             Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
             for (size_t i = 0; i < angles.size(); i++)
             {
-                Complex Y = -0.5*special::constant::pi_inv * sphY(ell, abs(M-mf), angles[i], 0.);
+                Complex Y = -0.5*special::constant::pi_inv * sphY(ell, std::abs(M-mf), angles[i], 0.);
                 
                 amplitudes[i]  += Tmatrix  * Y;
                 amplitudesb[i] += Tmatrixb * Y;

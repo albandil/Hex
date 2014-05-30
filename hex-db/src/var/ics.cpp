@@ -62,7 +62,7 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     //  0                   0
     //
     int tail = CB.tail(1e-10);
-    auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(sin(beta), tail)); };
+    auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(std::sin(beta), tail)); };
     ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
     double result = integrator.integrate(0, special::constant::pi_quart);
     
@@ -122,7 +122,8 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db) const
 std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + IntegralCrossSection::Id + "' ("
+        "CREATE TABLE IF NOT EXISTS '" + IntegralCrossSection::Id + "' "
+        "("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -160,7 +161,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
                 "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)), "
-                "0 " // Born T-matrix (to be implemented in future)
+                "0 " // TODO Born T-matrix (to be implemented in future)
             "FROM " + IonizationF::Id + " "
             "GROUP BY ni, li, mi, L, S, Ei"
     };
@@ -263,7 +264,7 @@ bool IntegralCrossSection::run
         
         // output
         for (size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << "\n";
+            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << std::endl;
     }
     
     return true;
