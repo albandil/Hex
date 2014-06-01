@@ -96,63 +96,14 @@ bool CompleteCrossSection::initialize (sqlitepp::session & db) const
 
 std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable () const
 {
-    static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + CompleteCrossSection::Id + "' "
-        "("
-            "ni INTEGER, "
-            "li INTEGER, "
-            "mi INTEGER, "
-            "nf INTEGER, "
-            "lf INTEGER, "
-            "mf INTEGER, "
-            "Ei DOUBLE PRECISION, "
-            "sigma DOUBLE PRECISION, "
-            "sigmaB DOUBLE PRECISION DEFAULT 0, "
-            "PRIMARY KEY (ni,li,mi,nf,lf,mf,Ei)"
-        ")"
-    };
+    static const std::vector<std::string> cmd;
     
     return cmd;
 }
 
 std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
 {
-    static std::vector<std::string> cmd = {
-        
-        //
-        // Compute the complete cross section
-        //                     ==
-        //    S   kf 2S+1  1   \    LS  L'S*
-        //   σ  = —— ———— ———  /   T   T
-        //        ki   4  4π²  ==   ℓ   ℓ
-        //                    ℓLL'
-        
-        "INSERT OR REPLACE INTO " + CompleteCrossSection::Id + " "
-            "SELECT ni, li, mi, nf, lf, mf, Ei, "
-                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*SUM((2*S+1)*sigma/157.91367), "
-                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*SUM((2*S+1)*sigmaB/157.91367) "
-            "FROM "
-            "("
-                "SELECT a.ni AS ni, a.li AS li, a.mi AS mi, a.nf AS nf, a.lf AS lf, a.mf AS mf, a.S AS S, a.Ei AS Ei, a.ell AS ell, "
-                    "SUM(a.Re_T_ell    * b.Re_T_ell     + a.Im_T_ell     * b.Im_T_ell    ) AS sigma, "
-                    "SUM(a.Re_TBorn_ell* b.Re_TBorn_ell + a.Im_TBorn_ell * b.Im_TBorn_ell) AS sigmaB "
-                "FROM "
-                "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
-                    "ORDER BY ell "
-                ") AS a "
-                "INNER JOIN "
-                "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
-                    "ORDER BY ell "
-                ") AS b "
-                "ON a.ni = b.ni AND a.li = b.li AND a.mi = b.mi AND "
-                "a.nf = b.nf AND a.lf = b.lf AND a.mf = b.mf AND "
-                    "a.S = b.S  AND a.Ei = b.Ei AND a.ell = b.ell "
-                "GROUP BY a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.S, a.Ei, a.ell "
-            ") "
-            "GROUP BY ni, li, mi, nf, lf, mf, Ei"
-    };
+    static std::vector<std::string> cmd;
     
     return cmd;
 }
@@ -197,7 +148,7 @@ bool CompleteCrossSection::run
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma, sigmaB FROM " + CompleteCrossSection::Id + " "
+    st << "SELECT Ei, SUM(sigma), SUM(sigmaB) FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "

@@ -149,12 +149,24 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         // insert discrete transitions
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-            "SELECT ni, li, mi, nf, lf, mf, L, S, Ei, "
-                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_T_ell*Re_T_ell + Im_T_ell*Im_T_ell)/157.91367, " // 16π²
-                "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1)*SUM(Re_TBorn_ell*Re_TBorn_ell + Im_TBorn_ell*Im_TBorn_ell)/157.91367 " // 16π²
-            "FROM " + TMatrix::Id + " "
-            "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
-            "GROUP BY ni, li, mi, nf, lf, mf, L, S, Ei",
+            "SELECT a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.L, a.S, a.Ei, "
+                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_T_ell    * b.Re_T_ell     + a.Im_T_ell     * b.Im_T_ell    )/157.91367, " // 16π²
+                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_TBorn_ell* b.Re_TBorn_ell + a.Im_TBorn_ell * b.Im_TBorn_ell)/157.91367 " // 16π²
+                "FROM "
+                "("
+                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
+                    "ORDER BY ell"
+                ") AS a "
+                "INNER JOIN "
+                "("
+                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
+                    "ORDER BY ell"
+                ") AS b "
+                "ON a.ni = b.ni AND a.li = b.li AND a.mi = b.mi AND "
+                "   a.nf = b.nf AND a.lf = b.lf AND a.mf = b.mf AND "
+                "   a.S = b.S  AND a.Ei = b.Ei AND a.ell = b.ell "
+                "WHERE a.Ei > 0 AND a.Ei - 1./(a.ni*a.ni) + 1./(a.nf*a.nf) > 0 "
+                "GROUP BY a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.L, a.S, a.Ei",
         
         // insert ionization
         

@@ -29,7 +29,7 @@ const std::vector<std::string> CollisionStrength::Dependencies = {
 };
 const std::vector<std::string> CollisionStrength::VecDependencies = { "Ei" };
 
-bool CollisionStrength::initialize(sqlitepp::session & db) const
+bool CollisionStrength::initialize (sqlitepp::session & db) const
 {
     return true;
 }
@@ -126,9 +126,16 @@ bool CollisionStrength::run
         // negative energy indicates full output
         for (size_t i = 0; i < E_arr.size(); i++)
         {
-            double Omega = E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigma_arr[i];
-            double OmegaB = E_arr[i] * efactor * (2*L+1) * (2*S+1) * sigmab_arr[i];
+            // kinematic variables to unscale the cross sections
+            double ki = std::sqrt(E_arr[i]);
+            double kf = std::sqrt(E_arr[i] - 1./(ni*ni) + 1./(nf*nf));
+            double cs_prefactor = kf / ki * (2*S+1) / 4.;
             
+            // compute collisions strengths
+            double Omega = E_arr[i] * (2*li+1) * sigma_arr[i] / cs_prefactor;
+            double OmegaB = E_arr[i] * (2*li+1) * sigmab_arr[i] / cs_prefactor;
+            
+            // print collisions strengths
             std::cout << E_arr[i] / efactor << "\t" << Omega << "\t" << OmegaB << "\n";
         }
     }
@@ -136,6 +143,11 @@ bool CollisionStrength::run
     {
         // threshold for ionization
         double Eion = 1./(ni*ni);
+        
+        // kinematic variables to unscale the cross sections
+        rArray ki = sqrt(energies);
+        rArray kf = sqrt(energies - 1./(ni*ni) + 1./(nf*nf));
+        rArray cs_prefactor = kf / ki * (2*S+1) / 4.;
         
         // interpolate
         rArray interp = (efactor * energies.front() < Eion) ? 
@@ -146,8 +158,8 @@ bool CollisionStrength::run
             interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_cspline);
         
         // compute collision strength
-        rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
-        rArray omegasB = energies * (2*L+1) * (2*S+1) * interpB * efactor;
+        rArray omegas = energies * efactor * (2*li+1) * interp / cs_prefactor;
+        rArray omegasB = energies * efactor * (2*li+1) * interpB / cs_prefactor;
         
         // output
         for (size_t i = 0; i < energies.size(); i++)
