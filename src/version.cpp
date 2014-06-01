@@ -32,7 +32,7 @@ std::string logo ()
         "#                                         \n"
         "#             UK MFF (c) 2014             \n"
         "#                                         \n"
-        "#          version: 1.01 %s               \n"
+        "#          version: 1.02 %s               \n"
         "#                                         \n",
         
         commit_hash
@@ -51,7 +51,7 @@ std::string logo_raw ()
         "                                          \n"
         "              UK MFF (c) 2014             \n"
         "                                          \n"
-        "           version: 1.01 %s               \n"
+        "           version: 1.02 %s               \n"
         "                                          \n",
         
         commit_hash
