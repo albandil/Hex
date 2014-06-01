@@ -146,8 +146,8 @@ bool CollisionStrength::run
             interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_cspline);
         
         // compute collision strength
-        rArray omegas = energies * (2*L+1) * (2*S+1) * interp * efactor;
-        rArray omegasB = energies * (2*L+1) * (2*S+1) * interpB * efactor;
+        rArray omegas = pow(energies,1.5) * (2*li+1) * interp * efactor;
+        rArray omegasB = pow(energies,1.5) * (2*li+1) * interpB * efactor;
         
         // output
         for (size_t i = 0; i < energies.size(); i++)
