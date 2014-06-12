@@ -163,7 +163,7 @@ class PreconditionerBase
         /**
          * @brief Return the right-hand side.
          */
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const = 0;
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -217,7 +217,7 @@ class NoPreconditioner : public PreconditionerBase
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const;
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const;
         virtual void multiply (const cArrayView p, cArrayView q) const;
         virtual void precondition (const cArrayView r, cArrayView z) const;
         
@@ -276,7 +276,7 @@ class CGPreconditioner : public NoPreconditioner
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         virtual void setup () { return NoPreconditioner::setup(); }
         virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions
@@ -314,7 +314,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions
@@ -369,7 +369,7 @@ class JacobiCGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
         
@@ -409,7 +409,7 @@ class SSORCGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi, ienergy, instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
         
@@ -451,7 +451,7 @@ class ILUCGPreconditioner : public CGPreconditioner
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions
@@ -498,7 +498,7 @@ class DICCGPreconditioner : public CGPreconditioner
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions
@@ -542,7 +542,7 @@ class SPAICGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
         
@@ -654,7 +654,7 @@ class TwoLevelPreconditioner : public SSORCGPreconditioner
         // declare own definitions
         void setup();
         void update (double E);
-        void rhs (cArrayView chi, int ienergy, int instate) const;
+        void rhs (cArrayView chi, int ienergy, int instate, int Spin) const;
         void multiply (const cArrayView p, cArrayView q) const;
         
         // inner CG callback
@@ -745,9 +745,9 @@ class MultiresPreconditioner : public PreconditionerBase
         }
         
         // use RHS from the highest preconditioner
-        void rhs (cArrayView chi, int ienergy, int instate) const
+        void rhs (cArrayView chi, int ienergy, int instate, int Spin) const
         {
-            p_.back()->rhs(chi, ienergy, instate);
+            p_.back()->rhs(chi, ienergy, instate, Spin);
         }
         
         // multiply by the matrix of the highest order

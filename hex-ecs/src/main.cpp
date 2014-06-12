@@ -203,6 +203,12 @@ int main (int argc, char* argv[])
         throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
     prec->setup();
     
+    // CG preconditioner callback
+    auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
+    
+    // CG matrix multiplication callback
+    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
+    
     //
     // Solve the equations
     //
@@ -222,6 +228,7 @@ int main (int argc, char* argv[])
         // we may have already computed all solutions for this energy... is it so?
         bool all_done = true;
         for (auto instate : inp.instates)
+        for (unsigned Spin = 0; Spin <= 1; Spin++)
         {
             int li = std::get<1>(instate);
             int mi = std::get<2>(instate);
@@ -238,7 +245,7 @@ int main (int argc, char* argv[])
             
             // compose filename of the output file for this solution
             std::ostringstream oss;
-            oss << "psi-" << inp.L << "-" << inp.Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
+            oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
             
             // check if there is some precomputed solution on the disk
             if ( not current_solution.hdfload(oss.str().c_str()) )
@@ -258,6 +265,7 @@ int main (int argc, char* argv[])
         
         // for all initial states
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
+        for (unsigned Spin = 0; Spin <= 1; Spin++)
         {
             int li = std::get<1>(inp.instates[instate]);
             int mi = std::get<2>(inp.instates[instate]);
@@ -271,14 +279,14 @@ int main (int argc, char* argv[])
             
             // we may have already computed solution for this state and energy... is it so?
             std::ostringstream cur_oss;
-            cur_oss << "psi-" << inp.L << "-" << inp.Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
+            cur_oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
             if ( current_solution.hdfload(cur_oss.str().c_str()) )
                 continue;
             
             // create right hand side
-            std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << "\n";
+            std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << "\n";
             cArray chi (coupled_states.size() * Nspline * Nspline);
-            prec->rhs(chi, ie, instate);
+            prec->rhs(chi, ie, instate, Spin);
             if (chi.norm() == 0.)
             {
                 std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings)." << std::endl;
@@ -291,16 +299,10 @@ int main (int argc, char* argv[])
             if (ie > 0)
             {
                 std::ostringstream prev_oss;
-                prev_oss << "psi-" << inp.L << "-" << inp.Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie-1] << ".hdf";
+                prev_oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie-1] << ".hdf";
                 if (previous_solution.hdfload(prev_oss.str().c_str()))
                     current_solution = previous_solution;
             }
-            
-            // CG preconditioner callback
-            auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
-            
-            // CG matrix multiplication callback
-            auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
             
             // custom conjugate gradients callback-based solver
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
@@ -323,7 +325,7 @@ int main (int argc, char* argv[])
             // save solution to disk
             current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
             
-        } // end of For li
+        } // end of For Spin, instate
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
@@ -343,197 +345,200 @@ StgExtract:
     // radial integrals
     RadialIntegrals rad (bspline);
     
-    // compose output filename
-    std::ostringstream ossfile;
-    if (par.active())
-        ossfile << inp.ni << "-" << inp.L << "-" << inp.Spin << "-" << inp.Pi << "-(" << par.iproc() << ").sql";
-    else
-        ossfile << inp.ni << "-" << inp.L << "-" << inp.Spin << "-" << inp.Pi << ".sql";
-    
-    // Create SQL batch file
-    std::ofstream fsql(ossfile.str().c_str());
-    
-    // set exponential format for floating point output
-    fsql.setf(std::ios_base::scientific);
-    
-    // write header
-    fsql << "BEGIN TRANSACTION;" << std::endl;
-    
-    //
-    // Extract the cross sections
-    //
-    
-    std::cout << std::endl << "Extracting T-matrices..." << std::endl;
-    
-    std::vector<std::tuple<int,int,int,int,int>> transitions;
-    for (auto instate  : inp.instates)
-    for (auto outstate : inp.outstates)
+    for (int Spin = 0; Spin <= 1; Spin++)
     {
-        transitions.push_back
-        (
-            std::make_tuple
-            (
-                inp.Spin,
-                /*li*/ std::get<1>(instate),
-                /*mi*/ std::get<2>(instate),
-                /*nf*/ std::get<0>(outstate),
-                /*lf*/ std::get<1>(outstate)
-            )
-        );
-    }
-    
-    int finished = 0;
-    
-    for (unsigned i = 0; i < transitions.size(); i++)
-    {
-        // skip other process's work
-        if (not par.isMyWork(i))
-            continue;
-        
-        // get quantum numbers
-        int Spin = std::get<0>(transitions[i]);
-        int li   = std::get<1>(transitions[i]);
-        int mi   = std::get<2>(transitions[i]);
-        int nf   = std::get<3>(transitions[i]);
-        int lf   = std::get<4>(transitions[i]);
-        
-        // skip angular forbidden states
-        bool allowed = false;
-        for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-            allowed = allowed or ClebschGordan(li,mi,l,0,inp.L,mi);
-        if (not allowed)
-            continue;
-        
-        if (nf > 0)
-        {
-            //
-            // Discrete transition
-            //
-            
-            // precompute hydrogen function overlaps
-            cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
-            
-            // compute radial integrals
-            cArrays Lambda(2 * lf + 1);
-            for (int mf = -lf; mf <= lf; mf++)
-            {
-                // final projectile momenta
-                rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
-                
-                // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-                Lambda[mf+lf] = std::move (
-                    computeLambda (bspline, kf, inp.ki, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, lf, Pf_overlaps, coupled_states)
-                );
-            }
-            
-            // save the data
-            for (int mf = -lf; mf <= lf; mf++)
-            {
-                // final projectile momenta
-                rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
-                
-                // compute Tℓ
-                cArray T_ell(Lambda[mf+lf].size());
-                for (unsigned i = 0; i < T_ell.size(); i++)
-                {
-                    int ie  = i / (inp.maxell + 1);
-                    int ell = i % (inp.maxell + 1);
-                    
-                    T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * pow(Complex(0.,1.), -ell)
-                                    * ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
-                }
-                
-                //
-                // print out SQL
-                //
-                
-                for (unsigned i = 0; i < T_ell.size(); i++)
-                {
-                    int ie  = i / (inp.maxell + 1);
-                    int ell = i % (inp.maxell + 1);
-                    
-                    if (std::isfinite(T_ell[i].real()) and std::isfinite(T_ell[i].imag()))
-                    if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
-                    {
-                        fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
-                             << inp.ni << "," << li << "," << mi << ","
-                             << nf << "," << lf << "," << mf << ","
-                             << inp.L  << "," << Spin << ","
-                             << inp.Ei[ie] << "," << ell << "," 
-                             << T_ell[i].real() << "," << T_ell[i].imag() << ","
-                             << "0, 0);" << std::endl;
-                    }
-                }
-                
-                //
-                // print out the total cross section for quick overview
-                //
-                
-                std::ostringstream sigmaname;
-                sigmaname << "sigma-" 
-                          << inp.ni << "-" << li << "-" << mi << "-"
-                          << nf << "-" << lf << "-" << mf << "-"
-                          << inp.L << "-" << Spin << "-" << inp.Pi << ".dat";
-
-                std::ofstream ftxt(sigmaname.str().c_str());
-                
-                ftxt << "# Ei [Ry] sigma [a0^2]" << std::endl;
-                for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
-                {
-                    double sigma = 0.;
-                    for (int ell = 0; ell <= inp.maxell; ell++)
-                    {
-                        double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / (2 * special::constant::pi);
-                        double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * special::constant::pi);
-                        sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
-                    }
-                    if (std::isfinite(sigma))
-                    {
-                        ftxt << inp.Ei[ie] << "\t" << sigma << "\n";
-                    }
-                }
-                ftxt.close();
-            }
-        }
+        // compose output filename
+        std::ostringstream ossfile;
+        if (par.active())
+            ossfile << inp.ni << "-" << inp.L << "-" << Spin << "-" << inp.Pi << "-(" << par.iproc() << ").sql";
         else
+            ossfile << inp.ni << "-" << inp.L << "-" << Spin << "-" << inp.Pi << ".sql";
+        
+        // Create SQL batch file
+        std::ofstream fsql(ossfile.str().c_str());
+        
+        // set exponential format for floating point output
+        fsql.setf(std::ios_base::scientific);
+        
+        // write header
+        fsql << "BEGIN TRANSACTION;" << std::endl;
+        
+        //
+        // Extract the cross sections
+        //
+        
+        std::cout << std::endl << "Extracting T-matrices..." << std::endl;
+        
+        std::vector<std::tuple<int,int,int,int,int>> transitions;
+        for (auto instate  : inp.instates)
+        for (auto outstate : inp.outstates)
         {
-            //
-            // Ionization
-            //
-            
-            rArray ics;
-            cArrays data = std::move
+            transitions.push_back
             (
-                computeXi(bspline, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, ics, coupled_states)
+                std::make_tuple
+                (
+                    Spin,
+                    /*li*/ std::get<1>(instate),
+                    /*mi*/ std::get<2>(instate),
+                    /*nf*/ std::get<0>(outstate),
+                    /*lf*/ std::get<1>(outstate)
+                )
             );
-            
-            for (size_t ie = 0; ie < inp.Ei.size(); ie++)
-            for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
-            {
-                // save data as BLOBs
-                fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
-                     << inp.ni << "," << li << "," << mi << ","
-                     << inp.L  << "," << Spin << ","
-                     << inp.Ei[ie] << "," << coupled_states[ill].first << ","
-                     << coupled_states[ill].second << ","
-                     << data[ie * coupled_states.size() + ill].toBlob() << ");" << std::endl;
-            }
-            
-            // print ionization cross section
-            std::ostringstream fname;
-            fname << "isigma-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << ".dat";
-            write_array(inp.Ei, ics, fname.str().c_str());
         }
         
-        finished++;
+        int finished = 0;
         
-        std::cout << "\rExtracting T-matrices... " 
-                  << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
-                  << " %        ";
+        for (unsigned i = 0; i < transitions.size(); i++)
+        {
+            // skip other process's work
+            if (not par.isMyWork(i))
+                continue;
+            
+            // get quantum numbers
+            int Spin = std::get<0>(transitions[i]);
+            int li   = std::get<1>(transitions[i]);
+            int mi   = std::get<2>(transitions[i]);
+            int nf   = std::get<3>(transitions[i]);
+            int lf   = std::get<4>(transitions[i]);
+            
+            // skip angular forbidden states
+            bool allowed = false;
+            for (int l = abs(li - inp.L); l <= li + inp.L; l++)
+                allowed = allowed or ClebschGordan(li,mi,l,0,inp.L,mi);
+            if (not allowed)
+                continue;
+            
+            if (nf > 0)
+            {
+                //
+                // Discrete transition
+                //
+                
+                // precompute hydrogen function overlaps
+                cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
+                
+                // compute radial integrals
+                cArrays Lambda(2 * lf + 1);
+                for (int mf = -lf; mf <= lf; mf++)
+                {
+                    // final projectile momenta
+                    rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
+                    
+                    // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
+                    Lambda[mf+lf] = std::move (
+                        computeLambda (bspline, kf, inp.ki, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, lf, Pf_overlaps, coupled_states)
+                    );
+                }
+                
+                // save the data
+                for (int mf = -lf; mf <= lf; mf++)
+                {
+                    // final projectile momenta
+                    rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
+                    
+                    // compute Tℓ
+                    cArray T_ell(Lambda[mf+lf].size());
+                    for (unsigned i = 0; i < T_ell.size(); i++)
+                    {
+                        int ie  = i / (inp.maxell + 1);
+                        int ell = i % (inp.maxell + 1);
+                        
+                        T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * pow(Complex(0.,1.), -ell)
+                                        * ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
+                    }
+                    
+                    //
+                    // print out SQL
+                    //
+                    
+                    for (unsigned i = 0; i < T_ell.size(); i++)
+                    {
+                        int ie  = i / (inp.maxell + 1);
+                        int ell = i % (inp.maxell + 1);
+                        
+                        if (std::isfinite(T_ell[i].real()) and std::isfinite(T_ell[i].imag()))
+                        if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
+                        {
+                            fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+                                << inp.ni << "," << li << "," << mi << ","
+                                << nf << "," << lf << "," << mf << ","
+                                << inp.L  << "," << Spin << ","
+                                << inp.Ei[ie] << "," << ell << "," 
+                                << T_ell[i].real() << "," << T_ell[i].imag() << ","
+                                << "0, 0);" << std::endl;
+                        }
+                    }
+                    
+                    //
+                    // print out the total cross section for quick overview
+                    //
+                    
+                    std::ostringstream sigmaname;
+                    sigmaname << "sigma-" 
+                            << inp.ni << "-" << li << "-" << mi << "-"
+                            << nf << "-" << lf << "-" << mf << "-"
+                            << inp.L << "-" << Spin << "-" << inp.Pi << ".dat";
+
+                    std::ofstream ftxt(sigmaname.str().c_str());
+                    
+                    ftxt << "# Ei [Ry] sigma [a0^2]" << std::endl;
+                    for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
+                    {
+                        double sigma = 0.;
+                        for (int ell = 0; ell <= inp.maxell; ell++)
+                        {
+                            double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / (2 * special::constant::pi);
+                            double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * special::constant::pi);
+                            sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
+                        }
+                        if (std::isfinite(sigma))
+                        {
+                            ftxt << inp.Ei[ie] << "\t" << sigma << "\n";
+                        }
+                    }
+                    ftxt.close();
+                }
+            }
+            else
+            {
+                //
+                // Ionization
+                //
+                
+                rArray ics;
+                cArrays data = std::move
+                (
+                    computeXi(bspline, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, ics, coupled_states)
+                );
+                
+                for (size_t ie = 0; ie < inp.Ei.size(); ie++)
+                for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
+                {
+                    // save data as BLOBs
+                    fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+                        << inp.ni << "," << li << "," << mi << ","
+                        << inp.L  << "," << Spin << ","
+                        << inp.Ei[ie] << "," << coupled_states[ill].first << ","
+                        << coupled_states[ill].second << ","
+                        << data[ie * coupled_states.size() + ill].toBlob() << ");" << std::endl;
+                }
+                
+                // print ionization cross section
+                std::ostringstream fname;
+                fname << "isigma-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << ".dat";
+                write_array(inp.Ei, ics, fname.str().c_str());
+            }
+            
+            finished++;
+            
+            std::cout << "\rExtracting T-matrices... " 
+                    << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
+                    << " %        ";
+        }
+        
+        fsql << "COMMIT;" << std::endl;
+        fsql.close();
     }
-    
-    fsql << "COMMIT;" << std::endl;
-    fsql.close();
 }
 
 End:

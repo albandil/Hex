@@ -50,8 +50,8 @@ const std::string sample_input =
     "  0\n"
     "\n"
     "# angular momenta\n"
-    "# L  S  Pi limit\n"
-    "  0  0  0  4\n"
+    "# L  Pi limit\n"
+    "  0  0  4\n"
     "\n"
     "# initial energies in Rydbergs\n"
     " 0.65   -1\n"
@@ -505,7 +505,6 @@ void InputFile::read (std::ifstream & inputfile)
     try {
         
         L = read_int(inputfile);
-        Spin = read_int(inputfile) % 2;
         Pi = read_int(inputfile) % 2;
         levels = read_int(inputfile);
         
@@ -526,7 +525,6 @@ void InputFile::read (std::ifstream & inputfile)
     
     std::cout << "\n----------  Angular momentum limits  -------------\n";
     std::cout << "L = " << L << "\n";
-    std::cout << "S = " << Spin << "\n";
     std::cout << "Π = " << Pi << "\n";
     std::cout << "ℓ = " << levels << "\n";
     

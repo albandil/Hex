@@ -475,7 +475,7 @@ void NoPreconditioner::update (double E)
     std::cout << "ok\n";
 }
 
-void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
+void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
 {
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
@@ -518,7 +518,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
                 continue;
             
             // (anti)symmetrization
-            int Sign = ((inp_.Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
+            int Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*special::constant::pi*(2*l+1)) / Complex(inp_.ki[ie]); 

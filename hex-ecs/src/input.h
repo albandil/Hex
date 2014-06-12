@@ -170,7 +170,7 @@ class InputFile
         // public attributes
         //
         
-        int order, ni, L, Spin, Pi, levels, maxell;
+        int order, ni, L, Pi, levels, maxell;
         double ecstheta, B;
         rArray rknots, cknots, Ei, ki;
         std::vector<std::tuple<int,int,int>> instates, outstates;
