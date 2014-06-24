@@ -58,13 +58,13 @@ cArray computeLambda
         
         // load the solution
         cArray solution;
-        
+        bool solution_exists = false;
         #pragma omp critical
+        solution_exists = solution.hdfload(oss.str().c_str());
+        if (not solution_exists)
         {
-            if (not solution.hdfload(oss.str().c_str()))
-            {
-                throw exception ("Failed to load \"%s\"\n", oss.str().c_str());
-            }
+            std::cout << "File \"" << oss.str() << "\" not found." << std::endl;
+            continue;
         }
         
         // The cross section oscillates, so we will do some averaging
