@@ -42,6 +42,7 @@
 		<Unit filename="src/hdffile.h" />
 		<Unit filename="src/hydrogen.cpp" />
 		<Unit filename="src/hydrogen.h" />
+		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/ode.h" />
 		<Unit filename="src/potential.cpp" />

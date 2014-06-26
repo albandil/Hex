@@ -39,6 +39,7 @@
 		<Unit filename="src/gausskronrod.h" />
 		<Unit filename="src/hydrogen.cpp" />
 		<Unit filename="src/hydrogen.h" />
+		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/nodeintegrate.h" />
 		<Unit filename="src/pwba2.cpp" />

@@ -45,6 +45,7 @@
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/matrix.h" />
+		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/moments.cpp" />
 		<Unit filename="src/moments.h" />

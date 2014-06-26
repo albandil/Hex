@@ -62,6 +62,7 @@
 		<Unit filename="src/hex-db.h" />
 		<Unit filename="src/interfaces.h" />
 		<Unit filename="src/interpolate.h" />
+		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/special.cpp" />
 		<Unit filename="src/special.h" />

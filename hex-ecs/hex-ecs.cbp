@@ -74,6 +74,7 @@
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/matrix.h" />
+		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/opencl.h" />
 		<Unit filename="src/parallel.h" />
