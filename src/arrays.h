@@ -145,30 +145,27 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
 #endif
 
 // Forward declaration of Array (unaligned array of items).
-template <
-    class T,
-    class Alloc = PlainAllocator<T>
-> class Array;
+template <class T, class Alloc = PlainAllocator<T>> class Array;
 
 #ifndef NO_ALIGN
-// Forward declaration of NumberArray (aligned array of numbers).
+// Forward declaration of NumberArray (memory-aligned array of numbers).
 // - Align at least at multiples of sizeof(void*), but preferably on multiples
-//   of 2*sizeof(Complex). This should enable vectorization of Complex
-//   operations using AVX instruction, bacause two Complex numbers occupy
+//   of 2*sizeof(T). This should enable vectorization of operations
+//   also for T=Complex, using AVX instruction, bacause two Complex numbers occupy
 //   2*2*64 = 256 bits, which is the size of AVX register.
-template <
+template
+<
     class T,
-    class Alloc = AlignedAllocator <
+    class Alloc = AlignedAllocator
+    <
         T,
         larger_of ( sizeof(void*), 2*sizeof(T) )
     >
-> class NumberArray;
+>
+class NumberArray;
 #else
-// Forward declaration of NumberArray (unaligned array of numbers).
-template <
-    class T,
-    class Alloc = PlainAllocator<T>
-> class NumberArray;
+// Forward declaration of NumberArray (without any alignment requirements).
+template <class T, class Alloc = PlainAllocator<T>> class NumberArray;
 #endif
 
 /**
@@ -740,18 +737,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         /**
          * @brief Data pointer.
          * 
-         * Get pointer to the aligned memory. In the present implementation the
-         * pointer is filtered through the builtin function
-           @code
-              __builtin_assume_aligned(pointer, alignment)
-           @endcode
-         * to make the compiler (GCC) assume that the memory pointed to by the
-         * data pointer is specifically aligned.
-         * 
-         * @note It is not clear, however, if the state "assumed aligned" is
-         * preserved when passing the pointer as a return value. It may be
-         * necessary to filter the pointer through the builtin function just
-         * before the pointer is accessed. See e.g. SymDiaMatrix::dot function.
+         * Gets pointer to the (possibly aligned) memory.
          */
         //@{
         virtual T * data ()
