@@ -31,142 +31,14 @@
 #endif
 
 #include "complex.h"
+#include "memory.h"
 #include "misc.h"
 
-/**
- * @brief Basic memory allocator.
- * 
- * Memory allocators are used by @ref Array -like classes for memory
- * management: allocating and freeing of memory. PlainAllocator uses
- * the usual C++ "new/delete" mechanism for manipulation of the memory.
- */
-template <class T> class PlainAllocator
-{
-    public:
-        
-        /**
-         * @brief Allocate array.
-         * 
-         * This method will allocate fields of the data type T.
-         * The elements will be constructed by the implicit constructor.
-         * @param n Number of items to allocate.
-         */
-        static T * alloc (size_t n)
-        {
-            return new T[n]();
-        }
-        
-        /**
-         * @brief Free array.
-         * 
-         * This method will deallocate memory pointed to by the pointer
-         * "ptr". It is expected that pointer has been previously
-         * retrieved from the function PlainAllocator::alloc. The pointer
-         * can have the value "nullptr"; in such a case nothing will
-         * be done.
-         */
-        static void free (T * ptr)
-        {
-            if (ptr != nullptr)
-                delete [] ptr;
-        }
-};
-
-#ifndef NO_ALIGN
-/**
- * @brief Aligned memory allocator.
- * 
- * Memory allocators are used by @ref Array -like classes for memory
- * management: allocating and freeing of memory. This particular class
- * allocates aligned memory, i.e. every allocated block will begin at
- * a memory address that is multiple of the size of the allocated type.
- * Also, all items of the allocated array will be placed in memory-aligned
- * locations. The alignment helps the system load the memory efficiently
- * and the compiler can thus do some optimizations -- particularly the
- * autovectorization, which can utilize SIMD instruction of the CPU and
- * speed up the operation on the arrays.
- */
-template <class T, size_t alignment = std::alignment_of<T>::value> class AlignedAllocator
-{
-    public:
-        
-        /**
-         * @brief Allocate aligned memory.
-         * 
-         * Allocate array of "n" items of the type "T". The array will be
-         * aligned on the alignment given as the template parameter of the
-         * class. If the alignment were less than sizeof(void*), the alignment
-         * is changed to sizeof(void*) because smaller values are invalid
-         * anyway. The code uses system-dependent allocation functions.
-         */
-        static T * alloc (size_t n)
-        {
-            // is there anything to allocate?
-            if (n < 1)
-                return nullptr;
-            
-            // allocate the aligned memory; make sure there will be even number of elements
-            // so that we can always use pairs
-            size_t bytes = (n + (n % 2)) * sizeof(T);
-            size_t align = std::max(alignment, sizeof(void*));
-            
-            // use standard function
-            void* aligned_ptr = nullptr;
-            int err = posix_memalign(&aligned_ptr, align, bytes);
-            
-            // check the return value
-            if (err != 0 or aligned_ptr == nullptr)
-                throw exception ("[AlignedAllocator<T>::alloc] Aligned memory allocation error. Probably out of memory.");
-            
-            // get the number pointer
-            T* ptr = reinterpret_cast<T*>(aligned_ptr);
-            
-            // clear the last element so that we may disregard it during multiplication
-            *(ptr + n + (n % 2) - 1) = 0;
-            
-            // return the pointer
-            return ptr;
-        }
-        
-        /**
-         * @brief Deallocate aligned memory.
-         * 
-         * Free the memory pointed to by the pointer "ptr". It is assumed
-         * that the pointer was obtained from the call to the function
-         * alloc of the same specialization of the class AlignedAllocator.
-         * Value "nullptr" is allowed; nothing will be done in that case.
-         */
-        static void free (T * ptr)
-        {
-            if (ptr != nullptr)
-                std::free (ptr);
-        }
-};
-#endif
-
 // Forward declaration of Array (unaligned array of items).
-template <class T, class Alloc = PlainAllocator<T>> class Array;
+template < class T, class Alloc = PlainAllocator<T> > class Array;
 
-#ifndef NO_ALIGN
 // Forward declaration of NumberArray (memory-aligned array of numbers).
-// - Align at least at multiples of sizeof(void*), but preferably on multiples
-//   of 2*sizeof(T). This should enable vectorization of operations
-//   also for T=Complex, using AVX instruction, bacause two Complex numbers occupy
-//   2*2*64 = 256 bits, which is the size of AVX register.
-template
-<
-    class T,
-    class Alloc = AlignedAllocator
-    <
-        T,
-        larger_of ( sizeof(void*), 2*sizeof(T) )
-    >
->
-class NumberArray;
-#else
-// Forward declaration of NumberArray (without any alignment requirements).
-template <class T, class Alloc = PlainAllocator<T>> class NumberArray;
-#endif
+template < class T, class Alloc = AlignedAllocator<T,2*sizeof(Complex)> > class NumberArray;
 
 /**
  * @brief Array view.
