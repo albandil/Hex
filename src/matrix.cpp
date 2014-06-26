@@ -130,33 +130,27 @@ CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
     return CooMatrix(m, n, C_i, C_j, C_x);
 }
 
-CooMatrix eye(size_t N)
+CooMatrix eye (size_t N)
 {
-    return CooMatrix(N,N).symm_populate_band(
+    return CooMatrix(N,N).symm_populate_band
+    (
         0,
-        [](size_t i, size_t j) -> Complex {
-            return 1.;
-        }
+        [](size_t i, size_t j) -> Complex { return 1.; }
     );
 }
 
-CooMatrix stairs(size_t N)
+CooMatrix stairs (size_t N)
 {
-    return CooMatrix(N,N).symm_populate_band(
+    return CooMatrix(N,N).symm_populate_band
+    (
         0,
-        [](size_t i, size_t j) -> Complex {
-            return (i == j) ? i : 0.;
-        }
+        [](size_t i, size_t j) -> Complex { return (i == j) ? i : 0.; }
     );
 }
 
-
-
-// ------------------------------------------------------------------------- //
-
-// -- CSC matrix methods --------------------------------------------------- //
-
-// ------------------------------------------------------------------------- //
+// 
+// CSC matrix routines
+// 
 
 CscMatrix & CscMatrix::operator *= (double r)
 {
@@ -204,7 +198,7 @@ CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
     return *this;
 }
 
-cArray CscMatrix::dotT(const cArrayView b) const
+cArray CscMatrix::dotT (const cArrayView b) const
 {
     // create output array
     cArray c (n_);
@@ -230,11 +224,11 @@ cArray CscMatrix::dotT(const cArrayView b) const
 }
 
 #ifndef NO_UMFPACK
-CooMatrix CscMatrix::tocoo() const
+CooMatrix CscMatrix::tocoo () const
 {
-    // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
+    // reserve space for the auxiliary (J) and the output (Ti,Tj,Tx,Tz) arrays
     size_t N = x_.size();
-    std::vector<long> Ti(N), Tj(N), __j(N);
+    std::vector<long> Ti(N), Tj(N), J(N);
     std::vector<Complex> Tx(N);
     
     // do we have any elements at all?
@@ -242,7 +236,7 @@ CooMatrix CscMatrix::tocoo() const
     {
     
         // do the conversion
-        long status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
+        long status = umfpack_zl_col_to_triplet(n_, p_.data(), J.data());
         
         // check success
         if (status != 0)
@@ -258,7 +252,7 @@ CooMatrix CscMatrix::tocoo() const
             if (x_[i] != 0.)
             {
                 Ti[nz] = i_[i];
-                Tj[nz] = __j[i];
+                Tj[nz] = J[i];
                 Tx[nz] = x_[i];
                 nz++;
             }
@@ -276,7 +270,7 @@ CooMatrix CscMatrix::tocoo() const
 }
 #endif
 
-bool CscMatrix::hdfsave(const char* name) const
+bool CscMatrix::hdfsave (const char* name) const
 {
 #ifndef NO_HDF
     try
@@ -296,7 +290,8 @@ bool CscMatrix::hdfsave(const char* name) const
         // write complex data as a "double" array
         if (not x_.empty())
         {
-            file.write (
+            file.write
+            (
                 "x",
                 reinterpret_cast<double const*>( &(x_[0]) ),
                 x_.size() * 2
@@ -314,7 +309,7 @@ bool CscMatrix::hdfsave(const char* name) const
 #endif
 }
 
-bool CscMatrix::hdfload(const char* name)
+bool CscMatrix::hdfload (const char* name)
 {
 #ifndef NO_HDF
     try
@@ -334,7 +329,8 @@ bool CscMatrix::hdfload(const char* name)
         // read data
         if (x_.resize(hdf.size("x") / 2))
         {
-            hdf.read (
+            hdf.read
+            (
                 "x",
                 reinterpret_cast<double*>(&(x_[0])),
                 x_.size() * 2
@@ -352,12 +348,9 @@ bool CscMatrix::hdfload(const char* name)
 #endif
 }
 
-
-// ------------------------------------------------------------------------- //
-
-// -- CSR matrix methods --------------------------------------------------- //
-
-// ------------------------------------------------------------------------- //
+//
+// CSR matrix routines
+//
 
 CsrMatrix & CsrMatrix::operator *= (Complex r)
 {
@@ -398,7 +391,7 @@ CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
     return *this;
 }
 
-cArray CsrMatrix::dot(cArrayView const & b) const
+cArray CsrMatrix::dot (cArrayView const & b) const
 {
     // create output array
     cArray c(m_);
@@ -428,11 +421,11 @@ CsrMatrix::PngGenerator::PngGenerator (CsrMatrix const * mat, double threshold)
 {
 }
 
-CsrMatrix::PngGenerator::~PngGenerator()
+CsrMatrix::PngGenerator::~PngGenerator ()
 {
 }
 
-png::byte* CsrMatrix::PngGenerator::get_next_row(size_t irow)
+png::byte* CsrMatrix::PngGenerator::get_next_row (size_t irow)
 {
     // get column indices
     int idx_min = M_->p_[irow];
@@ -481,7 +474,8 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
     Control[UMFPACK_DROPTOL] = droptol;
     
     // analyze the sparse structure
-    status = umfpack_zl_symbolic (
+    status = umfpack_zl_symbolic
+    (
         m_, n_,                    // matrix dimensions
         p_.data(), i_.data(),        // column and row indices
         reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
@@ -495,7 +489,8 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
     }
     
     // do some factorizations
-    status = umfpack_zl_numeric (
+    status = umfpack_zl_numeric
+    (
         p_.data(), i_.data(),    // column and row indices
         reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
         Symbolic, &Numeric, Control, nullptr    // UMFPACK internals
@@ -570,7 +565,8 @@ bool CsrMatrix::hdfsave (std::string name) const
         // write data
         if (not x_.empty())
         {
-            hdf.write (
+            hdf.write
+            (
                 "x",
                 reinterpret_cast<double const*>(&(x_[0])),
                 x_.size() * 2
@@ -608,7 +604,8 @@ bool CsrMatrix::hdfload (std::string name)
         // read data
         if (x_.resize(hdf.size("x") / 2))
         {
-            hdf.read (
+            hdf.read
+            (
                 "x",
                 reinterpret_cast<double*>(&(x_[0])),
                 x_.size() * 2
@@ -626,7 +623,7 @@ bool CsrMatrix::hdfload (std::string name)
 #endif
 }
 
-double CsrMatrix::norm() const
+double CsrMatrix::norm () const
 {
     size_t N = i_.size();
     double res = 0.;
@@ -645,7 +642,7 @@ double CsrMatrix::norm() const
     return res;
 }
 
-cArray CsrMatrix::upperSolve(cArrayView const &  b) const
+cArray CsrMatrix::upperSolve (cArrayView const &  b) const
 {
     // check size
     size_t N = b.size();
@@ -693,7 +690,7 @@ cArray CsrMatrix::upperSolve(cArrayView const &  b) const
     return x;
 }
 
-cArray CsrMatrix::lowerSolve(cArrayView const & b) const
+cArray CsrMatrix::lowerSolve (cArrayView const & b) const
 {
     // check size
     size_t N = b.size();
@@ -740,7 +737,7 @@ cArray CsrMatrix::lowerSolve(cArrayView const & b) const
     return x;
 }
 
-cArray CsrMatrix::diag() const
+cArray CsrMatrix::diag () const
 {
     cArray D ( std::min(m_, n_) );
     
@@ -753,7 +750,7 @@ cArray CsrMatrix::diag() const
 }
 
 #ifndef NO_UMFPACK
-CooMatrix CsrMatrix::tocoo() const
+CooMatrix CsrMatrix::tocoo () const
 {
     // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
     size_t N = x_.size();
@@ -845,7 +842,7 @@ CsrMatrix CsrMatrix::sparse_like (const CsrMatrix& B) const
     return A;
 }
 
-Complex CsrMatrix::operator() (unsigned i, unsigned j) const
+Complex CsrMatrix::operator () (unsigned i, unsigned j) const
 {
     // get all column indices, which have nonzero element in row "i"
     size_t idx1 = p_[i];
@@ -861,16 +858,15 @@ Complex CsrMatrix::operator() (unsigned i, unsigned j) const
     return x_[it - i_.begin()];
 }
 
-Complex sparse_row_scalar_product (
+Complex sparse_row_scalar_product
+(
   int n1, Complex const * const restrict x1, long const * const restrict i1,
   int n2, Complex const * const restrict x2, long const * const restrict i2
-) {
+)
+{
     Complex ssp = 0.;
     if (n1 < 1 or n2 < 1)
         return ssp;
-    
-//     std::cout << "SSP:\n\t" << ArrayView<Complex>(x1, x1 + n1)
-//               <<     "\n\t" << ArrayView<Complex>(x2, x2 + n2) << "\n";
     
     for (int pos1 = 0, pos2 = 0; pos1 < n1 and pos2 < n2;)
     {
@@ -910,7 +906,8 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
         for (int icol = 0; icol < (int)B.cols(); icol++)
         {
             // compute scalar product of the rows
-            Complex ssp = sparse_row_scalar_product (
+            Complex ssp = sparse_row_scalar_product
+            (
                 A.p()[irow+1] - A.p()[irow],   // nnz count
                 A.x().data() + A.p()[irow],    // elements
                 A.i().data() + A.p()[irow],    // column indices
@@ -932,21 +929,16 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
         Cp.push_back(Cx.size());
     }
     
-//     std::cout << "Cx.size() = " << Cx.size() << "\n";
-    
     return CsrMatrix(A.rows(), B.cols(), Cp, Ci, Cx);
 }
 
 
-// ------------------------------------------------------------------------- //
-
-// -- COO matrix methods --------------------------------------------------- //
-
-// ------------------------------------------------------------------------- //
-
+//
+// COO matrix routines
+//
 
 #ifndef NO_UMFPACK
-CscMatrix CooMatrix::tocsc() const
+CscMatrix CooMatrix::tocsc () const
 {
     size_t nz = x_.size();
     
@@ -958,7 +950,8 @@ CscMatrix CooMatrix::tocsc() const
     if (nz != 0)
     {
     
-        long status = umfpack_zl_triplet_to_col (
+        long status = umfpack_zl_triplet_to_col
+        (
             m_,            // rows
             n_,            // cols
             nz,                // data length
@@ -989,7 +982,7 @@ CscMatrix CooMatrix::tocsc() const
 #endif
 
 #ifndef NO_UMFPACK
-CsrMatrix CooMatrix::tocsr() const
+CsrMatrix CooMatrix::tocsr () const
 {
     size_t nz = x_.size();
     
@@ -1041,7 +1034,7 @@ CsrMatrix CooMatrix::tocsr() const
 }
 #endif
 
-SymDiaMatrix CooMatrix::todia(MatrixTriangle triangle) const
+SymDiaMatrix CooMatrix::todia (MatrixTriangle triangle) const
 {
     // diagonal indices
     std::set<int> diags;
@@ -1090,7 +1083,8 @@ SymDiaMatrix CooMatrix::todia(MatrixTriangle triangle) const
     }
     
     // concatenate the diagonals, construct matrix object
-    return SymDiaMatrix (
+    return SymDiaMatrix
+    (
         m_,
         Array<int>(diags.cbegin(), diags.cend()),
         join(elems)
@@ -1108,7 +1102,7 @@ void CooMatrix::write (const char* filename) const
 }
 
 
-CooMatrix CooMatrix::reshape(size_t m, size_t n) const
+CooMatrix CooMatrix::reshape (size_t m, size_t n) const
 {
     CooMatrix C = *this;
     
@@ -1139,7 +1133,7 @@ CooMatrix CooMatrix::reshape(size_t m, size_t n) const
     return C;
 }
 
-cArray CooMatrix::todense() const
+cArray CooMatrix::todense () const
 {
     // return column-major dense representations
     cArray v (m_ * n_);
@@ -1159,7 +1153,7 @@ CooMatrix& CooMatrix::operator *= (const cArrayView B)
 #endif
 
 #ifndef NO_UMFPACK
-CooMatrix CooMatrix::dot(const cArrayView B) const
+CooMatrix CooMatrix::dot (const cArrayView B) const
 {
     // FIXME: This is a memory INEFFICIENT method.
     // NOTE: Row-major storage assumed for B.
@@ -1185,7 +1179,8 @@ CooMatrix CooMatrix::dot(const cArrayView B) const
         // for all columns of B
         for (unsigned icol = 0; icol < C_cols; icol++)
         {
-            C.add (
+            C.add
+            (
                 row, icol,
                 x_[i] * B[col*C_cols + icol]
             );
@@ -1197,7 +1192,7 @@ CooMatrix CooMatrix::dot(const cArrayView B) const
 }
 #endif
 
-Complex CooMatrix::ddot(CooMatrix const & B) const
+Complex CooMatrix::ddot (CooMatrix const & B) const
 {
     assert(m_ == B.m_);
     assert(n_ == B.n_);
@@ -1238,14 +1233,14 @@ Complex CooMatrix::ddot(CooMatrix const & B) const
 }
 
 #ifndef NO_UMFPACK
-CooMatrix CooMatrix::shake() const
+CooMatrix CooMatrix::shake () const
 {
     // ugly and memory inefficient method... FIXME
     return tocsc().tocoo();
 }
 #endif
 
-bool CooMatrix::hdfsave(const char* name) const
+bool CooMatrix::hdfsave (const char* name) const
 {
 #ifndef NO_HDF
     try
@@ -1265,7 +1260,8 @@ bool CooMatrix::hdfsave(const char* name) const
         // write data
         if (not x_.empty())
         {
-            hdf.write (
+            hdf.write
+            (
                 "x",
                 reinterpret_cast<double const*>(&x_),
                 x_.size() * 2
@@ -1283,7 +1279,7 @@ bool CooMatrix::hdfsave(const char* name) const
 #endif
 }
 
-bool CooMatrix::hdfload(const char* name)
+bool CooMatrix::hdfload (const char* name)
 {
     sorted_ = false;
     
@@ -1305,7 +1301,8 @@ bool CooMatrix::hdfload(const char* name)
         // read data
         if (x_.resize(hdf.size("x") / 2))
         {
-            hdf.read (
+            hdf.read
+            (
                 "x",
                 reinterpret_cast<double*>(&(x_[0])),
                 x_.size() * 2
@@ -1537,11 +1534,13 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
             int idB = signum(dB) * (bptr - B.diag().begin());
             
             // get starting/ending columns of the diagonals
-            int start_column = std::max (
+            int start_column = std::max
+            (
                 (dA > 0 ? dA : 0),
                 (dB > 0 ? dB : 0)
             );
-            int end_column = std::min (
+            int end_column = std::min
+            (
                 (dA > 0 ? A.size() - 1 : A.size() - 1 + dA),
                 (dB > 0 ? B.size() - 1 : B.size() - 1 + dB)
             );
@@ -1563,7 +1562,7 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
     return C;
 }
 
-bool SymDiaMatrix::is_compatible(SymDiaMatrix const & B) const
+bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
 {
     if (n_ != B.n_)
         throw exception ("[SymDiaMatrix] Unequal ranks.");
@@ -1643,23 +1642,14 @@ bool SymDiaMatrix::hdfsave (std::string name, bool docompress, int consec) const
     else
         elements = elems_;
     
-    // write compressed elements array
-    if (not zero_blocks.empty())
-    {
-        if (not hdf.write (
-            "zero_blocks",
-            &(zero_blocks[0]),
-            zero_blocks.size()
-        )) return false;
-    }
-    if (not elements.empty())
-    {
-        if (not hdf.write (
-            "x",
-            &(elements[0]),
-            elements.size()
-        )) return false;
-    }
+    // write compressed elements array (if non-empty); check result
+    if (not zero_blocks.empty() and
+        not hdf.write("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+        return false;
+    
+    if (not elements.empty() and
+        not hdf.write("x", &(elements[0]), elements.size()))
+        return false;
     
     return true;
 #else /* NO_HDF */
