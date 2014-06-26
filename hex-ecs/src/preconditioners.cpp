@@ -719,7 +719,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         (
             rview,                  // rhs
             zview,                  // solution
-            cmd_.itertol/10,        // tolerance
+            cmd_.itertol,        // tolerance
             0,                      // min. iterations
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
