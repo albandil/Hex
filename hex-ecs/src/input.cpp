@@ -110,7 +110,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-extract             (-c)  only extract amplitudes                                                         \n"
                     "\t--preconditioner <name>   (-p)  preconditioner to use (default: ILU)                                            \n"
                     "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
-                    "\t--tolerance <number>      (-t)  tolarance for the conjugate gradients solver                                    \n"
+                    "\t--tolerance <number>      (-t)  tolerance for the conjugate gradients solver                                    \n"
                     "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
