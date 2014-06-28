@@ -15,8 +15,10 @@
 #include "misc.h"
 #include "pwba2.h"
 #include "radial.h"
+#include "vec3d.h"
 
 #include "clenshawcurtis.h"
+#include "diophantine.h"
 #include "gausskronrod.h"
 #include "nodeintegrate.h"
 
@@ -182,8 +184,8 @@ cArrays PWBA2::PartialWave_direct
             for (int Mi = -Li; Mi <= Li; Mi++)
             for (int Mf = -Lf; Mf <= Lf; Mf++)
             {
-                double Cf = ClebschGordan(Lf, Mf, lf, Mi-Mf, L, Mi);
-                double Ci = ClebschGordan(Li, Mi, li, 0, L, Mi);
+                double Cf = special::ClebschGordan(Lf, Mf, lf, Mi-Mf, L, Mi);
+                double Ci = special::ClebschGordan(Li, Mi, li, 0, L, Mi);
                 
                 std::cout << "Contribution of li = " << li << ": " << factor * Cf * Ci * Tdir_lf_li << std::endl;
                 
@@ -197,66 +199,27 @@ cArrays PWBA2::PartialWave_direct
     return Tdir;
 }
 
-Complex W_1s (double kx, double ky, double kz, double px, double py, double pz)
+inline Complex WA (double k, double nu, double q)
 {
-    double alpha = 1;
-    double k2 = kx*kx + ky*ky + kz*kz, k = std::sqrt(k2);
-    double p2 = px*px + py*py + pz*pz, p = std::sqrt(p2);
-    
-    if (k == 0)
-        return 0.;
-    
-    Complex i_over_k (0.,1/k);
-    Complex A (k2 + alpha*alpha - p2, -2*alpha*p);
-    double B = alpha*alpha + (kx-px)*(kx-px) + (ky-py)*(ky-py) + (kz-pz)*(kz-pz);
-    Complex A_B = A/B;
-    
-    //           d   |
-    // evaluate -- I |
-    //          dα   |α=1
-    
-    Complex dA_da (2*alpha, -2*p);
-    double dB_da = 2 * alpha;
-    Complex dI_da = std::pow(A_B,i_over_k) * (i_over_k / (A*B) * dA_da - (i_over_k+1.) / (B*B) * dB_da);
-    
-    return -dI_da / special::constant::pi_sqrt;
+    return Complex (k*k + nu*nu - q*q, - 2.*nu*q);
 }
 
-Complex W_2s (double kx, double ky, double kz, double px, double py, double pz)
+inline double WB (vec3d k, double nu, vec3d q)
 {
-    double alpha = 0.5;
-    double k2 = kx*kx + ky*ky + kz*kz, k = std::sqrt(k2);
-    double p2 = px*px + py*py + pz*pz, p = std::sqrt(p2);
+    return nu*nu + (k.x+q.x)*(k.x+q.x) + (k.y+q.y)*(k.y+q.y) + (k.z+q.z)*(k.z+q.z);
+}
+
+Complex W_1s (vec3d vk, vec3d vq)
+{
+    double nu = 1.;
+    double k = vec3d::norm(vk);
+    double q = vec3d::norm(vq);
     
-    if (k == 0)
-        return 0.;
+    Complex miq (0.,-1./q);
+    Complex A = WA(k,nu,q);
+    double B = WB(vk,nu,vq);
     
-    Complex i_over_k (0.,1/k);
-    Complex A = k2 + std::pow(Complex(alpha,-p), 2);
-    Complex B = alpha*alpha + std::pow(kx-px,2) + std::pow(ky-py,2) + std::pow(kz-pz,2);
-    
-    //           d   |
-    // evaluate -- I |
-    //          dα   |α=1/2
-    
-    Complex dA_da (2*alpha, -2*p);
-    Complex dB_da = 2*alpha;
-    Complex dI_da = i_over_k * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k+1.) * dA_da
-                  -(i_over_k+1.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+2.) * dB_da;
-    
-    //           d²   |
-    // evaluate --  I |
-    //          dα²   |α=1/2
-    
-    Complex d2A_da2 = 2;
-    Complex d2B_da2 = 2;
-    Complex d2I_da2 = i_over_k * (i_over_k-1.) * std::pow(A,i_over_k-2.) / std::pow(B,i_over_k+1.) * dA_da * dA_da
-                    - 2. * i_over_k * (i_over_k+1.) * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k) * dA_da * dB_da
-                    + i_over_k * std::pow(A,i_over_k-1.) / std::pow(B,i_over_k-1.) * d2A_da2
-                    + (i_over_k+1.) * (i_over_k+2.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+3.) * dB_da * dB_da
-                    - (i_over_k+1.) * std::pow(A,i_over_k) / std::pow(B,i_over_k+2.) * d2B_da2;
-    
-    return (-dI_da - 0.5*d2I_da2) / std::sqrt(8. * special::constant::pi);
+    return Complex(0.,2/q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B);
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -268,52 +231,117 @@ cArrays PWBA2::FullTMatrix_direct
     int maxlevel_allowed, int maxlevel_forbidden
 )
 {
-    double Etot = 0.5 * ki * ki - 0.5 / (Ni * Ni);
-    Complex Eplus (Etot, 1e-5);
-    double En = 0.5 * Etot;
-    double qn = std::sqrt(2 * En);
-    
-    double qx  = 0,  qy  = 0,  qz  = qn;
-    double kix = ki, kiy = 0,  kiz = 0;
-    double kfx = 0,  kfy = kf, kfz = 0;
-    
-    rArray kxgrid = linspace<double>(-2.5,2.5,101);
-    rArray kygrid = linspace<double>(-2.5,2.5,101);
-    rArray kzgrid = linspace<double>(-2.5,2.5,101);
-    cArray Wi (kxgrid.size() * kygrid.size() * kzgrid.size());
-    cArray Wf (kxgrid.size() * kygrid.size() * kzgrid.size());
-    cArray Green (kxgrid.size() * kygrid.size() * kzgrid.size());
-    
-    for (unsigned ix = 0; ix < kxgrid.size()-1; ix++)
-    for (unsigned iy = 0; iy < kygrid.size()-1; iy++)
-    for (unsigned iz = 0; iz < kzgrid.size()-1; iz++)
+    int Ntheta = 10, Nphi = 10;
+//     for (int itheta = 0; itheta < Ntheta; itheta++)
+    for (int iphi = 0; iphi < Nphi; iphi++)
     {
-        double knx = 0.5*(kxgrid[ix]+kxgrid[ix+1]);
-        double kny = 0.5*(kygrid[iy]+kygrid[iy+1]);
-        double knz = 0.5*(kzgrid[iz]+kzgrid[iz+1]);
+//         double theta = itheta * special::constant::pi / (Ntheta - 1);
+        double theta = special::constant::pi_quart;
+        double phi = iphi * special::constant::two_pi / (Nphi - 1);
         
-        Wi[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = W_1s(kix-knx, kiy-kny, kiz-knz, qx, qy, qz)
-            / ( std::pow(kix-knx,2) + std::pow(kiy-kny,2) + std::pow(kiz-knz,2) );
+        // total energy of the system
+        double Etot = 0.5 * ki * ki - 0.5 / (Ni * Ni);
         
-        Wf[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = W_1s(kfx-knx, kfy-kny, kfz-knz, qx, qy, qz)
-            / ( std::pow(kfx-knx,2) + std::pow(kfy-kny,2) + std::pow(kfz-knz,2) );
+        // initial and final wave-vectors
+        vec3d vki = { 0, 0, ki };
+        vec3d vkf = {
+            kf * std::sin(theta) * std::cos(phi),
+            kf * std::sin(theta) * std::sin(phi),
+            kf * std::cos(theta)
+        };
         
-        Green[ix + kxgrid.size() * (iy + kygrid.size() * iz)] = 1.
-            / (Eplus - 0.5*(qx*qx+qy*qy+qz*qz) - 0.5*(knx*knx+kny*kny+knz*knz));
+        // maximal total intermediate wave-number
+        double Qmax = 10;
+        
+        auto integrand_U_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
+        {
+            // check dimensions
+            assert(n == 6);
+            
+            // unpack polar coordinates
+            double costheta1 = 2.*coords[0]-1.;
+            double costheta2 = 2.*coords[1]-1.;
+            double sintheta1 = std::sqrt(1. - costheta1*costheta1);
+            double sintheta2 = std::sqrt(1. - costheta2*costheta2);
+            double phi1 = special::constant::two_pi * coords[2];
+            double phi2 = special::constant::two_pi * coords[3];
+            double alpha = special::constant::pi_half * coords[4];
+            double Q = Qmax * coords[5];
+            double q1 = Q * std::cos(alpha);
+            double q2 = Q * std::sin(alpha);
+            
+            // compute carthesian coordinates
+            //   "vql" = q<
+            //   "vqg" = q>
+            vec3d vql, vqg;
+            double ql, qg;
+            if (q1 < q2)
+            {
+                ql = q1; vql = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
+                qg = q2; vqg = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
+            }
+            else // q1 >= q2
+            {
+                ql = q2; vql = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
+                qg = q1; vqg = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
+            }
+            
+            // the value of the integral
+            double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
+            Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
+            Complex integrand_U = norm * Wf * Wi / (Etot - 0.5*Q*Q);
+            
+            // evaluate integrand
+            return special::constant::two_inv_pi * Qmax * std::pow(q1*q2,2) * integrand_U;
+        };
+        
+        auto integrand_W_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
+        {
+            // check dimensions
+            assert(n == 6);
+            
+            // unpack polar coordinates
+            double costheta1 = 2.*coords[0]-1.;
+            double costheta2 = 2.*coords[1]-1.;
+            double sintheta1 = std::sqrt(1. - costheta1*costheta1);
+            double sintheta2 = std::sqrt(1. - costheta2*costheta2);
+            double phi1 = special::constant::two_pi * coords[2];
+            double phi2 = special::constant::two_pi * coords[3];
+            double alpha = special::constant::pi_half * coords[4];
+            double Q = std::sqrt(2*Etot);
+            double q1 = Q * std::cos(alpha);
+            double q2 = Q * std::sin(alpha);
+            
+            // compute carthesian coordinates
+            //   "vql" = q<
+            //   "vqg" = q>
+            vec3d vql, vqg;
+            double ql, qg;
+            if (q1 < q2)
+            {
+                ql = q1; vql = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
+                qg = q2; vqg = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
+            }
+            else // q1 >= q2
+            {
+                ql = q2; vql = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
+                qg = q1; vqg = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
+            }
+            
+            // the value of the integral
+            double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
+            Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
+            Complex integrand_U = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
+            
+            // evaluate integrand
+            return special::constant::two_inv_pi * std::pow(q1*q2,2) * integrand_U;
+        };
+        
+        // integrate the integrand with a 6-dimensional 9644-point Diophantine rule
+        Complex T = diophantine<Complex>(integrand_W_wrap,dioph::d6n9644);
+        Complex f = -std::pow(2*special::constant::pi,2) * T;
+        std::cout << theta << '\t' << phi << '\t' << std::abs(f) << std::endl;
     }
     
-    cArray result = Green * Wi * Wf;
-    for (Complex & x : result)
-    {
-        if (not std::isfinite(x.real()) or not std::isfinite(x.imag()))
-            x = 0.;
-    }
-    std::ofstream vtk ("integrand.vtk");
-    writeVTK_cells (vtk, result, kxgrid, kygrid, kzgrid);
-    vtk.close();
-    
-    throw exception
-    (
-        "Computation of the full T-matrix element is not implemented yet."
-    );
+    exit(0);
 }

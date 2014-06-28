@@ -108,7 +108,7 @@ template <class T, class Function> T diophantine (Function F, dioph::id id)
     for (int two_m = 1; two_m <= M; two_m += 2)
     {
         for (int d = 0; d < dim; d++)
-            x[d] = std::abs(2 * std::modf((two_m * a[d] + 1) / 2, &intpart) - 1);
+            x[d] = std::abs(2 * std::modf(0.5 * (two_m * a[d] + 1), &intpart) - 1);
         
         suma += F(dim,x);
     }

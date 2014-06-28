@@ -105,6 +105,11 @@ vec3d operator * (vec3d const & u, double a)
     );
 }
 
+vec3d operator * (double a, vec3d const & u)
+{
+    return u * a;
+}
+
 double vec3d::norm (vec3d const & v)
 {
     return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);

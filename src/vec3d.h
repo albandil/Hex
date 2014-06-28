@@ -46,5 +46,6 @@ vec3d operator - (vec3d const & u, vec3d const & v);
 
 /// Vector scaling.
 vec3d operator * (vec3d const & u, double a);
+vec3d operator * (double a, vec3d const & u);
 
 #endif
