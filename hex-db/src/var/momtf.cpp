@@ -160,8 +160,8 @@ bool MomentumTransfer::run
         // compute factor
         double factor = 0;
         for (int m = -l; m <= l; m++)
-            factor += ClebschGordan(l,m,1,0,lp,m);
-        factor *= -sqrt((2.*l+1.)/(2.*lp+1.)) * ClebschGordan(l,0,1,0,lp,0);
+            factor += special::ClebschGordan(l,m,1,0,lp,m);
+        factor *= -sqrt((2.*l+1.)/(2.*lp+1.)) * special::ClebschGordan(l,0,1,0,lp,0);
         if (l == lp)
             factor += 1.;
         

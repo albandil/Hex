@@ -104,7 +104,7 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
 }
 #endif /* NO_LAPACK */
 
-cArray ric_jv (int lmax, Complex z)
+cArray special::ric_jv (int lmax, Complex z)
 {
     // results
     cArray eval(lmax+1);
@@ -157,9 +157,9 @@ cArray ric_jv (int lmax, Complex z)
     for (int l = 0; l <= lmax; l++)
     {
         if (l == 0)
-            eval[l] = sin(z);
+            eval[l] = std::sin(z);
         else if (l == 1)
-            eval[l] = sin(z) * inv_z - cos(z);
+            eval[l] = std::sin(z) * inv_z - std::cos(z);
         else
             eval[l] = Complex(2.*l - 1.) * eval[l-1] * inv_z - eval[l-2];
     }
@@ -167,12 +167,12 @@ cArray ric_jv (int lmax, Complex z)
     return eval;
 }
 
-Complex ric_j (int l, Complex z)
+Complex special::ric_j (int l, Complex z)
 {
-    return ric_jv(l, z).back();
+    return special::ric_jv(l, z).back();
 }
 
-cArray dric_jv (int lmax, Complex z)
+cArray special::dric_jv (int lmax, Complex z)
 {
     // evaluate first the Riccati-Bessel functions themselves
     cArray eval = ric_jv(lmax, z);
@@ -187,9 +187,9 @@ cArray dric_jv (int lmax, Complex z)
     for (int l = 0; l <= lmax; l++)
     {
         if (l == 0)
-            deval[l] = cos(z);
+            deval[l] = std::cos(z);
         else if (l == 1)
-            deval[l] = inv_z * ( cos(z) - sin(z) * inv_z ) + sin(z);
+            deval[l] = inv_z * ( std::cos(z) - std::sin(z) * inv_z ) + std::sin(z);
         else
             deval[l] = -Complex(2.*l - 1) * (eval[l-1] * inv_z - deval[l-1] ) * inv_z - deval[l-2];
     }
@@ -197,9 +197,9 @@ cArray dric_jv (int lmax, Complex z)
     return deval;
 }
 
-Complex dric_j (int l, Complex z)
+Complex special::dric_j (int l, Complex z)
 {
-    return dric_jv(l, z).back();
+    return special::dric_jv(l, z).back();
 }
 
 // Slater-type-orbital data for hydrogen
@@ -245,7 +245,7 @@ Complex hydro_P_table (unsigned n, unsigned l, Complex z)
         sum = a[i] + z * sum;
     
     // return the result
-    return sum * pow(z, l + 1) * exp(-z/double(n));
+    return sum * std::pow(z, l + 1) * std::exp(-z/double(n));
 }
 
 Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
@@ -262,7 +262,7 @@ Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
         sum = (l+i+1)*a[i] + z * sum;
     
     // return the result
-    return sum * pow(z, l) * exp(-z/double(n)) - hydro_P_table(n,l,z) / double(n);
+    return sum * std::pow(z, l) * std::exp(-z/double(n)) - hydro_P_table(n,l,z) / double(n);
 }
 
 /*
@@ -275,13 +275,13 @@ Complex associated_laguerre_poly (int k, int s, Complex z)
     Complex val = 0;
     
     // begin with highest order
-    val += pow(-1,k) / (fac(k) * fac(k-s));
+    val += std::pow(-1,k) / (fac(k) * fac(k-s));
     
     // continue with other orders
     for (int j = k - 1; j >= s; j--)
-        val = z * val + pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s));
+        val = z * val + std::pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s));
     
-    return val * pow(fac(k),2);
+    return val * std::pow(fac(k),2);
 }
 
 /*
@@ -294,13 +294,13 @@ Complex der_associated_laguerre_poly (int k, int s, Complex z)
     Complex val = 0;
     
     // begin with highest order
-    val += pow(-1,k) / (fac(k) * fac(k-s-1));
+    val += std::pow(-1,k) / (fac(k) * fac(k-s-1));
     
     // continue with other orders
     for (int j = k - 1; j >= s + 1; j--)
-        val = z * val + pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s-1));
+        val = z * val + std::pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s-1));
     
-    return val * pow(fac(k),2);
+    return val * std::pow(fac(k),2);
 }
 
 /*
@@ -309,14 +309,14 @@ Complex der_associated_laguerre_poly (int k, int s, Complex z)
  */
 double hydrogen_wfn_normalization (int n, int l)
 {
-    return sqrt(pow(2./n,3) * fac(n-l-1) / (2*n*pow(fac(n+l),3)));
+    return std::sqrt(std::pow(2./n,3) * fac(n-l-1) / (2*n*std::pow(fac(n+l),3)));
 }
 
 /*
  * Hydrogen radial function.
  * HydrogenP(n,l,r) := r * HydrogenN(n,l) * (2*r/n)^l * Laguerre(n+l,2*l+1,2*r/n) * exp(-r/n);
  */
-Complex hydro_P (unsigned n, unsigned l, Complex z)
+Complex special::hydro_P (unsigned n, unsigned l, Complex z)
 {
     // this is faster
     if (n <= max_table_n)
@@ -325,7 +325,7 @@ Complex hydro_P (unsigned n, unsigned l, Complex z)
     // this is general
     double Norm = hydrogen_wfn_normalization(n, l);
     Complex Lag = associated_laguerre_poly(n + l, 2 * l + 1, z);
-    return z * Norm * pow(2.*z/double(n), l) * Lag * exp(-z/double(n));
+    return z * Norm * std::pow(2.*z/double(n), l) * Lag * std::exp(-z/double(n));
 }
 
 /*
@@ -335,7 +335,7 @@ Complex hydro_P (unsigned n, unsigned l, Complex z)
  *    z * DLaguerre(n+l,2*l+1,2*r/n)
  *    ) * exp(-r/n)
  */
-Complex dhydro_P (unsigned n, unsigned l, Complex z)
+Complex special::dhydro_P (unsigned n, unsigned l, Complex z)
 {
     // this is faster
     if (n <= max_table_n)
@@ -345,15 +345,17 @@ Complex dhydro_P (unsigned n, unsigned l, Complex z)
     double Norm = hydrogen_wfn_normalization(n, l);
     Complex Lag = associated_laguerre_poly(n + l, 2 * l + 1, z);
     Complex DLag= der_associated_laguerre_poly(n + 1, 2 * l + 1, z);
-    return Norm * pow(2.*z/double(n), l) * ((l + 1. - z/double(n)) * Lag + z * DLag) * exp(-z/double(n));
+    return Norm * std::pow(2.*z/double(n), l) * ((l + 1. - z/double(n)) * Lag + z * DLag) * std::exp(-z/double(n));
 }
 
 
-Complex sphY (int l, int m, double theta, double phi)
+Complex special::sphY (int l, int m, double theta, double phi)
 {
-    if (l < abs(m))
+    if (l < std::abs(m))
         return 0.;
-    return gsl_sf_legendre_sphPlm(l,abs(m),cos(theta)) * Complex(cos(m*phi),sin(m*phi));
+    
+    return gsl_sf_legendre_sphPlm(l,std::abs(m),std::cos(theta))
+           * Complex(std::cos(m*phi),std::sin(m*phi));
 }
 
 void clipang (double & theta, double & phi)
@@ -367,7 +369,7 @@ void clipang (double & theta, double & phi)
     }
     
     // clip theta to (0,2π)
-    theta = fmod(theta, 2 * special::constant::pi);
+    theta = std::fmod(theta, special::constant::two_pi);
     
     // clip theta to (0,π)
     if (theta > special::constant::pi)
@@ -378,10 +380,10 @@ void clipang (double & theta, double & phi)
     }
     
     // clip phi to (0,2π) FIXME (won't work for phi < 0)
-    phi = fmod(phi, 2*special::constant::pi);
+    phi = std::fmod(phi, special::constant::two_pi);
 }
 
-Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
+Complex special::sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double theta2, double phi2)
 {
     // NOTE This is very strange... To get the expected results one has to clip the
     //      angles to the 0..π and 0..2π intervals, respectively, and to include
@@ -396,27 +398,38 @@ Complex sphBiY (int l1, int l2, int L, int M, double theta1, double phi1, double
     // evaluate the bi-polar spherical harmonic function
     Complex YY = 0;
     for (int m = -l1; m <= l1; m++)
-        YY += gsl_sf_pow_int(-1,m) * ClebschGordan(l1,m,l2,M-m,L,M) * sphY(l1, m, theta1, phi1) * sphY(l2, M-m, theta2, phi2);
+    {
+        Complex Y1 = special::sphY(l1, m, theta1, phi1);
+        Complex Y2 = special::sphY(l2, M-m, theta2, phi2);
+        double CG = special::ClebschGordan(l1,m,l2,M-m,L,M);
+        YY += gsl_sf_pow_int(-1,m) * CG * Y1 * Y2;
+    }
     return YY;
 }
 
-int coul_F_michel (int l, double k, double r, double& F, double& Fp)
+int special::coul_F_michel (int l, double k, double r, double& F, double& Fp)
 {
     // initialize parameters
     double eta = -1/k;
-    double rho_t = eta + sqrt(eta*eta + l*(l+1));
+    double rho_t = eta + std::sqrt(eta*eta + l*(l+1));
     double x = (k*r-rho_t)/rho_t;
     double a = 1 - 2*eta/rho_t;
     double phi, phip;
     
     // evaluate phi-function
     if (x < 0)
-        phi = -pow(1.5*(-sqrt(-x*(1+a+x)) + (1-a)/2*acos(1+2*x/(1+a)) + 2*sqrt(a)*atanh(sqrt(-a*x/(1+a+x)))),2./3);
+    {
+        phi = -std::pow(1.5*(-std::sqrt(-x*(1+a+x)) + (1-a)/2*std::acos(1+2*x/(1+a))
+              + 2*std::sqrt(a)*std::atanh(std::sqrt(-a*x/(1+a+x)))),2./3);
+    }
     else
-        phi = pow(1.5*((1-a)*(log(sqrt(1+a)/(sqrt(x)+sqrt(1+x+a)))) + sqrt(x*(1+a+x)) -2*sqrt(a)*atan(sqrt(a*x/(1+a+x)))), 2./3);
+    {
+        phi = std::pow(1.5*((1-a)*(std::log(std::sqrt(1+a)/(std::sqrt(x)+std::sqrt(1+x+a)))) + std::sqrt(x*(1+a+x))
+              -2*std::sqrt(a)*std::atan(std::sqrt(a*x/(1+a+x)))), 2./3);
+    }
     
     // evaluate derivative of the phi-function
-    phip = sqrt((x/(1+x) + a*x/pow(x+1,2))/phi);
+    phip = std::sqrt((x/(1+x) + a*x/std::pow(x+1,2))/phi);
     
     // check the result and use asymptotics if the full turned unstable
     #define ASYEPS 1e-5 // TODO tune?
@@ -424,7 +437,7 @@ int coul_F_michel (int l, double k, double r, double& F, double& Fp)
     if (std::abs(x) < ASYEPS or not std::isfinite(phi) or not std::isfinite(phip))
     {
         // use x ⟶ 0 asymptotic formulas
-        phip = pow(1 + a, 1./3);
+        phip = std::pow(1 + a, 1./3);
         phi = phip * x;
     }
     
@@ -438,14 +451,17 @@ int coul_F_michel (int l, double k, double r, double& F, double& Fp)
     int errp = gsl_sf_airy_Ai_deriv_e(ai_arg, GSL_PREC_DOUBLE, &aip);
     
     // evaluate the Coulomb wave function and its derivative
-    F = special::constant::pi_sqrt * pow(rho_t,1./6)/sqrt(phip) * ai.val;
-    Fp = special::constant::pi_sqrt * pow(rho_t,-5./6)*(0.5*pow(phip,-1.5)*phipp * ai.val - sqrt(phip)*aip.val*pow(rho_t,2./3));
+    F = special::constant::sqrt_pi * std::pow(rho_t,1./6)/std::sqrt(phip) * ai.val;
+    Fp = special::constant::sqrt_pi * std::pow(rho_t,-5./6) * (
+            0.5*std::pow(phip,-1.5)*phipp * ai.val
+            - std::sqrt(phip)*aip.val*std::pow(rho_t,2./3)
+    );
     
     // return corresponding GSL error
     return GSL_ERROR_SELECT_2(err, errp);
 }
 
-int coul_F (int l, double k, double r, double& F, double& Fp)
+int special::coul_F (int l, double k, double r, double& F, double& Fp)
 {
     if (r < 0.)
         return GSL_EDOM;
@@ -495,7 +511,7 @@ int coul_F (int l, double k, double r, double& F, double& Fp)
     return err;
 }
 
-double coul_F_sigma (int l, double k)
+double special::coul_F_sigma (int l, double k)
 {
     // return arg(gamma(Complex(l+1,-1./k)));
     
@@ -508,31 +524,31 @@ double coul_F_sigma (int l, double k)
     return arg.val;
 }
 
-double coul_F_asy (int l, double k, double r, double sigma)
+double special::coul_F_asy (int l, double k, double r, double sigma)
 {
     sigma = (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
     
     return std::sin(k*r - l*special::constant::pi_half + std::log(2.*k*r)/k + sigma);
 }
 
-bool makes_triangle (int two_j1, int two_j2, int two_j3)
+bool special::makes_triangle (int two_j1, int two_j2, int two_j3)
 {
     return std::abs(two_j1 - two_j2) <= two_j3 and two_j3 <= two_j1 + two_j2
        and std::abs(two_j2 - two_j3) <= two_j1 and two_j1 <= two_j2 + two_j3
        and std::abs(two_j3 - two_j1) <= two_j2 and two_j2 <= two_j3 + two_j1;
 }
 
-double logdelta (int two_j1, int two_j2, int two_j3)
+double special::logdelta (int two_j1, int two_j2, int two_j3)
 {
     return .5 * (
-        lgamma(1 + (  two_j1 + two_j2 - two_j3) / 2)
-      + lgamma(1 + (  two_j1 - two_j2 + two_j3) / 2)
-      + lgamma(1 + (- two_j1 + two_j2 + two_j3) / 2)
-      - lgamma(2 + (  two_j1 + two_j2 + two_j3) / 2)
+        std::lgamma(1 + (  two_j1 + two_j2 - two_j3) / 2)
+      + std::lgamma(1 + (  two_j1 - two_j2 + two_j3) / 2)
+      + std::lgamma(1 + (- two_j1 + two_j2 + two_j3) / 2)
+      - std::lgamma(2 + (  two_j1 + two_j2 + two_j3) / 2)
     );
 }
 
-double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, int two_m3)
+double special::Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, int two_m3)
 {
     // check conservation of the projection
     if (two_m1 + two_m2 + two_m3 != 0)
@@ -551,23 +567,23 @@ double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, i
         return 0.;
     
     // check triangle inequalities
-    if (not makes_triangle (two_j1, two_j2, two_j3))
+    if (not special::makes_triangle (two_j1, two_j2, two_j3))
         return 0.;
     
     // determine sign
     int Sign = (((two_j1 - two_j2 - two_m3) / 2) % 2 == 0) ? 1 : -1;
     
     // evaluate Delta-coefficient
-    double lnDelta = logdelta (two_j1, two_j2, two_j3);
+    double lnDelta = special::logdelta (two_j1, two_j2, two_j3);
     
     // precompute square root terms
     double lnSqrt = .5*(
-        lgamma(1 + (two_j1 + two_m1) / 2)
-      + lgamma(1 + (two_j1 - two_m1) / 2)
-      + lgamma(1 + (two_j2 + two_m2) / 2)
-      + lgamma(1 + (two_j2 - two_m2) / 2)
-      + lgamma(1 + (two_j3 + two_m3) / 2)
-      + lgamma(1 + (two_j3 - two_m3) / 2)
+        std::lgamma(1 + (two_j1 + two_m1) / 2)
+      + std::lgamma(1 + (two_j1 - two_m1) / 2)
+      + std::lgamma(1 + (two_j2 + two_m2) / 2)
+      + std::lgamma(1 + (two_j2 - two_m2) / 2)
+      + std::lgamma(1 + (two_j3 + two_m3) / 2)
+      + std::lgamma(1 + (two_j3 - two_m3) / 2)
     );
     
     // compute the sum bounds
@@ -587,15 +603,15 @@ double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, i
     for (int k = kmin; k <= kmax; k++)
     {
         // evaluate term
-        double Term = exp (
+        double Term = std::exp (
               lnDelta
             + lnSqrt
-            - lgamma(1 + k)
-            - lgamma(1 + (two_j1 + two_j2 - two_j3) / 2 - k)
-            - lgamma(1 + (two_j1 - two_m1) / 2 - k)
-            - lgamma(1 + (two_j2 + two_m2) / 2 - k)
-            - lgamma(1 + (two_j3 - two_j2 + two_m1) / 2 + k)
-            - lgamma(1 + (two_j3 - two_j1 - two_m2) / 2 + k)
+            - std::lgamma(1 + k)
+            - std::lgamma(1 + (two_j1 + two_j2 - two_j3) / 2 - k)
+            - std::lgamma(1 + (two_j1 - two_m1) / 2 - k)
+            - std::lgamma(1 + (two_j2 + two_m2) / 2 - k)
+            - std::lgamma(1 + (two_j3 - two_j2 + two_m1) / 2 + k)
+            - std::lgamma(1 + (two_j3 - two_j1 - two_m2) / 2 + k)
         );
         
         // update sum
@@ -606,7 +622,7 @@ double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, i
     return Sign * Sum;
 }
 
-double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, int two_j6)
+double special::Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, int two_j6)
 {
     // check that triads have integer sum (i.e. twice the sum is even)
     if ((two_j1 + two_j2 + two_j3) % 2 != 0 or
@@ -651,14 +667,14 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
         double Term = std::exp
         (
               d1 + d2 + d3 + d4
-            + lgamma (2 + k)
-            - lgamma (1 + k + (- two_j1 - two_j2 - two_j3) / 2)
-            - lgamma (1 + k + (- two_j1 - two_j5 - two_j6) / 2)
-            - lgamma (1 + k + (- two_j2 - two_j4 - two_j6) / 2)
-            - lgamma (1 + k + (- two_j3 - two_j4 - two_j5) / 2)
-            - lgamma (1 + (two_j1 + two_j2 + two_j4 + two_j5) / 2 - k)
-            - lgamma (1 + (two_j1 + two_j3 + two_j4 + two_j6) / 2 - k)
-            - lgamma (1 + (two_j2 + two_j3 + two_j5 + two_j6) / 2 - k)
+            + std::lgamma (2 + k)
+            - std::lgamma (1 + k + (- two_j1 - two_j2 - two_j3) / 2)
+            - std::lgamma (1 + k + (- two_j1 - two_j5 - two_j6) / 2)
+            - std::lgamma (1 + k + (- two_j2 - two_j4 - two_j6) / 2)
+            - std::lgamma (1 + k + (- two_j3 - two_j4 - two_j5) / 2)
+            - std::lgamma (1 + (two_j1 + two_j2 + two_j4 + two_j5) / 2 - k)
+            - std::lgamma (1 + (two_j1 + two_j3 + two_j4 + two_j6) / 2 - k)
+            - std::lgamma (1 + (two_j2 + two_j3 + two_j5 + two_j6) / 2 - k)
         );
         
         // update the sum
@@ -669,7 +685,7 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
     return Sum;
 }
 
-double computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
+double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
 {
     double A = Wigner6j(l1, l2, L, l2p, l1p, lambda);
     double B = Wigner3j(l1, lambda, l1p, 0, 0, 0);
@@ -701,7 +717,7 @@ inline long double dfact (long double x)
     return prod;
 }
 
-double ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int in_M)
+double special::ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int in_M)
 {
     if((in_m1 + in_m2) != in_M) return 0.;
     if(abs(in_m1) > in_j1) return 0;
@@ -727,7 +743,7 @@ double ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int 
         n2=((j1-m1)/2+nu);
         d0=dfact((double) nu);
         exp=nu+(j2+m2)/2;
-        n0 = (double) pow(-1.,exp);
+        n0 = (double) std::pow(-1.,exp);
         sum += ((n0*dfact(n1)*dfact(n2))/(d0*dfact(d1)*dfact(d2)*dfact(d3)));
         nu++;
     }
@@ -753,7 +769,7 @@ double ClebschGordan (int in_j1, int in_m1, int in_j2, int in_m2, int in_J, int 
     return std::sqrt(A)*sum;
 }
 
-double Gaunt (int l1, int m1, int l2, int m2, int l, int m)
+double special::Gaunt (int l1, int m1, int l2, int m2, int l, int m)
 {
     typedef std::tuple<int,int,int,int,int,int> TKey;
     
@@ -768,8 +784,8 @@ double Gaunt (int l1, int m1, int l2, int m2, int l, int m)
         return dict[key];
     
     // compute the value and store it to the dictionary
-    return dict[key] = sqrt((2*l1+1)*(2*l2+1) / (4*special::constant::pi*(2*l+1))) *
-        ClebschGordan(l1, m1, l2, m2, l, m) * ClebschGordan(l1,  0, l2,  0, l, 0);
+    return dict[key] = std::sqrt((2*l1+1)*(2*l2+1) / (4*special::constant::pi*(2*l+1))) *
+        special::ClebschGordan(l1, m1, l2, m2, l, m) * special::ClebschGordan(l1,  0, l2,  0, l, 0);
 }
 
 int triangle_count (int L, int maxl)
@@ -784,7 +800,7 @@ int triangle_count (int L, int maxl)
     return n;
 }
 
-double Hyper2F1 (double a, double b, double c, double x)
+double special::Hyper2F1 (double a, double b, double c, double x)
 {
     if (x < -1.0)
     {
@@ -827,7 +843,7 @@ double Hyper2F1 (double a, double b, double c, double x)
     }
 }
 
-std::vector<std::vector<int>> FdB_partition (int n)
+std::vector<std::vector<int>> special::FdB_partition (int n)
 {
     // all conformant partitionings
     std::vector<std::vector<int>> partgs;

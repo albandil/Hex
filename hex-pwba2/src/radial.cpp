@@ -276,7 +276,7 @@ rArray interpolate_riccati_bessel_j
 {
     return x.transform
     (
-        [&](double r) -> double { return ric_j(l,k*r); }
+        [&](double r) -> double { return special::ric_j(l,k*r); }
     );
 }
 
@@ -293,7 +293,7 @@ rArray interpolate_riccati_bessel_y
             if (k == 0. or r == 0.)
                 return l == 0 ? 1 : 0;
             else
-                return -ric_n(l,k*r);
+                return -special::ric_n(l,k*r);
         }
     );
 }
@@ -306,7 +306,7 @@ rArray interpolate_riccati_bessel_iscaled
 {
     return x.transform
     (
-        [&](double r) -> double { return ric_i_scaled(l,k*r); }
+        [&](double r) -> double { return special::ric_i_scaled(l,k*r); }
     );
 }
 
@@ -323,7 +323,7 @@ rArray interpolate_riccati_bessel_kscaled
             if (k == 0. or r == 0.)
                 return l == 0 ? 1 : 0;
             else
-                return ric_k_scaled(l,k*r);
+                return special::ric_k_scaled(l,k*r);
         }
     );
 }
@@ -518,8 +518,8 @@ Complex Idir_nBound_allowed
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = computef(lambdaf, Li, li, Ln, ln, L);
-        double fi = computef(lambdai, Ln, ln, Li, li, L);
+        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
         if (ff == 0. or fi == 0.)
@@ -565,8 +565,8 @@ Complex Idir_nBound_forbidden
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = computef(lambdaf, Li, li, Ln, ln, L);
-        double fi = computef(lambdai, Ln, ln, Li, li, L);
+        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
         if (ff == 0. or fi == 0.)
@@ -612,8 +612,8 @@ Complex Idir_nFree_allowed
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = computef(lambdaf, Li, li, Ln, ln, L);
-        double fi = computef(lambdai, Ln, ln, Li, li, L);
+        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
         if (ff == 0. or fi == 0.)
@@ -659,8 +659,8 @@ Complex Idir_nFree_forbidden
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = computef(lambdaf, Li, li, Ln, ln, L);
-        double fi = computef(lambdai, Ln, ln, Li, li, L);
+        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
         if (ff == 0. or fi == 0.)

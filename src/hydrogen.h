@@ -202,7 +202,7 @@ double getFreeFar(double k, int l, double Sigma = special::constant::Nan, double
 /**
  * Hydrogen radial function.
  */
-class HydrogenFunction : public RadialFunction<double>
+class HydrogenFunction : public special::RadialFunction<double>
 {
 public:
     

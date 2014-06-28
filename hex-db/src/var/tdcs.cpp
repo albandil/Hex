@@ -163,16 +163,17 @@ bool TripleDifferentialCrossSection::run
                 // evaluate bispherical function
                 // NOTE evaluating sphY is the bottleneck; unfortunately, we need to compute this
                 //      for every idir and il
-                Complex YY = sphBiY (
+                Complex YY = special::sphBiY
+                (
                     l1, l2, L, mi,
                     dirs[idir].first.x * afactor, dirs[idir].first.y * afactor,
                     dirs[idir].second.x * afactor,dirs[idir].second.y * afactor
                 );
                 
                 // evaluate Coulomb phaseshifts
-                double sig1 = coul_F_sigma(l1,k1);
-                double sig2 = coul_F_sigma(l2,k2);
-                Complex phase = pow(Complex(0.,1.),-l1-l2) * Complex(cos(sig1+sig2),sin(sig1+sig2));
+                double sig1 = special::coul_F_sigma(l1,k1);
+                double sig2 = special::coul_F_sigma(l2,k2);
+                Complex phase = std::pow(Complex(0.,1.),-l1-l2) * Complex(std::cos(sig1+sig2),std::sin(sig1+sig2));
                 
                 // sum the contribution
                 ampls0[ie] += phase * YY * f;
@@ -180,11 +181,7 @@ bool TripleDifferentialCrossSection::run
         }
         
         // interpolate
-        tdcs[idir] = 0.25 * (2 * S + 1) * interpolate (
-            E_arr,
-            sqrabs(ampls0) * k1 * k2 / sqrt(Ei),
-            { Ei }
-        )[0];
+        tdcs[idir] = 0.25 * (2 * S + 1) * interpolate(E_arr, sqrabs(ampls0) * k1 * k2 / sqrt(Ei), {Ei})[0];
     }
     
     // write out
@@ -202,24 +199,24 @@ bool TripleDifferentialCrossSection::run
         
         // outgoing electrons' directions
         vec3d e1 = {
-            sin(dirs[i].first.x * afactor) * cos(dirs[i].first.y * afactor),
-            sin(dirs[i].first.x * afactor) * sin(dirs[i].first.y * afactor),
-            cos(dirs[i].first.x * afactor)
+            std::sin(dirs[i].first.x * afactor) * std::cos(dirs[i].first.y * afactor),
+            std::sin(dirs[i].first.x * afactor) * std::sin(dirs[i].first.y * afactor),
+            std::cos(dirs[i].first.x * afactor)
         };
         vec3d e2 = {
-            sin(dirs[i].second.x * afactor) * cos(dirs[i].second.y * afactor),
-            sin(dirs[i].second.x * afactor) * sin(dirs[i].second.y * afactor),
-            cos(dirs[i].second.x * afactor)
+            std::sin(dirs[i].second.x * afactor) * std::cos(dirs[i].second.y * afactor),
+            std::sin(dirs[i].second.x * afactor) * std::sin(dirs[i].second.y * afactor),
+            std::cos(dirs[i].second.x * afactor)
         };
         
         // new axes:
         vec3d ez = e1; // along the first outgoing electron
-        vec3d ey = normalize(cross(ez,ei)); // perpendicular to the scattering plane of the first electron
-        vec3d ex = normalize(cross(ey,ez)); // third axis
+        vec3d ey = vec3d::normalize(vec3d::cross(ez,ei)); // perpendicular to the scattering plane of the first electron
+        vec3d ex = vec3d::normalize(vec3d::cross(ey,ez)); // third axis
         
         // polar angles of the second electron's scattering direction in the new coordinate system
-        double theta = acos(dot(e2,ez));
-        double phi = atan2(dot(e2,ey),dot(e2,ex));
+        double theta = std::acos (vec3d::dot(e2,ez));
+        double phi   = std::atan2(vec3d::dot(e2,ey),vec3d::dot(e2,ex));
         
         std::cout << 
             dirs[i].first << "\t" << 

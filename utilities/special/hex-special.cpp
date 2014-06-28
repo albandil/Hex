@@ -49,7 +49,7 @@ int run_f (int argc, char* argv[])
     int L   = std::atoi(argv[7]);
     
     std::cout << "f[" << lam << "](" << l1 << "," << l2 << "," << l1p << ","
-              << l2p << ") = " << computef(lam,l1,l2,l1p,l2p,L) << std::endl;
+              << l2p << ") = " << special::computef(lam,l1,l2,l1p,l2p,L) << std::endl;
     
     return EXIT_SUCCESS;
 }
@@ -70,7 +70,7 @@ int run_ClebschGordan (int argc, char* argv[])
     int M  = std::atoi(argv[7]);
     
     std::cout << "C[" << l1 << "," << m1 << ";" << l2 << "," << m2 << ";"
-              << L << "," << M << "] = " << ClebschGordan(l1,m1,l2,m2,L,M) << std::endl;
+              << L << "," << M << "] = " << special::ClebschGordan(l1,m1,l2,m2,L,M) << std::endl;
     
     return EXIT_SUCCESS;
 }
@@ -91,7 +91,7 @@ int run_Gaunt (int argc, char* argv[])
     int M  = std::atoi(argv[7]);
     
     std::cout << "G[" << l1 << "," << m1 << ";" << l2 << "," << m2 << ";"
-              << L << "," << M << "] = " << Gaunt(l1,m1,l2,m2,L,M) << std::endl;
+              << L << "," << M << "] = " << special::Gaunt(l1,m1,l2,m2,L,M) << std::endl;
     
     return EXIT_SUCCESS;
 }

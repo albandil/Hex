@@ -71,7 +71,9 @@ void pwba
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
                     
                     // compute angular integrals (Gaunt coefficients)
-                    double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lam,Lf,lf,Li,li,L);
+                    double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
+                               * special::ClebschGordan(Li,Mi,li,0,L,Mi)
+                               * special::computef(lam,Lf,lf,Li,li,L);
                     
                     // add the T-matrix contributions
                     Tdir[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vdir;
@@ -99,7 +101,9 @@ void pwba
                     int idx = (Mi + Li)*(2*Lf + 1) + Mf + Lf;
                     
                     // compute angular integrals (Gaunt coefficients)
-                    double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lam,lf,Lf,Li,li,L);
+                    double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
+                               * special::ClebschGordan(Li,Mi,li,0,L,Mi)
+                               * special::computef(lam,lf,Lf,Li,li,L);
                     
                     // add the T-matrix contributions
                     Texc[idx][lf-std::abs(Lf - L)] += prefactor * ang * Vexc;
@@ -251,7 +255,7 @@ double PWBA1::compute_Idir (int li, int lf, int lambda, int Ni, int Li, double k
                 );
             }
             
-            return Qi.result() * ric_j(li,ki*r2) * ric_j(lf,kf*r2);
+            return Qi.result() * special::ric_j(li,ki*r2) * special::ric_j(lf,kf*r2);
         };
         
         // which Bessel function oscillates slowlier ?
@@ -327,7 +331,7 @@ double PWBA1::compute_Idir (int li, int lf, int lambda, int Ni, int Li, double k
                 integral += (int_low + int_high) * symbolic::double_approx(p.kr) / gsl_sf_pow_int(c,p.a);
             }
             
-            return Normi * Normf * integral * ric_j(li,ki*r) * ric_j(lf,kf*r);
+            return Normi * Normf * integral * special::ric_j(li,ki*r) * special::ric_j(lf,kf*r);
         };
         
         // which Bessel function oscillates slowlier ?
@@ -363,7 +367,10 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
         auto integrand = [Ni,Li,Nf,Lf,li,ki,lf,kf](double r2) -> double
         {
             // inner integrand
-            auto iintegrand = [Ni,Li,kf,lf,r2](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * ric_j(lf,kf*r1) * (1./r1 - 1./r2); };
+            auto iintegrand = [Ni,Li,kf,lf,r2](double r1) -> double
+            {
+                return Hydrogen::P(Ni,Li,r1) * special::ric_j(lf,kf*r1) * (1./r1 - 1./r2);
+            };
             
             // inner integrator
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
@@ -378,7 +385,7 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
                 );
             }
             
-            return Qi.result() * ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
+            return Qi.result() * special::ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
         
         // outer integrator
@@ -403,7 +410,10 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
         auto integrand1 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r2) -> double
         {
             // inner integrand
-            auto iintegrand1 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double { return Hydrogen::P(Ni,Li,r1) * ric_j(lf,kf*r1) * std::pow(r1/r2,lambda); };
+            auto iintegrand1 = [Ni,Li,kf,lf,r2,lambda](double r1) -> double
+            {
+                return Hydrogen::P(Ni,Li,r1) * special::ric_j(lf,kf*r1) * std::pow(r1/r2,lambda);
+            };
             
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand1),GaussKronrod<decltype(iintegrand1)>> Qi1 (iintegrand1, kf, lf);
@@ -418,7 +428,7 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
                 );
             }
             
-            return Qi1.result() / r2 * ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
+            return Qi1.result() / r2 * special::ric_j(li,ki*r2) * Hydrogen::P(Nf,Lf,r2);
         };
         
         BesselNodeIntegrator1D<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1 (integrand1, ki, li);
@@ -435,7 +445,10 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
         auto integrand2 = [Ni,Li,Nf,Lf,li,ki,lf,kf,lambda](double r1) -> double
         {
             // inner integrand
-            auto iintegrand2 = [Nf,Lf,ki,li,r1,lambda](double r2) -> double { return Hydrogen::P(Nf,Lf,r2) * ric_j(li,ki*r2) * std::pow(r2/r1,lambda); };
+            auto iintegrand2 = [Nf,Lf,ki,li,r1,lambda](double r2) -> double
+            {
+                return Hydrogen::P(Nf,Lf,r2) * special::ric_j(li,ki*r2) * std::pow(r2/r1,lambda);
+            };
             
             // inner integrator
             BesselNodeIntegrator1D<decltype(iintegrand2),GaussKronrod<decltype(iintegrand2)>> Qi2 (iintegrand2, ki, li);
@@ -450,7 +463,7 @@ double PWBA1::compute_Iexc (int li, int lf, int lambda, int Ni, int Li, double k
                 );
             }
             
-            return Qi2.result() / r1 * ric_j(lf,kf*r1) * Hydrogen::P(Ni,Li,r1);
+            return Qi2.result() / r1 * special::ric_j(lf,kf*r1) * Hydrogen::P(Ni,Li,r1);
         };
         
         BesselNodeIntegrator1D<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2 (integrand2, kf, lf);

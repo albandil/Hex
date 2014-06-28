@@ -137,7 +137,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
             Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
             for (size_t i = 0; i < angles.size(); i++)
             {
-                Complex Y = -0.5*special::constant::pi_inv * sphY(ell, std::abs(M-mf), angles[i], 0.);
+                Complex Y = -0.5*special::constant::inv_pi * special::sphY(ell, std::abs(M-mf), angles[i], 0.);
                 
                 amplitudes[i]  += Tmatrix  * Y;
                 amplitudesb[i] += Tmatrixb * Y;
@@ -182,7 +182,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
             TE[i] = db_bornf[i].clenshaw(std::cos(angles[i]), db_bornf[i].tail(1e-10));
         
         // interpolate
-        bornf[i] = -0.5*special::constant::pi_inv * (TE.size() > 0 ? interpolate(db_Ei, TE, { E })[0] : 0.);
+        bornf[i] = -0.5*special::constant::inv_pi * (TE.size() > 0 ? interpolate(db_Ei, TE, { E })[0] : 0.);
     }
     
     //

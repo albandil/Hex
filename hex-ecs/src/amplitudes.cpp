@@ -95,8 +95,8 @@ cArray computeLambda
             ) - t;
             
             // evaluate j and dj at far radius for all angular momenta up to maxell
-            cArray j_R0 = ric_jv(maxell, kf[ie] * eval_r);
-            cArray dj_R0 = dric_jv(maxell, kf[ie] * eval_r) * kf[ie];
+            cArray j_R0 = special::ric_jv(maxell, kf[ie] * eval_r);
+            cArray dj_R0 = special::dric_jv(maxell, kf[ie] * eval_r) * kf[ie];
             
             // evaluate B-splines and their derivatives at evaluation radius
             CooMatrix Bspline_R0(Nspline, 1), Dspline_R0(Nspline, 1);
@@ -154,7 +154,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
     
     // determine evaluation radius
     char const * HEX_RHO = getenv("HEX_RHO");
-     double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : atof(HEX_RHO);
+    double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : std::atof(HEX_RHO);
     
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
     auto fLSl1l2k1k2 = [&](double k1) -> Complex
@@ -163,14 +163,15 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             return 0.;
         
         // compute momentum of the other electron
-        double k2 = sqrt(kmax*kmax - k1*k1);
+        double k2 = std::sqrt(kmax*kmax - k1*k1);
         
         // Xi integrand
-        auto integrand = [&](double alpha) -> Complex {
+        auto integrand = [&](double alpha) -> Complex
+        {
             
             // precompute projectors
-            double cos_alpha = (alpha == special::constant::pi_half) ? 0. : cos(alpha);
-            double sin_alpha = sin(alpha);
+            double cos_alpha = (alpha == special::constant::pi_half) ? 0. : std::cos(alpha);
+            double sin_alpha = std::sin(alpha);
             
             // precompute coordinates
             double r1 = rho * cos_alpha;
@@ -178,8 +179,8 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             
             // evaluate Coulomb wave functions and derivatives
             double F1, F2, F1p, F2p;
-            int err1 = coul_F(l1,k1,r1, F1,F1p);
-            int err2 = coul_F(l2,k2,r2, F2,F2p);
+            int err1 = special::coul_F(l1,k1,r1, F1,F1p);
+            int err2 = special::coul_F(l2,k2,r2, F2,F2p);
             
             /// DEBUG
             if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
@@ -253,7 +254,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         // integrator
         ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
         Q.setEps(1e-6);
-        Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::pi_sqrt;
+        Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
         
         return res;
         

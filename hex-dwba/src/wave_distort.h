@@ -51,7 +51,7 @@
  * the phase shift is determined. This number sets the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$
  * of the whole wave.
  */
-class DistortedWave : public RadialFunction<double>
+class DistortedWave : public special::RadialFunction<double>
 {
 public:
     

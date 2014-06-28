@@ -64,7 +64,7 @@ extern const rArrays Ucoeffs;
  * for forbidden waves ( ForbiddenWave @f$ \theta_{l_n}(k_n, r) @f$ and HyperbolicWave
  * @f$ \zeta_{l_n}(k_n, r) @f$ ).
  */
-class DistortingPotential : public RadialFunction<double>
+class DistortingPotential : public special::RadialFunction<double>
 {
 public:
     // constructors

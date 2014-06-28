@@ -423,7 +423,7 @@ void NoPreconditioner::update (double E)
         // two-electron part
         for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
-            Complex f = computef(lambda,l1,l2,l1,l2,inp_.L);
+            Complex f = special::computef(lambda,l1,l2,l1,l2,inp_.L);
             
             // check that the "f" coefficient is valid (no factorial overflow etc.)
             if (not Complex_finite(f))
@@ -511,7 +511,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
         chi_block.fill(0);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
-        for (int l = abs(li - inp_.L); l <= li + inp_.L; l++)
+        for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
         {
             // skip wrong parity
             if ((inp_.L + li + l) % 2 != inp_.Pi)
@@ -521,8 +521,8 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             int Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = pow(Complex(0.,1.),l) * sqrt(2*special::constant::pi*(2*l+1)) / Complex(inp_.ki[ie]); 
-            prefactor *= ClebschGordan(li,mi,l,0,inp_.L,mi);
+            Complex prefactor = std::pow(Complex(0.,1.),l) * std::sqrt(2*special::constant::pi*(2*l+1)) / Complex(inp_.ki[ie]); 
+            prefactor *= special::ClebschGordan(li,mi,l,0,inp_.L,mi);
             if (prefactor == 0.)
                 continue;
             
@@ -536,8 +536,8 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             // skip angular forbidden right hand sides
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
-                double f1 = computef(lambda, l1, l2, li, l, inp_.L);
-                double f2 = computef(lambda, l1, l2, l, li, inp_.L);
+                double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
+                double f2 = special::computef(lambda, l1, l2, l, li, inp_.L);
                 
                 // abort if any of the coefficients is non-number (factorial overflow etc.)
                 if (not std::isfinite(f1))
@@ -652,7 +652,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // compute the offdiagonal block
             for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
-                double f = computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
                 
                 // check finiteness
                 if (not std::isfinite(f))

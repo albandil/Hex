@@ -127,9 +127,9 @@ bool IonizationAmplitude::run
         (
             Chebyshev<double,Complex>
             (
-                cb,                   // expansion coefficients
-                0.,                   // lowest energy
-                sqrt(E - 1./(ni*ni))  // highest energy
+                cb,                        // expansion coefficients
+                0.,                        // lowest energy
+                std::sqrt(E - 1./(ni*ni))  // highest energy
             )
         );
     }
@@ -172,17 +172,17 @@ bool IonizationAmplitude::run
                 Complex YY = 0;
                 for (int m = -l1; m <= l1; m++)
                 {
-                    YY += ClebschGordan(l1,m,l2,mi-m,L,mi)
-                          * sphY(l1,m,dirs[idir].first.x*afactor,dirs[idir].first.y*afactor)
-                          * sphY(l1,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
+                    YY += special::ClebschGordan(l1,m,l2,mi-m,L,mi)
+                          * special::sphY(l1,m,dirs[idir].first.x*afactor,dirs[idir].first.y*afactor)
+                          * special::sphY(l1,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
                 }
                 
                 // evaluate Coulomb phaseshifts
-                Complex sig1 = coul_F_sigma(l1,k1[ie]);
-                Complex sig2 = coul_F_sigma(l2,k2[ie]);
+                Complex sig1 = special::coul_F_sigma(l1,k1[ie]);
+                Complex sig2 = special::coul_F_sigma(l2,k2[ie]);
                 
                 // compute angular factors
-                Complex angfact = pow(Complex(0.,1.),-l1-l2) * exp(Complex(0.,1.)*(sig1+sig2)) * YY;
+                Complex angfact = std::pow(Complex(0.,1.),-l1-l2) * std::exp(Complex(0.,1.)*(sig1+sig2)) * YY;
                 
                 // sum the contribution
                 ampls0[ie] += angfact * f;

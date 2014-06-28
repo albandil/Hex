@@ -85,7 +85,7 @@ PotentialMatrix::PotentialMatrix
                     // for all multipoles
                     for (int lambda = lambdamin; lambda <= lambdamax; lambda++)
                     {
-                        double f = computef (lambda, L, l, Lp, lp, J);
+                        double f = special::computef (lambda, L, l, Lp, lp, J);
                         
                         // skip uncontributing multipoles
                         if (f == 0.)
@@ -351,7 +351,7 @@ double PotentialMatrix::ComputeIdir_nested
             auto iintegrand = [&](double v) -> double
             {
                 double r2 = v / (1. - v);
-                return (1./r1 - 1./r2) * ric_j(l,k*r2) * ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
+                return (1./r1 - 1./r2) * special::ric_j(l,k*r2) * special::ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
             };
             
             GaussKronrod<decltype(iintegrand)> Qi(iintegrand);
@@ -385,7 +385,7 @@ double PotentialMatrix::ComputeIdir_nested
             auto iintegrand1 = [&](double v) -> double
             {
                 double r2 = v / (1. - v);
-                return  pow(r2/r1,lambda)/r1 * ric_j(l,k*r2) * ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
+                return std::pow(r2/r1,lambda)/r1 * special::ric_j(l,k*r2) * special::ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
             };
             
             GaussKronrod<decltype(iintegrand1)> Qi(iintegrand1);
@@ -411,7 +411,7 @@ double PotentialMatrix::ComputeIdir_nested
             auto iintegrand2 = [&](double v) -> double
             {
                 double r2 = v / (1. - v);
-                return  pow(r1/r2,lambda)/r2 * ric_j(l,k*r2) * ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
+                return std::pow(r1/r2,lambda)/r2 * special::ric_j(l,k*r2) * special::ric_j(lp,kp*r2) / ((1.-v)*(1.-v));
             };
             
             GaussKronrod<decltype(iintegrand2)> Qi(iintegrand2);
@@ -475,8 +475,8 @@ double PotentialMatrix::ComputeIdir_semisymbolic
         // integrate short-range (exponentially decreasing) part
         auto integrand = [&](double x) -> double
         {
-            double j = ric_j(l,k*x);
-            double jp = ric_j(lp,kp*x);
+            double j = special::ric_j(l,k*x);
+            double jp = special::ric_j(lp,kp*x);
             
             return symbolic::eval(short_range_integral, x) * symbolic::eval(expc, x) * j * jp;
         };
@@ -555,8 +555,8 @@ double PotentialMatrix::ComputeIdir_semisymbolic
         
         auto integrand = [&](double x) -> double
         {
-            double j = ric_j(l,k*x);
-            double jp = ric_j(lp,kp*x);
+            double j = special::ric_j(l,k*x);
+            double jp = special::ric_j(lp,kp*x);
             
             return symbolic::eval(phipsi, x) * j * jp;
         };
@@ -601,8 +601,8 @@ double PotentialMatrix::ComputeIdir_Romberg
             // precompute radial functions
             rArray xi  = x.transform ([&](double r) -> double { return basis_.basestate(L, i, r);   });
             rArray xip = x.transform ([&](double r) -> double { return basis_.basestate(Lp, ip, r); });
-            rArray j   = x.transform ([&](double r) -> double { return ric_j(l, k*r);               });
-            rArray jp  = x.transform ([&](double r) -> double { return ric_j(lp, kp*r);             });
+            rArray j   = x.transform ([&](double r) -> double { return special::ric_j(l, k*r);      });
+            rArray jp  = x.transform ([&](double r) -> double { return special::ric_j(lp, kp*r);    });
             
             // sum of evaluations
             double suma = 0.;
@@ -649,8 +649,8 @@ double PotentialMatrix::ComputeIdir_Romberg
             // precompute radial functions
             rArray xi  = x.transform ([&](double r) -> double { return basis_.basestate(L, i, r);   });
             rArray xip = x.transform ([&](double r) -> double { return basis_.basestate(Lp, ip, r); });
-            rArray j   = x.transform ([&](double r) -> double { return ric_j(l, k*r);               });
-            rArray jp  = x.transform ([&](double r) -> double { return ric_j(lp, kp*r);             });
+            rArray j   = x.transform ([&](double r) -> double { return special::ric_j(l, k*r);      });
+            rArray jp  = x.transform ([&](double r) -> double { return special::ric_j(lp, kp*r);    });
             
             // sum of evaluations
             double suma = 0.;
@@ -659,9 +659,9 @@ double PotentialMatrix::ComputeIdir_Romberg
             for (unsigned ir1 = 0; ir1 < n; ir1++)
             {
                 for (unsigned ir2 = 0; ir2 < ir1; ir2++)
-                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*pow(x[ir2]/x[ir1],lambda)/x[ir1] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
+                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*std::pow(x[ir2]/x[ir1],lambda)/x[ir1] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
                 for (unsigned ir2 = ir1; ir2 < n; ir2++)
-                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*pow(x[ir1]/x[ir2],lambda)/x[ir2] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
+                    suma += xi[ir1]*xip[ir1]*j[ir2]*jp[ir2]*std::pow(x[ir1]/x[ir2],lambda)/x[ir2] / ((1.-u[ir1])*(1.-u[ir1])*(1.-u[ir2])*(1.-u[ir2]));
             }
             
             // returh the aggregated result

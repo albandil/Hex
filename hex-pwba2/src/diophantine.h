@@ -114,7 +114,7 @@ template <class T, class Function> T diophantine (Function F, dioph::id id)
     }
     
     // normalize and return the sum
-    return 2 * suma / M;
+    return (T(2) * suma) / T(M);
 }
 
 #endif

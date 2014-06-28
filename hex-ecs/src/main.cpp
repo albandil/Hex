@@ -236,7 +236,7 @@ int main (int argc, char* argv[])
             // skip angular forbidden states
             bool allowed = false;
             for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or ClebschGordan(li,mi,l,0,inp.L,mi);
+                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
             if (not allowed)
             {
                 std::cout << "\tThe initial state li=" << li << ", mi=" << mi << " is not allowed within the total angular variables.\n";
@@ -273,7 +273,7 @@ int main (int argc, char* argv[])
             // skip angular forbidden states
             bool allowed = false;
             for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or ClebschGordan(li,mi,l,0,inp.L,mi);
+                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
             if (not allowed)
                 continue;
             
@@ -404,7 +404,7 @@ StgExtract:
             // skip angular forbidden states
             bool allowed = false;
             for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or ClebschGordan(li,mi,l,0,inp.L,mi);
+                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
             if (not allowed)
                 continue;
             
@@ -444,7 +444,7 @@ StgExtract:
                         int ell = i % (inp.maxell + 1);
                         
                         T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * pow(Complex(0.,1.), -ell)
-                                        * ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
+                                        * special::ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
                     }
                     
                     //

@@ -32,7 +32,7 @@
  *     GaussKronrod<decltype(integrand)> Q(integrand);
  * @endcode
  */
-template <typename Functor> class GaussKronrod : public RadialFunction<double>
+template <typename Functor> class GaussKronrod : public special::RadialFunction<double>
 {
     private:
         

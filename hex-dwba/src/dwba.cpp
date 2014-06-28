@@ -32,7 +32,7 @@ Complex computeDirect1e (DistortingPotential const& U, int l, double k)
     // set up the integrands
     auto integrand1 = [ & ](double r) -> double
     {
-        return chi_kl(r) * U(r) * ric_j(l,k*r);
+        return chi_kl(r) * U(r) * special::ric_j(l,k*r);
     };
     auto integrand2 = [ & ](double r) -> double
     {
@@ -46,7 +46,7 @@ Complex computeDirect1e (DistortingPotential const& U, int l, double k)
     Q2.integrate(0., special::constant::Inf);
     
     // return the result
-    return pow(4*pi,2) * sqrt((2*l+1)/(4*pi)) / (k*k) * 
+    return std::pow(4*pi,2) * std::sqrt((2*l+1)/(4*pi)) / (k*k) * 
         (Q1.result() - Q2.result() * chi_kl.getPhasef()) * chi_kl.getPhasef();
 }
 
@@ -304,7 +304,9 @@ void dwba
                 {
                     for (int Mf = -Lf; Mf <= Lf; Mf++)
                     {
-                        double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lambda,Lf,lf,Li,li,L);
+                        double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
+                                   * special::ClebschGordan(Li,Mi,li,0,L,Mi)
+                                   * special::computef(lambda,Lf,lf,Li,li,L);
                         
                         if (not std::isfinite(ang))
                             throw exception ("Gaunt failure!\n");
@@ -325,7 +327,9 @@ void dwba
                 {
                     for (int Mf = -Lf; Mf <= Lf; Mf++)
                     {
-                        double ang = ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi) * ClebschGordan(Li,Mi,li,0,L,Mi) * computef(lambda,lf,Lf,Li,li,L);
+                        double ang = special::ClebschGordan(Lf,Mf,lf,Mi-Mf,L,Mi)
+                                   * special::ClebschGordan(Li,Mi,li,0,L,Mi)
+                                   * special::computef(lambda,lf,Lf,Li,li,L);
                         
                         if (not std::isfinite(ang))
                             throw exception ("Gaunt failure!\n");

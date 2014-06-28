@@ -41,27 +41,28 @@ namespace special
 namespace constant
 {
 
-const double e              = M_E; // e
+const double e               = M_E;        // e
 
-const double pi             = M_PI; // π
-const double pi_half        = M_PI_2; // π/2
-const double pi_quart       = M_PI_4; // π/4
-const double pi_sqrt        = M_SQRTPI; // √π
-const double pi_inv         = M_1_PI; // 1/π
-const double pi_two_inv     = M_2_PI; // 2/π
-const double pi_two_invsqrt = M_2_SQRTPI; // 2/√π
+const double pi              = M_PI;       // π
+const double pi_half         = M_PI_2;     // π/2
+const double pi_quart        = M_PI_4;     // π/4
+const double sqrt_pi         = M_SQRTPI;   // √π
+const double inv_pi          = M_1_PI;     // 1/π
+const double two_pi          = 2.0 * M_PI; // 2π
+const double two_inv_pi      = M_2_PI;     // 2/π
+const double two_inv_sqrt_pi = M_2_SQRTPI; // 2/√π
 
-const double sqrt_two       = M_SQRT2; // √2
-const double sqrt_three     = M_SQRT3; // √3
-const double sqrt_half      = M_SQRT1_2; // 1/√2
+const double sqrt_two        = M_SQRT2;    // √2
+const double sqrt_three      = M_SQRT3;    // √3
+const double sqrt_half       = M_SQRT1_2;  // 1/√2
 
-const double log2e          = M_LOG2E;  // log₂ e
-const double log10e         = M_LOG10E; // log e
-const double ln2            = M_LN2; // ln 2
-const double ln10           = M_LN10; // ln 10
-const double lnpi           = M_LNPI; // ln π
+const double log2e           = M_LOG2E;    // log₂ e
+const double log10e          = M_LOG10E;   // log₁₀ e
+const double ln2             = M_LN2;      // ln 2
+const double ln10            = M_LN10;     // ln 10
+const double lnpi            = M_LNPI;     // ln π
 
-const double euler          = M_EULER; // γ
+const double euler           = M_EULER;    // γ
 
 // other special numbers
 const double Inf = std::numeric_limits<double>::infinity();
@@ -325,8 +326,6 @@ template <class T, class OuterFunctionDerivative, class InnerFunctionDerivative>
     }
     return gsl_sf_fact(n) * suma;
 }
-
-}; // end of namespace "special"
 
 /** Hydrogen radial function (radius-multiplied)
  * Evaluate hydrogen radial function (radius-multiplied) for complex argument
@@ -781,5 +780,7 @@ int triangle_count (int L, int maxell);
  * @todo Document transformations.
  */
 double Hyper2F1 (double a, double b, double c, double x);
+
+}; // end of namespace "special"
 
 #endif

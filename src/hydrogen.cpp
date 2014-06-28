@@ -244,7 +244,7 @@ double F (double k, int l, double r, double sigma)
         return 0.;
     
     // normalization
-    double norm = special::constant::sqrt_two / (k * special::constant::pi_sqrt);
+    double norm = special::constant::sqrt_two / (k * special::constant::sqrt_pi);
     
     // some local variables
     double F, exp_F, Fp;
@@ -263,7 +263,7 @@ double F (double k, int l, double r, double sigma)
 //     
 //     // evaluation failed in classically forbidden region
     // -> use uniform WKB approximation by Michel
-    if ((err = coul_F_michel (l, k, r, F, Fp)) == GSL_SUCCESS)
+    if ((err = special::coul_F_michel (l, k, r, F, Fp)) == GSL_SUCCESS)
         return norm * F;
     
     // some other problem
@@ -276,18 +276,18 @@ double F (double k, int l, double r, double sigma)
 
 double evalFreeStatePhase (double k, int l, double sigma)
 {
-    return l * 0.5 * M_PI + (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k));
+    return l * 0.5 * special::constant::pi + (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k));
 }
 
 double S (int n, int l, double r, double lambda)
 {
-    return n * n * pow(lambda,l+1) * sqrt(pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
-        * exp(-lambda*r) * pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
+    return n * n * std::pow(lambda,l+1) * std::sqrt(std::pow(2./n,3)*gsl_sf_fact(n-l-1.)/(2.*n*gsl_sf_fact(n+l))) 
+        * std::exp(-lambda*r) * std::pow(2.*r,l) * gsl_sf_laguerre_n(n-l-1,2*l+1,2*r);
 }
 
 double evalFreeState_asy (double k, int l, double r, double sigma)
 {
-    return coul_F_asy(l,k,r,sigma);
+    return special::coul_F_asy(l,k,r,sigma);
 }
 
 double getFreeAsyZero (double k, int l, double Sigma, double eps, int max_steps, int nzero)
@@ -296,12 +296,12 @@ double getFreeAsyZero (double k, int l, double Sigma, double eps, int max_steps,
     //    n*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
     // using trivial Banach contraction
     
-    double kr = (2*nzero+l)*M_PI/2 - Sigma;
+    double kr = (2*nzero+l)*special::constant::pi_half - Sigma;
     if (kr < 0)
         return kr;
     
     while (max_steps-- > 0 and std::abs(kr) > eps)
-        kr = (2*nzero+l)*M_PI/2 - Sigma - log(2*kr)/k;
+        kr = (2*nzero+l)*special::constant::pi_half - Sigma - std::log(2*kr)/k;
     
     return kr / k;
 }
@@ -312,12 +312,12 @@ double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, 
     //    (n+1/4)*2*pi = k*r - l*pi/2 + log(2*k*r)/k + Sigma
     // using trivial Banach contraction
     
-    double kr = (2*ntop+0.5*(l+1))*M_PI - Sigma;
+    double kr = (2*ntop+0.5*(l+1))*special::constant::pi - Sigma;
     if (kr < 0)
         return kr;
     
     while (max_steps-- > 0 and std::abs(kr) > eps)
-        kr = (2*ntop+0.5*(l+1))*M_PI - Sigma - log(2*kr)/k;
+        kr = (2*ntop+0.5*(l+1))*special::constant::pi - Sigma - std::log(2*kr)/k;
     
     return kr / k;
 }
@@ -325,7 +325,7 @@ double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, 
 double getFreeFar (double k, int l, double Sigma, double eps, int max_steps)
 {
     // precompute Coulomb shift
-    Sigma = std::isfinite(Sigma) ? Sigma : coul_F_sigma(l,k);
+    Sigma = std::isfinite(Sigma) ? Sigma : special::coul_F_sigma(l,k);
     
     //
     // hunt phase
@@ -398,7 +398,7 @@ double HydrogenFunction::getTurningPoint () const
 {
     // bound state
 //     if (n_ != 0)
-        return n_ * (n_ - sqrt(n_*n_ - l_*(l_+1.)));
+        return n_ * (n_ - std::sqrt(n_*n_ - l_*(l_+1.)));
     
     // free state
 //         return sqrt(l*(l+1))/k;
