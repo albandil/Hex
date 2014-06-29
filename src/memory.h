@@ -168,7 +168,7 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
                 return;
             
             // get root and origin addresses
-            std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t*>(origin) - 1);
+            std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t const*>(origin) - 1);
             std::uintptr_t origin_address = reinterpret_cast<std::uintptr_t>(origin);
             
             // get distance between 'root' and 'origin'; also get the root pointer
@@ -185,11 +185,11 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             
             // write information to stdout
             std::cout << "Aligned pointer information:" << std::endl;
-            std::cout << "   root pointer :   " << root << std::endl;
-            std::cout << "   origin :         " << origin << std::endl;
-            std::cout << "   origin to root : " << d << " bits" << std::endl;
-            std::cout << "   padding :        " << d - sizeof(root_address) << " bits" << std::endl;
-            std::cout << "   alignment :      " << align << " bits (default: " << alignof(max_align_t) << ")" << std::endl;
+            std::cout << "   root pointer : " << root << std::endl;
+            std::cout << "   origin       : " << origin << std::endl;
+            std::cout << "   origin-root  : " << d << " Bytes" << std::endl;
+            std::cout << "   padding      : " << d - sizeof(root_address) << " Bytes" << std::endl;
+            std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
 };
 

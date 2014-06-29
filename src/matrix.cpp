@@ -1723,11 +1723,15 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     cArray res(Nrows);
     
     // data pointers
-    // - "restricted" and "aligned" for maximization of the cache usage
-    // - optionally "aligned" to convince the auto-vectorizer of the worth of the vectorization using AVX instructions
-    // NOTE: cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary
-    // NOTE: GCC needs -ffast-math (included in -Ofast) to auto-vectorize both the ielem-loops below
-#if !defined(NO_ALIGN) && (defined(__GNUC__) || defined(__INTEL_COMPILER))
+    // - "restricted" for maximization of the cache usage
+    // - "aligned" to convince the auto-vectorizer of the worth of the vectorization using SIMD
+    // Note that:
+    //    - cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary
+    //    - GCC needs -fcx-limited-range to auto-vectorize 'complex' operations
+    // The option -fcx-limited-range will inhibit some run-time range checking, so, technically,
+    // some 'complex' operations may overflow. However, e.g. GNU Fortran compiler never(!) checks
+    // for overflows, so why should we here, when we do not expect any.
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
     Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(res.data(),    2*sizeof(Complex));
     Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(elems_.data(), 2*sizeof(Complex));
     Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(B.data(),      2*sizeof(Complex));
