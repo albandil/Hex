@@ -10,6 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <sstream>
+
 #include <cstdlib>
 #include <cmath>
 #include <cstddef>
@@ -98,6 +100,18 @@ Complex CarthesianBoundWaveFunction::operator() (double x, double y, double z) c
     }
     
     return result * std::exp(-r / N_);
+}
+
+std::string stateName (int n, int l, int m)
+{
+    static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
+    
+    assert(l < sizeof(ang));
+    
+    std::ostringstream oss;
+    oss << n << ang[l] << "(" << m << ")";
+    
+    return oss.str();
 }
 
 double lastZeroBound (int n, int l)

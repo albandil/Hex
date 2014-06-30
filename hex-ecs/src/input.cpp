@@ -374,9 +374,11 @@ void InputFile::read (std::ifstream & inputfile)
     // construct complex(-to-be) knot sequence
     for (unsigned i = 0; i < cknots_begin.size(); i++)
     {
-        cknots = concatenate (
+        cknots = concatenate
+        (
             cknots,
-            linspace(
+            linspace
+            (
                 cknots_begin[i],
                 cknots_end[i],
                 cknots_samples[i]

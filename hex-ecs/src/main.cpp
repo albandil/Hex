@@ -23,6 +23,7 @@
 #include "arrays.h"
 #include "bspline.h"
 #include "complex.h"
+#include "hydrogen.h"
 #include "input.h"
 #include "itersolve.h"
 #include "misc.h"
@@ -350,9 +351,15 @@ StgExtract:
         // compose output filename
         std::ostringstream ossfile;
         if (par.active())
-            ossfile << inp.ni << "-" << inp.L << "-" << Spin << "-" << inp.Pi << "-(" << par.iproc() << ").sql";
+        {
+            ossfile << "tmat-n" << inp.ni << "-L" << inp.L << "-S" << Spin << "-Pi"
+                    << inp.Pi << "-(" << par.iproc() << ").sql";
+        }
         else
-            ossfile << inp.ni << "-" << inp.L << "-" << Spin << "-" << inp.Pi << ".sql";
+        {
+            ossfile << "tmat-n" << inp.ni << "-L" << inp.L << "-S" << Spin << "-Pi"
+                    << inp.Pi << ".sql";
+        }
         
         // Create SQL batch file
         std::ofstream fsql(ossfile.str().c_str());
@@ -364,42 +371,22 @@ StgExtract:
         fsql << "BEGIN TRANSACTION;" << std::endl;
         
         //
-        // Extract the cross sections
+        // Extract the amplitudes
         //
         
-        std::cout << std::endl << "Extracting T-matrices..." << std::endl;
+        std::cout << std::endl << "Extracting T-matrices for S = " << Spin << std::endl;
         
-        std::vector<std::tuple<int,int,int,int,int>> transitions;
+        // collected cross sections
+        std::vector<std::tuple<int,int,int,int,int,int,rArray>> ics;
+        
         for (auto instate  : inp.instates)
         for (auto outstate : inp.outstates)
         {
-            transitions.push_back
-            (
-                std::make_tuple
-                (
-                    Spin,
-                    /*li*/ std::get<1>(instate),
-                    /*mi*/ std::get<2>(instate),
-                    /*nf*/ std::get<0>(outstate),
-                    /*lf*/ std::get<1>(outstate)
-                )
-            );
-        }
-        
-        int finished = 0;
-        
-        for (unsigned i = 0; i < transitions.size(); i++)
-        {
-            // skip other process's work
-            if (not par.isMyWork(i))
-                continue;
-            
             // get quantum numbers
-            int Spin = std::get<0>(transitions[i]);
-            int li   = std::get<1>(transitions[i]);
-            int mi   = std::get<2>(transitions[i]);
-            int nf   = std::get<3>(transitions[i]);
-            int lf   = std::get<4>(transitions[i]);
+            int li   = std::get<1>(instate);
+            int mi   = std::get<2>(instate);
+            int nf   = std::get<0>(outstate);
+            int lf   = std::get<1>(outstate);
             
             // skip angular forbidden states
             bool allowed = false;
@@ -425,14 +412,23 @@ StgExtract:
                     rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
                     
                     // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-                    Lambda[mf+lf] = std::move (
-                        computeLambda (bspline, kf, inp.ki, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, lf, Pf_overlaps, coupled_states)
+                    Lambda[mf+lf] = computeLambda
+                    (
+                        bspline, kf, inp.ki, inp.maxell,
+                        inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, lf,
+                        Pf_overlaps, coupled_states
                     );
                 }
                 
-                // save the data
+                // for all final magnetic sublevels
                 for (int mf = -lf; mf <= lf; mf++)
                 {
+                    // add new cross section set to the storage
+                    ics.push_back
+                    (
+                        std::make_tuple(inp.ni,li,mi,nf,lf,mf,rArray(inp.Ei.size()))
+                    );
+                    
                     // final projectile momenta
                     rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
                     
@@ -443,8 +439,8 @@ StgExtract:
                         int ie  = i / (inp.maxell + 1);
                         int ell = i % (inp.maxell + 1);
                         
-                        T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * pow(Complex(0.,1.), -ell)
-                                        * special::ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) / sqrt(2.);
+                        T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * std::pow(Complex(0.,1.), -ell)
+                                        * special::ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) * special::constant::sqrt_half;
                     }
                     
                     //
@@ -470,33 +466,20 @@ StgExtract:
                     }
                     
                     //
-                    // print out the total cross section for quick overview
+                    // evaluate and store cross sections
                     //
                     
-                    std::ostringstream sigmaname;
-                    sigmaname << "sigma-" 
-                            << inp.ni << "-" << li << "-" << mi << "-"
-                            << nf << "-" << lf << "-" << mf << "-"
-                            << inp.L << "-" << Spin << "-" << inp.Pi << ".dat";
-
-                    std::ofstream ftxt(sigmaname.str().c_str());
-                    
-                    ftxt << "# Ei [Ry] sigma [a0^2]" << std::endl;
                     for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
                     {
                         double sigma = 0.;
                         for (int ell = 0; ell <= inp.maxell; ell++)
                         {
-                            double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / (2 * special::constant::pi);
-                            double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / (2 * special::constant::pi);
+                            double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / special::constant::two_pi;
+                            double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / special::constant::two_pi;
                             sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
                         }
-                        if (std::isfinite(sigma))
-                        {
-                            ftxt << inp.Ei[ie] << "\t" << sigma << "\n";
-                        }
+                        std::get<6>(ics.back())[ie] = sigma;
                     }
-                    ftxt.close();
                 }
             }
             else
@@ -505,10 +488,16 @@ StgExtract:
                 // Ionization
                 //
                 
-                rArray ics;
-                cArrays data = std::move
+                ics.push_back
                 (
-                    computeXi(bspline, inp.maxell, inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, ics, coupled_states)
+                    std::make_tuple(inp.ni,li,mi,0,0,0,rArray(inp.Ei.size()))
+                );
+                
+                cArrays data = computeXi
+                (
+                    bspline, inp.maxell, inp.L, Spin,
+                    inp.Pi, inp.ni, li, mi, inp.Ei,
+                    std::get<6>(ics.back()), coupled_states
                 );
                 
                 for (size_t ie = 0; ie < inp.Ei.size(); ie++)
@@ -522,22 +511,48 @@ StgExtract:
                         << coupled_states[ill].second << ","
                         << data[ie * coupled_states.size() + ill].toBlob() << ");" << std::endl;
                 }
-                
-                // print ionization cross section
-                std::ostringstream fname;
-                fname << "isigma-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << ".dat";
-                write_array(inp.Ei, ics, fname.str().c_str());
             }
-            
-            finished++;
-            
-            std::cout << "\rExtracting T-matrices... " 
-                    << std::setw(3) << int(trunc(finished * 100. / transitions.size() + 0.5))
-                    << " %        ";
         }
         
         fsql << "COMMIT;" << std::endl;
         fsql.close();
+        
+        //
+        // Write cross sections to files.
+        //
+        
+        // open file
+        std::ofstream fout (format("ics-n%d-L%d-S%d.dat", inp.ni, inp.L, Spin));
+        
+        // print table header
+        fout << "#E[Ry]\t";
+        for (auto data : ics)
+        {
+            fout << format
+            (
+                "%s-%s\t",
+                Hydrogen::stateName(std::get<0>(data),std::get<1>(data),std::get<2>(data)).c_str(),
+                Hydrogen::stateName(std::get<3>(data),std::get<4>(data),std::get<5>(data)).c_str()
+            );
+        }
+        fout << std::endl;
+        
+        // print data (cross sections)
+        for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
+        {
+            fout << inp.Ei[ie] << '\t';
+            for (auto data : ics)
+            {
+                if (std::isfinite(std::get<6>(data)[ie]))
+                    fout << std::get<6>(data)[ie] << '\t';
+                else
+                    fout << 0.0 << '\t';
+            }
+            fout << std::endl;
+        }
+        
+        // close file
+        fout.close();
     }
 }
 

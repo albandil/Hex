@@ -83,6 +83,14 @@ class CarthesianBoundWaveFunction
 };
 
 /**
+ * @brief Compose name of the hydrogen state.
+ * 
+ * Return the spectroscopic notation for given quantum numbers.
+ * Example are: 1s(0), 2s(0), 2p(0), 2p(1), 2p(-1).
+ */
+std::string stateName (int n, int l, int m);
+
+/**
  * @brief Hydrogen bound radial orbital.
  * 
  * The hydrogen radial functions @f$ R_{nl} @f$ are defined as
@@ -197,7 +205,7 @@ double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, i
     */
 double getFreeFar(double k, int l, double Sigma = special::constant::Nan, double eps = 1e-10, int max_steps = DEFAULT_MAXSTEPS);
 
-}
+} // end of namespace Hydrogen
     
 /**
  * Hydrogen radial function.
