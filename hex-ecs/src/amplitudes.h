@@ -49,7 +49,8 @@
  * @param coupled_states List of all coupled-state angular momenta pairs.
  * @return Vector of radial integrals.
  */
-cArray computeLambda (
+cArray computeLambda
+(
     Bspline const & bspline,
     rArray const & kf,
     rArray const & ki,
@@ -95,7 +96,8 @@ cArray computeLambda (
  * @param coupled_states List of all coupled-state angular momenta pairs.
  * @return Vector of radial integrals.
  */
-cArrays computeXi (
+cArrays computeXi
+(
     Bspline const & bspline, int maxell,
     int L, int Spin, int Pi,
     int ni, int li, int mi,

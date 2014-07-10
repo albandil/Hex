@@ -109,7 +109,10 @@ std::string stateName (int n, int l, int m)
     assert(l < sizeof(ang));
     
     std::ostringstream oss;
-    oss << n << ang[l] << "(" << m << ")";
+    if (n != 0)
+        oss << n << ang[l] << "(" << m << ")";
+    else
+        oss << "ion";
     
     return oss.str();
 }

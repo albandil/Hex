@@ -401,6 +401,8 @@ StgExtract:
                 // Discrete transition
                 //
                 
+                std::cout << "\texc: -> nf = " << nf << ", lf = " << lf << ", mf = *" << std::flush;
+                
                 // precompute hydrogen function overlaps
                 cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
                 
@@ -481,6 +483,8 @@ StgExtract:
                         std::get<6>(ics.back())[ie] = sigma;
                     }
                 }
+                
+                std::cout << " ok" << std::endl;
             }
             else
             {

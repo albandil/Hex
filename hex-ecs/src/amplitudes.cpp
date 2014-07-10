@@ -319,7 +319,7 @@ cArrays computeXi
             int l1 = coupled_states[ill].first;
             int l2 = coupled_states[ill].second;
             
-            std::cout << "\tEi[" << ie << "] = " << Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << "\n";
+            std::cout << "\tion: Ei[" << ie << "] = " << Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << std::flush;
             
             // create subset of the solution
             cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
@@ -335,7 +335,7 @@ cArrays computeXi
             ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
             double cs = integrator.integrate(0, special::constant::pi_quart, &n) / sqrt(Ei[ie]);
             
-            std::cout << "\t\t- contrib to ics: " << cs << " (" << n << " evaluations)\n";
+            std::cout << " - contrib to ics: " << cs << " (" << n << " evaluations)" << std::endl;
             ics[ie] += cs;
         }
     }
