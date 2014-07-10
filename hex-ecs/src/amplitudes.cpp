@@ -257,7 +257,6 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
         
         return res;
-        
     };
     
     // Chebyshev approximation
@@ -331,9 +330,9 @@ cArrays computeXi
             // integrate the expansion
             int tail = CB.tail(1e-10);
             int n;
-            auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*sin(beta), tail)); };
+            auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*std::sin(beta), tail)); };
             ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-            double cs = integrator.integrate(0, special::constant::pi_quart, &n) / sqrt(Ei[ie]);
+            double cs = integrator.integrate(0, special::constant::pi_quart, &n) / std::sqrt(Ei[ie]);
             
             std::cout << " - contrib to ics: " << cs << " (" << n << " evaluations)" << std::endl;
             ics[ie] += cs;

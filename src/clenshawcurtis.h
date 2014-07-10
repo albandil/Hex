@@ -234,10 +234,10 @@ public:
                 double pi_over_N = special::constant::pi / N;
                 for (int k = 0; k < N; k++)
                 {
-                    fvals[k] = fvals[2*N-k] = f(cos(k * pi_over_N));
+                    fvals[k] = fvals[2*N-k] = f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("%s \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], cos(k * pi_over_N));
+                        throw exception("%s \"%g\" when evaluating function at %g", vName.c_str(), fvals[k], std::cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
@@ -250,7 +250,7 @@ public:
                 double pi_over_N = special::constant::pi / N;
                 for (int k = 0; k < N; k++)
                 {
-                    fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(cos(k * pi_over_N));
+                    fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
                         throw exception("%s \"%g\" when evaluating function.", vName.c_str(), fvals[k]);
@@ -413,10 +413,10 @@ public:
                 for (int i = 1; i <= N - 1; i++)
                 {
                     double x = i * special::constant::pi / N;
-                    fvals[i] = F(L / tan(x));
+                    fvals[i] = F(L / std::tan(x));
                     if (not std::isfinite(std::abs(fvals[i])))
                         fvals[i] = 0;
-                    weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
+                    weights[i] = 1. / gsl_sf_pow_int(std::sin(x), 2);
                 }
             }
             else
@@ -432,10 +432,10 @@ public:
                     else
                     {
                         double x = i * special::constant::pi / N;
-                        fvals[i] = F(L / tan(x));
+                        fvals[i] = F(L / std::tan(x));
                         if (not std::isfinite(std::abs(fvals[i])))
                             fvals[i] = 0;
-                        weights[i] = 1. / gsl_sf_pow_int(sin(x), 2);
+                        weights[i] = 1. / gsl_sf_pow_int(std::sin(x), 2);
                     }
                 }
             }

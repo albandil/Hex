@@ -95,7 +95,7 @@ public:
     Tout operator() (Tin const & x) const
     {
         Tout ret = 0.5 * C[0];
-        const double xp = scale (x);
+        const double xp = scale(x);
         
         for (int k = 1; k < N; k++)
         {
@@ -176,7 +176,7 @@ public:
         int k;
         for (k = 1; k < N; k++)
         {
-            double Tk_x = cos(k * acos(xp));
+            double Tk_x = std::cos(k * std::acos(xp));
             Tout delta = C[k] * Tk_x;
             ret += delta;
             
@@ -281,7 +281,7 @@ public:
      */
     static Tin root (int N, int k, Tin x1 = 0., Tin x2 = 1.)
     {
-        return x1 + 0.5 * (1. + cos(special::constant::pi * (k + 0.5) / N)) * (x2 - x1);
+        return x1 + 0.5 * (1. + std::cos(special::constant::pi * (k + 0.5) / N)) * (x2 - x1);
     }
     
     /**
@@ -289,7 +289,7 @@ public:
      * 
      * Write out the coefficients to std::string.
      */
-    std::string str() const
+    std::string str () const
     {
         std::ostringstream out;
         
@@ -306,7 +306,7 @@ public:
     }
     
     /// Return reference to the coefficient array.
-    NumberArray<Tout> const & coeffs() const
+    NumberArray<Tout> const & coeffs () const
     {
         return C;
     }
@@ -324,12 +324,14 @@ public:
 private:
     
     /// map interval (xt-m,xt+m) to (-1,1)
-    inline double scale(Tin x) const {
+    inline double scale (Tin x) const
+    {
         return (x - xt) / m;
     }
     
     /// map interval (-1,1) to (xt-m,xt+m)
-    inline Tin unscale(double x) const {
+    inline Tin unscale (double x) const
+    {
         return (xt + m*x);
     }
     
@@ -373,7 +375,7 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     double pi_over_N = special::constant::pi / N;
     for (int k = 0; k < N; k++)
     {
-        double xk = cos(pi_over_N * (k + 0.5));
+        double xk = std::cos(pi_over_N * (k + 0.5));
         fvals[k] = f(unscale(xk));
     }
     
@@ -405,7 +407,8 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     cArray fvals(4*N), ftraf(4*N);
     
     // create the FFTW plan
-    fftw_plan plan = fftw_plan_dft_1d (
+    fftw_plan plan = fftw_plan_dft_1d
+    (
         4*N,
         reinterpret_cast<fftw_complex*>(&fvals[0]),
         reinterpret_cast<fftw_complex*>(&ftraf[0]),
@@ -417,7 +420,7 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     double pi_over_N = special::constant::pi / N;
     for (int k = 0; k < N; k++)
     {
-        double xk = cos(pi_over_N * (k + 0.5));
+        double xk = std::cos(pi_over_N * (k + 0.5));
         fvals[2*k+1] = fvals[4*N-(2*k+1)] = f(unscale(xk));
     }
     
@@ -431,4 +434,4 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
         C[i] = ftraf[i] * scal;
 }
 
-#endif
+#endif /* HEX_CHEBYSHEV */
