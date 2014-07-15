@@ -469,7 +469,8 @@ class OutputTable
 {
     public:
         
-        OutputTable (std::ostream & out = std::cout) : out_(out.rdbuf()) {}
+        OutputTable (std::ostream & out = std::cout)
+            : width_(1, 15), alignment_(1, OutputTable::left), out_(out.rdbuf()) {}
         
         typedef enum
         {
