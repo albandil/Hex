@@ -10,6 +10,12 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+
 #include "arrays.h"
 #include "complex.h"
 #include "misc.h"
@@ -21,6 +27,7 @@
 #include "diophantine.h"
 #include "gausskronrod.h"
 #include "nodeintegrate.h"
+#include "spgrid.h"
 
 cArrays PWBA2::PartialWave_direct
 (
@@ -201,7 +208,7 @@ cArrays PWBA2::PartialWave_direct
 
 inline Complex WA (double k, double nu, double q)
 {
-    return Complex (k*k + nu*nu - q*q, - 2.*nu*q);
+    return Complex (k*k + nu*nu - q*q, -2.*nu*q);
 }
 
 inline double WB (vec3d k, double nu, vec3d q)
@@ -215,11 +222,11 @@ Complex W_1s (vec3d vk, vec3d vq)
     double k = vec3d::norm(vk);
     double q = vec3d::norm(vq);
     
-    Complex miq (0.,-1./q);
+    Complex miq (0.,-1./q); // = -i/q
     Complex A = WA(k,nu,q);
     double B = WB(vk,nu,vq);
     
-    return Complex(0.,2/q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B);
+    return Complex(0.,2./q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B) / (k*k);
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -231,6 +238,11 @@ cArrays PWBA2::FullTMatrix_direct
     int maxlevel_allowed, int maxlevel_forbidden
 )
 {
+    // DEBUG output
+    OutputTable tab;
+    tab.setWidth(15, 15, 15, 15, 15, 15, 15);
+    tab.write("theta", "phi", "|fU|", "eval", "|fW|", "eval", "|fU+fW|");
+    
     int Ntheta = 10, Nphi = 10;
 //     for (int itheta = 0; itheta < Ntheta; itheta++)
     for (int iphi = 0; iphi < Nphi; iphi++)
@@ -251,7 +263,7 @@ cArrays PWBA2::FullTMatrix_direct
         };
         
         // maximal total intermediate wave-number
-        double Qmax = 10;
+        double Qmax = 100;
         
         auto integrand_U_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
         {
@@ -270,21 +282,15 @@ cArrays PWBA2::FullTMatrix_direct
             double q1 = Q * std::cos(alpha);
             double q2 = Q * std::sin(alpha);
             
-            // compute carthesian coordinates
-            //   "vql" = q<
-            //   "vqg" = q>
-            vec3d vql, vqg;
-            double ql, qg;
-            if (q1 < q2)
-            {
-                ql = q1; vql = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
-                qg = q2; vqg = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
-            }
-            else // q1 >= q2
-            {
-                ql = q2; vql = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
-                qg = q1; vqg = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
-            }
+            // compute directions
+            vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
+            vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
+            
+            // compute carthesian coordinates: "vql" = q<, "vqg" = q>
+            double ql = std::min(q1,q2);
+            double qg = std::max(q1,q2);
+            vec3d vql = (q1 < q2 ? vq1 : vq2);
+            vec3d vqg = (q1 > q2 ? vq1 : vq2);
             
             // the value of the integral
             double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
@@ -298,35 +304,29 @@ cArrays PWBA2::FullTMatrix_direct
         auto integrand_W_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
         {
             // check dimensions
-            assert(n == 6);
+            assert(n = 5);
             
             // unpack polar coordinates
-            double costheta1 = 2.*coords[0]-1.;
-            double costheta2 = 2.*coords[1]-1.;
-            double sintheta1 = std::sqrt(1. - costheta1*costheta1);
-            double sintheta2 = std::sqrt(1. - costheta2*costheta2);
+            double costheta1 = 2 * coords[1] - 1;
+            double costheta2 = 2 * coords[0] - 1;
+            double sintheta1 = std::sqrt(1 - costheta1*costheta1);
+            double sintheta2 = std::sqrt(1 - costheta2*costheta2);
             double phi1 = special::constant::two_pi * coords[2];
             double phi2 = special::constant::two_pi * coords[3];
             double alpha = special::constant::pi_half * coords[4];
-            double Q = std::sqrt(2*Etot);
+            double Q = std::sqrt(2 * Etot);
             double q1 = Q * std::cos(alpha);
             double q2 = Q * std::sin(alpha);
             
-            // compute carthesian coordinates
-            //   "vql" = q<
-            //   "vqg" = q>
-            vec3d vql, vqg;
-            double ql, qg;
-            if (q1 < q2)
-            {
-                ql = q1; vql = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
-                qg = q2; vqg = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
-            }
-            else // q1 >= q2
-            {
-                ql = q2; vql = q2 * vec3d({ sintheta2*std::cos(phi2), sintheta2*std::sin(phi2),costheta2 });
-                qg = q1; vqg = q1 * vec3d({ sintheta1*std::cos(phi1), sintheta1*std::sin(phi1),costheta1 });
-            }
+            // compute directions
+            vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
+            vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
+            
+            // compute carthesian coordinates: "vql" = q<, "vqg" = q>
+            double ql = std::min(q1,q2);
+            double qg = std::max(q1,q2);
+            vec3d vql = (q1 < q2 ? vq1 : vq2);
+            vec3d vqg = (q1 > q2 ? vq1 : vq2);
             
             // the value of the integral
             double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
@@ -334,14 +334,22 @@ cArrays PWBA2::FullTMatrix_direct
             Complex integrand_U = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
             
             // evaluate integrand
-            return special::constant::two_inv_pi * std::pow(q1*q2,2) * integrand_U;
+            return special::constant::two_inv_pi * q1*q1 * q2*q2 * integrand_U;
         };
         
-        // integrate the integrand with a 6-dimensional 9644-point Diophantine rule
-        Complex T = diophantine<Complex>(integrand_W_wrap,dioph::d6n9644);
-        Complex f = -std::pow(2*special::constant::pi,2) * T;
-        std::cout << theta << '\t' << phi << '\t' << std::abs(f) << std::endl;
+        // integrate the integrands with an n-dimensional sparse grid
+        spgrid::SparseGrid<Complex> G;
+        
+        G.integrate_adapt(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
+        Complex fU = G.result();
+        int nEvalU = G.evalcount();
+        
+        G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
+        Complex fW = G.result();
+        int nEvalW = G.evalcount();
+        
+        tab.write(theta, phi, std::abs(fU), nEvalU, std::abs(fW), nEvalW, std::abs(fU+fW));
     }
     
-    exit(0);
+    std::exit(0);
 }

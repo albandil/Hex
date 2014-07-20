@@ -55,7 +55,7 @@ CXXDEBUG = $(CFLAGS) -g -pg -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays diophantine hydrogen pwba2 radial special ui vec3d version
+FILES = arrays diophantine hydrogen pwba2 radial special spgrid ui vec3d version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
