@@ -17,12 +17,13 @@
 #include "bspline.h"
 #include "complex.h"
 
+
 // ----------------------------------------------------------------------- //
 //  Recursive single-point B-spline evaluation                             //
 // ----------------------------------------------------------------------- //
 
 
-Complex Bspline::bspline(int i, int iknot, int k, Complex r) const
+Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
 {
     if (k == 0)
         return  (i == iknot) ? 1. : 0.;
@@ -36,7 +37,7 @@ Complex Bspline::bspline(int i, int iknot, int k, Complex r) const
     return A * S1 + B * S2;
 }
 
-Complex Bspline::dspline(int i, int iknot, int k, Complex r) const
+Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
 {
     if (k == 0)
         return 0.;
@@ -62,7 +63,7 @@ void Bspline::B (int i, int iknot, int n, Complex const * const restrict x, Comp
         y[j] = bspline(i, iknot, order_, x[j]);
 }
 
-void Bspline::dB(int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
+void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
 {
     for (int j = 0; j < n; j++)
         y[j] = dspline(i, iknot, order_, x[j]);
@@ -144,12 +145,14 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
     for (int ispline = 0; ispline < Nspline_; ispline++)
     {
         // get relevant subset of x[]
-        xleft = std::upper_bound<Complex const*> (
+        xleft = std::upper_bound<Complex const*>
+        (
             x.begin(), x.end(),
             t_[ispline],
             Complex_realpart_less
         );
-        xright = std::lower_bound<Complex const*> (
+        xright = std::lower_bound<Complex const*>
+        (
             xleft, x.end(),
             t_[ispline + order_ + 1],
             Complex_realpart_less
@@ -180,12 +183,14 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
     for (int ispline = 0; ispline < Nspline_; ispline++)
     {
         // get relevant subset of y[]
-        yleft = std::upper_bound<Complex const*>(
+        yleft = std::upper_bound<Complex const*>
+        (
             y.begin(), y.end(),
             t_[ispline],
             Complex_realpart_less
         );
-        yright = std::lower_bound<Complex const*> (
+        yright = std::lower_bound<Complex const*>
+        (
             yleft, y.end(),
             t_[ispline + order_ + 1],
             Complex_realpart_less
@@ -215,12 +220,14 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
     for (int ixspline = 0; ixspline < Nspline_; ixspline++)
     {
         // get relevant subset of x[]
-        xleft = std::upper_bound<Complex const*> (
+        xleft = std::upper_bound<Complex const*>
+        (
             x.begin(), x.end(),
             t_[ixspline],
             Complex_realpart_less
         );
-        xright = std::lower_bound<Complex const*> (
+        xright = std::lower_bound<Complex const*>
+        (
             xleft, x.end(),
             t_[ixspline + order_ + 1],
             Complex_realpart_less
@@ -233,12 +240,14 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
         for (int iyspline = 0; iyspline < Nspline_; iyspline++)
         {
             // get relevant subset of y[]
-            yleft = std::upper_bound<Complex const*> (
+            yleft = std::upper_bound<Complex const*>
+            (
                 y.begin(), y.end(),
                 t_[iyspline],
                 Complex_realpart_less
             );
-            yright = std::lower_bound<Complex const*> (
+            yright = std::lower_bound<Complex const*>
+            (
                 yleft, y.end(),
                 t_[iyspline + order_ + 1],
                 Complex_realpart_less
@@ -294,17 +303,15 @@ Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView co
 // ----------------------------------------------------------------------- //
 
 
-int Bspline::knot(Complex x) const
+int Bspline::knot (Complex x) const
 {
     // get "lower" bound by bisection (will return the first equal or greater element)
-    Complex* iknot_notless = std::lower_bound (
-        t_,             // search from here ...
-        t_ + Nknot_,    // ... to here (exclusively)
-        x,              // and compare with respect to this item
-        // comparator using the real parts
-        [](Complex const & a, Complex const & x) -> bool {
-            return a.real() < x.real();
-        }
+    Complex* iknot_notless = std::lower_bound
+    (
+        t_,                     // search from here ...
+        t_ + Nknot_,            // ... to here (exclusively)
+        x,                      // and compare with respect to this item
+        Complex_realpart_less   // comparator using the real parts
     );
     
     // check if this is a valid knot
