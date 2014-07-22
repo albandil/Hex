@@ -240,8 +240,8 @@ cArrays PWBA2::FullTMatrix_direct
 {
     // DEBUG output
     OutputTable tab;
-    tab.setWidth(15, 15, 15, 15, 15, 15, 15);
-    tab.write("theta", "phi", "|fU|", "eval", "|fW|", "eval", "|fU+fW|");
+    tab.setWidth(15, 15, 30, 15, 30, 15, 30);
+    tab.write("theta", "phi", "fU", "evaluations", "fW", "evaluations", "fU+fW");
     
     int Ntheta = 10, Nphi = 10;
 //     for (int itheta = 0; itheta < Ntheta; itheta++)
@@ -249,7 +249,7 @@ cArrays PWBA2::FullTMatrix_direct
     {
 //         double theta = itheta * special::constant::pi / (Ntheta - 1);
         double theta = special::constant::pi_quart;
-        double phi = iphi * special::constant::two_pi / (Nphi - 1);
+        double phi = iphi * special::constant::pi / (Nphi - 1);
         
         // total energy of the system
         double Etot = 0.5 * ki * ki - 0.5 / (Ni * Ni);
@@ -337,18 +337,28 @@ cArrays PWBA2::FullTMatrix_direct
             return special::constant::two_inv_pi * q1*q1 * q2*q2 * integrand_U;
         };
         
+        //
         // integrate the integrands with an n-dimensional sparse grid
-        spgrid::SparseGrid<Complex> G;
+        //
         
+        // setup the sparse grid integrator
+        spgrid::SparseGrid<Complex> G;
+        G.setMaxLevel(5);
+        G.setEpsAbs(1e-9);
+        G.setEpsRel(1e-5);
+        
+        // integrate U on 6-dimensional sparse grid
         G.integrate_adapt(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
         Complex fU = G.result();
-        int nEvalU = G.evalcount();
+        std::size_t nEvalU = G.evalcount();
         
+        // integrate W on 5-dimensional sparse grid
         G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
         Complex fW = G.result();
-        int nEvalW = G.evalcount();
+        std::size_t nEvalW = G.evalcount();
         
-        tab.write(theta, phi, std::abs(fU), nEvalU, std::abs(fW), nEvalW, std::abs(fU+fW));
+        // DEBUG output
+        tab.write(theta, phi, fU, nEvalU, fW, nEvalW, fU+fW);
     }
     
     std::exit(0);

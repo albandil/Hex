@@ -122,8 +122,8 @@ template <class T> class SparseGrid
         
         T result_;
         T error_;
-        int neval_;
-        int ncells_;
+        std::size_t neval_;
+        std::size_t ncells_;
         double epsabs_;
         double epsrel_;
         int minlevel_;
@@ -139,8 +139,8 @@ template <class T> class SparseGrid
         
         T result () const { return result_; }
         T error () const { return error_; }
-        int evalcount () const { return neval_; }
-        int cellcount () const { return ncells_; }
+        std::size_t evalcount () const { return neval_; }
+        std::size_t cellcount () const { return ncells_; }
         int minlevel () const { return minlevel_; }
         int maxlevel () const { return maxlevel_; }
         bool ok () const { return ok_; }

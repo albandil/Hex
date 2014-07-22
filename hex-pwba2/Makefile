@@ -52,8 +52,8 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 CXXRILIS = $(CFLAGS) -O3 -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
 CXXDEBUG = $(CFLAGS) -g -pg -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-CXXFLAGS = $(CXXDEBUG)
-# CXXFLAGS = $(CXXRILIS)
+# CXXFLAGS = $(CXXDEBUG)
+CXXFLAGS = -g $(CXXRILIS)
 
 FILES = arrays diophantine hydrogen pwba2 radial special spgrid ui vec3d version
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
