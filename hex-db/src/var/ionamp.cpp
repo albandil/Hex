@@ -69,11 +69,11 @@ bool IonizationAmplitude::run
     //  dirs.first  = ( theta1, phi1, E1frac )
     //  dirs.second = ( theta2, phi2, E2frac )
     // NOTE: energy fractions will be normalized to become on-shell
-    std::vector<std::pair<vec3d,vec3d>> dirs;
+    std::vector<std::pair<geom::vec3d,geom::vec3d>> dirs;
     try {
-        dirs.push_back(As<std::pair<vec3d,vec3d>>(sdata, "dirs", Id));
+        dirs.push_back(As<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
     } catch (exception e) {
-        dirs = readStandardInput<std::pair<vec3d,vec3d>>();
+        dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }
     
     // energy and encoded Chebyshev approximation

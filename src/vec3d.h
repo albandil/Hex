@@ -15,6 +15,9 @@
 
 #include <iostream>
 
+namespace geom
+{
+
 /// Simple 3D vector class.
 class vec3d
 {
@@ -47,5 +50,7 @@ vec3d operator - (vec3d const & u, vec3d const & v);
 /// Vector scaling.
 vec3d operator * (vec3d const & u, double a);
 vec3d operator * (double a, vec3d const & u);
+
+}; // namespace geom
 
 #endif

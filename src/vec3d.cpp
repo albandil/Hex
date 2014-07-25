@@ -17,6 +17,9 @@
 #include "misc.h"
 #include "vec3d.h"
 
+namespace geom
+{
+
 std::ostream & operator << (std::ostream & os, vec3d const & v)
 {
     os << "( " << v.x << " " << v.y << " " << v.z << " )";
@@ -119,3 +122,5 @@ vec3d vec3d::normalize (vec3d const & v)
 {
     return v * (1/norm(v));
 }
+
+}; // namespace geom

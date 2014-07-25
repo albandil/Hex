@@ -69,11 +69,11 @@ bool TripleDifferentialCrossSection::run
     //  dirs.first  = ( theta1, phi1, E1frac )
     //  dirs.second = ( theta2, phi2, E2frac )
     // NOTE: energy fractions will be normalized to become on-shell
-    std::vector<std::pair<vec3d,vec3d>> dirs;
+    std::vector<std::pair<geom::vec3d,geom::vec3d>> dirs;
     try {
-        dirs.push_back(As<std::pair<vec3d,vec3d>>(sdata, "dirs", Id));
+        dirs.push_back(As<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
     } catch (exception e) {
-        dirs = readStandardInput<std::pair<vec3d,vec3d>>();
+        dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }
     
     // energy and encoded Chebyshev approximation
@@ -195,28 +195,28 @@ bool TripleDifferentialCrossSection::run
     for (size_t i = 0; i < dirs.size(); i++)
     {
         // projectile direction
-        vec3d ei = { 0., 0., 1. };
+        geom::vec3d ei = { 0., 0., 1. };
         
         // outgoing electrons' directions
-        vec3d e1 = {
+        geom::vec3d e1 = {
             std::sin(dirs[i].first.x * afactor) * std::cos(dirs[i].first.y * afactor),
             std::sin(dirs[i].first.x * afactor) * std::sin(dirs[i].first.y * afactor),
             std::cos(dirs[i].first.x * afactor)
         };
-        vec3d e2 = {
+        geom::vec3d e2 = {
             std::sin(dirs[i].second.x * afactor) * std::cos(dirs[i].second.y * afactor),
             std::sin(dirs[i].second.x * afactor) * std::sin(dirs[i].second.y * afactor),
             std::cos(dirs[i].second.x * afactor)
         };
         
         // new axes:
-        vec3d ez = e1; // along the first outgoing electron
-        vec3d ey = vec3d::normalize(vec3d::cross(ez,ei)); // perpendicular to the scattering plane of the first electron
-        vec3d ex = vec3d::normalize(vec3d::cross(ey,ez)); // third axis
+        geom::vec3d ez = e1; // along the first outgoing electron
+        geom::vec3d ey = geom::vec3d::normalize(geom::vec3d::cross(ez,ei)); // perpendicular to the scattering plane of the first electron
+        geom::vec3d ex = geom::vec3d::normalize(geom::vec3d::cross(ey,ez)); // third axis
         
         // polar angles of the second electron's scattering direction in the new coordinate system
-        double theta = std::acos (vec3d::dot(e2,ez));
-        double phi   = std::atan2(vec3d::dot(e2,ey),vec3d::dot(e2,ex));
+        double theta = std::acos (geom::vec3d::dot(e2,ez));
+        double phi   = std::atan2(geom::vec3d::dot(e2,ey),geom::vec3d::dot(e2,ex));
         
         std::cout << 
             dirs[i].first << "\t" << 

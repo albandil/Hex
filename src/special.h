@@ -210,6 +210,41 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
 }; // end of namespace "special::integral"
 
 /**
+ * @brief Fast integer power of two.
+ * 
+ * The power is computed as a corresponding bit shift of 1.
+ */
+inline int pow2 (unsigned i)
+{
+    return 1 << i;
+}
+
+/**
+ * @brief Fast integer power of three.
+ * 
+ * The first ten powers are precomputed and stored in a table.
+ * The rest is computed plainly by std::pow (so it is not fast
+ * anymore).
+ */
+inline int pow3 (unsigned i)
+{
+    static const int pow3_table[10] = {
+        /* 3^0 */ 1,
+        /* 3^1 */ 3,
+        /* 3^2 */ 3*3,
+        /* 3^3 */ 3*3*3,
+        /* 3^4 */ 3*3*3*3,
+        /* 3^5 */ 3*3*3*3*3,
+        /* 3^6 */ 3*3*3*3*3*3,
+        /* 3^7 */ 3*3*3*3*3*3*3,
+        /* 3^8 */ 3*3*3*3*3*3*3*3,
+        /* 3^9 */ 3*3*3*3*3*3*3*3*3
+    };
+    
+    return (i < 10 ? pow3_table[i] : (int)std::pow(3,i));
+}
+
+/**
  * @brief Get zeros of the Coulomb wave function @f$ F_L(-1/k,kr) @f$.
  * 
  * Calculates given number of leading zeros of the Coulomb wave function

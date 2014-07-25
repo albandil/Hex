@@ -211,16 +211,16 @@ inline Complex WA (double k, double nu, double q)
     return Complex (k*k + nu*nu - q*q, -2.*nu*q);
 }
 
-inline double WB (vec3d k, double nu, vec3d q)
+inline double WB (geom::vec3d k, double nu, geom::vec3d q)
 {
     return nu*nu + (k.x+q.x)*(k.x+q.x) + (k.y+q.y)*(k.y+q.y) + (k.z+q.z)*(k.z+q.z);
 }
 
-Complex W_1s (vec3d vk, vec3d vq)
+Complex W_1s (geom::vec3d vk, geom::vec3d vq)
 {
     double nu = 1.;
-    double k = vec3d::norm(vk);
-    double q = vec3d::norm(vq);
+    double k = geom::vec3d::norm(vk);
+    double q = geom::vec3d::norm(vq);
     
     Complex miq (0.,-1./q); // = -i/q
     Complex A = WA(k,nu,q);
@@ -255,8 +255,8 @@ cArrays PWBA2::FullTMatrix_direct
         double Etot = 0.5 * ki * ki - 0.5 / (Ni * Ni);
         
         // initial and final wave-vectors
-        vec3d vki = { 0, 0, ki };
-        vec3d vkf = {
+        geom::vec3d vki = { 0, 0, ki };
+        geom::vec3d vkf = {
             kf * std::sin(theta) * std::cos(phi),
             kf * std::sin(theta) * std::sin(phi),
             kf * std::cos(theta)
@@ -265,7 +265,10 @@ cArrays PWBA2::FullTMatrix_direct
         // maximal total intermediate wave-number
         double Qmax = 100;
         
-        auto integrand_U_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
+        // on-shell total intermediate wavenumber
+        double Qon = std::sqrt(2*Etot);
+        
+        auto integrand_U_wrap = [ki,kf,vki,vkf,Qmax,Qon,Etot](int n, double const * coords) -> Complex
         {
             // check dimensions
             assert(n == 6);
@@ -282,23 +285,33 @@ cArrays PWBA2::FullTMatrix_direct
             double q1 = Q * std::cos(alpha);
             double q2 = Q * std::sin(alpha);
             
-            // compute directions
-            vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
-            vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
+            // compute the on-shell carthesian coordinates
+            double q1on = Qon * std::cos(alpha);
+            double q2on = Qon * std::sin(alpha);
+            
+            // compute both off- and on-shell momentum vectors
+            geom::vec3d nq1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
+            geom::vec3d nq2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
+            geom::vec3d vq1 = q1 * nq1, vq1on = q1on * nq1;
+            geom::vec3d vq2 = q2 * nq2, vq2on = q2on * nq2;
             
             // compute carthesian coordinates: "vql" = q<, "vqg" = q>
-            double ql = std::min(q1,q2);
-            double qg = std::max(q1,q2);
-            vec3d vql = (q1 < q2 ? vq1 : vq2);
-            vec3d vqg = (q1 > q2 ? vq1 : vq2);
+            double ql = std::min(q1,q2), qlon = std::min(q1on,q2on);
+            geom::vec3d vql = (q1 < q2 ? vq1 : vq2), vqlon = (q1on < q2on ? vq1on : vq2on);
+            geom::vec3d vqg = (q1 > q2 ? vq1 : vq2), vqgon = (q1on > q2on ? vq1on : vq2on);
             
-            // the value of the integral
+            // the value of the off-shell integrand
             double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
             Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
-            Complex integrand_U = norm * Wf * Wi / (Etot - 0.5*Q*Q);
+            Complex integrand_U_off = Q * norm * Wf * Wi;
+            
+            // the value of the on-shell integrand
+            double normon = 4. / (special::constant::pi * qlon * (1. - std::exp(-2.*special::constant::pi/qlon)));
+            Complex Wfon = W_1s(vkf - vqgon, vqlon), Wion = std::conj(W_1s(vki - vqgon, vqlon));
+            Complex integrand_U_on = Qon * normon * Wfon * Wion;
             
             // evaluate integrand
-            return special::constant::two_inv_pi * Qmax * std::pow(q1*q2,2) * integrand_U;
+            return special::constant::two_inv_pi * Qmax * std::pow(q1*q2,2) * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
         };
         
         auto integrand_W_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
@@ -319,22 +332,21 @@ cArrays PWBA2::FullTMatrix_direct
             double q2 = Q * std::sin(alpha);
             
             // compute directions
-            vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
-            vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
+            geom::vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
+            geom::vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
             
             // compute carthesian coordinates: "vql" = q<, "vqg" = q>
             double ql = std::min(q1,q2);
-            double qg = std::max(q1,q2);
-            vec3d vql = (q1 < q2 ? vq1 : vq2);
-            vec3d vqg = (q1 > q2 ? vq1 : vq2);
+            geom::vec3d vql = (q1 < q2 ? vq1 : vq2);
+            geom::vec3d vqg = (q1 > q2 ? vq1 : vq2);
             
-            // the value of the integral
+            // the value of the integrand
             double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
             Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
-            Complex integrand_U = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
+            Complex integrand_W = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
             
             // evaluate integrand
-            return special::constant::two_inv_pi * q1*q1 * q2*q2 * integrand_U;
+            return special::constant::two_inv_pi * q1*q1 * q2*q2 * integrand_W;
         };
         
         //
@@ -343,7 +355,7 @@ cArrays PWBA2::FullTMatrix_direct
         
         // setup the sparse grid integrator
         spgrid::SparseGrid<Complex> G;
-        G.setMaxLevel(5);
+        G.setMaxLevel(4);
         G.setEpsAbs(1e-9);
         G.setEpsRel(1e-5);
         

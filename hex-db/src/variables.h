@@ -72,7 +72,7 @@ std::string unit_name (aUnit u);
 /**
  * Write out std::pair.
  */
-inline std::ostream & operator << (std::ostream & os, std::pair<vec3d,vec3d> const & p)
+inline std::ostream & operator << (std::ostream & os, std::pair<geom::vec3d,geom::vec3d> const & p)
 {
     os << p.first << " " << p.second;
     return os;
@@ -81,7 +81,7 @@ inline std::ostream & operator << (std::ostream & os, std::pair<vec3d,vec3d> con
 /**
  * Read in std::pair.
  */
-inline std::istream & operator >> (std::istream & is, std::pair<vec3d,vec3d> & p)
+inline std::istream & operator >> (std::istream & is, std::pair<geom::vec3d,geom::vec3d> & p)
 {
     is >> p.first;
     is >> p.second;
