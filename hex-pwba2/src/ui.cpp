@@ -10,6 +10,7 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#include <clocale>
 #include <cmath>
 #include <iostream>
 
@@ -77,21 +78,24 @@ void parse_input_file
 )
 {
     // read all data
-    L = read_next<int>(inf);  Pi = read_next<int>(inf);
-    Ni = read_next<int>(inf); Li = read_next<int>(inf);
-    Nf = read_next<int>(inf); Lf = read_next<int>(inf);
-    Ei = read_next<double>(inf);
-    Rmax = read_next<double>(inf);
-    N = read_next<int>(inf);
-    maxNn = read_next<int>(inf);
-    maxLn = read_next<int>(inf);
-    Enmax = read_next<double>(inf);
-    maxlevel_allowed = read_next<int>(inf);
-    maxlevel_forbidden = read_next<int>(inf);
+    L = ReadNext<int>(inf).val;  Pi = ReadNext<int>(inf).val;
+    Ni = ReadNext<int>(inf).val; Li = ReadNext<int>(inf).val;
+    Nf = ReadNext<int>(inf).val; Lf = ReadNext<int>(inf).val;
+    Ei = ReadNext<double>(inf).val;
+    Rmax = ReadNext<double>(inf).val;
+    N = ReadNext<int>(inf).val;
+    maxNn = ReadNext<int>(inf).val;
+    maxLn = ReadNext<int>(inf).val;
+    Enmax = ReadNext<double>(inf).val;
+    maxlevel_allowed = ReadNext<int>(inf).val;
+    maxlevel_forbidden = ReadNext<int>(inf).val;
 }
 
 int main (int argc, char* argv[])
 {
+    // set proper locale
+    std::setlocale(LC_ALL, "en_GB.utf8");
+    
     // print program logo
     std::cout << logo_raw() << std::endl;
     std::cout << "=== Plane wave second Born approximation ===" << std::endl << std::endl;

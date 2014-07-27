@@ -226,7 +226,10 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     Complex A = WA(k,nu,q);
     double B = WB(vk,nu,vq);
     
-    return Complex(0.,2./q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B) / (k*k);
+//     return Complex(0.,2./q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B) / (k*k);
+    
+    Complex B_A = B / A;
+    return -2.0 * miq * std::pow(B_A,-miq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -239,7 +242,8 @@ cArrays PWBA2::FullTMatrix_direct
 )
 {
     // DEBUG output
-    OutputTable tab;
+    std::ostringstream table;
+    OutputTable tab (table);
     tab.setWidth(15, 15, 30, 15, 30, 15, 30);
     tab.write("theta", "phi", "fU", "evaluations", "fW", "evaluations", "fU+fW");
     
@@ -262,32 +266,26 @@ cArrays PWBA2::FullTMatrix_direct
             kf * std::cos(theta)
         };
         
-        // maximal total intermediate wave-number
-        double Qmax = 100;
+        // maximal total (and on-shell) intermediate wave-number
+        double Qmax = 10, Qon = std::sqrt(2 * Etot);
         
-        // on-shell total intermediate wavenumber
-        double Qon = std::sqrt(2*Etot);
-        
+        // U-integrand (real part of propagator)
         auto integrand_U_wrap = [ki,kf,vki,vkf,Qmax,Qon,Etot](int n, double const * coords) -> Complex
         {
             // check dimensions
             assert(n == 6);
             
             // unpack polar coordinates
-            double costheta1 = 2.*coords[0]-1.;
-            double costheta2 = 2.*coords[1]-1.;
-            double sintheta1 = std::sqrt(1. - costheta1*costheta1);
-            double sintheta2 = std::sqrt(1. - costheta2*costheta2);
-            double phi1 = special::constant::two_pi * coords[2];
-            double phi2 = special::constant::two_pi * coords[3];
+            double costheta1 = 2 * coords[0] - 1, sintheta1 = std::sqrt(1 - costheta1 * costheta1);
+            double costheta2 = 2 * coords[1] - 1, sintheta2 = std::sqrt(1 - costheta2 * costheta2);
+            double phi1  = special::constant::two_pi  * coords[2];
+            double phi2  = special::constant::two_pi  * coords[3];
             double alpha = special::constant::pi_half * coords[4];
             double Q = Qmax * coords[5];
-            double q1 = Q * std::cos(alpha);
-            double q2 = Q * std::sin(alpha);
             
-            // compute the on-shell carthesian coordinates
-            double q1on = Qon * std::cos(alpha);
-            double q2on = Qon * std::sin(alpha);
+            // compute both off- and on-shell momentum magnitudes
+            double q1 = Q * std::cos(alpha), q1on = Qon * std::cos(alpha);
+            double q2 = Q * std::sin(alpha), q2on = Qon * std::sin(alpha);
             
             // compute both off- and on-shell momentum vectors
             geom::vec3d nq1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
@@ -311,13 +309,14 @@ cArrays PWBA2::FullTMatrix_direct
             Complex integrand_U_on = Qon * normon * Wfon * Wion;
             
             // evaluate integrand
-            return special::constant::two_inv_pi * Qmax * std::pow(q1*q2,2) * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
+            return special::constant::two_inv_pi * Qmax * q1*q1 * q2*q2 * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
         };
         
+        // iW-integrand (imag part of propagator)
         auto integrand_W_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
         {
             // check dimensions
-            assert(n = 5);
+            assert(n == 5);
             
             // unpack polar coordinates
             double costheta1 = 2 * coords[1] - 1;
@@ -349,23 +348,28 @@ cArrays PWBA2::FullTMatrix_direct
             return special::constant::two_inv_pi * q1*q1 * q2*q2 * integrand_W;
         };
         
-        //
-        // integrate the integrands with an n-dimensional sparse grid
-        //
-        
         // setup the sparse grid integrator
         spgrid::SparseGrid<Complex> G;
-        G.setMaxLevel(4);
-        G.setEpsAbs(1e-9);
-        G.setEpsRel(1e-5);
+        G.setMaxLevel(6);
+        G.setLocEpsAbs(1e-9);
+        G.setLocEpsRel(1e-5);
+        G.setGlobEpsAbs(1e-6);
+        G.setGlobEpsRel(1e-6);
+        G.setVerbose(true);
+        
+        // DEBUG output
+        std::cout << underline(format("Sparse grid integration of U for θ = %g, φ = %g", theta, phi)) << std::endl;
         
         // integrate U on 6-dimensional sparse grid
-        G.integrate_adapt(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
+        G.integrate_adapt_v2(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
         Complex fU = G.result();
         std::size_t nEvalU = G.evalcount();
         
+        // DEBUG output
+        std::cout << underline(format("Sparse grid integration of W for θ = %g, φ = %g", theta, phi)) << std::endl;
+        
         // integrate W on 5-dimensional sparse grid
-        G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
+        G.integrate_adapt_v2(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
         Complex fW = G.result();
         std::size_t nEvalW = G.evalcount();
         
@@ -373,5 +377,11 @@ cArrays PWBA2::FullTMatrix_direct
         tab.write(theta, phi, fU, nEvalU, fW, nEvalW, fU+fW);
     }
     
+    // write out the table with T-matrices
+    std::cout << std::endl;
+    std::cout << underline("Resulting T-matrices") << std::endl;
+    std::cout << table.str() << std::endl;
+    
+    // for now, exit
     std::exit(0);
 }

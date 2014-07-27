@@ -45,29 +45,17 @@ template <int dim> class ndCube
         
         ndCube (double edge = 1.)
             : origin_(dim),
-              edge_(edge),
-              vertices_(dim * nVertex()),
-              subvertices_(dim * nSubvertex())
-        {
-            // pre-compute vertices
-            init_();
-        }
+              edge_(edge)
+        {}
         
         ndCube (std::vector<double> origin, double edge)
             : origin_(origin),
-              edge_(edge),
-              vertices_(dim * nVertex()),
-              subvertices_(dim * nSubvertex())
-        {
-            // pre-compute vertices
-            init_();
-        }
+              edge_(edge)
+        {}
         
         ndCube (std::initializer_list<double> list)
             : origin_(dim),
-              edge_(0.),
-              vertices_(dim * nVertex()),
-              subvertices_(dim * nSubvertex())
+              edge_(0.)
         {
             // first n-tuple is position of origin, then one number is edge length
             assert(list.size() == dim + 1);
@@ -77,48 +65,14 @@ template <int dim> class ndCube
             for (int i = 0; i < dim; i++)
                 origin_[i] = (*iter++);
             edge_ = (*iter++);
-            
-            // pre-compute vertices
-            init_();
         }
         
-        std::vector<double> const & origin () const
-        {
-            return origin_;
-        }
-        
-        double edge () const
-        {
-            return edge_;
-        }
-        
-        double volume () const
-        {
-            return std::pow(edge_, dim);
-        }
-        
-        static int nVertex ()
-        {
-            return special::pow2(dim);
-        }
-        
-        static int nSubvertex ()
-        {
-            return special::pow3(dim);
-        }
-        
-        double const * vertex (int i) const
-        {
-            assert(i < nVertex());
-            return vertices_.data() + dim * i;
-        }
-        
-        double const * subvertex (int i) const
-        {
-            assert(i < nSubvertex());
-            return subvertices_.data() + dim * i;
-        }
-        
+        /**
+         * @brief Subdivision of the cube.
+         * 
+         * This function will return a set of smaller cubes that arise
+         * when splitting every edge of the original cube into two equal parts.
+         */
         std::vector<ndCube<dim>> subdivide () const
         {
             std::vector<ndCube<dim>> subcubes;
@@ -137,74 +91,29 @@ template <int dim> class ndCube
             return subcubes;
         }
         
+        // getters
+        
+        std::vector<double> const & origin () const { return origin_; }
+        double edge () const { return edge_; }
+        double volume () const { return std::pow(edge_, dim); }
+        static int nVertex () { return special::pow2(dim); }
+        
     private:
         
-        void init_ ()
-        {
-            init_vertices_();
-            init_subvertices_();
-        }
-        
-        void init_vertices_ ()
-        {
-            // start with origin
-            for (int i = 0; i < dim; i++)
-                vertices_[i] = origin_[i];
-            
-            // extrude already existing n-cube into next dimensions
-            for (int d = 0; d < dim; d++)
-            {
-                // current position in 'vertices'
-                int pos = dim * special::pow2(d);
-                
-                // extrude existing points
-                for (int p = 0; p < special::pow2(d); p++)
-                {
-                    // copy existing point and shift the 'd'-th coordinate of this point
-                    for (int i = 0; i < dim; i++)
-                        vertices_[pos + p * dim + i] = vertices_[p * dim + i];
-                    vertices_[pos + p * dim + d] += edge_;
-                }
-            }
-        }
-        
-        void init_subvertices_ ()
-        {
-            // start with origin
-            for (int i = 0; i < dim; i++)
-                subvertices_[i] = origin_[i];
-            
-            // extrude already existing n-cube into next dimensions
-            for (int d = 0; d < dim; d++)
-            {
-                // current position in 'vertices'
-                int pos = dim * special::pow3(d);
-                
-                // extrude existing points
-                for (int p = 0; p < special::pow3(d); p++)
-                {
-                    // copy existing point and shift the 'd'-th coordinate of this point (halfway)
-                    for (int i = 0; i < dim; i++)
-                        subvertices_[pos + p * dim + i] = subvertices_[p * dim + i];
-                    subvertices_[pos + p * dim + d] += 0.5 * edge_;
-                    
-                    // copy existing point and shift the 'd'-th coordinate of this point (full)
-                    for (int i = 0; i < dim; i++)
-                        subvertices_[pos + (p + 1) * dim + i] = subvertices_[p * dim + i];
-                    subvertices_[pos + (p + 1) * dim + d] += edge_;
-                }
-            }
-        }
-        
+        /// Coordinates of the cube's origin.
         std::vector<double> origin_;
         
+        /// Length of an edge.
         double edge_;
-        
-        std::vector<double> vertices_;
-        
-        std::vector<double> subvertices_;
 };
 
+/**
+ * @brief Stream output of the ndCube class.
+ * 
+ * This is an overload of the stream output operator. The representation of the
+ * class is a list (enclosed in brackets "[" and "]") of positions (which are
+ * coordinates enclosed in parentheses "(" and ")").
+ */
 template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> const & dCube)
 {
     os << "[";
@@ -227,6 +136,7 @@ template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> co
 
 }; // namespace geom
 
+// some abbreviations
 #define Unit_5Cube geom::ndCube<5>()
 #define Unit_6Cube geom::ndCube<6>()
 

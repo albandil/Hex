@@ -15,6 +15,7 @@
 
 #include <cassert>
 #include <map>
+#include <numeric>
 #include <vector>
 
 #include "ndcube.h"
@@ -151,6 +152,12 @@ template <class T> class SparseGrid
         /// Relative tolerance for low- and high-order rule difference.
         double epsrel_;
         
+        /// Absolute tolerance for the contribution of a sub-domain.
+        double global_epsabs_;
+        
+        /// Relative tolerance for the contribution of a sub-domain.
+        double global_epsrel_;
+        
         /// Minimal subdivision level for integration termination.
         int minlevel_;
         
@@ -167,7 +174,9 @@ template <class T> class SparseGrid
         
         /// Constructor.
         SparseGrid ()
-            : epsabs_(1e-8), epsrel_(1e-8), minlevel_(0), maxlevel_(5), ok_(true), verbose_(false)
+            : epsabs_(1e-8), epsrel_(1e-8), global_epsabs_(1e-8),
+              global_epsrel_(1e-8), minlevel_(0), maxlevel_(5),
+              ok_(true), verbose_(false)
         {}
         
         /// Return the result value computed before.
@@ -186,16 +195,25 @@ template <class T> class SparseGrid
         bool ok () const { return ok_; }
         
         /// Set absolute tolerance.
-        void setEpsAbs (double epsabs) { epsabs_ = epsabs; }
+        void setLocEpsAbs (double epsabs) { epsabs_ = epsabs; }
         
         /// Set relative tolerance.
-        void setEpsRel (double epsrel) { epsrel_ = epsrel; }
+        void setLocEpsRel (double epsrel) { epsrel_ = epsrel; }
+        
+        /// Set global absolute tolerance.
+        void setGlobEpsAbs (double epsabs) { global_epsabs_ = epsabs; }
+        
+        /// Set global relative tolerance.
+        void setGlobEpsRel (double epsrel) { global_epsrel_ = epsrel; }
         
         /// Set minimal subdivision level.
         void setMinLevel (int minlevel) { minlevel_ = minlevel; }
         
         /// Set maximal subdivision level.
         void setMaxLevel (int maxlevel) { maxlevel_ = maxlevel; }
+        
+        /// Set verbosity level.
+        void setVerbose (bool verbose) { verbose_ = verbose; }
         
         /**
          * @brief Fixed-order spare-grid quadrature.
@@ -274,7 +292,10 @@ template <class T> class SparseGrid
             SparseGridId ruleLow, SparseGridId ruleHigh
         )
         {
+            // synonym for 'dim'-dimensional cube
             typedef geom::ndCube<dim> dCube;
+            
+            // short form for absolute value type of the template data type 'T'
             typedef decltype(std::abs(T(0))) AbsT;
             
             /**
@@ -391,6 +412,181 @@ template <class T> class SparseGrid
                     }
                 }
             }
+        }
+        
+        template <int dim, class Functor> bool integrate_adapt_v2
+        (
+            Functor F, geom::ndCube<dim> const & root,
+            SparseGridId ruleLow, SparseGridId ruleHigh
+        )
+        {
+            // synonym for 'dim'-dimensional cube
+            typedef geom::ndCube<dim> dCube;
+            
+            // integration domain info
+            typedef struct sDomain
+            {
+                dCube cube;
+                bool set;
+                T val;
+            } tDomain;
+            
+            // integral over processed cells
+            T finalEstimate = 0;
+            
+            // unprocessed subdomains of the integration domain
+            std::vector<tDomain> domains = {{ root, false, integrate_fixed(F, root, ruleLow) }};
+            
+            // initialize evaluations count and number of cells
+            neval_ = nodes.at(ruleLow).n;
+            ncells_ = 1;
+            
+            // for all subdivision levels
+            for (int level = 0; level <= maxlevel_; level++)
+            {
+                // first of all, sum the current estimates for use in the global convergence check
+                T globalEstimate = finalEstimate;
+                for (tDomain const & dom : domains)
+                    globalEstimate += dom.val;
+                
+                // debug info
+                if (verbose_)
+                {
+                    std::cout << std::endl;
+                    std::cout << "Level " << level << std::endl;
+                    std::cout << "  initial estimate : " << globalEstimate << std::endl;
+                    std::cout << "  cells to process : " << domains.size() << " (";
+                    
+                    double frac = domains.size() * 100. / special::pow2(level*dim);
+                    if (0 < frac and frac < 1)
+                        std::cout << "< 1";
+                    else
+                        std::cout << "~ " << (int)std::ceil(frac);
+                    
+                    std::cout << "% of orig. volume)" << std::endl;
+                }
+                
+                // debug variables
+                std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0;
+                
+                // check convergence for all not yet converged sub-domains
+                if (level >= minlevel_) for (tDomain & dom : domains)
+                {
+                    // compute the fine estimate for this domain
+                    T fineEstimate = integrate_fixed(F, dom.cube, ruleHigh);
+                    neval_ += nodes.at(ruleHigh).n;
+                    
+                    // check absolute local convergence
+                    if (std::abs(dom.val - fineEstimate) < epsabs_)
+                    {
+                        dom.set = true;
+                        abslocal++;
+                    }
+                    
+                    // check relative local convergence
+                    if (std::abs(dom.val - fineEstimate) < epsrel_ * std::abs(fineEstimate))
+                    {
+                        dom.set = true;
+                        rellocal++;
+                    }
+                    
+                    // check absolute global convergence
+                    if (std::abs(fineEstimate) < global_epsabs_)
+                    {
+                        dom.set = true;
+                        absglobal++;
+                    }
+                    
+                    // check relative global convergence
+                    if (std::abs(fineEstimate) < global_epsrel_ * std::abs(globalEstimate))
+                    {
+                        dom.set = true;
+                        relglobal++;
+                    }
+                    
+                    // store better estimate
+                    dom.val = fineEstimate;
+                }
+                
+                // debug info
+                if (verbose_)
+                {
+                    std::cout << "  converged cells due to" << std::endl;
+                    std::cout << "    absolute local change between rules : " << abslocal << std::endl;
+                    std::cout << "    relative local change between rules : " << rellocal << std::endl;
+                    std::cout << "    absolute global threshold : " << absglobal << std::endl;
+                    std::cout << "    relative global threshold : " << relglobal << std::endl;
+                    
+                    std::size_t nsub = std::count_if
+                    (
+                        domains.begin(),
+                        domains.end(),
+                        [](tDomain const & dom) -> bool { return not dom.set; }
+                    );
+                    double frac = nsub * 100. / domains.size();
+                    
+                    std::cout << "  cells to bisect : " << nsub << " (";
+                    if (0 < frac and frac < 1)
+                        std::cout << "< 1";
+                    else
+                        std::cout << "~ " << (int)std::ceil(frac);
+                    std::cout << "% of processed cells)" << std::endl;
+                }
+                
+                // stop if we reached the max level
+                if (level == maxlevel_)
+                {
+                    if (verbose_)
+                        std::cout << "  maximal level " << maxlevel_ << " reached" << std::endl;
+                    
+                    break;
+                }
+                
+                // further subdivide all not yet converged sub-domains
+                std::vector<tDomain> oldDomains = std::move(domains);
+                for (tDomain const & oldDom : oldDomains)
+                {
+                    if (oldDom.set)
+                    {
+                        // this domain has converged -- store its value
+                        finalEstimate += oldDom.val;
+                    }
+                    else
+                    {
+                        // this domains needs subdivision
+                        for (dCube const & c : oldDom.cube.subdivide())
+                        {
+                            domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
+                            neval_ += nodes.at(ruleLow).n;
+                            ncells_++;
+                        }
+                    }
+                }
+                
+                if (verbose_)
+                    std::cout << "  function evaluations up to now : " << neval_ << std::endl;
+                
+                // stop if no domain needs subdivision
+                if (domains.empty())
+                    break;
+            }
+            
+            // sum contributions to the integral
+            result_ = finalEstimate;
+            for (tDomain const & dom : domains)
+                result_ += dom.val;
+            
+            if (verbose_)
+            {
+                if (domains.empty())
+                    std::cout << "  cell list successfully emptied" << std::endl;
+                else
+                    std::cout << "  integral did not converge in some cells" << std::endl;
+                std::cout << "  final estimate : " << result_ << std::endl;
+            }
+            
+            // terminate
+            return ok_ = true;
         }
 
 }; // class SparseGrid
