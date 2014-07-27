@@ -17,6 +17,7 @@
 
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_sf.h>
+#include <gsl/gsl_const_num.h>
 
 /// factorial
 #define fac(n) gsl_sf_fact(n)
@@ -63,6 +64,9 @@ const double ln10            = M_LN10;     // ln 10
 const double lnpi            = M_LNPI;     // ln π
 
 const double euler           = M_EULER;    // γ
+
+const double alpha           = GSL_CONST_NUM_FINE_STRUCTURE; // α
+const double alpha_sqr       = alpha*alpha; // α²
 
 // other special numbers
 const double Inf = std::numeric_limits<double>::infinity();

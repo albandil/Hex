@@ -91,6 +91,20 @@ class CarthesianBoundWaveFunction
 std::string stateName (int n, int l, int m);
 
 /**
+ * @brief Hydrogenic radial moment.
+ * 
+ * Returns the value of the moment integral
+ * \f[
+ *     \langle nlm | r^a | nlm\rangle
+ *     = \int_0^\infty r^{2+a} R_{nl}(r)^2 \mathrm{d}r \,.
+ * \f]
+ * 
+ * Several values are precomputed using Maxima CAS,
+ * general formula is not yet implemented.
+ */
+double moment (int a, int n, int l);
+
+/**
  * @brief Hydrogen bound radial orbital.
  * 
  * The hydrogen radial functions @f$ R_{nl} @f$ are defined as
@@ -141,12 +155,12 @@ double S (int n, int l, double r, double lambda = DEFAULT_LAMBDA);
 double getBoundFar (int n, int l, double eps, int max_steps = DEFAULT_MAXSTEPS);
 
 /**
-    * Return radial distance in the exponential decreasing regions,
-    * for which the radial function is equal to "eps".
-    * 
-    * \warning A naive hunt & bisection algorithm is used, which will collapse
-    * if any of the roots lies in the vicinity of \f$ r_k = 2^k \f$.
-    */
+ * Return radial distance in the exponential decreasing regions,
+ * for which the radial function is equal to "eps".
+ * 
+ * \warning A naive hunt & bisection algorithm is used, which will collapse
+ * if any of the roots lies in the vicinity of \f$ r_k = 2^k \f$.
+ */
 double getSturmFar (int n, int l, double lambda, double eps, int max_steps = DEFAULT_MAXSTEPS);
 
 /**
@@ -174,35 +188,35 @@ double F (double k, int l, double r, double sigma = special::constant::Nan);
 double evalFreeStatePhase (double k, int l, double sigma = special::constant::Nan);
 
 /**
-    * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
-    */
+ * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
+ */
 double evalFreeState_asy(double k, int l, double r, double sigma);
 
 /**
-    * Find zeros of the free function asymptotics.
-    */
+ * Find zeros of the free function asymptotics.
+ */
 double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero);
 
 /**
-    * Find local maxima of the free function asymptotics.
-    */
+ * Find local maxima of the free function asymptotics.
+ */
 double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, int ntop);
 
 /**
-    * \brief Return sufficiently far radius for using the asymptotic form of the free state.
-    * 
-    * Return radial distance in the oscillating region,
-    * for which the radial function less than "eps" in some zero-node of the
-    * asymptotical form. The asymptotic form is
-    * \f[
-    *      F_\ell(k,r) \propto \sin \left(kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k)\right) \ ,
-    * \f]
-    * so the free state will be evaluated in such radii that the following
-    * is fulfilled:
-    * \f[
-    *      n\pi = kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k) \ .
-    * \f]
-    */
+ * \brief Return sufficiently far radius for using the asymptotic form of the free state.
+ * 
+ * Return radial distance in the oscillating region,
+ * for which the radial function less than "eps" in some zero-node of the
+ * asymptotical form. The asymptotic form is
+ * \f[
+ *      F_\ell(k,r) \propto \sin \left(kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k)\right) \ ,
+ * \f]
+ * so the free state will be evaluated in such radii that the following
+ * is fulfilled:
+ * \f[
+ *      n\pi = kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k) \ .
+ * \f]
+ */
 double getFreeFar(double k, int l, double Sigma = special::constant::Nan, double eps = 1e-10, int max_steps = DEFAULT_MAXSTEPS);
 
 } // end of namespace Hydrogen

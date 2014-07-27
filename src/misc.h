@@ -28,6 +28,7 @@
 #include <locale>
 #include <iostream>
 #include <type_traits>
+#include <string>
 
 /**
  * @brief Exception class.
@@ -307,7 +308,7 @@ template <class T> T string_to (std::string str)
 template <> inline int string_to (std::string str)
 {
     // convert to int
-    char* tail; long val = strtol (str.c_str(), &tail, 10);
+    char* tail; long val = std::strtol(str.c_str(), &tail, 10);
     
     // throw or return
     if (*tail != 0x0)
@@ -326,7 +327,7 @@ template <> inline int string_to (std::string str)
 template <> inline double string_to (std::string str)
 {
     // convert to float
-    char* tail; double val = strtod (str.c_str(), &tail);
+    char* tail; double val = std::strtod(str.c_str(), &tail);
     
     // throw or return
     if (*tail != 0x0)
@@ -334,6 +335,25 @@ template <> inline double string_to (std::string str)
     else
         return val;
 }
+
+/**
+ * @brief Output structure for the function @ref ReadNext.
+ * 
+ * This structure is returned by the function @ref ReadNext and it contains
+ * the read value and / or some special values. Currently, only the special character '*'
+ * is handled -- in that case 
+ */
+template <class T> struct ReadItem
+{
+    enum Flags
+    {
+        none     = 0x00,
+        asterisk = 0x01
+    };
+    
+    T val;
+    int flags;
+};
 
 /**
  * @brief Read next entry from input stream.
@@ -350,7 +370,7 @@ template <> inline double string_to (std::string str)
        double x = read_next<double>(inputfile);
    @endcode
  */
-template <class T> T read_next (std::ifstream & f)
+template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_special = ReadItem<T>::none)
 {
     // text buffer
     std::string s;
@@ -377,15 +397,17 @@ template <class T> T read_next (std::ifstream & f)
         break;
     }
     
-    // check for special character; exit if found
+    // check for asterisk
     if (s == "*")
-        throw true;
+    {
+        if (allowed_special & ReadItem<T>::asterisk)
+            return ReadItem<T>({ T(0), ReadItem<T>::asterisk });
+        else
+            throw exception ("Asterisk '*' not allowed here.");
+    }
     
     // convert entry to type T
-    T val = string_to<T>(s.c_str());
-    
-    // return
-    return val;
+    return ReadItem<T>({ string_to<T>(s.c_str()), ReadItem<T>::none });
 }
 
 /**
@@ -602,5 +624,38 @@ template <class T> class Range
             }
         }
 };
+
+/**
+ * @brief Underline text.
+ * 
+ * This simple function will count characters in the supplied text string,
+ * append a new-line character and a group of '-' characters whose number
+ * will be equal to the length of the supplied text. It is UTF-8-aware, so
+ * the following code
+   @code
+       std::cout << "Title containing UTF-8 characters αβγδ" << std::endl;
+   @endcode
+ * will produce the output
+   @verbatim
+       Title containing UTF-8 characters αβγδ
+       --------------------------------------
+   @endverbatim
+ * It may be necessary to set the user locale, first, using the function call
+   @code
+       std::setlocale(LC_ALL, "");
+   @endcode
+ */
+inline std::string underline (std::string text)
+{
+    std::mbstate_t state = std::mbstate_t();
+    const char * mbstr = text.data();
+    
+    std::size_t wlen = std::mbsrtowcs(NULL, &mbstr, 0, &state);
+    
+    text.push_back('\n');
+    for (std::size_t i = 0; i < wlen; i++)
+        text.push_back('-');
+    return text;
+}
 
 #endif

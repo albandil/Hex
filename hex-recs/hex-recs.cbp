@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="hex-recs" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Release">
+				<Option output="bin/hex-ecs" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O3" />
+					<Add option="-std=c++11" />
+					<Add option="-Wall" />
+					<Add option="-fexceptions" />
+					<Add option="-fopenmp" />
+					<Add option="-DNDEBUG" />
+					<Add option="-DNO_OPENCL" />
+					<Add option="-DNO_MPI" />
+					<Add option="-DNO_PNG" />
+					<Add directory="../win-include" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-static-libstdc++" />
+					<Add library="../win-libraries/libgsl.a" />
+					<Add library="../win-libraries/libumfpack.a" />
+					<Add library="../win-libraries/liblapack.a" />
+					<Add library="../win-libraries/libdlfcn.a" />
+					<Add library="../win-libraries/libcholmod.a" />
+					<Add library="../win-libraries/libccolamd.a" />
+					<Add library="../win-libraries/libamd.a" />
+					<Add library="../win-libraries/libcamd.a" />
+					<Add library="../win-libraries/libcolamd.a" />
+					<Add library="../win-libraries/libmetis.a" />
+					<Add library="../win-libraries/libgsl.a" />
+					<Add library="../win-libraries/libhdf5.a" />
+					<Add library="../win-libraries/libfftw3.a" />
+					<Add library="../win-libraries/libblas.a" />
+					<Add library="gfortran" />
+					<Add library="dl" />
+					<Add option="-fopenmp" />
+				</Linker>
+			</Target>
+		</Build>
+		<Unit filename="src/amplitudes.cpp" />
+		<Unit filename="src/amplitudes.h" />
+		<Unit filename="src/arrays.cpp" />
+		<Unit filename="src/arrays.h" />
+		<Unit filename="src/arrithm.h" />
+		<Unit filename="src/bspline.cpp" />
+		<Unit filename="src/bspline.h" />
+		<Unit filename="src/chebyshev.h" />
+		<Unit filename="src/clenshawcurtis.h" />
+		<Unit filename="src/cmdline.h" />
+		<Unit filename="src/compact.h" />
+		<Unit filename="src/complex.h" />
+		<Unit filename="src/doc.h" />
+		<Unit filename="src/gauss.cpp" />
+		<Unit filename="src/gauss.h" />
+		<Unit filename="src/hdffile.cpp" />
+		<Unit filename="src/hdffile.h" />
+		<Unit filename="src/input.cpp" />
+		<Unit filename="src/input.h" />
+		<Unit filename="src/itersolve.h" />
+		<Unit filename="src/kernels_cl.c">
+			<Option compilerVar="CC" />
+			<Option compile="0" />
+			<Option link="0" />
+		</Unit>
+		<Unit filename="src/main.cpp" />
+		<Unit filename="src/matrix.cpp" />
+		<Unit filename="src/matrix.h" />
+		<Unit filename="src/memory.h" />
+		<Unit filename="src/misc.h" />
+		<Unit filename="src/opencl.h" />
+		<Unit filename="src/parallel.h" />
+		<Unit filename="src/preconditioners.cpp" />
+		<Unit filename="src/preconditioners.h" />
+		<Unit filename="src/radial.cpp" />
+		<Unit filename="src/radial.h" />
+		<Unit filename="src/slater.cpp" />
+		<Unit filename="src/special.cpp" />
+		<Unit filename="src/special.h" />
+		<Unit filename="src/version.cpp" />
+		<Unit filename="src/version.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
