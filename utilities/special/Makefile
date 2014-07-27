@@ -1,9 +1,9 @@
 .PHONY: all
 
-all: special
+all: hex-special
 
 clean:
-	rm -rf special
+	rm -rf hex-special
 
-special: hex-special.cpp ../../src/special.cpp ../../src/special.h
-	g++ $< -o special -DNO_LAPACK -lgsl -lgslcblas -std=c++11
+hex-special: hex-special.cpp ../../src/special.cpp ../../src/special.h
+	g++ -O2 -Wall -DNO_LAPACK -std=c++11 $< -o $@ -lgsl -lgslcblas

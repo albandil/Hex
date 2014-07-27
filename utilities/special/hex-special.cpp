@@ -37,7 +37,7 @@ int run_f (int argc, char* argv[])
 {
     if (argc < 8)
     {
-        std::cout << "\nUsage:\n\t./special f <lambda> <l1> <l2> <l1p> <l2p> <L>\n\n";
+        std::cout << "\nUsage:\n\t./hex-special f <lambda> <l1> <l2> <l1p> <l2p> <L>\n\n";
         return EXIT_FAILURE;
     }
     
@@ -79,7 +79,7 @@ int run_Gaunt (int argc, char* argv[])
 {
     if (argc < 8)
     {
-        std::cout << "\nUsage:\n\t./special Gaunt <l1> <m1> <l2> <m2> <L> <M>\n\n";
+        std::cout << "\nUsage:\n\t./hex-special Gaunt <l1> <m1> <l2> <m2> <L> <M>\n\n";
         return EXIT_FAILURE;
     }
     
@@ -92,6 +92,34 @@ int run_Gaunt (int argc, char* argv[])
     
     std::cout << "G[" << l1 << "," << m1 << ";" << l2 << "," << m2 << ";"
               << L << "," << M << "] = " << special::Gaunt(l1,m1,l2,m2,L,M) << std::endl;
+    
+    return EXIT_SUCCESS;
+}
+
+int run_Y (int argc, char* argv[])
+{
+    if (argc < 6)
+    {
+        std::cout << "\nUsage:\n\t./hex-special Y [--degrees] <l> <m> <theta> <phi>\n\n";
+        return EXIT_FAILURE;
+    }
+    
+    int i = 2;
+    double scale = 1;
+    if (std::string(argv[i]) == std::string("--degrees"))
+    {
+        scale = special::constant::pi / 180.;
+        i++;
+    }
+    
+    int l = std::atoi(argv[i++]);
+    int m = std::atoi(argv[i++]);
+    double theta = std::atof(argv[i++]);
+    double phi   = std::atof(argv[i++]);
+    
+    std::cout << "Y[" << l << "," << m << "](" << theta << (scale == 1. ? "," : "°,")
+              << phi << (scale == 1. ? ") = " : "°) = ")
+              << special::sphY(l, m, theta*scale, phi*scale) << std::endl;
     
     return EXIT_SUCCESS;
 }
@@ -111,6 +139,7 @@ int main (int argc, char* argv[])
     Use(f);             // reduced matrix element factor
     Use(ClebschGordan); // Clebsch-Gordan coefficient
     Use(Gaunt);         // Gaunt coefficient
+    Use(Y);             // spherical harmonic
     
     if (needHelp)
     {
