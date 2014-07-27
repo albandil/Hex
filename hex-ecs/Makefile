@@ -139,7 +139,7 @@ dist:
 	rm -rf hex-ecs/
 
 clean:
-	rm -f bin/hex $(OBJECTS) $(DEPENDENCIES)
+	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES)
 
 allclean: clean docclean distclean
 
