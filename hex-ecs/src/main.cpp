@@ -306,6 +306,7 @@ int main (int argc, char* argv[])
             }
             
             // custom conjugate gradients callback-based solver
+            unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
@@ -313,11 +314,15 @@ int main (int argc, char* argv[])
                 current_solution,         // on input, the initial guess, on return, the solution
                 cmd.itertol,              // requested precision, |A·x - b|² < ε·|b|²
                 0,                        // minimal iteration count
-                (inp.maxell+1) * Nspline, // maximal iteration count
+                max_iter,                 // maximal iteration count
                 apply_preconditioner,     // preconditioner callback
                 matrix_multiply           // matrix multiplication callback
             );
-            std::cout << "\tEnd CG callback\n";
+            
+            if (iterations >= max_iter)
+                std::cout << "\tConvergence too slow... The saved solution will be probably wrong.";
+            else
+                std::cout << "\tEnd CG callback\n";
             
             // update progress
             iterations_done += iterations;
