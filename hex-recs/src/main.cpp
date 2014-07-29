@@ -25,7 +25,7 @@
 #include "bspline.h"
 #include "complex.h"
 #include "hydrogen.h"
-#include "input.h"
+#include "io.h"
 #include "itersolve.h"
 #include "misc.h"
 #include "parallel.h"
@@ -33,51 +33,16 @@
 #include "radial.h"
 #include "version.h"
 
-void zip_solution (CommandLine & cmd, Bspline const & bspline, AngularBasis const & ll)
-{
-    // use whole grid if not restricted
-    if (cmd.zipmax < 0)
-        cmd.zipmax = bspline.Rmax();
-    
-    cArray sol;     // stored solution expansion
-    cArray ev;      // evaluated solution
-    rArray grid;    // real evaluation grid
-    
-    // size of solution (l,l)-segment
-    size_t N = bspline.Nspline() * bspline.Nspline();
-    
-    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
-    
-    // load the requested file
-    if (not sol.hdfload(cmd.zipfile.c_str()))
-        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
-    
-    // evaluation grid
-    grid = linspace (0., cmd.zipmax, cmd.zipcount);
-    
-    // for all coupled angular momentum pairs
-    for (unsigned ill = 0; ill < ll.size(); ill++)
-    {
-        std::cout << "\t- partial wave l1 = " << ll[ill].l1 << ", l2 = " << ll[ill].l2 << "\n";
-        
-        // write to file
-        std::ofstream out (format("%s_(%d,%d,%d,%d).vtk", cmd.zipfile.c_str(), ll[ill].L, ll[ill].S, ll[ill].l1, ll[ill].l2));
-        writeVTK_points
-        (
-            out,
-            bspline.zip
-            (
-                sol.slice(ill * N, (ill + 1) * N),
-                grid, grid
-            ),
-            grid, grid, rArray({0.})
-        );
-    }
-}
-
 int main (int argc, char* argv[])
 {
-    // Preparations ------------------------------------------------------- //
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// Preparations                                                              //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+    
+    //
+    // Program initialization ---------------------------------------------- //
     //
     
     // display logo
@@ -121,11 +86,11 @@ int main (int argc, char* argv[])
         std::cout << "Nothing to compute." << std::endl;
         exit(0);
     }
-    // --------------------------------------------------------------------- //
     
-    
+    //
     // Setup B-spline environment ------------------------------------------ //
     //
+    
     double R0 = inp.rknots.back();       // end of real grid
     double Rmax = inp.cknots.back();     // end of complex grid
     
@@ -141,15 +106,15 @@ int main (int argc, char* argv[])
     
     // info
     std::cout << "B-spline solver count: " << Nspline << "\n\n";
-    // --------------------------------------------------------------------- //
     
-    
+    //
     // Setup angular data -------------------------------------------------- //
     //
+    
     std::cout << "Setting up the angular expansion basis..." << std::endl;
     
     // coupled angular momentum pairs
-    AngularBasis coupled_states;
+    AngularBasis ang;
     
     // for given J list all available (L,S) pairs
     AngularState state;
@@ -171,56 +136,63 @@ int main (int argc, char* argv[])
             {
                 state.l2 = sum - state.l1;
                 std::cout << "(" << state.l1 << "," << state.l2 << ") ";
-                coupled_states.push_back(state);
+                ang.push_back(state);
             }
             std::cout << std::endl;
         }
     }
     
-    std::cout << "    The matrix of the set contains " << coupled_states.size()
+    std::cout << "    The matrix of the set contains " << ang.size()
               << " diagonal blocks." << std::endl;
     
     // skip if there is nothing to compute
-    if (coupled_states.empty())
+    if (ang.empty())
         exit(0);
     
     std::cout << "\n";
-    // --------------------------------------------------------------------- //
     
+    //
+    // Zip solution file into VTK geometry if told so
+    //
     
-    // zip file if told so
     if (cmd.zipfile.size() != 0 and par.IamMaster())
     {
-        zip_solution (cmd, bspline, coupled_states);
-        goto End;
+        zip_solution (cmd, bspline, ang);
+        std::cout << std::endl << "Done." << std::endl << std::endl;
+        return 0;
     }
-    
-// StgSolve:
+
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// StgSolve                                                                  //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+
+if (cmd.itinerary & CommandLine::StgSolve)
 {
-    // skip stage 2 if told so
-    if (not (cmd.itinerary & CommandLine::StgSolve))
-    {
-        std::cout << "Skipped solution of the equation." << std::endl;
-        goto StgExtract;
-    }
-    
     // create and initialize the preconditioner
-    PreconditionerBase * prec = Preconditioners::choose(par, inp, coupled_states, bspline, cmd);
+    PreconditionerBase * prec = Preconditioners::choose(par, inp, ang, bspline, cmd);
     if (prec == nullptr)
         throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
     prec->setup();
     
     // CG preconditioner callback
-    auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
+    auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void
+    {
+        prec->precondition(r, z);
+    };
     
     // CG matrix multiplication callback
-    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
+    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+    {
+        prec->multiply(p, q);
+    };
     
     //
     // Solve the equations
     //
     
-    std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n";
+    std::cout << "Hamiltonian size: " << Nspline * Nspline * ang.size() << "\n";
     int iterations_done = 0, computations_done = 0;
     double prevE = special::constant::Nan, E = special::constant::Nan;
     for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
@@ -254,13 +226,13 @@ int main (int argc, char* argv[])
                 prec->update(E);
             
             // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.J, ni, li, two_ji, two_mi, inp.Ei[ie]);
+            SolutionIO reader (inp.J, inp.two_M, ni, li, two_ji, two_mi, inp.Ei[ie]);
             if (reader.load(current_solution))
                 continue;
             
             // create right hand side
             std::cout << "\tCreate RHS for ni = " << ni << ", li = " << li << ", ji = " << ji << ", mi = " << mi << ", σi = " << 0.5 * inp.two_M - mi << std::endl;
-            cArray chi (coupled_states.size() * Nspline * Nspline);
+            cArray chi (ang.size() * Nspline * Nspline);
             prec->rhs(chi, ie, instate);
             if (chi.norm() == 0.)
             {
@@ -273,7 +245,7 @@ int main (int argc, char* argv[])
             current_solution = cArray(chi.size());
             if (ie > 0)
             {
-                SolutionIO prev_reader (inp.J, ni, li, two_ji, two_mi, inp.Ei[ie-1]);
+                SolutionIO prev_reader (inp.J, inp.two_M, ni, li, two_ji, two_mi, inp.Ei[ie-1]);
                 prev_reader.load(current_solution);
             }
             
@@ -305,18 +277,21 @@ int main (int argc, char* argv[])
     std::cout << "\rSolving the systems... ok                                                            \n";
     std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)\n";
 }
-
-StgExtract:
+else
 {
-    // skip stage 3 if told so
-    if (not (cmd.itinerary & CommandLine::StgExtract))
-    {
-        std::cout << "Skipped extraction of amplitudes." << std::endl;
-        goto End;
-    }
-    
+    std::cout << "Skipped solution of the equation." << std::endl;
+}
+
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// StgExtract                                                                //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+
+if (cmd.itinerary & CommandLine::StgExtract)
+{
     // extract amplitudes
-    Amplitudes ampl (bspline, inp, par, coupled_states);
+    Amplitudes ampl (bspline, inp, par, ang);
     ampl.extract();
     
     // write T-matrices to a text file as SQL statements 
@@ -325,10 +300,18 @@ StgExtract:
     // write integral cross sections to a text file
     ampl.writeICS_files();
 }
-
-End:
+else
 {
+    std::cout << "Skipped extraction of amplitudes." << std::endl;
+}
+
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// End                                                                       //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+
     std::cout << std::endl << "Done." << std::endl << std::endl;
-}    
+    
     return 0;
 }

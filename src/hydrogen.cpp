@@ -118,7 +118,7 @@ std::string stateName (int n, int l, int m)
     return oss.str();
 }
 
-std::string stateName (int n, int l, int two_j, int two_m)
+std::string stateRName (int n, int l, int two_j, int two_m)
 {
     static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
     

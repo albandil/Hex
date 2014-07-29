@@ -15,7 +15,7 @@
 
 #include "arrays.h"
 #include "gauss.h"
-#include "input.h"
+#include "io.h"
 #include "itersolve.h"
 #include "misc.h"
 #include "preconditioners.h"

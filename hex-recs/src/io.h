@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 
+#include "angular.h"
 #include "arrays.h"
 #include "bspline.h"
 
@@ -188,8 +189,8 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int J, int ni, int li, int two_ji, int two_mi, double E)
-            : name_(format("psi-%d-[%d,%d,%g,%g]-E%g.hdf", J, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
+        SolutionIO (int J, int two_M, int ni, int li, int two_ji, int two_mi, double E)
+            : name_(format("psi-(%d,%g)-[%d,%d,%g,%g]-E%g.hdf", J, 0.5*two_M, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
         
         std::string const & name () const
         {
@@ -216,5 +217,28 @@ class SolutionIO
         
         std::string name_;
 };
+
+/**
+ * @brief Convert solution to VTK file.
+ * 
+ * This function will convert a solution (the filename of the HDF file
+ * should come from the command line option --zipfile) to a series of VTK text
+ * files that can be viewed e.g. by the free ParaView program. The resulting
+ * VTK files (one for each angular basis vector) will contain real and imaginary
+ * part of the wave function component on an rectilinear grid. Parameters of the
+ * grid can be further refined by the command line arguments --zipcount and --zipmax).
+ * 
+ * @param cmd Class containing command line options.
+ * @param bspline B-spline environment.
+ * @param ll Angular basis.
+ * 
+ * See the respective classes for deeper explanation of individual parameters.
+ */
+void zip_solution
+(
+    CommandLine & cmd,
+    Bspline const & bspline,
+    AngularBasis const & ll
+);
 
 #endif

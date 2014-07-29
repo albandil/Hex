@@ -20,7 +20,7 @@
 
 #include "arrays.h"
 #include "cmdline.h"
-#include "input.h"
+#include "io.h"
 #include "matrix.h"
 #include "preconditioners.h"
 
@@ -466,4 +466,46 @@ void InputFile::read (std::ifstream & inf)
     // print info
     std::cout << "magnetic field: " << B << " a.u." << std::endl;
     std::cout << std::endl;
+}
+
+void zip_solution (CommandLine & cmd, Bspline const & bspline, AngularBasis const & ll)
+{
+    // use whole grid if not restricted
+    if (cmd.zipmax < 0)
+        cmd.zipmax = bspline.Rmax();
+    
+    cArray sol;     // stored solution expansion
+    cArray ev;      // evaluated solution
+    rArray grid;    // real evaluation grid
+    
+    // size of solution (l,l)-segment
+    size_t N = bspline.Nspline() * bspline.Nspline();
+    
+    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
+    
+    // load the requested file
+    if (not sol.hdfload(cmd.zipfile.c_str()))
+        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
+    
+    // evaluation grid
+    grid = linspace (0., cmd.zipmax, cmd.zipcount);
+    
+    // for all coupled angular momentum pairs
+    for (unsigned ill = 0; ill < ll.size(); ill++)
+    {
+        std::cout << "\t- partial wave l1 = " << ll[ill].l1 << ", l2 = " << ll[ill].l2 << "\n";
+        
+        // write to file
+        std::ofstream out (format("%s_(%d,%d,%d,%d).vtk", cmd.zipfile.c_str(), ll[ill].L, ll[ill].S, ll[ill].l1, ll[ill].l2));
+        writeVTK_points
+        (
+            out,
+            bspline.zip
+            (
+                sol.slice(ill * N, (ill + 1) * N),
+                grid, grid
+            ),
+            grid, grid, rArray({0.})
+        );
+    }
 }

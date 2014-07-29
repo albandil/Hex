@@ -41,23 +41,55 @@ class Amplitudes
         
     private:
         
+        /**
+         * @brief Transition description.
+         * 
+         * The structure contains ll discrete quantum numbers identificating
+         * the transition
+         * \f[
+         *     | n_i l_i j_i m_i \rangle | \mathbf{k}_i \sigma_i \rangle
+         *     \rightarrow
+         *     | n_f l_f j_f m_f \rangle | \mathbf{k}_f \sigma_f \rangle \,.
+         * \f]
+         * 
+         * The structure also defined an ordering operator so that it can be used
+         * as an index in std::map container.
+         */
+        typedef struct tTransition
+        {
+            // initial state
+            int ni, li, two_ji, two_mi, two_si;
+            
+            // final state
+            int nf, lf, two_jf, two_mf, two_sf;
+            
+            // necessary ordering operator so that we can use this structure as an index in std::map
+            bool operator < (tTransition const & t) const
+            {
+                #define Compare(x) if (x < t.x) return true; if (x > t.x) return false;
+                
+                // perform standard lexicographic comparison (by components)
+                Compare(ni); Compare(li); Compare(two_ji); Compare(two_mi); Compare(two_si);
+                Compare(nf); Compare(lf); Compare(two_jf); Compare(two_mf); Compare(two_sf);
+                
+                // they are equal
+                return false;
+            }
+        }
+        Transition;
+        
+        // shorteded data types
+        typedef std::map<std::tuple<int,int,int>,cArray> ThreeIntComplexMap;
+        typedef std::map<std::tuple<int,int>,cArray> TwoIntComplexMap;
+        
         // Λ[ie] indexed by (ni,li,2*ji,2*mi,nf,lf,2*jf,2*mf) and (L,S,l')
-        std::map <
-            std::tuple<int,int,int,int,int,int,int,int>,
-            std::map<std::tuple<int,int,int>,cArray>
-        > Lambda_LSlp;
+        std::map<Transition,ThreeIntComplexMap> Lambda_LSlp;
         
         // T[ie] indexed by (ni,li,2*ji,2*mi,nf,lf,2*jf,2*mf) and (l',j')
-        std::map <
-            std::tuple<int,int,int,int,int,int,int,int>,
-            std::map<std::tuple<int,int>,cArray>
-        > Tmat_jplp;
+        std::map<Transition,TwoIntComplexMap> Tmat_jplp;
         
         // σ[ie] indexed by (ni,li,2*ji,2*mi,nf,lf,2*jf,2*mf)
-        std::map <
-            std::tuple<int,int,int,int,int,int,int,int>,
-            rArray
-        > sigma;
+        std::map<Transition,rArray> sigma;
         
         /**
          * @brief Extract radial part of scattering amplitude.
@@ -74,23 +106,11 @@ class Amplitudes
          *        \mathrm{d}r_1 \ .
          *  @f]
          */
-        std::map<std::tuple<int,int,int>,cArray> computeLambda_
-        (
-            std::tuple<int,int,int,int,int,int,int,int> transition,
-            rArray const & kf
-        );
+        ThreeIntComplexMap computeLambda_ (Transition, rArray const &);
         
-        std::map<std::tuple<int,int>,cArray> computeTmat_
-        (
-            std::tuple<int,int,int,int,int,int,int,int> transition,
-            rArray const & kf
-        );
+        TwoIntComplexMap computeTmat_ (Transition, rArray const &);
         
-        rArray computeSigma_
-        (
-            std::tuple<int,int,int,int,int,int,int,int> transition,
-            rArray const & kf
-        );
+        rArray computeSigma_ (Transition, rArray const &);
         
         /**
          * @brief Extract radial part of ionization amplitude.

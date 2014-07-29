@@ -112,6 +112,12 @@ int run_Y (int argc, char* argv[])
         i++;
     }
     
+    if ((scale == 1. and argc != 6) or (scale != 1. and argc != 7))
+    {
+        std::cout << "\nUsage:\n\t./hex-special Y [--degrees] <l> <m> <theta> <phi>\n\n";
+        return EXIT_FAILURE;
+    }
+    
     int l = std::atoi(argv[i++]);
     int m = std::atoi(argv[i++]);
     double theta = std::atof(argv[i++]);
@@ -132,7 +138,7 @@ int main (int argc, char* argv[])
     if (needHelp)
     {
         std::cout << "\nEvaluates a special function as implemented in Hex.\n";
-        std::cout << "\nUsage:\n\t./special <name> [options]\n\n";
+        std::cout << "\nUsage:\n\t./hex-special <name> [options]\n\n";
         std::cout << "Available functions:\n";
     }
     
@@ -143,7 +149,9 @@ int main (int argc, char* argv[])
     
     if (needHelp)
     {
-        std::cout << std::endl;
+        std::cout << "By calling \"./hex-special <name>\" (i.e. without further arguments) "
+                      "you will receive detailed information on the chosen special function."
+                  << std::endl << std::endl;
     }
     else
     {
