@@ -91,6 +91,14 @@ class CarthesianBoundWaveFunction
 std::string stateName (int n, int l, int m);
 
 /**
+ * @brief Compose name of the semi-relativistic hydrogen state.
+ * 
+ * Return the spectroscopic notation for given quantum numbers.
+ * Example are: 1s1/2(0), 2s1/2(0), 2p1/2(0), 2p3/2(0), 2p1/2(-1/2).
+ */
+std::string stateRName (int n, int l, int two_j, int two_m);
+
+/**
  * @brief Hydrogenic radial moment.
  * 
  * Returns the value of the moment integral

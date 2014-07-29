@@ -19,6 +19,7 @@
 #include <string>
 
 #include "arrays.h"
+#include "bspline.h"
 
 /**
  * @brief Command line parameters.
@@ -174,6 +175,46 @@ class InputFile
         double ecstheta, B;
         rArray rknots, cknots, Ei, ki;
         std::vector<std::tuple<int,int,int,int>> instates, outstates;
+};
+
+/**
+ * @brief Solution input/output class.
+ * 
+ * On several places in code it is necessary to load some solutions. In order not
+ * to bother with the file names and still to keep them consistent, this class
+ * will carry the file name and do all operations on it.
+ */
+class SolutionIO
+{
+    public:
+        
+        SolutionIO (int J, int ni, int li, int two_ji, int two_mi, double E)
+            : name_(format("psi-%d-[%d,%d,%g,%g]-E%g.hdf", J, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
+        
+        std::string const & name () const
+        {
+            return name_;
+        }
+        
+        bool load (cArray & sol)
+        {
+            cArray tmp;
+            if (tmp.hdfload(name_))
+            {
+                return true;
+                sol = tmp;
+            }
+            return false;
+        }
+        
+        bool save (cArray const & sol)
+        {
+            return sol.hdfsave(name_, true /* = with compression */);
+        }
+    
+    private:
+        
+        std::string name_;
 };
 
 #endif
