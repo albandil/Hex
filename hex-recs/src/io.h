@@ -192,11 +192,20 @@ class SolutionIO
         SolutionIO (int J, int two_M, int ni, int li, int two_ji, int two_mi, double E)
             : name_(format("psi-(%d,%g)-[%d,%d,%g,%g]-E%g.hdf", J, 0.5*two_M, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
         
+        /// Get name of the solution file.
         std::string const & name () const
         {
             return name_;
         }
         
+        /**
+         * @brief Load the solution from disk.
+         * 
+         * This function will try to load the solution HDF file (of name 'name_')
+         * into a complex array passed as argument. If the file is not found, array
+         * is not written and 'false' is returned. Otherwise the function returns 'true'
+         * and fills the contents of the array with the read data.
+         */
         bool load (cArray & sol)
         {
             cArray tmp;
@@ -208,6 +217,14 @@ class SolutionIO
             return false;
         }
         
+        /**
+         * @brief Write solution to disk.
+         * 
+         * Save solution to disk as a HDF file. Zero blocks
+         * of the solution are automatically detected and compressed
+         * (substituted by position & length information). The function
+         * return 'true' when write was successful, 'false' otherwise.
+         */
         bool save (cArray const & sol)
         {
             return sol.hdfsave(name_, true /* = with compression */);
