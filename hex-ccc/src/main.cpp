@@ -26,7 +26,7 @@
 int main (int argc, char *argv[])
 {
     // write the program header
-    std::cout << logo_raw();
+    std::cout << logo(" ");
     
     // turn off GSL and HDF exceptions
     gsl_set_error_handler_off();

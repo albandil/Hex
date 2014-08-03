@@ -20,40 +20,22 @@
 
 char const * commit_hash = GIT_COMMIT;
 
-std::string logo ()
+std::string logo (std::string esc)
 {
-    return format (
-        
-        "#                                         \n"
-        "#       / /   / /    __    \\ \\  / /     \n"
-        "#      / /__ / /   / _ \\    \\ \\/ /     \n"
-        "#     /  ___  /   | |/_/    / /\\ \\      \n"
-        "#    / /   / /    \\_\\      / /  \\ \\   \n"
-        "#                                         \n"
-        "#             UK MFF (c) 2014             \n"
-        "#                                         \n"
-        "#          version: 1.02 %s               \n"
-        "#                                         \n",
-        
-        commit_hash
-    );
-}
-
-std::string logo_raw ()
-{
-    return format (
-        
-        "                                          \n"
-        "        / /   / /    __    \\ \\  / /     \n"
-        "       / /__ / /   / _ \\    \\ \\/ /     \n"
-        "      /  ___  /   | |/_/    / /\\ \\      \n"
-        "     / /   / /    \\_\\      / /  \\ \\   \n"
-        "                                          \n"
-        "              UK MFF (c) 2014             \n"
-        "                                          \n"
-        "           version: 1.02 %s               \n"
-        "                                          \n",
-        
-        commit_hash
+    return format
+    (
+        "%s                                         \n"
+        "%s       / /   / /    __    \\ \\  / /     \n"
+        "%s      / /__ / /   / _ \\    \\ \\/ /     \n"
+        "%s     /  ___  /   | |/_/    / /\\ \\      \n"
+        "%s    / /   / /    \\_\\      / /  \\ \\   \n"
+        "%s                                         \n"
+        "%s             UK MFF (c) 2014             \n"
+        "%s                                         \n"
+        "%s          version: 1.02 %s               \n"
+        "%s                                         \n",
+        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
+        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
+        esc.c_str(),commit_hash,esc.c_str()
     );
 }

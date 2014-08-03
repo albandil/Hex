@@ -142,7 +142,7 @@ bool TMatrix::run
     cArray Tb_out = interpolate(E_arr, Tb_arr, energies * efactor);
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# T-matrices in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

@@ -97,7 +97,7 @@ int main (int argc, char* argv[])
     std::setlocale(LC_ALL, "en_GB.utf8");
     
     // print program logo
-    std::cout << logo_raw() << std::endl;
+    std::cout << logo(" ") << std::endl;
     std::cout << "=== Plane wave second Born approximation ===" << std::endl << std::endl;
     
     // disable fatal GSL errors

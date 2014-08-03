@@ -148,7 +148,7 @@ bool StokesParameters::run
     rArray Pplus = hypot(Pl, P3);
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Stokes parameters for\n"
         "#     ni = " << ni << ", li = " << 0 << ",\n"
         "#     nf = " << nf << ", lf = " << 1 << ",\n"

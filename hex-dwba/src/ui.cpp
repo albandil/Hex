@@ -37,7 +37,7 @@ std::string help_text =
 int main (int argc, char *argv[])
 {
     // draw package logo
-    std::cout << logo_raw() << "\n";
+    std::cout << logo(" ") << std::endl;
     std::cout << "=== Distorted wave first Born approximation ===" << std::endl << std::endl;
     
     // echo command line

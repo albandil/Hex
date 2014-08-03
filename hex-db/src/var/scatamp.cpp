@@ -232,7 +232,7 @@ bool ScatteringAmplitude::run
     cArray amplitudes = scattering_amplitude(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"

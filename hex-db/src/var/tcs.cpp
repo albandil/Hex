@@ -126,7 +126,7 @@ bool TotalCrossSection::run
     //
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Total cross section in " << unit_name(Lunits) << " for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<

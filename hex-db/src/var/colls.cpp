@@ -108,7 +108,7 @@ bool CollisionStrength::run
     }
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Collision strength (dimensionless) for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

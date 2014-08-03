@@ -157,7 +157,7 @@ bool ExtrapolatedCrossSection::run
         return true;
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Extrapolated and complete cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

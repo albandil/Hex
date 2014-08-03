@@ -161,7 +161,7 @@ bool IonizationF::run
     }
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Ionization amplitudes (radial part) in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     L = " << L << ", S = " << S << ", ℓ₁ = " << l1 << ", ℓ₂ = " << l2 << "\n" <<

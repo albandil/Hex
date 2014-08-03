@@ -49,10 +49,12 @@ VariableList::~VariableList ()
 Variable const * VariableList::get (std::string const & id) const
 {
     // search the list for a (pointer to a) variable with the correct ID
-    std::vector<Variable*>::const_iterator it = std::find_if (
+    std::vector<Variable*>::const_iterator it = std::find_if
+    (
         list.begin(),
         list.end(),
-        [&](Variable* const & constptr) -> bool {
+        [&](Variable* const & constptr) -> bool
+        {
             return constptr->id() == id;
         }
     );

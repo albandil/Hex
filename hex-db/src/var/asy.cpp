@@ -109,7 +109,7 @@ bool SpinAsymmetry::run
     }
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Spin asymetry for \n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

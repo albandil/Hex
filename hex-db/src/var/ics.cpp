@@ -242,7 +242,7 @@ bool IntegralCrossSection::run
     }
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Integral cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

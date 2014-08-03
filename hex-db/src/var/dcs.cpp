@@ -221,7 +221,7 @@ bool DifferentialCrossSection::run
     rArray dcs = differential_cross_section(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Differential cross section in " << unit_name(Lunits) << " for \n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

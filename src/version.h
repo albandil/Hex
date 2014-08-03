@@ -26,10 +26,12 @@
  */
 extern char const * commit_hash;
 
-/// Return the application ASCII logo for use in text outputs.
-std::string logo ();
-
-/// Return the application ASCII logo for use in terminal outputs.
-std::string logo_raw ();
+/**
+ * @brief Application text logo.
+ *
+ * Return the application ASCII logo string for use in text outputs.
+ * The argument string will be prepended before every line of the logo.
+ */
+std::string logo (std::string escape = " ");
 
 #endif

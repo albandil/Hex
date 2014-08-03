@@ -185,7 +185,7 @@ bool TripleDifferentialCrossSection::run
     }
     
     // write out
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Triple differential cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     S = " << S << ", Ei = " << Ei / efactor << " " << unit_name(Eunits) << "\n" <<

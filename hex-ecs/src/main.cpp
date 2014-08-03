@@ -78,6 +78,13 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     }
 }
 
+std::string current_time() 
+{
+    std::time_t result;
+    result = std::time(NULL);
+    return std::asctime(std::localtime(&result));
+}
+
 int main (int argc, char* argv[])
 {
 // ------------------------------------------------------------------------- //
@@ -91,7 +98,7 @@ int main (int argc, char* argv[])
     //
     
     // display logo
-    std::cout << logo_raw() << std::endl;
+    std::cout << logo(" ") << std::endl;
     std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
     
     // echo command line
@@ -303,19 +310,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             }
             
-            // we may have already computed the previous solution - it will serve as initial guess
-            current_solution = cArray(chi.size());
-/*
-            if (ie > 0)
-            {
-                std::ostringstream prev_oss;
-                prev_oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie-1] << ".hdf";
-                if (previous_solution.hdfload(prev_oss.str().c_str()))
-                    current_solution = previous_solution;
-            }
-*/
-            
             // custom conjugate gradients callback-based solver
+            current_solution = cArray(chi.size());
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
@@ -386,6 +382,8 @@ if (cmd.itinerary & CommandLine::StgExtract)
         fsql.setf(std::ios_base::scientific);
         
         // write header
+        fsql << logo("--");
+        fsql << "-- File generated on " << current_time() << "--" << std::endl;
         fsql << "BEGIN TRANSACTION;" << std::endl;
         
         //

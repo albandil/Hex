@@ -199,7 +199,7 @@ bool CompleteCrossSection::run
     //
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Complete cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

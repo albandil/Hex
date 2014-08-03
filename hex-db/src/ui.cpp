@@ -73,7 +73,7 @@ const std::string HelpText =
 
 void print_help_and_exit()
 {
-    std::cout << logo_raw() << std::endl;
+    std::cout << logo(" ") << std::endl;
     std::cout << "=== Database interface program ===" << std::endl;
     std::cout << std::endl << HelpText;
     exit(0);

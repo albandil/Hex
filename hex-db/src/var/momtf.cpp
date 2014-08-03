@@ -171,7 +171,7 @@ bool MomentumTransfer::run
     eta *= 1. / std::pow(2 * special::constant::pi, 2);
     
     // write header
-    std::cout << logo() <<
+    std::cout << logo("#") <<
         "# Momentum transfer in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<

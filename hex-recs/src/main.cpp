@@ -46,7 +46,7 @@ int main (int argc, char* argv[])
     //
     
     // display logo
-    std::cout << logo_raw() << std::endl;
+    std::cout << logo(" ") << std::endl;
     std::cout << "=== Relativistic exterior complex scaling in B-splines ===" << std::endl << std::endl;
     
     // echo command line
