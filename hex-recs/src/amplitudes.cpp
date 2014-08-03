@@ -55,7 +55,10 @@ void Amplitudes::extract ()
         
         // add spin-orbital energy
         if (li > 0)
-            ETot += 0.5 * special::constant::alpha_sqr * (ji*(ji+1)-li*(li+1)-0.75) * Hydrogen::moment(-3,ni,li);
+        {
+            ETot += 0.5 * special::constant::alpha_sqr * (ji*(ji+1) - li*(li+1) - 0.75) // = ½(Zα)² L·S
+                    / (ni*ni*ni * li * (li+0.5) * (li+1)); // = ⟨ni,li|r⁻³|ni,li⟩
+        }
         
         if (nf > 0)
         {
@@ -77,7 +80,10 @@ void Amplitudes::extract ()
                 
                 // add spin-orbital energy
                 if (lf > 0)
-                    Ef += 0.5 * special::constant::alpha_sqr * (jf*(jf+1)-lf*(lf+1)-0.75) * Hydrogen::moment(-3,nf,lf);
+                {
+                    Ef += 0.5 * special::constant::alpha_sqr * (jf*(jf+1) - lf*(lf+1) - 0.75)  // = ½(Zα)² L·S
+                          / (nf*nf*nf * lf * (lf+0.5) * (lf+1)); // = ⟨nf,lf|r⁻³|nf,lf⟩
+                }
                 
                 // final projectile momenta
                 rArray kf = sqrt(ETot - Ef);

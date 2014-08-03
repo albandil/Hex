@@ -18,7 +18,6 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "gausskronrod.h"
 #include "hydrogen.h"
 #include "misc.h"
 #include "special.h"
@@ -131,24 +130,6 @@ std::string stateRName (int n, int l, int two_j, int two_m)
         oss << "ion";
     
     return oss.str();
-}
-
-double moment (int a, int n, int l)
-{
-    if (a + 2*l + 2 < 0)
-        throw exception ("Hydrogenic moment ⟨%d,%d|r^(%d)|%d,%d⟩ is not finite!", n, l, a, n, l);
-    
-    // some precomputed values
-    // TODO
-    
-    // general analytic formula is yet to be implemented; for now we just need to compute the values manually
-    auto integrand = [a,n,l](double r) -> double { return gsl_sf_pow_int(r,2+a) * gsl_sf_pow_int(2, gsl_sf_hydrogenicR(n,l,1,r)); };
-    GaussKronrod<decltype(integrand)> Q (integrand);
-    Q.integrate(0, special::constant::Inf);
-    if (Q.ok()) 
-        return Q.result();
-    
-    throw exception ("Can't evaluate hydrogenic moment ⟨%d,%d|r^(%d)|%d,%d⟩ is not finite!", n, l, a, n, l);
 }
 
 double lastZeroBound (int n, int l)

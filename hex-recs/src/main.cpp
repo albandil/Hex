@@ -219,7 +219,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // add spin-orbital interaction energy contribution to non-S-states
             if (li > 0)
-                E += special::constant::alpha_sqr * (ji*(ji+1) - li*(li+1) - 0.75) * Hydrogen::moment(-3, ni, li); // spin-orbital energy
+            {
+                E += 0.5 * special::constant::alpha_sqr * (ji*(ji+1) - li*(li+1) - 0.75) // = ½(Zα)² L·S
+                     / (ni*ni*ni * li * (li+0.5) * (li+1)); // = ⟨ni,li|r⁻³|ni,li⟩
+            }
             
             // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
             if (not (E == prevE)) // does not use 'if (E != prevE)' to work with initial Nan values

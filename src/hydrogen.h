@@ -99,20 +99,6 @@ std::string stateName (int n, int l, int m);
 std::string stateRName (int n, int l, int two_j, int two_m);
 
 /**
- * @brief Hydrogenic radial moment.
- * 
- * Returns the value of the moment integral
- * \f[
- *     \langle nlm | r^a | nlm\rangle
- *     = \int_0^\infty r^{2+a} R_{nl}(r)^2 \mathrm{d}r \,.
- * \f]
- * 
- * Several values are precomputed using Maxima CAS,
- * general formula is not yet implemented.
- */
-double moment (int a, int n, int l);
-
-/**
  * @brief Hydrogen bound radial orbital.
  * 
  * The hydrogen radial functions @f$ R_{nl} @f$ are defined as
