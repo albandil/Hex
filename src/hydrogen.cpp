@@ -106,7 +106,7 @@ std::string stateName (int n, int l, int m)
 {
     static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
     
-    assert(l < sizeof(ang));
+    assert(l < (int)sizeof(ang));
     
     std::ostringstream oss;
     if (n != 0)
@@ -121,11 +121,11 @@ std::string stateRName (int n, int l, int two_j, int two_m)
 {
     static const char ang[] = { 's', 'p', 'd', 'f', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o' };
     
-    assert(l < sizeof(ang));
+    assert(l < (int)sizeof(ang));
     
     std::ostringstream oss;
     if (n != 0)
-        oss << n << ang[l] << two_j << "2(" << two_m << "/2)";
+        oss << n << ang[l] << two_j << "/2(" << two_m << "/2)";
     else
         oss << "ion";
     

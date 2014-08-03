@@ -177,7 +177,7 @@ class Amplitudes
         Bspline const & bspline_;
         
         // radial integrals
-        RadialIntegrals const & rad_;
+        RadialIntegrals rad_;
         
         // input data
         InputFile const & inp_;

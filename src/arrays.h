@@ -76,7 +76,7 @@ template <class T> class ArrayView
             : N_(0), array_(nullptr) {}
         
         // construct from pointer and size
-        ArrayView (size_t n, T * ptr)
+        explicit ArrayView (size_t n, T * ptr)
             : N_(n), array_(ptr) {}
         
         // copy constructor
@@ -84,15 +84,15 @@ template <class T> class ArrayView
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
         
         // construct view from Array const lvalue reference
-        ArrayView (Array<T> const & a, size_t i = 0, size_t n = 0)
+        explicit ArrayView (Array<T> const & a, size_t i = 0, size_t n = 0)
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
             
         // construct view from NumberArray const lvalue reference
-        ArrayView (NumberArray<T> const & a, size_t i = 0, size_t n = 0)
+        explicit ArrayView (NumberArray<T> const & a, size_t i = 0, size_t n = 0)
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
         
         // construct from consecutive memory segment
-        ArrayView (const_iterator i, const_iterator j)
+        explicit ArrayView (const_iterator i, const_iterator j)
             : N_(j - i), array_(const_cast<T*>(&(*i))) {}
         
         // construct from right-value reference
@@ -208,11 +208,11 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             : ArrayView<T>() {}
         
         // constructor, creates a length-n "x"-filled array
-        Array (size_t n, T x = T(0))
+        explicit Array (size_t n, T x = T(0))
             : ArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < size(); i++) (*this)[i] = x; }
         
         // constructor, copies a length-n "array
-        Array (size_t n, T const * const x)
+        explicit Array (size_t n, T const * const x)
             : ArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < size(); i++) (*this)[i] = x[i]; }
         
         // copy constructor from Array const lvalue reference
@@ -220,7 +220,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from const ArrayView
-        Array (const ArrayView<T> a)
+        explicit Array (const ArrayView<T> a)
             : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from Array rvalue reference
@@ -228,7 +228,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             : ArrayView<T>() { std::swap (ArrayView<T>::N_, a.ArrayView<T>::N_); std::swap (ArrayView<T>::array_, a.ArrayView<T>::array_); }
         
         // copy constructor from std::vector
-        Array (std::vector<T> const & a)
+        explicit Array (std::vector<T> const & a)
             : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from initializer list
@@ -494,11 +494,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             : Array<T,Alloc>(), Nres_(size()), name_() {}
         
         // constructor, creates a length-n "x"-filled array
-        NumberArray (size_t n, T x = T(0))
+        explicit NumberArray (size_t n, T x = T(0))
             : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // constructor, copies a length-n "array
-        NumberArray (size_t n, T const * x)
+        explicit NumberArray (size_t n, T const * x)
             : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // copy constructor from ArrayView const lvalue reference
@@ -518,7 +518,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from two forward iterators
-        template <typename ForwardIterator> NumberArray (ForwardIterator i, ForwardIterator j)
+        template <typename ForwardIterator> explicit NumberArray (ForwardIterator i, ForwardIterator j)
             : Array<T,Alloc>(i,j), Nres_(size()), name_() {}
         
         // copy constructor from Array rvalue reference

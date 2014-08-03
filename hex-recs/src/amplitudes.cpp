@@ -26,9 +26,10 @@
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
 #include "hydrogen.h"
+#include "matrix.h"
 #include "radial.h"
 #include "special.h"
-#include "matrix.h"
+#include "version.h"
 
 void Amplitudes::extract ()
 {
@@ -42,13 +43,15 @@ void Amplitudes::extract ()
         int ni = std::get<0>(instate);
         int li = std::get<1>(instate);
         int two_ji = std::get<2>(instate); double ji = 0.5 * two_ji;
-        int two_mi = std::get<3>(instate); double mi = 0.5 * two_mi;
+        int two_mi = std::get<3>(instate);
         int two_si = inp_.two_M - two_mi;
         
         // get final quantum numbers
         int nf = std::get<0>(outstate);
         int lf = std::get<1>(outstate);
         int two_jf = std::get<2>(outstate); double jf = 0.5 * two_jf;
+        int two_mf = std::get<3>(outstate);
+        int two_sf = inp_.two_M - two_mf;
         
         // non-relativistic total energies
         rArray ETot = inp_.Ei - 1./(ni*ni) /*- mi * inp.B*/;
@@ -66,7 +69,12 @@ void Amplitudes::extract ()
             // Discrete transition
             //
             
-            std::cout << "\texc: -> nf = " << nf << ", lf = " << lf << ", jf = " << jf << ", mf = *" << std::flush;
+            std::cout << format
+            (
+                "\texc %s%s -> %s%s ",
+                Hydrogen::stateRName(ni, li, two_ji, two_mi).c_str(), (two_si > 0 ? "+" : "-"),
+                Hydrogen::stateRName(nf, lf, two_jf, two_mf).c_str(), (two_sf > 0 ? "+" : "-")
+            ) << std::flush;
             
             // precompute hydrogen function overlaps
             cArray Pf_overlaps = rad_.overlapP(nf,lf,weightEndDamp(bspline_));
@@ -75,8 +83,8 @@ void Amplitudes::extract ()
             for (int two_mf = -two_jf; two_mf <= two_jf; two_mf += 2) // for all atomic final composite projections
             for (int two_sf = -1; two_sf <= 1; two_sf += 2) // for all projectile final spin projections
             {
-                // final atomic energies
-                rArray Ef = -1./(nf*nf) /*- mf * inp.B*/;
+                // final atomic energy
+                double Ef = -1./(nf*nf) /*- mf * inp.B*/;
                 
                 // add spin-orbital energy
                 if (lf > 0)
@@ -156,10 +164,10 @@ Amplitudes::ThreeIntComplexMap Amplitudes::computeLambda_
         // As recommended by Bartlett, we will compute several amplitudes
         // separated by π/(n*kf[ie]) near the R₀ turning point.
         double wavelength = special::constant::pi / kf[ie];
-        char const * HEX_RHO = getenv("HEX_RHO");
-        char const * HEX_SAMPLES = getenv("HEX_SAMPLES");
-        int samples = (HEX_SAMPLES == nullptr) ? 10 : atoi(HEX_SAMPLES);
-        double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : atof(HEX_RHO);
+        char const * HEX_RHO = std::getenv("HEX_RHO");
+        char const * HEX_SAMPLES = std::getenv("HEX_SAMPLES");
+        int samples = (HEX_SAMPLES == nullptr) ? 10 : std::atoi(HEX_SAMPLES);
+        double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : std::atof(HEX_RHO);
         
         // skip impact energies with undefined outgoing momentum
         if (std::isnan(kf[ie]))
@@ -259,7 +267,7 @@ Amplitudes::TwoIntComplexMap Amplitudes::computeTmat_
             double C2 = gsl_sf_coupling_3j
             (
                 2*lp,                          1,         two_jp,
-                inp_.two_M-T.two_mf-T.two_sf,  T.two_sf,  inp_.two_M-T.two_mf
+                inp_.two_M-T.two_mf-T.two_sf,  T.two_sf,  -inp_.two_M+T.two_mf
             ) * std::sqrt(two_jp+1);
             
             // sum over L and S
@@ -282,7 +290,7 @@ Amplitudes::TwoIntComplexMap Amplitudes::computeTmat_
                 );
                 
                 // initialize the storage (if needed)
-                auto index = std::make_tuple(T.lf,T.two_jf);
+                auto index = std::make_tuple(lp,two_jp);
                 if (Tmat.find(index) == Tmat.end())
                     Tmat[index] = cArray(inp_.Ei.size());
                 
@@ -307,8 +315,8 @@ rArray Amplitudes::computeSigma_
     // for all summation indices
     for (int two_jp = std::abs(2*inp_.J-T.two_jf); two_jp <= 2*inp_.J+T.two_jf; two_jp += 2)
     for (int two_jpp= std::abs(2*inp_.J-T.two_jf); two_jpp<= 2*inp_.J+T.two_jf; two_jpp+= 2)
-    for (int lp = std::abs(two_jp-1)/2; lp <= (two_jp+1)/2; lp ++)
-    for (int lpp= std::abs(two_jp-1)/2; lpp<= (two_jp+1)/2; lpp++)
+    for (int lp = std::abs(two_jp-1)/2;  lp <= (two_jp+1)/2;  lp ++)
+    for (int lpp= std::abs(two_jpp-1)/2; lpp<= (two_jpp+1)/2; lpp++)
     if (lp == lpp)
     {
         rArray Re_f_ell = -realpart(Tmat_jplp[T][std::make_tuple(lp,two_jp)]) / special::constant::two_pi;
@@ -319,10 +327,20 @@ rArray Amplitudes::computeSigma_
     return sigma;
 }
 
+std::string current_time ()
+{
+    std::time_t result;
+    result = std::time(nullptr);
+    return std::asctime(std::localtime(&result));
+}
+
 void Amplitudes::writeSQL_files ()
 {
     // open file
     std::ofstream fsql (format("tmat-J%d-M%d.sql", inp_.J, inp_.two_M));
+    fsql << logo("--");
+    fsql << "-- File generated on " << current_time() << "--" << std::endl;
+    fsql << "-- Columns: ni,li,2ji,2mi,2si, nf,lf,2jf,2mf,2sf, J,Ei,l',2j', Re_T,Im_T, Re_TBorn,Im_TBorn" << std::endl;
     fsql << "BEGIN TRANSACTION;" << std::endl;
     
     // for all transitions
