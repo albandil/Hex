@@ -20,6 +20,21 @@
 #include "bspline.h"
 #include "radial.h"
 
+/**
+ * @brief Extraction of amplitudes from solutions.
+ * 
+ * This class is responsible for the last stage of the computation:
+ * the extraction of T-matrices from the calculated solutions. Given
+ * the input file (and some other environment classes) it will load
+ * solution one after one and extract all requested amplitudes.
+ * Unavailable solutions are skipped with a warning message, so it is
+ * possible to run the extraction even when some other process is yet
+ * doing the main computation.
+ * 
+ * The class also offers the possibility to write out the data: as an
+ * SQL batch file for use in hex-db, or as a text file containing
+ * cross section column data.
+ */
 class Amplitudes
 {
     public:
@@ -33,10 +48,47 @@ class Amplitudes
             // nothing to do
         }
         
+        /**
+         * @brief Extract the amplitudes.
+         * 
+         * This is the main routine of the class. It will do the extraction of
+         * T-matrices, which involves some linear algebra (~ radial integrals in
+         * B-spline basis) and computations of various coupling coefficients. In the
+         * end the class will contain T-matrices and partial cross sections for
+         * transitions requested in the input file.
+         */
         void extract ();
         
+        /**
+         * @brief Write SQL batch file.
+         * 
+         * This routine will write out T-matrices in the form of SQL batch file
+         * usable in hex-db. The file's name will be "tmat-J-M.sql", where J and M
+         * will be substituted by actual values of these total quantum numbers.
+         * See the documentation of hex-db for details on the output format.
+         */
         void writeSQL_files ();
         
+        /**
+         * @brief Write integral cross sections to file.
+         * 
+         * This routine will write the partial integral cross sections (i.e. for
+         * the given total quantum numbers) for every transition and energy into
+         * a text column-formatted file "ics-J-M.dat". (J and M will be replaced
+         * by the actual values of these quantum numbers.) The format is as follows:
+         * The first column lists the energies, the next columns are cross sections
+         * for every possible transition allowed by input file. The first row is
+         * the header, which is commented out by hash symbol ('#') for easy use in
+         * gnuplot. An example of a name of a column is
+         @verbatim
+              2p1/2(-1/2)⁺-2p3/2(1/2)⁻
+         @endverbatim
+         * which is a transition from
+         * @f$ |nljm\rangle |\mathbf{k}\sigma\rangle = |2,1,1/2,-1/2\rangle |\mathbf{k}_i +\rangle @f$
+         * to
+         * @f$ |nljm\rangle |\mathbf{k}\sigma\rangle = |2,1,1/2,-1/2\rangle |\mathbf{k}_f -\rangle @f$.
+         * The signs (+/-) are the projectile spin orientation.
+         */
         void writeICS_files ();
         
     private:
@@ -94,48 +146,32 @@ class Amplitudes
         /**
          * @brief Extract radial part of scattering amplitude.
          * 
-         * Compute radial integrals for evaluation of the discrete T-matrices,
-         * @f[
-         *    \Lambda_l^{(1)LMS} = 
-         *      \int_0^{R_0}
-         *        P_{n_f l_f}(r_1)
-         *        \mathcal{W}\left[
-         *           \psi_{\ell_1 \ell_2}^{LMS}(r_1,\bullet),
-         *            \hat{j}_l(k_f\bullet)
-         *         \right]_{R_0}
-         *        \mathrm{d}r_1 \ .
-         *  @f]
+         * Compute radial integrals for evaluation of the discrete T-matrices.
          */
         ThreeIntComplexMap computeLambda_ (Transition, rArray const &);
         
+        /**
+         * @brief Evaluate T-matrices.
+         * 
+         * This function will used precomputed Lambda-s to compute the
+         * discrete scattering T-matrices. It it necessary to call
+         * @ref computeLambda_ for the given trnasition first and store that
+         * precomputed Lambda dataset to 'Lambda_LSlp' with the proper
+         * key (= Transition object).
+         * 
+         * The T-matrices are stored in TwoIntComplexMap as complex array
+         * (an item per impact energy) indexed by @f$ j' @f$ and @f$ l' @f$
+         * (the angular momenta of the projectile).
+         */
         TwoIntComplexMap computeTmat_ (Transition, rArray const &);
         
-        rArray computeSigma_ (Transition, rArray const &);
-        
         /**
-         * @brief Extract radial part of ionization amplitude.
+         * @brief Evaluate cross sections.
          * 
-         * Compute hyperangular integrals for evaluation of the ionization T-matrices,
-         * @f[
-         *     \Xi_{\ell_1 \ell_2}^{LS}(k_1,k_2) =
-         *       \int_0^{\pi/2}
-         *         \left(
-         *           F_{\ell_1}(k_1,r_1) F_{\ell_2}(k_2,r_2)
-         *           \frac{\partial}{\partial\rho}
-         *           \psi^{LS}_{\ell_1\ell_2}(r_1,r_2)
-         *           -
-         *           \psi^{LS}_{\ell_1\ell_2}(r_1,r_2)
-         *           \frac{\partial}{\partial\rho}
-         *           F_{\ell_1}(k_1,r_1) F_{\ell_2}(k_2,r_2)
-         *         \right)
-         *         \rho\mathrm{d}\alpha \ ,
-         * @f]
-         * where @f$ r_1 = \rho \cos\alpha @f$ and @f$ r_2 = \rho \sin\alpha @f$.
+         * This routine will reuse the T-matrices calculated by @ref computeTmat_
+         * and compute the cross sections.
          */
-        /*cArrays computeXi
-        (
-            // TODO
-        );*/
+        rArray computeSigma_ (Transition, rArray const &);
         
         // B-spline environment
         Bspline const & bspline_;
