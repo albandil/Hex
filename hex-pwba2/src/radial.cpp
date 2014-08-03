@@ -518,7 +518,7 @@ Complex Idir_nBound_allowed
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double ff = special::computef(lambdaf, Lf, lf, Ln, ln, L);
         double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
@@ -565,7 +565,7 @@ Complex Idir_nBound_forbidden
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double ff = special::computef(lambdaf, Lf, lf, Ln, ln, L);
         double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
@@ -612,7 +612,7 @@ Complex Idir_nFree_allowed
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double ff = special::computef(lambdaf, Lf, lf, Ln, ln, L);
         double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers
@@ -659,7 +659,7 @@ Complex Idir_nFree_forbidden
     for (int lambdaf = lambdaf_min; lambdaf <= lambdaf_max; lambdaf++)
     for (int lambdai = lambdai_min; lambdai <= lambdai_max; lambdai++)
     {
-        double ff = special::computef(lambdaf, Li, li, Ln, ln, L);
+        double ff = special::computef(lambdaf, Lf, lf, Ln, ln, L);
         double fi = special::computef(lambdai, Ln, ln, Li, li, L);
         
         // skip non-contributing transfers

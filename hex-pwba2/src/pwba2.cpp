@@ -83,6 +83,7 @@ cArrays PWBA2::PartialWave_direct
                 
                 // sum over bound states
                 std::cout << "\tBound intermediate states" << std::endl;
+                Complex bound_contrib = 0;
                 for (int Nn = Ln + 1; Nn <= maxNn; Nn++)
                 {
                     // compute energy of the intermediate projectile state
@@ -94,7 +95,7 @@ cArrays PWBA2::PartialWave_direct
                         double kn = std::sqrt(en);
                         
                         // integrate
-                        Tdir_lf_li += Idir_nBound_allowed
+                        bound_contrib += Idir_nBound_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -107,7 +108,7 @@ cArrays PWBA2::PartialWave_direct
                         double kappan = std::sqrt(-en);
                         
                         // integrate
-                        Tdir_lf_li += Idir_nBound_forbidden
+                        bound_contrib += Idir_nBound_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -121,6 +122,7 @@ cArrays PWBA2::PartialWave_direct
                 // integrate over allowed free states (Kn^2 < ki^2 - 1/Ni^2)
                 //
                 
+                Complex allowed_contrib = 0;
                 if (maxlevel_allowed != 0)
                 {
                     std::cout << "\n\tAllowed intermediate states" << std::endl;
@@ -136,27 +138,26 @@ cArrays PWBA2::PartialWave_direct
                         double kn = std::sqrt(ki*ki - 1./(Ni*Ni) - En);
                         
                         // compute the radial integral
-                        return En * Idir_nFree_allowed
+                        return Idir_nFree_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kn, ln,
                             Ni, Li, ki, li
-                        ) * (-2. / kn);
+                        ) * (-Kn / kn);
                     };
                     
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
                     CCa.setVerbose(true, "\t\tcc");
                     CCa.setEps(1e-5); // relative tolerance
-//                     CCa.setSubdiv(6); // evaluation points
-//                     CCa.setStack(5);  // subdivision limit
-                    Tdir_lf_li += CCa.integrate(0., std::min(Enmax, Etot));
+                    allowed_contrib += CCa.integrate(0., std::min(Enmax, Etot));
                 }
                 
                 //
                 // integrate over forbidden free states (Kn^2 > ki^2 - 1/Ni^2)
                 //
                 
+                Complex forbidden_contrib = 0;
                 if (maxlevel_forbidden != 0 and Etot < Enmax)
                 {
                     std::cout << "\n\tForbidden intermediate states" << std::endl;
@@ -172,17 +173,31 @@ cArrays PWBA2::PartialWave_direct
                         double kappan = std::sqrt(En - ki*ki + 1./(Ni*Ni));
                         
                         // compute the radial integral
-                        return En * Idir_nFree_forbidden
+                        return Idir_nFree_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kappan, ln,
                             Ni, Li, ki, li
-                        ) * (-2. / kappan);
+                        ) * (-Kn / kappan);
                             
                     };
                     ClenshawCurtis<decltype(forbidden_energy_contribution),Complex> CCf(forbidden_energy_contribution);
-                    Tdir_lf_li += CCf.integrate(Etot, Enmax);
+                    forbidden_contrib += CCf.integrate(Etot, Enmax);
+                }
+                
+                // update T-matrix
+                Complex contrib = bound_contrib + allowed_contrib + forbidden_contrib;
+                Tdir_lf_li += contrib;
+                
+                // convergence check for Ln-loop (and high angular momenta)
+                if (Ln > 5 and Ln != ell + L + Pi and std::abs(contrib) < 1e-8 * std::abs(Tdir_lf_li))
+                {
+                    std::cout << "\t\tSkipping the following values of Ln due to negligible contribution: ";
+                    for (int LLn = Ln + 1; LLn <= ell + L + Pi; LLn++)
+                        std::cout << LLn << ' ';
+                    std::cout << std::endl;
+                    break;
                 }
             }
             
@@ -226,10 +241,8 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     Complex A = WA(k,nu,q);
     double B = WB(vk,nu,vq);
     
-//     return Complex(0.,2./q) * std::pow(A/B,miq) / B * (Complex(-1.,q)/A + Complex(1.,q)/B) / (k*k);
-    
     Complex B_A = B / A;
-    return -2.0 * miq * std::pow(B_A,-miq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
+    return 2.0 * (-miq) * std::pow(B_A,-miq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
 }
 
 cArrays PWBA2::FullTMatrix_direct
