@@ -630,10 +630,10 @@ template <class T> class Range
  * 
  * This simple function will count characters in the supplied text string,
  * append a new-line character and a group of '-' characters whose number
- * will be equal to the length of the supplied text. It is UTF-8-aware, so
+ * will be equal to the length of the supplied text. It supports UTF-8, so
  * the following code
    @code
-       std::cout << "Title containing UTF-8 characters αβγδ" << std::endl;
+       std::cout << underline("Title containing UTF-8 characters αβγδ") << std::endl;
    @endcode
  * will produce the output
    @verbatim
@@ -650,7 +650,7 @@ inline std::string underline (std::string text)
     std::mbstate_t state = std::mbstate_t();
     const char * mbstr = text.data();
     
-    std::size_t wlen = std::mbsrtowcs(NULL, &mbstr, 0, &state);
+    std::size_t wlen = std::mbsrtowcs(nullptr, &mbstr, 0, &state);
     
     text.push_back('\n');
     for (std::size_t i = 0; i < wlen; i++)
