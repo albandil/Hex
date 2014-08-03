@@ -80,7 +80,14 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
 
 int main (int argc, char* argv[])
 {
-    // Preparations ------------------------------------------------------- //
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// Preparations                                                              //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+    
+    //
+    // Program initialization ---------------------------------------------- //
     //
     
     // display logo
@@ -124,11 +131,11 @@ int main (int argc, char* argv[])
         std::cout << "Nothing to compute." << std::endl;
         exit(0);
     }
-    // --------------------------------------------------------------------- //
     
-    
+    // 
     // Setup B-spline environment ------------------------------------------ //
     //
+    
     double R0 = inp.rknots.back();       // end of real grid
     double Rmax = inp.cknots.back();     // end of complex grid
     
@@ -144,11 +151,11 @@ int main (int argc, char* argv[])
     
     // info
     std::cout << "B-spline solver count: " << Nspline << "\n\n";
-    // --------------------------------------------------------------------- //
     
-    
+    //
     // Setup angular data -------------------------------------------------- //
     //
+    
     std::cout << "Setting up the coupled angular states..." << std::endl;
     
     // coupled angular momentum pairs
@@ -179,25 +186,26 @@ int main (int argc, char* argv[])
         exit(0);
     
     std::cout << "\n";
-    // --------------------------------------------------------------------- //
     
+    //
+    // Zip solution file into VTK geometry if told so
+    //
     
-    // zip file if told so
     if (cmd.zipfile.size() != 0 and par.IamMaster())
     {
         zip_solution (cmd, bspline, coupled_states);
-        goto End;
+        std::cout << std::endl << "Done." << std::endl << std::endl;
+        return 0;
     }
     
-// StgSolve:
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// StgSolve                                                                  //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+    
+if (cmd.itinerary & CommandLine::StgSolve)
 {
-    // skip stage 2 if told so
-    if (not (cmd.itinerary & CommandLine::StgSolve))
-    {
-        std::cout << "Skipped solution of the equation." << std::endl;
-        goto StgExtract;
-    }
-    
     // create and initialize the preconditioner
     PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
     if (prec == nullptr)
@@ -297,6 +305,7 @@ int main (int argc, char* argv[])
             
             // we may have already computed the previous solution - it will serve as initial guess
             current_solution = cArray(chi.size());
+/*
             if (ie > 0)
             {
                 std::ostringstream prev_oss;
@@ -304,6 +313,7 @@ int main (int argc, char* argv[])
                 if (previous_solution.hdfload(prev_oss.str().c_str()))
                     current_solution = previous_solution;
             }
+*/
             
             // custom conjugate gradients callback-based solver
             unsigned max_iter = (inp.maxell + 1) * Nspline;
@@ -320,9 +330,9 @@ int main (int argc, char* argv[])
             );
             
             if (iterations >= max_iter)
-                std::cout << "\tConvergence too slow... The saved solution will be probably wrong.";
+                std::cout << "\tConvergence too slow... The saved solution will be probably wrong." << std::endl;
             else
-                std::cout << "\tEnd CG callback\n";
+                std::cout << "\tEnd CG callback" << std::endl;
             
             // update progress
             iterations_done += iterations;
@@ -335,19 +345,22 @@ int main (int argc, char* argv[])
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
-    std::cout << "\rSolving the systems... ok                                                            \n";
-    std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)\n";
+    std::cout << "\rSolving the systems... ok                                                            " << std::endl;
+    std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)" << std::endl;
+}
+else // i.e. no StgSolve
+{
+    std::cout << "Skipped solution of the equation." << std::endl;
 }
 
-StgExtract:
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// StgExtract                                                                //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+
+if (cmd.itinerary & CommandLine::StgExtract)
 {
-    // skip stage 3 if told so
-    if (not (cmd.itinerary & CommandLine::StgExtract))
-    {
-        std::cout << "Skipped extraction of amplitudes." << std::endl;
-        goto End;
-    }
-    
     // radial integrals
     RadialIntegrals rad (bspline);
     
@@ -564,10 +577,18 @@ StgExtract:
         fout.close();
     }
 }
-
-End:
+else
 {
+    std::cout << "Skipped extraction of amplitudes." << std::endl;
+}
+
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// End                                                                       //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+
     std::cout << std::endl << "Done." << std::endl << std::endl;
-}    
+    
     return 0;
 }
