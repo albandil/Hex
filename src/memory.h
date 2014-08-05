@@ -150,7 +150,7 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
                 std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t*>(origin) - 1);
                 
                 // free the whole memory pool
-                delete [] reinterpret_cast<T*>(root_address);
+                std::free(reinterpret_cast<T*>(root_address));
             }
         }
         
