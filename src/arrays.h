@@ -64,7 +64,7 @@ template <class T> class ArrayView
     protected:
         
         /// Number of elements in the array.
-        size_t N_;
+        std::size_t N_;
         
         /// Pointer to the array.
         T * array_;
@@ -76,23 +76,23 @@ template <class T> class ArrayView
             : N_(0), array_(nullptr) {}
         
         // construct from pointer and size
-        explicit ArrayView (size_t n, T * ptr)
+        ArrayView (std::size_t n, T * ptr)
             : N_(n), array_(ptr) {}
         
         // copy constructor
-        ArrayView (ArrayView<T> const & a, size_t i = 0, size_t n = 0)
+        ArrayView (ArrayView<T> const & a, std::size_t i = 0, std::size_t n = 0)
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
         
         // construct view from Array const lvalue reference
-        explicit ArrayView (Array<T> const & a, size_t i = 0, size_t n = 0)
+        ArrayView (Array<T> const & a, std::size_t i = 0, std::size_t n = 0)
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
             
         // construct view from NumberArray const lvalue reference
-        explicit ArrayView (NumberArray<T> const & a, size_t i = 0, size_t n = 0)
+        ArrayView (NumberArray<T> const & a, std::size_t i = 0, std::size_t n = 0)
             : N_((n > 0) ? n : a.size()), array_(const_cast<T*>(a.data()) + i) { assert(i + N_ <= a.size()); }
         
         // construct from consecutive memory segment
-        explicit ArrayView (const_iterator i, const_iterator j)
+        ArrayView (const_iterator i, const_iterator j)
             : N_(j - i), array_(const_cast<T*>(&(*i))) {}
         
         // construct from right-value reference
@@ -108,14 +108,14 @@ template <class T> class ArrayView
             if (v.size() != size())
                 throw exception ("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N_);
             
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 array_[i] = v[i];
             
             return *this;
         }
     
         /// Element-wise access (non-const).
-        T & operator[] (size_t i)
+        T & operator[] (std::size_t i)
         {
 #ifdef NDEBUG
             return array_[i];
@@ -129,7 +129,7 @@ template <class T> class ArrayView
         }
     
         /// Element-wise access (const).
-        T const & operator[] (size_t i) const
+        T const & operator[] (std::size_t i) const
         {
 #ifdef NDEBUG
             return array_[i];
@@ -142,7 +142,7 @@ template <class T> class ArrayView
         }
         
         /// Length of the array (number of elements).
-        size_t size () const { return N_; }
+        std::size_t size () const { return N_; }
         
         /// Pointer to the data.
         //@{
@@ -208,38 +208,38 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             : ArrayView<T>() {}
         
         // constructor, creates a length-n "x"-filled array
-        explicit Array (size_t n, T x = T(0))
-            : ArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < size(); i++) (*this)[i] = x; }
+        explicit Array (std::size_t n, T x = T(0))
+            : ArrayView<T>(n, Alloc::alloc(n)) { for (std::size_t i = 0; i < size(); i++) (*this)[i] = x; }
         
         // constructor, copies a length-n "array
-        explicit Array (size_t n, T const * const x)
-            : ArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < size(); i++) (*this)[i] = x[i]; }
+        explicit Array (std::size_t n, T const * const x)
+            : ArrayView<T>(n, Alloc::alloc(n)) { for (std::size_t i = 0; i < size(); i++) (*this)[i] = x[i]; }
         
         // copy constructor from Array const lvalue reference
         Array (Array<T> const & a)
-            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
+            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (std::size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from const ArrayView
-        explicit Array (const ArrayView<T> a)
-            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
+        Array (const ArrayView<T> a)
+            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (std::size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from Array rvalue reference
         Array (Array<T> && a)
             : ArrayView<T>() { std::swap (ArrayView<T>::N_, a.ArrayView<T>::N_); std::swap (ArrayView<T>::array_, a.ArrayView<T>::array_); }
         
         // copy constructor from std::vector
-        explicit Array (std::vector<T> const & a)
-            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
+        Array (std::vector<T> const & a)
+            : ArrayView<T>(a.size(), Alloc::alloc(a.size())) { for (std::size_t i = 0; i < size(); i++) (*this)[i] = a[i]; }
         
         // copy constructor from initializer list
         Array (std::initializer_list<T> a)
-            : ArrayView<T>(a.end()-a.begin(), Alloc::alloc(a.end()-a.begin())) { size_t i = 0; for (auto it = a.begin(); it != a.end(); it++) (*this)[i++] = *it; }
+            : ArrayView<T>(a.end()-a.begin(), Alloc::alloc(a.end()-a.begin())) { std::size_t i = 0; for (auto it = a.begin(); it != a.end(); it++) (*this)[i++] = *it; }
         
         // copy constructor from two forward iterators
         template <typename ForwardIterator> Array (ForwardIterator i, ForwardIterator j)
             : ArrayView<T>(std::distance(i,j), Alloc::alloc(std::distance(i,j)))
         {
-            size_t n = 0;
+            std::size_t n = 0;
             for (ForwardIterator k = i; k != j; k++)
                 (*this)[n++] = *k;
         }
@@ -255,7 +255,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         }
         
         /// Return number of elements.
-        size_t size () const { return ArrayView<T>::size(); }
+        std::size_t size () const { return ArrayView<T>::size(); }
         
         /**
          * @brief Resize array.
@@ -266,7 +266,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
          * virtual, so that is can be safely overridden in the
          * derived classes.
          */
-        virtual size_t resize (size_t n)
+        virtual std::size_t resize (std::size_t n)
         {
             if (n == 0)
             {
@@ -280,7 +280,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             }
             
             T * new_array = Alloc::alloc(n);
-            for (size_t i = 0; i < n; i++)
+            for (std::size_t i = 0; i < n; i++)
                 new_array[i] = (i < size()) ? (*this)[i] : T(0);
             
             Alloc::free (ArrayView<T>::array_);
@@ -292,10 +292,10 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         }
         
         /// Element-wise access (non-const).
-        inline T & operator[] (size_t i) { return ArrayView<T>::operator[](i); }
+        inline T & operator[] (std::size_t i) { return ArrayView<T>::operator[](i); }
 
         /// Element-wise access (const).
-        inline T const & operator[] (size_t i) const { return ArrayView<T>::operator[](i); }
+        inline T const & operator[] (std::size_t i) const { return ArrayView<T>::operator[](i); }
     
         /// Data pointer.
         //@{
@@ -328,7 +328,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         virtual void push_back (T const & a)
         {
             T* new_array = Alloc::alloc (size() + 1);
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 new_array[i] = std::move(ArrayView<T>::array_[i]);
             new_array[size()] = a;
             ArrayView<T>::N_++;
@@ -361,11 +361,13 @@ template <class T, class Alloc> class Array : public ArrayView<T>
          * array. A reallocation takes place. The range is specified
          * using input iterators.
          */
-        template <class InputIterator> void append (
+        template <class InputIterator> void append
+        (
             InputIterator first, InputIterator last
-        ) {
+        )
+        {
             T* new_array = Alloc::alloc(size() + last - first);
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 new_array[i] = (*this)[i];
             for (InputIterator it = first; it != last; it++)
                 new_array[size() + it - first] = *it;
@@ -431,7 +433,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
                 ArrayView<T>::array_ = Alloc::alloc(size());
             
             // run over the elements
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 (*this)[i] = b[i];
             
             return *this;
@@ -482,7 +484,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
     protected:
         
         /// Allocated memory.
-        size_t Nres_;
+        std::size_t Nres_;
         
         /// HDF file to store to / load from.
         std::string name_;
@@ -494,11 +496,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             : Array<T,Alloc>(), Nres_(size()), name_() {}
         
         // constructor, creates a length-n "x"-filled array
-        explicit NumberArray (size_t n, T x = T(0))
+        explicit NumberArray (std::size_t n, T x = T(0))
             : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // constructor, copies a length-n "array
-        explicit NumberArray (size_t n, T const * x)
+        explicit NumberArray (std::size_t n, T const * x)
             : Array<T,Alloc>(n, x), Nres_(size()), name_() {}
         
         // copy constructor from ArrayView const lvalue reference
@@ -518,7 +520,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             : Array<T,Alloc>(a), Nres_(size()), name_() {}
         
         // copy constructor from two forward iterators
-        template <typename ForwardIterator> explicit NumberArray (ForwardIterator i, ForwardIterator j)
+        template <typename ForwardIterator> NumberArray (ForwardIterator i, ForwardIterator j)
             : Array<T,Alloc>(i,j), Nres_(size()), name_() {}
         
         // copy constructor from Array rvalue reference
@@ -539,7 +541,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
         
         /// Item count.
-        size_t size () const { return ArrayView<T>::size(); }
+        std::size_t size () const { return ArrayView<T>::size(); }
         
         /**
          * @brief Resize array.
@@ -551,7 +553,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
          * takes place and new elements are initialized to T(0).
          * @return New size of the array.
          */
-        virtual size_t resize (size_t n)
+        virtual std::size_t resize (std::size_t n)
         {
             if (n <= Nres_)
             {
@@ -562,7 +564,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             Nres_ = n;
             T * new_array = Alloc::alloc(Nres_);
             
-            for (size_t i = 0; i < n; i++)
+            for (std::size_t i = 0; i < n; i++)
                 new_array[i] = (i < size()) ? (*this)[i] : T(0);
             
             Alloc::free (ArrayView<T>::array_);
@@ -581,7 +583,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
          * is necessary then.
          * @return New reserve size.
          */
-        size_t reserve (size_t n)
+        std::size_t reserve (std::size_t n)
         {
             if (n > Nres_)
             {
@@ -601,10 +603,10 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         }
         
         /// Element-wise access (non-const).
-        inline T & operator[] (size_t i) { return ArrayView<T>::operator[](i); }
+        inline T & operator[] (std::size_t i) { return ArrayView<T>::operator[](i); }
         
         /// Element-wise access (const).
-        inline T const & operator[] (size_t i) const { return ArrayView<T>::operator[](i); }
+        inline T const & operator[] (std::size_t i) const { return ArrayView<T>::operator[](i); }
         
         /**
          * @brief Data pointer.
@@ -650,7 +652,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             if (size() + 1 <= Nres_)
             {
                 // shift data by one element
-                for (size_t i = size(); i > 0; i--)
+                for (std::size_t i = size(); i > 0; i--)
                     (*this)[i] = (*this)[i-1];
                 
                 // set the new front element
@@ -662,7 +664,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             else
             {
                 // reset storage size
-                Nres_ = 2 * std::max<size_t>(1, Nres_);
+                Nres_ = 2 * std::max<std::size_t>(1, Nres_);
                 
                 // reallocate
                 T* new_array = Alloc::alloc(Nres_);
@@ -800,7 +802,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             ArrayView<T>::N_ = b.size();
             
             // run over the elements
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
                 (*this)[i] = b[i];
             
             return *this;
@@ -818,7 +820,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         NumberArray<T> conj () const
         {
             NumberArray<T> c = *this;
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
             {
                 Complex z = c[i];
                 c[i] = Complex(z.real(), -z.imag());
@@ -830,7 +832,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         double norm () const
         {
             double ret = 0.;
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
             {
                 Complex z = (*this)[i];
                 ret += z.real() * z.real() + z.imag() * z.imag();
@@ -847,17 +849,17 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         */
         template <class Functor> auto transform (Functor f) const -> NumberArray<decltype(f(T(0)))>
         {
-            size_t n = size();
+            std::size_t n = size();
             NumberArray<decltype(f(T(0)))> c(n);
             
-            for (size_t i = 0; i < n; i++)
+            for (std::size_t i = 0; i < n; i++)
                 c[i] = f((*this)[i]);
             
             return c;
         }
         
         /// Return a subarray using ArrayView.
-        ArrayView<T> slice (size_t left, size_t right) const
+        ArrayView<T> slice (std::size_t left, std::size_t right) const
         {
             assert (right >= left);
             
@@ -877,14 +879,14 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             unsigned char const * dataptr = reinterpret_cast<unsigned char const*>(data());
             
             // get byte count
-            size_t count = size() * sizeof(T);
+            std::size_t count = size() * sizeof(T);
             
             // resulting string
             std::ostringstream hexa;
             hexa << "x'" << std::hex << std::setfill('0');
             
             // for all bytes
-            for (size_t i = 0; i < count; i++)
+            for (std::size_t i = 0; i < count; i++)
                 hexa << std::setw(2) << static_cast<unsigned>(dataptr[i]);
             
             hexa << "'";
@@ -913,14 +915,14 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             std::string ss (s.begin() + 2, s.end() - 1);
             
             // compute size
-            size_t bytes = ss.size() / 2;
+            std::size_t bytes = ss.size() / 2;
             ArrayView<T>::N_ = bytes / sizeof(T);
             
             // allocate space
             ArrayView<T>::array_ = Alloc::alloc(size());
             
             // for all bytes
-            for (size_t i = 0; i < bytes; i++)
+            for (std::size_t i = 0; i < bytes; i++)
             {
                 unsigned byte;
                 std::stringstream sst;
@@ -1037,7 +1039,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                     return false;
                 
                 // get data size
-                size_t size = hdf.size("array");
+                std::size_t size = hdf.size("array");
             
             // scale size if this is a complex array
             if (typeid(T) == typeid(Complex))
@@ -1094,7 +1096,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             int zero_counter = 0;
             
             // analyze: find compressible segments
-            for (size_t i = 0; i < size(); i++)
+            for (std::size_t i = 0; i < size(); i++)
             {
                 if ((*this)[i] == 0.)
                 {
@@ -1128,7 +1130,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             nonzero_blocks.push_back(size());
             
             // compress: copy only nonzero elements
-            for (size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
+            for (std::size_t iblock = 0; iblock < nonzero_blocks.size()/2; iblock++)
             {
                 int start = nonzero_blocks[2*iblock];
                 int end = nonzero_blocks[2*iblock+1];
@@ -1157,8 +1159,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 return *this;
             
             // compute final size
-            size_t final_size = size();
-            for (size_t i = 0; i < zero_blocks.size()/2; i++)
+            std::size_t final_size = size();
+            for (std::size_t i = 0; i < zero_blocks.size()/2; i++)
                 final_size += zero_blocks[2*i+1] - zero_blocks[2*i];
             
             // resize and clean internal storage
@@ -1168,7 +1170,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             // copy nonzero chunks
             int this_end = 0;   // index of last updated element in "this"
             int load_end = 0;   // index of last used element in "nnz_array"
-            for (size_t i = 0; i < zero_blocks.size()/2; i++)
+            for (std::size_t i = 0; i < zero_blocks.size()/2; i++)
             {
                 int zero_start = zero_blocks[2*i];
                 int zero_end = zero_blocks[2*i+1];
@@ -1203,7 +1205,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
 template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
 {
     // get size; check if sizes match
-    size_t N = a.size();
+    std::size_t N = a.size();
     assert(N == b.size());
     
     // the scalar product
@@ -1214,7 +1216,7 @@ template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
     T const * const restrict pb = b.data();
     
     // sum the products
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         result += pa[i] * pb[i];
     
     return result;
@@ -1228,7 +1230,8 @@ template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
  * a_1 b_1, a_1 b_2, \dots, a_1, b_n, a_2 b_1, \dots, a_m b_n
  * @f]
  */
-template <class T1, class T2> auto outer_product (
+template <class T1, class T2> auto outer_product
+(
     const ArrayView<T1> a,
     const ArrayView<T2> b
 ) -> NumberArray<decltype(T1(0) * T2(0))>
@@ -1248,7 +1251,7 @@ template <class T1, class T2> auto outer_product (
 template <typename T> std::ostream & operator << (std::ostream & out, ArrayView<T> const & a)
 {
     out << "[";
-    for (size_t i = 0; i < a.size(); i++)
+    for (std::size_t i = 0; i < a.size(); i++)
     {
         if (i == 0)
             out << a[i];
@@ -1317,7 +1320,7 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
  * @param x1 Right boundary and last sample for "samples" > 1.
  * @param samples Sample count.
  */
-template <typename T> NumberArray<T> logspace (T x0, T x1, size_t samples)
+template <typename T> NumberArray<T> logspace (T x0, T x1, std::size_t samples)
 {
     if (x0 <= 0 or x1 <= 0 or x1 < x0)
         throw exception ("[logspace] It must be 0 < x1 <= x2 !");
@@ -1360,7 +1363,7 @@ template <typename T> NumberArray<T> logspace (T x0, T x1, size_t samples)
  *      a_k = a_1 + (a_n - a_1) \frac{1-q^{k-1}}{1-q^{n-1}}
  * @f]
  */
-template <typename T> NumberArray<T> geomspace (T x0, T x1, size_t samples, double q)
+template <typename T> NumberArray<T> geomspace (T x0, T x1, std::size_t samples, double q)
 {
     NumberArray<T> grid(samples);
     
@@ -1415,14 +1418,14 @@ template <class T1, class T2> void write_array
  * For all integers from 0 to m-1 call fetch(i) and save the results to
  * a text file as a single column.
  */
-template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, Fetcher fetch)
+template <typename Fetcher> bool write_1D_data (std::size_t m, const char* filename, Fetcher fetch)
 {
     std::ofstream f(filename);
     
     if (f.bad())
         return false;
     
-    for (size_t i = 0; i < m; i++)
+    for (std::size_t i = 0; i < m; i++)
         f << fetch(i) << "\n";
     
     return true;
@@ -1443,16 +1446,16 @@ template <typename Fetcher> bool write_1D_data (size_t m, const char* filename, 
           @endcode
  * @return Write success indicator (@c false for failure).
  */
-template <class Fetcher> bool write_2D_data (size_t m, size_t n, const char* filename, Fetcher fetch)
+template <class Fetcher> bool write_2D_data (std::size_t m, std::size_t n, const char* filename, Fetcher fetch)
 {
     std::ofstream f(filename);
     
     if (f.bad())
         return false;
     
-    for (size_t i = 0; i < m; i++)
+    for (std::size_t i = 0; i < m; i++)
     {
-        for (size_t j = 0; j < n; j++)
+        for (std::size_t j = 0; j < n; j++)
             f << fetch(i,j) << " ";
         f << "\n";
     }
@@ -1545,9 +1548,9 @@ template <typename ...Params> rArray concatenate (rArray const & v1, Params ...p
     {
         rArray v2 = concatenate (p...);
         rArray v (v1.size() + v2.size());
-        for (size_t i = 0; i < v1.size(); i++)
+        for (std::size_t i = 0; i < v1.size(); i++)
             v[i] = v1[i];
-        for (size_t i = 0; i < v2.size(); i++)
+        for (std::size_t i = 0; i < v2.size(); i++)
             v[i + v1.size()] = v2[i];
         return v;
     }
@@ -1608,10 +1611,10 @@ template <typename T> Array<T> pow (Array<T> const & u, double e)
 /// Return per-element square root.
 template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
 {
-    size_t N = A.size();
+    std::size_t N = A.size();
     NumberArray<T> B (N);
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         B[i] = std::sqrt(A[i]);
     
     return B;
@@ -1620,10 +1623,10 @@ template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
 /// Return per-element sine.
 template <class T> NumberArray<T> sin (NumberArray<T> const & A)
 {
-    size_t N = A.size();
+    std::size_t N = A.size();
     NumberArray<T> B (N);
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         B[i] = std::sin(A[i]);
     
     return B;
@@ -1632,10 +1635,10 @@ template <class T> NumberArray<T> sin (NumberArray<T> const & A)
 /// Return per-element arcsine.
 template <class T> NumberArray<T> asin (NumberArray<T> const & A)
 {
-    size_t N = A.size();
+    std::size_t N = A.size();
     NumberArray<T> B (N);
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         B[i] = std::asin(A[i]);
     
     return B;
@@ -1644,10 +1647,10 @@ template <class T> NumberArray<T> asin (NumberArray<T> const & A)
 /// Return per-element cosine.
 template <class T> NumberArray<T> cos (NumberArray<T> const & A)
 {
-    size_t N = A.size();
+    std::size_t N = A.size();
     NumberArray<T> B (N);
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         B[i] = std::cos(A[i]);
     
     return B;
@@ -1674,13 +1677,15 @@ template <typename T> T sum (const ArrayView<T> v)
 template <typename T> NumberArray<T> sums (const ArrayView<NumberArray<T>> v)
 {
     if (v.size() == 0)
-        return NumberArray<T>();	// empty array
+        return NumberArray<T>();    // empty array
         
-        return std::accumulate (
+        return std::accumulate
+        (
             v.begin(),
             v.end(),
             NumberArray<T> (v[0].size()),
-            [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T> {
+            [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T>
+            {
                 return a + b;
             }
         );
@@ -1696,7 +1701,7 @@ template <typename T>
 Array<bool> operator == (const ArrayView<T> u, T x)
 {
     Array<bool> v(u.size());
-    for (size_t i  = 0; i < u.size(); i++)
+    for (std::size_t i  = 0; i < u.size(); i++)
         v[i] = (u[i] == x);
     return v;
 }
@@ -1708,7 +1713,7 @@ Array<bool> operator == (const ArrayView<T> u, const ArrayView<T> v)
     assert(u.size() == v.size());
     
     Array<bool> w(u.size());
-    for (size_t i  = 0; i < u.size(); i++)
+    for (std::size_t i  = 0; i < u.size(); i++)
         w[i] = (u[i] == v[i]);
     return w;
 }
@@ -1741,10 +1746,10 @@ inline bool any(const ArrayView<bool> B)
 template <typename TFunctor, typename TArray>
 void eval (TFunctor f, TArray grid, TArray& vals)
 {
-    size_t N = grid.size();
+    std::size_t N = grid.size();
     assert(N == vals.size());
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         vals[i] = f(grid[i]);
 }
 
@@ -1758,13 +1763,15 @@ void eval (TFunctor f, TArray grid, TArray& vals)
  * @param idx2 Sorted (!) indices of the second array.
  * @param arr2 Merge FROM array.
  */
-template <typename Tidx, typename Tval> void merge (
+template <typename Tidx, typename Tval> void merge
+(
     NumberArray<Tidx>       & idx1, NumberArray<Tval>       & arr1,
     NumberArray<Tidx> const & idx2, NumberArray<Tval> const & arr2
-){
+)
+{
     // positions in arrays
-    size_t i1 = 0;
-    size_t i2 = 0;
+    std::size_t i1 = 0;
+    std::size_t i2 = 0;
     
     // output arrays
     NumberArray<Tidx> idx;
@@ -1809,18 +1816,18 @@ template <typename Tidx, typename Tval> void merge (
 /// Join elements from all subarrays.
 template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> arrays)
 {
-    NumberArray<size_t> partial_sizes(arrays.size() + 1);
+    NumberArray<std::size_t> partial_sizes(arrays.size() + 1);
     
     // get partial sizes
     partial_sizes[0] = 0;
-    for (size_t i = 0; i < arrays.size(); i++)
+    for (std::size_t i = 0; i < arrays.size(); i++)
         partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
     
     // result array
     NumberArray<T> res(partial_sizes.back());
     
     // concatenate arrays
-    for (size_t i = 0; i < arrays.size(); i++)
+    for (std::size_t i = 0; i < arrays.size(); i++)
     {
         if (arrays[i].size() > 0)
             ArrayView<T>(res, partial_sizes[i], arrays[i].size()) = arrays[i];
@@ -1887,7 +1894,7 @@ template <class T> void smoothen (ArrayView<T> v)
 template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 {
     std::ostringstream ss;
-    for (size_t i = 0; i < v.size(); i++)
+    for (std::size_t i = 0; i < v.size(); i++)
     {
         if (i == 0)
             ss << v[i];
