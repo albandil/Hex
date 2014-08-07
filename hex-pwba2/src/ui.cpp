@@ -74,7 +74,7 @@ void parse_input_file
     int & Ni, int & Li, int & Nf, int & Lf, double & Ei,
     double & Rmax, int & N,
     int & maxNn, int & maxLn, double & Enmax,
-    int & maxlevel_allowed, int & maxlevel_forbidden
+    int & integrate_allowed, int & integrate_forbidden
 )
 {
     // read all data
@@ -87,8 +87,8 @@ void parse_input_file
     maxNn = ReadNext<int>(inf).val;
     maxLn = ReadNext<int>(inf).val;
     Enmax = ReadNext<double>(inf).val;
-    maxlevel_allowed = ReadNext<int>(inf).val;
-    maxlevel_forbidden = ReadNext<int>(inf).val;
+    integrate_allowed = ReadNext<int>(inf).val;
+    integrate_forbidden = ReadNext<int>(inf).val;
 }
 
 int main (int argc, char* argv[])
@@ -184,8 +184,8 @@ int main (int argc, char* argv[])
     int Pi, L, maxNn, nL;
     int Ni, Li, Nf, Lf;
     double Ei, Enmax;
-    int maxlevel_allowed;
-    int maxlevel_forbidden;
+    int integrate_allowed;
+    int integrate_forbidden;
     
     // parse input file
     parse_input_file
@@ -195,13 +195,13 @@ int main (int argc, char* argv[])
         Ni, Li, Nf, Lf, Ei,
         Rmax, N,
         maxNn, nL, Enmax,
-        maxlevel_allowed, maxlevel_forbidden
+        integrate_allowed, integrate_forbidden
     );
     
     // compute other variables from input
     double ki = std::sqrt(Ei);
     double Etot = ki*ki - 1./(Ni*Ni);
-    rArray grid = linspace(0., Rmax, N);
+    rArray grid = linspace(0., Rmax, N + 1);
     
     // echo input data
     std::cout << "Quantum state parameters:" << std::endl;
@@ -221,8 +221,8 @@ int main (int argc, char* argv[])
     std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
     std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
     std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
-    std::cout << "\t- integrate allowed states: " << (maxlevel_allowed == 0 ? "no" : "yes") << std::endl;
-    std::cout << "\t- integrate forbidden states: " << (maxlevel_forbidden == 0 ? "no" : "yes") << std::endl;
+    std::cout << "\t- integrate allowed states: " << (integrate_allowed == 0 ? "no" : "yes") << std::endl;
+    std::cout << "\t- integrate forbidden states: " << (integrate_forbidden == 0 ? "no" : "yes") << std::endl;
     
     if (partial_wave)
     {
@@ -263,8 +263,8 @@ int main (int argc, char* argv[])
     // outgoing electron partial T-matrices
     cArrays Tdir =
         partial_wave ?
-        PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, maxlevel_allowed, maxlevel_forbidden) :
-        PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, maxlevel_allowed, maxlevel_forbidden);
+        PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, integrate_allowed, integrate_forbidden) :
+        PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, integrate_allowed, integrate_forbidden);
     
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;

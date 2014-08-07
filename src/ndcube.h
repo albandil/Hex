@@ -48,7 +48,7 @@ template <int dim> class ndCube
               edge_(edge)
         {}
         
-        ndCube (std::vector<double> origin, double edge)
+        ndCube (std::vector<double> const & origin, double edge)
             : origin_(origin),
               edge_(edge)
         {}
@@ -137,6 +137,9 @@ template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> co
 }; // namespace geom
 
 // some abbreviations
+#define Unit_2Cube geom::ndCube<2>()
+#define Unit_3Cube geom::ndCube<3>()
+#define Unit_4Cube geom::ndCube<4>()
 #define Unit_5Cube geom::ndCube<5>()
 #define Unit_6Cube geom::ndCube<6>()
 

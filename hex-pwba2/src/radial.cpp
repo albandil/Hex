@@ -48,8 +48,8 @@ rArray interpolate_bound_bound_potential
     {
         auto potential = [&](double y) -> double
         {
-            if (y == 0.)
-                return 0;
+            if (y == 0)
+                return 0; // actually Inf, but...
             
             // for all terms of product of Laguerre polynomials
             double suma1 = 0, suma2 = 0;
@@ -77,8 +77,8 @@ rArray interpolate_bound_bound_potential
     {
         auto potential = [&](double y) -> double
         {
-            if (y == 0.)
-                return 0;
+            if (y == 0)
+                return 0; // actually Inf, but...
             
             // for all terms of product of Laguerre polynomials
             double suma1 = 0, suma2 = 0;
@@ -338,13 +338,13 @@ Complex Idir_allowed
 {
     size_t N = grid.size();
     
-    rArray inner_lower(N), inner_higher_re(N), inner_higher_im(N);
+    rArray inner_lower(N), inner_higher_re(N)/*, inner_higher_im(N)*/;
     
     # pragma omp parallel for firstprivate (N)
     for (size_t i = 1; i < N; i++)
     {
         inner_lower[i] = Vni[i] * jn[i] * ji[i];
-        inner_higher_im[i] = inner_lower[i];
+//         inner_higher_im[i] = inner_lower[i];
         inner_higher_re[i] = Vni[i] * yn[i] * ji[i];
     }
     
@@ -359,6 +359,7 @@ Complex Idir_allowed
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         
+        // compute forward partial sums
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_lower[i] = gsl_spline_eval_integ (spline, grid.front(), grid[i], acc);
@@ -378,6 +379,7 @@ Complex Idir_allowed
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         
+        // compute backward partial sums
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_higher_re[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
@@ -386,20 +388,21 @@ Complex Idir_allowed
     }
     gsl_spline_free (spline);
     
-    spline = gsl_spline_alloc (gsl_interp_cspline, N);
+/*    spline = gsl_spline_alloc (gsl_interp_cspline, N);
     gsl_spline_init (spline, grid.data(), inner_higher_im.data(), N);
     
     # pragma omp parallel firstprivate (N)
     {
         gsl_interp_accel * acc = gsl_interp_accel_alloc ();
         
+        // compute backward partial sums
         # pragma omp for
         for (size_t i = 0; i < N; i++)
             inner_higher_im[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
         
         gsl_interp_accel_free (acc);
     }
-    gsl_spline_free (spline);
+    gsl_spline_free (spline); */
     
     double sum_outer_re = 0, sum_outer_im = 0;
     
@@ -424,13 +427,15 @@ Complex Idir_allowed
         }
         # pragma omp section
         {
-            rArray outer_im = Vfn * jf * (inner_lower * jn + inner_higher_im * jn);
+//             rArray outer_im = Vfn * jf * (inner_lower * jn + inner_higher_im * jn);
+            rArray outer_im = Vfn * jf * jn;
             
             gsl_interp_accel * acc = gsl_interp_accel_alloc ();
             gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
             gsl_spline_init (spline, grid.data(), outer_im.data(), N);
             
-            sum_outer_im = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
+//             sum_outer_im = gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
+            sum_outer_im = inner_lower.back() * gsl_spline_eval_integ (spline, grid.front(), grid.back(), acc);
             
             gsl_spline_free (spline);
             gsl_interp_accel_free (acc);

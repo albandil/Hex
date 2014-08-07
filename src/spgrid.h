@@ -458,7 +458,9 @@ template <class T> class SparseGrid
                     std::cout << "  cells to process : " << domains.size() << " (";
                     
                     double frac = domains.size() * 100. / special::pow2(level*dim);
-                    if (0 < frac and frac < 1)
+                    if (frac == 0)
+                        std::cout << "= 0";
+                    else if (frac < 1)
                         std::cout << "< 1";
                     else
                         std::cout << "~ " << (int)std::ceil(frac);
@@ -512,10 +514,14 @@ template <class T> class SparseGrid
                 if (verbose_)
                 {
                     std::cout << "  converged cells due to" << std::endl;
-                    std::cout << "    absolute local change between rules : " << abslocal << std::endl;
-                    std::cout << "    relative local change between rules : " << rellocal << std::endl;
-                    std::cout << "    absolute global threshold : " << absglobal << std::endl;
-                    std::cout << "    relative global threshold : " << relglobal << std::endl;
+                    if (epsabs_ > 0)
+                        std::cout << "    absolute local change between rules : " << abslocal << std::endl;
+                    if (epsrel_ > 0)
+                        std::cout << "    relative local change between rules : " << rellocal << std::endl;
+                    if (global_epsabs_ > 0)
+                        std::cout << "    absolute global threshold : " << absglobal << std::endl;
+                    if (global_epsrel_ > 0)
+                        std::cout << "    relative global threshold : " << relglobal << std::endl;
                     
                     std::size_t nsub = std::count_if
                     (
