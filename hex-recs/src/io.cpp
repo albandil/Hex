@@ -340,6 +340,7 @@ void InputFile::read (std::ifstream & inf)
     for (int li = 0; li < nis[i].val; li++)
     for (int two_ji = std::abs(2*li-1); two_ji <= 2*li+1; two_ji += 2)
     for (int two_mi = -two_ji; two_mi <= two_ji; two_mi += 2)
+    for (int two_si = -1; two_si <= 1; two_si += 2)
     {
         // skip unused orbital angular momenta
         if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
@@ -351,6 +352,10 @@ void InputFile::read (std::ifstream & inf)
         
         // skip unused angular momentum projections
         if (two_mis[i].val != two_mi and not (two_mis[i].flags & ReadItem<int>::asterisk))
+            continue;
+        
+        // conserve requested angular momentum projection
+        if (two_mi + two_si != two_M)
             continue;
         
         // add this initial state

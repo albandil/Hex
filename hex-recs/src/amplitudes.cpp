@@ -79,39 +79,34 @@ void Amplitudes::extract ()
             // precompute hydrogen function overlaps
             cArray Pf_overlaps = rad_.overlapP(nf,lf,weightEndDamp(bspline_));
             
-            // compute radial integrals
-            for (int two_mf = -two_jf; two_mf <= two_jf; two_mf += 2) // for all atomic final composite projections
-            for (int two_sf = -1; two_sf <= 1; two_sf += 2) // for all projectile final spin projections
+            // final atomic energy
+            double Ef = -1./(nf*nf) /*- mf * inp.B*/;
+            
+            // add spin-orbital energy
+            if (lf > 0)
             {
-                // final atomic energy
-                double Ef = -1./(nf*nf) /*- mf * inp.B*/;
-                
-                // add spin-orbital energy
-                if (lf > 0)
-                {
-                    Ef += 0.5 * special::constant::alpha_sqr * (jf*(jf+1) - lf*(lf+1) - 0.75)  // = ½(Zα)² L·S
-                          / (nf*nf*nf * lf * (lf+0.5) * (lf+1)); // = ⟨nf,lf|r⁻³|nf,lf⟩
-                }
-                
-                // final projectile momenta
-                rArray kf = sqrt(ETot - Ef);
-                
-                // setup transition name
-                Transition transition = 
-                {
-                    ni, li, two_ji, two_mi, two_si,
-                    nf, lf, two_jf, two_mf, two_sf
-                };
-                
-                // compute Λ for this transition
-                Lambda_LSlp[transition] = computeLambda_(transition, kf);
-                
-                // compute T-matrices for this transition
-                Tmat_jplp[transition] = computeTmat_(transition, kf);
-                
-                // compute cross sections for this transition
-                sigma[transition] = computeSigma_(transition, kf);
+                Ef += 0.5 * special::constant::alpha_sqr * (jf*(jf+1) - lf*(lf+1) - 0.75)  // = ½(Zα)² L·S
+                        / (nf*nf*nf * lf * (lf+0.5) * (lf+1)); // = ⟨nf,lf|r⁻³|nf,lf⟩
             }
+            
+            // final projectile momenta
+            rArray kf = sqrt(ETot - Ef);
+            
+            // setup transition name
+            Transition transition = 
+            {
+                ni, li, two_ji, two_mi, two_si,
+                nf, lf, two_jf, two_mf, two_sf
+            };
+            
+            // compute Λ for this transition
+            Lambda_LSlp[transition] = computeLambda_(transition, kf);
+            
+            // compute T-matrices for this transition
+            Tmat_jplp[transition] = computeTmat_(transition, kf);
+            
+            // compute cross sections for this transition
+            sigma[transition] = computeSigma_(transition, kf);
             
             std::cout << " ok" << std::endl;
         }
@@ -374,7 +369,7 @@ void Amplitudes::writeSQL_files ()
                          << inp_.J  << "," << inp_.Ei[i] << ","
                          << lp << "," << two_jp << "," 
                          << T[i].real() << "," << T[i].imag() << ","
-                         << "0, 0);"
+                         << "0,0);"
                          << std::endl;
                 }
             }
