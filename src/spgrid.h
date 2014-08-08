@@ -13,6 +13,8 @@
 #ifndef HEX_SPARSE_GRID
 #define HEX_SPARSE_GRID
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <map>
 #include <numeric>
@@ -22,6 +24,125 @@
 
 namespace spgrid
 {
+
+static std::vector<unsigned> vtk_cell = {
+     1, // 0-D: vertex
+     3, // 1-D: line
+     9, // 2-D: quad
+    12  // 3-D: hexahedron
+};
+
+template <int d> class order_bitsets
+{
+    public:
+        
+        bool operator() (std::bitset<d> const & u, std::bitset<d> const & v)
+        {
+            // define ordering for 'std::bitset<d>' variables
+            return d < 8 * sizeof(unsigned long) ?
+                    u.to_ulong() < v.to_ulong() : u.to_string() < v.to_string() ;
+        }
+        
+        
+};
+
+template <int d> class order_vector_of_bitsets
+{
+    public:
+        
+        bool operator()
+        (
+            std::vector<std::bitset<d>> const & a,
+            std::vector<std::bitset<d>> const & b
+        )
+        {
+            // compare two vectors of bitsets
+            return std::lexicographical_compare
+            (
+                a.begin(), a.end(),
+                b.begin(), b.end(),
+                order_bitsets<d>()
+            );
+        }
+};
+
+template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::vector<std::bitset<dim>> pt)
+{
+    // find the latest history point where the point can be shifted forward
+    for (auto bit = pt.rbegin(); bit != pt.rend(); bit++)
+    {
+        if ((*bit)[axis])
+        {
+            (*bit)[axis] = 0;  // set bit to 0 (and "carry" to the next binary "digit")
+            continue;
+        }
+        else
+        {
+            (*bit)[axis] = 1;  // set bit to 1 (no "carry", done)
+            return pt;
+        }
+    }
+    
+    throw exception ("Cannot shift foward.");
+}
+
+template <int dim> std::vector<std::bitset<dim>> shift_bck (unsigned axis, std::vector<std::bitset<dim>> pt)
+{
+    // find the latest history point where the point can be shifted back
+    for (auto bit = pt.rbegin(); bit != pt.rend(); bit++)
+    {
+        if ((*bit)[axis])
+        {
+            (*bit)[axis] = 0;  // set bit to 0 (no "carry", done)
+            return pt;
+        }
+        else
+        {
+            (*bit)[axis] = 1;  // set bit to 1 (and "carry" to the next binary "digit")
+            continue;
+        }
+    }
+    
+    throw exception ("Cannot shift backward.");
+}
+
+template <int dim> std::vector<std::vector<std::bitset<dim>>> extrude_point_to_regular_VTK_cell (std::vector<std::bitset<dim>> const & pt)
+{
+    throw exception ("Regular extrusion of point into more than 3 dimensions is not implemented. Please do not use VTK grid export here.");
+}
+
+template<> inline std::vector<std::vector<std::bitset<1>>> extrude_point_to_regular_VTK_cell<1> (std::vector<std::bitset<1>> const & pt)
+{
+    // order required by VTK: (xmin) (xmax)
+    std::vector<std::vector<std::bitset<1>>> cell_points = { pt };
+    cell_points.push_back(shift_fwd<1>(0,pt));
+    return cell_points;
+}
+
+template<> inline std::vector<std::vector<std::bitset<2>>> extrude_point_to_regular_VTK_cell<2> (std::vector<std::bitset<2>> const & pt)
+{
+    // order required by VTK: (xmin,ymin) (xmax,ymin) (xmax,ymax) (xmin,ymax)
+    std::vector<std::vector<std::bitset<2>>> cell_points = { pt };
+    cell_points.push_back(shift_fwd<2>(0,pt));
+    cell_points.push_back(shift_fwd<2>(1,cell_points.back()));
+    cell_points.push_back(shift_bck<2>(0,cell_points.back()));
+    return cell_points;
+}
+
+template<> inline std::vector<std::vector<std::bitset<3>>> extrude_point_to_regular_VTK_cell<3> (std::vector<std::bitset<3>> const & pt)
+{
+    // order required by VTK: (xmin,ymin,zmin) (xmax,ymin,zmin) (xmax,ymax,zmin) (xmin,ymax,zmin)
+    //                        (xmin,ymin,zmax) (xmax,ymin,zmax) (xmax,ymax,zmax) (xmin,ymax,zmax)
+    std::vector<std::vector<std::bitset<3>>> cell_points = { pt };
+    cell_points.push_back(shift_fwd<3>(0,pt));
+    cell_points.push_back(shift_fwd<3>(1,cell_points.back()));
+    cell_points.push_back(shift_bck<3>(0,cell_points.back()));
+    cell_points.push_back(shift_fwd<3>(2,pt));
+    cell_points.push_back(shift_fwd<3>(0,cell_points.back()));
+    cell_points.push_back(shift_fwd<3>(1,cell_points.back()));
+    cell_points.push_back(shift_bck<3>(0,cell_points.back()));
+    return cell_points;
+}
 
 /**
  * @brief Available sparse grid types.
@@ -169,6 +290,15 @@ template <class T> class SparseGrid
         
         /// Whether do output diagnosti information (not used at the moment).
         bool verbose_;
+        
+        /// Verbose outpu prefix.
+        std::string prefix_;
+        
+        /// Whether to write final grid to VTK (only usable when dim <= 3).
+        bool write_vtk_;
+        
+        /// VTK output file name.
+        std::string vtkfilename_;
     
     public:
         
@@ -176,7 +306,8 @@ template <class T> class SparseGrid
         SparseGrid ()
             : epsabs_(1e-8), epsrel_(1e-8), global_epsabs_(1e-8),
               global_epsrel_(1e-8), minlevel_(0), maxlevel_(5),
-              ok_(true), verbose_(false)
+              ok_(true), verbose_(false), prefix_(""), write_vtk_(false),
+              vtkfilename_("spgrid.vtk")
         {}
         
         /// Return the result value computed before.
@@ -214,6 +345,16 @@ template <class T> class SparseGrid
         
         /// Set verbosity level.
         void setVerbose (bool verbose) { verbose_ = verbose; }
+        
+        /// Set verbose output prefix.
+        void setPrefix (std::string prefix) { prefix_ = std::string(prefix); }
+        
+        /// Set whether to write final grid to VTK (can be used only when dim <= 3).
+        void setWriteVTK (bool write_vtk, std::string vtkfilename = "spgrid.vtk")
+        {
+            write_vtk_ = write_vtk;
+            vtkfilename_ = vtkfilename;
+        }
         
         /**
          * @brief Fixed-order spare-grid quadrature.
@@ -437,6 +578,9 @@ template <class T> class SparseGrid
             // unprocessed subdomains of the integration domain
             std::vector<tDomain> domains = {{ root, false, integrate_fixed(F, root, ruleLow) }};
             
+            // VTK debug data
+            std::map<std::vector<std::bitset<dim>>,T,order_vector_of_bitsets<dim>> vtk;
+            
             // initialize evaluations count and number of cells
             neval_ = nodes.at(ruleLow).n;
             ncells_ = 1;
@@ -453,9 +597,9 @@ template <class T> class SparseGrid
                 if (verbose_)
                 {
                     std::cout << std::endl;
-                    std::cout << "Level " << level << std::endl;
-                    std::cout << "  initial estimate : " << globalEstimate << std::endl;
-                    std::cout << "  cells to process : " << domains.size() << " (";
+                    std::cout << prefix_ << "Level " << level << std::endl;
+                    std::cout << prefix_ << "  initial estimate : " << globalEstimate << std::endl;
+                    std::cout << prefix_ << "  cells to process : " << domains.size() << " (";
                     
                     double frac = domains.size() * 100. / special::pow2(level*dim);
                     if (frac == 0)
@@ -513,15 +657,15 @@ template <class T> class SparseGrid
                 // debug info
                 if (verbose_)
                 {
-                    std::cout << "  converged cells due to" << std::endl;
+                    std::cout << prefix_ << "  converged cells due to" << std::endl;
                     if (epsabs_ > 0)
-                        std::cout << "    absolute local change between rules : " << abslocal << std::endl;
+                        std::cout << prefix_ << "    absolute local change between rules : " << abslocal << std::endl;
                     if (epsrel_ > 0)
-                        std::cout << "    relative local change between rules : " << rellocal << std::endl;
+                        std::cout << prefix_ << "    relative local change between rules : " << rellocal << std::endl;
                     if (global_epsabs_ > 0)
-                        std::cout << "    absolute global threshold : " << absglobal << std::endl;
+                        std::cout << prefix_ << "    absolute global threshold : " << absglobal << std::endl;
                     if (global_epsrel_ > 0)
-                        std::cout << "    relative global threshold : " << relglobal << std::endl;
+                        std::cout << prefix_ << "    relative global threshold : " << relglobal << std::endl;
                     
                     std::size_t nsub = std::count_if
                     (
@@ -531,7 +675,7 @@ template <class T> class SparseGrid
                     );
                     double frac = nsub * 100. / domains.size();
                     
-                    std::cout << "  cells to bisect : " << nsub << " (";
+                    std::cout << prefix_ << "  cells to bisect : " << nsub << " (";
                     if (0 < frac and frac < 1)
                         std::cout << "< 1";
                     else
@@ -543,7 +687,7 @@ template <class T> class SparseGrid
                 if (level == maxlevel_)
                 {
                     if (verbose_)
-                        std::cout << "  maximal level " << maxlevel_ << " reached" << std::endl;
+                        std::cout << prefix_ << "  maximal level " << maxlevel_ << " reached" << std::endl;
                     
                     break;
                 }
@@ -556,10 +700,14 @@ template <class T> class SparseGrid
                     {
                         // this domain has converged -- store its value
                         finalEstimate += oldDom.val;
+                        
+                        // save data for potential VTK debug output
+                        if (write_vtk_ and dim <= 3)
+                            vtk[oldDom.cube.history()] = F(dim,oldDom.cube.centre().data());
                     }
                     else
                     {
-                        // this domains needs subdivision
+                        // this domain needs subdivision
                         for (dCube const & c : oldDom.cube.subdivide())
                         {
                             domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
@@ -570,7 +718,7 @@ template <class T> class SparseGrid
                 }
                 
                 if (verbose_)
-                    std::cout << "  function evaluations up to now : " << neval_ << std::endl;
+                    std::cout << prefix_ << "  function evaluations up to now : " << neval_ << std::endl;
                 
                 // stop if no domain needs subdivision
                 if (domains.empty())
@@ -585,10 +733,105 @@ template <class T> class SparseGrid
             if (verbose_)
             {
                 if (domains.empty())
-                    std::cout << "  cell list successfully emptied" << std::endl;
+                    std::cout << prefix_ << "  cell list successfully emptied" << std::endl;
                 else
-                    std::cout << "  integral did not converge in some cells" << std::endl;
-                std::cout << "  final estimate : " << result_ << std::endl;
+                    std::cout << prefix_ << "  integral did not converge in some cells" << std::endl;
+                std::cout << prefix_ << "  final estimate : " << result_ << std::endl;
+            }
+            
+            if (write_vtk_ and dim <= 3)
+            {
+                if (verbose_)
+                {
+                    std::cout << std::endl;
+                    std::cout << prefix_ << "Writing VTK to file \"" << vtkfilename_ << "\"." << std::endl;
+                }
+                
+                std::map<std::vector<std::bitset<dim>>,std::size_t,order_vector_of_bitsets<dim>> point_histories_map;
+                std::vector<std::pair<std::array<std::size_t,special::pow2(dim)>,T>> cell_data;
+                
+                // for every cell in grid: extrude its origin to the whole cell
+                for (auto data : vtk)
+                {
+                    // start with the root corner of the cube (use its subdivision history)
+                    std::vector<std::vector<std::bitset<dim>>> pthistory = extrude_point_to_regular_VTK_cell<dim>(data.first);
+                    
+                    // point indices for this cell
+                    std::array<std::size_t,special::pow2(dim)> pts;
+                    
+                    // check whether these points exist in database (add if they don't, add with a new consecutive id)
+                    for (std::size_t i = 0; i < special::pow2(dim); i++)
+                    {
+                        if (point_histories_map.find(pthistory[i]) == point_histories_map.end())
+                        {
+                            // these two lines need to be split ('=' is not a sequence point!)
+                            std::size_t npoints = point_histories_map.size();
+                            point_histories_map[pthistory[i]] = npoints;
+                        }
+                        pts[i] = point_histories_map[pthistory[i]];
+                    }
+                    
+                    // add cell point data to database
+                    cell_data.push_back(std::make_pair(pts, data.second));
+                }
+                
+                // reorder points so that they match their indices (flip the data structure)
+                std::vector<std::vector<std::bitset<dim>>> point_histories(point_histories_map.size());
+                for (auto data : point_histories_map)
+                    point_histories[data.second] = data.first;
+                
+                // write data file header
+                std::ofstream vtkf(vtkfilename_.c_str());
+                vtkf << "# vtk DataFile Version 2.0" << std::endl;
+                vtkf << "Sparse grid dump." << std::endl;
+                vtkf << "ASCII" << std::endl;
+                vtkf << "DATASET UNSTRUCTURED_GRID" << std::endl;
+                vtkf << "POINTS " << point_histories.size() << " float" << std::endl;
+                
+                // decode subdivision histories into final coordinates
+                for (auto ptsubs : point_histories)
+                {
+                    // compute coordinates of this point given its subdivision history
+                    std::vector<double> coords = root.origin();
+                    for (unsigned sub = 0; sub < ptsubs.size(); sub++)
+                    for (int axis = 0; axis < dim; axis++)
+                    if (ptsubs[sub][axis])
+                        coords[axis] += root.edge() * std::pow(0.5,sub);
+                    
+                    // write exactly three coordinates
+                    for (unsigned axis = 0; axis < dim; axis++)
+                        vtkf << coords[axis] << " ";
+                    for (int axis = dim; axis < 3; axis++)
+                        vtkf << 0 << " ";
+                    
+                    vtkf << std::endl;
+                }
+                
+                vtkf << "CELLS " << cell_data.size() << " " << cell_data.size() * (special::pow2(dim) + 1) << std::endl;
+                
+                // write cell vertex list in the correct order
+                for (auto cell : cell_data)
+                {
+                    vtkf << special::pow2(dim) << " ";
+                    for (unsigned ptid : cell.first)
+                        vtkf << ptid << " ";
+                    vtkf << std::endl;
+                }
+                
+                vtkf << "CELL_TYPES " << cell_data.size() << std::endl;
+                for (std::size_t i = 0; i < cell_data.size(); i++)
+                    vtkf << vtk_cell[dim] << std::endl;
+                vtkf << "CELL_DATA " << cell_data.size() << std::endl;
+                vtkf << "FIELD EvaluatedIntegrand " << typeinfo<T>::ncmpt << std::endl;
+                
+                // for all components of the data type 'T'
+                for (std::size_t i = 0; i < typeinfo<T>::ncmpt; i++)
+                {
+                    vtkf << "Component" << i << " 1 " << cell_data.size() << " float" << std::endl;
+                    for (auto celldata : cell_data)
+                        vtkf << typeinfo<T>::cmpt(i,celldata.second) << std::endl;
+                }
+                vtkf.close();
             }
             
             // terminate

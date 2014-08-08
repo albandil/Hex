@@ -13,6 +13,8 @@
 #ifndef HEX_NDCUBE
 #define HEX_NDCUBE
 
+#include <algorithm>
+#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -45,17 +47,20 @@ template <int dim> class ndCube
         
         ndCube (double edge = 1.)
             : origin_(dim),
-              edge_(edge)
+              edge_(edge),
+              history_({0})
         {}
         
-        ndCube (std::vector<double> const & origin, double edge)
+        ndCube (std::vector<double> const & origin, double edge, std::vector<std::bitset<dim>> history)
             : origin_(origin),
-              edge_(edge)
+              edge_(edge),
+              history_(history)
         {}
         
         ndCube (std::initializer_list<double> list)
             : origin_(dim),
-              edge_(0.)
+              edge_(0.),
+              history_(0)
         {
             // first n-tuple is position of origin, then one number is edge length
             assert(list.size() == dim + 1);
@@ -78,14 +83,30 @@ template <int dim> class ndCube
             std::vector<ndCube<dim>> subcubes;
             std::vector<double> suborigin(dim);
             
+            // copy the subdivision history and append a new element for this subdivision
+            std::vector<std::bitset<dim>> new_history(history_.size() + 1);
+            std::copy(history_.begin(), history_.end(), new_history.begin());
+            std::bitset<dim> & subhistory = new_history.back();
+            
             for (int i = 0; i < nVertex(); i++)
             {
                 // get coordinates of the sub-origin
                 for (int j = 0; j < dim; j++)
+                {
                     suborigin[j] = origin_[j] + ((i & special::pow2(j)) != 0 ? 1 : 0) * 0.5 * edge_;
+                    subhistory[j] = (i & special::pow2(j));
+                }
                 
                 // add sub-cube
-                subcubes.push_back(ndCube<dim>(suborigin, 0.5 * edge_));
+                subcubes.push_back
+                (
+                    ndCube<dim>
+                    (
+                        suborigin,
+                        0.5 * edge_,
+                        new_history
+                    )
+                );
             }
             
             return subcubes;
@@ -96,6 +117,16 @@ template <int dim> class ndCube
         std::vector<double> const & origin () const { return origin_; }
         double edge () const { return edge_; }
         double volume () const { return std::pow(edge_, dim); }
+        std::vector<std::bitset<dim>> history () const { return history_; }
+        
+        std::vector<double> centre () const
+        {
+            std::vector<double> coords = origin_;
+            for (double & coord : coords)
+                coord += 0.5 * edge_;
+            return coords;
+        }
+        
         static int nVertex () { return special::pow2(dim); }
         
     private:
@@ -105,6 +136,9 @@ template <int dim> class ndCube
         
         /// Length of an edge.
         double edge_;
+        
+        /// Subdivision history.
+        std::vector<std::bitset<dim>> history_;
 };
 
 /**

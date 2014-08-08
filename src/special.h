@@ -218,7 +218,7 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
  * 
  * The power is computed as a corresponding bit shift of 1.
  */
-inline int pow2 (unsigned i)
+inline constexpr unsigned pow2 (unsigned i)
 {
     return 1 << i;
 }

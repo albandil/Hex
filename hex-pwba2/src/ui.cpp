@@ -74,7 +74,7 @@ void parse_input_file
     int & Ni, int & Li, int & Nf, int & Lf, double & Ei,
     double & Rmax, int & N,
     int & maxNn, int & maxLn, double & Enmax,
-    int & integrate_allowed, int & integrate_forbidden
+    bool & integrate_allowed, bool & integrate_forbidden
 )
 {
     // read all data
@@ -184,8 +184,8 @@ int main (int argc, char* argv[])
     int Pi, L, maxNn, nL;
     int Ni, Li, Nf, Lf;
     double Ei, Enmax;
-    int integrate_allowed;
-    int integrate_forbidden;
+    bool integrate_allowed;
+    bool integrate_forbidden;
     
     // parse input file
     parse_input_file
@@ -221,8 +221,8 @@ int main (int argc, char* argv[])
     std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
     std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
     std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
-    std::cout << "\t- integrate allowed states: " << (integrate_allowed == 0 ? "no" : "yes") << std::endl;
-    std::cout << "\t- integrate forbidden states: " << (integrate_forbidden == 0 ? "no" : "yes") << std::endl;
+    std::cout << "\t- integrate allowed states: " << (integrate_allowed ? "yes" : "no") << std::endl;
+    std::cout << "\t- integrate forbidden states: " << (integrate_forbidden ? "yes" : "no") << std::endl;
     
     if (partial_wave)
     {

@@ -14,6 +14,7 @@
 #define HEX_MISC
 
 #include <algorithm> 
+#include <cassert>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -657,5 +658,25 @@ inline std::string underline (std::string text)
         text.push_back('-');
     return text;
 }
+
+//
+// Data type abstract traits.
+//
+
+template <class T> class typeinfo {};
+template<> class typeinfo<double>
+{
+    public:
+        typedef double cmpttype;
+        static const std::size_t ncmpt = 1;
+        static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
+};
+template<> template<class T> class typeinfo<std::complex<T>>
+{
+    public:
+        typedef T cmpttype;
+        static const std::size_t ncmpt = 2;
+        static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
+};
 
 #endif
