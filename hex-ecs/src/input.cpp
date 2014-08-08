@@ -17,6 +17,8 @@
 #include <string>
 #include <tuple>
 
+#include <omp.h>
+
 #include "arrays.h"
 #include "cmdline.h"
 #include "input.h"
@@ -115,6 +117,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
                     "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
+                    "\t--concurrent-factorizations     whether to run several (√N) LU preconditioner factorizations simultaneously     \n"
                     "                                                                                                                  \n"
                 ;
                 exit(0);
@@ -210,6 +213,28 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // un-parallelize preconditioning
                 parallel_block = false;
+                return true;
+            },
+        "concurrent-factorizations", "", 0, [&](std::string optarg) -> bool
+            {
+                // check that the thread number is square of an integer
+                int Nthread = omp_get_max_threads();
+                int Nsqrt = std::sqrt(Nthread);
+                if (Nsqrt <= 1)
+                {
+                    std::cout << "Warning: Available number of threads (" << Nthread
+                              << ") too low for parallel factorizations - going sequential." << std::endl;
+                    return true;
+                }
+                if (Nsqrt*Nsqrt != Nthread)
+                {
+                    std::cout << "Warning: Available number of threads (" << Nthread
+                              << ") is not an integer squared at it ought to be. Only "
+                              << Nsqrt*Nsqrt << " threads will be used in the factorizations." << std::endl;
+                }
+                
+                // parallelize LU factorizations
+                concurrent_factorizations = true;
                 return true;
             },
         

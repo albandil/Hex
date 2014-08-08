@@ -27,6 +27,9 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
 SUITESPARSEFLAGS =
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
                   -lmetis -lsuitesparseconfig -lopenblas
+                  
+# - do not use openblas-specific functions
+# SUITESPARSEFLAGS = -DNO_OPENBLAS
 
 # ---------------------------------------------------------------------------- #
 # OpenMPI environment (optional, use -DNO_MPI to omit)                         #

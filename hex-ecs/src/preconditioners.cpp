@@ -13,6 +13,11 @@
 #include <iostream>
 #include <set>
 
+#ifndef NO_OPENBLAS
+    #include <omp.h>
+    extern "C" void openblas_set_num_threads (int);
+#endif
+
 #include "arrays.h"
 #include "gauss.h"
 #include "input.h"
@@ -1159,13 +1164,29 @@ void ILUCGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-    std::cout << "\t[" << par_.iproc() << "] Update preconditioner\n";
+#ifndef NO_OPENBLAS
+    // redistribute threads to run several factorizations at one time
+    if (cmd_.concurrent_factorizations)
+    {
+        int M = omp_get_max_threads();
+        int N = std::sqrt(M);
+        omp_set_nested(true);
+        omp_set_num_threads(N);
+        openblas_set_num_threads(N);
+        
+        std::cout << "\t[" << par_.iproc() << "] Update preconditioner (" << N << " concurrent factorizations)\n";
+    }
+    else
+#endif
+    {
+        std::cout << "\t[" << par_.iproc() << "] Update preconditioner (sequentially)\n";
+    }
     
     // for all diagonal blocks
+    # pragma omp parallel for if (cmd_.concurrent_factorizations)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        std::cout << "\t\t- block #" << ill << " (" << l1_l2_[ill].first << "," << l1_l2_[ill].second << ")..." << std::flush;
-        
+        // load diagonal block from disk (if OOC)
         if (cmd_.outofcore)
         {
             // load DIA block from a linked disk file
@@ -1179,22 +1200,27 @@ void ILUCGPreconditioner::update (double E)
         // create CSR block
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
-        // factorize the block and store it in lu_[ill] (transfer data)
+        // factorize the block and store it in lu_[ill]
         lu_[ill].transfer
         (
+            // transfer data (use &&-constructor)
             std::move
             (
                 csr_blocks_[ill].factorize(droptol_)
             )
         );
         
-        // time usage
-        int secs = timer.seconds();
+        // print time and memory info for this block
+        std::cout << format
+        (
+            "\t\t- block #%d (%d,%d) in %d:%02d (%d MiB)",
+            ill, l1_l2_[ill].first, l1_l2_[ill].second, // block identification (id, ℓ₁, ℓ₂)
+            timer.seconds() / 60,                       // factorization time: minutes
+            timer.seconds() % 60,                       // factorization time: seconds
+            lu_[ill].size() / 1048576                   // final memory size
+        ) << std::endl;
         
-        // print info
-        std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
-                  << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
-        
+        // save factorization to disk (if OOC)
         if (cmd_.outofcore)
         {
             // link CSR block to a disk file
@@ -1213,6 +1239,15 @@ void ILUCGPreconditioner::update (double E)
             lu_[ill].drop();
         }
     }
+    
+#ifndef NO_OPENBLAS
+    // reset threads
+    if (cmd_.concurrent_factorizations)
+    {
+        omp_set_num_threads(omp_get_max_threads());
+        openblas_set_num_threads(omp_get_max_threads());
+    }
+#endif
 }
 
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
