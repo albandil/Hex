@@ -15,6 +15,13 @@
 
 #include "spgrid.h"
 
+const std::vector<unsigned> spgrid::vtk_cell = {
+     1, // 0-D: vertex (not used)
+     3, // 1-D: line
+     9, // 2-D: quad
+    12  // 3-D: hexahedron
+};
+
 // The nodes and weights are from the web page http://sparse-grids.de/#Nodes.
 // It is a subset of the whole data for 1 <= dim <= 6 and 1 <= l <= 5.
 

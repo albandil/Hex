@@ -25,13 +25,34 @@
 namespace spgrid
 {
 
-static std::vector<unsigned> vtk_cell = {
-     1, // 0-D: vertex
-     3, // 1-D: line
-     9, // 2-D: quad
-    12  // 3-D: hexahedron
-};
+/**
+ * @brief VTK cell shapes for various dimensions.
+ * 
+ * This list contains VTK cell shapes that are used when exporting the sparse grid
+ * into VTK file. The types used are:
+ * 
+ * dimension | VTK id | meaning
+ * --------- | ------ | ----------
+ * 0         | 1      | point
+ * 1         | 3      | line
+ * 2         | 9      | quad
+ * 3         | 12     | hexahedron
+ */
+extern const std::vector<unsigned> vtk_cell;
 
+/**
+ * @brief Ordering for 'std::bitset' type.
+ * 
+ * This template defines a "less than" relation for the 'std::bitset' type.
+ * The relation is necessary for use of 'std::bitset' as the indexing key 
+ * of tree storage ('std::map').
+ * 
+ * The comparison is done by transforming the bitset to an unsigned integral
+ * number (if its size is sufficient) or to text string of zeros and ones
+ * (if more space is necessary). It is not really astonishingly fast method,
+ * but it is used only in debug output of the VTK file, which makes it
+ * acceptable.
+ */
 template <int d> class order_bitsets
 {
     public:
@@ -46,6 +67,16 @@ template <int d> class order_bitsets
         
 };
 
+/**
+ * @brief Ordering for vectors of bitsets.
+ * 
+ * This template defined a "less than" relation for vectors of bitsets, or to
+ * be exact for the type std::vector&lt;std::bitset&lt;T,dim&gt;&gt;. The
+ * normal lexicographical comparison library call is used.
+ * 
+ * This function relies on the existence of @ref order_bitsets, which defines
+ * the ordering of the 'std::bitset' type.
+ */
 template <int d> class order_vector_of_bitsets
 {
     public:
@@ -66,6 +97,53 @@ template <int d> class order_vector_of_bitsets
         }
 };
 
+/**
+ * @brief Get further point of a cube along given axis.
+ * 
+ * Given a subdivision history of a sparse grid point, return a the neares shifted point along
+ * the specified axis.
+ * 
+ * This function template accepts a "subdivision history" of a point in a sparse grid.
+ * The history is a set of bitsets, number of bits in every bitset is equal to the dimension
+ * of the grid; every bit of a specific bitset belongs to a single coordinate. The string
+ * of axis-specific bits across the bitsets makes a big-endian fractional binary number
+ * between 0 and 1 that encodes the position of a point within the (unit) grid.
+ * 
+ * Example
+ * -------
+ * 
+ * Let the history of a 2-D point looks like this:
+ @verbatim
+   00, 10, 11
+ @endverbatim
+ * Then its position is x = 0.011 and y = 0.001 (note once again that these are binary numbers!).
+ * The encoded subdivision history of the near cells is then:
+ <pre>
+      ┌───────────────┬───────────────┐
+      │               │               │
+      │               │               │
+      │               │               │
+      │       ?       │       ?       │
+      │               │               │
+      │               │               │
+      │               │               │
+  .1  ├───────┬───────┼───────────────┤
+      │       │       │               │
+      │   ?   │   ?   │               │
+      │       │       │               │
+  .01 ├───────┼───┬───┤       ?       │
+      │       │   │   │               │
+  .001│   ?   ├───●───┤               │
+      │       │   │   │               │
+  .0  └───────┴───┴───┴───────────────┘
+      .0      ↑   ↑   .1           
+              ↑   ↑
+              .01 .011
+ </pre>
+ * The x-shifted point would have coordinate x=0.100, whereas the y-shifted coordinate would be y = 0.010.
+ * Note that the number of digits matters; x=0.1 and x=0.100 are the same point but the subdivision
+ * history is different.
+ */
 template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::vector<std::bitset<dim>> pt)
 {
     // find the latest history point where the point can be shifted forward
@@ -86,6 +164,13 @@ template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::
     throw exception ("Cannot shift foward.");
 }
 
+/**
+ * @brief Get previous point of a cube along given axis.
+ * 
+ * Get the previous (back-shifted) point. See @ref shift_fwd for details on the storage.
+ * The back-shifted point from the example in @ref shift_fwd would be x = 0.010 (if the x-axis
+ * were chosen) or y = 0.000 (if the y-axis were chosen).
+ */
 template <int dim> std::vector<std::bitset<dim>> shift_bck (unsigned axis, std::vector<std::bitset<dim>> pt)
 {
     // find the latest history point where the point can be shifted back
@@ -106,11 +191,23 @@ template <int dim> std::vector<std::bitset<dim>> shift_bck (unsigned axis, std::
     throw exception ("Cannot shift backward.");
 }
 
+/**
+ * @brief Blind template.
+ * 
+ * This template should never be called (it will throw an exception otherwise).
+ * Its explicit specializations for 1-D, 2-D and 3-D are expected to be called instead.
+ */
 template <int dim> std::vector<std::vector<std::bitset<dim>>> extrude_point_to_regular_VTK_cell (std::vector<std::bitset<dim>> const & pt)
 {
     throw exception ("Regular extrusion of point into more than 3 dimensions is not implemented. Please do not use VTK grid export here.");
 }
 
+/**
+ * @brief Make line segment from origin point.
+ * 
+ * The function will return set of points (in the form of subdivision history, see @ref shift_fwd for details)
+ * making a line, starting from given origin.
+ */
 template<> inline std::vector<std::vector<std::bitset<1>>> extrude_point_to_regular_VTK_cell<1> (std::vector<std::bitset<1>> const & pt)
 {
     // order required by VTK: (xmin) (xmax)
@@ -119,6 +216,13 @@ template<> inline std::vector<std::vector<std::bitset<1>>> extrude_point_to_regu
     return cell_points;
 }
 
+/**
+ * @brief Make square from origin point.
+ * 
+ * The function will return set of points (in the form of subdivision history, see @ref shift_fwd for details)
+ * making a square, starting from given origin. The ordering of the vertices is chosen such that it will
+ * make a valid VTK_QUAD specification.
+ */
 template<> inline std::vector<std::vector<std::bitset<2>>> extrude_point_to_regular_VTK_cell<2> (std::vector<std::bitset<2>> const & pt)
 {
     // order required by VTK: (xmin,ymin) (xmax,ymin) (xmax,ymax) (xmin,ymax)
@@ -129,6 +233,13 @@ template<> inline std::vector<std::vector<std::bitset<2>>> extrude_point_to_regu
     return cell_points;
 }
 
+/**
+ * @brief Make cube from origin point.
+ * 
+ * The function will return set of points (in the form of subdivision history, see @ref shift_fwd for details)
+ * making a cube, starting from given origin. The ordering of the vertices is chosen such that it will
+ * make a valid VTK_HEXAHEDRON specification.
+ */
 template<> inline std::vector<std::vector<std::bitset<3>>> extrude_point_to_regular_VTK_cell<3> (std::vector<std::bitset<3>> const & pt)
 {
     // order required by VTK: (xmin,ymin,zmin) (xmax,ymin,zmin) (xmax,ymax,zmin) (xmin,ymax,zmin)
@@ -703,7 +814,7 @@ template <class T> class SparseGrid
                         
                         // save data for potential VTK debug output
                         if (write_vtk_ and dim <= 3)
-                            vtk[oldDom.cube.history()] = F(dim,oldDom.cube.centre().data());
+                            vtk[oldDom.cube.history()] = oldDom.val / oldDom.cube.volume();
                     }
                     else
                     {

@@ -336,8 +336,6 @@ cArrays PWBA2::FullTMatrix_direct
             // start marching integration along Q
             do
             {
-                G.setWriteVTK(Qmin == 0);
-                
                 // real bound integrand
                 auto integrand_Ub_wrap = [ki,kf,vki,vkf,Nn,Ln,Qmin,Qmax,Etot](int n, double const * coords) -> Complex
                 {
@@ -378,6 +376,7 @@ cArrays PWBA2::FullTMatrix_direct
                 std::cout << std::endl << "Marching: Step " << ++step << " from Q = " << Qmin << " to " << Qmax << std::endl;
                 
                 // integrate U on 6-dimensional sparse grid
+//                 G.setWriteVTK(true, format("spgrid-U-%g-%g.vtk", Qmin, Qmax));
                 G.integrate_adapt_v2(integrand_Ub_wrap, Unit_3Cube, spgrid::d3l4n39, spgrid::d3l5n87);
                 fUb_contrib += G.result();
                 nEvalUb += G.evalcount();
@@ -429,7 +428,9 @@ cArrays PWBA2::FullTMatrix_direct
             std::cout << underline(format("Sparse grid integration of bound W for θ = %g, φ = %g", theta, phi)) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
+//             G.setWriteVTK(true, "spgrid-W.vtk");
             G.integrate_adapt_v2(integrand_Wb_wrap, Unit_2Cube, spgrid::d2l4n17, spgrid::d2l5n33);
+//             G.setWriteVTK(false);
             fWb += G.result();
             nEvalWb += G.evalcount();
             
