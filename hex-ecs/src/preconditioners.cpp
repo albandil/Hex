@@ -1165,7 +1165,7 @@ void ILUCGPreconditioner::update (double E)
     NoPreconditioner::update(E);
     
     // write info
-    std::cout << "[" << par_.iproc() << "] Update preconditioner";
+    std::cout << "\t[" << par_.iproc() << "] Update preconditioner";
     if (cmd_.concurrent_factorizations > 1)
         std::cout << " using " << cmd_.concurrent_factorizations << " concurrent 1-thread parallelizations";
     else

@@ -117,7 +117,7 @@ class CommandLine
         bool parallel_block;
         
         /// How many LU factorizations to run concurrently.
-        bool concurrent_factorizations;
+        int concurrent_factorizations;
 };
 
 /**
