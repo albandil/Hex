@@ -377,7 +377,7 @@ cArrays PWBA2::FullTMatrix_direct
                 
                 // integrate U on 6-dimensional sparse grid
 //                 G.setWriteVTK(true, format("spgrid-U-%g-%g.vtk", Qmin, Qmax));
-                G.integrate_adapt_v2(integrand_Ub_wrap, Unit_3Cube, spgrid::d3l4n39, spgrid::d3l5n87);
+                G.integrate_adapt(integrand_Ub_wrap, Unit_3Cube, spgrid::d3l4n39, spgrid::d3l5n87);
                 fUb_contrib += G.result();
                 nEvalUb += G.evalcount();
                 
@@ -429,7 +429,7 @@ cArrays PWBA2::FullTMatrix_direct
             
             // integrate W on 5-dimensional sparse grid
 //             G.setWriteVTK(true, "spgrid-W.vtk");
-            G.integrate_adapt_v2(integrand_Wb_wrap, Unit_2Cube, spgrid::d2l4n17, spgrid::d2l5n33);
+            G.integrate_adapt(integrand_Wb_wrap, Unit_2Cube, spgrid::d2l4n17, spgrid::d2l5n33);
 //             G.setWriteVTK(false);
             fWb += G.result();
             nEvalWb += G.evalcount();
@@ -442,6 +442,7 @@ cArrays PWBA2::FullTMatrix_direct
         {
             // allow at most 7 integration cell bisections
             G.setMaxLevel(7);
+            G.setParallel(true);
             
             std::cout << underline(format("Sparse grid integration of continuum U for θ = %g, φ = %g", theta, phi)) << std::endl;
             
@@ -508,7 +509,7 @@ cArrays PWBA2::FullTMatrix_direct
                 std::cout << std::endl << "Marching: Step " << ++step << " from Q = " << Qmin << " to " << Qmax << std::endl;
                 
                 // integrate U on 6-dimensional sparse grid
-                G.integrate_adapt_v2(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
+                G.integrate_adapt(integrand_U_wrap, Unit_6Cube, spgrid::d6l4n257, spgrid::d6l5n737);
                 fU += G.result();
                 nEvalU += G.evalcount();
                 
@@ -572,7 +573,7 @@ cArrays PWBA2::FullTMatrix_direct
             std::cout << underline(format("Sparse grid integration of continuum W for θ = %g, φ = %g", theta, phi)) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
-            G.integrate_adapt_v2(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
+            G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
             fW = G.result();
             nEvalW = G.evalcount();
             

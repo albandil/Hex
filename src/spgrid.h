@@ -410,6 +410,9 @@ template <class T> class SparseGrid
         
         /// VTK output file name.
         std::string vtkfilename_;
+        
+        /// Whether to process cells in parallel.
+        bool parallel_;
     
     public:
         
@@ -418,7 +421,7 @@ template <class T> class SparseGrid
             : epsabs_(1e-8), epsrel_(1e-8), global_epsabs_(1e-8),
               global_epsrel_(1e-8), minlevel_(0), maxlevel_(5),
               ok_(true), verbose_(false), prefix_(""), write_vtk_(false),
-              vtkfilename_("spgrid.vtk")
+              vtkfilename_("spgrid.vtk"), parallel_(false)
         {}
         
         /// Return the result value computed before.
@@ -466,6 +469,9 @@ template <class T> class SparseGrid
             write_vtk_ = write_vtk;
             vtkfilename_ = vtkfilename;
         }
+        
+        /// Set whether to process cells in parallel.
+        void setParallel (bool parallel) { parallel_ = parallel; }
         
         /**
          * @brief Fixed-order spare-grid quadrature.
@@ -534,139 +540,11 @@ template <class T> class SparseGrid
          * integral estimates on the two specified grids.
          * 
          * @param F Function to integrate.
-         * @param domain N-dimensional cube (integration volume).
+         * @param root N-dimensional cube (integration volume).
          * @param ruleLow Low-order rule for error estimation.
          * @param ruleHigh High-order rule for error estimation.
          */
         template <int dim, class Functor> bool integrate_adapt
-        (
-            Functor F, geom::ndCube<dim> const & root,
-            SparseGridId ruleLow, SparseGridId ruleHigh
-        )
-        {
-            // synonym for 'dim'-dimensional cube
-            typedef geom::ndCube<dim> dCube;
-            
-            // short form for absolute value type of the template data type 'T'
-            typedef decltype(std::abs(T(0))) AbsT;
-            
-            /**
-             * @brief Integration domain info.
-             * 
-             * The structure 'sDomain' contains integration domain data, namely
-             * the subdivision level of the domain (i.e. how many parents it has),
-             * the position and extent of the domain (via the @ref ndCube type) and
-             * index of the parent domain. The variables 'set' and 'val' are used
-             * by the integrator to keep the values of the integral estimates.
-             */
-            typedef struct sDomain
-            {
-                int level;
-                dCube cube;
-                int parent;
-                bool set;
-                T val;
-            } tDomain;
-            
-            const int NO_PARENT = -1;
-            
-            // subdomains of the integration domain (hypercube) that are yet to be processed
-            std::vector<tDomain> domains = { { 0, root, NO_PARENT, false, T(0) } };
-            
-            // initialize subdivision count
-            ncells_ = 1;
-            
-            // initialize evaluations count
-            neval_ = 0;
-            
-            // there is always something to do
-            while (true)
-            {
-                // get last added domain info
-                tDomain & Dom = domains.back();
-                
-                // check if we already have an estimate in this subdomain
-                if (Dom.set)
-                {
-                    // check if this is the root domain
-                    if (Dom.parent == NO_PARENT)
-                    {
-                        ok_ = true;
-                        result_ = Dom.val;
-                        return ok_;
-                    }
-                    
-                    // otherwise add this estimate to the parent estimate
-                    domains[Dom.parent].set = true;
-                    domains[Dom.parent].val += Dom.val;
-                    
-                    // drop this subdomain
-                    domains.pop_back();
-                    
-                    // loop next
-                    continue;
-                }
-                
-                // evaluate estimates, check convergence and possibly subdivide
-                {
-                    // integral estimates (rough and fine)
-                    T estimateLow = integrate_fixed(F, Dom.cube, ruleLow);
-                    T estimateHigh = integrate_fixed(F, Dom.cube, ruleHigh);
-                    
-                    // update evaluation count
-                    neval_ += nodes.at(ruleLow).n;
-                    neval_ += nodes.at(ruleHigh).n;
-                    
-                    // compute difference
-                    AbsT absdelta = std::abs(estimateLow - estimateHigh);
-                    AbsT abshigh = std::abs(estimateHigh);
-                    
-                    // do not further subdivide this cell if
-                    // - the absolute tolerance has been reached
-                    // - the relative tolerance has been reached
-                    if (Dom.level >= minlevel_ and (absdelta < epsabs_ or absdelta < epsrel_ * abshigh))
-                    {
-                        //std::cout << "    converged" << std::endl;
-                        
-                        // store the estimate
-                        domains.back().set = true;
-                        domains.back().val = estimateHigh;
-                        
-                        // loop next
-                        continue;
-                    }
-                    // - the maximal subdivision level has been reached
-                    if (Dom.level == maxlevel_)
-                    {
-                        // no further subdivision allowed; copy the rough estimate to parent
-                        domains[Dom.parent].set = true;
-                        domains[Dom.parent].val += estimateHigh;
-                        
-                        // drop this subdomain
-                        domains.pop_back();
-                        
-                        // loop next
-                        continue;
-                    }
-                    
-                    // get index and level of this domain
-                    int idx = domains.size() - 1;
-                    int lvl = Dom.level;
-                    
-                    // subdivide this domain
-                    for (dCube c : Dom.cube.subdivide())
-                    {
-                        // add subdomain
-                        domains.push_back({ lvl + 1, c, idx, false, T(0) });
-                        
-                        // update subdivision count
-                        ncells_++;
-                    }
-                }
-            }
-        }
-        
-        template <int dim, class Functor> bool integrate_adapt_v2
         (
             Functor F, geom::ndCube<dim> const & root,
             SparseGridId ruleLow, SparseGridId ruleHigh
@@ -727,42 +605,53 @@ template <class T> class SparseGrid
                 std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0;
                 
                 // check convergence for all not yet converged sub-domains
-                if (level >= minlevel_) for (tDomain & dom : domains)
+                if (level >= minlevel_)
                 {
-                    // compute the fine estimate for this domain
-                    T fineEstimate = integrate_fixed(F, dom.cube, ruleHigh);
-                    neval_ += nodes.at(ruleHigh).n;
+                    // number of function evaluations in this step
+                    std::size_t neval = 0;
                     
-                    // check absolute local convergence
-                    if (std::abs(dom.val - fineEstimate) < epsabs_)
+                    // for all domains
+                    # pragma omp parallel for if (parallel_) reduction (+:neval)
+                    for (auto dom = domains.begin(); dom < domains.end(); dom++)
                     {
-                        dom.set = true;
-                        abslocal++;
+                        // compute the fine estimate for this domain
+                        T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
+                        neval += nodes.at(ruleHigh).n;
+                        
+                        // check absolute local convergence
+                        if (std::abs(dom->val - fineEstimate) < epsabs_)
+                        {
+                            dom->set = true;
+                            abslocal++;
+                        }
+                        
+                        // check relative local convergence
+                        if (std::abs(dom->val - fineEstimate) < epsrel_ * std::abs(fineEstimate))
+                        {
+                            dom->set = true;
+                            rellocal++;
+                        }
+                        
+                        // check absolute global convergence
+                        if (std::abs(fineEstimate) < global_epsabs_)
+                        {
+                            dom->set = true;
+                            absglobal++;
+                        }
+                        
+                        // check relative global convergence
+                        if (std::abs(fineEstimate) < global_epsrel_ * std::abs(globalEstimate))
+                        {
+                            dom->set = true;
+                            relglobal++;
+                        }
+                        
+                        // store better estimate
+                        dom->val = fineEstimate;
                     }
                     
-                    // check relative local convergence
-                    if (std::abs(dom.val - fineEstimate) < epsrel_ * std::abs(fineEstimate))
-                    {
-                        dom.set = true;
-                        rellocal++;
-                    }
-                    
-                    // check absolute global convergence
-                    if (std::abs(fineEstimate) < global_epsabs_)
-                    {
-                        dom.set = true;
-                        absglobal++;
-                    }
-                    
-                    // check relative global convergence
-                    if (std::abs(fineEstimate) < global_epsrel_ * std::abs(globalEstimate))
-                    {
-                        dom.set = true;
-                        relglobal++;
-                    }
-                    
-                    // store better estimate
-                    dom.val = fineEstimate;
+                    // update number of evaluations
+                    neval_ += neval;
                 }
                 
                 // debug info
@@ -805,26 +694,52 @@ template <class T> class SparseGrid
                 
                 // further subdivide all not yet converged sub-domains
                 std::vector<tDomain> oldDomains = std::move(domains);
-                for (tDomain const & oldDom : oldDomains)
+                
+                # pragma omp parallel if (parallel_)
                 {
-                    if (oldDom.set)
+                    // per-thread data
+                    std::size_t thread_neval = 0, thread_ncells = 0;
+                    std::vector<tDomain> thread_domains;
+                    T thread_finalEstimate = 0;
+                    
+                    // for all domains
+                    # pragma omp for
+                    for (auto oldDom = oldDomains.begin(); oldDom < oldDomains.end(); oldDom++)
                     {
-                        // this domain has converged -- store its value
-                        finalEstimate += oldDom.val;
-                        
-                        // save data for potential VTK debug output
-                        if (write_vtk_ and dim <= 3)
-                            vtk[oldDom.cube.history()] = oldDom.val / oldDom.cube.volume();
-                    }
-                    else
-                    {
-                        // this domain needs subdivision
-                        for (dCube const & c : oldDom.cube.subdivide())
+                        if (oldDom->set)
                         {
-                            domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
-                            neval_ += nodes.at(ruleLow).n;
-                            ncells_++;
+                            // this domain has converged -- store its value
+                            thread_finalEstimate += oldDom->val;
+                            
+                            // save data for potential VTK debug output
+                            if (write_vtk_ and dim <= 3)
+                            {
+                                # pragma omp critical
+                                vtk[oldDom->cube.history()] = oldDom->val / oldDom->cube.volume();
+                            }
                         }
+                        else
+                        {
+                            // this domain needs subdivision
+                            for (dCube const & c : oldDom->cube.subdivide())
+                            {
+                                // compute also the rough estimate of integral in this new cell 'c'
+                                thread_domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
+                                
+                                // update (per-thread) evaluation count and cell count
+                                thread_neval += nodes.at(ruleLow).n;
+                                thread_ncells++;
+                            }
+                        }
+                    }
+                    
+                    # pragma omp critical
+                    {
+                        // copy the per-thread data to the global shared variables
+                        ncells_ += thread_ncells;
+                        neval_ += thread_neval;
+                        finalEstimate += thread_finalEstimate;
+                        domains.insert(domains.end(), thread_domains.begin(), thread_domains.end());
                     }
                 }
                 
@@ -858,6 +773,7 @@ template <class T> class SparseGrid
                     std::cout << prefix_ << "Writing VTK to file \"" << vtkfilename_ << "\"." << std::endl;
                 }
                 
+                // auxiliary data structures needed for points and cells
                 std::map<std::vector<std::bitset<dim>>,std::size_t,order_vector_of_bitsets<dim>> point_histories_map;
                 std::vector<std::pair<std::array<std::size_t,special::pow2(dim)>,T>> cell_data;
                 
@@ -870,15 +786,21 @@ template <class T> class SparseGrid
                     // point indices for this cell
                     std::array<std::size_t,special::pow2(dim)> pts;
                     
-                    // check whether these points exist in database (add if they don't, add with a new consecutive id)
+                    // for all points of the current cell
                     for (std::size_t i = 0; i < special::pow2(dim); i++)
                     {
+                        // check whether this points exists in the database
                         if (point_histories_map.find(pthistory[i]) == point_histories_map.end())
                         {
-                            // these two lines need to be split ('=' is not a sequence point!)
+                            // if it doesn't, add it with a new consecutive id
+                            // NOTE : The followig two lines need to be split, because the first std::map access
+                            //        must precede the second (and '=' is not a sequence point). Otherwise a new
+                            //        element could be created in the map, which we do not want to count.
                             std::size_t npoints = point_histories_map.size();
                             point_histories_map[pthistory[i]] = npoints;
                         }
+                        
+                        // save index of this point
                         pts[i] = point_histories_map[pthistory[i]];
                     }
                     
@@ -886,20 +808,20 @@ template <class T> class SparseGrid
                     cell_data.push_back(std::make_pair(pts, data.second));
                 }
                 
-                // reorder points so that they match their indices (flip the data structure)
+                // sort points so that their order matches their indices
                 std::vector<std::vector<std::bitset<dim>>> point_histories(point_histories_map.size());
                 for (auto data : point_histories_map)
                     point_histories[data.second] = data.first;
                 
                 // write data file header
                 std::ofstream vtkf(vtkfilename_.c_str());
-                vtkf << "# vtk DataFile Version 2.0" << std::endl;
-                vtkf << "Sparse grid dump." << std::endl;
+                vtkf << "# vtk DataFile Version 3.0" << std::endl;
+                vtkf << "Sparse grid dump from the Hex package." << std::endl;
                 vtkf << "ASCII" << std::endl;
                 vtkf << "DATASET UNSTRUCTURED_GRID" << std::endl;
                 vtkf << "POINTS " << point_histories.size() << " float" << std::endl;
                 
-                // decode subdivision histories into final coordinates
+                // decode subdivision histories into final coordinates (= translate the binary number)
                 for (auto ptsubs : point_histories)
                 {
                     // compute coordinates of this point given its subdivision history
@@ -909,7 +831,7 @@ template <class T> class SparseGrid
                     if (ptsubs[sub][axis])
                         coords[axis] += root.edge() * std::pow(0.5,sub);
                     
-                    // write exactly three coordinates
+                    // write exactly three coordinates, even in the lower-dimensional case (VTK wants it this way)
                     for (unsigned axis = 0; axis < dim; axis++)
                         vtkf << coords[axis] << " ";
                     for (int axis = dim; axis < 3; axis++)
@@ -918,6 +840,7 @@ template <class T> class SparseGrid
                     vtkf << std::endl;
                 }
                 
+                // write cell information header
                 vtkf << "CELLS " << cell_data.size() << " " << cell_data.size() * (special::pow2(dim) + 1) << std::endl;
                 
                 // write cell vertex list in the correct order
@@ -929,19 +852,25 @@ template <class T> class SparseGrid
                     vtkf << std::endl;
                 }
                 
+                // write cell types and field header
                 vtkf << "CELL_TYPES " << cell_data.size() << std::endl;
                 for (std::size_t i = 0; i < cell_data.size(); i++)
                     vtkf << vtk_cell[dim] << std::endl;
                 vtkf << "CELL_DATA " << cell_data.size() << std::endl;
                 vtkf << "FIELD EvaluatedIntegrand " << typeinfo<T>::ncmpt << std::endl;
                 
-                // for all components of the data type 'T'
+                // for all components of the data type 'T' (i.e. one for real number or two for a complex number)
                 for (std::size_t i = 0; i < typeinfo<T>::ncmpt; i++)
                 {
+                    // write header for this component
                     vtkf << "Component" << i << " 1 " << cell_data.size() << " float" << std::endl;
+                    
+                    // write cell data
                     for (auto celldata : cell_data)
                         vtkf << typeinfo<T>::cmpt(i,celldata.second) << std::endl;
                 }
+                
+                // close the file, we are done
                 vtkf.close();
             }
             
