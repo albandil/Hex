@@ -65,7 +65,7 @@ class CommandLine
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), itertol(1e-8),
-              parallel_dot(false), parallel_block(true)
+              parallel_dot(false), parallel_block(true), concurrent_factorizations(1)
         {
             // get command line options
             parse(argc, argv);
@@ -117,6 +117,9 @@ class CommandLine
         
         /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
         bool parallel_block;
+        
+        /// How many concurrent LU factorizations to run.
+        int concurrent_factorizations;
 };
 
 /**

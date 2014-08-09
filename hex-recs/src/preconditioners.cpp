@@ -1236,9 +1236,16 @@ void ILUCGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-    std::cout << "\t[" << par_.iproc() << "] Update preconditioner\n";
+    // write info
+    std::cout << "\t[" << par_.iproc() << "] Update preconditioner";
+    if (cmd_.concurrent_factorizations > 1)
+        std::cout << " using " << cmd_.concurrent_factorizations << " concurrent 1-thread parallelizations";
+    else
+        std::cout << " sequentially, using all available threads for each factorization";
+    std::cout << std::endl;
     
     // for all diagonal blocks
+    # pragma omp parallel for if (cmd_.concurrent_factorizations > 1) num_threads (cmd_.concurrent_factorizations)
     for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
     {
         std::cout << "\t\t- block #" << ill << " (" << ang_[ill].L << "," << ang_[ill].S << "," << ang_[ill].l1 << "," << ang_[ill].l2 << ")..." << std::flush;

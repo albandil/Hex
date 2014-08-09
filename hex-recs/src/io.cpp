@@ -116,6 +116,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
                     "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
+                    "\t--concurrent-factorizations <number>   how many LU preconditioner factorizations to run simultaneously          \n"
                     "                                                                                                                  \n"
                 ;
                 exit(0);
@@ -211,6 +212,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // un-parallelize preconditioning
                 parallel_block = false;
+                return true;
+            },
+        "concurrent-factorizations", "", 1, [&](std::string optarg) -> bool
+            {
+                // parallelize LU factorizations
+                concurrent_factorizations = std::max(1,std::atoi(optarg.c_str()));
                 return true;
             },
         
