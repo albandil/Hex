@@ -439,38 +439,99 @@ template <class T> class SparseGrid
         /// Check that the last integration has been successful.
         bool ok () const { return ok_; }
         
-        /// Set absolute tolerance.
+        /**
+         * @brief Set local absolute tolerance.
+         * 
+         * If the absolute change of integral estimates between the rough and fine
+         * quadrature rule is smaller than the local relative tolerance set by this function,
+         * the cell is considered converged.
+         */
         void setLocEpsAbs (double epsabs) { epsabs_ = epsabs; }
         
-        /// Set relative tolerance.
+        /**
+         * @brief Set local relative tolerance.
+         * 
+         * If the relative change of integral estimates between the rough and fine
+         * quadrature rule is smaller than the local relative tolerance set by this function,
+         * the cell is considered converged.
+         */
         void setLocEpsRel (double epsrel) { epsrel_ = epsrel; }
         
-        /// Set global absolute tolerance.
+        /**
+         * @brief Set global absolute tolerance
+         * 
+         * Every cell will be considered converged (or here actually 'irrelevant') if the
+         * extrapolation of its integral over the whole integration domain yields a number
+         * that is less than the number set by this function.
+         */
         void setGlobEpsAbs (double epsabs) { global_epsabs_ = epsabs; }
         
-        /// Set global relative tolerance.
+        /**
+         * @brief Set global relative tolerance.
+         * 
+         * Every cell will be considered converged (or here actually 'irrelevant') if the
+         * extrapolation of its integral over the whole integration domain yields
+         * a fraction of the total estimate that is less than the number set by this function.
+         */
         void setGlobEpsRel (double epsrel) { global_epsrel_ = epsrel; }
         
-        /// Set minimal subdivision level.
+        /**
+         * @brief Set minimal subdivision level.
+         * 
+         * If 'n' is passed as the argument of this function, the integration domain
+         * will be subdivided into 2^n sub-cells before the convergence criteria start
+         * to be tested.
+         */
         void setMinLevel (int minlevel) { minlevel_ = minlevel; }
         
-        /// Set maximal subdivision level.
+        /**
+         * @brief Set maximal subdivision level.
+         * 
+         * Inhibits further subdivision of small enough cells, even though they
+         * will be still considered non-converged.
+         */
         void setMaxLevel (int maxlevel) { maxlevel_ = maxlevel; }
         
-        /// Set verbosity level.
+        /**
+         * @brief Set verbosity level.
+         * 
+         * If set to true, the integrator will print a large amount of diagnostic
+         * information.
+         */
         void setVerbose (bool verbose) { verbose_ = verbose; }
         
-        /// Set verbose output prefix.
+        /**
+         * @brief Set verbose output prefix.
+         * 
+         * Every line of the verbose output (if enabled by @ref setVerbose) will
+         * be prefixed by the string passed to this function. For example a string
+         * of spaces can be used to align the verbose output among the other output
+         * of a program.
+         */
         void setPrefix (std::string prefix) { prefix_ = std::string(prefix); }
         
-        /// Set whether to write final grid to VTK (can be used only when dim <= 3).
+        /**
+         * @brief Set whether to write final grid to VTK.
+         * 
+         * If the write-out is enabled, every final integration grid will be written
+         * to a VTK file so that it can be viewed e.g. in ParaView. This function
+         * can be used only for one- to three-dimensional grids, because VTK file
+         * format does not support higher dimensions.
+         */
         void setWriteVTK (bool write_vtk, std::string vtkfilename = "spgrid.vtk")
         {
             write_vtk_ = write_vtk;
             vtkfilename_ = vtkfilename;
         }
         
-        /// Set whether to process cells in parallel.
+        /**
+         * @brief Set whether to process cells in parallel.
+         * 
+         * If the parallelization is enabled, integral estimates for several cells
+         * will be evaluated simultaneously. OpenMP is used here, so the number
+         * of simultaneous threads is controlled by the environment variable
+         * OMP_NUM_THREADS.
+         */
         void setParallel (bool parallel) { parallel_ = parallel; }
         
         /**
@@ -590,7 +651,7 @@ template <class T> class SparseGrid
                     std::cout << prefix_ << "  initial estimate : " << globalEstimate << std::endl;
                     std::cout << prefix_ << "  cells to process : " << domains.size() << " (";
                     
-                    double frac = domains.size() * 100. / special::pow2(level*dim);
+                    double frac = domains.size() * 100. / std::pow(2,level*dim);
                     if (frac == 0)
                         std::cout << "= 0";
                     else if (frac < 1)
@@ -607,16 +668,15 @@ template <class T> class SparseGrid
                 // check convergence for all not yet converged sub-domains
                 if (level >= minlevel_)
                 {
-                    // number of function evaluations in this step
-                    std::size_t neval = 0;
+                    Timer timer;
                     
                     // for all domains
-                    # pragma omp parallel for if (parallel_) reduction (+:neval)
+                    # pragma omp parallel for if (parallel_)
                     for (auto dom = domains.begin(); dom < domains.end(); dom++)
                     {
                         // compute the fine estimate for this domain
                         T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
-                        neval += nodes.at(ruleHigh).n;
+                        neval_ += nodes.at(ruleHigh).n;
                         
                         // check absolute local convergence
                         if (std::abs(dom->val - fineEstimate) < epsabs_)
@@ -633,14 +693,14 @@ template <class T> class SparseGrid
                         }
                         
                         // check absolute global convergence
-                        if (std::abs(fineEstimate) < global_epsabs_)
+                        if (std::abs(fineEstimate) < global_epsabs_ * dom->cube.volume())
                         {
                             dom->set = true;
                             absglobal++;
                         }
                         
                         // check relative global convergence
-                        if (std::abs(fineEstimate) < global_epsrel_ * std::abs(globalEstimate))
+                        if (std::abs(fineEstimate) < global_epsrel_ * dom->cube.volume() * std::abs(globalEstimate))
                         {
                             dom->set = true;
                             relglobal++;
@@ -650,14 +710,15 @@ template <class T> class SparseGrid
                         dom->val = fineEstimate;
                     }
                     
-                    // update number of evaluations
-                    neval_ += neval;
+                    if (verbose_)
+                        std::cout << prefix_ << "  processing took " << timer.seconds() << " s" << std::endl;
                 }
                 
                 // debug info
                 if (verbose_)
                 {
-                    std::cout << prefix_ << "  converged cells due to" << std::endl;
+                    // print how many cells are converged (in every convergence category)
+                        std::cout << prefix_ << "  converged cells due to" << std::endl;
                     if (epsabs_ > 0)
                         std::cout << prefix_ << "    absolute local change between rules : " << abslocal << std::endl;
                     if (epsrel_ > 0)
@@ -667,6 +728,7 @@ template <class T> class SparseGrid
                     if (global_epsrel_ > 0)
                         std::cout << prefix_ << "    relative global threshold : " << relglobal << std::endl;
                     
+                    // calculate non-converged cells
                     std::size_t nsub = std::count_if
                     (
                         domains.begin(),
@@ -675,6 +737,7 @@ template <class T> class SparseGrid
                     );
                     double frac = nsub * 100. / domains.size();
                     
+                    // print how many cells will need further bisection
                     std::cout << prefix_ << "  cells to bisect : " << nsub << " (";
                     if (0 < frac and frac < 1)
                         std::cout << "< 1";
@@ -694,6 +757,8 @@ template <class T> class SparseGrid
                 
                 // further subdivide all not yet converged sub-domains
                 std::vector<tDomain> oldDomains = std::move(domains);
+                
+                Timer timer;
                 
                 # pragma omp parallel if (parallel_)
                 {
@@ -744,7 +809,10 @@ template <class T> class SparseGrid
                 }
                 
                 if (verbose_)
+                {
+                    std::cout << prefix_ << "  bisection took " << timer.seconds() << " s" << std::endl;
                     std::cout << prefix_ << "  function evaluations up to now : " << neval_ << std::endl;
+                }
                 
                 // stop if no domain needs subdivision
                 if (domains.empty())
