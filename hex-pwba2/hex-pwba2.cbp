@@ -42,7 +42,8 @@
 		<Unit filename="src/memory.h" />
 		<Unit filename="src/misc.h" />
 		<Unit filename="src/nodeintegrate.h" />
-		<Unit filename="src/pwba2.cpp" />
+		<Unit filename="src/pwba2-pwx.cpp" />
+		<Unit filename="src/pwba2-spg.cpp" />
 		<Unit filename="src/pwba2.h" />
     		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
