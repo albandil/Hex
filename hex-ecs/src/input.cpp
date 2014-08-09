@@ -215,7 +215,7 @@ void CommandLine::parse (int argc, char* argv[])
                 parallel_block = false;
                 return true;
             },
-        "concurrent-factorizations", "", 0, [&](std::string optarg) -> bool
+        "concurrent-factorizations", "", 1, [&](std::string optarg) -> bool
             {
                 // parallelize LU factorizations
                 concurrent_factorizations = std::max(1,std::atoi(optarg.c_str()));
