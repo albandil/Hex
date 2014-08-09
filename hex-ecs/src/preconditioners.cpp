@@ -1164,26 +1164,16 @@ void ILUCGPreconditioner::update (double E)
     // update parent
     NoPreconditioner::update(E);
     
-#ifndef NO_OPENBLAS
-    // redistribute threads to run several factorizations at one time
-    if (cmd_.concurrent_factorizations)
-    {
-        int M = omp_get_max_threads();
-        int N = std::sqrt(M);
-        omp_set_nested(true);
-        omp_set_num_threads(N);
-        openblas_set_num_threads(N);
-        
-        std::cout << "\t[" << par_.iproc() << "] Update preconditioner (" << N << " concurrent factorizations)\n";
-    }
+    // write info
+    std::cout << "[" << par_.iproc() << "] Update preconditioner";
+    if (cmd_.concurrent_factorizations > 1)
+        std::cout << " using " << cmd_.concurrent_factorizations << " concurrent 1-thread parallelizations";
     else
-#endif
-    {
-        std::cout << "\t[" << par_.iproc() << "] Update preconditioner (sequentially)\n";
-    }
+        std::cout << " sequentially, using all available threads for each factorization";
+    std::cout << std::endl;
     
     // for all diagonal blocks
-    # pragma omp parallel for if (cmd_.concurrent_factorizations)
+    # pragma omp parallel for if (cmd_.concurrent_factorizations > 1) num_threads (cmd_.concurrent_factorizations)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // load diagonal block from disk (if OOC)
