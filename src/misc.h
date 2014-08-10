@@ -439,15 +439,30 @@ class Timer
         }
         
         /// Return elapsed time in seconds.
-        unsigned seconds ()
+        unsigned seconds () const
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
             return secs.count();
         }
         
+        /// Return formatted time.
+        std::string nice_time () const
+        {
+            unsigned secs = seconds();
+            
+            // format only seconds
+            if (secs < 60) return format("%d", secs);
+            
+            // format minutes and seconds
+            if (secs < 3600) return format("%d:%d", secs / 60, secs % 60);
+            
+            // format hours, minutes and seconds
+            return format("%d:%d:%d", secs / 86400, (secs % 86400) / 60, secs % 60);
+        }
+        
         /// Return elapsed time in milliseconds.
-        unsigned milliseconds ()
+        unsigned milliseconds () const
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::milliseconds misecs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
@@ -455,7 +470,7 @@ class Timer
         }
         
         /// Return elapsed time in microseconds.
-        unsigned microseconds ()
+        unsigned microseconds () const
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::microseconds musecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start_);

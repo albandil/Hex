@@ -41,12 +41,12 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     double k = geom::vec3d::norm(vk);
     double q = geom::vec3d::norm(vq);
     
-    Complex miq (0.,-1./q); // = -i/q
+    Complex iq (0.,1./q); // = i/q
     Complex A = WA(k,nu,q);
     double B = WB(vk,nu,vq);
     
     Complex B_A = B / A;
-    return 2.0 * (-miq) * std::pow(B_A,-miq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
+    return 2.0 * iq * std::pow(B_A,iq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
 }
 
 double Wb_1s (geom::vec3d vk, int Nn, int Ln)

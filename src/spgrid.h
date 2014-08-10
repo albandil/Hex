@@ -643,6 +643,9 @@ template <class T> class SparseGrid
                 for (tDomain const & dom : domains)
                     globalEstimate += dom.val;
                 
+                // also compute the volume (as a fraction of root volume) for use in convergence checking
+                double levelVolume = domains.size() * std::pow(0.5,level*dim);
+                
                 // debug info
                 if (verbose_)
                 {
@@ -651,7 +654,7 @@ template <class T> class SparseGrid
                     std::cout << prefix_ << "  initial estimate : " << globalEstimate << std::endl;
                     std::cout << prefix_ << "  cells to process : " << domains.size() << " (";
                     
-                    double frac = domains.size() * 100. / std::pow(2,level*dim);
+                    double frac = levelVolume * 100;
                     if (frac == 0)
                         std::cout << "= 0";
                     else if (frac < 1)
@@ -664,12 +667,11 @@ template <class T> class SparseGrid
                 
                 // debug variables
                 std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0;
+                Timer timer;
                 
                 // check convergence for all not yet converged sub-domains
                 if (level >= minlevel_)
                 {
-                    Timer timer;
-                    
                     // for all domains
                     # pragma omp parallel for if (parallel_)
                     for (auto dom = domains.begin(); dom < domains.end(); dom++)
@@ -686,21 +688,21 @@ template <class T> class SparseGrid
                         }
                         
                         // check relative local convergence
-                        if (std::abs(dom->val - fineEstimate) < epsrel_ * std::abs(fineEstimate))
+                        if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
                         {
                             dom->set = true;
                             rellocal++;
                         }
                         
-                        // check absolute global convergence
-                        if (std::abs(fineEstimate) < global_epsabs_ * dom->cube.volume())
+                        // check absolute global (extrapolated) convergence
+                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
                         {
                             dom->set = true;
                             absglobal++;
                         }
                         
-                        // check relative global convergence
-                        if (std::abs(fineEstimate) < global_epsrel_ * dom->cube.volume() * std::abs(globalEstimate))
+                        // check relative global (extrapolated) convergence
+                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
                         {
                             dom->set = true;
                             relglobal++;
@@ -711,7 +713,7 @@ template <class T> class SparseGrid
                     }
                     
                     if (verbose_)
-                        std::cout << prefix_ << "  processing took " << timer.seconds() << " s" << std::endl;
+                        std::cout << prefix_ << "  processing time : " << timer.nice_time() << std::endl;
                 }
                 
                 // debug info
@@ -746,19 +748,13 @@ template <class T> class SparseGrid
                     std::cout << "% of processed cells)" << std::endl;
                 }
                 
-                // stop if we reached the max level
-                if (level == maxlevel_)
-                {
-                    if (verbose_)
-                        std::cout << prefix_ << "  maximal level " << maxlevel_ << " reached" << std::endl;
-                    
-                    break;
-                }
+                // warn if we reached the max level (no further subdivision will be done)
+                if (level == maxlevel_ and verbose_)
+                    std::cout << prefix_ << "  maximal level " << maxlevel_ << " reached" << std::endl;
                 
                 // further subdivide all not yet converged sub-domains
                 std::vector<tDomain> oldDomains = std::move(domains);
-                
-                Timer timer;
+                timer.reset();
                 
                 # pragma omp parallel if (parallel_)
                 {
@@ -771,9 +767,9 @@ template <class T> class SparseGrid
                     # pragma omp for
                     for (auto oldDom = oldDomains.begin(); oldDom < oldDomains.end(); oldDom++)
                     {
-                        if (oldDom->set)
+                        if (oldDom->set or level == maxlevel_)
                         {
-                            // this domain has converged -- store its value
+                            // this domain has either converged or we can't subdivide anyway, so store its value
                             thread_finalEstimate += oldDom->val;
                             
                             // save data for potential VTK debug output
@@ -810,7 +806,7 @@ template <class T> class SparseGrid
                 
                 if (verbose_)
                 {
-                    std::cout << prefix_ << "  bisection took " << timer.seconds() << " s" << std::endl;
+                    std::cout << prefix_ << "  bisection time : " << timer.nice_time() << std::endl;
                     std::cout << prefix_ << "  function evaluations up to now : " << neval_ << std::endl;
                 }
                 
@@ -829,7 +825,7 @@ template <class T> class SparseGrid
                 if (domains.empty())
                     std::cout << prefix_ << "  cell list successfully emptied" << std::endl;
                 else
-                    std::cout << prefix_ << "  integral did not converge in some cells" << std::endl;
+                    std::cout << prefix_ << "  integral did not converge in " << domains.size() << " cells" << std::endl;
                 std::cout << prefix_ << "  final estimate : " << result_ << std::endl;
             }
             
