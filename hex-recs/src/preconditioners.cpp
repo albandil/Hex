@@ -1276,7 +1276,7 @@ void ILUCGPreconditioner::update (double E)
         (
             "\t\t- block #%d (%d,%d,%d,%d) in %s (%d MiB)\n",
             ill, ang_[ill].L, ang_[ill].S, ang_[ill].l1, ang_[ill].l2,
-            timer.nice_time(), lu_[ill].size() / 1048576
+            timer.nice_time().c_str(), lu_[ill].size() / 1048576
         ) << std::endl;
         
         if (cmd_.outofcore)
