@@ -492,7 +492,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
     int li = std::get<1>(inp_.instates[instate]);
     int two_ji = std::get<2>(inp_.instates[instate]);
     int two_mi = std::get<3>(inp_.instates[instate]);
-    int two_si = inp_.two_M - two_mi;
+    int two_si = 2*inp_.M - two_mi;
     int Nspline = s_rad_.bspline().Nspline();
     
     // j-overlaps of shape [Nangmom × Nspline]
@@ -539,7 +539,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate) const
                     1,      1,       2*Sp,
                     two_ji, two_j2p, 2*inp_.J
                 );
-                double C1 = gsl_sf_coupling_3j(two_ji,two_j2p,2*inp_.J,two_mi,two_si,-inp_.two_M) * std::sqrt(2*inp_.J+1);
+                double C1 = gsl_sf_coupling_3j(two_ji,two_j2p,2*inp_.J,two_mi,two_si,-2*inp_.M) * std::sqrt(2*inp_.J+1);
                 double C2 = gsl_sf_coupling_3j(2*l,1,two_j2p,0,two_si,-two_si) * std::sqrt(two_j2p+1);
                 prefactor += C1 * C2 * W * std::sqrt((two_ji+1)*(two_j2p+1)*(2*Lp+1)*(2*Sp+1));
             }

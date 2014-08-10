@@ -44,14 +44,14 @@ void Amplitudes::extract ()
         int li = std::get<1>(instate);
         int two_ji = std::get<2>(instate); double ji = 0.5 * two_ji;
         int two_mi = std::get<3>(instate);
-        int two_si = inp_.two_M - two_mi;
+        int two_si = 2*inp_.M - two_mi;
         
         // get final quantum numbers
         int nf = std::get<0>(outstate);
         int lf = std::get<1>(outstate);
         int two_jf = std::get<2>(outstate); double jf = 0.5 * two_jf;
         int two_mf = std::get<3>(outstate);
-        int two_sf = inp_.two_M - two_mf;
+        int two_sf = 2*inp_.M - two_mf;
         
         // non-relativistic total energies
         rArray ETot = inp_.Ei - 1./(ni*ni) /*- mi * inp.B*/;
@@ -145,7 +145,7 @@ Amplitudes::ThreeIntComplexMap Amplitudes::computeLambda_
     for (unsigned ie = 0; ie < Nenergy; ie++)
     {
         // compose filename of the data file for this solution
-        SolutionIO reader (inp_.J, inp_.two_M, T.ni, T.li, T.two_ji, T.two_mi, inp_.Ei[ie]);
+        SolutionIO reader (inp_.J, inp_.M, T.ni, T.li, T.two_ji, T.two_mi, inp_.Ei[ie]);
         
         // load the solution
         cArray solution;
@@ -253,7 +253,7 @@ Amplitudes::TwoIntComplexMap Amplitudes::computeTmat_
         double C1 = gsl_sf_coupling_3j
         (
             T.two_jf,  two_jp,              2*inp_.J,
-            T.two_mf,  inp_.two_M-T.two_mf, -inp_.two_M
+            T.two_mf,  2*inp_.M-T.two_mf,   -2*inp_.M
         ) * std::sqrt(2*inp_.J+1);
         
         // for all l'
@@ -262,7 +262,7 @@ Amplitudes::TwoIntComplexMap Amplitudes::computeTmat_
             double C2 = gsl_sf_coupling_3j
             (
                 2*lp,                          1,         two_jp,
-                inp_.two_M-T.two_mf-T.two_sf,  T.two_sf,  -inp_.two_M+T.two_mf
+                2*inp_.M-T.two_mf-T.two_sf,    T.two_sf,  -2*inp_.M+T.two_mf
             ) * std::sqrt(two_jp+1);
             
             // sum over L and S
@@ -332,7 +332,7 @@ std::string current_time ()
 void Amplitudes::writeSQL_files ()
 {
     // open file
-    std::ofstream fsql (format("tmat-J%d-M%d.sql", inp_.J, inp_.two_M));
+    std::ofstream fsql (format("tmat-J%d-M%d.sql", inp_.J, inp_.M));
     fsql << logo("--");
     fsql << "-- File generated on " << current_time() << "--" << std::endl;
     fsql << "-- Columns: ni,li,2ji,2mi,2si, nf,lf,2jf,2mf,2sf, J,Ei,l',2j', Re_T,Im_T, Re_TBorn,Im_TBorn" << std::endl;
@@ -384,7 +384,7 @@ void Amplitudes::writeSQL_files ()
 void Amplitudes::writeICS_files ()
 {
     // open file
-    std::ofstream fout (format("ics-J%d-M%d.dat", inp_.J, inp_.two_M));
+    std::ofstream fout (format("ics-J%d-M%d.dat", inp_.J, inp_.M));
     
     // print table header
     fout << "#E[Ry]\t";

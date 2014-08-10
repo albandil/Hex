@@ -229,12 +229,12 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 prec->update(E);
             
             // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.J, inp.two_M, ni, li, two_ji, two_mi, inp.Ei[ie]);
+            SolutionIO reader (inp.J, inp.M, ni, li, two_ji, two_mi, inp.Ei[ie]);
             if (reader.load(current_solution))
                 continue;
             
             // create right hand side
-            std::cout << "\tCreate RHS for ni = " << ni << ", li = " << li << ", ji = " << ji << ", mi = " << mi << ", σi = " << 0.5 * inp.two_M - mi << std::endl;
+            std::cout << "\tCreate RHS for ni = " << ni << ", li = " << li << ", ji = " << ji << ", mi = " << mi << ", σi = " << inp.M - mi << std::endl;
             cArray chi (ang.size() * Nspline * Nspline);
             prec->rhs(chi, ie, instate);
             if (chi.norm() == 0.)
@@ -248,7 +248,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             current_solution = cArray(chi.size());
             if (ie > 0)
             {
-                SolutionIO prev_reader (inp.J, inp.two_M, ni, li, two_ji, two_mi, inp.Ei[ie-1]);
+                SolutionIO prev_reader (inp.J, inp.M, ni, li, two_ji, two_mi, inp.Ei[ie-1]);
                 prev_reader.load(current_solution);
             }
             

@@ -40,7 +40,7 @@ const std::string sample_input =
     "  41\n"
     "\n"
     "# angular momenta\n"
-    "# J  2M limit\n"
+    "# J  M  limit\n"
     "  0  0  4\n"
     "\n"
     "# initial atomic states (ni, li, 2ji, 2mi)\n"
@@ -312,11 +312,11 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\n----------  Angular momentum limits  -------------\n";
     
     J = ReadNext<int>(inf).val;
-    two_M = ReadNext<int>(inf).val;
+    M = ReadNext<int>(inf).val;
     levels = ReadNext<int>(inf).val;
     
     std::cout << "J = " << J << std::endl;
-    std::cout << "M = " << 0.5 * two_M << std::endl;
+    std::cout << "M = " << M << std::endl;
     std::cout << "ℓ = " << levels << std::endl;
     
     //
@@ -362,7 +362,7 @@ void InputFile::read (std::ifstream & inf)
             continue;
         
         // conserve requested angular momentum projection
-        if (two_mi + two_si != two_M)
+        if (two_mi + two_si != 2*M)
             continue;
         
         // add this initial state

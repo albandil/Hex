@@ -175,7 +175,7 @@ class InputFile
         // public attributes
         //
         
-        int order, J, two_M, levels, maxell;
+        int order, J, M, levels, maxell;
         double ecstheta, B;
         rArray rknots, cknots, Ei, ki;
         std::vector<std::tuple<int,int,int,int>> instates, outstates;
