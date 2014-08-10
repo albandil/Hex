@@ -1270,13 +1270,14 @@ void ILUCGPreconditioner::update (double E)
             )
         );
         
-        // time usage
-        int secs = timer.seconds();
-        
-        // print info
-        std::cout << "\t\t- block #" << ill << " (" << ang_[ill].L << "," << ang_[ill].S << "," << ang_[ill].l1 << "," << ang_[ill].l2 << ") ";
-        std::cout << "in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
-                  << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
+        // print info (one thread at a time)
+        # pragma omp critical
+        std::cout << format
+        (
+            "\t\t- block #%d (%d,%d,%d,%d) in %s (%d MiB)\n",
+            ill, ang_[ill].L, ang_[ill].S, ang_[ill].l1, ang_[ill].l2,
+            timer.nice_time(), lu_[ill].size() / 1048576
+        ) << std::endl;
         
         if (cmd_.outofcore)
         {

@@ -1200,7 +1200,8 @@ void ILUCGPreconditioner::update (double E)
             )
         );
         
-        // print time and memory info for this block
+        // print time and memory info for this block (one thread at a time)
+        # pragma omp critical
         std::cout << format
         (
             "\t\t- block #%d (%d,%d) in %d:%02d (%d MiB)",

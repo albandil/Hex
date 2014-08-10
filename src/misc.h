@@ -455,10 +455,10 @@ class Timer
             if (secs < 60) return format("%d", secs);
             
             // format minutes and seconds
-            if (secs < 3600) return format("%d:%d", secs / 60, secs % 60);
+            if (secs < 3600) return format("%d:%02d", secs / 60, secs % 60);
             
             // format hours, minutes and seconds
-            return format("%d:%d:%d", secs / 86400, (secs % 86400) / 60, secs % 60);
+            return format("%d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60);
         }
         
         /// Return elapsed time in milliseconds.
