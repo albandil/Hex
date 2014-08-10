@@ -1248,8 +1248,6 @@ void ILUCGPreconditioner::update (double E)
     # pragma omp parallel for if (cmd_.concurrent_factorizations > 1) num_threads (cmd_.concurrent_factorizations)
     for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
     {
-        std::cout << "\t\t- block #" << ill << " (" << ang_[ill].L << "," << ang_[ill].S << "," << ang_[ill].l1 << "," << ang_[ill].l2 << ")..." << std::flush;
-        
         if (cmd_.outofcore)
         {
             // load DIA block from a linked disk file
@@ -1276,7 +1274,8 @@ void ILUCGPreconditioner::update (double E)
         int secs = timer.seconds();
         
         // print info
-        std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
+        std::cout << "\t\t- block #" << ill << " (" << ang_[ill].L << "," << ang_[ill].S << "," << ang_[ill].l1 << "," << ang_[ill].l2 << ") ";
+        std::cout << "in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
                   << " (" << lu_[ill].size() / 1048576 << " MiB)\n";
         
         if (cmd_.outofcore)
