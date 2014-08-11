@@ -102,9 +102,9 @@ cArrays PWBA2::FullTMatrix_direct
         spgrid::SparseGrid<Complex> G;
         
         // criteria to stop integration cell currently being processed
-        G.setLocEpsRel(1e-5);  // ... if the rules are equal up to 1e-5 (relative)
+        G.setLocEpsRel(1e-3);  // ... if the rules are equal up to 1e-5 (relative)
         G.setLocEpsAbs(1e-9);  // ... if the rules are equal up to 1e-9 (absolute)
-        G.setGlobEpsRel(1e-6); // ... if the extrapolated relative contribution to the whole domain is within 1e-6
+        G.setGlobEpsRel(1e-3); // ... if the extrapolated relative contribution to the whole domain is within 1e-6
         G.setGlobEpsAbs(0);    // ... if the extrapolated contribution to the whole domain is within ... [not used]
         G.setVerbose(true);    // print detailed progress information
         G.setPrefix("  ");     // output formatting prefix
@@ -135,7 +135,7 @@ cArrays PWBA2::FullTMatrix_direct
             // contribution to fUb from the current state
             Complex fUb_contrib = 0;
             
-            std::cout << underline(format("Sparse grid marching integration of bound U for θ = %g, φ = %g", theta, phi)) << std::endl;
+            std::cout << underline(format("Sparse grid marching integration of bound U for theta = %g, phi = %g", theta, phi)) << std::endl;
             
             // start marching integration along Q
             do
@@ -229,7 +229,7 @@ cArrays PWBA2::FullTMatrix_direct
                 return special::constant::two_inv_pi * Jac * integrand_Wb;
             };
             
-            std::cout << underline(format("Sparse grid integration of bound W for θ = %g, φ = %g", theta, phi)) << std::endl;
+            std::cout << underline(format("Sparse grid integration of bound W for theta = %g, phi = %g", theta, phi)) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
 //             G.setWriteVTK(true, "spgrid-W.vtk");
@@ -249,7 +249,7 @@ cArrays PWBA2::FullTMatrix_direct
             G.setParallel(true);
             G.setGlobEpsAbs(0);
             
-            std::cout << underline(format("Sparse grid integration of continuum U for θ = %g, φ = %g", theta, phi)) << std::endl;
+            std::cout << underline(format("Sparse grid integration of continuum U for theta = %g, phi = %g", theta, phi)) << std::endl;
             
             // marching integration bounds
             double Qmin = 0, Qmax = Qon;
@@ -272,7 +272,7 @@ cArrays PWBA2::FullTMatrix_direct
                     double phi1  = special::constant::two_pi  * coords[2];
                     double phi2  = special::constant::two_pi  * coords[3];
                     double alpha = special::constant::pi_half * coords[4];
-                    double Q = Qmax * coords[5];
+                    double Q = Qmin + (Qmax - Qmin) * coords[5];
                     
                     // compute both off- and on-shell momentum magnitudes
                     double q1 = Q * std::cos(alpha), q1on = Qon * std::cos(alpha);
@@ -305,7 +305,7 @@ cArrays PWBA2::FullTMatrix_direct
                             * special::constant::two_pi // for phi1
                             * special::constant::two_pi // for phi2
                             * special::constant::pi_half // for alpha
-                            * Qmax; // for Q
+                            * (Qmax - Qmin); // for Q
                     
                     // evaluate integrand
                     return special::constant::two_inv_pi * Jac * q1*q1 * q2*q2 * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
@@ -372,14 +372,13 @@ cArrays PWBA2::FullTMatrix_direct
                            * 2. // for costheta2
                            * special::constant::two_pi // for phi1
                            * special::constant::two_pi // for phi2
-                           * special::constant::pi_half // for alpha
-                           * Qmax; // for Q
+                           * special::constant::pi_half; // for alpha
                 
                 // evaluate integrand
                 return special::constant::two_inv_pi * Jac * q1*q1 * q2*q2 * integrand_W;
             };
             
-            std::cout << underline(format("Sparse grid integration of continuum W for θ = %g, φ = %g", theta, phi)) << std::endl;
+            std::cout << underline(format("Sparse grid integration of continuum W for theta = %g, phi = %g", theta, phi)) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
             G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);

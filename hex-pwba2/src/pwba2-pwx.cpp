@@ -137,9 +137,9 @@ cArrays PWBA2::PartialWave_direct
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
-                            std::min(kn,Kn), Ln, std::max(kn,Kn), ln,
+                            Kn, Ln, kn, ln,
                             Ni, Li, ki, li
-                        ) * (-std::min(Kn,kn) / std::max(kn,Kn));
+                        ) * (-Kn / kn);
                     };
                     
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
