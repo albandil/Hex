@@ -132,6 +132,8 @@ double getBoundN (int n, int l);
 
 /**
  * @brief Sturmian wave function
+ * 
+ * Evaluate the Sturmian wave function from the formula
  * \f[
  * S_{n\ell}(r) = \left(\frac{\lambda_\ell (k-1)!}{(2\ell+1+k)!}\right)^{1/2} 
  * (\lambda_\ell r)^{\ell+1} \exp(-\lambda_\ell r/2) L_{k-1}^{2\ell+2}(\lambda_\ell r)
@@ -158,11 +160,21 @@ double getBoundFar (int n, int l, double eps, int max_steps = DEFAULT_MAXSTEPS);
 double getSturmFar (int n, int l, double lambda, double eps, int max_steps = DEFAULT_MAXSTEPS);
 
 /**
+ * @brief Free hydrogen state wave function.
+ * 
  * Evaluate free state
  * \f[
  *     \psi_{\mathbf{k}lm}(\mathbf{r}) = \frac{1}{k} \sqrt{\frac{2}{\pi}} F_l(k,r) 
  * 			Y_{lm} (\mathbf{\hat{r}})
- * 			Y_{lm}^\ast(\mathbf{\hat{k}})
+ * 			Y_{lm}^\ast(\mathbf{\hat{k}}) \,,
+ * \f]
+ * where the Coulomb wave function is computed by GSL, which uses the formula
+ * \f[
+ *     F_l(k,r) = \mathrm{e}^{\pi/2k} \frac{|\Gamma(l+1-\mathrm{i}/k)|}{(2l+1)!}
+ *     \mathrm{e}^{-\mathrm{i}kr} \,{}_1\!F_1\left(
+ *         \left.\matrix{l+1-\mathrm{i}/k \cr 2l+2}\right|
+ *         2\mathrm{i}kr
+ *     \right) .
  * \f]
  * Use precomputed value of the Coulomb phase shift "sigma" if available.
  * Complete wave function is further modified by a complex unit factor,
@@ -172,6 +184,11 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps = DEF
  * 			\psi_{\mathbf{k}lm}(\mathbf{r}) \ .
  * \f]
  * The missing phase (as a real number) can be retrieved by \ref evalFreeStatePhase .
+ * 
+ * \note Note that the factor \f$ \mathrm{i}^l \f$ is used rather inconsistently
+ * at the moment: sometimes as \f$ (-\mathrm{i})^l \f$ instead. This just flips
+ * the direction of the momentum vector, which is always integrated over, anyway,
+ * so it doesn't matter.
  */
 double F (double k, int l, double r, double sigma = special::constant::Nan);
 
@@ -184,17 +201,17 @@ double evalFreeStatePhase (double k, int l, double sigma = special::constant::Na
 /**
  * Evaluate free state asymptotics \f$ \sin (kr - \pi l / 2 + \sigma_l) \f$.
  */
-double evalFreeState_asy(double k, int l, double r, double sigma);
+double evalFreeState_asy (double k, int l, double r, double sigma);
 
 /**
  * Find zeros of the free function asymptotics.
  */
-double getFreeAsyZero(double k, int l, double Sigma, double eps, int max_steps, int nzero);
+double getFreeAsyZero (double k, int l, double Sigma, double eps, int max_steps, int nzero);
 
 /**
  * Find local maxima of the free function asymptotics.
  */
-double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, int ntop);
+double getFreeAsyTop (double k, int l, double Sigma, double eps, int max_steps, int ntop);
 
 /**
  * \brief Return sufficiently far radius for using the asymptotic form of the free state.
@@ -211,7 +228,13 @@ double getFreeAsyTop(double k, int l, double Sigma, double eps, int max_steps, i
  *      n\pi = kr - \frac{\ell\pi}{2} + \frac{1}{k}\log 2k + \sigma_\ell(k) \ .
  * \f]
  */
-double getFreeFar(double k, int l, double Sigma = special::constant::Nan, double eps = 1e-10, int max_steps = DEFAULT_MAXSTEPS);
+double getFreeFar
+(
+    double k, int l,
+    double Sigma = special::constant::Nan,
+    double eps = 1e-10,
+    int max_steps = DEFAULT_MAXSTEPS
+);
 
 } // end of namespace Hydrogen
     
@@ -223,7 +246,7 @@ class HydrogenFunction : public special::RadialFunction<double>
 public:
     
     /// Constructor for bound state
-    HydrogenFunction(int n, int l)
+    HydrogenFunction (int n, int l)
         : n_(n), l_(l) {}
     
     /**

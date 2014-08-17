@@ -130,6 +130,51 @@ int run_Y (int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
+int run_Coulomb (int argc, char* argv[])
+{
+    if (argc < 6)
+    {
+        std::cout << std::endl << "Usage:" << std::endl;
+        std::cout << "\t./hex-special Coulomb --eta-rho <L> <eta> <rho>" << std::endl;
+        std::cout << "\t./hex-special Coulomb --k-r <L> <k> <r>" << std::endl;
+        std::cout << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    if (std::string(argv[2]) == std::string("--eta-rho"))
+    {    
+        int L = std::atoi(argv[3]);
+        double eta = std::atof(argv[4]);
+        double rho = std::atof(argv[5]);
+        
+        double F, expF;
+        gsl_sf_coulomb_wave_F_array(L, 0, eta, rho, &F, &expF);
+        
+        std::cout << "F[" << L << "](" << eta << "," << rho << ") = " << F << std::endl;
+    }
+    else if (std::string(argv[2]) == std::string("--k-r"))
+    {
+        int L = std::atoi(argv[3]);
+        double k = std::atof(argv[4]);
+        double r = std::atof(argv[5]);
+        
+        double F, expF;
+        gsl_sf_coulomb_wave_F_array(L, 0, -1/k, k*r, &F, &expF);
+        
+        std::cout << "F[" << L << "](" << k << "," << r << ") = " << F << std::endl;
+    }
+    else
+    {
+        std::cout << std::endl << "Usage:" << std::endl;
+        std::cout << "\t./hex-special Coulomb --eta-rho <L> <eta> <rho>" << std::endl;
+        std::cout << "\t./hex-special Coulomb --k-r <L> <k> <r>" << std::endl;
+        std::cout << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    return EXIT_SUCCESS;
+}
+
 int main (int argc, char* argv[])
 {
     std::string name = (argc > 1 ? argv[1] : "help");
@@ -146,6 +191,7 @@ int main (int argc, char* argv[])
     Use(ClebschGordan); // Clebsch-Gordan coefficient
     Use(Gaunt);         // Gaunt coefficient
     Use(Y);             // spherical harmonic
+    Use(Coulomb)        // Coulomb function
     
     if (needHelp)
     {

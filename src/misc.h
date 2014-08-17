@@ -653,7 +653,7 @@ template <class T> class Range
    @endverbatim
  * It may be necessary to set the user locale, first, using the function call
    @code
-       std::setlocale(LC_ALL, "");
+       std::setlocale(LC_ALL, "en_GB.utf8");
    @endcode
  */
 inline std::string underline (std::string text)
@@ -673,19 +673,47 @@ inline std::string underline (std::string text)
 // Data type abstract traits.
 //
 
+/**
+ * @brief Data-type information.
+ * 
+ * The information about components of a specific data type can be used in
+ * type-generic template functions. This class (or rather its specializations
+ * for individual types) offer the necessary information.
+ * 
+ * An example of use would be a formatted output of column data of an array
+ * of the abstract data type 'T'. If we wanted to print every component as a
+ * separate column, we would need to (a) know the total number of components
+ * of the data type 'T' and (b) have the tool to access individual elements.
+ * This class (or rather its specializations for different types) offers
+ * both through the members 'ncmpt' and 'cmpt'.
+ */
 template <class T> class typeinfo {};
+
+/// Data-type info class specialization for 'double'.
 template<> class typeinfo<double>
 {
     public:
+        /// Component data type.
         typedef double cmpttype;
+        
+        /// Component count.
         static const std::size_t ncmpt = 1;
+        
+        /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
 };
+
+/// Data-type info class specialization for 'std::complex'.
 template<> template<class T> class typeinfo<std::complex<T>>
 {
     public:
+        /// Component data type.
         typedef T cmpttype;
+        
+        /// Component count.
         static const std::size_t ncmpt = 2;
+        
+        /// Component getter.
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
 };
 
