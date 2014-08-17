@@ -1176,6 +1176,9 @@ void ILUCGPreconditioner::update (double E)
     # pragma omp parallel for if (cmd_.concurrent_factorizations > 1) num_threads (cmd_.concurrent_factorizations)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        // delete old factorization first to maximally spare memory
+        lu_[ill].drop();
+        
         // load diagonal block from disk (if OOC)
         if (cmd_.outofcore)
         {
@@ -1230,15 +1233,6 @@ void ILUCGPreconditioner::update (double E)
             lu_[ill].drop();
         }
     }
-    
-#ifndef NO_OPENBLAS
-    // reset threads
-    if (cmd_.concurrent_factorizations)
-    {
-        omp_set_num_threads(omp_get_max_threads());
-        openblas_set_num_threads(omp_get_max_threads());
-    }
-#endif
 }
 
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
