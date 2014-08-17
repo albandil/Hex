@@ -1274,7 +1274,7 @@ void ILUCGPreconditioner::update (double E)
         # pragma omp critical
         std::cout << format
         (
-            "\t\t- block #%d (%d,%d,%d,%d) in %s (%d MiB)\n",
+            "\t\t- block #%d (%d,%d,%d,%d) in %s (%d MiB)",
             ill, ang_[ill].L, ang_[ill].S, ang_[ill].l1, ang_[ill].l2,
             timer.nice_time().c_str(), lu_[ill].size() / 1048576
         ) << std::endl;

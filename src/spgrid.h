@@ -759,6 +759,7 @@ template <class T> class SparseGrid
                 # pragma omp parallel if (parallel_)
                 {
                     // per-thread data
+                    std::size_t Nlow = nodes.at(ruleLow).n;
                     std::size_t thread_neval = 0, thread_ncells = 0;
                     std::vector<tDomain> thread_domains;
                     T thread_finalEstimate = 0;
@@ -788,7 +789,7 @@ template <class T> class SparseGrid
                                 thread_domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
                                 
                                 // update (per-thread) evaluation count and cell count
-                                thread_neval += nodes.at(ruleLow).n;
+                                thread_neval += Nlow;
                                 thread_ncells++;
                             }
                         }

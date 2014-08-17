@@ -193,7 +193,7 @@ class SolutionIO
     public:
         
         SolutionIO (int J, int M, int ni, int li, int two_ji, int two_mi, double E)
-            : name_(format("psi-(%d,%g)-[%d,%d,%g,%g]-E%g.hdf", J, M, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
+            : name_(format("psi-(%d,%d)-[%d,%d,%g,%g]-E%g.hdf", J, M, ni, li, 0.5*two_ji, 0.5*two_mi, E)) {}
         
         /// Get name of the solution file.
         std::string const & name () const

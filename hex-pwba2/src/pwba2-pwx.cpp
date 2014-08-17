@@ -123,6 +123,7 @@ cArrays PWBA2::PartialWave_direct
                     std::cout << "\n\tAllowed intermediate states" << std::endl;
                     auto allowed_energy_contribution = [&](double En) -> Complex
                     {
+                        // define limit; however, it is never used
                         if (En == 0 or En == Etot)
                             return 0.;
                         
@@ -130,7 +131,7 @@ cArrays PWBA2::PartialWave_direct
                         double Kn = std::sqrt(En);
                             
                         // get momentum of the projectile
-                        double kn = std::sqrt(ki*ki - 1./(Ni*Ni) - En);
+                        double kn = std::sqrt(Etot - En);
                         
                         // compute the radial integral
                         return Idir_nFree_allowed
@@ -158,6 +159,7 @@ cArrays PWBA2::PartialWave_direct
                     std::cout << "\n\tForbidden intermediate states" << std::endl;
                     auto forbidden_energy_contribution = [&](double En) -> Complex
                     {
+                        // define limit; however, it is never used
                         if (En == Etot)
                             return 0.;
                         
@@ -165,7 +167,7 @@ cArrays PWBA2::PartialWave_direct
                         double Kn = std::sqrt(En);
                         
                         // get momentum of the projectile
-                        double kappan = std::sqrt(En - ki*ki + 1./(Ni*Ni));
+                        double kappan = std::sqrt(En - Etot);
                         
                         // compute the radial integral
                         return Idir_nFree_forbidden
