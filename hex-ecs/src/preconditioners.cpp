@@ -490,19 +490,27 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     int Nspline = s_rad_.bspline().Nspline();
     
     // j-overlaps of shape [Nangmom × Nspline]
-    cArray ji_overlaps = s_rad_.overlapj (
+    cArray ji_overlaps = s_rad_.overlapj
+    (
         inp_.maxell,
         inp_.ki.slice(ie, ie + 1), // use only one ki
         weightEdgeDamp(s_rad_.bspline())
     );
+    ji_overlaps.hdfsave("ji_overlaps.hdf");
+    if (not std::isfinite(ji_overlaps.norm()))
+        throw exception ("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
     cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
+    if (not std::isfinite(ji_expansion.norm()))
+        throw exception ("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
     Pi_overlaps = s_rad_.overlapP(inp_.ni, li, weightEndDamp(s_rad_.bspline()));
     Pi_expansion = s_rad_.S().tocoo().tocsr().solve(Pi_overlaps);
+    if (not std::isfinite(Pi_expansion.norm()))
+        throw exception ("Unable to expand hydrogen bound orbital in B-splines!");
     
     // for all segments constituting the RHS
     # pragma omp parallel for
@@ -523,11 +531,12 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 continue;
             
             // (anti)symmetrization
-            int Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
+            int Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1 : -1;
             
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(Complex(0.,1.),l) * std::sqrt(2*special::constant::pi*(2*l+1)) / Complex(inp_.ki[ie]); 
-            prefactor *= special::ClebschGordan(li,mi,l,0,inp_.L,mi);
+            Complex prefactor = std::pow(Complex(0.,1.),l)
+                              * std::sqrt(special::constant::two_pi * (2 * l + 1))
+                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / inp_.ki[ie];
             if (prefactor == 0.)
                 continue;
             
@@ -546,9 +555,9 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 
                 // abort if any of the coefficients is non-number (factorial overflow etc.)
                 if (not std::isfinite(f1))
-                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, li, l, inp_.L);
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
                 if (not std::isfinite(f2))
-                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda, l1, l2, l, li, inp_.L);
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
                 // skip contribution if both coefficients are zero
                 if (f1 == 0. and f2 == 0.)

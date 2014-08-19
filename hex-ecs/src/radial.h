@@ -298,7 +298,24 @@ class RadialIntegrals
                     // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
                     cArrays evalj(points);
                     for (int ipoint = 0; ipoint < points; ipoint++)
-                        evalj[ipoint] = weightf(xs[ipoint]) * special::ric_jv(maxell, vk[ie] * xs[ipoint]);
+                    {
+                        // compute the damping factor
+                        double damp = weightf(xs[ipoint]);
+                        
+                        // if the factor is numerical zero, do not evaluate the function, just allocate zeros
+                        if (damp == 0)
+                        {
+                            evalj[ipoint] = cArray(maxell + 1);
+                            continue;
+                        }
+                        
+                        // evaluate all Riccati-Bessel functions in point
+                        evalj[ipoint] = damp * special::ric_jv(maxell, vk[ie] * xs[ipoint]);
+                        
+                        // clear all possible NaN entries (these may occur for far radii, where should be zero)
+                        for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint][l]))
+                            evalj[ipoint][l] = 0.;
+                    }
                     
                     // for all angular momenta
                     for (int l = 0; l <= maxell; l++)

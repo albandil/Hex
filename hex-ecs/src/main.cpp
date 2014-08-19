@@ -303,9 +303,18 @@ if (cmd.itinerary & CommandLine::StgSolve)
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << "\n";
             cArray chi (coupled_states.size() * Nspline * Nspline);
             prec->rhs(chi, ie, instate, Spin);
-            if (chi.norm() == 0.)
+            
+            // compute and check norm of the right hand side vector
+            double chi_norm = chi.norm();
+            if (chi_norm == 0.)
             {
                 std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings)." << std::endl;
+                computations_done++;
+                continue;
+            }
+            if (not std::isfinite(chi_norm))
+            {
+                std::cout << "\t! Right hand side has invalid norm (" << chi_norm << ")." << std::endl;
                 computations_done++;
                 continue;
             }
