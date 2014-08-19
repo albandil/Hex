@@ -408,10 +408,11 @@ if (cmd.itinerary & CommandLine::StgExtract)
         for (auto outstate : inp.outstates)
         {
             // get quantum numbers
-            int li   = std::get<1>(instate);
-            int mi   = std::get<2>(instate);
-            int nf   = std::get<0>(outstate);
-            int lf   = std::get<1>(outstate);
+            int ni = std::get<0>(instate);
+            int li = std::get<1>(instate);
+            int mi = std::get<2>(instate);
+            int nf = std::get<0>(outstate);
+            int lf = std::get<1>(outstate);
             
             // skip angular forbidden states
             bool allowed = false;
@@ -426,7 +427,7 @@ if (cmd.itinerary & CommandLine::StgExtract)
                 // Discrete transition
                 //
                 
-                std::cout << "\texc: -> nf = " << nf << ", lf = " << lf << ", mf = *" << std::flush;
+                std::cout << format("\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::flush;
                 
                 // precompute hydrogen function overlaps
                 cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
