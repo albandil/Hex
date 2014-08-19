@@ -74,14 +74,11 @@ cArrays PWBA2::FullTMatrix_direct
     tab.setWidth(15, 15, 30, 15, 30, 15, 30, 15, 30, 15, 30);
     tab.write("theta", "phi", "fUb", "evaluations", "fWb", "evaluations", "fU", "evaluations", "fW", "evaluations", "sum");
     
-    int Ntheta = 1, Nphi = 10;
-//     for (int itheta = 0; itheta < Ntheta; itheta++)
-//     for (int iphi = 0; iphi < Nphi; iphi++)
+    for (int itheta = 15; itheta < 180; itheta += 15)
     {
-//         double theta = itheta * special::constant::pi / (Ntheta - 1);
-        double theta = special::constant::pi_quart;
-//         double theta = 0;
-//         double phi = iphi * special::constant::pi / (Nphi - 1);
+        double theta = itheta * special::constant::pi / 180.;
+//         double theta = special::constant::pi_quart;
+//         double theta = special::constant::pi;
         double phi = 0;
         
         // total energy of the system
@@ -170,8 +167,8 @@ cArrays PWBA2::FullTMatrix_direct
                     
                     // Jacobian
                     double Jac = 2. // for cos theta
-                            * special::constant::two_pi // for phi
-                            * (Qmax - Qmin); // for Q
+                               * special::constant::two_pi // for phi
+                               * (Qmax - Qmin); // for Q
                     
                     // evaluate integrand
                     return special::constant::two_inv_pi * Jac * (integrand_Ub_off - integrand_Ub_on) / (0.5*Qn*Qn - 0.5*kn*kn);
@@ -180,7 +177,6 @@ cArrays PWBA2::FullTMatrix_direct
                 std::cout << std::endl << "Marching: Step " << ++step << " from Q = " << Qmin << " to " << Qmax << std::endl;
                 
                 // integrate U on 6-dimensional sparse grid
-//                 G.setWriteVTK(true, format("spgrid-U-%g-%g.vtk", Qmin, Qmax));
                 G.integrate_adapt(integrand_Ub_wrap, Unit_3Cube, spgrid::d3l4n39, spgrid::d3l5n87);
                 fUb_contrib += G.result();
                 nEvalUb += G.evalcount();
@@ -232,9 +228,7 @@ cArrays PWBA2::FullTMatrix_direct
             std::cout << underline(format("Sparse grid integration of bound W for theta = %g, phi = %g", theta, phi)) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
-//             G.setWriteVTK(true, "spgrid-W.vtk");
             G.integrate_adapt(integrand_Wb_wrap, Unit_2Cube, spgrid::d2l4n17, spgrid::d2l5n33);
-//             G.setWriteVTK(false);
             fWb += G.result();
             nEvalWb += G.evalcount();
             
@@ -275,40 +269,35 @@ cArrays PWBA2::FullTMatrix_direct
                     double Q = Qmin + (Qmax - Qmin) * coords[5];
                     
                     // compute both off- and on-shell momentum magnitudes
-                    double q1 = Q * std::cos(alpha), q1on = Qon * std::cos(alpha);
-                    double q2 = Q * std::sin(alpha), q2on = Qon * std::sin(alpha);
+                    double qn = Q * std::sin(alpha), qnon = Qon * std::sin(alpha);
+                    double kn = Q * std::cos(alpha), knon = Qon * std::cos(alpha);
                     
                     // compute both off- and on-shell momentum vectors
-                    geom::vec3d nq1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
-                    geom::vec3d nq2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
-                    geom::vec3d vq1 = q1 * nq1, vq1on = q1on * nq1;
-                    geom::vec3d vq2 = q2 * nq2, vq2on = q2on * nq2;
-                    
-                    // compute carthesian coordinates: "vql" = q<, "vqg" = q>
-                    double ql = std::min(q1,q2), qlon = std::min(q1on,q2on);
-                    geom::vec3d vql = (q1 < q2 ? vq1 : vq2), vqlon = (q1on < q2on ? vq1on : vq2on);
-                    geom::vec3d vqg = (q1 > q2 ? vq1 : vq2), vqgon = (q1on > q2on ? vq1on : vq2on);
+                    geom::vec3d n1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
+                    geom::vec3d n2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
+                    geom::vec3d vqn = qn * n1, vqnon = qnon * n1;
+                    geom::vec3d vkn = kn * n2, vknon = knon * n2;
                     
                     // the value of the off-shell integrand
-                    double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
-                    Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
-                    Complex integrand_U_off = Q * norm * Wf * Wi;
+                    double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                    Complex Wf = W_1s(vkf - vkn, vqn), Wi = std::conj(W_1s(vki - vkn, vqn));
+                    Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
                     
                     // the value of the on-shell integrand
-                    double normon = 4. / (special::constant::pi * qlon * (1. - std::exp(-2.*special::constant::pi/qlon)));
-                    Complex Wfon = W_1s(vkf - vqgon, vqlon), Wion = std::conj(W_1s(vki - vqgon, vqlon));
-                    Complex integrand_U_on = Qon * normon * Wfon * Wion;
+                    double normon = 4. / (special::constant::pi * qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
+                    Complex Wfon = W_1s(vkf - vknon, vqnon), Wion = std::conj(W_1s(vki - vknon, vqnon));
+                    Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
                     
                     // Jacobian
                     double Jac = 2. // for costheta1
-                            * 2. // for costheta2
-                            * special::constant::two_pi // for phi1
-                            * special::constant::two_pi // for phi2
-                            * special::constant::pi_half // for alpha
-                            * (Qmax - Qmin); // for Q
+                               * 2. // for costheta2
+                               * special::constant::two_pi // for phi1
+                               * special::constant::two_pi // for phi2
+                               * special::constant::pi_half // for alpha
+                               * (Qmax - Qmin); // for Q
                     
                     // evaluate integrand
-                    return special::constant::two_inv_pi * Jac * q1*q1 * q2*q2 * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
+                    return special::constant::two_inv_pi * Jac * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
                 };
                 
                 std::cout << std::endl << "Marching: Step " << ++step << " from Q = " << Qmin << " to " << Qmax << std::endl;
@@ -336,35 +325,27 @@ cArrays PWBA2::FullTMatrix_direct
             G.setGlobEpsAbs(0);
             
             // iW-integrand (imag part of propagator)
-            auto integrand_W_wrap = [ki,kf,vki,vkf,Qmax,Etot](int n, double const * coords) -> Complex
+            auto integrand_W_wrap = [ki,kf,vki,vkf,Etot,Qon](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 5);
                 
                 // unpack polar coordinates
-                double costheta1 = 2 * coords[1] - 1;
-                double costheta2 = 2 * coords[0] - 1;
-                double sintheta1 = std::sqrt(1 - costheta1*costheta1);
-                double sintheta2 = std::sqrt(1 - costheta2*costheta2);
-                double phi1 = special::constant::two_pi * coords[2];
-                double phi2 = special::constant::two_pi * coords[3];
+                double costheta1 = 2 * coords[0] - 1, sintheta1 = std::sqrt(1 - costheta1 * costheta1);
+                double costheta2 = 2 * coords[1] - 1, sintheta2 = std::sqrt(1 - costheta2 * costheta2);
+                double phi1  = special::constant::two_pi  * coords[2];
+                double phi2  = special::constant::two_pi  * coords[3];
                 double alpha = special::constant::pi_half * coords[4];
-                double Q = std::sqrt(2 * Etot);
-                double q1 = Q * std::cos(alpha);
-                double q2 = Q * std::sin(alpha);
+                double qn = Qon * std::sin(alpha);
+                double kn = Qon * std::cos(alpha);
                 
                 // compute directions
-                geom::vec3d vq1 = { q1 * sintheta1 * std::cos(phi1), q1 * sintheta1 * std::sin(phi1), q1 * costheta1 };
-                geom::vec3d vq2 = { q2 * sintheta2 * std::cos(phi2), q2 * sintheta2 * std::sin(phi2), q2 * costheta2 };
-                
-                // compute carthesian coordinates: "vql" = q<, "vqg" = q>
-                double ql = std::min(q1,q2);
-                geom::vec3d vql = (q1 < q2 ? vq1 : vq2);
-                geom::vec3d vqg = (q1 > q2 ? vq1 : vq2);
+                geom::vec3d vqn = { qn * sintheta1 * std::cos(phi1), qn * sintheta1 * std::sin(phi1), qn * costheta1 };
+                geom::vec3d vkn = { kn * sintheta2 * std::cos(phi2), kn * sintheta2 * std::sin(phi2), kn * costheta2 };
                 
                 // the value of the integrand
-                double norm = 4. / (special::constant::pi * ql * (1. - std::exp(-2.*special::constant::pi/ql)));
-                Complex Wf = W_1s(vkf - vqg, vql), Wi = std::conj(W_1s(vki - vqg, vql));
+                double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                Complex Wf = W_1s(vkf - vkn, vqn), Wi = std::conj(W_1s(vki - vkn, vqn));
                 Complex integrand_W = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
                 
                 // Jacobian
@@ -375,7 +356,7 @@ cArrays PWBA2::FullTMatrix_direct
                            * special::constant::pi_half; // for alpha
                 
                 // evaluate integrand
-                return special::constant::two_inv_pi * Jac * q1*q1 * q2*q2 * integrand_W;
+                return special::constant::two_inv_pi * Jac * qn*qn * kn*kn * integrand_W;
             };
             
             std::cout << underline(format("Sparse grid integration of continuum W for theta = %g, phi = %g", theta, phi)) << std::endl;
@@ -384,12 +365,11 @@ cArrays PWBA2::FullTMatrix_direct
             G.integrate_adapt(integrand_W_wrap, Unit_5Cube, spgrid::d5l4n151, spgrid::d5l5n391);
             fW = G.result();
             nEvalW = G.evalcount();
-            
             std::cout << std::endl;
         }
         
         // write new row to the output table
-        tab.write(theta, phi, fUb, nEvalUb, fWb, nEvalWb, fU, nEvalU, fW, nEvalW, fUb+fWb+fU+fW);
+        tab.write(itheta, phi, fUb, nEvalUb, fWb, nEvalWb, fU, nEvalU, fW, nEvalW, fUb+fWb+fU+fW);
     }
     
     // write out the table with T-matrices
