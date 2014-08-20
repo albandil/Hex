@@ -208,10 +208,20 @@ if (cmd.itinerary & CommandLine::StgSolve)
         // for all initial states
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
         {
+            // initial quantum numbers
             int ni = std::get<0>(inp.instates[instate]);
             int li = std::get<1>(inp.instates[instate]);
             int two_ji = std::get<2>(inp.instates[instate]); double ji = 0.5 * two_ji;
             int two_mi = std::get<3>(inp.instates[instate]); double mi = 0.5 * two_mi;
+            
+            // we may have already computed solution for this state and energy... is it so?
+            SolutionIO reader (inp.J, inp.M, ni, li, two_ji, two_mi, inp.Ei[ie]);
+            if (reader.load(current_solution))
+            {
+                std::cout << "\tSolution already exists in file \"" << reader.name() << "\"" << std::endl;
+                computations_done++;
+                continue;
+            }
             
             // get total energy of the system
             prevE = E;
@@ -228,11 +238,6 @@ if (cmd.itinerary & CommandLine::StgSolve)
             if (not (E == prevE)) // does not use 'if (E != prevE)' to work with initial Nan values
                 prec->update(E);
             
-            // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.J, inp.M, ni, li, two_ji, two_mi, inp.Ei[ie]);
-            if (reader.load(current_solution))
-                continue;
-            
             // create right hand side
             std::cout << "\tCreate RHS for ni = " << ni << ", li = " << li << ", ji = " << ji << ", mi = " << mi << ", σi = " << inp.M - mi << std::endl;
             cArray chi (ang.size() * Nspline * Nspline);
@@ -242,14 +247,6 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings)." << std::endl;
                 computations_done++;
                 continue;
-            }
-            
-            // we may have already computed the previous solution - it will serve as initial guess
-            current_solution = cArray(chi.size());
-            if (ie > 0)
-            {
-                SolutionIO prev_reader (inp.J, inp.M, ni, li, two_ji, two_mi, inp.Ei[ie-1]);
-                prev_reader.load(current_solution);
             }
             
             // custom conjugate gradients callback-based solver
