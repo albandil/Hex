@@ -23,18 +23,12 @@
 
 #ifndef NO_UMFPACK
 #include <umfpack.h>
-#ifndef SuiteSparse_time
-double SuiteSparse_time()
-{
-    return 0.;
-}
-#endif
 #endif
 
 #ifndef NO_HDF
 #include "hdffile.h"
 #endif
-    
+
 #include "arrays.h"
 #include "matrix.h"
 #include "misc.h"
