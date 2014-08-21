@@ -628,7 +628,7 @@ template <class T> class SparseGrid
             // unprocessed subdomains of the integration domain
             std::vector<tDomain> domains = {{ root, false, integrate_fixed(F, root, ruleLow) }};
             
-            // VTK debug data
+            // VTK debug data (only used when write_vtk_ == true)
             std::map<std::vector<std::bitset<dim>>,T,order_vector_of_bitsets<dim>> vtk;
             
             // initialize evaluations count and number of cells
@@ -667,49 +667,86 @@ template <class T> class SparseGrid
                 
                 // debug variables
                 std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0;
+                std::vector<std::size_t> bisectIDs;
                 Timer timer;
                 
                 // check convergence for all not yet converged sub-domains
                 if (level >= minlevel_)
                 {
-                    // for all domains
-                    # pragma omp parallel for if (parallel_)
-                    for (auto dom = domains.begin(); dom < domains.end(); dom++)
+                    # pragma omp parallel if (parallel_) \
+                        reduction (+:abslocal,absglobal,rellocal,relglobal)
                     {
-                        // compute the fine estimate for this domain
-                        T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
-                        neval_ += nodes.at(ruleHigh).n;
+                        // per-thread data
+                        std::size_t thread_neval = 0;
+                        T thread_finalEstimate = 0;
+                        std::vector<std::size_t> thread_bisectIDs;
                         
-                        // check absolute local convergence
-                        if (std::abs(dom->val - fineEstimate) < epsabs_)
+                        // for all domains
+                        # pragma omp for schedule (static)
+                        for (auto dom = domains.begin(); dom < domains.end(); dom++)
                         {
-                            dom->set = true;
-                            abslocal++;
+                            // compute the fine estimate for this domain
+                            T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
+                            thread_neval += nodes.at(ruleHigh).n;
+                            
+                            // check absolute local convergence
+                            if (std::abs(dom->val - fineEstimate) < epsabs_)
+                            {
+                                dom->set = true;
+                                abslocal++;
+                            }
+                            
+                            // check relative local convergence
+                            if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
+                            {
+                                dom->set = true;
+                                rellocal++;
+                            }
+                            
+                            // check absolute global (extrapolated) convergence
+                            if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
+                            {
+                                dom->set = true;
+                                absglobal++;
+                            }
+                            
+                            // check relative global (extrapolated) convergence
+                            if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
+                            {
+                                dom->set = true;
+                                relglobal++;
+                            }
+                            
+                            // store the better estimate
+                            dom->val = fineEstimate;
+                            
+                            // is the cell converged or was max level reached?
+                            if (dom->set or level == maxlevel_)
+                            {
+                                // YES : use the current value as final
+                                thread_finalEstimate += dom->val;
+                                
+                                // YES : save data for optional VTK debug output
+                                if (write_vtk_ and dim <= 3)
+                                {
+                                    # pragma omp critical
+                                    vtk[dom->cube.history()] = dom->val / dom->cube.volume();
+                                }
+                            }
+                            else
+                            {
+                                // NO : add domain ID to the list of domains needing bisection
+                                thread_bisectIDs.push_back(dom - domains.begin());
+                            }
                         }
                         
-                        // check relative local convergence
-                        if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
+                        # pragma omp critical
                         {
-                            dom->set = true;
-                            rellocal++;
+                            // update shared variables by contributions from this thread
+                            neval_ += thread_neval;
+                            finalEstimate += thread_finalEstimate;
+                            bisectIDs.insert(bisectIDs.end(), thread_bisectIDs.begin(), thread_bisectIDs.end());
                         }
-                        
-                        // check absolute global (extrapolated) convergence
-                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
-                        {
-                            dom->set = true;
-                            absglobal++;
-                        }
-                        
-                        // check relative global (extrapolated) convergence
-                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
-                        {
-                            dom->set = true;
-                            relglobal++;
-                        }
-                        
-                        // store better estimate
-                        dom->val = fineEstimate;
                     }
                     
                     if (verbose_)
@@ -730,83 +767,60 @@ template <class T> class SparseGrid
                     if (global_epsrel_ > 0)
                         std::cout << prefix_ << "    relative global threshold : " << relglobal << std::endl;
                     
-                    // calculate non-converged cells
-                    std::size_t nsub = std::count_if
-                    (
-                        domains.begin(),
-                        domains.end(),
-                        [](tDomain const & dom) -> bool { return not dom.set; }
-                    );
-                    double frac = nsub * 100. / domains.size();
-                    
                     // print how many cells will need further bisection
-                    std::cout << prefix_ << "  cells to bisect : " << nsub << " (";
+                    double frac = bisectIDs.size() * 100. / domains.size();
+                    std::cout << prefix_ << "  cells to bisect : " << bisectIDs.size() << " (";
                     if (0 < frac and frac < 1)
                         std::cout << "< 1";
                     else
                         std::cout << "~ " << (int)std::ceil(frac);
                     std::cout << "% of processed cells)" << std::endl;
+                    
+                    // warn if we reached the max level (no further subdivision will be done)
+                    if (level == maxlevel_)
+                        std::cout << prefix_ << "  maximal level " << maxlevel_ << " reached" << std::endl;
                 }
                 
-                // warn if we reached the max level (no further subdivision will be done)
-                if (level == maxlevel_ and verbose_)
-                    std::cout << prefix_ << "  maximal level " << maxlevel_ << " reached" << std::endl;
+                // move current domains to temporary array
+                std::vector<tDomain> oldDomains = std::move(domains);
                 
                 // further subdivide all not yet converged sub-domains
-                std::vector<tDomain> oldDomains = std::move(domains);
                 timer.reset();
-                
                 # pragma omp parallel if (parallel_)
                 {
                     // per-thread data
                     std::size_t Nlow = nodes.at(ruleLow).n;
                     std::size_t thread_neval = 0, thread_ncells = 0;
                     std::vector<tDomain> thread_domains;
-                    T thread_finalEstimate = 0;
                     
-                    // for all domains
-                    # pragma omp for
-                    for (auto oldDom = oldDomains.begin(); oldDom < oldDomains.end(); oldDom++)
+                    // for all domains that need subdivision
+                    # pragma omp for schedule (static)
+                    for (auto itID = bisectIDs.begin(); itID < bisectIDs.end(); itID++)
                     {
-                        if (oldDom->set or level == maxlevel_)
+                        // subdivide this domain
+                        for (dCube const & c : oldDomains[*itID].cube.subdivide())
                         {
-                            // this domain has either converged or we can't subdivide anyway, so store its value
-                            thread_finalEstimate += oldDom->val;
+                            // compute also the rough estimate of integral in this new cell 'c'
+                            thread_domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
                             
-                            // save data for potential VTK debug output
-                            if (write_vtk_ and dim <= 3)
-                            {
-                                # pragma omp critical
-                                vtk[oldDom->cube.history()] = oldDom->val / oldDom->cube.volume();
-                            }
-                        }
-                        else
-                        {
-                            // this domain needs subdivision
-                            for (dCube const & c : oldDom->cube.subdivide())
-                            {
-                                // compute also the rough estimate of integral in this new cell 'c'
-                                thread_domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
-                                
-                                // update (per-thread) evaluation count and cell count
-                                thread_neval += Nlow;
-                                thread_ncells++;
-                            }
+                            // update (per-thread) evaluation count and cell count
+                            thread_neval += Nlow;
+                            thread_ncells++;
                         }
                     }
                     
                     # pragma omp critical
                     {
-                        // copy the per-thread data to the global shared variables
+                        // update shared variables by contributions from this thread
                         ncells_ += thread_ncells;
                         neval_ += thread_neval;
-                        finalEstimate += thread_finalEstimate;
                         domains.insert(domains.end(), thread_domains.begin(), thread_domains.end());
                     }
                 }
                 
                 if (verbose_)
                 {
+                    // print some more statistics
                     std::cout << prefix_ << "  bisection time : " << timer.nice_time() << std::endl;
                     std::cout << prefix_ << "  function evaluations up to now : " << neval_ << std::endl;
                 }
