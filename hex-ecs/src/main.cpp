@@ -255,7 +255,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
             if (not allowed)
             {
-                std::cout << "\tThe initial state li=" << li << ", mi=" << mi << " is not allowed within the total angular variables.\n";
+                std::cout << "\tInitial state li=" << li << ", mi=" << mi << " will be skipped (not allowed by total angular variables).\n";
                 continue;
             }
             
@@ -308,7 +308,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             double chi_norm = chi.norm();
             if (chi_norm == 0.)
             {
-                std::cout << "\t! Right-hand-side is zero (probably due to incompatible angular settings)." << std::endl;
+                std::cout << "\t! Right-hand-side is zero, check L, Π and nL." << std::endl;
                 computations_done++;
                 continue;
             }

@@ -169,19 +169,25 @@ unsigned cg_callbacks
     // compute norm of the right hand side
     double bnorm = compute_norm(b);
     
+    // trivial solution for zero right hand side
+    if (bnorm == 0)
+    {
+        x.fill(0.);
+        return 0;
+    }
+    
     // get size of the problem
     size_t N = b.size();
-    
-    // some auxiliary arrays (search directions etc.)
-    TArray p (std::move(new_array(N)));
-    TArray q (std::move(new_array(N)));
-    TArray z (std::move(new_array(N)));
     
     // residual; initialized to starting residual using the initial guess
     TArray r (std::move(new_array(N)));
     matrix_multiply(x, r); // r = A x
     axby (-1., r, 1., b); // r = b - r
     double rnorm = compute_norm(r);
+    
+    // terminate if the initial guess is already fine enough
+    if (rnorm / bnorm < eps)
+        return 0;
     
     // if the (non-zero) initial guess seems horribly wrong,
     //    use rather the right hand side as the initial guess
@@ -190,6 +196,11 @@ unsigned cg_callbacks
         x.fill(0.);
         axby (0., r, 1., b); // r = b
     }
+    
+    // some auxiliary arrays (search directions etc.)
+    TArray p (std::move(new_array(N)));
+    TArray q (std::move(new_array(N)));
+    TArray z (std::move(new_array(N)));
     
     // some other scalar variables
     Complex rho_new;        // contains inner product r_i^T · r_i
@@ -241,7 +252,7 @@ unsigned cg_callbacks
         rnorm = compute_norm(r);
         if (not std::isfinite(rnorm))
         {
-            std::cout << "\t[cg] Oh my god... the norm of the solution is not finite. Something went wrong!\n";
+            std::cout << "\t[cg] Damn... the norm of the solution is not finite. Something went wrong!\n";
             break;
         }
         

@@ -88,10 +88,10 @@ cArray computeLambda
             // determine knot
             int eval_knot = std::lower_bound
             (
-                t,
-                t + Nknot,
-                Complex(eval_r, 0.),
-                [](Complex a, Complex b) -> bool { return a.real() < b.real(); }
+                t,                      // pointer to the first knot
+                t + Nknot,              // pointer to one after the last knot
+                Complex(eval_r, 0.),    // value to search
+                Complex_realpart_less   // ordering for complex numbers
             ) - t;
             
             // evaluate j and dj at far radius for all angular momenta up to maxell
