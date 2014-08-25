@@ -19,17 +19,14 @@
 					<Add option="-fopenmp" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_OPENCL" />
-					<Add option="-DNO_MPI" />
 					<Add option="-DNO_PNG" />
 					<Add directory="../win-include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add option="-static-libstdc++" />
 					<Add library="../win-libraries/libgsl.a" />
 					<Add library="../win-libraries/libumfpack.a" />
 					<Add library="../win-libraries/liblapack.a" />
-					<Add library="../win-libraries/libdlfcn.a" />
 					<Add library="../win-libraries/libcholmod.a" />
 					<Add library="../win-libraries/libccolamd.a" />
 					<Add library="../win-libraries/libamd.a" />
@@ -63,6 +60,8 @@
 		<Unit filename="src/gauss.h" />
 		<Unit filename="src/hdffile.cpp" />
 		<Unit filename="src/hdffile.h" />
+		<Unit filename="src/hydrogen.cpp" />
+		<Unit filename="src/hydrogen.h" />
 		<Unit filename="src/input.cpp" />
 		<Unit filename="src/input.h" />
 		<Unit filename="src/itersolve.h" />

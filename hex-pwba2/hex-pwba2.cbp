@@ -23,7 +23,6 @@
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add option="-static-libstdc++" />
          				<Add library="../win-libraries/libfftw3.a" />
 					<Add library="../win-libraries/libgsl.a" />
 				</Linker>
