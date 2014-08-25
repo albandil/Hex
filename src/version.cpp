@@ -32,7 +32,7 @@ std::string logo (std::string esc)
         "%s                                         \n"
         "%s             UK MFF (c) 2014             \n"
         "%s                                         \n"
-        "%s          version: 1.02 %s               \n"
+        "%s          version: 1.03 %s               \n"
         "%s                                         \n",
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
