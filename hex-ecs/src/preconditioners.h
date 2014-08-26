@@ -16,7 +16,6 @@
 #include <tuple>
 
 #include "arrays.h"
-#include "input.h"
 #include "matrix.h"
 #include "radial.h"
 #include "parallel.h"

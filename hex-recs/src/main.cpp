@@ -274,8 +274,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
-    std::cout << "\rSolving the systems... ok                                                            \n";
-    std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)\n";
+    std::cout << "All solutions computed." << std::endl;
+    std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)\n";
 }
 else
 {

@@ -21,7 +21,7 @@
 
 #include "arrays.h"
 #include "cmdline.h"
-#include "input.h"
+#include "io.h"
 #include "matrix.h"
 #include "preconditioners.h"
 
@@ -229,122 +229,30 @@ void CommandLine::parse (int argc, char* argv[])
     );
 }
 
-long read_int (std::ifstream& f)
+void InputFile::read (std::ifstream & inf)
 {
-    // text buffer
-    std::string s;
-    
-    while (not f.eof())
-    {
-        // read string
-        f >> s;
-        
-        // check length
-        if (s.size() == 0)
-            continue;
-        
-        // check if it is a beginning of a comment
-        if (s[0] == '#')
-        {
-            // get the rest of the line
-            std::getline(f, s);
-            continue;
-        }
-        
-        break;
-    }
-    
-    // convert to long
-    char* tail;
-    long val = strtol(s.c_str(), &tail, 10);
-    if (*tail != 0)
-    {
-        if (s == "*")
-            throw false;
-        else
-            throw exception ("Can't read int.\n");
-    }
-    else
-    {
-        return val;
-    }
-}
-
-double read_dbl (std::ifstream& f)
-{
-    // text buffer
-    std::string s;
-    
-    while (not f.eof())
-    {
-        // read string
-        f >> s;
-        
-        // check length
-        if (s.size() == 0)
-            continue;
-        
-        // check if it is a beginning of a comment
-        if (s[0] == '#')
-        {
-            // get the rest of the line
-            std::getline(f, s);
-            continue;
-        }
-        
-        break;
-    }
-    
-    // convert to double
-    char* tail;
-    double val = strtod(s.c_str(), &tail);
-    if (*tail != 0)
-    {
-        if (s == "*")
-            throw false;
-        else
-            throw exception ("Can't read double.\n");
-    }
-    else
-    {
-        return val;
-    }
-}
-
-void InputFile::read (std::ifstream & inputfile)
-{
-    double x;
+    double x; int y;
+    ReadItem<int> idata;
     
     // load B-spline parameters
-    try {
-        order = read_int(inputfile);
-        ecstheta = read_dbl(inputfile);
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check B-spline parameters.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    order = ReadNext<int>(inf).val;
+    ecstheta = ReadNext<double>(inf).val;
     
     std::cout << "\n-----   B-spline environment  -------\n";
     std::cout << "order = " << order << "\n";
     std::cout << "ecsθ = " << ecstheta << "\n";
     
+    //
     // load real knot data
+    //
+    
     std::vector<double> rknots_begin, rknots_end, rknots_samples;
-    try {
-        while ((x = read_dbl(inputfile)) != -1.)
-            rknots_begin.push_back(x);
-        for (size_t i = 0; i < rknots_begin.size(); i++)
-            rknots_end.push_back(read_dbl(inputfile));
-        for (size_t i = 0; i < rknots_begin.size(); i++)
-            rknots_samples.push_back(read_dbl(inputfile));
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check real knot data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    while ((x = ReadNext<double>(inf).val) != -1.)
+        rknots_begin.push_back(x);
+    for (size_t i = 0; i < rknots_begin.size(); i++)
+        rknots_end.push_back(ReadNext<double>(inf).val);
+    for (size_t i = 0; i < rknots_begin.size(); i++)
+        rknots_samples.push_back(ReadNext<double>(inf).val);
     
     // construct real knot sequence
     for (unsigned i = 0; i < rknots_begin.size(); i++)
@@ -352,35 +260,30 @@ void InputFile::read (std::ifstream & inputfile)
         if (rknots_begin[i] > rknots_end[i])
         {
             std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
-            throw exception("Inconsistent knot specification!");
+            throw exception ("Inconsistent knot specification!");
         }
         
-        auto new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
+        rArray new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
         rknots = concatenate(rknots, new_knots);
     }
     
+    // print info
     std::cout << "\n----------   Real knots  ------------\n";
-    for (auto knot = rknots.begin(); knot != rknots.end(); knot++)
-        std::cout << *knot << " ";
-    std::cout << std::endl;
+    std::cout << rknots << std::endl;
     
+    //
     // load complex knot data
-    std::vector<double> cknots_begin, cknots_end, cknots_samples;
-    try {
-        while ((x = read_dbl(inputfile)) != -1.)
-            cknots_begin.push_back(x);
-        for (size_t i = 0; i < cknots_begin.size(); i++)
-            cknots_end.push_back(read_dbl(inputfile));
-        for (size_t i = 0; i < cknots_begin.size(); i++)
-            cknots_samples.push_back(read_int(inputfile));
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check complex knot data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    //
     
-    // construct complex(-to-be) knot sequence
+    std::vector<double> cknots_begin, cknots_end, cknots_samples;
+    while ((x = ReadNext<double>(inf).val) != -1.)
+        cknots_begin.push_back(x);
+    for (size_t i = 0; i < cknots_begin.size(); i++)
+        cknots_end.push_back(ReadNext<double>(inf).val);
+    for (size_t i = 0; i < cknots_begin.size(); i++)
+        cknots_samples.push_back(ReadNext<double>(inf).val);
+    
+    // construct complex(-to-become) knot sequence
     for (unsigned i = 0; i < cknots_begin.size(); i++)
     {
         cknots = concatenate
@@ -395,195 +298,202 @@ void InputFile::read (std::ifstream & inputfile)
         );
     }
     
+    // print info
     std::cout << "\n---------  Complex knots  ------------\n";
-    for (auto knot = cknots.begin(); knot != cknots.end(); knot++)
-        std::cout << *knot << " ";
-    std::cout << std::endl;
+    std::cout << cknots << std::endl;
+    
+    //
+    // load initial atomic quantum numbers
+    //
+    
+    std::cout << "\n----------  Initial atomic states  -------------\n";
+    
+    std::vector<ReadItem<int>> lis, mis;
     
     // load initial principal quantum number
-    try {
-        ni = read_int(inputfile);
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check \"ni\".\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    ni = ReadNext<int>(inf).val;
     
-    // load initial atomic angular states
-    std::vector<int> lis, mis;
-    int maxli = 0;
-    try {
-        while ((x = read_int(inputfile)) != -1.)
-        {
-            lis.push_back(x);
-            if (lis.back() >= ni)
-                throw exception("Input error: Angular momentum greater than \"ni\".\n");
-            if (lis.back() > maxli)
-                maxli = lis.back();
-        }
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check initial atomic state data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    // - orbital angular momentum
+    while ((idata = ReadNext<int>(inf)).val != -1)
+        lis.push_back(idata);
+    
+    // - magnetic quantum number
+    for (size_t i = 0; i < lis.size(); i++)
+        mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
     for (size_t i = 0; i < lis.size(); i++)
     {
-        try {
+        for (unsigned i = 0; i < lis.size(); i++)
+        for (int li = 0; li < ni; li++)
+        for (int mi = -li; mi <= li; mi++)
+        {
+            // skip unused orbital angular momenta
+            if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
+                continue;
             
-            mis.push_back(read_int(inputfile));
-            if (std::abs(mis[i]) > lis[i])
-                throw exception("Input error: Magnetic quantum number greater than \"li\".\n");
+            // skip unused angular momentum projections
+            if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
+                continue;
             
-            instates.push_back(std::make_tuple(ni,lis[i],mis[i]));
-            
-        } catch (std::exception e) {
-            
-            std::cerr << e.what() << std::endl;
-            throw exception("Input error: Check initial atomic state data.\n");
-            
-        } catch (bool b) {
-            
-            // wildcard "*" found
-            for (int j = -lis[i]; j <= lis[i]; j++)
-            {
-                mis.push_back(j);
-                instates.push_back(std::make_tuple(ni,lis[i],j));
-            }
-            
+            // add this initial state
+            instates.push_back(std::make_tuple(ni,li,mi));
         }
     }
     
-    // load final atomic quantum numbers
-    std::vector<int> nfs, lfs;
-    int maxlf = 0;
-    try {
-        while ((x = read_int(inputfile)) != -1.)
-            nfs.push_back(x);
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check final atomic state data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
-    
-    for (size_t i = 0; i < nfs.size(); i++)
+    // print info
+    std::cout << "[n l m]: ";
+    for (auto state : instates)
     {
-        try {
-            
-            lfs.push_back(read_int(inputfile));
-            
-            if (nfs[i] == 0)
-            {
-                outstates.push_back(std::make_tuple(0,0,0));
-                continue;
-            }
-            
-            if (lfs[i] > nfs[i])
-                throw exception("Input error: Angular momentum greater than \"nf\".\n");
-            if (lfs[i] > maxlf)
-                maxlf = lfs[i];
-            
-            outstates.push_back(std::make_tuple(nfs[i],lfs[i],0));
-            
-        } catch (std::exception e) {
-            
-            std::cerr << e.what() << std::endl;
-            throw exception("Input error: Check final atomic state data.\n");
-            
-        } catch (bool b) {
-            
-            if (nfs[i] == 0)
-            {
-                outstates.push_back(std::make_tuple(0,0,0));
-                continue;
-            }
-            
-            // wildcard "*" found, add all allowed angular momenta
-            for (int j = 0; j < nfs[i]; j++)
-            {
-                lfs.push_back(j);
-                outstates.push_back(std::make_tuple(nfs[i],j,0));
-            }
-            
-        }
+        std::cout << "["
+                  << std::get<0>(state) << " "
+                  << std::get<1>(state) << " "
+                  << std::get<2>(state)
+                  << "] ";
+    }
+    std::cout << std::endl;
+    
+    //
+    // load final atomic quantum numbers
+    //
+    
+    std::cout << "\n----------  Final atomic states  -------------\n";
+    std::vector<int> nfs;
+    std::vector<ReadItem<int>> lfs;
+    
+    // - principal quantum number
+    while ((y = ReadNext<int>(inf).val) != -1)
+        nfs.push_back(y);
+    
+    // - orbital angular momentum
+    for (size_t i = 0; i < nfs.size(); i++)
+        lfs.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
+    
+    // - construct final states
+    for (unsigned f = 0; f < nfs.size(); f++)
+    for (int lf = 0; lf < nfs[f]; lf++)
+    {
+        // skip unused orbital angular momenta
+        if (lfs[f].val != lf and not (lfs[f].flags & ReadItem<int>::asterisk))
+            continue;
+        
+        // add this initial state
+        outstates.push_back(std::make_tuple(nfs[f],lf,0));
     }
     
-    
-    // load total quantum numbers
-    try {
-        
-        L = read_int(inputfile);
-        Pi = read_int(inputfile) % 2;
-        levels = read_int(inputfile);
-        
-        if (L + L%2 + levels < maxli)
-            throw exception("Input error: ℓ is smaller than some initial angular momenta.\n");
-        
-        if (L + L%2 + levels < maxlf)
-            throw exception("Input error: ℓ is smaller than some final angular momenta.\n");
-        
-    } catch (std::exception e) {
-        
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check angular momentum data.\n");
-        
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
+    // print info
+    std::cout << "[n l m]: ";
+    for (auto state : outstates)
+    {
+        std::cout << "["
+                  << std::get<0>(state) << " "
+                  << std::get<1>(state)
+                  << " *]";
     }
+    std::cout << std::endl;
+    
+    //
+    // load total quantum numbers etc.
+    //
     
     std::cout << "\n----------  Angular momentum limits  -------------\n";
+    
+    L = ReadNext<int>(inf).val;
+    Pi = ReadNext<int>(inf).val % 2;
+    levels = ReadNext<int>(inf).val;
+    
     std::cout << "L = " << L << "\n";
     std::cout << "Π = " << Pi << "\n";
     std::cout << "ℓ = " << levels << "\n";
     
-    std::cout << "\n----------  Initial atomic states  -------------\n";
-    for (auto state : instates)
-        std::cout << "[" << std::get<0>(state) << " " << std::get<1>(state) << " " << std::get<2>(state) << "] ";
-    std::cout << "\n";
-    
-    std::cout << "\n----------  Final atomic states  -------------\n";
-    for (auto state : outstates)
-        std::cout << "[" << std::get<0>(state) << " " << std::get<1>(state) << " " << std::get<2>(state) << "] ";
-    std::cout << "\n";
-    
+    //
     // load initial energies
+    //
+    
+    std::cout << "\n---  Initial projectile energies  ----\n";
     std::vector<double> Ei_begin, Ei_end, Ei_samples;
-    try {
-        while ((x = read_dbl(inputfile)) != -1.)
-            Ei_begin.push_back(x);
-        for (size_t i = 0; i < Ei_begin.size(); i++)
-            Ei_end.push_back(read_dbl(inputfile));
-        for (size_t i = 0; i < Ei_begin.size(); i++)
-            Ei_samples.push_back(read_int(inputfile));
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check energy data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
-    }
+    
+    while ((x = ReadNext<double>(inf).val) != -1.)
+        Ei_begin.push_back(x);
+    for (size_t i = 0; i < Ei_begin.size(); i++)
+        Ei_end.push_back(ReadNext<double>(inf).val);
+    for (size_t i = 0; i < Ei_begin.size(); i++)
+        Ei_samples.push_back(ReadNext<double>(inf).val);
     
     // construct energy sequence
     for (unsigned i = 0; i < Ei_begin.size(); i++)
-        Ei = concatenate(Ei, linspace(Ei_begin[i], Ei_end[i], Ei_samples[i]));
-    
-    std::cout << "\n---  Initial projectile energies  ----\n";
-    std::cout << "lowest energy: " << Ei.front() << "\n";
-    std::cout << "highest energy: " << Ei.back() << "\n";
-    std::cout << "total enegies: " << Ei.size() << "\n";
-    std::cout << "full energy list: " << Ei << "\n";
-    
-    try {
-        B = read_dbl(inputfile);
-    } catch (std::exception e) {
-        std::cerr << e.what() << std::endl;
-        throw exception("Input error: Check magnetic field data.\n");
-    } catch (bool b) {
-        throw exception("Wildcard not accepted here.\n");
+    {
+        Ei = concatenate
+        (
+            Ei,
+            linspace
+            (
+                Ei_begin[i],
+                Ei_end[i],
+                Ei_samples[i]
+            )
+        );
     }
     
+    // print info
+    std::cout << "lowest energy: "    << Ei.front() << std::endl;
+    std::cout << "highest energy: "   << Ei.back()  << std::endl;
+    std::cout << "total enegies: "    << Ei.size()  << std::endl;
+    std::cout << "full energy list: " << Ei         << std::endl;
+    
+    //
+    // load some other optional data
+    //
+    
     std::cout << "\n---------- Other parameters -----------\n";
-    std::cout << "magnetic field: " << B << " a.u.\n\n";
+    B = ReadNext<double>(inf).val;
+    
+    // print info
+    std::cout << "magnetic field: " << B << " a.u." << std::endl;
+    std::cout << std::endl;
+}
+
+void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
+{
+    // use whole grid if not restricted
+    if (cmd.zipmax < 0)
+        cmd.zipmax = bspline.Rmax();
+    
+    cArray sol;     // stored solution expansion
+    cArray ev;      // evaluated solution
+    rArray grid;    // real evaluation grid
+    
+    // size of solution (l,l)-segment
+    size_t N = bspline.Nspline() * bspline.Nspline();
+    
+    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
+    
+    // load the requested file
+    if (not sol.hdfload(cmd.zipfile.c_str()))
+        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
+    
+    // evaluation grid
+    grid = linspace (0., cmd.zipmax, cmd.zipcount);
+    
+    // for all coupled angular momentum pairs
+    for (unsigned ill = 0; ill < ll.size(); ill++)
+    {
+        // angular momenta
+        int l1 = ll[ill].first;
+        int l2 = ll[ill].second;
+        
+        std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
+        
+        // write to file
+        std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
+        writeVTK_points
+        (
+            out,
+            bspline.zip
+            (
+                sol.slice (ill * N, (ill + 1) * N),
+                grid, grid
+            ),
+            grid, grid, rArray({0.})
+        );
+    }
 }

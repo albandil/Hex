@@ -76,9 +76,6 @@ void Amplitudes::extract ()
                 Hydrogen::stateRName(nf, lf, two_jf, two_mf).c_str(), (two_sf > 0 ? "+" : "-")
             ) << std::flush;
             
-            // precompute hydrogen function overlaps
-            cArray Pf_overlaps = rad_.overlapP(nf,lf,weightEndDamp(bspline_));
-            
             // final atomic energy
             double Ef = -1./(nf*nf) /*- mf * inp.B*/;
             

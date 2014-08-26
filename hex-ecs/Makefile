@@ -113,7 +113,7 @@ CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT
 CXXFLAGS = $(CXXDEBUG)
 # CXXFLAGS = -g $(CXXRILIS)
 
-FILES = amplitudes arrays gauss bspline hdffile hydrogen main input \
+FILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
 	matrix preconditioners radial slater special version
 
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))

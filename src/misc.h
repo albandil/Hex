@@ -295,7 +295,7 @@ template <class T> T string_to (std::string str)
 {
     throw exception
     (
-        "Conversion to \"%s\" not implemented.", typeid(T).name()
+        "Conversion of string to \"%s\" not implemented.", typeid(T).name()
     );
 }
 

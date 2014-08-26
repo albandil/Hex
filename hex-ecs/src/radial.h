@@ -20,7 +20,7 @@
 #include "bspline.h"
 #include "complex.h"
 #include "gauss.h"
-#include "input.h"
+#include "io.h"
 #include "parallel.h"
 #include "special.h"
 #include "matrix.h"

@@ -23,67 +23,13 @@
 #include "arrays.h"
 #include "bspline.h"
 #include "complex.h"
-#include "hydrogen.h"
-#include "input.h"
+#include "io.h"
 #include "itersolve.h"
 #include "misc.h"
 #include "parallel.h"
 #include "preconditioners.h"
 #include "radial.h"
 #include "version.h"
-
-void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
-{
-    // use whole grid if not restricted
-    if (cmd.zipmax < 0)
-        cmd.zipmax = bspline.Rmax();
-    
-    cArray sol;     // stored solution expansion
-    cArray ev;      // evaluated solution
-    rArray grid;    // real evaluation grid
-    
-    // size of solution (l,l)-segment
-    size_t N = bspline.Nspline() * bspline.Nspline();
-    
-    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
-    
-    // load the requested file
-    if (not sol.hdfload(cmd.zipfile.c_str()))
-        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
-    
-    // evaluation grid
-    grid = linspace (0., cmd.zipmax, cmd.zipcount);
-    
-    // for all coupled angular momentum pairs
-    for (unsigned ill = 0; ill < ll.size(); ill++)
-    {
-        // angular momenta
-        int l1 = ll[ill].first;
-        int l2 = ll[ill].second;
-        
-        std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
-        
-        // write to file
-        std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
-        writeVTK_points
-        (
-            out,
-            bspline.zip
-            (
-                sol.slice (ill * N, (ill + 1) * N),
-                grid, grid
-            ),
-            grid, grid, rArray({0.})
-        );
-    }
-}
-
-std::string current_time() 
-{
-    std::time_t result;
-    result = std::time(NULL);
-    return std::asctime(std::localtime(&result));
-}
 
 int main (int argc, char* argv[])
 {
@@ -190,7 +136,7 @@ int main (int argc, char* argv[])
     
     // skip if there is nothing to compute
     if (coupled_states.empty())
-        exit(0);
+        std::exit(0);
     
     std::cout << "\n";
     
@@ -230,6 +176,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     //
     
     std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n";
+    double prevE = special::constant::Nan, E = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
     {
@@ -259,12 +206,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             }
             
-            // compose filename of the output file for this solution
-            std::ostringstream oss;
-            oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
-            
             // check if there is some precomputed solution on the disk
-            if ( not current_solution.hdfload(oss.str().c_str()) )
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
+            if (not reader.load(current_solution))
                 all_done = false;
         }
         if (all_done)
@@ -272,12 +216,6 @@ if (cmd.itinerary & CommandLine::StgSolve)
             std::cout << "\tAll solutions for Ei[" << ie << "] = " << inp.Ei[ie] << " loaded." << std::endl;
             continue;
         }
-        
-        // get total energy of the system
-        double E = 0.5 * (inp.Ei[ie] - 1./(inp.ni * inp.ni));
-        
-        // update the preconditioner
-        prec->update(E);
         
         // for all initial states
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
@@ -294,10 +232,16 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             
             // we may have already computed solution for this state and energy... is it so?
-            std::ostringstream cur_oss;
-            cur_oss << "psi-" << inp.L << "-" << Spin << "-" << inp.Pi << "-" << inp.ni << "-" << li << "-" << mi << "-" << inp.Ei[ie] << ".hdf";
-            if ( current_solution.hdfload(cur_oss.str().c_str()) )
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
+            if (reader.load(current_solution))
                 continue;
+            
+            // get total energy of the system
+            prevE = E; E = 0.5 * (inp.Ei[ie] - 1./(inp.ni * inp.ni));
+            
+            // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
+            if (not (E == prevE)) // does not use 'if (E != prevE)' to work with initial Nan values
+                prec->update(E);
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << "\n";
@@ -335,7 +279,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             );
             
             if (iterations >= max_iter)
-                std::cout << "\tConvergence too slow... The saved solution will be probably wrong." << std::endl;
+                std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
             else
                 std::cout << "\tEnd CG callback" << std::endl;
             
@@ -344,14 +288,14 @@ if (cmd.itinerary & CommandLine::StgSolve)
             computations_done++;
             
             // save solution to disk
-            current_solution.hdfsave(cur_oss.str().c_str(), true /* = with compression */);
+            reader.save(current_solution);
             
         } // end of For Spin, instate
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
-    std::cout << "\rSolving the systems... ok                                                            " << std::endl;
-    std::cout << "\t(typically " << iterations_done/inp.Ei.size() << " CG iterations per energy)" << std::endl;
+    std::cout << "All solutions computed." << std::endl;
+    std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
 }
 else // i.e. no StgSolve
 {
@@ -366,224 +310,15 @@ else // i.e. no StgSolve
 
 if (cmd.itinerary & CommandLine::StgExtract)
 {
-    // radial integrals
-    RadialIntegrals rad (bspline);
+    // extract amplitudes
+    Amplitudes ampl (bspline, inp, par, coupled_states);
+    ampl.extract();
     
-    for (int Spin = 0; Spin <= 1; Spin++)
-    {
-        // compose output filename
-        std::ostringstream ossfile;
-        if (par.active())
-        {
-            ossfile << "tmat-n" << inp.ni << "-L" << inp.L << "-S" << Spin << "-Pi"
-                    << inp.Pi << "-(" << par.iproc() << ").sql";
-        }
-        else
-        {
-            ossfile << "tmat-n" << inp.ni << "-L" << inp.L << "-S" << Spin << "-Pi"
-                    << inp.Pi << ".sql";
-        }
-        
-        // Create SQL batch file
-        std::ofstream fsql(ossfile.str().c_str());
-        
-        // set exponential format for floating point output
-        fsql.setf(std::ios_base::scientific);
-        
-        // write header
-        fsql << logo("--");
-        fsql << "-- File generated on " << current_time() << "--" << std::endl;
-        fsql << "BEGIN TRANSACTION;" << std::endl;
-        
-        //
-        // Extract the amplitudes
-        //
-        
-        std::cout << std::endl << "Extracting T-matrices for S = " << Spin << std::endl;
-        
-        // collected cross sections
-        std::vector<std::tuple<int,int,int,int,int,int,rArray>> ics;
-        
-        for (auto instate  : inp.instates)
-        for (auto outstate : inp.outstates)
-        {
-            // get quantum numbers
-            int ni = std::get<0>(instate);
-            int li = std::get<1>(instate);
-            int mi = std::get<2>(instate);
-            int nf = std::get<0>(outstate);
-            int lf = std::get<1>(outstate);
-            
-            // skip angular forbidden states
-            bool allowed = false;
-            for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
-            if (not allowed)
-                continue;
-            
-            if (nf > 0)
-            {
-                //
-                // Discrete transition
-                //
-                
-                std::cout << format("\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::flush;
-                
-                // precompute hydrogen function overlaps
-                cArray Pf_overlaps = rad.overlapP(nf,lf,weightEndDamp(bspline));
-                
-                // compute radial integrals
-                cArrays Lambda(2 * lf + 1);
-                for (int mf = -lf; mf <= lf; mf++)
-                {
-                    // final projectile momenta
-                    rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
-                    
-                    // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
-                    Lambda[mf+lf] = computeLambda
-                    (
-                        bspline, kf, inp.ki, inp.maxell,
-                        inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei, lf,
-                        Pf_overlaps, coupled_states
-                    );
-                }
-                
-                // for all final magnetic sublevels
-                for (int mf = -lf; mf <= lf; mf++)
-                {
-                    // add new cross section set to the storage
-                    ics.push_back
-                    (
-                        std::make_tuple(inp.ni,li,mi,nf,lf,mf,rArray(inp.Ei.size()))
-                    );
-                    
-                    // final projectile momenta
-                    rArray kf = sqrt(inp.Ei - 1./(inp.ni*inp.ni) + 1./(nf*nf) + (mf-mi) * inp.B);
-                    
-                    // compute Tℓ
-                    cArray T_ell(Lambda[mf+lf].size());
-                    for (unsigned i = 0; i < T_ell.size(); i++)
-                    {
-                        int ie  = i / (inp.maxell + 1);
-                        int ell = i % (inp.maxell + 1);
-                        
-                        T_ell[i] = Lambda[mf+lf][i] * 4. * special::constant::pi / kf[ie] * std::pow(Complex(0.,1.), -ell)
-                                        * special::ClebschGordan(lf, mf, ell, mi - mf, inp.L, mi) * special::constant::sqrt_half;
-                    }
-                    
-                    //
-                    // print out SQL
-                    //
-                    
-                    for (unsigned i = 0; i < T_ell.size(); i++)
-                    {
-                        int ie  = i / (inp.maxell + 1);
-                        int ell = i % (inp.maxell + 1);
-                        
-                        if (std::isfinite(T_ell[i].real()) and std::isfinite(T_ell[i].imag()))
-                        if (T_ell[i].real() != 0. or T_ell[i].imag() != 0.)
-                        {
-                            fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
-                                << inp.ni << "," << li << "," << mi << ","
-                                << nf << "," << lf << "," << mf << ","
-                                << inp.L  << "," << Spin << ","
-                                << inp.Ei[ie] << "," << ell << "," 
-                                << T_ell[i].real() << "," << T_ell[i].imag() << ","
-                                << "0, 0);" << std::endl;
-                        }
-                    }
-                    
-                    //
-                    // evaluate and store cross sections
-                    //
-                    
-                    for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
-                    {
-                        double sigma = 0.;
-                        for (int ell = 0; ell <= inp.maxell; ell++)
-                        {
-                            double Re_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].real() / special::constant::two_pi;
-                            double Im_f_ell = -T_ell[ie * (inp.maxell + 1) + ell].imag() / special::constant::two_pi;
-                            sigma += 0.25 * (2*Spin + 1) * kf[ie] / inp.ki[ie] * (Re_f_ell * Re_f_ell + Im_f_ell * Im_f_ell);
-                        }
-                        std::get<6>(ics.back())[ie] = sigma;
-                    }
-                }
-                
-                std::cout << " ok" << std::endl;
-            }
-            else
-            {
-                //
-                // Ionization
-                //
-                
-                ics.push_back
-                (
-                    std::make_tuple(inp.ni,li,mi,0,0,0,rArray(inp.Ei.size()))
-                );
-                
-                cArrays data = computeXi
-                (
-                    bspline, inp.maxell, inp.L, Spin,
-                    inp.Pi, inp.ni, li, mi, inp.Ei,
-                    std::get<6>(ics.back()), coupled_states
-                );
-                
-                for (size_t ie = 0; ie < inp.Ei.size(); ie++)
-                for (unsigned ill = 0; ill < coupled_states.size(); ill++) //??? or triangular
-                {
-                    // save data as BLOBs
-                    fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
-                        << inp.ni << "," << li << "," << mi << ","
-                        << inp.L  << "," << Spin << ","
-                        << inp.Ei[ie] << "," << coupled_states[ill].first << ","
-                        << coupled_states[ill].second << ","
-                        << data[ie * coupled_states.size() + ill].toBlob() << ");" << std::endl;
-                }
-            }
-        }
-        
-        fsql << "COMMIT;" << std::endl;
-        fsql.close();
-        
-        //
-        // Write cross sections to files.
-        //
-        
-        // open file
-        std::ofstream fout (format("ics-n%d-L%d-S%d.dat", inp.ni, inp.L, Spin));
-        
-        // print table header
-        fout << "#E[Ry]\t";
-        for (auto data : ics)
-        {
-            fout << format
-            (
-                "%s-%s\t",
-                Hydrogen::stateName(std::get<0>(data),std::get<1>(data),std::get<2>(data)).c_str(),
-                Hydrogen::stateName(std::get<3>(data),std::get<4>(data),std::get<5>(data)).c_str()
-            );
-        }
-        fout << std::endl;
-        
-        // print data (cross sections)
-        for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
-        {
-            fout << inp.Ei[ie] << '\t';
-            for (auto data : ics)
-            {
-                if (std::isfinite(std::get<6>(data)[ie]))
-                    fout << std::get<6>(data)[ie] << '\t';
-                else
-                    fout << 0.0 << '\t';
-            }
-            fout << std::endl;
-        }
-        
-        // close file
-        fout.close();
-    }
+    // write T-matrices to a text file as SQL statements 
+    ampl.writeSQL_files();
+    
+    // write integral cross sections to a text file
+    ampl.writeICS_files();
 }
 else
 {

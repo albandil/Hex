@@ -20,50 +20,284 @@
 
 #include <fftw3.h>
 
+#include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
+#include "hydrogen.h"
 #include "radial.h"
 #include "special.h"
 #include "matrix.h"
+#include "version.h"
 
-cArray computeLambda
+std::string current_time() 
+{
+    std::time_t result;
+    result = std::time(NULL);
+    return std::asctime(std::localtime(&result));
+}
+
+
+void Amplitudes::extract ()
+{
+    // radial integrals
+    RadialIntegrals rad (bspline_);
+    
+    std::cout << std::endl << "Extracting T-matrices" << std::endl;
+        
+    // for all initial and final states
+    for (auto instate  : inp_.instates)
+    for (auto outstate : inp_.outstates)
+    {
+        // get quantum numbers
+        int ni = std::get<0>(instate);
+        int li = std::get<1>(instate);
+        int mi = std::get<2>(instate);
+        int nf = std::get<0>(outstate);
+        int lf = std::get<1>(outstate);
+        
+        // skip angular forbidden states
+        bool allowed = false;
+        for (int l = abs(li - inp_.L); l <= li + inp_.L; l++)
+            allowed = allowed or special::ClebschGordan(li,mi,l,0,inp_.L,mi);
+        if (not allowed)
+            continue;
+        
+        if (nf > 0)
+        {
+            //
+            // Discrete transition
+            //
+            
+            std::cout << format("\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::flush;
+            
+            // compute radial integrals
+            for (int mf = -lf; mf <= lf; mf++)
+            {
+                // transition
+                Transition transition = { ni, li, mi, nf, lf, mf };
+                
+                // compute Λ for transitions to (nf,lf,mf); it will depend on [ie,ℓ]
+                Lambda_Slp[transition] = computeLambda_(transition);
+                
+                // compute T-matrices for this transition
+                Tmat_Slp[transition] = computeTmat_(transition);
+                
+                // compute cross sections for this transition
+                sigma_S[transition] = computeSigma_(transition);
+            }
+            
+            std::cout << " ok" << std::endl;
+        }
+        else
+        {
+            //
+            // Ionization
+            //
+            
+            std::cout << format("\tion: (%d,%d,%d) -> ion ",ni, li, mi) << std::flush;
+            
+            // transition
+            Transition transition = { ni, li, mi, 0, 0, 0 };
+            
+            // compute Ξ
+            Xi_Sl1l2[transition] = computeXi_(transition);
+            
+            // compute σ
+            sigma_S[transition] = computeSigmaIon_(transition);
+            
+            std::cout << " ok" << std::endl;
+        }
+    }
+}
+
+void Amplitudes::writeSQL_files ()
+{
+    // compose output filename
+    std::ostringstream ossfile;
+    if (par_.active())
+    {
+        ossfile << "tmat-n" << inp_.ni << "-L" << inp_.L << "-Pi" << inp_.Pi << "-(" << par_.iproc() << ").sql";
+    }
+    else
+    {
+        ossfile << "tmat-n" << inp_.ni << "-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
+    }
+    
+    // Create SQL batch file
+    std::ofstream fsql(ossfile.str().c_str());
+        
+    // set exponential format for floating point output
+    fsql.setf(std::ios_base::scientific);
+        
+    // write header
+    fsql << logo("--");
+    fsql << "-- File generated on " << current_time() << "--" << std::endl;
+    fsql << "BEGIN TRANSACTION;" << std::endl;
+        
+    // for all discrete transitions data
+    for (auto Tmat : Tmat_Slp)
+    {
+        // get transition
+        Transition const & T = Tmat.first;
+        
+        // for all angular momenta (partial waves)
+        for (auto data : Tmat.second)
+        {
+            // get angular momentum
+            int ell = data.first;
+            
+            // get T-matrices
+            cArray const & T_S0 = data.second.first;
+            cArray const & T_S1 = data.second.second;
+            
+            // write energies
+            for (unsigned i = 0; i < inp_.Ei.size(); i++)
+            {
+                // write singlet value (S = 0)
+                if (Complex_finite(T_S0[i]) and T_S0[i] != 0.)
+                {
+                    fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+                        << T.ni << "," << T.li << "," << T.mi << ","
+                        << T.nf << "," << T.lf << "," << T.mf << ","
+                        << inp_.L  << "," << 0 << ","
+                        << inp_.Ei[i] << "," << ell << "," 
+                        << T_S0[i].real() << "," << T_S0[i].imag() << ","
+                        << "0, 0);" << std::endl;
+                }
+                
+                // write triplet value (S = 1)
+                if (Complex_finite(T_S1[i]) and T_S1[i] != 0.)
+                {
+                    fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+                        << T.ni << "," << T.li << "," << T.mi << ","
+                        << T.nf << "," << T.lf << "," << T.mf << ","
+                        << inp_.L  << "," << 1 << ","
+                        << inp_.Ei[i] << "," << ell << "," 
+                        << T_S1[i].real() << "," << T_S1[i].imag() << ","
+                        << "0, 0);" << std::endl;
+                }
+            }
+        }
+    }
+    
+    // for all ionizations
+    for (auto xi : Xi_Sl1l2)
+    {
+        // get transition
+        Transition const & T = xi.first;
+        
+        // get Chebyshev expansion coefficients
+        cArrays const & Xi_S0 = xi.second.first;
+        cArrays const & Xi_S1 = xi.second.second;
+        
+        // for all energies and angular momenta
+        for (std::size_t ie = 0; ie < inp_.Ei.size(); ie++)
+        for (unsigned ill = 0; ill < ang_.size(); ill++) //??? or triangular
+        {
+            // save singlet data as BLOBs
+            fsql << format
+            (
+                "INSERT OR REPLACE INTO \"ionf\" VALUES (%d,%d,%d, %d,%d, %g, %d,%d, %s);",
+                inp_.ni, T.li, T.mi, inp_.L, 0, inp_.Ei[ie], ang_[ill].first, ang_[ill].second,
+                Xi_S0[ill * inp_.Ei.size() + ie].toBlob().c_str()
+            ) << std::endl;
+            
+            // save triplet data as BLOBs
+            fsql << format
+            (
+                "INSERT OR REPLACE INTO \"ionf\" VALUES (%d,%d,%d, %d,%d, %g, %d,%d, %s);",
+                inp_.ni, T.li, T.mi, inp_.L, 1, inp_.Ei[ie], ang_[ill].first, ang_[ill].second,
+                Xi_S1[ill * inp_.Ei.size() + ie].toBlob().c_str()
+            ) << std::endl;
+        }
+    }
+    
+    // finish writing
+    fsql << "COMMIT;" << std::endl;
+    fsql.close();
+}
+
+void Amplitudes::writeICS_files ()
+{
+    // open files
+    std::ofstream fS0 (format("ics-n%d-L%d-S0-Pi%d.dat", inp_.ni, inp_.L, inp_.Pi));
+    std::ofstream fS1 (format("ics-n%d-L%d-S1-Pi%d.dat", inp_.ni, inp_.L, inp_.Pi));
+    
+    // print table header
+    fS0 << "#E[Ry]\t"; fS1 << "#E[Ry]\t"; 
+    for (auto data : sigma_S)
+    {
+        // get transition
+        Transition const & T = data.first;
+        
+        // write transition
+        std::string header = format
+        (
+            "%s-%s\t",
+            Hydrogen::stateName(T.ni,T.li,T.mi).c_str(),
+            Hydrogen::stateName(T.nf,T.lf,T.mf).c_str()
+        );
+        fS0 << header; fS1 << header;
+    }
+    fS0 << std::endl; fS1 << std::endl;
+    
+    // print data (cross sections)
+    for (unsigned ie = 0; ie < inp_.Ei.size(); ie++)
+    {
+        fS0 << inp_.Ei[ie] << '\t'; fS1 << inp_.Ei[ie] << '\t';
+        
+        for (auto data : sigma_S)
+        {
+            // get singlet and triplet data
+            rArray const & sigma_S0 = data.second.first;
+            rArray const & sigma_S1 = data.second.second;
+            
+            fS0 << (std::isfinite(sigma_S0[ie]) ? sigma_S0[ie] : 0.) << '\t';
+            fS1 << (std::isfinite(sigma_S1[ie]) ? sigma_S1[ie] : 0.) << '\t';
+        }
+        fS0 << std::endl; fS1 << std::endl;
+    }
+        
+    // finish writing
+    fS0.close(); fS1.close();
+}
+
+std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
 (
-    Bspline const & bspline,
-    rArray const & kf, rArray const & ki,
-    int maxell, int L, int Spin, int Pi,
-    int ni, int li, int mi,
-    rArray const & Ei, int lf,
-    cArray const & Pf_overlaps,
-    std::vector<std::pair<int,int>> const & coupled_states
+    Amplitudes::Transition T
 )
 {
+    // final projectile momenta
+    rArray kf = sqrt(inp_.Ei - 1./(inp_.ni*inp_.ni) + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    
     // shorthands
     unsigned Nenergy = kf.size();                // energy count
-    Complex const * const t = &(bspline.t(0));   // B-spline knots
-    int order   = bspline.order();               // B-spline order
-    int Nspline = bspline.Nspline();             // B-spline count
-    int Nknot   = bspline.Nknot();               // number of all knots
-    int Nreknot = bspline.Nreknot();             // number of real knots
+    Complex const * const t = &(bspline_.t(0));   // B-spline knots
+    int order   = bspline_.order();               // B-spline order
+    int Nspline = bspline_.Nspline();             // B-spline count
+    int Nknot   = bspline_.Nknot();               // number of all knots
+    int Nreknot = bspline_.Nreknot();             // number of real knots
     
-    cArray rads(Nenergy * (maxell + 1));
+    // compute final hydrogen orbital overlaps with B-spline basis
+    cArray Pf_overlaps = rad_.overlapP(T.nf, T.lf, weightEndDamp(bspline_));
+    
+    // output array
+    std::map<int,std::pair<cArray,cArray>> Lambda;
     
     // for all energies, compute the radial factors
+    for (unsigned Spin = 0; Spin <= 1; Spin++)
     for (unsigned ie = 0; ie < Nenergy; ie++)
     {
         // compose filename of the data file for this solution
-        std::ostringstream oss;
-        oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+        SolutionIO reader (inp_.L, Spin, inp_.Pi, T.ni, T.li, T.mi, inp_.Ei[ie]);
         
         // load the solution
         cArray solution;
-        bool solution_exists = false;
-        #pragma omp critical
-        solution_exists = solution.hdfload(oss.str().c_str());
-        if (not solution_exists)
+        if (not reader.load(solution))
         {
-            std::cout << "File \"" << oss.str() << "\" not found." << std::endl;
+            std::cout << "File \"" << reader.name() << "\" not found." << std::endl;
             continue;
         }
         
@@ -95,8 +329,8 @@ cArray computeLambda
             ) - t;
             
             // evaluate j and dj at far radius for all angular momenta up to maxell
-            cArray j_R0 = special::ric_jv(maxell, kf[ie] * eval_r);
-            cArray dj_R0 = special::dric_jv(maxell, kf[ie] * eval_r) * kf[ie];
+            cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
+            cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
             
             // evaluate B-splines and their derivatives at evaluation radius
             CooMatrix Bspline_R0(Nspline, 1), Dspline_R0(Nspline, 1);
@@ -105,43 +339,118 @@ cArray computeLambda
                 Complex val;
                 
                 // evaluate B-spline
-                val = bspline.bspline(ispline, eval_knot-1, order, eval_r);
+                val = bspline_.bspline(ispline, eval_knot-1, order, eval_r);
                 if (val != 0.)
                     Bspline_R0.add(ispline, 0, val);
                 
                 // evaluate B-spline derivative
-                val = bspline.dspline(ispline, eval_knot-1, order, eval_r);
+                val = bspline_.dspline(ispline, eval_knot-1, order, eval_r);
                 if (val != 0.)
                     Dspline_R0.add(ispline, 0, val);
             }
             
             // evaluate Wronskians
-            CooMatrix Wj[maxell + 1];
-            for (int l = 0; l <= maxell; l++)
+            CooMatrix Wj[inp_.maxell + 1];
+            for (int l = 0; l <= inp_.maxell; l++)
                 Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
                 
             // we need "P_overlaps" to have a 'dot' method
             CooMatrix Sp (Nspline, 1, Pf_overlaps.begin());
             
             // compute radial factor
-            #pragma omp parallel for
-            for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+            for (unsigned ill = 0; ill < ang_.size(); ill++)
             {
-                // use blocks that result in requested final lf
-                int l1 = coupled_states[ill].first;
-                int l2 = coupled_states[ill].second;
-                if (l1 != lf)
+                // skip blocks that do not contribute to (l1 = ) lf
+                if (ang_[ill].first != T.lf)
                     continue;
+                
+                // get angular momentum
+                int ell = ang_[ill].second;
                 
                 // get correct solution (for this ang. mom.)
                 cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
                 
-                rads[ie * (maxell + 1) + l2] += Sp.transpose().dot(PsiSc).dot(Wj[l2].todense()).todense()[0] / double(samples);
+                // initialize the storage (if needed)
+                if (Lambda.find(ell) == Lambda.end())
+                    Lambda[ell] = std::make_pair(cArray(Nenergy),cArray(Nenergy));
+                
+                // update value in the storage
+                Complex lambda = Sp.transpose().dot(PsiSc).dot(Wj[ell].todense()).todense()[0] / double(samples);
+                if (Spin == 0)
+                    (Lambda[ell].first)[ie] += lambda;
+                else
+                    (Lambda[ell].second)[ie] += lambda;
             }
         }
     }
     
-    return rads;
+    return Lambda;
+}
+
+std::map<int,std::pair<cArray,cArray>> Amplitudes::computeTmat_
+(
+    Amplitudes::Transition T
+)
+{
+    // final projectile momenta
+    rArray kf = sqrt(inp_.Ei - 1./(inp_.ni*inp_.ni) + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    
+    // return data
+    std::map<int,std::pair<cArray,cArray>> Tmat;
+    
+    // for all radial integrals (indexed by angular momenta)
+    for (auto lambda : Lambda_Slp[T])
+    {
+        // get angular momentum
+        int ell = lambda.first;
+        
+        // get radial integrals
+        cArray const & rad_S0 = lambda.second.first;
+        cArray const & rad_S1 = lambda.second.second;
+        
+        // compute T-matrices
+        cArray Tmat_S0 = rad_S0 * 4. * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+                    * special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+        cArray Tmat_S1 = rad_S1 * 4. * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+                    * special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+        
+        // store T-matrices
+        Tmat[ell] = std::make_pair(Tmat_S0,Tmat_S1);
+    }
+    
+    return Tmat;
+}
+
+std::pair<rArray,rArray> Amplitudes::computeSigma_
+(
+    Amplitudes::Transition T
+)
+{
+    // final projectile momenta
+    rArray kf = sqrt(inp_.Ei - 1./(inp_.ni*inp_.ni) + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    
+    // return data
+    std::pair<rArray,rArray> sigma = std::make_pair(rArray(kf.size()),rArray(kf.size()));
+    
+    // for all T-matrices (indexed by angular momenta)
+    for (auto tmat : Tmat_Slp[T])
+    {
+        // get radial integrals
+        cArray const & Tmat_S0 = tmat.second.first;
+        cArray const & Tmat_S1 = tmat.second.second;
+        
+        // compute singlet contribution
+        rArray Re_f0_ell = -realpart(Tmat_S0) / special::constant::two_pi;
+        rArray Im_f0_ell = -imagpart(Tmat_S0) / special::constant::two_pi;
+        sigma.first += 0.25 * kf / inp_.ki * (Re_f0_ell * Re_f0_ell + Im_f0_ell * Im_f0_ell);
+        
+        // compute triplet contribution
+        rArray Re_f1_ell = -realpart(Tmat_S1) / special::constant::two_pi;
+        rArray Im_f1_ell = -imagpart(Tmat_S1) / special::constant::two_pi;
+        sigma.second += 0.75 * kf / inp_.ki * (Re_f1_ell * Re_f1_ell + Im_f1_ell * Im_f1_ell);
+    }
+    
+    return sigma;
 }
 
 Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & PsiSc, double kmax, int l1, int l2)
@@ -280,64 +589,88 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
     return CB;
 }
 
-cArrays computeXi
-(
-    Bspline const & bspline, int maxell, int L, int Spin, int Pi, int ni, int li, int mi, 
-    rArray const & Ei, rArray & ics, std::vector<std::pair<int,int>> const & coupled_states
-)
+std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
 {
-    // resize and clear the output storage for integral cross sections
-    ics.resize(Ei.size());
-    ics.clear();
-    
-    // array of Chebyshev expansions for every Ei and angular state
-    cArrays results (coupled_states.size());
+    // array of Chebyshev expansions coefficients for bot spins and for every Ei and angular state
+    std::pair<cArrays,cArrays> Xi = std::make_pair(cArrays(ang_.size()), cArrays(ang_.size()));
     
     // B-spline count
-    int Nspline = bspline.Nspline();
+    int Nspline = bspline_.Nspline();
     
     // for all energies
-    for (size_t ie = 0; ie < Ei.size(); ie++)
+    for (int Spin = 0; Spin <= 1; Spin++)
+    for (size_t ie = 0; ie < inp_.Ei.size(); ie++)
     {
         // compose filename of the data file for this solution
-        std::ostringstream oss;
-        oss << "psi-" << L << "-" << Spin << "-" << Pi << "-" << ni << "-" << li << "-" << mi << "-" << Ei[ie] << ".hdf";
+        SolutionIO reader (inp_.L, Spin, inp_.Pi, T.ni, T.li, T.mi, inp_.Ei[ie]);
         
         // load the solution
         cArray solution;
-        # pragma omp critical
-        if (not solution.hdfload(oss.str().c_str()))
-            throw exception ("Can't open the solution file \"%s\"!", oss.str().c_str());
+        if (not reader.load(solution))
+        {
+            std::cout << "File \"" << reader.name() << "\" not found." << std::endl;
+            continue;
+        }
         
         // maximal available momentum
-        double kmax = sqrt(Ei[ie] - 1./(ni*ni));
+        double kmax = std::sqrt(inp_.Ei[ie] - 1./(T.ni*T.ni));
         
         // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
-        for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+        for (unsigned ill = 0; ill < ang_.size(); ill++)
         {
-            int l1 = coupled_states[ill].first;
-            int l2 = coupled_states[ill].second;
+            int l1 = ang_[ill].first;
+            int l2 = ang_[ill].second;
             
-            std::cout << "\tion: Ei[" << ie << "] = " << Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << std::flush;
+            std::cout << "\tion: Ei[" << ie << "] = " << inp_.Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << std::flush;
             
             // create subset of the solution
             cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
             
             // compute new ionization amplitude
-            Chebyshev<double,Complex> CB = fcheb (bspline, PsiSc, kmax, l1, l2);
-            results[ill] = CB.coeffs();
-            
-            // integrate the expansion
-            int tail = CB.tail(1e-10);
-            int n;
-            auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax*std::sin(beta), tail)); };
-            ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-            double cs = integrator.integrate(0, special::constant::pi_quart, &n) / std::sqrt(Ei[ie]);
-            
-            std::cout << " - contrib to ics: " << cs << " (" << n << " evaluations)" << std::endl;
-            ics[ie] += cs;
+            Chebyshev<double,Complex> CB = fcheb(bspline_, PsiSc, kmax, l1, l2);
+            if (Spin == 0)
+                (Xi.first)[ill * inp_.Ei.size() + ie] = CB.coeffs();
+            else
+                (Xi.second)[ill * inp_.Ei.size() + ie] = CB.coeffs();
         }
     }
     
-    return results;
+    return Xi;
+}
+
+std::pair<rArray,rArray> Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
+{
+    // number of energies
+    unsigned Nenergy = inp_.Ei.size();
+    
+    // return data
+    std::pair<rArray,rArray> sigma = std::make_pair(rArray(Nenergy),rArray(Nenergy));
+    
+    // for all energies and angular blocks
+    for (size_t ie = 0; ie < inp_.Ei.size(); ie++)
+    for (unsigned ill = 0; ill < ang_.size(); ill++)
+    {
+        // maximal available momentum
+        double kmax = std::sqrt(inp_.Ei[ie] - 1./(T.ni*T.ni));
+        
+        // Chebyshev expansion coefficients
+        Chebyshev<double,Complex> CB;
+        
+        // integrand |f|²
+        int tail; int n;
+        auto fsqr = [&](double beta) -> double { return sqrabs(CB.clenshaw(kmax * std::sin(beta), tail)); };
+        
+        // integrator
+        ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
+        
+        // integrate singlet
+        CB = Chebyshev<double,Complex>(Xi_Sl1l2[T].first[ill], 0., kmax); tail = CB.tail(1e-10); 
+        sigma.first[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / std::sqrt(inp_.Ei[ie]);
+        
+        // integrate triplet
+        CB = Chebyshev<double,Complex>(Xi_Sl1l2[T].second[ill], 0., kmax); tail = CB.tail(1e-10); 
+        sigma.second[ie] = integrator.integrate(0, special::constant::pi_quart, &n) / std::sqrt(inp_.Ei[ie]);
+    }
+    
+    return sigma;
 }

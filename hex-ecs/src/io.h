@@ -10,8 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_INPUT
-#define HEX_INPUT
+#ifndef HEX_IO_H
+#define HEX_IO_H
 
 #include <cstdio>
 #include <fstream>
@@ -19,6 +19,7 @@
 #include <string>
 
 #include "arrays.h"
+#include "bspline.h"
 
 /**
  * @brief Command line parameters.
@@ -179,4 +180,84 @@ class InputFile
         std::vector<std::tuple<int,int,int>> instates, outstates;
 };
 
-#endif
+/**
+ * @brief Solution input/output class.
+ * 
+ * On several places in code it is necessary to load some solutions. In order not
+ * to bother with the file names and still to keep them consistent, this class
+ * will carry the file name and do all operations on it.
+ */
+class SolutionIO
+{
+    public:
+        
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E)
+            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)) {}
+        
+        /// Get name of the solution file.
+        std::string const & name () const
+        {
+            return name_;
+        }
+        
+        /**
+         * @brief Load the solution from disk.
+         * 
+         * This function will try to load the solution HDF file (of name 'name_')
+         * into a complex array passed as argument. If the file is not found, array
+         * is not written and 'false' is returned. Otherwise the function returns 'true'
+         * and fills the contents of the array with the read data.
+         */
+        bool load (cArray & sol)
+        {
+            cArray tmp;
+            if (tmp.hdfload(name_))
+            {
+                sol = tmp;
+                return true;
+            }
+            return false;
+        }
+        
+        /**
+         * @brief Write solution to disk.
+         * 
+         * Save solution to disk as a HDF file. Zero blocks
+         * of the solution are automatically detected and compressed
+         * (substituted by position & length information). The function
+         * return 'true' when write was successful, 'false' otherwise.
+         */
+        bool save (cArray const & sol)
+        {
+            return sol.hdfsave(name_, true /* = with compression */);
+        }
+    
+    private:
+        
+        std::string name_;
+};
+
+/**
+ * @brief Convert solution to VTK file.
+ * 
+ * This function will convert a solution (the filename of the HDF file
+ * should come from the command line option --zipfile) to a series of VTK text
+ * files that can be viewed e.g. by the free ParaView program. The resulting
+ * VTK files (one for each angular basis vector) will contain real and imaginary
+ * part of the wave function component on an rectilinear grid. Parameters of the
+ * grid can be further refined by the command line arguments --zipcount and --zipmax).
+ * 
+ * @param cmd Class containing command line options.
+ * @param bspline B-spline environment.
+ * @param ll Angular basis.
+ * 
+ * See the respective classes for deeper explanation of individual parameters.
+ */
+void zip_solution
+(
+    CommandLine & cmd,
+    Bspline const & bspline,
+    std::vector<std::pair<int,int>> const & ll
+);
+
+#endif /* HEX_IO_H */
