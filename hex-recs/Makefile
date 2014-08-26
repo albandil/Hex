@@ -79,19 +79,19 @@ FFTWFLAGS =
 FFTWLIBS = -lfftw3
 
 # ---------------------------------------------------------------------------- #
-# Lapack (optional, use -DNO_LAPACK to omit)                                   #
+# Lapack (optional if not already in OpenBLAS; use -DNO_LAPACK to omit)        #
 # ---------------------------------------------------------------------------- #
 
-LAPACKFLAGS = -DNO_LAPACK
+# LAPACKFLAGS = -DNO_LAPACK
 # LAPACKLIBS = -lgfortran -llapack
 
 # ---------------------------------------------------------------------------- #
 # PNG++ (optional, use -DNO_PNG to omit)                                       #
 # ---------------------------------------------------------------------------- #
 
-PNGPPFLAGS = -DNO_PNG
-# PNGPPFLAGS = -I./libs
-# PNGPPLIBS = -lpng
+# PNGPPFLAGS = -DNO_PNG
+PNGPPFLAGS = -I./libs
+PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 

@@ -210,15 +210,16 @@ unsigned cg_callbacks
     // Iterate
     
     unsigned k;
-    for (k = 0; k < max_iterations; k++)
+    for (k = 1; k <= max_iterations; k++)
     {
-        int sec = timer.seconds();
-        
         if (verbose)
         {
-            std::cout << "\t[cg] Residual relative magnitude after "
-                    << k << " iterations: " << rnorm / bnorm
-                    << " (" << sec / 60 << " min)\n";
+            std::cout << '\t';
+            std::cout << std::setw(4) << std::right << k;
+            std::cout << " | ";
+            std::cout << std::setw(11) << std::left << timer.nice_time();
+            std::cout << " | ";
+            std::cout << std::setw(15) << std::left << rnorm / bnorm;
         }
         
         // apply desired preconditioner
@@ -228,7 +229,7 @@ unsigned cg_callbacks
         rho_new = scalar_product(r, z);
         
         // setup search direction p
-        if (k == 0)
+        if (k == 1)
         {
             axby (0., p, 1., z); // p = z
         }
@@ -250,9 +251,11 @@ unsigned cg_callbacks
         
         // compute and check norm
         rnorm = compute_norm(r);
+        if (verbose)
+            std::cout << std::endl;
         if (not std::isfinite(rnorm))
         {
-            std::cout << "\t[cg] Damn... the norm of the solution is not finite. Something went wrong!\n";
+            std::cout << "\t     The norm of the solution is not finite. Something went wrong!" << std::endl;
             break;
         }
         
@@ -285,14 +288,16 @@ unsigned cg_callbacks
  * @return Iteration count.
  */
 template <typename TFunctor1, typename TFunctor2>
-int bicgstab_callbacks (
+int bicgstab_callbacks
+(
     const cArrayView b, cArrayView x,
     double eps,
     int min_iterations, int max_iterations,
     TFunctor1 apply_preconditioner,
     TFunctor2 matrix_multiply,
     bool verbose = false
-) {
+)
+{
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
     
@@ -392,14 +397,16 @@ int bicgstab_callbacks (
  * @return Iteration count.
  */
 template <typename TFunctor1, typename TFunctor2>
-int cgs_callbacks (
+int cgs_callbacks
+(
     const cArrayView b, cArrayView x,
     double eps,
     int min_iterations, int max_iterations,
     TFunctor1 apply_preconditioner,
     TFunctor2 matrix_multiply,
     bool verbose = false
-) {
+)
+{
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     std::chrono::duration<int> sec;
     

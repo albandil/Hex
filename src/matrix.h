@@ -102,9 +102,11 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
             : DenseMatrix<Type>(rows, cols) {}
         ColMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
+        ColMatrix (RowMatrix<Type> const & m)
+            : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
         
-        explicit ColMatrix (DenseMatrix<Type> const & M)
-            : DenseMatrix<Type>(M) {}
+//         explicit ColMatrix (DenseMatrix<Type> const & M)
+//             : DenseMatrix<Type>(M) {}
         
         /**
          * @brief Populator.
@@ -140,6 +142,22 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         }
         
         /**
+         * @brief Matrix hermitian conjugate.
+         * 
+         * Return hermitian conjugated matrix. The result is of the type RowMatrix,
+         * so that no reordering of the entries is necessary.
+         */
+        RowMatrix<Type> H () const
+        {
+            return RowMatrix<Type>
+            (
+                this->cols(),
+                this->rows(),
+                NumberArray<Type>(this->data()).conj()
+            );
+        }
+        
+        /**
          * @brief Matrix column.
          *
          * Return shallow copy of the chosen matrix column.
@@ -170,6 +188,26 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         Type operator() (int i, int j) const { return col(j)[i]; }
         Type & operator() (int i, int j) { return col(j)[i]; }
         //@}
+        
+        /// Inversion.
+        ColMatrix<Type> invert () const;
+        
+        /// Diagonalization.
+        std::tuple<NumberArray<Type>,ColMatrix<Type>,ColMatrix<Type>> diagonalize () const;
+    
+    private:
+        
+        /// Change "data" from row-oriented to column-oriented.
+        void reorder_ ()
+        {
+            NumberArray<Type> new_data (this->data().size());
+            
+            for (int irow = 0; irow < this->rows(); irow++)
+            for (int icol = 0; icol < this->cols(); icol++)
+                new_data[icol * this->rows() + irow] = this->data()[irow * this->cols() + icol];
+            
+            this->data() = new_data;
+        }
 };
 
 /**
@@ -194,8 +232,8 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
         RowMatrix (ColMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
         
-        explicit RowMatrix (DenseMatrix<Type> const & M)
-            : DenseMatrix<Type>(M) {}
+//         explicit RowMatrix (DenseMatrix<Type> const & M)
+//             : DenseMatrix<Type>(M) {}
         
         /**
          * @brief Populator.
@@ -378,7 +416,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
                 out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
                 {
-                    if (*ptr >= 0) out << " "; out << *ptr++ << " ";
+                    if (*ptr == std::abs(*ptr)) out << " "; out << *ptr++ << " ";
                 }
                 
                 out << pos << "\n";
@@ -450,8 +488,30 @@ template <class T> RowMatrix<T> operator * (T x, RowMatrix<T> const & A) { RowMa
 template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() *= x; return B; }
 template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() /= x; return B; }
 
-// matrix multiplication
-template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, ColMatrix<T> const & B);
+/**
+ * @brief Dot product of kronecker product and a vector
+ * 
+ * This function will compute the following expression, given two matrices and a vector:
+ * @f[
+ *     (A \otimes B) \cdot v
+ * @f]
+ * witnout the need of evaluating (and storing) the Kronecker product.
+ */
+template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T> const & B, ArrayView<T> const v)
+{
+    assert (A.cols() * B.cols() == v.size());
+    
+    // return vector
+    NumberArray<T> w(A.rows() * B.rows());
+    
+    // for all elements of A_kron_B; FIXME : Optimize.
+    # pragma omp parallel for
+    for (unsigned i = 0; i < A.rows() * B.rows(); i++)
+    for (unsigned j = 0; j < A.cols() * B.cols(); j++)
+        w[i] += A(i / B.rows(), j / B.cols()) * B(i % B.rows(), j % B.cols()) * v[j];
+    
+    return w;
+}
 
 /**
  * @brief Dense matrix multiplication.
@@ -830,7 +890,8 @@ public:
             for (int eq = 0; eq < eqs; eq++)
             {
                 // solve for current RHS
-                long status = umfpack_zl_solve (
+                long status = umfpack_zl_solve
+                (
                     UMFPACK_Aat,
                     matrix_->p_.data(), matrix_->i_.data(),
                     reinterpret_cast<const double*>(matrix_->x_.data()), nullptr,

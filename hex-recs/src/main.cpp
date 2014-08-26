@@ -251,6 +251,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // custom conjugate gradients callback-based solver
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
+            std::cout << "\t   i | time        | residual        | max & avg block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
                 chi,                      // right-hand side

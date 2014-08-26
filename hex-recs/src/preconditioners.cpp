@@ -780,6 +780,9 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     
+    // iterations
+    iArray n (ang_.size());
+    
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
     {
@@ -792,11 +795,11 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
         // solve using the CG solver
-        cg_callbacks < cArray, cArrayView >
+        n[ill] = cg_callbacks < cArray, cArrayView >
         (
             rview,                  // rhs
             zview,                  // solution
-            cmd_.itertol,           // tolerance
+            cmd_.prec_itertol,      // preconditioner tolerance
             0,                      // min. iterations
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
@@ -804,6 +807,11 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             false                   // verbose output
         );
     }
+    
+    // inner preconditioner info (max and avg number of iterations)
+    std::cout << " | ";
+    std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
+    std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, ang_.size());
@@ -1262,13 +1270,7 @@ void ILUCGPreconditioner::update (double E)
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
         // factorize the block and store it in lu_[ill] (transfer data)
-        lu_[ill].transfer
-        (
-            std::move
-            (
-                csr_blocks_[ill].factorize(droptol_)
-            )
-        );
+        lu_[ill].transfer(csr_blocks_[ill].factorize(droptol_));
         
         // print info (one thread at a time)
         # pragma omp critical

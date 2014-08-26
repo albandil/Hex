@@ -267,15 +267,17 @@ if (cmd.itinerary & CommandLine::StgSolve)
             current_solution = cArray(chi.size());
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
+            std::cout << "\t   i | time        | residual        | max & avg block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
-                chi,                      // right-hand side
-                current_solution,         // on input, the initial guess, on return, the solution
-                cmd.itertol,              // requested precision, |A·x - b|² < ε·|b|²
-                0,                        // minimal iteration count
-                max_iter,                 // maximal iteration count
-                apply_preconditioner,     // preconditioner callback
-                matrix_multiply           // matrix multiplication callback
+                chi,                    // right-hand side
+                current_solution,       // on input, the initial guess, on return, the solution
+                cmd.itertol,            // requested precision, |A·x - b|² < ε·|b|²
+                0,                      // minimal iteration count
+                max_iter,               // maximal iteration count
+                apply_preconditioner,   // preconditioner callback
+                matrix_multiply,        // matrix multiplication callback
+                true                    // verbose output
             );
             
             if (iterations >= max_iter)

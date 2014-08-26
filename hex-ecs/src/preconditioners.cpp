@@ -716,7 +716,10 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     
-    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
+    // iterations
+    iArray n (l1_l2_.size());
+    
+//     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create segment views
@@ -728,11 +731,11 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
         // solve using the CG solver
-        cg_callbacks < cArray, cArrayView >
+        n[ill] = cg_callbacks < cArray, cArrayView >
         (
             rview,                  // rhs
             zview,                  // solution
-            cmd_.itertol,        // tolerance
+            cmd_.prec_itertol,      // preconditioner tolerance
             0,                      // min. iterations
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
@@ -740,6 +743,11 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             false                   // verbose output
         );
     }
+    
+    // inner preconditioner info (max and avg number of iterations)
+    std::cout << " | ";
+    std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
+    std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // synchronize across processes
     par_.sync (z, Nspline * Nspline, l1_l2_.size());
@@ -1155,6 +1163,100 @@ void SSORCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
     }
 }
 
+const std::string SepCGPreconditioner::name = "sep";
+const std::string SepCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
+
+void SepCGPreconditioner::setup ()
+{
+    NoPreconditioner::setup();
+    
+    // resize arrays
+    csr_blocks_.resize(l1_l2_.size());
+    lu_.resize(l1_l2_.size());
+    invsqrtS_Cl_.resize(inp_.maxell);
+    invCl_invsqrtS_.resize(inp_.maxell);
+    Dl_.resize(inp_.maxell);
+    
+    // diagonalize overlap matrix
+    ColMatrix<Complex> S = s_rad_.S().torow().T();
+    ColMatrix<Complex> CL, CR; cArray DS;
+    std::tie(DS,CL,CR) = S.diagonalize();
+    ColMatrix<Complex> invCR = CR.invert();
+    
+    // convert eigenvalues to diagonal matrix
+    ColMatrix<Complex> DSmat(DS.size()), invDSmat(DS.size());
+    ColMatrix<Complex> DSsqrtmat(DS.size()), invDSsqrtmat(DS.size());
+    for (unsigned i = 0; i < DS.size(); i++)
+    {
+        DSmat(i,i) = DS[i];
+        DSsqrtmat(i,i) = std::sqrt(DS[i]);
+        invDSmat(i,i) = 1.0 / DS[i];
+        invDSsqrtmat(i,i) = 1.0 / std::sqrt(DS[i]);
+    }
+    
+    // NOTE : Now S = CR * DSmat * CR⁻¹
+    std::cout << "Set up SEP preconditioner" << std::endl;
+    std::cout << "\tS factorization residual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
+    
+    // compute √S and √S⁻¹
+    RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
+    RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
+    
+    // diagonalize one-electron hamiltonians for all angular momenta
+    for (int l = 0; l < inp_.maxell; l++)
+    {
+        std::cout << "\tH(l=" << l << ") " << std::flush;
+        
+        // compose the one-electron hamiltonian
+        ColMatrix<Complex> H ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
+        
+        // symmetrically transform by inverse square root of the overlap matrix
+        RowMatrix<Complex> tH = invsqrtS * H * ColMatrix<Complex>(invsqrtS);
+        
+        // diagonalize the transformed matrix
+        ColMatrix<Complex> ClL, ClR;
+        std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tH).diagonalize();
+        
+        // covert Dl to matrix form and print verification
+        ColMatrix<Complex> Dlmat(Dl_[l].size());
+        for (unsigned i = 0; i < Dl_[l].size(); i++)
+            Dlmat(i,i) = Dl_[l][i];
+        std::cout << "factorization residual: " << cArray((tH - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
+        
+        // store the data
+        invsqrtS_Cl_[l] = invsqrtS * ClR;
+        invCl_invsqrtS_[l] = RowMatrix<Complex>(ClR.invert()) * ColMatrix<Complex>(invsqrtS);
+    }
+    
+    std::cout << std::endl;
+}
+
+void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    // get angular momenta of this block
+    int l1 = l1_l2_[iblock].first;
+    int l2 = l1_l2_[iblock].second;
+    
+    // get the diagonalization matrices
+    RowMatrix<Complex> const & Cl1S = invCl_invsqrtS_[l1];
+    RowMatrix<Complex> const & Cl2S = invCl_invsqrtS_[l2];
+    RowMatrix<Complex> const & SCl1 = invsqrtS_Cl_[l1];
+    RowMatrix<Complex> const & SCl2 = invsqrtS_Cl_[l2];
+    
+    // get one-electron eigenvalues
+    cArray const & Dl1 = Dl_[l1];
+    cArray const & Dl2 = Dl_[l2];
+    
+    // construct common diagonal
+    cArray diag (Dl1.size() * Dl2.size(), Complex(E_));
+    diag -= outer_product(Dl1, cArray(Dl2.size()));
+    diag -= outer_product(cArray(Dl1.size()), Dl2);
+    
+    // precondition
+    z = kron_dot(SCl1, SCl2, kron_dot(Cl1S, Cl2S, r) / diag);
+    std::cout << std::endl;
+}
+
 const std::string ILUCGPreconditioner::name = "ILU";
 const std::string ILUCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
 
@@ -1173,7 +1275,7 @@ void ILUCGPreconditioner::update (double E)
     NoPreconditioner::update(E);
     
     // write info
-    std::cout << "\t[" << par_.iproc() << "] Update preconditioner";
+    std::cout << "\t[" << par_.iproc() << "] Update preconditioner ILU";
     if (cmd_.concurrent_factorizations > 1)
         std::cout << " using " << cmd_.concurrent_factorizations << " concurrent 1-thread parallelizations";
     else
@@ -1202,14 +1304,7 @@ void ILUCGPreconditioner::update (double E)
         csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
         
         // factorize the block and store it in lu_[ill]
-        lu_[ill].transfer
-        (
-            // transfer data (use &&-constructor)
-            std::move
-            (
-                csr_blocks_[ill].factorize(droptol_)
-            )
-        );
+        lu_[ill].transfer(csr_blocks_[ill].factorize(droptol_));
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical

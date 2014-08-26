@@ -82,7 +82,7 @@ void CommandLine::parse (int argc, char* argv[])
                 out << sample_input;
                     
                 out.close();
-                exit(0);
+                std::exit(0);
             },
         "input", "i", 1, [&](std::string optarg) -> bool
             {
@@ -112,7 +112,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-extract             (-c)  only extract amplitudes                                                         \n"
                     "\t--preconditioner <name>   (-p)  preconditioner to use (default: ILU)                                            \n"
                     "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
-                    "\t--tolerance <number>      (-t)  tolerance for the conjugate gradients solver                                    \n"
+                    "\t--tolerance <number>      (-T)  tolerance for the conjugate gradients solver                                    \n"
+                    "\t--prec-tolerance <number> (-t)  tolerance for the conjugate gradients preconditioner                            \n"
                     "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
@@ -131,13 +132,13 @@ void CommandLine::parse (int argc, char* argv[])
         "zipcount", "n", 1, [&](std::string optarg) -> bool
             {
                 // zip samples
-                zipcount = atol(optarg.c_str());
+                zipcount = std::atol(optarg.c_str());
                 return true;
             },
         "zipmax", "R", 1, [&](std::string optarg) -> bool
             {
                 // zip bounding box
-                zipmax = atof(optarg.c_str());
+                zipmax = std::atof(optarg.c_str());
                 return true;
             },
 #ifndef NO_MPI
@@ -175,13 +176,19 @@ void CommandLine::parse (int argc, char* argv[])
         "drop-tolerance", "d", 1, [&](std::string optarg) -> bool
             {
                 // drop tolerance for iLU-factorization
-                droptol = atof(optarg.c_str());
+                droptol = std::atof(optarg.c_str());
                 return true;
             },
-        "tolerance", "t", 1, [&](std::string optarg) -> bool
+        "tolerance", "T", 1, [&](std::string optarg) -> bool
             {
                 // iteration tolerance for terminating iteration solution
-                itertol = atof(optarg.c_str());
+                itertol = std::atof(optarg.c_str());
+                return true;
+            },
+        "prec-tolerance", "t", 1, [&](std::string optarg) -> bool
+            {
+                // iteration tolerance for terminating iteration solution
+                prec_itertol = std::atof(optarg.c_str());
                 return true;
             },
         "preconditioner", "p", 1, [&](std::string optarg) -> bool
@@ -200,8 +207,8 @@ void CommandLine::parse (int argc, char* argv[])
                     std::cout << Preconditioners::name(i) << "\n";
                     std::cout << "\t" << Preconditioners::description(i) << "\n";
                 }
-                std::cout << "\n";
-                exit (0);
+                std::cout << std::endl;
+                std::exit(0);
             },
         "parallel-dot", "", 0, [&](std::string optarg) -> bool
             {

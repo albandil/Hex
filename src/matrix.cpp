@@ -37,6 +37,49 @@
 // Dense matrix routines
 //
 
+#ifndef NO_LAPACK
+// Calculates LU decomposition of a complex dense matrix.
+extern "C" void zgetrf_
+(
+    int * M,
+    int * N,
+    Complex * A,
+    int * LDA,
+    int * IPIV,
+    int * INFO
+);
+// Inverts a complex dense matrix using precomputed LU decomposition.
+extern "C" void zgetri_
+(
+    int * N,
+    Complex * A,
+    int * LDA,
+    int * IPIV,
+    Complex * WORK,
+    int * LWORK,
+    int * INFO
+);
+// Eigen-diagonalization of a general complex matrix.
+extern "C" void zgeev_
+(
+    char * JOBVL,
+    char * JOBVR,
+    int * N,
+    Complex * A,
+    int * LDA,
+    Complex * W,
+    Complex * VL,
+    int * LDVL,
+    Complex * VR,
+    int * LDVR,
+    Complex * WORK,
+    int * LWORK,
+    double * RWORK,
+    int * INFO
+);
+#endif
+
+// specialization of multiplication of real dense row-major ("C-like") matrices
 template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B)
 {
     // check sanity
@@ -68,6 +111,134 @@ template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<
     
     // return result
     return C;
+}
+
+template<> ColMatrix<Complex> ColMatrix<Complex>::invert () const
+{
+#ifndef NO_LAPACK
+    if (rows() != cols())
+        throw exception ("Only square matrices can be diagonalized.");
+    int N = rows();
+    
+    ColMatrix<Complex> inv (*this);
+    iArray IPIV(N);
+    int LWORK = -1;
+    cArray WORK(1);
+    int INFO;
+    
+    // compute the LU factorization
+    zgetrf_
+    (
+        &N,             // number of rows in the matrix
+        &N,             // number of columns of the matrix
+        inv.begin(),    // matrix data (on return the LU factors)
+        &N,             // leading dimension of A
+        &IPIV[0],       // pivot indices
+        &INFO           // diagnostic information
+    );
+    
+    // query for optimal work size for inversion
+    zgetri_
+    (
+        &N,             // order of the matrix
+        inv.begin(),    // LU-factors (on return the inverse matrix)
+        &N,             // leading dimension of A
+        &IPIV[0],       // pivot indices
+        &WORK[0],       // work array
+        &LWORK,         // work array length
+        &INFO           // diagnostic information
+    );
+    
+    // resize work array
+    LWORK = WORK.front().real();
+    WORK.resize(LWORK);
+    
+    // compute the inverse
+    zgetri_
+    (
+        &N,             // order of the matrix
+        inv.begin(),    // LU-factors (on return the inverse matrix)
+        &N,             // leading dimension of A
+        &IPIV[0],       // pivot indices
+        &WORK[0],       // work array
+        &LWORK,         // work array length
+        &INFO           // diagnostic information
+    );
+    
+    return inv;
+#else
+    throw exception ("Cannot invert dense matrix without LAPACK support.");
+#endif
+}
+
+// specialization of diagonalization of complex dense column-major ("Fortran-like") matrices
+template<> std::tuple<cArray,ColMatrix<Complex>,ColMatrix<Complex>> ColMatrix<Complex>::diagonalize () const
+{
+#ifndef NO_LAPACK
+    if (rows() != cols())
+        throw exception ("Only square matrices can be diagonalized.");
+    int N = rows();
+    
+    ColMatrix<Complex> VL(N,N), VR(N,N);
+    cArray W(N), WORK(1);
+    rArray RWORK(2*N);
+    int LWORK = -1, INFO;
+    char JOB = 'V';
+    
+    // copy matrix data (it will be overwritten)
+    cArray A = data();
+    
+    // get work size
+    zgeev_
+    (
+        &JOB,       // compute left eigenvectors
+        &JOB,       // compute right eigenvectors
+        &N,         // order of the matrix
+        &A[0],      // matrix A elements
+        &N,         // leading dimension of the matrix A
+        &W[0],      // eigenvalues
+        VL.begin(), // left eigenvectors elements
+        &N,         // leading dimension of the matrix VL
+        VR.begin(), // right eigenvectors elements
+        &N,         // leading dimension of the matrix VR
+        &WORK[0],   // work array
+        &LWORK,     // length of the work array
+        &RWORK[0],  // work array
+        &INFO       // diagnostic information
+    );
+    
+    // resize work array
+    LWORK = WORK[0].real();
+    WORK.resize(LWORK);
+    
+    // run the diagonalization
+    zgeev_
+    (
+        &JOB,       // compute left eigenvectors
+        &JOB,       // compute right eigenvectors
+        &N,         // order of the matrix
+        &A[0],      // matrix A elements
+        &N,         // leading dimension of the matrix A
+        &W[0],      // eigenvalues
+        VL.begin(), // left eigenvectors elements
+        &N,         // leading dimension of the matrix VL
+        VR.begin(), // right eigenvectors elements
+        &N,         // leading dimension of the matrix VR
+        &WORK[0],   // work array
+        &LWORK,     // length of the work array
+        &RWORK[0],  // work array
+        &INFO       // diagnostic information
+    );
+    
+    if (INFO != 0)
+    {
+        std::cerr << "Diagonalization error: " << INFO << std::endl;
+    }
+    
+    return std::make_tuple(W,VL,VR);
+#else
+    throw exception ("Cannot diagonalize dense matrix without LAPACK support.");
+#endif
 }
 
 //

@@ -203,7 +203,8 @@ class NoPreconditioner : public PreconditionerBase
         static const std::string name;
         static const std::string description;
         
-        NoPreconditioner (
+        NoPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -263,7 +264,8 @@ class CGPreconditioner : public NoPreconditioner
         static const std::string name;
         static const std::string description;
         
-        CGPreconditioner (
+        CGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -301,7 +303,8 @@ class GPUCGPreconditioner : public NoPreconditioner
         static const std::string name;
         static const std::string description;
         
-        GPUCGPreconditioner (
+        GPUCGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -358,7 +361,8 @@ class JacobiCGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
-        JacobiCGPreconditioner (
+        JacobiCGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -398,7 +402,8 @@ class SSORCGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
-        SSORCGPreconditioner (
+        SSORCGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -426,6 +431,59 @@ class SSORCGPreconditioner : public CGPreconditioner
 };
 
 /**
+ * 
+ */
+class SepCGPreconditioner : public CGPreconditioner
+{
+    public:
+        
+        static const std::string name;
+        static const std::string description;
+        
+        SepCGPreconditioner
+        (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline,
+            CommandLine const & cmd
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol) {}
+        
+        // reuse parent definitions
+        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
+        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        
+        // declare own definitions
+        virtual void setup ();
+        virtual void update (double E) { CGPreconditioner::update(E); E_ = E; }
+        
+        // inner CG callback (needed by parent)
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
+        
+    protected:
+        
+        // drop tolarance for the factorizations
+        double droptol_;
+        
+        // diagonal CSR block for every coupled state
+        mutable std::vector<CsrMatrix> csr_blocks_;
+        
+        // LU decompositions of the CSR blocks
+        mutable std::vector<CsrMatrix::LUft> lu_;
+        
+        // auxiliary matrices
+        std::vector<RowMatrix<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
+        
+        // diagonal parts of one-electron hamiltonians
+        std::vector<cArray> Dl_;
+        
+        // current preconditioner energy
+        double E_;
+};
+
+/**
  * @brief ILU-preconditioned CG-based preconditioner.
  * 
  * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
@@ -439,7 +497,8 @@ class ILUCGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
-        ILUCGPreconditioner (
+        ILUCGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -486,7 +545,8 @@ class DICCGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
-        DICCGPreconditioner (
+        DICCGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -531,7 +591,8 @@ class SPAICGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
-        SPAICGPreconditioner  (
+        SPAICGPreconditioner
+        (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
@@ -805,7 +866,8 @@ class Preconditioners
 #ifndef NO_OPENCL
             GPUCGPreconditioner,        // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
 #endif
-            SSORCGPreconditioner        // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+            SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+            SepCGPreconditioner         // Solve diagonal blocks by separate electrons preconditioned CG iterations.
 //             MultiresPreconditioner,     // Multi-resolution preconditioner.
 //             SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.
 //             TwoLevelPreconditioner,     // Solve diagonal blocks by two-level precondtioned CG iterations.

@@ -64,6 +64,7 @@ class CommandLine
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), itertol(1e-8),
+              prec_itertol(1e-5),
               parallel_dot(false), parallel_block(true), concurrent_factorizations(1)
         {
             // get command line options
@@ -110,6 +111,9 @@ class CommandLine
         
         /// Tolerance for terminating iterative solution.
         double itertol;
+        
+        /// Tolerance for terminating block preconditioner.
+        double prec_itertol;
         
         /// Whether to use OpenMP parallelization in SymDiaMatrix::dot
         bool parallel_dot;
