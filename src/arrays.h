@@ -37,8 +37,8 @@
 // Forward declaration of Array (unaligned array of items).
 template < class T, class Alloc = PlainAllocator<T> > class Array;
 
-// Forward declaration of NumberArray (memory-aligned array of numbers).
-template < class T, class Alloc = AlignedAllocator<T,2*sizeof(Complex)> > class NumberArray;
+// Forward declaration of NumberArray (256bit-aligned array of numbers ~AVX).
+template < class T, class Alloc = AlignedAllocator<T,32u> > class NumberArray;
 
 /**
  * @brief Array view.

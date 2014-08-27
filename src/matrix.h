@@ -499,16 +499,57 @@ template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMa
  */
 template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T> const & B, ArrayView<T> const v)
 {
-    assert (A.cols() * B.cols() == v.size());
+    assert(A.cols() * B.cols() == v.size());
     
     // return vector
     NumberArray<T> w(A.rows() * B.rows());
     
-    // for all elements of A_kron_B; FIXME : Optimize.
+    // auxiliary matrix
+    RowMatrix<T> C(B.rows(),A.cols());
+    
+    // for all rows of B
     # pragma omp parallel for
-    for (unsigned i = 0; i < A.rows() * B.rows(); i++)
-    for (unsigned j = 0; j < A.cols() * B.cols(); j++)
-        w[i] += A(i / B.rows(), j / B.cols()) * B(i % B.rows(), j % B.cols()) * v[j];
+    for (unsigned irow = 0; irow < B.rows(); irow++)
+    {
+        // get current row of B
+        T const * const restrict pB = B.row(irow).data();
+        
+        // get corresponding row of C
+        T       * const restrict pC = C.row(irow).data();
+        
+        // for all segments of v
+        for (unsigned icol = 0; icol < A.cols(); icol++)
+        {
+            // get current segment of v
+            T const * const restrict pv = v.begin() + icol * B.cols();
+            
+            // compute scalar product between the current row of B and the segment of v
+            for (unsigned ielem = 0; ielem < B.cols(); ielem++)
+                pC[icol] += pB[ielem] * pv[ielem];
+        }
+    }
+    
+    // for all rows of A
+    # pragma omp parallel for
+    for (unsigned i = 0; i < A.rows(); i++)
+    {
+        // get current row of A
+        T const * const restrict pA = A.row(i).data();
+        
+        // get corresponding segment of w
+        T       * const restrict pw = w.begin() + i * C.rows();
+        
+        // for all rows of C
+        for (unsigned j = 0; j < C.rows(); j++)
+        {
+            // get current row of C
+            T const * const restrict pC = C.row(j).data();
+            
+            // compute scalar product between the rows
+            for (unsigned ielem = 0; ielem < A.cols(); ielem++)
+                pw[j] += pA[ielem] * pC[ielem];
+        }
+    }
     
     return w;
 }

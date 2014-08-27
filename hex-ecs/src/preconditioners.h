@@ -457,7 +457,7 @@ class SepCGPreconditioner : public CGPreconditioner
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (double E) { CGPreconditioner::update(E); E_ = E; }
+        virtual void update (double E);
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
@@ -468,7 +468,7 @@ class SepCGPreconditioner : public CGPreconditioner
         double droptol_;
         
         // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix> csr_blocks_;
+        mutable std::vector<CsrMatrix> csr_blocks_, prec_blocks_;
         
         // LU decompositions of the CSR blocks
         mutable std::vector<CsrMatrix::LUft> lu_;

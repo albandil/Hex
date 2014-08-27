@@ -13,8 +13,10 @@
 #ifndef HEX_MEMORY
 #define HEX_MEMORY
 
+#include <iostream>
 #include <cstdint>
 #include <cstddef>
+#include <cstdlib>
 
 /**
  * @brief Basic memory allocator.

@@ -719,7 +719,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // iterations
     iArray n (l1_l2_.size());
     
-//     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
+    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create segment views
@@ -1164,18 +1164,16 @@ void SSORCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
 }
 
 const std::string SepCGPreconditioner::name = "sep";
-const std::string SepCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
+const std::string SepCGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by separated electrons hamiltonian.";
 
 void SepCGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
     // resize arrays
-    csr_blocks_.resize(l1_l2_.size());
-    lu_.resize(l1_l2_.size());
-    invsqrtS_Cl_.resize(inp_.maxell);
-    invCl_invsqrtS_.resize(inp_.maxell);
-    Dl_.resize(inp_.maxell);
+    invsqrtS_Cl_.resize(inp_.maxell + 1);
+    invCl_invsqrtS_.resize(inp_.maxell + 1);
+    Dl_.resize(inp_.maxell + 1);
     
     // diagonalize overlap matrix
     ColMatrix<Complex> S = s_rad_.S().torow().T();
@@ -1203,32 +1201,41 @@ void SepCGPreconditioner::setup ()
     RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
     
     // diagonalize one-electron hamiltonians for all angular momenta
-    for (int l = 0; l < inp_.maxell; l++)
+    for (int l = 0; l <= inp_.maxell; l++)
     {
         std::cout << "\tH(l=" << l << ") " << std::flush;
         
         // compose the one-electron hamiltonian
-        ColMatrix<Complex> H ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
+        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
         
         // symmetrically transform by inverse square root of the overlap matrix
-        RowMatrix<Complex> tH = invsqrtS * H * ColMatrix<Complex>(invsqrtS);
+        RowMatrix<Complex> tHl = invsqrtS * Hl * ColMatrix<Complex>(invsqrtS);
         
         // diagonalize the transformed matrix
         ColMatrix<Complex> ClL, ClR;
-        std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tH).diagonalize();
-        
-        // covert Dl to matrix form and print verification
-        ColMatrix<Complex> Dlmat(Dl_[l].size());
-        for (unsigned i = 0; i < Dl_[l].size(); i++)
-            Dlmat(i,i) = Dl_[l][i];
-        std::cout << "factorization residual: " << cArray((tH - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
+        std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
         
         // store the data
         invsqrtS_Cl_[l] = invsqrtS * ClR;
         invCl_invsqrtS_[l] = RowMatrix<Complex>(ClR.invert()) * ColMatrix<Complex>(invsqrtS);
+        
+        // covert Dl to matrix form and print verification
+        ColMatrix<Complex> Dlmat(Dl_[l].size()), invDlmat(Dl_[l].size());
+        for (unsigned i = 0; i < Dl_[l].size(); i++)
+        {
+            Dlmat(i,i) = Dl_[l][i];
+            invDlmat(i,i) = 1.0 / Dl_[l][i];
+        }
+        std::cout << "factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
     }
     
     std::cout << std::endl;
+}
+
+void SepCGPreconditioner::update (double E)
+{
+    CGPreconditioner::update(E);
+    E_ = E;
 }
 
 void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -1248,13 +1255,12 @@ void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     cArray const & Dl2 = Dl_[l2];
     
     // construct common diagonal
-    cArray diag (Dl1.size() * Dl2.size(), Complex(E_));
-    diag -= outer_product(Dl1, cArray(Dl2.size()));
-    diag -= outer_product(cArray(Dl1.size()), Dl2);
+    cArray diag (Dl1.size() * Dl2.size(), E_);
+    diag -= outer_product(Dl1, cArray(Dl2.size(),1.));
+    diag -= outer_product(cArray(Dl1.size(),1.), Dl2);
     
     // precondition
     z = kron_dot(SCl1, SCl2, kron_dot(Cl1S, Cl2S, r) / diag);
-    std::cout << std::endl;
 }
 
 const std::string ILUCGPreconditioner::name = "ILU";
