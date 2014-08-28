@@ -49,9 +49,9 @@ template <class T> class CLArrayView : public ArrayView<T>
         
         CLArrayView ()
             : ArrayView<T>(), cl_handle_(nullptr) { /*std::cout << "Init Default\n";*/ }
-        CLArrayView (size_t n, T const * ptr)
+        CLArrayView (std::size_t n, T const * ptr)
             : ArrayView<T>(n, const_cast<T*>(ptr)), cl_handle_(nullptr) { /*std::cout << "Init from ptr.\n";*/ }
-        CLArrayView (ArrayView<T> v, size_t i = 0, size_t n = 0)
+        CLArrayView (ArrayView<T> v, std::size_t i = 0, std::size_t n = 0)
             : ArrayView<T>(v, i, n), cl_handle_(nullptr) { /*std::cout << "Init from ArrayView\n";*/ }
         CLArrayView (CLArrayView<T> const & v)
             : ArrayView<T>(v), cl_handle_(v.cl_handle_) { /*std::cout << "Init from CLArrayView\n";*/ }
@@ -75,19 +75,19 @@ template <class T> class CLArrayView : public ArrayView<T>
         // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
         //
         
-        size_t size () const                    { return ArrayView<T>::size();        }
-        T const & operator [] (size_t i) const  { return ArrayView<T>::operator[](i); }
-        T & operator [] (size_t i)              { return ArrayView<T>::operator[](i); }
-        T const * data () const                 { return ArrayView<T>::data();        }
-        T * data ()                             { return ArrayView<T>::data();        }
-        const_iterator begin () const           { return ArrayView<T>::begin();       }
-        iterator begin ()                       { return ArrayView<T>::begin();       }
-        const_iterator end () const             { return ArrayView<T>::end();         }
-        iterator end ()                         { return ArrayView<T>::end();         }
-        T const & front (size_t i = 0) const    { return ArrayView<T>::front(i);      }
-        T & front (size_t i = 0)                { return ArrayView<T>::front(i);      }
-        T const & back (size_t i = 0) const     { return ArrayView<T>::back(i);       }
-        T & back (size_t i = 0)                 { return ArrayView<T>::back(i);       }
+        std::size_t size () const                    { return ArrayView<T>::size();        }
+        T const & operator [] (std::size_t i) const  { return ArrayView<T>::operator[](i); }
+        T & operator [] (std::size_t i)              { return ArrayView<T>::operator[](i); }
+        T const * data () const                      { return ArrayView<T>::data();        }
+        T * data ()                                  { return ArrayView<T>::data();        }
+        const_iterator begin () const                { return ArrayView<T>::begin();       }
+        iterator begin ()                            { return ArrayView<T>::begin();       }
+        const_iterator end () const                  { return ArrayView<T>::end();         }
+        iterator end ()                              { return ArrayView<T>::end();         }
+        T const & front (std::size_t i = 0) const    { return ArrayView<T>::front(i);      }
+        T & front (std::size_t i = 0)                { return ArrayView<T>::front(i);      }
+        T const & back (std::size_t i = 0) const     { return ArrayView<T>::back(i);       }
+        T & back (std::size_t i = 0)                 { return ArrayView<T>::back(i);       }
         
         //
         // OpenCL intrinsics
@@ -171,12 +171,12 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
         
         CLArray ()
             : CLArrayView<T>() {}
-        CLArray (size_t n, T x = T(0))
-            : CLArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < n; i++) (*this)[i] = x; }
-        CLArray (ArrayView<T> v, size_t i = 0, size_t n = 0)
-            : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n)) { for (size_t j = 0; j < size(); j++) (*this)[j] = v[i+j]; }
+        CLArray (std::size_t n, T x = T(0))
+            : CLArrayView<T>(n, Alloc::alloc(n)) { for (std::size_t i = 0; i < n; i++) (*this)[i] = x; }
+        CLArray (ArrayView<T> v, std::size_t i = 0, std::size_t n = 0)
+            : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n)) { for (std::size_t j = 0; j < size(); j++) (*this)[j] = v[i+j]; }
         CLArray (std::initializer_list<T> list)
-            : CLArrayView<T>(list.size(), Alloc::alloc(list.size())) { size_t i = 0; for (auto it = list.begin(); it != list.end(); it++) (*this)[i++] = *it; }
+            : CLArrayView<T>(list.size(), Alloc::alloc(list.size())) { std::size_t i = 0; for (auto it = list.begin(); it != list.end(); it++) (*this)[i++] = *it; }
         CLArray (CLArray<T,Alloc> && rvrf)
             : CLArrayView<T>(std::move(rvrf)) {}
         
@@ -197,19 +197,19 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
         // STL interface (except changes in size -- we don't want to bother with GPU reallocation)
         //
         
-        size_t size () const                        { return CLArrayView<T>::size();        }
-        T const & operator [] (size_t i) const      { return CLArrayView<T>::operator[](i); }
-        T & operator [] (size_t i)                  { return CLArrayView<T>::operator[](i); }
-        T const * data () const                     { return CLArrayView<T>::data();        }
-        T * data ()                                 { return CLArrayView<T>::data();        }
-        const_iterator begin () const               { return CLArrayView<T>::begin();       }
-        iterator begin ()                           { return CLArrayView<T>::begin();       }
-        const_iterator end () const                 { return CLArrayView<T>::end();         }
-        iterator end ()                             { return CLArrayView<T>::end();         }
-        T const & front (size_t i = 0) const        { return CLArrayView<T>::front(i);      }
-        T & front (size_t i = 0)                    { return CLArrayView<T>::front(i);      }
-        T const & back (size_t i = 0) const         { return CLArrayView<T>::back(i);       }
-        T & back (size_t i = 0)                     { return CLArrayView<T>::back(i);       }
+        std::size_t size () const                        { return CLArrayView<T>::size();        }
+        T const & operator [] (std::size_t i) const      { return CLArrayView<T>::operator[](i); }
+        T & operator [] (std::size_t i)                  { return CLArrayView<T>::operator[](i); }
+        T const * data () const                          { return CLArrayView<T>::data();        }
+        T * data ()                                      { return CLArrayView<T>::data();        }
+        const_iterator begin () const                    { return CLArrayView<T>::begin();       }
+        iterator begin ()                                { return CLArrayView<T>::begin();       }
+        const_iterator end () const                      { return CLArrayView<T>::end();         }
+        iterator end ()                                  { return CLArrayView<T>::end();         }
+        T const & front (std::size_t i = 0) const        { return CLArrayView<T>::front(i);      }
+        T & front (std::size_t i = 0)                    { return CLArrayView<T>::front(i);      }
+        T const & back (std::size_t i = 0) const         { return CLArrayView<T>::back(i);       }
+        T & back (std::size_t i = 0)                     { return CLArrayView<T>::back(i);       }
         
         //
         // OpenCL intrinsics

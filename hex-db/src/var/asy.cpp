@@ -116,7 +116,7 @@ bool SpinAsymmetry::run
         "#     E = " << E/efactor << " " << unit_name(Eunits)
                      << " ordered by angle in " << unit_name(Aunits) << "\n" <<
         "# θ\t dσ\n";
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
         std::cout << angles[i] << "\t" << asy[i] << "\t" << dcs0[i] << "\t" << dcs1[i] << "\n";
     
     return true;

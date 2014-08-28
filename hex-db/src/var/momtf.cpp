@@ -183,7 +183,7 @@ bool MomentumTransfer::run
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
-        for (size_t i = 0; i < eta_energies.size(); i++)
+        for (std::size_t i = 0; i < eta_energies.size(); i++)
             std::cout << eta_energies[i] / efactor << "\t" << eta[i] * lfactor * lfactor << "\n";
     }
     else
@@ -192,7 +192,7 @@ bool MomentumTransfer::run
         eta = interpolate (eta_energies, eta, energies * efactor);
         
         // output
-        for (size_t i = 0; i < energies.size(); i++)
+        for (std::size_t i = 0; i < energies.size(); i++)
             std::cout << energies[i] << "\t" << eta[i] * lfactor * lfactor << "\n";
     }
     

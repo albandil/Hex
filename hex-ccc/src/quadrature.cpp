@@ -30,7 +30,7 @@ QuadratureRule::QuadratureRule (LaguerreBasis const & basis, double E)
     maxpell_ = basis.size() - 1; // ( FIXME : equal to "maxell" now )
     
     // get iterator
-    size_t pos = 0;
+    std::size_t pos = 0;
     
     // for all angular momenta of the basis
     for (int ell = 0; ell < basis.size(); ell++)
@@ -120,7 +120,7 @@ QuadratureRule::QuadratureRule (LaguerreBasis const & basis, double E)
     
     // sanity check
 #ifndef NDEBUG
-    size_t npoints_total = std::accumulate(npoints_.begin(), npoints_.end(), 0);
+    std::size_t npoints_total = std::accumulate(npoints_.begin(), npoints_.end(), 0);
     assert (npoints_total == nodes_.size());
     assert (npoints_total == weights_.size());
 #endif
@@ -165,7 +165,7 @@ const rArrayView QuadratureRule::nodes (int ell, int l, int n) const
     assert (ell < 0 or n <= basis_.size(ell));
     assert (n != 0);
     
-    size_t first, last;
+    std::size_t first, last;
     
     if (l < 0)
     {
@@ -216,7 +216,7 @@ const rArrayView QuadratureRule::weights (int ell, int l, int n) const
     assert (ell < 0 or n <= basis_.size(ell));
     assert (n != 0);
     
-    size_t first, last;
+    std::size_t first, last;
     
     if (l < 0)
     {

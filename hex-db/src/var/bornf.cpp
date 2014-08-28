@@ -139,11 +139,11 @@ bool BornFullTMatrix::run
     
     // for all angles
     cArray T_out(angles.size());
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
     {
         // for all impact energies evaluate the T-matrix
         cArray Ti(E_arr.size());
-        for (size_t ie = 0; ie < E_arr.size(); ie++)
+        for (std::size_t ie = 0; ie < E_arr.size(); ie++)
             Ti[ie] = cheb_arr[ie].clenshaw(angles[i], cheb_arr[ie].tail(1e-8));
         
         // interpolate
@@ -160,7 +160,7 @@ bool BornFullTMatrix::run
         "# ordered by angle in " << unit_name(Aunits) <<
         "# \n" <<
         "# angle\t Re TB\t Im TB\n";
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
     {
         std::cout << 
             angles[i] << "\t" << 

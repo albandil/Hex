@@ -143,7 +143,7 @@ bool IonizationF::run
     
     // for all energy shares
     cArray f_out(Eshare.size());
-    for (size_t i = 0; i < Eshare.size(); i++)
+    for (std::size_t i = 0; i < Eshare.size(); i++)
     {
         // initialize k₁ and k₂ so that
         //   1) (k₁)² + (k₂)² = Ei
@@ -153,7 +153,7 @@ bool IonizationF::run
         
         // for all impact energies evaluate the radial part
         cArray f0(E_arr.size());
-        for (size_t ie = 0; ie < E_arr.size(); ie++)
+        for (std::size_t ie = 0; ie < E_arr.size(); ie++)
             f0[ie] = cheb_arr[ie].clenshaw(k1[ie], cheb_arr[ie].tail(1e-8)) / gsl_sf_pow_int(k1[ie] * k2[ie], 2);
         
         // interpolate
@@ -170,7 +170,7 @@ bool IonizationF::run
         "# ordered by energy share " << 
         "# \n" <<
         "# Eshare\t Re f\t Im f\n";
-    for (size_t i = 0; i < Eshare.size(); i++)
+    for (std::size_t i = 0; i < Eshare.size(); i++)
     {
         std::cout << 
             Eshare[i] << "\t" << 

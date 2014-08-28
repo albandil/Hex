@@ -52,7 +52,7 @@ PotentialMatrix::PotentialMatrix
     std::cout << "Precomputing potential matrix...\n\n";
     
     // matrix indices
-    size_t irow = 0, icol = 0;
+    std::size_t irow = 0, icol = 0;
     
     // row iterations
 //     # pragma omp parallel for collapse (3)

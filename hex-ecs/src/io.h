@@ -167,7 +167,7 @@ class InputFile
             
             // projectile momenta
             ki.resize(Ei.size());
-            for (size_t i = 0; i < Ei.size(); i++)
+            for (std::size_t i = 0; i < Ei.size(); i++)
                 ki[i] = sqrt(Ei[i]);
         }
         

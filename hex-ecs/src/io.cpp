@@ -256,9 +256,9 @@ void InputFile::read (std::ifstream & inf)
     std::vector<double> rknots_begin, rknots_end, rknots_samples;
     while ((x = ReadNext<double>(inf).val) != -1.)
         rknots_begin.push_back(x);
-    for (size_t i = 0; i < rknots_begin.size(); i++)
+    for (std::size_t i = 0; i < rknots_begin.size(); i++)
         rknots_end.push_back(ReadNext<double>(inf).val);
-    for (size_t i = 0; i < rknots_begin.size(); i++)
+    for (std::size_t i = 0; i < rknots_begin.size(); i++)
         rknots_samples.push_back(ReadNext<double>(inf).val);
     
     // construct real knot sequence
@@ -285,9 +285,9 @@ void InputFile::read (std::ifstream & inf)
     std::vector<double> cknots_begin, cknots_end, cknots_samples;
     while ((x = ReadNext<double>(inf).val) != -1.)
         cknots_begin.push_back(x);
-    for (size_t i = 0; i < cknots_begin.size(); i++)
+    for (std::size_t i = 0; i < cknots_begin.size(); i++)
         cknots_end.push_back(ReadNext<double>(inf).val);
-    for (size_t i = 0; i < cknots_begin.size(); i++)
+    for (std::size_t i = 0; i < cknots_begin.size(); i++)
         cknots_samples.push_back(ReadNext<double>(inf).val);
     
     // construct complex(-to-become) knot sequence
@@ -325,10 +325,10 @@ void InputFile::read (std::ifstream & inf)
         lis.push_back(idata);
     
     // - magnetic quantum number
-    for (size_t i = 0; i < lis.size(); i++)
+    for (std::size_t i = 0; i < lis.size(); i++)
         mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
-    for (size_t i = 0; i < lis.size(); i++)
+    for (std::size_t i = 0; i < lis.size(); i++)
     {
         for (unsigned i = 0; i < lis.size(); i++)
         for (int li = 0; li < ni; li++)
@@ -372,7 +372,7 @@ void InputFile::read (std::ifstream & inf)
         nfs.push_back(y);
     
     // - orbital angular momentum
-    for (size_t i = 0; i < nfs.size(); i++)
+    for (std::size_t i = 0; i < nfs.size(); i++)
         lfs.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
     // - construct final states
@@ -421,9 +421,9 @@ void InputFile::read (std::ifstream & inf)
     
     while ((x = ReadNext<double>(inf).val) != -1.)
         Ei_begin.push_back(x);
-    for (size_t i = 0; i < Ei_begin.size(); i++)
+    for (std::size_t i = 0; i < Ei_begin.size(); i++)
         Ei_end.push_back(ReadNext<double>(inf).val);
-    for (size_t i = 0; i < Ei_begin.size(); i++)
+    for (std::size_t i = 0; i < Ei_begin.size(); i++)
         Ei_samples.push_back(ReadNext<double>(inf).val);
     
     // construct energy sequence
@@ -470,7 +470,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     rArray grid;    // real evaluation grid
     
     // size of solution (l,l)-segment
-    size_t N = bspline.Nspline() * bspline.Nspline();
+    std::size_t N = bspline.Nspline() * bspline.Nspline();
     
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
     

@@ -132,7 +132,7 @@ bool TripleDifferentialCrossSection::run
     
     // for all directions and energy shares evaluate the amplitude
     rArray tdcs(dirs.size());
-    for (size_t idir = 0; idir < dirs.size(); idir++)
+    for (std::size_t idir = 0; idir < dirs.size(); idir++)
     {
         // compute energy sharing factor
         double Eshare = 1. / (1 + dirs[idir].second.z / dirs[idir].first.z);
@@ -147,10 +147,10 @@ bool TripleDifferentialCrossSection::run
         cArray ampls0(E_arr.size());
         
         // for all impact energies
-        for (size_t ie = 0; ie < E_arr.size(); ie++)
+        for (std::size_t ie = 0; ie < E_arr.size(); ie++)
         {
             // for all angular momenta
-            for (size_t il = 0; il < Lll_arr[ie].size(); il++)
+            for (std::size_t il = 0; il < Lll_arr[ie].size(); il++)
             {
                 // get angular quantum numbers
                 int  L = std::get<0>(Lll_arr[ie][il]);
@@ -192,7 +192,7 @@ bool TripleDifferentialCrossSection::run
         "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
         "# \n" <<
         "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ\tφ\n";
-    for (size_t i = 0; i < dirs.size(); i++)
+    for (std::size_t i = 0; i < dirs.size(); i++)
     {
         // projectile direction
         geom::vec3d ei = { 0., 0., 1. };

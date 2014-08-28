@@ -193,13 +193,13 @@ bool ExtrapolatedCrossSection::run
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
-        for (size_t i = 0; i < Efull.size(); i++)
+        for (std::size_t i = 0; i < Efull.size(); i++)
             std::cout << Efull[i] / efactor << "\t" << xcs[i]*lfactor*lfactor << "\t" << ccs[i]*lfactor*lfactor << "\n";
     }
     else
     {
         // output
-        for (size_t i = 0; i < energies.size(); i++)
+        for (std::size_t i = 0; i < energies.size(); i++)
             std::cout << energies[i] << "\t" << xcs[i]*lfactor*lfactor << "\t" << ccs[i]*lfactor*lfactor << "\n";
     }
     

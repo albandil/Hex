@@ -145,7 +145,7 @@ bool TMatrixB::run
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n" <<
         "# E\t Re T\t Im T\n";
-    for (size_t i = 0; i < energies.size(); i++)
+    for (std::size_t i = 0; i < energies.size(); i++)
     {
         std::cout << 
             energies[i] << "\t" << 

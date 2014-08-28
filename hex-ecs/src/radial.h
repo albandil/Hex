@@ -266,7 +266,7 @@ class RadialIntegrals
             int order = bspline_.order();
             
             // reserve space for the output array
-            size_t size = Nspline * Nenergy * (maxell + 1);
+            std::size_t size = Nspline * Nenergy * (maxell + 1);
             cArray res(size);
             
             // per interval
@@ -352,7 +352,7 @@ class RadialIntegrals
             return R_tr_dia_[i];
         }
         
-        size_t maxlambda() const { return R_tr_dia_.size() - 1; }
+        std::size_t maxlambda() const { return R_tr_dia_.size() - 1; }
         
     private:
         

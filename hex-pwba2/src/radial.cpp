@@ -336,12 +336,12 @@ Complex Idir_allowed
     rArray const & ji, rArray const & Vni
 )
 {
-    size_t N = grid.size();
+    std::size_t N = grid.size();
     
     rArray inner_lower(N), inner_higher_re(N)/*, inner_higher_im(N)*/;
     
     # pragma omp parallel for firstprivate (N)
-    for (size_t i = 1; i < N; i++)
+    for (std::size_t i = 1; i < N; i++)
     {
         inner_lower[i] = Vni[i] * jn[i] * ji[i];
 //         inner_higher_im[i] = inner_lower[i];
@@ -361,7 +361,7 @@ Complex Idir_allowed
         
         // compute forward partial sums
         # pragma omp for
-        for (size_t i = 0; i < N; i++)
+        for (std::size_t i = 0; i < N; i++)
             inner_lower[i] = gsl_spline_eval_integ (spline, grid.front(), grid[i], acc);
         
         gsl_interp_accel_free (acc);
@@ -381,7 +381,7 @@ Complex Idir_allowed
         
         // compute backward partial sums
         # pragma omp for
-        for (size_t i = 0; i < N; i++)
+        for (std::size_t i = 0; i < N; i++)
             inner_higher_re[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
         
         gsl_interp_accel_free (acc);
@@ -397,7 +397,7 @@ Complex Idir_allowed
         
         // compute backward partial sums
         # pragma omp for
-        for (size_t i = 0; i < N; i++)
+        for (std::size_t i = 0; i < N; i++)
             inner_higher_im[i] = gsl_spline_eval_integ (spline, grid[i], grid.back(), acc);
         
         gsl_interp_accel_free (acc);

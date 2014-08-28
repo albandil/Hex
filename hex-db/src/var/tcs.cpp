@@ -149,7 +149,7 @@ bool TotalCrossSection::run
             interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_cspline);
         
         // output corrected cross section
-        for (size_t i = 0; i < E_arr.size(); i++)
+        for (std::size_t i = 0; i < E_arr.size(); i++)
             std::cout << E_arr[i] / efactor << "\t" << (sigmaBorn[i] + (sigma_arr[i] - sigmab_arr[i])) * lfactor * lfactor << "\n";
     }
     else
@@ -169,7 +169,7 @@ bool TotalCrossSection::run
         rArray cs = tcsB + (tcs - tcsb);
         
         // output
-        for (size_t i = 0; i < energies.size(); i++)
+        for (std::size_t i = 0; i < energies.size(); i++)
             std::cout << energies[i] << "\t" << (std::isfinite(cs[i]) ? cs[i] * lfactor * lfactor : 0.) << "\n";
     }
     

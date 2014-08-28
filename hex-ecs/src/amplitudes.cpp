@@ -599,7 +599,7 @@ std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
     
     // for all energies
     for (int Spin = 0; Spin <= 1; Spin++)
-    for (size_t ie = 0; ie < inp_.Ei.size(); ie++)
+    for (std::size_t ie = 0; ie < inp_.Ei.size(); ie++)
     {
         // compose filename of the data file for this solution
         SolutionIO reader (inp_.L, Spin, inp_.Pi, T.ni, T.li, T.mi, inp_.Ei[ie]);
@@ -647,7 +647,7 @@ std::pair<rArray,rArray> Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
     std::pair<rArray,rArray> sigma = std::make_pair(rArray(Nenergy),rArray(Nenergy));
     
     // for all energies and angular blocks
-    for (size_t ie = 0; ie < inp_.Ei.size(); ie++)
+    for (std::size_t ie = 0; ie < inp_.Ei.size(); ie++)
     for (unsigned ill = 0; ill < ang_.size(); ill++)
     {
         // maximal available momentum

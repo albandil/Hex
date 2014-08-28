@@ -82,7 +82,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView grid) const
     
     // rotate the grid
     cArray x(grid.size());
-    for (size_t i = 0; i < grid.size(); i++)
+    for (std::size_t i = 0; i < grid.size(); i++)
         x[i] = rotate(grid[i]);
     
     // iterators pointing to the left and right boundary of evaluation
@@ -134,9 +134,9 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
     
     // rotate the grids
     cArray x(xgrid.size()), y(ygrid.size());
-    for (size_t i = 0; i < xgrid.size(); i++)
+    for (std::size_t i = 0; i < xgrid.size(); i++)
         x[i] = rotate(xgrid[i]);
-    for (size_t i = 0; i < ygrid.size(); i++)
+    for (std::size_t i = 0; i < ygrid.size(); i++)
         y[i] = rotate(ygrid[i]);
     
     // evaluate B-splines on x-grid

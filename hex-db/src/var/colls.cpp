@@ -124,7 +124,7 @@ bool CollisionStrength::run
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
-        for (size_t i = 0; i < E_arr.size(); i++)
+        for (std::size_t i = 0; i < E_arr.size(); i++)
         {
             // kinematic variables to unscale the cross sections
             double ki = std::sqrt(E_arr[i]);
@@ -162,7 +162,7 @@ bool CollisionStrength::run
         rArray omegasB = energies * efactor * (2*li+1) * interpB / cs_prefactor;
         
         // output
-        for (size_t i = 0; i < energies.size(); i++)
+        for (std::size_t i = 0; i < energies.size(); i++)
             std::cout << energies[i] << "\t" << omegas[i] << "\t" << omegasB[i] << "\n";
     }
     

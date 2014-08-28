@@ -31,8 +31,8 @@ cArray IC (cArrayView const & A, lArrayView const & I, lArrayView const & P)
     cArray LD(A.size());
     
     // check lengths
-    assert(A.size() == (size_t)P.back());
-    assert(I.size() == (size_t)P.back());
+    assert(A.size() == (std::size_t)P.back());
+    assert(I.size() == (std::size_t)P.back());
     
     // current row
     int irow = 0;
@@ -236,7 +236,7 @@ extern "C" void zgelsd_
 
 void LapackLeastSquares (ColMatrix<Complex> const & A, cArrayView b)
 {
-    if ((size_t)A.rows() != b.size())
+    if ((std::size_t)A.rows() != b.size())
         throw exception ("[LapackLeastSquares] Matrix row count (%d) is different from RHS size (%d).", A.rows(), b.size());
     
     // set data to pass to Lapack
@@ -949,7 +949,7 @@ void GPUCGPreconditioner::update (double E)
     std::cout << "\tUpdate preconditioner..." << std::flush;
     
     // zero-pad diagonals of the diagonal DIA blocks
-    for (size_t ill = 0; ill < ang_.size(); ill++)
+    for (std::size_t ill = 0; ill < ang_.size(); ill++)
     {
         if (cmd_.outofcore)
         {
@@ -981,8 +981,8 @@ void GPUCGPreconditioner::update (double E)
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 {
     // shorthands
-    size_t Nspline = s_rad_.bspline().Nspline();
-    size_t Nsegsiz = Nspline * Nspline;
+    std::size_t Nspline = s_rad_.bspline().Nspline();
+    std::size_t Nsegsiz = Nspline * Nspline;
     
     for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
     {
@@ -1010,7 +1010,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         CLArray<Complex> invd (1. / dia_blocks_[ill].main_diagonal());  invd.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         
         // allocation (and upload) of an OpenCL array
-        auto new_opencl_array = [&](size_t n) -> CLArray<Complex>
+        auto new_opencl_array = [&](std::size_t n) -> CLArray<Complex>
         {
             // create array
             CLArray<Complex> a(n);
@@ -1321,309 +1321,3 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         lu_[iblock].drop();
     }
 }
-
-#if 0
-const std::string DICCGPreconditioner::name = "DIC";
-const std::string DICCGPreconditioner::description = "Block inversion using DIC-preconditioned conjugate gradients [not working].";
-
-void DICCGPreconditioner::setup()
-{
-    CGPreconditioner::setup();
-    DIC_.resize(ang_.size());
-}
-
-void DICCGPreconditioner::update(double E)
-{
-    CGPreconditioner::update(E);
-    
-    // diagonal incomplete Cholesky factorization
-    for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
-        DIC_[ill] = DIC(dia_blocks_[ill]);
-}
-
-#ifndef NO_LAPACK
-const std::string SPAICGPreconditioner::name = "SPAI";
-const std::string SPAICGPreconditioner::description = "Block inversion using SPAI-preconditioned conjugate gradients [not working].";
-
-void SPAICGPreconditioner::setup()
-{
-    // setup parent
-    NoPreconditioner::setup();
-    
-    // reserve space for preconditioner
-    spai_.resize(ang_.size());
-}
-
-void SPAICGPreconditioner::update (double E)
-{
-    // update parent
-    NoPreconditioner::update(E);
-    
-    std::cout << "\tCompute SPAI preconditioner... " << std::flush;
-    Timer::timer().start();
-    
-    // set diagonal pattern for the inverse
-    iArray diagset = dia_blocks_[0].diag();
-    
-    // for all diagonal blocks sitting on this CPU compute SPAI
-    for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
-        spai_[ill] = SPAI(dia_blocks_[ill], diagset).tocsr();
-    
-    int secs = Timer::timer().stop();
-    std::cout << "done in " << (secs / 60) << std::setw(2) << std::setfill('0') << (secs % 60) << "\n";
-}
-#endif
-
-const std::string TwoLevelPreconditioner::name = "two";
-const std::string TwoLevelPreconditioner::description = "Block inversion using conjugate gradients preconditioned by solution of coarse system [not working].";
-
-void TwoLevelPreconditioner::setup ()
-{
-    std::cout << "Setting up ML preconditioner.\n";
-    std::cout << "\t- rknots = " << p_bspline_.rknots() << "\n";
-    std::cout << "\t- cknots = " << p_bspline_.cknots() << "\n";
-    std::cout << "\t- B-spline count = " << p_bspline_.Nspline() << "\n\n";
-    
-    // setup parent
-    SSORCGPreconditioner::setup();
-    
-    // which lambdas to keep on this CPU TODO
-    Array<bool> lambdas (s_rad_.maxlambda() + 1, true);
-    
-    // compute radial integrals
-    p_rad_.setupOneElectronIntegrals();
-    p_rad_.setupTwoElectronIntegrals(par_, lambdas);
-    
-    // precompute kronecker products
-    p_S_kron_S_ = p_rad_.S().kron(p_rad_.S());
-    p_half_D_minus_Mm1_tr_kron_S_ = (0.5 * p_rad_.D() - p_rad_.Mm1_tr()).kron(p_rad_.S());
-    p_S_kron_half_D_minus_Mm1_tr_ = p_rad_.S().kron(0.5 * p_rad_.D() - p_rad_.Mm1_tr());
-    p_Mm2_kron_S_ = p_rad_.Mm2().kron(p_rad_.S());
-    p_S_kron_Mm2_ = p_rad_.S().kron(p_rad_.Mm2());
-    
-    // compute the transition overlap matrix
-    computeSigma_();
-}
-
-void TwoLevelPreconditioner::update (double E)
-{
-    // update parent
-    SSORCGPreconditioner::update(E);
-    
-    // resize arrays
-    p_csr_.resize(ang_.size());
-    p_lu_.resize(ang_.size());
-    
-    // use total angular momentum from parent
-    int L = NoPreconditioner::inp_.L;
-    
-    // construct hamiltonian blocks
-    for (size_t ill = 0; ill < ang_.size(); ill++) if (par_.isMyWork(ill))
-    {
-        int l1 = ang_[ill].first;
-        int l2 = ang_[ill].second;
-        
-        std::cout << "\t[" << par_.iproc() << "] Update preconditioner for block ("
-                  << l1 << "," << l2 << ")..." << std::flush;
-        
-        // start timer
-        Timer::timer().start();
-        
-        // construct DIA block
-        SymDiaMatrix p_dia = E * p_S_kron_S_
-            - p_half_D_minus_Mm1_tr_kron_S_
-            - p_S_kron_half_D_minus_Mm1_tr_
-            - (0.5 * l1 * (l1 + 1.)) * p_Mm2_kron_S_
-            - (0.5 * l2 * (l2 + 1.)) * p_S_kron_Mm2_;
-        for (unsigned lambda = 0; lambda <= p_rad_.maxlambda(); lambda++)
-        {
-            Complex f = computef(lambda,l1,l2,l1,l2,L);
-            if (f != 0.)
-                p_dia -= f * p_rad_.R_tr_dia(lambda);
-        }
-        
-        // convert DIA block to CSR and factorize
-        p_csr_[ill] = p_dia.tocoo().tocsr();
-        p_lu_[ill] = p_csr_[ill].factorize();
-        
-        // stop timer
-        int secs = Timer::timer().stop();
-        
-        // print info
-        std::cout << "\b\b\b in " << secs / 60 << ":" << std::setw(2) << std::setfill('0') << secs % 60
-                  << " (" << p_lu_[ill].size() / 1048576 << " MiB)\n";
-    }
-}
-
-Complex TwoLevelPreconditioner::computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const
-{
-    // get interval bounds
-    Complex t1 = p_bspline_.t(iknotp);
-    Complex t2 = p_bspline_.t(iknotp + 1);
-    
-    // get evaluation points and weights
-    cArray x = g_.p_points(qord, t1, t2);
-    cArray w = g_.p_weights(qord, t1, t2);
-    
-    // evaluate the B-splines
-    cArray Bp(qord), Bs(qord);
-    p_bspline_.B(ip, iknotp, qord, x.data(), Bp.data());
-    s_bspline_.B(is, iknots, qord, x.data(), Bs.data());
-    
-    // integrate
-    Complex sum = 0;
-    for (int i = 0; i < qord; i++)
-        sum += w[i] * Bp[i] * Bs[i];
-    return sum;
-}
-
-void TwoLevelPreconditioner::computeSigma_()
-{
-    // sizes
-    int Nss = s_bspline_.Nspline();
-//     int Nks = s_bspline_.Nknot();
-    int Nsp = p_bspline_.Nspline();
-    int Nkp = p_bspline_.Nknot();
-    int ords = s_bspline_.order();
-    int ordp = p_bspline_.order();
-    size_t N = Nss * Nsp;
-    
-    // quadrature order (use at least 2nd order rule)
-    int qord = std::max (2, (ords + ordp + 1) / 2);
-    
-    // allocate memory
-    spSigma = ColMatrix<Complex>(Nss, Nsp, cArray(N));
-    SspSigma = ColMatrix<Complex>(Nss, Nsp, cArray(N));
-    psSigma = ColMatrix<Complex>(Nsp, Nss, cArray(N));
-    SpsSigma = ColMatrix<Complex>(Nsp, Nss, cArray(N));
-    
-    // for all B-splines
-    for (int iss = 0; iss < Nss; iss++)
-    for (int isp = 0; isp < Nsp; isp++)
-    {
-        // element of the Sigma matrix
-        Complex elem = 0.;
-        
-        // for all preconditioner B-spline interknot intervals
-        for (int iknotp = isp; iknotp <= isp + ordp and iknotp < Nkp - 1; iknotp++)
-        {
-            // find corresponding solution basis knot
-            // WARNING : Assuming full multiplicity in zero and zero multiplicity elsewhere!
-            int iknots = iknotp + ords - 1;
-            
-            // skip non-existent intervals
-            if (iknots < 0)
-                continue;
-            
-            // check that the knot indices correspond
-            assert(p_bspline_.t(iknotp) == s_bspline_.t(iknots));
-            
-            // evaluate B-spline integral on this interval
-            elem += computeSigma_iknot_(qord, iss, iknots, isp, iknotp);
-        }
-        
-        // update the elements
-        spSigma(iss, isp) = psSigma(isp, iss) = elem;
-    }
-    
-    // compute inverse overlap matrices
-    CsrMatrix csrSs = s_rad_.S().tocoo().tocsr();
-    CsrMatrix csrSp = p_rad_.S().tocoo().tocsr();
-    CsrMatrix::LUft luSs = csrSs.factorize();
-    CsrMatrix::LUft luSp = csrSp.factorize();
-    
-    // multiply by S⁻¹(s)
-    for (int icol = 0; icol < spSigma.cols(); icol++)
-        SspSigma.col(icol) = luSs.solve(spSigma.col(icol));
-    for (int icol = 0; icol < psSigma.cols(); icol++)
-        SpsSigma.col(icol) = luSp.solve(psSigma.col(icol));
-    
-    // save the matrix
-    spSigma_ = RowMatrix<Complex>(SspSigma);
-    psSigma_ = RowMatrix<Complex>(SpsSigma);
-}
-
-void TwoLevelPreconditioner::rhs (const cArrayView chi, int ienergy, int instate) const
-{
-    NoPreconditioner::rhs(chi, ienergy, instate);
-}
-
-void TwoLevelPreconditioner::multiply (const cArrayView p, cArrayView q) const
-{
-    NoPreconditioner::multiply(p, q);
-}
-
-void TwoLevelPreconditioner::CG_prec (int iblock, const cArrayView rs, cArrayView zs) const
-{
-    // shorthands
-    int Nss = s_bspline_.Nspline();
-    int Nsp = p_bspline_.Nspline();
-
-    // reinterpret rs as a column matrix
-    ColMatrix<Complex> Rs (Nss, Nss, rs);
-    
-    // convert R^s to preconditioner basis
-    ColMatrix<Complex> Rp = (psSigma_ * (psSigma_ * Rs).T()).T();
-    
-    // solve the low-order system of equations
-    ColMatrix<Complex> Zp (Nsp, Nsp, p_lu_[iblock].solve(Rp.data()));
-    
-    // convert Z^p to solver basis
-    ColMatrix<Complex> Zs = (spSigma_ * (spSigma_ * Zp).T()).T();
-    
-    // use the result
-    zs = Zs.data();
-}
-
-const std::string MultiresPreconditioner::name = "res";
-const std::string MultiresPreconditioner::description = "Multi-resolution preconditioner [implementation not finished].";
-
-MultiresPreconditioner::MultiresPreconditioner (
-    Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
-){
-    // first order will be solved by ILU (-> ILUCGPreconditioner)
-    p_.push_back
-    (
-        new ILUCGPreconditioner
-        (
-            par, inp, ll,
-            Bspline
-            (
-                1,
-                sorted_unique(bspline.rknots(), 1),
-                bspline.ECStheta(),
-                sorted_unique(bspline.cknots(), 1)
-            ),
-            cmd
-        )
-    );
-    
-    // all other levels need just common radial data (-> NoPreconditioner)
-    for (int ord = 2; ord <= bspline.order(); ord++)
-    {
-        // construct preconditioner
-        p_.push_back
-        (
-            new NoPreconditioner
-            (
-                par, inp, ll,
-                Bspline
-                (
-                    ord,
-                    sorted_unique(bspline.rknots(), ord),
-                    bspline.ECStheta(),
-                    sorted_unique(bspline.cknots(), ord)
-                ),
-                cmd
-            )
-        );
-    }
-}
-
-void MultiresPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    // HOA WHOW... TODO
-    
-}
-
-#endif

@@ -341,7 +341,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_program program_;
         
         // size of a workgroup
-        size_t Nlocal_;
+        std::size_t Nlocal_;
         
         // computational kernels
         cl_kernel mmul_;
@@ -831,7 +831,7 @@ class Preconditioners
         /**
          * @brief Number of available preconditioners.
          */
-        static size_t size ()
+        static std::size_t size ()
         {
             return std::tuple_size<AvailableTypes>::value;
         }

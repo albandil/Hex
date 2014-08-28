@@ -680,7 +680,7 @@ class Preconditioners
         /**
          * @brief Number of available preconditioners.
          */
-        static size_t size ()
+        static std::size_t size ()
         {
             return std::tuple_size<AvailableTypes>::value;
         }

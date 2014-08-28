@@ -156,7 +156,7 @@ bool StokesParameters::run
         "# ordered by angle in " << unit_name(Aunits) << "\n"
         "# \n"
         "# θ\t λ\t R\t I\t P₁\t P₂\t P₃\t Pl\t γ\t P⁺\n";
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
     {
         std::cout << 
             angles[i] << "\t" << 

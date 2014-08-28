@@ -258,7 +258,7 @@ bool IntegralCrossSection::run
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
-        for (size_t i = 0; i < E_arr.size(); i++)
+        for (std::size_t i = 0; i < E_arr.size(); i++)
             std::cout << E_arr[i] / efactor << "\t" << sigma_arr[i] * lfactor * lfactor << "\n";
     }
     else
@@ -275,7 +275,7 @@ bool IntegralCrossSection::run
             interpolate_real(E_arr, sigmaB_arr, energies * efactor, gsl_interp_cspline);
         
         // output
-        for (size_t i = 0; i < energies.size(); i++)
+        for (std::size_t i = 0; i < energies.size(); i++)
             std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << std::endl;
     }
     

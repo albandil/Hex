@@ -150,7 +150,7 @@ bool TMatrix::run
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n" <<
         "# E\tRe T\tIm T\tRe TBorn\tIm TBorn\n";
-    for (size_t i = 0; i < energies.size(); i++)
+    for (std::size_t i = 0; i < energies.size(); i++)
     {
         std::cout << energies[i] << "\t" << 
             T_out[i].real()*lfactor << "\t" <<

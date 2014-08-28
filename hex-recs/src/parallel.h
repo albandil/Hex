@@ -126,7 +126,7 @@ class Parallel
          *               will be synchronized. If there are some elements more, they will be left
          *               untouched (and un-broadcast).
          */
-        template <class T> void sync (ArrayView<T> array, size_t chunksize, size_t Nchunk) const
+        template <class T> void sync (ArrayView<T> array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifndef NO_MPI
             if (active_)
@@ -134,7 +134,8 @@ class Parallel
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
                 {
                     // relevant process will broadcast this chunk's data
-                    MPI_Bcast (
+                    MPI_Bcast
+                    (
                         array.data() + ichunk * chunksize,
                         chunksize,
                         MPI_DOUBLE_COMPLEX,

@@ -135,7 +135,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
             // update value of "f"
             Complex Tmatrix  = interpolate(db_Ei, db_T_ell, {E})[0];
             Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
-            for (size_t i = 0; i < angles.size(); i++)
+            for (std::size_t i = 0; i < angles.size(); i++)
             {
                 Complex Y = -0.5*special::constant::inv_pi * special::sphY(ell, std::abs(M-mf), angles[i], 0.);
                 
@@ -174,7 +174,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         coeffs.fromBlob(cheb);
         db_bornf.push_back(Chebyshev<double,Complex>(coeffs, -1., 1.));
     }
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
     {
         // evaluate all energies for this angle
         cArray TE (db_Ei.size());
@@ -240,7 +240,7 @@ bool ScatteringAmplitude::run
         "# ordered by angle in " << unit_name(Aunits) << "\n"
         "# \n"
         "# θ\t Re f\t Im f\n";
-    for (size_t i = 0; i < angles.size(); i++)
+    for (std::size_t i = 0; i < angles.size(); i++)
     {
         std::cout << 
             angles[i] << "\t" << 

@@ -102,7 +102,7 @@ public:
      */
     double farRadius() const { return rf; }
     
-    size_t sampleCount() const { return grid.size(); }
+    std::size_t sampleCount() const { return grid.size(); }
     
     /// (debuging parameter) number of evaluations
     mutable unsigned Evaluations;

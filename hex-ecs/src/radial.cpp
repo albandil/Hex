@@ -144,7 +144,7 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
     int order = bspline_.order();
     
     int i, j, iknot;
-    size_t size = Nspline * (2 * order + 1) * (order + 1);
+    std::size_t size = Nspline * (2 * order + 1) * (order + 1);
     
     // (logarithms of) partial integral moments
     cArray m (size, Complex(0.,special::constant::Inf));

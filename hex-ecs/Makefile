@@ -46,11 +46,11 @@ OPENMPILIBS =
 # OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
 # ---------------------------------------------------------------------------- #
 
-OPENCLFLAGS = -DNO_OPENCL
+# OPENCLFLAGS = -DNO_OPENCL
 
 # - for AMD OpenCL
-# OPENCLFLAGS = -I/opt/AMDAPP/include
-# OPENCLLIBS = -lOpenCL
+OPENCLFLAGS = -I/opt/AMDAPP/include
+OPENCLLIBS = -lOpenCL
 
 # - for Intel OpenCL
 # OPENCLFLAGS = -I/opt/intel/opencl-1.2-3.1.1.11385/include
