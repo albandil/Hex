@@ -169,16 +169,51 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
         // basic constructors
         //
         
-        CLArray ()
-            : CLArrayView<T>() {}
-        CLArray (size_t n, T x = T(0))
-            : CLArrayView<T>(n, Alloc::alloc(n)) { for (size_t i = 0; i < n; i++) (*this)[i] = x; }
-        CLArray (ArrayView<T> v, size_t i = 0, size_t n = 0)
-            : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n)) { for (size_t j = 0; j < size(); j++) (*this)[j] = v[i+j]; }
-        CLArray (std::initializer_list<T> list)
-            : CLArrayView<T>(list.size(), Alloc::alloc(list.size())) { size_t i = 0; for (auto it = list.begin(); it != list.end(); it++) (*this)[i++] = *it; }
-        CLArray (CLArray<T,Alloc> && rvrf)
-            : CLArrayView<T>(std::move(rvrf)) {}
+        CLArray () : CLArrayView<T>()
+        {
+            // nothing to do
+        }
+        CLArray (size_t n, T x = T(0)) : CLArrayView<T>(n, Alloc::alloc(n))
+        {
+            for (std::size_t i = 0; i < n; i++)
+                (*this)[i] = x;
+        }
+        CLArray (ArrayView<T> v, size_t i = 0, size_t n = 0) : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n))
+        {
+            for (std::size_t j = 0; j < size(); j++)
+                (*this)[j] = v[i+j];
+        }
+        CLArray (std::initializer_list<T> list) : CLArrayView<T>(list.size(), Alloc::alloc(list.size()))
+        {
+            std::size_t i = 0;
+            for (auto it = list.begin(); it != list.end(); it++)
+                (*this)[i++] = *it;
+        }
+        CLArray (CLArray<T,Alloc> && rvrf) : CLArrayView<T>(std::move(rvrf))
+        {
+            // nothing to do
+        }
+        
+        //
+        // data assignment
+        //
+        
+        CLArray & operator = (const ArrayView<T> v)
+        {
+            // realloc memory if needed
+            if (size() != v.size())
+            {
+                Alloc::free(data());
+                ArrayView<T>::array_ = Alloc::alloc(v.size());
+                ArrayView<T>::N_ = v.size();
+            }
+            
+            // copy data
+            for (std::size_t j = 0; j < size(); j++)
+                (*this)[j] = v[j];
+            
+            return *this;
+        }
         
         //
         // destructor

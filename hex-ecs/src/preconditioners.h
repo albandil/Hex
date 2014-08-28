@@ -325,7 +325,6 @@ class GPUCGPreconditioner : public NoPreconditioner
     private:
         
         // diagonal blocks
-        mutable std::vector<CsrMatrix> csr_blocks_;
         mutable std::vector<cArray> block_;
         
         // OpenCL environment
@@ -336,7 +335,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_program program_;
         
         // size of a workgroup
-        size_t Nlocal_;
+        std::size_t Nlocal_;
         
         // computational kernels
         cl_kernel mmul_;
@@ -345,6 +344,16 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_kernel vnrm_;
         cl_kernel norm_;
         cl_kernel spro_;
+        cl_kernel sepp_;
+        
+        // auxiliary matrices
+        std::vector<CLArray<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
+        
+        // diagonal parts of one-electron hamiltonians
+        std::vector<CLArray<Complex>> Dl_;
+        
+        // current preconditioner energy
+        Complex E_;
 };
 #endif
 
@@ -624,208 +633,6 @@ class SPAICGPreconditioner : public CGPreconditioner
 #endif
 
 /**
- * @brief Two-resolution preconditioner.
- * 
- * This preconditioner class is inspired by the method of multi-resolution in the finite
- * difference computations. A high-order differential operator that gives rise to the
- * multi-diagonal matrix is initially solved in low order. The result is then used as
- * a preconditioner for the full, high-order method.
- * 
- * In the case of B-spline expansion, that is being used in Hex, the bandwidth of the
- * resulting matrix is given by the order of the B-splines. Analogously to the just
- * metioned method, we compute the solution in a sharper base (lower order), which is
- * computationally less demanding. The algorithm works as follows:
- * 
- * - In every step we are solving the equation @f$ \mathbf{M}^{(s)}\mathbf{z}^{(s)} = \mathbf{r}^{(s)} @f$.
- * - The matrix @f$ \mathbf{M}^{(s)} @f$ is the diagonal block
- *   @f$ E\mathbf{S}^{(s)}\otimes\mathbf{S}^{(s)} - \mathbf{H}^{(s)} @f$. The symbol "s"
- *   stands for solution B-spline basis.
- * - But we want just to compute the simplified system @f$ \mathbf{M}^{(p)}\mathbf{z}^{(p)} = \mathbf{r}^{(p)} @f$.
- *   The symbol "p" stands for preconditioner B-spline basis.
- * - The matrices contained in @f$ \mathbf{M}^{(p)} @f$ are computed in a low-order B-spline
- *   basis; these are the matrices @f$ \mathbf{S}^{(p)} @f$, @f$ \mathbf{D}^{(p)} @f$
- *   etc., whereas fhe original full-order matrices are @f$ \mathbf{S}^{(s)} @f$,
- *   @f$ \mathbf{D}^{(s)} @f$ etc.
- * - Before and after the solution of the simplified system we need to map the solutions
- *   between the bases. This is done by the equations
- *   @f[
- *          \mathbf{S}^{(p)}\otimes\mathbf{S}^{(p)} \mathbf{r}^{(p)}
- *          = \mathbb{\Sigma}^{(p,q)} \otimes \mathbb{\Sigma}^{(p,q)} \mathbf{r}^{(q)}
- *   @f]
- * - Together we have the sequence
- *   @f[
- *          \mathbf{S}^{(p)}\otimes\mathbf{S}^{(p)} \mathbf{r}^{(p)}
- *          = \mathbb{\Sigma}^{(p,s)} \otimes \mathbb{\Sigma}^{(p,s)} \mathbf{r}^{(s)}
- *   @f]
- *   @f[
- *          \mathbf{M}^{(p)}\mathbf{z}^{(p)} = \mathbf{r}^{(p)}
- *   @f]
- *   @f[
- *          \mathbf{S}^{(s)}\otimes\mathbf{S}^{(s)} \mathbf{z}^{(s)}
- *          = \mathbb{\Sigma}^{(s,p)} \otimes \mathbb{\Sigma}^{(s,p)} \mathbf{z}^{(p)}
- *   @f]
- *   instead of the single equation
- *   @f[
- *          \mathbf{M}^{(s)}\mathbf{z}^{(s)} = \mathbf{r}^{(s)} \ .
- *   @f]
- * 
- * The transition overlap matrix @f$ \mathbb{\Sigma}^{(p,q)} @f$ is defined in components
- * as
- * @f[
- *        \Sigma_{ij}^{(p,q)} = \int B_i^{(p)}(r) B_j^{(q)}(r) \mathrm{d}r \ .
- * @f]
- * The solution of transition equations can be recast into a matrix form of Kronecker product,
- * @f[
- *        \mathbf{S}^{(p)} \mathbf{R}^{(p)} \mathbf{S}^{(p)T} = \mathbb{\Sigma}^{(p,q)}\mathrm{Matrix}(\mathbf{r}^{(q)})\mathbb{\Sigma}^{(p,q)^T}
- *        \qquad\Rightarrow\qquad
- *        \mathbf{R}^{(p)} = \mathbf{S}^{(p)^{-1}} \mathbb{\Sigma}^{(p,q)} \mathrm{Matrix}(\mathbf{r}^{(q)}) \mathbb{\Sigma}^{(p,q)^T} \mathbf{S}^{(p)^{-T}}
- * @f]
- * where the word "Matrix" indicates that we want to split long vector into a square matrix. The resulting square matrix
- * @f$ \mathbf{R} @f$ will then have the same structure.
- */
-class TwoLevelPreconditioner : public SSORCGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        // constructor
-        TwoLevelPreconditioner (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & s_bspline,
-            CommandLine const & cmd
-        ) : SSORCGPreconditioner(par,inp,ll,s_bspline, cmd),
-            p_bspline_ (
-                1,                                     // use first order for preconditioner basis
-                sorted_unique(s_bspline.rknots(), 1),  // allow just one consecutive occurence
-                s_bspline.ECStheta(),                  // copy rotation point
-                sorted_unique(s_bspline.cknots(), 1)   // allow just one consecutive occurence
-            ),
-            p_rad_(p_bspline_), g_(p_bspline_)
-        {}
-        
-        // reuse parent definitions
-        RadialIntegrals const & rad () const { return SSORCGPreconditioner::rad(); }
-        void precondition (const cArrayView r, cArrayView z) const { SSORCGPreconditioner::precondition(r,z); }
-        
-        // declare own definitions
-        void setup();
-        void update (double E);
-        void rhs (cArrayView chi, int ienergy, int instate, int Spin) const;
-        void multiply (const cArrayView p, cArrayView q) const;
-        
-        // inner CG callback
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        
-    protected:
-        
-        // compute transfer matrix
-        void computeSigma_();
-        
-        // compute contribution to an element of the transfer matrix
-        Complex computeSigma_iknot_ (int qord, int is, int iknots, int ip, int iknotp) const;
-        
-        // transfer overlap matrix (s|p) multiplied from left by S⁻¹ (in s-basis)
-        RowMatrix<Complex> spSigma_;
-        
-        // transfer overlap matrix (p|s) multiplied from left by S⁻¹ (in p-basis)
-        RowMatrix<Complex> psSigma_;
-        
-        /// DEBUG
-        ColMatrix<Complex> spSigma, SspSigma;
-        ColMatrix<Complex> psSigma, SpsSigma;
-        
-        // preconditioner objects
-            
-            // - B-spline environment for the preconditioning
-            Bspline p_bspline_;
-            
-            // - radial integrals for the preconditioning
-            RadialIntegrals p_rad_;
-            
-            // diagonal blocks in the preconditioner basis
-            std::vector<CsrMatrix> p_csr_;
-            
-            // factorization of p_csr
-            std::vector<CsrMatrix::LUft> p_lu_;
-            
-            // - Kronecker products
-            SymDiaMatrix p_half_D_minus_Mm1_tr_kron_S_, p_S_kron_half_D_minus_Mm1_tr_,
-                         p_Mm2_kron_S_, p_S_kron_Mm2_, p_S_kron_S_;
-        
-        // integrator
-        GaussLegendre g_;
-};
-
-/**
- * @brief Multi-resolution (V-cycle) preconditioner.
- * 
- * @note Not implemented yet.
- */
-class MultiresPreconditioner : public PreconditionerBase
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        // constructor
-        MultiresPreconditioner (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        );
-        
-        // destructor
-        ~MultiresPreconditioner();
-        
-        // use data from the highest order
-        RadialIntegrals const & rad() const
-        {
-            return p_.back()->rad();
-        }
-        
-        // setup all levels
-        void setup () 
-        {
-            for (PreconditionerBase* p : p_)
-                p->setup();
-        }
-        
-        // update all levels
-        void update (double E)
-        {
-            for (PreconditionerBase* p : p_)
-                p->update(E);
-        }
-        
-        // use RHS from the highest preconditioner
-        void rhs (cArrayView chi, int ienergy, int instate, int Spin) const
-        {
-            p_.back()->rhs(chi, ienergy, instate, Spin);
-        }
-        
-        // multiply by the matrix of the highest order
-        void multiply (const cArrayView p, cArrayView q) const
-        {
-            p_.back()->multiply(p,q);
-        }
-        
-        // execute the preconditioner
-        void precondition (const cArrayView r, cArrayView z) const;
-        
-    private:
-        
-        // array of per-level preconditioners
-        std::vector<PreconditionerBase*> p_;
-};
-
-/**
  * @brief Preconditioner traits.
  * 
  * This class is used for accessing all available preconditioners. Preconditioner types and objects
@@ -868,10 +675,6 @@ class Preconditioners
 #endif
             SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
             SepCGPreconditioner         // Solve diagonal blocks by separate electrons preconditioned CG iterations.
-//             MultiresPreconditioner,     // Multi-resolution preconditioner.
-//             SPAICGPreconditioner,       // Solve diagonal blocks by SPAI-preconditioned CG iterations.
-//             TwoLevelPreconditioner,     // Solve diagonal blocks by two-level precondtioned CG iterations.
-//             DICCGPreconditioner         // Diagonal incomplete Cholesky factorization + CG iterations.
         > AvailableTypes;
         
         /**
@@ -889,17 +692,31 @@ class Preconditioners
          * to choose the correct preconditioner.
          */
         //@{
-        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose (
-            Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
-        ){
+        template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
+        (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline,
+            CommandLine const & cmd
+        )
+        {
             // check if i-th preconditioner is the right one
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
-            return (i == cmd.preconditioner) ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline, cmd) : choose<i+1>(par, inp, ll, bspline, cmd);
+            return   (i == cmd.preconditioner)
+                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline, cmd)
+                   : choose<i+1>(par, inp, ll, bspline, cmd);
         }
-        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose (
-            Parallel const & par, InputFile const & inp, std::vector<std::pair<int,int>> const & ll, Bspline const & bspline, CommandLine const & cmd
-        ){
+        template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
+        (
+            Parallel const & par,
+            InputFile const & inp,
+            std::vector<std::pair<int,int>> const & ll,
+            Bspline const & bspline,
+            CommandLine const & cmd
+        )
+        {
             // we visited all available preconditioners without success : return NULL pointer
             return nullptr;
         }

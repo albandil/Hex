@@ -45,11 +45,28 @@
  * 
  * Multiplies two complex numbers and returns the product.
  */
-inline double2 cpxm (double2 a, double2 b)
+inline double2 cmul (double2 a, double2 b)
 {
     double2 c;
     c.x = a.x * b.x - a.y * b.y;
     c.y = a.x * b.y + a.y * b.x;
+    return c;
+}
+
+/**
+ * @brief Complex division.
+ * 
+ * Divides two complex numbers and returns the fraction. No overflow
+ * checking is done.
+ */
+inline double2 cdiv (double2 a, double2 b)
+{
+    double2 c;
+    double b2 = b.x * b.x + b.y * b.y;
+    
+    c.x = (a.x * b.x + a.y * b.y) / b2;
+    c.y = (a.y * b.x - a.x * b.y) / b2;
+    
     return c;
 }
 
@@ -62,7 +79,7 @@ inline double2 cpxm (double2 a, double2 b)
 kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
 {
     uint i = get_global_id(0);
-    x[i] = cpxm(a,x[i]) + cpxm(b,y[i]);
+    x[i] = cmul(a,x[i]) + cmul(b,y[i]);
 }
 
 /**
@@ -74,7 +91,7 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
 kernel void vec_mul_vec (global double2 *a, global double2 *b, global double2 *c)
 {
     uint i = get_global_id(0);
-    c[i] = cpxm(a[i],b[i]);
+    c[i] = cmul(a[i],b[i]);
 }
 
 /**
@@ -211,11 +228,68 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
             // multiply the elements
             if (0 <= icol && icol < NCOL)
             {
-                yloc += cpxm(A[idiag * NROW + irow], x[icol]);
+                yloc += cmul(A[idiag * NROW + irow], x[icol]);
             }
         }
         
         // copy results to global memory
         y[irow] = yloc;
     }
+}
+
+void kron_dot (global double2 *A, global double2 *B, global double2 *v, global double2 *w, global double2 *C)
+{
+    // get worker's segment index
+    int seg = get_global_id(0);
+    
+    // for all rows of B
+    for (int irow = 0; irow < NSPLINE; irow++)
+    {
+        // scalar product of the current row of B and the worker's segment
+        double2 prod = 0;
+        for (int icol = 0; icol < NSPLINE; icol++)
+            prod = prod + cmul(B[irow * NSPLINE + icol],v[seg * NSPLINE + icol]);
+        C[irow * NSPLINE + seg] = prod;
+    }
+    
+    // wait for all threads
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    
+    // for all rows of C
+    for (int irow = 0; irow < NSPLINE; irow++)
+    {
+        // scalar product of the current row of A and C
+        double2 prod = 0;
+        for (int icol = 0; icol < NSPLINE; icol++)
+            prod = prod + cmul(A[seg * NSPLINE + icol],C[irow * NSPLINE + icol]);
+        w[seg * NSPLINE + irow] = prod;
+    }
+    
+    // wait for all threads
+    barrier(CLK_GLOBAL_MEM_FENCE);
+}
+
+kernel void sep_precond
+(
+    private double2 E,
+    global double2 *D1,  global double2 *D2,   // (short) arrays of length NSPLINE
+    global double2 *SC1, global double2 *SC2,  // matrices of size NSPLINE x NSPLINE
+    global double2 *CS1, global double2 *CS2,  // matrices of size NSPLINE x NSPLINE
+    global double2 *x,   global double2 *y,    // (long) arrays of length NSPLINE^2
+    global double2 *C                          // aux. matrix of size NSPLINE x NSPLINE
+)
+{
+    // y = (CS1 kron CS2) dot x
+    kron_dot(CS1, CS2, x, y, C);
+    
+    // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
+    int i = get_global_id(0);
+    for (int j = 0; j < NSPLINE; j++)
+        y[i * NSPLINE + j] = cdiv(y[i * NSPLINE + j], E - D1[i] - D2[j]);
+    
+    // wait for all threads
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    
+    // y = (SC1 kron SC2) dot y
+    kron_dot(SC1, SC2, y, y, C);
 }
