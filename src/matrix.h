@@ -524,8 +524,10 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
             T const * const restrict pv = v.begin() + icol * B.cols();
             
             // compute scalar product between the current row of B and the segment of v
+            T prod = 0;
             for (unsigned ielem = 0; ielem < B.cols(); ielem++)
-                pC[icol] += pB[ielem] * pv[ielem];
+                prod += pB[ielem] * pv[ielem];
+            pC[icol] = prod;
         }
     }
     
@@ -546,8 +548,10 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
             T const * const restrict pC = C.row(j).data();
             
             // compute scalar product between the rows
+            T prod = 0;
             for (unsigned ielem = 0; ielem < A.cols(); ielem++)
-                pw[j] += pA[ielem] * pC[ielem];
+                prod += pA[ielem] * pC[ielem];
+            pw[j] = prod;
         }
     }
     
