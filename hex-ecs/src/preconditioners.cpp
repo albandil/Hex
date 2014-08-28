@@ -13,11 +13,6 @@
 #include <iostream>
 #include <set>
 
-#ifndef NO_OPENBLAS
-    #include <omp.h>
-    extern "C" void openblas_set_num_threads (int);
-#endif
-
 #include "arrays.h"
 #include "gauss.h"
 #include "itersolve.h"
@@ -819,6 +814,7 @@ void GPUCGPreconditioner::setup ()
     
     // use device 0
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
+//     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
     clGetDeviceInfo (device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
     std::cout << "\tdevice: " << text << " ";
     clGetDeviceInfo (device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
@@ -851,11 +847,11 @@ void GPUCGPreconditioner::setup ()
     
     // setup compile flags
     std::ostringstream flags;
-    flags << "-cl-strict-aliasing -cl-fast-relaxed-math ";
-    flags << "-D ORDER="     << order     << " ";
-    flags << "-D NSPLINE="   << Nspline   << " ";
-    flags << "-D DIAGONALS=" << diagonals << " ";
-    flags << "-D NLOCAL="    << Nlocal_   << " ";
+    flags << " -cl-fast-relaxed-math ";
+    flags << " -D ORDER="     << order     << " ";
+    flags << " -D NSPLINE="   << Nspline   << " ";
+    flags << " -D DIAGONALS=" << diagonals << " ";
+    flags << " -D NLOCAL="    << Nlocal_   << " ";
     
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -1088,7 +1084,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish (queue_);
         };
-        auto inner_prec = [&](/*const*/ CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
+        auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
         {
             // multiply by approximate inverse block
             
@@ -1133,7 +1129,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         (
             rsegment,               // rhs
             zsegment,               // solution to be filled
-            cmd_.itertol,           // tolerance
+            cmd_.prec_itertol,      // tolerance
             0,                      // min. iterations
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
