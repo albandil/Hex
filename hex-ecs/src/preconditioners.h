@@ -344,7 +344,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         cl_kernel vnrm_;
         cl_kernel norm_;
         cl_kernel spro_;
-        cl_kernel sepp_;
+        cl_kernel krd1_, krd2_, krdv_;
         
         // auxiliary matrices
         std::vector<CLArray<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;

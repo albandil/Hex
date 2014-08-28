@@ -814,6 +814,8 @@ void GPUCGPreconditioner::setup ()
     std::cout << "\tplatform: " << text << " ";
     clGetPlatformInfo (platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")\n";
+    clGetPlatformInfo (platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
+    std::cout << "\tavailable version: " << text << std::endl;
     
     // use device 0
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
@@ -880,7 +882,9 @@ void GPUCGPreconditioner::setup ()
     vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
     norm_ = clCreateKernel(program_, "norm",        nullptr);
     spro_ = clCreateKernel(program_, "scalar_product", nullptr);
-    sepp_ = clCreateKernel(program_, "sep_precond", nullptr);
+    krd1_ = clCreateKernel(program_, "kron_dot1",   nullptr);
+    krd2_ = clCreateKernel(program_, "kron_dot2",   nullptr);
+    krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
     
     // resize arrays
     invsqrtS_Cl_.resize(maxell + 1);
@@ -996,6 +1000,11 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // iterations
     iArray n (l1_l2_.size());
     
+    // some OpenCL auxiliary storage arrays (used by kernels for temporary data)
+    CLArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+    CLArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+    CLArray<Complex> tmA (Nspline * Nspline);                  tmA.connect (context_, CL_MEM_READ_WRITE);
+    
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         int l1 = l1_l2_[ill].first;
@@ -1011,9 +1020,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // create OpenCL representation of segment views + transfer data to GPU memory
         CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-        CLArray<Complex> tmA (Nspline * Nspline);                  tmA.connect (context_, CL_MEM_READ_WRITE);
         
         // create OpenCL representation of the matrix block + transfer data to GPU memory
         CLArrayView<Complex> A (block_[ill]); A.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
@@ -1036,10 +1042,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     a * x + b * y -> z
-            clSetKernelArg (axby_, 0, sizeof(a),          &a);
-            clSetKernelArg (axby_, 1, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (axby_, 2, sizeof(b),          &b);
-            clSetKernelArg (axby_, 3, sizeof(y.handle()), &y.handle());
+            clSetKernelArg (axby_, 0, sizeof(a),      &a);
+            clSetKernelArg (axby_, 1, sizeof(cl_mem), &x.handle());
+            clSetKernelArg (axby_, 2, sizeof(b),      &b);
+            clSetKernelArg (axby_, 3, sizeof(cl_mem), &y.handle());
             clEnqueueNDRangeKernel (queue_, axby_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
@@ -1047,9 +1053,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     x * y -> tmp
-            clSetKernelArg (spro_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (spro_, 1, sizeof(y.handle()), &y.handle());
-            clSetKernelArg (spro_, 2, sizeof(tmp.handle()), &tmp.handle());
+            clSetKernelArg (spro_, 0, sizeof(cl_mem), &x.handle());
+            clSetKernelArg (spro_, 1, sizeof(cl_mem), &y.handle());
+            clSetKernelArg (spro_, 2, sizeof(cl_mem), &tmp.handle());
             clEnqueueNDRangeKernel (queue_, spro_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             tmp.EnqueueDownload(queue_);
             clFinish (queue_);
@@ -1061,8 +1067,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     |x|² -> nrm
-            clSetKernelArg (norm_, 0, sizeof(x.handle()), &x.handle());
-            clSetKernelArg (norm_, 1, sizeof(nrm.handle()), &nrm.handle());
+            clSetKernelArg (norm_, 0, sizeof(cl_mem), &x.handle());
+            clSetKernelArg (norm_, 1, sizeof(cl_mem), &nrm.handle());
             clEnqueueNDRangeKernel (queue_, norm_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             nrm.EnqueueDownload(queue_);
             clFinish (queue_);
@@ -1076,26 +1082,49 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //      b = A · a
-            clSetKernelArg (mmul_, 0, sizeof(A.handle()),  &A.handle());
-            clSetKernelArg (mmul_, 1, sizeof(a.handle()),  &a.handle());
-            clSetKernelArg (mmul_, 2, sizeof(b.handle()),  &b.handle());
+            clSetKernelArg (mmul_, 0, sizeof(cl_mem), &A.handle());
+            clSetKernelArg (mmul_, 1, sizeof(cl_mem), &a.handle());
+            clSetKernelArg (mmul_, 2, sizeof(cl_mem), &b.handle());
             clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish (queue_);
         };
         auto inner_prec = [&](/*const*/ CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
         {
             // multiply by approximate inverse block
-            clSetKernelArg (sepp_, 0, sizeof(Complex),      &E_);
-            clSetKernelArg (sepp_, 1, sizeof(Dl_[l1].handle()),      &Dl_[l1].handle());
-            clSetKernelArg (sepp_, 2, sizeof(Dl_[l2].handle()),      &Dl_[l2].handle());
-            clSetKernelArg (sepp_, 3, sizeof(invsqrtS_Cl_[l1].handle()),      &invsqrtS_Cl_[l1].handle());
-            clSetKernelArg (sepp_, 4, sizeof(invsqrtS_Cl_[l2].handle()),      &invsqrtS_Cl_[l2].handle());
-            clSetKernelArg (sepp_, 5, sizeof(invCl_invsqrtS_[l1].handle()),      &invCl_invsqrtS_[l1].handle());
-            clSetKernelArg (sepp_, 6, sizeof(invCl_invsqrtS_[l2].handle()),      &invCl_invsqrtS_[l2].handle());
-            clSetKernelArg (sepp_, 7, sizeof(x.handle()),  &x.handle());
-            clSetKernelArg (sepp_, 8, sizeof(y.handle()),  &y.handle());
-            clSetKernelArg (sepp_, 9, sizeof(tmA.handle()),      &tmA.handle());
-            clEnqueueNDRangeKernel (queue_, sepp_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            
+            clSetKernelArg (krd1_, 0, sizeof(cl_mem), &invCl_invsqrtS_[l1].handle());
+            clSetKernelArg (krd1_, 1, sizeof(cl_mem), &invCl_invsqrtS_[l2].handle());
+            clSetKernelArg (krd1_, 2, sizeof(cl_mem), &x.handle());
+            clSetKernelArg (krd1_, 3, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel (queue_, krd1_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
+            
+            clSetKernelArg (krd2_, 0, sizeof(cl_mem), &invCl_invsqrtS_[l1].handle());
+            clSetKernelArg (krd2_, 1, sizeof(cl_mem), &invCl_invsqrtS_[l2].handle());
+            clSetKernelArg (krd2_, 2, sizeof(cl_mem), &y.handle());
+            clSetKernelArg (krd2_, 3, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel (queue_, krd2_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
+            
+            clSetKernelArg (krdv_, 0, sizeof(Complex), &E_);
+            clSetKernelArg (krdv_, 1, sizeof(cl_mem),  &Dl_[l1].handle());
+            clSetKernelArg (krdv_, 2, sizeof(cl_mem),  &Dl_[l2].handle());
+            clSetKernelArg (krdv_, 3, sizeof(cl_mem),  &y.handle());
+            clEnqueueNDRangeKernel (queue_, krdv_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
+            
+            clSetKernelArg (krd1_, 0, sizeof(cl_mem), &invsqrtS_Cl_[l1].handle());
+            clSetKernelArg (krd1_, 1, sizeof(cl_mem), &invsqrtS_Cl_[l2].handle());
+            clSetKernelArg (krd1_, 2, sizeof(cl_mem), &y.handle());
+            clSetKernelArg (krd1_, 3, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel (queue_, krd1_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clFinish (queue_);
+            
+            clSetKernelArg (krd2_, 0, sizeof(cl_mem), &invsqrtS_Cl_[l1].handle());
+            clSetKernelArg (krd2_, 1, sizeof(cl_mem), &invsqrtS_Cl_[l2].handle());
+            clSetKernelArg (krd2_, 2, sizeof(cl_mem), &y.handle());
+            clSetKernelArg (krd2_, 3, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel (queue_, krd2_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
         
@@ -1123,9 +1152,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         // free GPU memory
         rsegment.disconnect();
         zsegment.disconnect();
-        tmp.disconnect();
-        nrm.disconnect();
-        tmA.disconnect();
         A.disconnect();
         
         if (cmd_.outofcore)
@@ -1134,6 +1160,11 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             block_[ill].drop();
         }
     }
+    
+    // free GPU memory
+    tmp.disconnect();
+    nrm.disconnect();
+    tmA.disconnect();
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
