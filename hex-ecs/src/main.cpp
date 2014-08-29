@@ -224,10 +224,20 @@ if (cmd.itinerary & CommandLine::StgSolve)
             int li = std::get<1>(inp.instates[instate]);
             int mi = std::get<2>(inp.instates[instate]);
             
-            // skip angular forbidden states
+            // check if the right hand side will be zero for this instate
             bool allowed = false;
             for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
+            {
+                // does this combination conserve parity?
+                if ((inp.L + li + l) % 2 != inp.Pi)
+                    continue;
+                
+                // does this combination have valid 'mi' for this partial wave?
+                if (special::ClebschGordan(li,mi,l,0,inp.L,mi) != 0)
+                    allowed = true;
+            }
+            
+            // skip angular forbidden states
             if (not allowed)
                 continue;
             
@@ -252,12 +262,14 @@ if (cmd.itinerary & CommandLine::StgSolve)
             double chi_norm = chi.norm();
             if (chi_norm == 0.)
             {
+                // this should not happen, hopefully we already checked
                 std::cout << "\t! Right-hand-side is zero, check L, Π and nL." << std::endl;
                 computations_done++;
                 continue;
             }
             if (not std::isfinite(chi_norm))
             {
+                // this is a numerical problem, probably in evaluation of special functions (P, j)
                 std::cout << "\t! Right hand side has invalid norm (" << chi_norm << ")." << std::endl;
                 computations_done++;
                 continue;
@@ -289,8 +301,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
             iterations_done += iterations;
             computations_done++;
             
-            // save solution to disk
-            reader.save(current_solution);
+            // save solution to disk (if valid)
+            if (std::isfinite(current_solution.norm()))
+                reader.save(current_solution);
             
         } // end of For Spin, instate
         
