@@ -328,23 +328,20 @@ void InputFile::read (std::ifstream & inf)
     for (std::size_t i = 0; i < lis.size(); i++)
         mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
-    for (std::size_t i = 0; i < lis.size(); i++)
+    for (unsigned i = 0; i < lis.size(); i++)
+    for (int li = 0; li < ni; li++)
+    for (int mi = -li; mi <= li; mi++)
     {
-        for (unsigned i = 0; i < lis.size(); i++)
-        for (int li = 0; li < ni; li++)
-        for (int mi = -li; mi <= li; mi++)
-        {
-            // skip unused orbital angular momenta
-            if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
-                continue;
-            
-            // skip unused angular momentum projections
-            if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
-                continue;
-            
-            // add this initial state
-            instates.push_back(std::make_tuple(ni,li,mi));
-        }
+        // skip unused orbital angular momenta
+        if (lis[i].val != li and not (lis[i].flags & ReadItem<int>::asterisk))
+            continue;
+        
+        // skip unused angular momentum projections
+        if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
+            continue;
+        
+        // add this initial state
+        instates.push_back(std::make_tuple(ni,li,mi));
     }
     
     // print info

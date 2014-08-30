@@ -741,6 +741,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
+    std::cout << std::setw(4) << (*std::min_element(n.begin(), n.end()));
     std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
     std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
@@ -1164,6 +1165,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
+    std::cout << std::setw(4) << (*std::min_element(n.begin(), n.end()));
     std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
     std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     

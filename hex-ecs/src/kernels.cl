@@ -240,13 +240,12 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
 /**
  * SEP preconditioner
  * 
- * 1) kron_dot1(CS1,CS2,r,tmp)
- * 2) kron_dot2(CS1,CS2,t,tmp)
+ * 1) kron_dot1(CS1,CS2,r,C)
+ * 2) kron_dot2(CS1,CS2,t,C)
  * 3) kron_div (E,D1,D2,t)
- * 4) kron_dot1(SC1,SC2,t,tmp)
- * 5) kron_dot2(SC1,SC2,z,tmp)
+ * 4) kron_dot1(SC1,SC2,t,C)
+ * 5) kron_dot2(SC1,SC2,z,C)
  */
-
 kernel void kron_dot1 (global double2 *A, global double2 *B, global double2 *v, global double2 *C)
 {
     // get worker's segment index
