@@ -509,7 +509,7 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
     
     // for all rows of B
     # pragma omp parallel for
-    for (unsigned irow = 0; irow < B.rows(); irow++)
+    for (int irow = 0; irow < B.rows(); irow++)
     {
         // get current row of B
         T const * const restrict pB = B.row(irow).data();
@@ -518,14 +518,14 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
         T       * const restrict pC = C.row(irow).data();
         
         // for all segments of v
-        for (unsigned icol = 0; icol < A.cols(); icol++)
+        for (int icol = 0; icol < A.cols(); icol++)
         {
             // get current segment of v
             T const * const restrict pv = v.begin() + icol * B.cols();
             
             // compute scalar product between the current row of B and the segment of v
             T prod = 0;
-            for (unsigned ielem = 0; ielem < B.cols(); ielem++)
+            for (int ielem = 0; ielem < B.cols(); ielem++)
                 prod += pB[ielem] * pv[ielem];
             pC[icol] = prod;
         }
@@ -533,7 +533,7 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
     
     // for all rows of A
     # pragma omp parallel for
-    for (unsigned i = 0; i < A.rows(); i++)
+    for (int i = 0; i < A.rows(); i++)
     {
         // get current row of A
         T const * const restrict pA = A.row(i).data();
@@ -542,14 +542,14 @@ template <class T> NumberArray<T> kron_dot (RowMatrix<T> const & A, RowMatrix<T>
         T       * const restrict pw = w.begin() + i * C.rows();
         
         // for all rows of C
-        for (unsigned j = 0; j < C.rows(); j++)
+        for (int j = 0; j < C.rows(); j++)
         {
             // get current row of C
             T const * const restrict pC = C.row(j).data();
             
             // compute scalar product between the rows
             T prod = 0;
-            for (unsigned ielem = 0; ielem < A.cols(); ielem++)
+            for (int ielem = 0; ielem < A.cols(); ielem++)
                 prod += pA[ielem] * pC[ielem];
             pw[j] = prod;
         }
