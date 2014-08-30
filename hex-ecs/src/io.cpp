@@ -374,8 +374,12 @@ void InputFile::read (std::ifstream & inf)
     
     // - construct final states
     for (unsigned f = 0; f < nfs.size(); f++)
-    for (int lf = 0; lf < nfs[f]; lf++)
+    for (int lf = 0; lf <= nfs[f]; lf++)
     {
+        // l=n only in ionization specification
+        if (lf == nfs[f] and nfs[f] != 0)
+            continue;
+        
         // skip unused orbital angular momenta
         if (lfs[f].val != lf and not (lfs[f].flags & ReadItem<int>::asterisk))
             continue;

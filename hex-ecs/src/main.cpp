@@ -214,10 +214,20 @@ if (cmd.itinerary & CommandLine::StgSolve)
             int li = std::get<1>(instate);
             int mi = std::get<2>(instate);
             
-            // skip angular forbidden states
+            // check if the right hand side will be zero for this instate
             bool allowed = false;
             for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-                allowed = allowed or special::ClebschGordan(li,mi,l,0,inp.L,mi);
+            {
+                // does this combination conserve parity?
+                if ((inp.L + li + l) % 2 != inp.Pi)
+                    continue;
+                
+                // does this combination have valid 'mi' for this partial wave?
+                if (special::ClebschGordan(li,mi,l,0,inp.L,mi) != 0)
+                    allowed = true;
+            }
+            
+            // skip angular forbidden states
             if (not allowed)
             {
                 std::cout << "\tInitial state li=" << li << ", mi=" << mi << " will be skipped (not allowed by total angular variables).\n";

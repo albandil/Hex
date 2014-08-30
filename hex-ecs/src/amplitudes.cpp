@@ -57,10 +57,20 @@ void Amplitudes::extract ()
         int nf = std::get<0>(outstate);
         int lf = std::get<1>(outstate);
         
-        // skip angular forbidden states
+        // check if the right hand side will be zero for this instate
         bool allowed = false;
         for (int l = abs(li - inp_.L); l <= li + inp_.L; l++)
-            allowed = allowed or special::ClebschGordan(li,mi,l,0,inp_.L,mi);
+        {
+            // does this combination conserve parity?
+            if ((inp_.L + li + l) % 2 != inp_.Pi)
+                continue;
+            
+            // does this combination have valid 'mi' for this partial wave?
+            if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
+                allowed = true;
+        }
+        
+        // skip angular forbidden states
         if (not allowed)
             continue;
         
@@ -70,7 +80,7 @@ void Amplitudes::extract ()
             // Discrete transition
             //
             
-            std::cout << format("\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::flush;
+            std::cout << format("\texc: (%d,%d,%d) -> (%d,%d,*) ",ni, li, mi, nf, lf) << std::endl;
             
             // compute radial integrals
             for (int mf = -lf; mf <= lf; mf++)
@@ -87,8 +97,6 @@ void Amplitudes::extract ()
                 // compute cross sections for this transition
                 sigma_S[transition] = computeSigma_(transition);
             }
-            
-            std::cout << " ok" << std::endl;
         }
         else
         {
@@ -96,7 +104,7 @@ void Amplitudes::extract ()
             // Ionization
             //
             
-            std::cout << format("\tion: (%d,%d,%d) -> ion ",ni, li, mi) << std::flush;
+            std::cout << format("\tion: (%d,%d,%d) -> ion ",ni, li, mi) << std::endl;
             
             // transition
             Transition transition = { ni, li, mi, 0, 0, 0 };
@@ -106,8 +114,6 @@ void Amplitudes::extract ()
             
             // compute σ
             sigma_S[transition] = computeSigmaIon_(transition);
-            
-            std::cout << " ok" << std::endl;
         }
     }
 }
@@ -197,20 +203,20 @@ void Amplitudes::writeSQL_files ()
         for (unsigned ill = 0; ill < ang_.size(); ill++) //??? or triangular
         {
             // save singlet data as BLOBs
-            fsql << format
-            (
-                "INSERT OR REPLACE INTO \"ionf\" VALUES (%d,%d,%d, %d,%d, %g, %d,%d, %s);",
-                inp_.ni, T.li, T.mi, inp_.L, 0, inp_.Ei[ie], ang_[ill].first, ang_[ill].second,
-                Xi_S0[ill * inp_.Ei.size() + ie].toBlob().c_str()
-            ) << std::endl;
+            fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+                 << inp_.ni << "," << T.li << "," << T.mi << ","
+                 << inp_.L << ", 0, " << inp_.Ei[ie] << ", "
+                 << ang_[ill].first << ", " << ang_[ill].second
+                 << Xi_S0[ill * inp_.Ei.size() + ie].toBlob().c_str() << ");"
+                 << std::endl;
             
             // save triplet data as BLOBs
-            fsql << format
-            (
-                "INSERT OR REPLACE INTO \"ionf\" VALUES (%d,%d,%d, %d,%d, %g, %d,%d, %s);",
-                inp_.ni, T.li, T.mi, inp_.L, 1, inp_.Ei[ie], ang_[ill].first, ang_[ill].second,
-                Xi_S1[ill * inp_.Ei.size() + ie].toBlob().c_str()
-            ) << std::endl;
+            fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
+                 << inp_.ni << "," << T.li << "," << T.mi << ","
+                 << inp_.L << ", 1, " << inp_.Ei[ie] << ", "
+                 << ang_[ill].first << ", " << ang_[ill].second
+                 << Xi_S1[ill * inp_.Ei.size() + ie].toBlob().c_str() << ");"
+                 << std::endl;
         }
     }
     
@@ -494,9 +500,9 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             /// DEBUG
             if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
             {
-                std::cerr << "Errors while evaluating Coulomb function:\n";
-                std::cerr << "\terr1 = " << err1 << "\n";
-                std::cerr << "\terr2 = " << err2 << "\n";
+                std::cerr << "Errors while evaluating Coulomb function:" << std::endl;
+                std::cerr << "\terr1 = " << err1 << std::endl;
+                std::cerr << "\terr2 = " << err2 << std::endl;
                 exit(-1);
             }
             ///
@@ -547,13 +553,13 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             
             /// DEBUG
             if (not std::isfinite(F1F2))
-                std::cerr << "F1F2 = " << F1F2 << "\n";
+                std::cerr << "F1F2 = " << F1F2 << std::endl;
             if (not std::isfinite(std::abs(ddrho_Psi)))
-                std::cerr << "ddrho_Psi = " << ddrho_Psi << "\n";
+                std::cerr << "ddrho_Psi = " << ddrho_Psi << std::endl;
             if (not std::isfinite(std::abs(Psi)))
-                std::cerr << "Psi = " << Psi << "\n";
+                std::cerr << "Psi = " << Psi << std::endl;
             if (not std::isfinite(ddrho_F1F2))
-                std::cerr << "ddrho_F1F2 = " << ddrho_F1F2 << "\n";
+                std::cerr << "ddrho_F1F2 = " << ddrho_F1F2 << std::endl;
             ///
             
             // evaluate the integrand
@@ -592,7 +598,8 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
 std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
 {
     // array of Chebyshev expansions coefficients for bot spins and for every Ei and angular state
-    std::pair<cArrays,cArrays> Xi = std::make_pair(cArrays(ang_.size()), cArrays(ang_.size()));
+    unsigned N  = ang_.size() * inp_.Ei.size();
+    std::pair<cArrays,cArrays> Xi = std::make_pair(cArrays(N), cArrays(N));
     
     // B-spline count
     int Nspline = bspline_.Nspline();
@@ -615,13 +622,15 @@ std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
         // maximal available momentum
         double kmax = std::sqrt(inp_.Ei[ie] - 1./(T.ni*T.ni));
         
+        std::cout << "\t\tS = " << Spin << ", E = " << inp_.Ei[ie] << ": ";
+        
         // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
         for (unsigned ill = 0; ill < ang_.size(); ill++)
         {
             int l1 = ang_[ill].first;
             int l2 = ang_[ill].second;
             
-            std::cout << "\tion: Ei[" << ie << "] = " << inp_.Ei[ie] << ", l1 = " << l1 << ", l2 = " << l2 << std::flush;
+            std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
             
             // create subset of the solution
             cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
@@ -633,6 +642,8 @@ std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
             else
                 (Xi.second)[ill * inp_.Ei.size() + ie] = CB.coeffs();
         }
+        
+        std::cout << std::endl;
     }
     
     return Xi;
