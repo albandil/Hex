@@ -151,6 +151,30 @@ int main (int argc, char* argv[])
         return 0;
     }
     
+    //
+    // Create and the preconditioner.
+    //
+    
+    PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
+    if (prec == nullptr)
+        throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
+    
+// ------------------------------------------------------------------------- //
+//                                                                           //
+// StgRadial                                                                 //
+//                                                                           //
+// ------------------------------------------------------------------------- //
+    
+if (cmd.itinerary & CommandLine::StgRadial)
+{
+    // setup the preconditioner (compute radial integrals etc.)
+    prec->setup();
+}
+else
+{
+    std::cout << "Skipped computation of radial integrals." << std::endl;
+}
+
 // ------------------------------------------------------------------------- //
 //                                                                           //
 // StgSolve                                                                  //
@@ -159,12 +183,6 @@ int main (int argc, char* argv[])
     
 if (cmd.itinerary & CommandLine::StgSolve)
 {
-    // create and initialize the preconditioner
-    PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
-    if (prec == nullptr)
-        throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
-    prec->setup();
-    
     // CG preconditioner callback
     auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
     
