@@ -898,8 +898,12 @@ public:
          */
         size_t size () const
         {
+            if (numeric_ == nullptr)
+                return 0;
+            
             long lnz, unz, m, n, nz_udiag;
-            long status = umfpack_zl_get_lunz (
+            long status = umfpack_zl_get_lunz
+            (
                 &lnz, &unz, &m, &n, &nz_udiag, numeric_
             );
             return status == 0 ? (lnz + unz) * 16 : 0; // Byte count

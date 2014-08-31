@@ -223,6 +223,9 @@ class NoPreconditioner : public PreconditionerBase
         
     protected:
         
+        // energy
+        double E_;
+        
         // command line switches
         CommandLine const & cmd_;
         
@@ -463,10 +466,10 @@ class SepCGPreconditioner : public CGPreconditioner
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        virtual void update (double E) { CGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (double E);
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
@@ -487,9 +490,6 @@ class SepCGPreconditioner : public CGPreconditioner
         
         // diagonal parts of one-electron hamiltonians
         std::vector<cArray> Dl_;
-        
-        // current preconditioner energy
-        double E_;
 };
 
 /**
@@ -513,17 +513,19 @@ class ILUCGPreconditioner : public CGPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol) {}
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol),
+            csr_blocks_(ll.size()), lu_(ll.size())
+        {
+            // nothing more to do
+        }
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (double E);
+        virtual void setup () { CGPreconditioner::setup(); }
+        virtual void update (double E) { CGPreconditioner::update(E); }
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;

@@ -404,6 +404,7 @@ void NoPreconditioner::setup ()
 void NoPreconditioner::update (double E)
 {
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
+    E_ = E;
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
@@ -1345,12 +1346,6 @@ void SepCGPreconditioner::setup ()
     std::cout << std::endl;
 }
 
-void SepCGPreconditioner::update (double E)
-{
-    CGPreconditioner::update(E);
-    E_ = E;
-}
-
 void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     // get angular momenta of this block
@@ -1379,101 +1374,63 @@ void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 const std::string ILUCGPreconditioner::name = "ILU";
 const std::string ILUCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
 
-void ILUCGPreconditioner::setup ()
+void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
-    NoPreconditioner::setup();
-    
-    // resize arrays
-    csr_blocks_.resize(l1_l2_.size());
-    lu_.resize(l1_l2_.size());
-}
-
-void ILUCGPreconditioner::update (double E)
-{
-    // update parent
-    NoPreconditioner::update(E);
-    
-    // write info
-    std::cout << "\t[" << par_.iproc() << "] Update preconditioner ILU";
-    if (cmd_.concurrent_factorizations > 1)
-        std::cout << " using " << cmd_.concurrent_factorizations << " concurrent 1-thread parallelizations";
-    else
-        std::cout << " sequentially, using all available threads for each factorization";
-    std::cout << std::endl;
-    
-    // for all diagonal blocks
-    # pragma omp parallel for if (cmd_.concurrent_factorizations > 1) num_threads (cmd_.concurrent_factorizations)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    // load data from linked disk files
+    if (cmd_.outofcore)
+    # pragma omp critical
     {
-        // delete old factorization first to maximally spare memory
-        lu_[ill].drop();
-        
+        csr_blocks_[iblock].hdfload();
+        lu_[iblock].load();
+    }
+    
+    // check that the factorization is loaded
+    if (lu_[iblock].size() == 0)
+    {
         // load diagonal block from disk (if OOC)
         if (cmd_.outofcore)
-        {
-            // load DIA block from a linked disk file
-            # pragma omp critical
-            dia_blocks_[ill].hdfload();
-        }
+        # pragma omp critical
+            dia_blocks_[iblock].hdfload();
+        
+        // create CSR block
+        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo().tocsr();
+        
+        // release memory
+        if (cmd_.outofcore)
+            dia_blocks_[iblock].drop();
         
         // start timer
         Timer timer;
         
-        // create CSR block
-        csr_blocks_[ill] = dia_blocks_[ill].tocoo().tocsr();
-        
-        // factorize the block and store it in lu_[ill]
-        lu_[ill].transfer(csr_blocks_[ill].factorize(droptol_));
+        // factorize the block and store it
+        lu_[iblock].transfer(csr_blocks_[iblock].factorize(droptol_));
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
-        std::cout << format
+        std::cout << std::endl << std::setw(37) << format
         (
-            "\t\t- block #%d (%d,%d) in %d:%02d (%d MiB)",
-            ill, l1_l2_[ill].first, l1_l2_[ill].second, // block identification (id, ℓ₁, ℓ₂)
+            "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
+            iblock, l1_l2_[iblock].first, l1_l2_[iblock].second, // block identification (id, ℓ₁, ℓ₂)
             timer.seconds() / 60,                       // factorization time: minutes
             timer.seconds() % 60,                       // factorization time: seconds
-            lu_[ill].size() / 1048576                   // final memory size
-        ) << std::endl;
+            lu_[iblock].size() / 1048576                   // final memory size
+        );
         
-        // save factorization to disk (if OOC)
+        // release memory
         if (cmd_.outofcore)
-        {
-            // link CSR block to a disk file
-            csr_blocks_[ill].link(format("csr-%d.ooc", ill));
-            # pragma omp critical
-            csr_blocks_[ill].hdfsave();
-            
-            // release memory
-            csr_blocks_[ill].drop();
-            dia_blocks_[ill].drop();
-            
-            // link to a disk file
-            lu_[ill].link(format("lu-%d.ooc", ill));
-            # pragma omp critical
-            lu_[ill].save();
-            lu_[ill].drop();
-        }
-    }
-}
-
-void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
-{
-    if (cmd_.outofcore)
-    {
-        // load data from linked disk files
-        # pragma omp critical
-        csr_blocks_[iblock].hdfload();
-        # pragma omp critical
-        lu_[iblock].load();
+            csr_blocks_[iblock].drop();
     }
     
+    // precondition by LU
     z = lu_[iblock].solve(r);
     
+    // release memory
     if (cmd_.outofcore)
     {
-        // release memory
-        csr_blocks_[iblock].drop();
+        // link to a disk file
+        lu_[iblock].link(format("lu-%d.ooc", iblock));
+        # pragma omp critical
+        lu_[iblock].save();
         lu_[iblock].drop();
     }
 }
