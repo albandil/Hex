@@ -206,7 +206,7 @@ void Amplitudes::writeSQL_files ()
             fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
                  << inp_.ni << "," << T.li << "," << T.mi << ","
                  << inp_.L << ", 0, " << inp_.Ei[ie] << ", "
-                 << ang_[ill].first << ", " << ang_[ill].second
+                 << ang_[ill].first << ", " << ang_[ill].second << ", "
                  << Xi_S0[ill * inp_.Ei.size() + ie].toBlob().c_str() << ");"
                  << std::endl;
             
@@ -214,7 +214,7 @@ void Amplitudes::writeSQL_files ()
             fsql << "INSERT OR REPLACE INTO \"ionf\" VALUES ("
                  << inp_.ni << "," << T.li << "," << T.mi << ","
                  << inp_.L << ", 1, " << inp_.Ei[ie] << ", "
-                 << ang_[ill].first << ", " << ang_[ill].second
+                 << ang_[ill].first << ", " << ang_[ill].second << ", "
                  << Xi_S1[ill * inp_.Ei.size() + ie].toBlob().c_str() << ");"
                  << std::endl;
         }

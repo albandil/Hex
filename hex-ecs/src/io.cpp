@@ -395,7 +395,7 @@ void InputFile::read (std::ifstream & inf)
         std::cout << "["
                   << std::get<0>(state) << " "
                   << std::get<1>(state)
-                  << " *]";
+                  << " *] ";
     }
     std::cout << std::endl;
     
