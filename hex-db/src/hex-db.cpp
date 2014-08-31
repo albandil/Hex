@@ -72,7 +72,7 @@ void create_new_database ()
             
             std::cerr << "ERROR: Creation of tables failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
             std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-            exit(-1);
+            std::exit(-1);
             
         }
     }
@@ -133,6 +133,13 @@ void import (const char* sqlname)
         // for all statements on this line
         do
         {
+            // trim spaces
+            cmd = trim(cmd);
+            
+            // skip this line if it starts with a comment
+            if (cmd.size() > 1 and cmd[0] == '-' and cmd[1] == '-')
+                break;
+            
             // position of semicolon
             unsigned semicolon = std::find(cmd.begin(), cmd.end(), ';') - cmd.begin();
             
