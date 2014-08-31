@@ -380,16 +380,19 @@ class JacobiCGPreconditioner : public CGPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), invd_(ll.size())
+        {
+            // nothing more to do
+        }
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
+        virtual void setup () { CGPreconditioner::setup(); }
         
         // declare own definitions
-        virtual void setup ();
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
@@ -421,16 +424,19 @@ class SSORCGPreconditioner : public CGPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), SSOR_(ll.size())
+        {
+            // nothing more to do
+        }
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
+        virtual void setup () { CGPreconditioner::setup(); }
         
         // declare own definitions
-        virtual void setup ();
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
@@ -459,7 +465,11 @@ class SepCGPreconditioner : public CGPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol) {}
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd),
+            invCl_invsqrtS_(inp.maxell+1), invsqrtS_Cl_(inp.maxell+1), Dl_(inp.maxell+1)
+        {
+            // nothing more to do
+        }
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
@@ -476,16 +486,7 @@ class SepCGPreconditioner : public CGPreconditioner
         
     protected:
         
-        // drop tolarance for the factorizations
-        double droptol_;
-        
-        // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix> csr_blocks_, prec_blocks_;
-        
-        // LU decompositions of the CSR blocks
-        mutable std::vector<CsrMatrix::LUft> lu_;
-        
-        // auxiliary matrices
+        // one-electron hamiltonian eigen-diagonalization
         std::vector<RowMatrix<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
         
         // diagonal parts of one-electron hamiltonians

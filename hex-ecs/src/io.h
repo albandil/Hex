@@ -159,7 +159,7 @@ class InputFile
             read(inputfile);
             
             // compute angular momentum limit
-            maxell = levels + L;
+            maxell = levels + L + Pi;
             
             // projectile momenta
             ki.resize(Ei.size());

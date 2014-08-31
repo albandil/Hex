@@ -1179,14 +1179,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 const std::string JacobiCGPreconditioner::name = "Jacobi";
 const std::string JacobiCGPreconditioner::description = "Block inversion using Jacobi-preconditioned conjugate gradients.";
 
-void JacobiCGPreconditioner::setup ()
-{
-    NoPreconditioner::setup();
-    
-    // resize attributes
-    invd_.resize(l1_l2_.size());
-}
-
 void JacobiCGPreconditioner::update (double E)
 {
     // update parent
@@ -1217,15 +1209,6 @@ void JacobiCGPreconditioner::update (double E)
 
 const std::string SSORCGPreconditioner::name = "SSOR";
 const std::string SSORCGPreconditioner::description = "Block inversion using SSOR-preconditioned conjugate gradients.";
-
-void SSORCGPreconditioner::setup ()
-{
-    // setup parent
-    NoPreconditioner::setup();
-    
-    // resize array
-    SSOR_.resize(l1_l2_.size());
-}
 
 void SSORCGPreconditioner::update (double E)
 {
