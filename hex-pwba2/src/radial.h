@@ -64,7 +64,7 @@ Complex Idir_allowed
 (
     rArray const & grid,
     rArray const & jf, rArray const & Vfn,
-    rArray const & jn, rArray const & yn,
+    rArray const & jn, rArray const & yn_ji, rArray const & yn_jf,
     rArray const & ji, rArray const & Vni
 );
 

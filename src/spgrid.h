@@ -161,7 +161,7 @@ template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::
         }
     }
     
-    throw exception ("Cannot shift foward.");
+    throw exception ("Cannot shift forward.");
 }
 
 /**
@@ -601,14 +601,14 @@ template <class T> class SparseGrid
          * integral estimates on the two specified grids.
          * 
          * @param F Function to integrate.
-         * @param root N-dimensional cube (integration volume).
          * @param ruleLow Low-order rule for error estimation.
          * @param ruleHigh High-order rule for error estimation.
+         * @param root N-dimensional cube (integration volume); default is unit hypercube.
          */
         template <int dim, class Functor> bool integrate_adapt
         (
-            Functor F, geom::ndCube<dim> const & root,
-            SparseGridId ruleLow, SparseGridId ruleHigh
+            Functor F, SparseGridId ruleLow, SparseGridId ruleHigh,
+            geom::ndCube<dim> root = geom::ndCube<dim>()
         )
         {
             // synonym for 'dim'-dimensional cube
@@ -809,6 +809,7 @@ template <class T> class SparseGrid
                         }
                     }
                     
+                    // add new domains
                     # pragma omp critical
                     {
                         // update shared variables by contributions from this thread

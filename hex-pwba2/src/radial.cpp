@@ -338,7 +338,7 @@ Complex Idir_allowed
 {
     std::size_t N = grid.size();
     
-    rArray inner_lower(N), inner_higher_re(N);
+    rArray inner_lower(N), inner_lower_int(N), inner_higher_re(N), inner_higher_re_int(N);
     double sum_outer_re = 0, sum_outer_im = 0;
     
     # pragma omp parallel for firstprivate (N)
@@ -358,7 +358,7 @@ Complex Idir_allowed
         // compute forward partial sums
         # pragma omp for
         for (std::size_t i = 0; i < N; i++)
-            inner_lower[i] = gsl_spline_eval_integ(spline, grid.front(), grid[i], acc);
+            inner_lower_int[i] = gsl_spline_eval_integ(spline, grid.front(), grid[i], acc);
         
         gsl_interp_accel_free(acc);
         gsl_spline_free(spline);
@@ -374,7 +374,7 @@ Complex Idir_allowed
         // compute backward partial sums
         # pragma omp for
         for (std::size_t i = 0; i < N; i++)
-            inner_higher_re[i] = gsl_spline_eval_integ(spline, grid[i], grid.back(), acc);
+            inner_higher_re_int[i] = gsl_spline_eval_integ(spline, grid[i], grid.back(), acc);
         
         gsl_interp_accel_free(acc);
         gsl_spline_free(spline);
@@ -385,7 +385,7 @@ Complex Idir_allowed
     {
         # pragma omp section
         {
-            rArray outer_re = Vfn * (inner_lower * yn_jf + inner_higher_re * jf * jn);
+            rArray outer_re = Vfn * (inner_lower_int * yn_jf + inner_higher_re_int * jf * jn);
             
             gsl_interp_accel * acc = gsl_interp_accel_alloc();
             gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
@@ -404,7 +404,7 @@ Complex Idir_allowed
             gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
             gsl_spline_init(spline, grid.data(), outer_im.data(), N);
             
-            sum_outer_im = inner_lower.back() * gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
+            sum_outer_im = inner_lower_int.back() * gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
             
             gsl_spline_free(spline);
             gsl_interp_accel_free(acc);
@@ -508,13 +508,13 @@ Complex Idir_nBound_allowed
         
         // check finiteness (use asymptotic form if out)
         rArray yn_ji = yn * ji;
-        for (unsigned i = 0; i < yn_ji.size(); i++)
+        for (unsigned i = 1; i < yn_ji.size(); i++)
         {
             if (not std::isfinite(yn_ji[i]))
                 yn_ji[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*li+1) * std::pow(kn,-ln) * std::pow(ki,li+1) * std::pow(grid[i],li+1-ln);
         }
         rArray yn_jf = yn * jf;
-        for (unsigned i = 0; i < yn_jf.size(); i++)
+        for (unsigned i = 1; i < yn_jf.size(); i++)
         {
             if (not std::isfinite(yn_jf[i]))
                 yn_jf[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*lf+1) * std::pow(kn,-ln) * std::pow(kf,lf+1) * std::pow(grid[i],lf+1-ln);
@@ -616,13 +616,13 @@ Complex Idir_nFree_allowed
         
         // check finiteness (use asymptotic form if out)
         rArray yn_ji = yn * ji;
-        for (unsigned i = 0; i < yn_ji.size(); i++)
+        for (unsigned i = 1; i < yn_ji.size(); i++)
         {
             if (not std::isfinite(yn_ji[i]))
                 yn_ji[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*li+1) * std::pow(kn,-ln) * std::pow(ki,li+1) * std::pow(grid[i],li+1-ln);
         }
         rArray yn_jf = yn * jf;
-        for (unsigned i = 0; i < yn_jf.size(); i++)
+        for (unsigned i = 1; i < yn_jf.size(); i++)
         {
             if (not std::isfinite(yn_jf[i]))
                 yn_jf[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*lf+1) * std::pow(kn,-ln) * std::pow(kf,lf+1) * std::pow(grid[i],lf+1-ln);
