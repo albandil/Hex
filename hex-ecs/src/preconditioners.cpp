@@ -1357,6 +1357,23 @@ void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 const std::string ILUCGPreconditioner::name = "ILU";
 const std::string ILUCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
 
+void ILUCGPreconditioner::update (double E)
+{
+    if (E != E_)
+    {
+        // release outdated LU factorizations
+        for (auto lu : lu_)
+            lu.drop();
+        
+        // release outdated CSR diagonal blocks
+        for (auto csr : csr_blocks_)
+            csr.drop();
+    }
+    
+    // update parent
+    CGPreconditioner::update(E);
+}
+
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     // load data from linked disk files
@@ -1393,10 +1410,9 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         std::cout << std::endl << std::setw(37) << format
         (
             "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
-            iblock, l1_l2_[iblock].first, l1_l2_[iblock].second, // block identification (id, ℓ₁, ℓ₂)
-            timer.seconds() / 60,                       // factorization time: minutes
-            timer.seconds() % 60,                       // factorization time: seconds
-            lu_[iblock].size() / 1048576                   // final memory size
+            iblock, l1_l2_[iblock].first, l1_l2_[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
+            timer.seconds() / 60, timer.seconds() % 60,             // factorization time
+            lu_[iblock].size() / 1048576                            // final memory size
         );
         
         // release memory

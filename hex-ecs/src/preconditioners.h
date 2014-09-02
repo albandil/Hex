@@ -526,7 +526,9 @@ class ILUCGPreconditioner : public CGPreconditioner
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
         virtual void setup () { CGPreconditioner::setup(); }
-        virtual void update (double E) { CGPreconditioner::update(E); }
+        
+        // declare own definitions
+        virtual void update (double E);
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
