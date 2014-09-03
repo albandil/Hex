@@ -1362,11 +1362,11 @@ void ILUCGPreconditioner::update (double E)
     if (E != E_)
     {
         // release outdated LU factorizations
-        for (auto lu : lu_)
+        for (auto & lu : lu_)
             lu.drop();
         
         // release outdated CSR diagonal blocks
-        for (auto csr : csr_blocks_)
+        for (auto & csr : csr_blocks_)
             csr.drop();
     }
     

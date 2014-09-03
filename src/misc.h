@@ -717,4 +717,6 @@ template<> template<class T> class typeinfo<std::complex<T>>
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
 };
 
+#define Debug std::cout << __func__ << " (" << __LINE__ << "): "
+
 #endif
