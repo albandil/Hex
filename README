@@ -9,8 +9,9 @@ Third-party libraries:
     OpenBLAS 0.2.8
     SuiteSparse 4.2.1
     sqlitepp 0.2            (included in libs/, works e.g. with sqlite3 3.7.17)
-    cln 1.3.3
-    fftw 3.3.3
+    CLN 1.3.3
+    FFTW 3.3.3
+    GiNaC 1.6.2
     
 Optional dependencies:
     png++ 0.2.5             (included in libs/, works e.g. with libpng 1.5)
