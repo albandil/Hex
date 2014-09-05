@@ -24,8 +24,8 @@ GSLLIBS = $(shell gsl-config --libs)
 # GiNaC                                                                        #
 # ---------------------------------------------------------------------------- #
 
-CLNFLAGS =
-CLNLIBS = -lcln -lginac
+GINACFLAGS =
+GINACLIBS = -lcln -lginac
 
 # ---------------------------------------------------------------------------- #
 # FFTW                                                                         #
@@ -44,8 +44,8 @@ LAPACKLIBS = -lopenblas
 ################################################################################
 
 
-CFLAGS += $(GSLFLAGS) $(CLNFLAGS) $(LAPACKFLAGS) $(FFTWFLAGS)
-LFLAGS += $(GSLLIBS) $(CLNLIBS) $(LAPACKLIBS) $(FFTWLIBS)
+CFLAGS += $(GSLFLAGS) $(GINACFLAGS) $(LAPACKFLAGS) $(FFTWFLAGS)
+LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) $(FFTWLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

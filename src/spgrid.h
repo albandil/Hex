@@ -671,87 +671,84 @@ template <class T> class SparseGrid
                 Timer timer;
                 
                 // check convergence for all not yet converged sub-domains
-                if (level >= minlevel_)
+                # pragma omp parallel if (parallel_) reduction (+:abslocal,absglobal,rellocal,relglobal)
                 {
-                    # pragma omp parallel if (parallel_) \
-                        reduction (+:abslocal,absglobal,rellocal,relglobal)
+                    // per-thread data
+                    std::size_t thread_neval = 0;
+                    T thread_finalEstimate = 0;
+                    std::vector<std::size_t> thread_bisectIDs;
+                    
+                    // for all domains
+                    # pragma omp for schedule (static)
+                    for (auto dom = domains.begin(); dom < domains.end(); dom++)
                     {
-                        // per-thread data
-                        std::size_t thread_neval = 0;
-                        T thread_finalEstimate = 0;
-                        std::vector<std::size_t> thread_bisectIDs;
+                        // compute the fine estimate for this domain
+                        T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
+                        thread_neval += nodes.at(ruleHigh).n;
                         
-                        // for all domains
-                        # pragma omp for schedule (static)
-                        for (auto dom = domains.begin(); dom < domains.end(); dom++)
+                        // check absolute local convergence
+                        if (std::abs(dom->val - fineEstimate) < epsabs_)
                         {
-                            // compute the fine estimate for this domain
-                            T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
-                            thread_neval += nodes.at(ruleHigh).n;
-                            
-                            // check absolute local convergence
-                            if (std::abs(dom->val - fineEstimate) < epsabs_)
-                            {
-                                dom->set = true;
-                                abslocal++;
-                            }
-                            
-                            // check relative local convergence
-                            if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
-                            {
-                                dom->set = true;
-                                rellocal++;
-                            }
-                            
-                            // check absolute global (extrapolated) convergence
-                            if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
-                            {
-                                dom->set = true;
-                                absglobal++;
-                            }
-                            
-                            // check relative global (extrapolated) convergence
-                            if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
-                            {
-                                dom->set = true;
-                                relglobal++;
-                            }
-                            
-                            // store the better estimate
-                            dom->val = fineEstimate;
-                            
-                            // is the cell converged or was max level reached?
-                            if (dom->set or level == maxlevel_)
-                            {
-                                // YES : use the current value as final
-                                thread_finalEstimate += dom->val;
-                                
-                                // YES : save data for optional VTK debug output
-                                if (write_vtk_ and dim <= 3)
-                                {
-                                    # pragma omp critical
-                                    vtk[dom->cube.history()] = dom->val / dom->cube.volume();
-                                }
-                            }
-                            else
-                            {
-                                // NO : add domain ID to the list of domains needing bisection
-                                thread_bisectIDs.push_back(dom - domains.begin());
-                            }
+                            dom->set = true;
+                            abslocal++;
                         }
                         
-                        # pragma omp critical
+                        // check relative local convergence
+                        if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
                         {
-                            // update shared variables by contributions from this thread
-                            neval_ += thread_neval;
-                            finalEstimate += thread_finalEstimate;
-                            bisectIDs.insert(bisectIDs.end(), thread_bisectIDs.begin(), thread_bisectIDs.end());
+                            dom->set = true;
+                            rellocal++;
+                        }
+                        
+                        // check absolute global (extrapolated) convergence
+                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
+                        {
+                            dom->set = true;
+                            absglobal++;
+                        }
+                        
+                        // check relative global (extrapolated) convergence
+                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
+                        {
+                            dom->set = true;
+                            relglobal++;
+                        }
+                        
+                        // store the better estimate
+                        dom->val = fineEstimate;
+                        
+                        // is the cell converged or was max level reached?
+                        if (level >= minlevel_ and (dom->set or level == maxlevel_))
+                        {
+                            // YES : use the current value as final
+                            thread_finalEstimate += dom->val;
+                            
+                            // YES : save data for optional VTK debug output
+                            if (write_vtk_ and dim <= 3)
+                            {
+                                # pragma omp critical
+                                vtk[dom->cube.history()] = dom->val / dom->cube.volume();
+                            }
+                        }
+                        else
+                        {
+                            // NO : add domain ID to the list of domains needing bisection
+                            thread_bisectIDs.push_back(dom - domains.begin());
                         }
                     }
-                    
-                    if (verbose_)
-                        std::cout << prefix_ << "  processing time : " << timer.nice_time() << std::endl;
+                        
+                    # pragma omp critical
+                    {
+                        // update shared variables by contributions from this thread
+                        neval_ += thread_neval;
+                        finalEstimate += thread_finalEstimate;
+                        bisectIDs.insert(bisectIDs.end(), thread_bisectIDs.begin(), thread_bisectIDs.end());
+                    }
+                
                 }
+                
+                if (verbose_)
+                    std::cout << prefix_ << "  processing time : " << timer.nice_time() << std::endl;
                 
                 // debug info
                 if (verbose_)

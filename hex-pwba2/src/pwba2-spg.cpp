@@ -17,6 +17,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <ginac/ginac.h>
+
 #include "arrays.h"
 #include "complex.h"
 #include "misc.h"
@@ -25,7 +27,8 @@
 #include "special.h"
 #include "spgrid.h"
 
-#include <ginac/ginac.h>
+#include "clenshawcurtis.h"
+#include "gausskronrod.h"
 
 GiNaC::ex rl_Y
 (
@@ -75,7 +78,7 @@ GiNaC::ex psi_nlm_poly
     return N_nl * R_nl * GiNaC::pow(GiNaC::numeric(2,n),l) * Y;
 }
 
-GiNaC::ex W_symb
+GiNaC::ex Wb_symb
 (
     int n1, int l1, int m1,
     int n2, int l2, int m2,
@@ -135,7 +138,7 @@ GiNaC::ex W_symb
             GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
             
             // irp-times differentiate the basic integral
-            GiNaC::ex J_nu_rp = J_nu.diff(kp,irp) * GiNaC::pow(2*GiNaC::I,irp);
+            GiNaC::ex J_nu_rp = J_nu.diff(km,irp) * GiNaC::pow(2*GiNaC::I,irp);
             
             // for all powers of r- appearing in the polynomial 'nu_rp_poly'
             for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
@@ -144,7 +147,7 @@ GiNaC::ex W_symb
                 GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
                 
                 // irm-times differentiate the basic integral
-                GiNaC::ex J_nu_rp_rm = J_nu_rp.diff(km,irm) * GiNaC::pow(2*GiNaC::I,irm);
+                GiNaC::ex J_nu_rp_rm = J_nu_rp.diff(kp,irm) * GiNaC::pow(2*GiNaC::I,irm);
                 
                 // for all powers of r- appearing in the polynomial 'nu_rp_poly'
                 for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
@@ -153,7 +156,7 @@ GiNaC::ex W_symb
                     GiNaC::ex nu_rp_rm_rz_coef = nu_rp_rm_poly.coeff(rz,irz);
                     
                     // irz-times differentiate the basic integral
-                    GiNaC::ex J_nu_rp_rm_rz = J_nu_rp_rm.diff(kz,irz) * GiNaC::pow(2*GiNaC::I,irz);
+                    GiNaC::ex J_nu_rp_rm_rz = J_nu_rp_rm.diff(kz,irz) * GiNaC::pow(GiNaC::I,irz);
                     
                     // add new term to the result
                     integral += nu_rp_rm_rz_coef * J_nu_rp_rm_rz;
@@ -166,11 +169,112 @@ GiNaC::ex W_symb
     if (n1 == n2 and l1 == l2 and m1 == m2)
         integral -= 1;
     
+    Debug << format("⟨%d,%d,%d|W|%d,%d,%d⟩: ", n1, l1, m1, n2, l2, m2) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
+    
     // return the integral in its normal form
     return (integral / (k*k))
            .subs(k == GiNaC::sqrt(kx * kx + ky * ky + kz * kz))
            .subs(kp == kx + GiNaC::I * ky)
            .subs(km == kx - GiNaC::I * ky)
+           .normal();
+}
+
+GiNaC::ex W_symb
+(
+    int n, int l, int m,
+    GiNaC::realsymbol const & kx,
+    GiNaC::realsymbol const & ky,
+    GiNaC::realsymbol const & kz,
+    GiNaC::realsymbol const & qx,
+    GiNaC::realsymbol const & qy,
+    GiNaC::realsymbol const & qz
+)
+{
+    // This routine will compute integral
+    //                  -ik·r
+    //   W = Int χ(r)* e     ψ(r) d³r
+    //
+    // (without the normalization factor).
+    // There are seven symbols that the basic integral
+    //                   -ik·r  -ν|r| d³r   (k² + (ν-iq)²)^(-i/q)
+    //   I = Int χ(q,r) e      e      ——— = —————————————————————
+    //                                 r    (υ² + |k+q|²)^(1-i/q)
+    // depends on:
+    //     ν  ... the combined exponential factor (1/n₁ + 1/n₂)
+    //     kx,ky,kz ... components of momentum of the plane wave
+    //     qx,qy,qz ... components of momentum of the Coulomb wave
+    // Derivative with respect to any of the parameters ν,kx,ky,kz can be used to construct
+    // a different integrand.
+    
+    // the basic integral
+    GiNaC::possymbol k("k"), r("r"), nu("nu"), q("q");
+    GiNaC::realsymbol rz("rz");
+    GiNaC::symbol rp("rp"), rm("rm"), kp("kp"), km("km"), qp("qp"), qm("qm");
+    GiNaC::ex I = GiNaC::pow(k*k+GiNaC::pow(nu-GiNaC::I*q,2),-GiNaC::I/q) /
+                  GiNaC::pow(nu*nu+(kp+qp)*(km+qm)+(kz+qz)*(kz+qz),1-GiNaC::I/q);
+    
+    // calculate value of ν as a sum of two fractions
+    GiNaC::ex nu_val = GiNaC::numeric(1,n);
+    
+    // construct the initial and final state (drop exponential factor which is handled separately)
+    GiNaC::ex psi = psi_nlm_poly(n,l,m,r, rp, rm, rz);
+    
+    // this is the resulting integral
+    GiNaC::ex integral;
+    
+    // for all powers of r appearing in the polynomial 'poly'
+    for (int inu = psi.ldegree(r); inu <= psi.degree(r); inu++)
+    {
+        // extract factor in front of r^inu
+        GiNaC::ex nu_poly = psi.collect(r).coeff(r,inu);
+        
+        // (inu + 1)-times differentiate the basic integral and substitute
+        GiNaC::ex I_nu = I.diff(nu,inu+1).subs(nu == nu_val) * GiNaC::pow(-1,inu+1);
+        
+        // for all powers of r+ appearing in the polynomial 'nu_poly'
+        for (int irp = nu_poly.ldegree(rp); irp <= nu_poly.degree(rp); irp++)
+        {
+            // extract factor in front of ν^inu rp^irp
+            GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
+            
+            // irp-times differentiate the basic integral
+            GiNaC::ex I_nu_rp = I_nu.diff(km,irp) * GiNaC::pow(2*GiNaC::I,irp);
+            
+            // for all powers of r- appearing in the polynomial 'nu_rp_poly'
+            for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
+            {
+                // extract factor in front of ν^inu rp^irp rm^irm
+                GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
+                
+                // irm-times differentiate the basic integral
+                GiNaC::ex I_nu_rp_rm = I_nu_rp.diff(kp,irm) * GiNaC::pow(2*GiNaC::I,irm);
+                
+                // for all powers of r- appearing in the polynomial 'nu_rp_poly'
+                for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
+                {
+                    // extract factor in front of ν^inu rp^irp rm^irm rz^irz (it is a number)
+                    GiNaC::ex nu_rp_rm_rz_coef = nu_rp_rm_poly.coeff(rz,irz);
+                    
+                    // irz-times differentiate the basic integral
+                    GiNaC::ex I_nu_rp_rm_rz = I_nu_rp_rm.diff(kz,irz) * GiNaC::pow(GiNaC::I,irz);
+                    
+                    // add new term to the result
+                    integral += nu_rp_rm_rz_coef * I_nu_rp_rm_rz;
+                }
+            }
+        }
+    }
+    
+    Debug << format("⟨%d,%d,%d|W|χ(q)⟩: ", n, l, m) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
+    
+    // return the integral in its normal form
+    return (integral / (k*k))
+           .subs(k == GiNaC::sqrt(kx * kx + ky * ky + kz * kz))
+           .subs(kp == kx + GiNaC::I * ky)
+           .subs(km == kx - GiNaC::I * ky)
+           .subs(q == GiNaC::sqrt(qx * qx + qy * qy + qz * qz))
+           .subs(qp == qx + GiNaC::I * qy)
+           .subs(qm == qx - GiNaC::I * qy)
            .normal();
 }
 
@@ -196,16 +300,6 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     
     Complex B_A = B / A;
     return 2.0 * iq * std::pow(B_A,iq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
-}
-
-double Wb_1s (geom::vec3d vk, int Nn, int Ln)
-{
-    assert(Nn == 1);
-    assert(Ln == 0);
-    
-    double k = geom::vec3d::norm(vk);
-    
-    return -(k*k + 8) / ((k*k + 4)*(k*k + 4));
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -251,13 +345,14 @@ cArrays PWBA2::FullTMatrix_direct
         spgrid::SparseGrid<Complex> G;
         
         // criteria to stop integration cell currently being processed
-        G.setLocEpsRel(1e-5);  // ... if the rules are equal up to 1e-5 (relative)
-        G.setLocEpsAbs(1e-9);  // ... if the rules are equal up to 1e-9 (absolute)
-        G.setGlobEpsRel(1e-6); // ... if the extrapolated relative contribution to the whole domain is within 1e-6
-        G.setGlobEpsAbs(0);    // ... if the extrapolated contribution to the whole domain is within ... [not used]
-        G.setVerbose(true);    // print detailed progress information
-        G.setParallel(true);   // evaluate integration domains in parallel
-        G.setPrefix("  ");     // output formatting prefix
+        G.setMinLevel(1);       // ... do at least one subdivision
+        G.setLocEpsRel(1e-5);   // ... if the rules are equal up to 1e-5 (relative)
+        G.setLocEpsAbs(1e-9);   // ... if the rules are equal up to 1e-9 (absolute)
+        G.setGlobEpsRel(1e-6);  // ... if the extrapolated relative contribution to the whole domain is within 1e-6
+        G.setGlobEpsAbs(0);     // ... if the extrapolated contribution to the whole domain is within ... [not used]
+        G.setVerbose(true);     // print detailed progress information
+        G.setParallel(true);    // evaluate integration domains in parallel
+        G.setPrefix("    ");    // output formatting prefix
         
         // results (bound/continuum intermediate states, real/imag parts of propagator)
         Complex fUb = 0, fWb = 0, fU = 0, fW = 0;
@@ -266,26 +361,26 @@ cArrays PWBA2::FullTMatrix_direct
         std::size_t nEvalUb = 0, nEvalWb = 0, nEvalU = 0, nEvalW = 0;
         
         // for all intermediate bound state contributions
-        for (int Nn = 1; Nn <= maxNn; Nn++)
-        for (int Ln = 0; Ln < Nn and Ln <= maxLn; Ln++)
+        for (int Ln = 0; Ln <= maxLn; Ln++)
+        for (int Nn = Ln + 1; Nn <= maxNn; Nn++)
         for (int Mn = -Ln; Mn <= Ln; Mn++)
         {
-            std::cout << "Intermediate state (" << Nn << "," << Ln << "," << Mn << ")" << std::endl << std::endl;
+            std::cout << underline(format("Intermediate state (%d,%d,%d)",Nn,Ln,Mn)) << std::endl << std::endl;
             
-            // construct bound W-factors
+            // construct bound W-factors as GiNaC symbolic expressions
             GiNaC::realsymbol gkx("kx"), gky("ky"), gkz("kz");
-            GiNaC::ex Wf_symb = W_symb(Nf,Lf,Mf,Nn,Ln,Mn,gkx,gky,gkz);
-            GiNaC::ex Wi_symb = W_symb(Ni,Li,Mi,Nn,Ln,Mn,gkx,gky,gkz).conjugate();
+            GiNaC::ex Wbf_symb = Wb_symb(Nf,Lf,Mf,Nn,Ln,Mn,gkx,gky,gkz);
+            GiNaC::ex Wbi_symb = Wb_symb(Ni,Li,Mi,Nn,Ln,Mn,gkx,gky,gkz).conjugate();
             
             // create C-function names for the expressions
-            GiNaC::FUNCP_CUBA eval_Wf, eval_Wi;
+            GiNaC::FUNCP_CUBA eval_Wbf, eval_Wbi;
             
             // compile expressions to C-functions
-            GiNaC::compile_ex(GiNaC::lst(Wf_symb.real_part(),Wf_symb.imag_part()),GiNaC::lst(gkx,gky,gkz),eval_Wf);
-            GiNaC::compile_ex(GiNaC::lst(Wi_symb.real_part(),Wi_symb.imag_part()),GiNaC::lst(gkx,gky,gkz),eval_Wi);
+            GiNaC::compile_ex(GiNaC::lst(Wbf_symb.real_part(),Wbf_symb.imag_part()),GiNaC::lst(gkx,gky,gkz),eval_Wbf);
+            GiNaC::compile_ex(GiNaC::lst(Wbi_symb.real_part(),Wbi_symb.imag_part()),GiNaC::lst(gkx,gky,gkz),eval_Wbi);
             
             // real bound integrand
-            auto integrand_Ub_wrap_lin = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wf,eval_Wi](int n, double const * coords) -> Complex
+            auto integrand_Ub_wrap_lin = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wbf,eval_Wbi](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 3);
@@ -310,15 +405,15 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the off-shell integrand
 //                 Complex Wf = Wb_1s(vkf - vkn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vkn,Nn,Ln));
                 geom::vec3d dkf = vkf - vkn, dki = vki - vkn; Complex Wf, Wi;
-                eval_Wf(&nIn, reinterpret_cast<double*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
-                eval_Wi(&nIn, reinterpret_cast<double*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
+                eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
+                eval_Wbi(&nIn, reinterpret_cast<double const*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
                 Complex integrand_Ub_off = kn * kn * Wf * Wi;
                 
                 // the value of the on-shell integrand
 //                 Complex Wfon = Wb_1s(vkf - vQn,Nn,Ln), Wion = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wfon, Wion;
-                eval_Wf(&nIn, reinterpret_cast<double*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
-                eval_Wi(&nIn, reinterpret_cast<double*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
+                eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
+                eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
                 Complex integrand_Ub_on = Qn * Qn * Wfon * Wion;
                 
                 // Jacobian
@@ -331,7 +426,7 @@ cArrays PWBA2::FullTMatrix_direct
             };
             
             // real bound integrand
-            auto integrand_Ub_wrap_log = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wf,eval_Wi](int n, double const * coords) -> Complex
+            auto integrand_Ub_wrap_log = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wbf,eval_Wbi](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 3);
@@ -359,15 +454,15 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the off-shell integrand
 //                 Complex Wf = Wb_1s(vkf - vkn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vkn,Nn,Ln));
                 geom::vec3d dkf = vkf - vkn, dki = vki - vkn; Complex Wf, Wi;
-                eval_Wf(&nIn, reinterpret_cast<double*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
-                eval_Wi(&nIn, reinterpret_cast<double*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
+                eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
+                eval_Wbi(&nIn, reinterpret_cast<double const*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
                 Complex integrand_Ub_off = kn * kn * Wf * Wi;
                 
                 // the value of the on-shell integrand
 //                 Complex Wfon = Wb_1s(vkf - vQn,Nn,Ln), Wion = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wfon, Wion;
-                eval_Wf(&nIn, reinterpret_cast<double*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
-                eval_Wi(&nIn, reinterpret_cast<double*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
+                eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
+                eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
                 Complex integrand_Ub_on = Qn * Qn * Wfon * Wion;
                 
                 // Jacobian
@@ -379,19 +474,19 @@ cArrays PWBA2::FullTMatrix_direct
                 return special::constant::two_inv_pi * Jac * (integrand_Ub_off - integrand_Ub_on) / (0.5*Qn*Qn - 0.5*kn*kn);
             };
             
-            std::cout << underline(format("Sparse grid marching integration of bound U for theta = %g, phi = %g", theta, phi)) << std::endl;
+            std::cout << format("  Sparse grid marching integration of bound U for theta = %g, phi = %g", theta, phi) << std::endl;
             
             // allow at most 70 integration cell bisections
             G.setMaxLevel(70);
             
             // integrate U on 3-dimensional sparse grid
-            std::cout << std::endl<< "Linear integrand for Q = 0 .. " << Qon << std::endl;
+            std::cout << std::endl<< "  Linear integrand for Q = 0 .. " << Qon << std::endl;
             G.integrate_adapt<3>(integrand_Ub_wrap_lin, spgrid::d3l4n39, spgrid::d3l5n87);
             fUb += G.result();
             nEvalUb += G.evalcount();
             
             // integrate U on 3-dimensional sparse grid
-            std::cout << std::endl<< "Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
+            std::cout << std::endl<< "  Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
             G.integrate_adapt<3>(integrand_Ub_wrap_log, spgrid::d3l4n39, spgrid::d3l5n87);
             fUb += G.result();
             nEvalUb += G.evalcount();
@@ -399,7 +494,7 @@ cArrays PWBA2::FullTMatrix_direct
             std::cout << std::endl;
             
             // imag bound integrand
-            auto integrand_Wb_wrap = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wf,eval_Wi](int n, double const * coords) -> Complex
+            auto integrand_Wb_wrap = [ki,kf,vki,vkf,Nn,Ln,Qon,Etot,eval_Wbf,eval_Wbi](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 2);
@@ -422,8 +517,8 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the on-shell integrand
 //                 Complex Wf = Wb_1s(vkf - vQn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wf, Wi;
-                eval_Wf(&nIn, reinterpret_cast<double*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wf));
-                eval_Wi(&nIn, reinterpret_cast<double*>(&dkion), &nOut, reinterpret_cast<double*>(&Wi));
+                eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wf));
+                eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wi));
                 Complex integrand_Wb = Complex(0.,-special::constant::pi) * Qn * Wf * Wi;
                 
                 // Jacobian
@@ -434,10 +529,10 @@ cArrays PWBA2::FullTMatrix_direct
                 return special::constant::two_inv_pi * Jac * integrand_Wb;
             };
             
-            std::cout << underline(format("Sparse grid integration of bound W for theta = %g, phi = %g", theta, phi)) << std::endl;
+            std::cout << format("  Sparse grid integration of bound W for theta = %g, phi = %g", theta, phi) << std::endl;
             
             // integrate W on 2-dimensional sparse grid
-            G.integrate_adapt<2>(integrand_Wb_wrap, spgrid::d2l4n17, spgrid::d2l5n33);
+            G.integrate_adapt<2>(integrand_Wb_wrap, spgrid::d2l4n17, spgrid::d2l7n65);
             fWb += G.result();
             nEvalWb += G.evalcount();
             
@@ -446,7 +541,9 @@ cArrays PWBA2::FullTMatrix_direct
         
         // shall we integrate continuum intermediate state contributions?
         if (integrate_allowed)
-        {/*
+        {
+            std::cout << underline(format("Intermediate state CONTINUUM")) << std::endl << std::endl;
+/*
             // U-integrand (real part of propagator)
             auto integrand_U_wrap_lin = [ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
             {
@@ -567,7 +664,7 @@ cArrays PWBA2::FullTMatrix_direct
             nEvalU += G.evalcount();
             std::cout << std::endl;
             G.setGlobEpsAbs(0);
-            */
+*/
             // iW-integrand (imag part of propagator)
             auto integrand_W_wrap = [ki,kf,vki,vkf,Etot,Qon](int n, double const * coords) -> Complex
             {
@@ -603,7 +700,7 @@ cArrays PWBA2::FullTMatrix_direct
                 return special::constant::two_inv_pi * Jac * qn*qn * kn*kn * integrand_W;
             };
             
-            std::cout << underline(format("Sparse grid integration of continuum W for theta = %g, phi = %g", theta, phi)) << std::endl;
+            std::cout << format("  Sparse grid integration of continuum W for theta = %g, phi = %g", theta, phi) << std::endl;
             
             // integrate W on 5-dimensional sparse grid
             G.integrate_adapt<5>(integrand_W_wrap, spgrid::d5l4n151, spgrid::d5l5n391);
