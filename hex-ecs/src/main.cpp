@@ -338,7 +338,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
     std::cout << "All solutions computed." << std::endl;
-    std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
+    if (computations_done > 0)
+        std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
 }
 else // i.e. no StgSolve
 {

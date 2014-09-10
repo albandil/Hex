@@ -269,19 +269,19 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
     
     // auxiliary matrix
     ColMatrix<Complex> C(B.rows(),A.cols());
+    Complex alpha = 1, beta = 0;
+    char norm = 'N', trans = 'T';
     
-    // C = B * V
+    // C = V * A^T
     {
-        Complex alpha = 1, beta = 0; char norm = 'N', trans = 'T';
         int m = B.rows(), k = B.cols(), n = A.rows();
-        zgemm_(&trans, &norm, &m, &n, &k, &alpha, const_cast<Complex*>(B.data().begin()), &n, const_cast<Complex*>(v.data()), &k, &beta, C.data().begin(), &m);
+        zgemm_(&norm, &norm, &m, &n, &k, &alpha, const_cast<Complex*>(v.data()), &n, const_cast<Complex*>(A.data().data()), &k, &beta, C.data().begin(), &m);
     }
     
-    // W = A * C^T
+    // W = B * C
     {
-        Complex alpha = 1, beta = 0; char norm = 'N', trans = 'T';
         int m = A.rows(), k = A.cols(), n = C.cols();
-        zgemm_(&trans, &trans, &m, &n, &k, &alpha, const_cast<Complex*>(A.data().begin()), &n, C.data().begin(), &n, &beta, w.data(), &m);
+        zgemm_(&trans, &norm, &m, &n, &k, &alpha, const_cast<Complex*>(B.data().begin()), &n, C.data().begin(), &n, &beta, w.data(), &m);
     }
     
     return w;
