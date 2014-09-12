@@ -169,7 +169,7 @@ GiNaC::ex Wb_symb
     if (n1 == n2 and l1 == l2 and m1 == m2)
         integral -= 1;
     
-    Debug << format("⟨%d,%d,%d|W|%d,%d,%d⟩: ", n1, l1, m1, n2, l2, m2) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
+//     Debug << format("⟨%d,%d,%d|W|%d,%d,%d⟩: ", n1, l1, m1, n2, l2, m2) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
     
     // return the integral in its normal form
     return (integral / (k*k))
@@ -265,7 +265,7 @@ GiNaC::ex W_symb
         }
     }
     
-    Debug << format("⟨%d,%d,%d|W|χ(q)⟩: ", n, l, m) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
+//     Debug << format("⟨%d,%d,%d|W|χ(q)⟩: ", n, l, m) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
     
     // return the integral in its normal form
     return (integral / (k*k))
@@ -300,6 +300,14 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     
     Complex B_A = B / A;
     return 2.0 * iq * std::pow(B_A,iq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
+}
+
+Complex W_cont (int n, int l, int m, geom::vec3d vk, geom::vec3d vq)
+{
+    if (n == 1 and l == 0 and m == 0)
+        return W_1s(vk,vq);
+    
+    throw exception ("Matrix element ⟨χ⁻(q)|exp(-ik·r)|%d,%d,%d⟩ not implemented.", n, l, m);
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -362,9 +370,11 @@ cArrays PWBA2::FullTMatrix_direct
         
         // for all intermediate bound state contributions
         for (int Ln = 0; Ln <= maxLn; Ln++)
-        for (int Nn = Ln + 1; Nn <= maxNn; Nn++)
         for (int Mn = -Ln; Mn <= Ln; Mn++)
+        for (int Nn = Ln + 1; Nn <= maxNn; Nn++)
         {
+            Complex fUb_contrib = 0, fWb_contrib = 0;
+            
             std::cout << underline(format("Intermediate state (%d,%d,%d)",Nn,Ln,Mn)) << std::endl << std::endl;
             
             // construct bound W-factors as GiNaC symbolic expressions
@@ -403,14 +413,12 @@ cArrays PWBA2::FullTMatrix_direct
                 int nIn = 3, nOut = 2;
                 
                 // the value of the off-shell integrand
-//                 Complex Wf = Wb_1s(vkf - vkn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vkn,Nn,Ln));
                 geom::vec3d dkf = vkf - vkn, dki = vki - vkn; Complex Wf, Wi;
                 eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
                 eval_Wbi(&nIn, reinterpret_cast<double const*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
                 Complex integrand_Ub_off = kn * kn * Wf * Wi;
                 
                 // the value of the on-shell integrand
-//                 Complex Wfon = Wb_1s(vkf - vQn,Nn,Ln), Wion = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wfon, Wion;
                 eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
                 eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
@@ -452,14 +460,12 @@ cArrays PWBA2::FullTMatrix_direct
                 int nIn = 3, nOut = 2;
                 
                 // the value of the off-shell integrand
-//                 Complex Wf = Wb_1s(vkf - vkn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vkn,Nn,Ln));
                 geom::vec3d dkf = vkf - vkn, dki = vki - vkn; Complex Wf, Wi;
                 eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkf), &nOut, reinterpret_cast<double*>(&Wf));
                 eval_Wbi(&nIn, reinterpret_cast<double const*>(&dki), &nOut, reinterpret_cast<double*>(&Wi));
                 Complex integrand_Ub_off = kn * kn * Wf * Wi;
                 
                 // the value of the on-shell integrand
-//                 Complex Wfon = Wb_1s(vkf - vQn,Nn,Ln), Wion = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wfon, Wion;
                 eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wfon));
                 eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wion));
@@ -482,13 +488,13 @@ cArrays PWBA2::FullTMatrix_direct
             // integrate U on 3-dimensional sparse grid
             std::cout << std::endl<< "  Linear integrand for Q = 0 .. " << Qon << std::endl;
             G.integrate_adapt<3>(integrand_Ub_wrap_lin, spgrid::d3l4n39, spgrid::d3l5n87);
-            fUb += G.result();
+            fUb_contrib = G.result();
             nEvalUb += G.evalcount();
             
             // integrate U on 3-dimensional sparse grid
             std::cout << std::endl<< "  Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
             G.integrate_adapt<3>(integrand_Ub_wrap_log, spgrid::d3l4n39, spgrid::d3l5n87);
-            fUb += G.result();
+            fUb_contrib += G.result();
             nEvalUb += G.evalcount();
             
             std::cout << std::endl;
@@ -515,7 +521,6 @@ cArrays PWBA2::FullTMatrix_direct
                 int nIn = 3, nOut = 2;
                 
                 // the value of the on-shell integrand
-//                 Complex Wf = Wb_1s(vkf - vQn,Nn,Ln), Wi = std::conj(Wb_1s(vki - vQn,Nn,Ln));
                 geom::vec3d dkfon = vkf - vQn, dkion = vki - vQn; Complex Wf, Wi;
                 eval_Wbf(&nIn, reinterpret_cast<double const*>(&dkfon), &nOut, reinterpret_cast<double*>(&Wf));
                 eval_Wbi(&nIn, reinterpret_cast<double const*>(&dkion), &nOut, reinterpret_cast<double*>(&Wi));
@@ -523,7 +528,7 @@ cArrays PWBA2::FullTMatrix_direct
                 
                 // Jacobian
                 double Jac = 2. // for cos theta
-                           * special::constant::two_pi; // for phi
+                        * special::constant::two_pi; // for phi
                 
                 // evaluate integrand
                 return special::constant::two_inv_pi * Jac * integrand_Wb;
@@ -533,22 +538,28 @@ cArrays PWBA2::FullTMatrix_direct
             
             // integrate W on 2-dimensional sparse grid
             G.integrate_adapt<2>(integrand_Wb_wrap, spgrid::d2l4n17, spgrid::d2l7n65);
-            fWb += G.result();
+            fWb_contrib = G.result();
             nEvalWb += G.evalcount();
             
             std::cout << std::endl;
+            
+            // check convergence with respect to Nn
+            fUb += fUb_contrib;
+            fWb += fWb_contrib;
+            if (std::abs(fUb_contrib) < 1e-6 * std::abs(fUb) and std::abs(fWb_contrib) < 1e-6 * std::abs(fWb))
+                break;
         }
         
         // shall we integrate continuum intermediate state contributions?
         if (integrate_allowed)
         {
             std::cout << underline(format("Intermediate state CONTINUUM")) << std::endl << std::endl;
-/*
+            
             // U-integrand (real part of propagator)
-            auto integrand_U_wrap_lin = [ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
+            auto integrand_U_wrap_lin = [Ni,Li,Mi,ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
             {
                 // check dimensions
-                assert(n == 5);
+                assert(n == 6);
                 
                 // unpack polar coordinates
                 double costheta1 = 2 * coords[0] - 1, sintheta1 = std::sqrt(1 - costheta1 * costheta1);
@@ -557,8 +568,6 @@ cArrays PWBA2::FullTMatrix_direct
                 double phi2  = special::constant::two_pi  * coords[3];
                 double alpha = special::constant::pi_half * coords[4];
                 double Q = Qon * coords[5];
-//                 double alpha = special::constant::pi_quart;
-//                 double Q = Qon * coords[4];
                 
                 // compute both off- and on-shell momentum magnitudes
                 double qn = Q * std::sin(alpha), qnon = Qon * std::sin(alpha);
@@ -572,12 +581,12 @@ cArrays PWBA2::FullTMatrix_direct
                 
                 // the value of the off-shell integrand
                 double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_1s(vkf - vkn, vqn), Wi = std::conj(W_1s(vki - vkn, vqn));
+                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
                 Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
                 
                 // the value of the on-shell integrand
                 double normon = 4. / (special::constant::pi * qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = W_1s(vkf - vknon, vqnon), Wion = std::conj(W_1s(vki - vknon, vqnon));
+                Complex Wfon = W_cont(Ni,Li,Mi,vkf-vknon,vqnon), Wion = std::conj(W_cont(Ni,Li,Mi,vki-vknon,vqnon));
                 Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
                 
                 // Jacobian
@@ -593,10 +602,10 @@ cArrays PWBA2::FullTMatrix_direct
             };
             
             // U-integrand (real part of propagator)
-            auto integrand_U_wrap_log = [ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
+            auto integrand_U_wrap_log = [Ni,Li,Mi,ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
             {
                 // check dimensions
-                assert(n == 5);
+                assert(n == 6);
                 
                 // compactification parameter
                 const int m = 1;
@@ -607,9 +616,7 @@ cArrays PWBA2::FullTMatrix_direct
                 double phi1  = special::constant::two_pi  * coords[2];
                 double phi2  = special::constant::two_pi  * coords[3];
                 double alpha = special::constant::pi_half * coords[4];
-                double Q = Qon * coords[5];
-//                 double alpha = special::constant::pi_quart;
-//                 double Q = Qon / std::pow(1 - coords[4], m);
+                double Q = Qon / std::pow(1 - coords[5], m);
                 
                 // compute both off- and on-shell momentum magnitudes
                 double qn = Q * std::sin(alpha), qnon = Qon * std::sin(alpha);
@@ -623,12 +630,12 @@ cArrays PWBA2::FullTMatrix_direct
                 
                 // the value of the off-shell integrand
                 double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_1s(vkf - vkn, vqn), Wi = std::conj(W_1s(vki - vkn, vqn));
+                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
                 Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
                 
                 // the value of the on-shell integrand
                 double normon = 4. / (special::constant::pi * qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = W_1s(vkf - vknon, vqnon), Wion = std::conj(W_1s(vki - vknon, vqnon));
+                Complex Wfon = W_cont(Ni,Li,Mi,vkf-vknon,vqnon), Wion = std::conj(W_cont(Ni,Li,Mi,vki-vknon,vqnon));
                 Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
                 
                 // Jacobian
@@ -652,21 +659,19 @@ cArrays PWBA2::FullTMatrix_direct
             // integrate U on 6-dimensional sparse grid
             std::cout << std::endl << "Linear integrand for Q = 0 .. " << Qon << std::endl;
             G.integrate_adapt<6>(integrand_U_wrap_lin, spgrid::d6l4n257, spgrid::d6l5n737);
-//             G.integrate_adapt<5>(integrand_U_wrap_lin, spgrid::d5l4n151, spgrid::d5l5n391);
             fU += G.result();
             nEvalU += G.evalcount();
             
             // integrate U on 6-dimensional sparse grid
             std::cout << std::endl << "Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
             G.integrate_adapt<6>(integrand_U_wrap_log, spgrid::d6l4n257, spgrid::d6l5n737);
-//             G.integrate_adapt<5>(integrand_U_wrap_log, spgrid::d5l4n151, spgrid::d5l5n391);
             fU += G.result();
             nEvalU += G.evalcount();
             std::cout << std::endl;
             G.setGlobEpsAbs(0);
-*/
+            
             // iW-integrand (imag part of propagator)
-            auto integrand_W_wrap = [ki,kf,vki,vkf,Etot,Qon](int n, double const * coords) -> Complex
+            auto integrand_W_wrap = [Ni,Li,Mi,ki,kf,vki,vkf,Etot,Qon](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 5);
@@ -686,7 +691,7 @@ cArrays PWBA2::FullTMatrix_direct
                 
                 // the value of the integrand
                 double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_1s(vkf - vkn, vqn), Wi = std::conj(W_1s(vki - vkn, vqn));
+                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
                 Complex integrand_W = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
                 
                 // Jacobian

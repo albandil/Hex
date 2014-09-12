@@ -563,7 +563,8 @@ template <class T> class SparseGrid
             std::vector<double>::const_iterator pw = nodes.at(i).w.begin();
             
             // compute fixed-point quadrature
-            T res = 0;
+            T res = 0, eval = 0;
+            double orphaned_weights = 0;
             for (int j = 0; j < N; j++)
             {
                 // compute translated and scaled node coordinates
@@ -572,11 +573,26 @@ template <class T> class SparseGrid
                     x[k] = domain.origin()[k] + (*px++) * domain.edge();
                 
                 // evaluate function at the node
-                res += (*pw++) * F(dim,x);
+                eval = F(dim,x);
+                
+                // check that the result's magnitude is finite
+                if (not std::isfinite(std::abs(eval)))
+                {
+                    // NO : omit this value as we may have hit an (otherwise integrable) singularity
+                    orphaned_weights += (*pw++);
+                    
+                    // print warning
+                    Debug << "Warning: Non-numerical evaluation in " << domain << std::endl;
+                }
+                else
+                {
+                    // YES : update the estimate
+                    res += (*pw++) * eval;
+                }
             }
             
-            // return the result
-            return res * domain.volume();
+            // return the result (extrapolate omitted nodes)
+            return res / (1.0 - orphaned_weights) * domain.volume();
         };
         
         /**

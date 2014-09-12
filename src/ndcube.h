@@ -150,21 +150,13 @@ template <int dim> class ndCube
  */
 template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> const & dCube)
 {
-    os << "[";
-    for (int i = 0; i < dCube.nVertex(); i++)
-    {
-        os << "(";
-        for (int j = 0; j < dim; j++)
-        {
-            os << dCube.vertex(i)[j];
-            if (j < dim - 1)
-                os << " ";
-        }
-        os << ")";
-        if (i < dCube.nVertex() - 1)
-            os << ",";
-    }
-    os << "]";
+    os << "[(";
+    for (int i = 0; i < dim; i++)
+        if (i == 0) os << dCube.origin()[i]; else os << "," << dCube.origin()[i];
+    os << "),(";
+    for (int i = 0; i < dim; i++)
+        if (i == 0) os << dCube.origin()[i] + dCube.edge(); else os << "," << dCube.origin()[i] + dCube.edge();
+    os << ")]";
     return os;
 }
 

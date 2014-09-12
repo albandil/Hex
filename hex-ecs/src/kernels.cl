@@ -246,9 +246,15 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
  * 4) kron_dot1(SC1,SC2,t,C)
  * 5) kron_dot2(SC1,SC2,z,C)
  */
-kernel void kron_dot1 (global double2 *A, global double2 *B, global double2 *v, global double2 *C)
+kernel void kron_dot1
+(
+    global double2 const * restrict A,
+    global double2 const * restrict B,
+    global double2 const * restrict v,
+    global double2       * restrict C
+)
 {
-    // get worker's segment index
+    // get worker's segment index (0 <= i < NSPLINE)
     int seg = get_global_id(0);
     
     // for all rows of B
@@ -260,11 +266,16 @@ kernel void kron_dot1 (global double2 *A, global double2 *B, global double2 *v, 
             prod = prod + cmul(B[irow * NSPLINE + icol],v[seg * NSPLINE + icol]);
         C[irow * NSPLINE + seg] = prod;
     }
-    
 }
-kernel void kron_dot2 (global double2 *A, global double2 *B, global double2 *w, global double2 *C)
+kernel void kron_dot2
+(
+    global double2 const * restrict A,
+    global double2 const * restrict B,
+    global double2       * restrict w,
+    global double2 const * restrict C
+)
 {
-    // get worker's segment index
+    // get worker's segment index (0 <= i < NSPLINE)
     int seg = get_global_id(0);
     
     // for all rows of C
@@ -277,12 +288,18 @@ kernel void kron_dot2 (global double2 *A, global double2 *B, global double2 *w, 
         w[seg * NSPLINE + irow] = prod;
     }
 }
-kernel void kron_div (private double2 E, global double2 *D1,  global double2 *D2, global double2 *y)
+kernel void kron_div
+(
+    double2 E,
+    global double2 const * restrict D1,
+    global double2 const * restrict D2,
+    global double2       * restrict y
+)
 {
-    // get worker's segment index
+    // get worker's segment index (0 <= i < NSPLINE)
     int i = get_global_id(0);
     
     // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
     for (int j = 0; j < NSPLINE; j++)
-        y[i * NSPLINE + j] = cdiv(y[i * NSPLINE + j], E - D1[i] - D2[j]);
+        y[j * NSPLINE + i] = cdiv(y[j * NSPLINE + i], E - D1[j] - D2[i]);
 }

@@ -825,8 +825,8 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo (device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tlocal memory size: " << size/1024 << " kiB\n";
     clGetDeviceInfo (device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tglobal memory size: " << std::setprecision(3) << size/pow(1024,3) << " GiB ";
-    std::cout << "(appx. " << req * 100. / size << " % will be used)\n";
+    std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
+    std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)\n";
     clGetDeviceInfo (device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax compute units: " << size << "\n";
     clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
@@ -1267,6 +1267,8 @@ void SepCGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
+    std::cout << "Set up SEP preconditioner" << std::endl;
+    
     // resize arrays
     invsqrtS_Cl_.resize(inp_.maxell + 1);
     invCl_invsqrtS_.resize(inp_.maxell + 1);
@@ -1290,7 +1292,6 @@ void SepCGPreconditioner::setup ()
     }
     
     // NOTE : Now S = CR * DSmat * CR⁻¹
-    std::cout << "Set up SEP preconditioner" << std::endl;
     std::cout << "\tS factorization residual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
     
     // compute √S and √S⁻¹

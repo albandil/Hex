@@ -1678,17 +1678,17 @@ template <typename T> NumberArray<T> sums (const ArrayView<NumberArray<T>> v)
 {
     if (v.size() == 0)
         return NumberArray<T>();    // empty array
-        
-        return std::accumulate
-        (
-            v.begin(),
-            v.end(),
-            NumberArray<T> (v[0].size()),
-            [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T>
-            {
-                return a + b;
-            }
-        );
+    
+    return std::accumulate
+    (
+        v.begin(),
+        v.end(),
+        NumberArray<T> (v[0].size()),
+        [](NumberArray<T> a, NumberArray<T> b) -> NumberArray<T>
+        {
+            return a + b;
+        }
+    );
 }
 
 /**
