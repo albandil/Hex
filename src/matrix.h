@@ -416,7 +416,16 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
                 out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
                 {
-                    if (*ptr == std::abs(*ptr)) out << " "; out << *ptr++ << " ";
+                    if (*ptr == std::abs(*ptr))
+                    {
+                        // positive entry
+                        out << " " << std::abs(*ptr++) << " ";
+                    }
+                    else
+                    {
+                        // negative entry
+                        out << *ptr++ << " ";
+                    }
                 }
                 
                 out << pos << "\n";

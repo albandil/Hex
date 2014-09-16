@@ -372,28 +372,14 @@ void NoPreconditioner::setup ()
     std::cout << "Creating Kronecker products... ";
     
     // Kronecker products
-    # pragma omp parallel sections if (!cmd_.outofcore)
-    {
-        # pragma omp section
-        S_kron_S_   = s_rad_.S().kron(s_rad_.S());
-        # pragma omp section
-        S_kron_Mm1_tr_ = s_rad_.S().kron(s_rad_.Mm1_tr());
-        # pragma omp section
-        S_kron_Mm2_ = s_rad_.S().kron(s_rad_.Mm2());
-        # pragma omp section
-        Mm1_tr_kron_S_ = s_rad_.Mm1_tr().kron(s_rad_.S());
-        # pragma omp section
-        Mm2_kron_S_ = s_rad_.Mm2().kron(s_rad_.S());
-        # pragma omp section
-        half_D_minus_Mm1_tr_ = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
-    }
-    # pragma omp parallel sections if (!cmd_.outofcore)
-    {
-        # pragma omp section
-        half_D_minus_Mm1_tr_kron_S_ = half_D_minus_Mm1_tr_.kron(s_rad_.S());
-        # pragma omp section
-        S_kron_half_D_minus_Mm1_tr_ = s_rad_.S().kron(half_D_minus_Mm1_tr_);
-    }
+    S_kron_S_   = s_rad_.S().kron(s_rad_.S());
+    S_kron_Mm1_tr_ = s_rad_.S().kron(s_rad_.Mm1_tr());
+    S_kron_Mm2_ = s_rad_.S().kron(s_rad_.Mm2());
+    Mm1_tr_kron_S_ = s_rad_.Mm1_tr().kron(s_rad_.S());
+    Mm2_kron_S_ = s_rad_.Mm2().kron(s_rad_.S());
+    half_D_minus_Mm1_tr_ = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
+    half_D_minus_Mm1_tr_kron_S_ = half_D_minus_Mm1_tr_.kron(s_rad_.S());
+    S_kron_half_D_minus_Mm1_tr_ = s_rad_.S().kron(half_D_minus_Mm1_tr_);
     
     std::cout << "ok\n\n";
     

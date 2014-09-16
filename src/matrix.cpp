@@ -2088,6 +2088,9 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
                     // get position on the C's diagonal
                     std::size_t ic = ia * B.size() + ib;
                     
+                    if (j < 0)
+                        ic += B.diag(std::abs(j));
+                    
                     // compute element
                     pC[ic] = pA[ia] * pB[ib];
                 }
