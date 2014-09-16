@@ -726,6 +726,11 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
+        // load the diagonal block
+        if (cmd_.outofcore)
+        # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        
         // solve using the CG solver
         n[ill] = cg_callbacks < cArray, cArrayView >
         (
@@ -738,6 +743,10 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             inner_mmul,             // matrix multiplication
             false                   // verbose output
         );
+        
+        // unload diagonal block
+        if (cmd_.outofcore)
+            dia_blocks_[ill].drop();
     }
     
     // inner preconditioner info (max and avg number of iterations)
@@ -752,21 +761,21 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-    if (cmd_.outofcore)
-    {
-        // load matrix from disk file
-        # pragma omp critical
-        dia_blocks_[iblock].hdfload();
-    }
+//     if (cmd_.outofcore and cmd_.parallel_block)
+//     {
+//         // load matrix from disk file
+//         # pragma omp critical
+//         dia_blocks_[iblock].hdfload();
+//     }
     
     // multiply
     q = dia_blocks_[iblock].dot(p, both, cmd_.parallel_dot);
     
-    if (cmd_.outofcore)
-    {
-        // release memory
-        dia_blocks_[iblock].drop();
-    }
+//     if (cmd_.outofcore and cmd_.parallel_block)
+//     {
+//         // release memory
+//         dia_blocks_[iblock].drop();
+//     }
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -955,7 +964,6 @@ void GPUCGPreconditioner::setup ()
 void GPUCGPreconditioner::update (double E)
 {
     NoPreconditioner::update(E);
-    E_ = E;
     
     std::cout << "\tUpdate preconditioner..." << std::flush;
     

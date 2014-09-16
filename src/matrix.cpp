@@ -1531,18 +1531,53 @@ bool CooMatrix::hdfload (const char* name)
 #endif
 }
 
-SymDiaMatrix::SymDiaMatrix() : n_(0), elems_(0), idiag_(0), name_(), dptrs_(0) {}
+SymDiaMatrix::SymDiaMatrix ()
+    : n_(0), elems_(0), idiag_(0), name_(), dptrs_(0)
+{
+    
+}
 
-SymDiaMatrix::SymDiaMatrix(int n) : n_(n), elems_(n), idiag_(0), name_(), dptrs_(0) {}
+SymDiaMatrix::SymDiaMatrix (int n)
+    : n_(n), elems_(n), idiag_(0), name_(), dptrs_(0)
+{
+    
+}
 
-SymDiaMatrix::SymDiaMatrix(int n, const iArrayView id, const cArrayView v)
-    : n_(n), elems_(v), idiag_(id), name_() { setup_dptrs_(); }
+SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
+    : n_(n), idiag_(id), name_()
+{
+    // compute needed number of elements
+    std::size_t vol = 0;
+    for (int d : idiag_)
+        vol += n*n - d;
+    
+    // resize storage
+    elems_.resize(vol);
+    
+    // setup diagonal pointers
+    setup_dptrs_();
+}
+
+SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id, const cArrayView v)
+    : n_(n), elems_(v), idiag_(id), name_()
+{
+    // setup diagonal pointers
+    setup_dptrs_();
+}
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
-    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_), name_() { setup_dptrs_(); }
+    : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_), name_()
+{
+    // setup diagonal pointers
+    setup_dptrs_();
+}
 
 SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
-    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)), name_(A.name_) { setup_dptrs_(); }
+    : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)), name_(A.name_)
+{
+    // setup diagonal pointers
+    setup_dptrs_();
+}
 
 void SymDiaMatrix::setup_dptrs_()
 {
@@ -1997,10 +2032,79 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     return res;
 }
 
+SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
+{
+    iArray Cdiags;
+    
+    // compose diagonals of the result
+    for (int i = 0; i < (int)A.diag().size(); i++)
+    for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
+    {
+        // A's diagonal label
+        int dA = A.diag(i);
+        
+        // B's diagonal label
+        int dB = (j < 0 ? -B.diag(std::abs(j)) : B.diag(j));
+        
+        // C's diagonal label
+        int dC = dA * B.size() + dB;
+        
+        // add the new diagonal
+        if (dC >= 0)
+            Cdiags.push_back(dC);
+    }
+    
+    // create result matrix
+    SymDiaMatrix C (A.size() * B.size(), Cdiags);
+    
+    // for all A's and B's diagonals
+    # pragma omp parallel for collapse (2)
+    for (int i = 0; i < (int)A.diag().size(); i++)
+    for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
+    {
+        // A's diagonal label and pointer
+        int dA = A.diag(i);
+        Complex const * restrict pA = A.dptr(i);
+        
+        // B's diagonal label and pointer
+        int dB = (j < 0 ? -B.diag(std::abs(j)) : B.diag(j));
+        Complex const * restrict pB = B.dptr(std::abs(j));
+        
+        // C's diagonal label
+        int dC = dA * B.size() + dB;
+        
+        // compute elements on C's current diagonal dC
+        if (dC >= 0)
+        {
+            // C's diagonal pointer
+            Complex * const restrict pC = C.dptr(dC);
+            
+            // for all elements on A's diagonal dA
+            for (std::size_t ia = 0; ia < A.size() - dA; ia++)
+            {
+                // for all elements on B's diagonal dB
+                for (std::size_t ib = 0; ib < B.size() - dB; ib++)
+                {
+                    // get position on the C's diagonal
+                    std::size_t ic = ia * B.size() + ib;
+                    
+                    // compute element
+                    pC[ic] = pA[ia] * pB[ib];
+                }
+            }
+        }
+    }
+    
+    // return final result
+    return C;
+}
+
 SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
     // FIXME this is ugly and inefficient
-    return ::kron (this->tocoo(), B.tocoo()).todia();
+//     return ::kron (this->tocoo(), B.tocoo()).todia();
+    
+    return ::kron (*this, B);
 }
 
 cArray SymDiaMatrix::lowerSolve (const cArrayView b) const

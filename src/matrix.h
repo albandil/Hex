@@ -1539,27 +1539,27 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write(const char* filename) const;
+    void write (const char* filename) const;
     
     /// Shake the content, i.e. sum same element entries.
-    CooMatrix shake() const;
+    CooMatrix shake () const;
     
     /**
      * @brief Save matrix to HDF file.
      * @param name Filename.
      */
-    bool hdfsave(const char* name) const;
+    bool hdfsave (const char* name) const;
     
     /**
      * @brief Load matrix from HDF file.
      * @param name Filename.
      */
-    bool hdfload(const char* name);
+    bool hdfload (const char* name);
 
 private:
 
     // dimensions
-    size_t m_, n_;
+    std::size_t m_, n_;
 
     // ijv-representation
     lArray i_, j_;
@@ -1595,7 +1595,8 @@ private:
  *   matrix C = AB is equal to the sum of the bandwidths of the factors
  *   decreased by one.
  */
-class SymDiaMatrix {
+class SymDiaMatrix
+{
 
 public:
     //
@@ -1603,26 +1604,34 @@ public:
     //
 
     /// Empty constructor.
-    SymDiaMatrix();
+    SymDiaMatrix ();
     
     /// Size constructor.
-    SymDiaMatrix(int n);
+    SymDiaMatrix (int n);
     
     /**
      * @brief Data constructor.
      * 
      * @param n Size of the matrix.
      * @param id Identifyiers of the diagonals (positive integers expected).
-     * @param v Stacked (and padded if ncessary) diagonals.
      */
-    SymDiaMatrix(int n, const iArrayView id, const cArrayView v);
+    SymDiaMatrix (int n, const iArrayView id);
+    
+    /**
+     * @brief Data constructor.
+     * 
+     * @param n Size of the matrix.
+     * @param id Identifyiers of the diagonals (positive integers expected).
+     * @param v Stacked (and padded if necessary) diagonals.
+     */
+    SymDiaMatrix (int n, const iArrayView id, const cArrayView v);
     
     /// Copy constructor.
-    SymDiaMatrix(SymDiaMatrix const & A);
+    SymDiaMatrix (SymDiaMatrix const & A);
 
     /// Move constructor.
-    SymDiaMatrix(SymDiaMatrix && A);
-
+    SymDiaMatrix (SymDiaMatrix && A);
+    
     /**
      * @brief Plain symmetrical populator.
      *
@@ -1637,7 +1646,7 @@ public:
      *          be populated always.
      * @param f The functor that will compute the matrix elements.
      */
-    template <class Functor> SymDiaMatrix & populate(unsigned d, Functor f)
+    template <class Functor> SymDiaMatrix & populate (unsigned d, Functor f)
     {
         // throw away old data
         elems_.resize(0);
@@ -1666,7 +1675,7 @@ public:
     // Destructor
     //
 
-    ~SymDiaMatrix() {}
+    ~SymDiaMatrix () {}
     
     /// Free all fields, set dimensions to zero.
     void drop ()
@@ -1690,8 +1699,8 @@ public:
      * larger than zero.
      */
     //@{
-    iArray const & diag() const { return idiag_; }
-    iArray & diag() { return idiag_; }
+    iArray const & diag () const { return idiag_; }
+    iArray & diag () { return idiag_; }
     //@}
     
     /**
@@ -1701,7 +1710,7 @@ public:
      * diagonal is always the main diagonal (= 0), but it doesn't have to hold
      * for next diagonals.
      */
-    int diag(int i) const { return idiag_[i]; }
+    int diag (int i) const { return idiag_[i]; }
     
     /**
      * @brief Main diagonal.
@@ -1709,8 +1718,8 @@ public:
      * Return direct-access view of the main diagonal.
      */
     //@{
-    cArrayView main_diagonal() const { return cArrayView(elems_, 0, n_); }
-    cArrayView main_diagonal() { return cArrayView(elems_, 0, n_); }
+    cArrayView main_diagonal () const { return cArrayView(elems_, 0, n_); }
+    cArrayView main_diagonal () { return cArrayView(elems_, 0, n_); }
     //@}
     
     /**
@@ -1719,8 +1728,8 @@ public:
      * Return direct-access data pointer.
      */
     //@{
-    cArray const & data() const { return elems_; }
-    cArray & data() { return elems_; }
+    cArray const & data () const { return elems_; }
+    cArray & data () { return elems_; }
     //@}
     
     /**
@@ -1731,8 +1740,8 @@ public:
      *          diagonals.
      */
     //@{
-    Complex const * dptr(int i) const { return dptrs_[i]; }
-    Complex * dptr(int i) { return dptrs_[i]; }
+    Complex const * dptr (int i) const { return dptrs_[i]; }
+    Complex * dptr (int i) { return dptrs_[i]; }
     //@}
     
     /**
@@ -1741,7 +1750,7 @@ public:
      * Return row/column count. The matrix is symmetric and so both
      * counts are equal.
      */
-    size_t size() const { return n_; }
+    std::size_t size () const { return n_; }
     
     /**
      * @brief Bandwidth.
@@ -1749,7 +1758,7 @@ public:
      * Return the bandwidth of the matrix, i.e. number of all (upper, main an lower)
      * diagonals that would have to be stored in a full banded-matrix format.
      */
-    int bandwidth() const { return 1 + 2 * idiag_.back(); }
+    int bandwidth () const { return 1 + 2 * idiag_.back(); }
     
     /**
      * @brief Check compatibility of matrices.
@@ -2122,18 +2131,18 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
  * @param A First matrix
  * @param B Second matrix.
  */
-CooMatrix kron(const CooMatrix& A, const CooMatrix& B);
+CooMatrix kron (const CooMatrix& A, const CooMatrix& B);
 
 /**
  * Identity matrix.
  * @param N Dimension.
  */
-CooMatrix eye(size_t N);
+CooMatrix eye (std::size_t N);
 
 /**
  * Diagonal matrix with diagonal consisting of 0, 1, 2, 3, ..., N - 1.
  * @param N Dimension.
  */
-CooMatrix stairs(size_t N);
+CooMatrix stairs (std::size_t N);
 
 #endif
