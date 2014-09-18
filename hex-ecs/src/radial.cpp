@@ -33,10 +33,6 @@ inline double damp (Complex r, Complex R)
     return tanh(0.125 * (R.real() - r.real()));
 }
 
-// ----------------------------------------------------------------------- //
-//  Computation of B-spline moments                                        //
-// ----------------------------------------------------------------------- //
-
 rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
 {
     // get last knot (end of last interval)
@@ -45,7 +41,7 @@ rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
     
     // quadrature order
     // NOTE : must match that in RadialIntegrals::computeMi !
-    int Npts = std::max (2, bspline_.order() + abs(lambda) + 1);
+    int Npts = std::max(2, bspline_.order() + abs(lambda) + 1);
     
     // output arrays
     rArray data (iknotmax);
@@ -67,7 +63,15 @@ rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
     return data;
 }
 
-void RadialIntegrals::M_integrand (int n, Complex * const restrict in, Complex * const restrict out, int i, int j, int a, int iknot, int iknotmax, double& logscale) const
+void RadialIntegrals::M_integrand
+(
+    int n,
+    Complex * const restrict in,
+    Complex * const restrict out,
+    int i, int j, int a,
+    int iknot, int iknotmax,
+    double & logscale
+) const
 {
     // extract data
     Complex R = bspline_.t(iknotmax);
@@ -358,22 +362,14 @@ void RadialIntegrals::setupOneElectronIntegrals ()
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
-    std::string R_name;
-    
     // allocate storage
     R_tr_dia_.resize(lambdas.size());
     
+    // print information
     #pragma omp parallel
-    {
-        #pragma omp master
-        {
-            std::cout << "Precomputing multipole integrals (λ = 0 .. " 
-                      << lambdas.size() - 1
-                      << ") using " 
-                      << omp_get_num_threads() 
-                      << " threads.\n";
-        }
-    }
+    #pragma omp master
+    std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using " 
+              << omp_get_num_threads() << " threads." << std::endl;
     
     // shorthands
     int Nspline = bspline_.Nspline();
@@ -387,18 +383,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             continue;
         
         // look for precomputed data on disk
-        R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+        std::string R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
         if (R_tr_dia_[lambda].hdfload(R_name))
         {
             std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_name << "\"\n";
-            
-            // link and unload the disk file if out of core computation is active
-            if (cmd.outofcore)
-            {
-                R_tr_dia_[lambda].link(R_name);
-//                 R_tr_dia_[lambda].drop();
-            }
-            
             continue; // no need to compute
         }
         
@@ -406,8 +394,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         cArray Mtr_L, Mtr_mLm1;
         
         // compute partial moments
-        Mtr_L    = computeMi ( lambda, bspline_.Nreknot() - 1);
-        Mtr_mLm1 = computeMi (-lambda-1, bspline_.Nreknot() - 1);
+        Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+        Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
         
         // elements of R_tr
         lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
@@ -452,28 +440,17 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
         R_tr_dia_[lambda].hdfsave(R_name, true, 10);
         
-        // link and unload the disk file if out of core computation is active
-        if (cmd.outofcore)
-        {
-            R_tr_dia_[lambda].link(R_name);
-//             R_tr_dia_[lambda].drop();
-        }
-        
         std::cout << "\t- integrals for λ = " << lambda << " computed\n";
     }
     
-    // for all multipoles : synchronize
 #ifndef NO_MPI
+    // for all multipoles : synchronize
     if (par.active())
     {
         for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();
-            
-            // owner may need to load the data
-//             if (cmd.outofcore and owner == par.iproc())
-//                 R_tr_dia_[lambda].hdfload();
             
             // get dimensions
             int diagsize = R_tr_dia_[lambda].diag().size();
@@ -501,18 +478,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << "\n";
                 
                 // save to disk (if the file doesn't already exist)
-                R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
+                std::string R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
                 if (not HDFFile(R_name, HDFFile::readonly).valid())
                     R_tr_dia_[lambda].hdfsave(R_name, true, 10);
             }
-            
-            // are we to keep this radial integral for this process?
-//             if (cmd.outofcore or not lambdas[lambda])
-//                 R_tr_dia_[lambda].drop();
         }
+        
         MPI_Barrier(MPI_COMM_WORLD);
     }
 #endif
-    
-    // --------------------------------------------------------------------- //
 }

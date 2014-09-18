@@ -10,8 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#ifndef HEX_SPMATRIX
-#define HEX_SPMATRIX
+#ifndef HEX_MATRIX
+#define HEX_MATRIX
 
 #include <cassert>
 #include <complex>
@@ -104,9 +104,6 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
             : DenseMatrix<Type>(rows, cols, data) {}
         ColMatrix (RowMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
-        
-//         explicit ColMatrix (DenseMatrix<Type> const & M)
-//             : DenseMatrix<Type>(M) {}
         
         /**
          * @brief Populator.
@@ -231,9 +228,6 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             : DenseMatrix<Type>(rows, cols, data) {}
         RowMatrix (ColMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
-        
-//         explicit RowMatrix (DenseMatrix<Type> const & M)
-//             : DenseMatrix<Type>(M) {}
         
         /**
          * @brief Populator.
@@ -605,12 +599,12 @@ public:
     
     // Destructor
     
-    ~CscMatrix() {}
+    ~CscMatrix () {}
     
     /**
      * Convert to COO-matrix.
      */
-    CooMatrix tocoo() const;
+    CooMatrix tocoo () const;
     
     /**
      * Matrix-vector product using a transposed matrix, \f$ A^T \cdot b \f$.
@@ -618,16 +612,16 @@ public:
      * format.
      * @param b Vector to multiply with.
      */
-    cArray dotT(const cArrayView b) const;
+    cArray dotT (const cArrayView b) const;
     
     // Getters
     
-    size_t size() const { return i_.size(); }
-    size_t rows() const { return m_; }
-    size_t cols() const { return n_; }
-    lArray const & p() const { return p_; }
-    lArray const & i() const { return i_; }
-    cArray const & x() const { return x_; }
+    std::size_t size () const { return i_.size(); }
+    std::size_t rows () const { return m_; }
+    std::size_t cols () const { return n_; }
+    lArray const & p () const { return p_; }
+    lArray const & i () const { return i_; }
+    cArray const & x () const { return x_; }
     
     /**
      * Multiplication by a real number.
@@ -652,13 +646,13 @@ public:
      * Save matrix to HDF file.
      * @param name Filename.
      */
-    bool hdfsave(const char* name) const;
+    bool hdfsave (const char* name) const;
     
     /**
      * Load matrix from HDF file.
      * @param name Filename.
      */
-    bool hdfload(const char* name);
+    bool hdfload (const char* name);
     
 private:
     
@@ -722,16 +716,16 @@ public:
      * Ordinary matrix-vector product, \f$ A\cdot b \f$.
      * @param b Vector to multiply with.
      */
-    cArray dot(cArrayView const & b) const;
+    cArray dot (cArrayView const & b) const;
     
     // Getters
     
-    size_t size() const { return i_.size(); }
-    size_t rows() const { return m_; }
-    size_t cols() const { return n_; }
-    lArray const & p() const { return p_; }
-    lArray const & i() const { return i_; }
-    cArray const & x() const { return x_; }
+    std::size_t size () const { return i_.size(); }
+    std::size_t rows () const { return m_; }
+    std::size_t cols () const { return n_; }
+    lArray const & p () const { return p_; }
+    lArray const & i () const { return i_; }
+    cArray const & x () const { return x_; }
     
     // return absolute value of the (in absolute value) largest element
     double norm() const;
@@ -846,7 +840,7 @@ public:
          * Return the number of bytes occupied by the stored elements
          * of the LU-factorization. This doesn't contain any other structural data.
          */
-        size_t size () const
+        std::size_t size () const
         {
             if (numeric_ == nullptr)
                 return 0;
@@ -914,7 +908,7 @@ public:
          * 
          * Get UMFPACK "info" array.
          */
-        rArray const & info() const { return info_; }
+        rArray const & info () const { return info_; }
         
         /**
          * @brief Link to a disk file.
@@ -2140,7 +2134,8 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
  * @param A First matrix
  * @param B Second matrix.
  */
-CooMatrix kron (const CooMatrix& A, const CooMatrix& B);
+CooMatrix kron (CooMatrix const & A, CooMatrix const & B);
+SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
 
 /**
  * Identity matrix.
@@ -2154,4 +2149,4 @@ CooMatrix eye (std::size_t N);
  */
 CooMatrix stairs (std::size_t N);
 
-#endif
+#endif // HEX_MATRIX

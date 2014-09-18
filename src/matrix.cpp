@@ -37,7 +37,7 @@
 // Dense matrix routines
 //
 
-#ifndef NO_BLAS
+// Matrix-matrix multiplication.
 extern "C" void zgemm_
 (
     char * TRANSA, 
@@ -54,7 +54,6 @@ extern "C" void zgemm_
     Complex * C, 
     int * LDC 
 );
-#endif
 
 #ifndef NO_LAPACK
 // Calculates LU decomposition of a complex dense matrix.
@@ -262,7 +261,7 @@ template<> std::tuple<cArray,ColMatrix<Complex>,ColMatrix<Complex>> ColMatrix<Co
 
 cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cArrayView const v)
 {
-    assert(A.cols() * B.cols() == v.size());
+    assert(A.cols() * B.cols() == (int)v.size());
     
     // return vector
     NumberArray<Complex> w(A.rows() * B.rows());
@@ -275,13 +274,25 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
     // C = V * A^T
     {
         int m = B.rows(), k = B.cols(), n = A.rows();
-        zgemm_(&norm, &norm, &m, &n, &k, &alpha, const_cast<Complex*>(v.data()), &n, const_cast<Complex*>(A.data().data()), &k, &beta, C.data().begin(), &m);
+        zgemm_
+        (
+            &norm, &norm, &m, &n, &k,
+            &alpha, const_cast<Complex*>(v.data()), &n,
+            const_cast<Complex*>(A.data().data()), &k,
+            &beta, C.data().begin(), &m
+        );
     }
     
     // W = B * C
     {
         int m = A.rows(), k = A.cols(), n = C.cols();
-        zgemm_(&trans, &norm, &m, &n, &k, &alpha, const_cast<Complex*>(B.data().begin()), &n, C.data().begin(), &n, &beta, w.data(), &m);
+        zgemm_
+        (
+            &trans, &norm, &m, &n, &k,
+            &alpha, const_cast<Complex*>(B.data().begin()), &n,
+            C.data().begin(), &n,
+            &beta, w.data(), &m
+        );
     }
     
     return w;
@@ -294,11 +305,11 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
 CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
 {
     // shorthands
-    size_t Asize = A.v().size();
-    size_t Bsize = B.v().size();
-    size_t Csize = Asize * Bsize;
-    size_t Brows = B.rows();
-    size_t Bcols = B.cols();
+    std::size_t Asize = A.v().size();
+    std::size_t Bsize = B.v().size();
+    std::size_t Csize = Asize * Bsize;
+    std::size_t Brows = B.rows();
+    std::size_t Bcols = B.cols();
     
     // set correct dimensions, pre-allocate space
     int m = A.rows() * B.rows();
@@ -318,10 +329,10 @@ CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
     Complex       * restrict pC_x = C_x.data();
     
     // loop over A data
-    for (size_t ia = 0; ia < Asize; ia++)
+    for (std::size_t ia = 0; ia < Asize; ia++)
     {
         // loop over B data
-        for (size_t ib = 0; ib < Bsize; ib++)
+        for (std::size_t ib = 0; ib < Bsize; ib++)
         {
             // compute new row index
             *pC_i = pA_i[ia] * Brows + pB_i[ib];
@@ -341,21 +352,21 @@ CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
     return CooMatrix(m, n, C_i, C_j, C_x);
 }
 
-CooMatrix eye (size_t N)
+CooMatrix eye (std::size_t N)
 {
     return CooMatrix(N,N).symm_populate_band
     (
         0,
-        [](size_t i, size_t j) -> Complex { return 1.; }
+        [](unsigned i, unsigned j) -> Complex { return 1.; }
     );
 }
 
-CooMatrix stairs (size_t N)
+CooMatrix stairs (std::size_t N)
 {
     return CooMatrix(N,N).symm_populate_band
     (
         0,
-        [](size_t i, size_t j) -> Complex { return (i == j) ? i : 0.; }
+        [](unsigned i, unsigned j) -> Complex { return (i == j) ? i : 0.; }
     );
 }
 
@@ -365,9 +376,9 @@ CooMatrix stairs (size_t N)
 
 CscMatrix & CscMatrix::operator *= (double r)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         x_[i] *= r;
     
     return *this;
@@ -375,13 +386,13 @@ CscMatrix & CscMatrix::operator *= (double r)
 
 CscMatrix & CscMatrix::operator &= (const CscMatrix&  B)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
     assert(m_ == B.m_);
     assert(n_ == B.n_);
     assert(N == B.i_.size());
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
     {
         assert(i_[i] == B.i_[i]);
         
@@ -393,13 +404,13 @@ CscMatrix & CscMatrix::operator &= (const CscMatrix&  B)
 
 CscMatrix & CscMatrix::operator ^= (const CscMatrix&  B)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
     assert(m_ == B.m_);
     assert(n_ == B.n_);
     assert(N == B.i_.size());
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
     {
         assert(i_[i] == B.i_[i]);
         
@@ -417,11 +428,11 @@ cArray CscMatrix::dotT (const cArrayView b) const
     // the matrix "*this" is actually transposed
     for (unsigned icol = 0; icol < n_; icol++)
     {
-        size_t idx1 = p_[icol];
-        size_t idx2 = p_[icol+1];
+        std::size_t idx1 = p_[icol];
+        std::size_t idx2 = p_[icol+1];
         
         // for all nonzero elements in this column
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
         {
             // get row number
             unsigned irow = i_[idx];
@@ -438,7 +449,7 @@ cArray CscMatrix::dotT (const cArrayView b) const
 CooMatrix CscMatrix::tocoo () const
 {
     // reserve space for the auxiliary (J) and the output (Ti,Tj,Tx,Tz) arrays
-    size_t N = x_.size();
+    std::size_t N = x_.size();
     std::vector<long> Ti(N), Tj(N), J(N);
     std::vector<Complex> Tx(N);
     
@@ -457,8 +468,8 @@ CooMatrix CscMatrix::tocoo () const
         }
         
         // copy only non-zero entries to output arrays
-        size_t nz = 0;
-        for (size_t i = 0; i < N; i++)
+        std::size_t nz = 0;
+        for (std::size_t i = 0; i < N; i++)
         {
             if (x_[i] != 0.)
             {
@@ -565,9 +576,9 @@ bool CscMatrix::hdfload (const char* name)
 
 CsrMatrix & CsrMatrix::operator *= (Complex r)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         x_[i] *= r;
     
     return *this;
@@ -575,14 +586,14 @@ CsrMatrix & CsrMatrix::operator *= (Complex r)
 
 CsrMatrix & CsrMatrix::operator &= (CsrMatrix const &  B)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
     // check at least dimensions and non-zero element count
     assert(m_ == B.m_);
     assert(n_ == B.n_);
     assert(N == B.i_.size());
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         x_[i] += B.x_[i];
     
     return *this;
@@ -590,13 +601,13 @@ CsrMatrix & CsrMatrix::operator &= (CsrMatrix const &  B)
 
 CsrMatrix & CsrMatrix::operator ^= (CsrMatrix const &  B)
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     
     assert(m_ == B.m_);
     assert(n_ == B.n_);
     assert(N == B.i_.size());
     
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         x_[i] -= B.x_[i];
     
     return *this;
@@ -609,11 +620,11 @@ cArray CsrMatrix::dot (cArrayView const & b) const
     
     for (unsigned irow = 0; irow < m_; irow++)
     {
-        size_t idx1 = p_[irow];
-        size_t idx2 = p_[irow+1];
+        std::size_t idx1 = p_[irow];
+        std::size_t idx2 = p_[irow+1];
         
         // for all nonzero elements in this row
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
         {
             // get column number
             unsigned icol = i_[idx];
@@ -742,10 +753,10 @@ void CsrMatrix::write (const char* filename) const
     out << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
     for (unsigned irow = 0; irow < m_; irow++)
     {
-        size_t idx1 = p_[irow];
-        size_t idx2 = p_[irow + 1];
+        std::size_t idx1 = p_[irow];
+        std::size_t idx2 = p_[irow + 1];
         
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
             out << irow << "\t" << i_[idx] << "\t" << x_[idx].real() << "\t" << x_[idx].imag() << "\n";
     }
     out.close();
@@ -836,11 +847,11 @@ bool CsrMatrix::hdfload (std::string name)
 
 double CsrMatrix::norm () const
 {
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     double res = 0.;
     
     // return the abs(largest element)
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
     {
         // compute the absolute value
         double val = abs(x_[i]);
@@ -856,31 +867,31 @@ double CsrMatrix::norm () const
 cArray CsrMatrix::upperSolve (cArrayView const &  b) const
 {
     // check size
-    size_t N = b.size();
-    assert((size_t)m_ == N);
-    assert((size_t)n_ == N);
+    std::size_t N = b.size();
+    assert((std::size_t)m_ == N);
+    assert((std::size_t)n_ == N);
 
     // create output array
     cArray x(N);
     
     // loop over rows
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
     {
-        size_t row = N - 1 - i;
+        std::size_t row = N - 1 - i;
         Complex accum = 0.;
         
         // get relevant columns of the sparse matrix
-        size_t idx1 = p_[row];
-        size_t idx2 = p_[row + 1];
+        std::size_t idx1 = p_[row];
+        std::size_t idx2 = p_[row + 1];
         
         // diagonal element of the matrix
         Complex a = 0.;
         
         // loop over the columns
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
         {
             // which column is this?
-            size_t col = i_[idx];
+            std::size_t col = i_[idx];
             
             // diagonal element will be useful in a moment, store it
             if (col == row)
@@ -904,30 +915,30 @@ cArray CsrMatrix::upperSolve (cArrayView const &  b) const
 cArray CsrMatrix::lowerSolve (cArrayView const & b) const
 {
     // check size
-    size_t N = b.size();
-    assert((size_t)m_ == N);
-    assert((size_t)n_ == N);
+    std::size_t N = b.size();
+    assert((std::size_t)m_ == N);
+    assert((std::size_t)n_ == N);
     
     // create output array
     cArray x(N);
     
     // loop over rows
-    for (size_t row = 0; row < N; row++)
+    for (std::size_t row = 0; row < N; row++)
     {
         Complex accum = 0.;
         
         // get relevant columns of the sparse matrix
-        size_t idx1 = p_[row];
-        size_t idx2 = p_[row + 1];
+        std::size_t idx1 = p_[row];
+        std::size_t idx2 = p_[row + 1];
         
         // diagonal element of the matrix
         Complex a = 0.;
         
         // loop over the columns
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
         {
             // which column is this?
-            size_t col = i_[idx];
+            std::size_t col = i_[idx];
             
             // diagonal element will be useful in a moment, store it
             if (col == row)
@@ -950,12 +961,12 @@ cArray CsrMatrix::lowerSolve (cArrayView const & b) const
 
 cArray CsrMatrix::diag () const
 {
-    cArray D ( std::min(m_, n_) );
+    cArray D (std::min(m_, n_));
     
-    for (size_t irow = 0; irow < (size_t)m_; irow++)
-        for (size_t idx = p_[irow]; idx < (size_t)p_[irow+1]; idx++)
-            if ((size_t)i_[idx] == irow)
-                D[irow] = x_[idx];
+    for (int irow = 0; irow < m_; irow++)
+    for (int idx = p_[irow]; idx < p_[irow+1]; idx++)
+    if (i_[idx] == irow)
+        D[irow] = x_[idx];
     
     return D;
 }
@@ -964,7 +975,7 @@ cArray CsrMatrix::diag () const
 CooMatrix CsrMatrix::tocoo () const
 {
     // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
-    size_t N = x_.size();
+    std::size_t N = x_.size();
     lArray Ti(N), Tj(N), __j(N);
     cArray Tx(N);
     
@@ -983,8 +994,8 @@ CooMatrix CsrMatrix::tocoo () const
         }
         
         // copy only non-zero entries to output arrays
-        size_t nz = 0;
-        for (size_t i = 0; i < N; i++)
+        std::size_t nz = 0;
+        for (std::size_t i = 0; i < N; i++)
         {
             if (x_[i] != 0.)
             {
@@ -1034,15 +1045,15 @@ CsrMatrix CsrMatrix::sparse_like (const CsrMatrix& B) const
     
     // prepare zero matrix with the same storage pattern the matrix B has
     CsrMatrix A = B;
-    memset(A.x_.data(), 0, A.x_.size() * sizeof(Complex));
+    std::memset(A.x_.data(), 0, A.x_.size() * sizeof(Complex));
     
     // copy all nonzero elements of "this" matrix
     for (unsigned row = 0; row < m_; row++)
     {
-        size_t idx1 = A.p_[row];
-        size_t idx2 = A.p_[row+1];
+        std::size_t idx1 = A.p_[row];
+        std::size_t idx2 = A.p_[row+1];
         
-        for (size_t idx = idx1; idx < idx2; idx++)
+        for (std::size_t idx = idx1; idx < idx2; idx++)
         {
             unsigned col = A.i_[idx];
             A.x_[idx] = (*this)(row,col);
@@ -1056,8 +1067,8 @@ CsrMatrix CsrMatrix::sparse_like (const CsrMatrix& B) const
 Complex CsrMatrix::operator () (unsigned i, unsigned j) const
 {
     // get all column indices, which have nonzero element in row "i"
-    size_t idx1 = p_[i];
-    size_t idx2 = p_[i + 1];
+    std::size_t idx1 = p_[i];
+    std::size_t idx2 = p_[i + 1];
     
     // find the correct column ("j")
     auto it = std::lower_bound(i_.begin() + idx1, i_.begin() + idx2, j);
@@ -1151,7 +1162,7 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
 #ifndef NO_UMFPACK
 CscMatrix CooMatrix::tocsc () const
 {
-    size_t nz = x_.size();
+    std::size_t nz = x_.size();
     
     // CSC matrix data
     lArray Ap(n_ + 1), Ai(nz);
@@ -1183,7 +1194,7 @@ CscMatrix CooMatrix::tocsc () const
         }
         
         // crop storage
-        size_t N = Ap[n_];
+        std::size_t N = Ap[n_];
         Ai.resize(N);
         Ax.resize(N);
     }
@@ -1236,7 +1247,7 @@ CsrMatrix CooMatrix::tocsr () const
         }
         
         // crop storage
-        size_t N = Ap[m_];
+        std::size_t N = Ap[m_];
         Ai.resize(N);
         Ax.resize(N);
     }
@@ -1254,7 +1265,7 @@ SymDiaMatrix CooMatrix::todia (MatrixTriangle triangle) const
     cArrays elems(m_);
     
     // for all nonzero elements
-    for (size_t i = 0; i < x_.size(); i++)
+    for (std::size_t i = 0; i < x_.size(); i++)
     {
         // get row and column index
         int irow = i_[i];
@@ -1318,21 +1329,21 @@ CooMatrix CooMatrix::reshape (size_t m, size_t n) const
     CooMatrix C = *this;
     
     // conserved dimensions
-    size_t N = C.i_.size();
-    size_t H = C.m_;
+    std::size_t N = C.i_.size();
+    std::size_t H = C.m_;
     
     // check dimensions
     assert(m * n == C.m_ * C.n_);
     
     // reshape
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
     {
         // conserved position in column-ordered array
-        size_t idx = C.i_[i] + C.j_[i] * H;
+        std::size_t idx = C.i_[i] + C.j_[i] * H;
         
         // new coordinates
-        size_t row = idx % m;
-        size_t col = idx / m;
+        std::size_t row = idx % m;
+        std::size_t col = idx / m;
         
         // update values
         C.i_[i] = row;
@@ -1349,7 +1360,7 @@ cArray CooMatrix::todense () const
     // return column-major dense representations
     cArray v (m_ * n_);
     
-    size_t N = i_.size();
+    std::size_t N = i_.size();
     for (size_t i = 0; i < N; i++)
         v[i_[i] + j_[i] * m_] += x_[i];
     
@@ -1370,8 +1381,8 @@ CooMatrix CooMatrix::dot (const cArrayView B) const
     // NOTE: Row-major storage assumed for B.
     
     // volumes
-    size_t A_vol = x_.size();
-    size_t B_vol = B.size();
+    std::size_t A_vol = x_.size();
+    std::size_t B_vol = B.size();
     
     // check B shape
     assert(B_vol % n_ == 0);
@@ -1742,9 +1753,6 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A)
 
 SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
-    // FIXME : write an optimized routine
-//     return (A.tocoo().tocsr() * B.tocoo().tocsc()).tocoo().todia();
-    
     // check dimensions
     if (A.size() != B.size())
         throw exception ("Cannot multiply matrices: A's column count != B's row count.");
@@ -1757,7 +1765,8 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
     int A_Ndiag = A.diag().size();
     
     // create the output matrix
-    SymDiaMatrix C (
+    SymDiaMatrix C
+    (
         A.size(),
         linspace<int>(0, C_hbw, C_hbw + 1),
         cArray(C_nnz)
@@ -2058,7 +2067,7 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
     SymDiaMatrix C (A.size() * B.size(), Cdiags);
     
     // for all A's and B's diagonals
-//     # pragma omp parallel for collapse (2)
+    # pragma omp parallel for collapse (2)
     for (int i = 0; i < (int)A.diag().size(); i++)
     for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
     {
@@ -2092,13 +2101,6 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
                     if (j < 0)
                         ic += B.diag(std::abs(j));
                     
-                    if (dC == 11 and ic == 6)
-                    {
-                        std::cout << "Writing to C(dC=5,ic=6)" << std::endl;
-                        std::cout << "   A(dA=" << dA << ",ia=" << ia << ")" << std::endl;
-                        std::cout << "   B(dB=" << dB << ",ib=" << ib << ")" << std::endl;
-                    }
-                    
                     // compute element
                     pC[ic] = pA[ia] * pB[ib];
                 }
@@ -2112,9 +2114,6 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
 
 SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
-    // FIXME this is ugly and inefficient
-//     return ::kron (this->tocoo(), B.tocoo()).todia();
-    
     return ::kron (*this, B);
 }
 

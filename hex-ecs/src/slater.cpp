@@ -31,14 +31,14 @@
 inline double damp (Complex y, Complex x, Complex R)
 {
     // compute hyperradius
-    double r = hypot(x.real(), y.real());
+    double r = std::hypot(x.real(), y.real());
     
     // if sufficiently far, return clean zero
     if (r > R.real())
         return 0.;
     
     // else damp using tanh(x) distribution
-    return tanh(0.125 * (R.real() - r));
+    return std::tanh(0.125 * (R.real() - r));
 }
 
 void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const
@@ -55,7 +55,6 @@ void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i
         out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) * damp(in[k], 0, R);
 }
 
-
 void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const
 {
     // extract data
@@ -67,12 +66,13 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
     bspline_.B(j, iknot, n, in, values_j);
     
     // use at least 2nd order
-    int points2 = std::max (2, bspline_.order() + L + 1);
+    int points2 = std::max(2, bspline_.order() + L + 1);
     
     // evaluate inner integral, fill output array
     for (int u = 0; u < n; u++)
     {
-        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_.quadMFP (
+        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_.quadMFP
+        (
                  this, &RadialIntegrals::R_inner_integrand,                    // integrand pointers
                  points2, iknot, bspline_.t(iknot), in[u],                     // integrator parameters
                  k, l, L, iknot, iknotmax, in[u]                               // integrand data
@@ -80,10 +80,6 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
     }
 }
 
-
-/**
- * Triangle integral
- */
 Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const
 {
     // raise point count - this is not a poly!
@@ -91,17 +87,14 @@ Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int ikn
     int points = bspline_.order() + L + 10; 
     
     // integrate
-    return g_.quadMFP (
+    return g_.quadMFP
+    (
         this, &RadialIntegrals::R_outer_integrand,                // integrand pointers
         points, iknot, bspline_.t(iknot), bspline_.t(iknot+1),    // integrator parameters
         k, l, m, n, L, iknot, iknotmax                            // integrand data
     );
 }
 
-
-/**
- * Diagonal part of Slater integral
- */
 Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const
 {
     int order = bspline_.order();
@@ -120,12 +113,13 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
     return computeRtri(L,b,d,a,c,iknot,iknotmax) + computeRtri(L,a,c,b,d,iknot,iknotmax);
 }
 
-
-Complex RadialIntegrals::computeR (
+Complex RadialIntegrals::computeR
+(
     int lambda,
     int a, int b, int c, int d,
     cArray const & Mtr_L, cArray const & Mtr_mLm1
-) const {
+) const
+{
     int order = bspline_.order();
     int Nreknot = bspline_.Nreknot();
     
@@ -166,7 +160,7 @@ Complex RadialIntegrals::computeR (
             {
                 Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
                 if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp (lg);
+                    Rtr_Labcd_offdiag += std::exp(lg);
             }
             
             // ix > iy (by renaming the ix,iy indices)
@@ -175,7 +169,7 @@ Complex RadialIntegrals::computeR (
             {
                 Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
                 if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp (lg);
+                    Rtr_Labcd_offdiag += std::exp(lg);
             }
         }
     }
@@ -184,13 +178,15 @@ Complex RadialIntegrals::computeR (
     return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
 }
 
-void RadialIntegrals::allSymmetries (
+void RadialIntegrals::allSymmetries
+(
     int i, int j, int k, int l,
     Complex Rijkl_tr,
     NumberArray<long> & R_tr_i,
     NumberArray<long> & R_tr_j,
     NumberArray<Complex> & R_tr_v
-) const {
+) const
+{
     // shorthand
     int Nspline = bspline_.Nspline();
     

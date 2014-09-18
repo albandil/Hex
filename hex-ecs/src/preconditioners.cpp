@@ -419,24 +419,8 @@ void NoPreconditioner::update (double E)
             if (f == 0.)
                 continue;
             
-            // load two-electron integrals if necessary
-//             SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-//             if (cmd_.outofcore)
-//             {
-//                 # pragma omp critical
-//                 ref_R_tr_dia.hdfload();
-//             }
-            
             // add two-electron contributions
-//             Hdiag += f * ref_R_tr_dia;
             Hdiag += f * s_rad_.R_tr_dia(lambda);
-            
-            // unload the two-electron integrals if necessary
-//             if (cmd_.outofcore)
-//             {
-//                 #pragma omp critical
-//                 ref_R_tr_dia.drop();
-//             }
         }
         
         // finalize the matrix
@@ -544,35 +528,18 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (f1 == 0. and f2 == 0.)
                     continue;
                 
-                // load two-electron integrals if necessary
-//                 SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-//                 if (cmd_.outofcore)
-//                 {
-//                     # pragma omp critical
-//                     ref_R_tr_dia.hdfload();
-//                 }
-                
                 // add the contributions
                 if (f1 != 0.)
                 {
-//                     chi_block += (prefactor * f1) * ref_R_tr_dia.dot(Pj1);
                     chi_block += (prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1);
                 }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-//                         chi_block += (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
                         chi_block += (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
                     else
-//                         chi_block -= (prefactor * f2) * ref_R_tr_dia.dot(Pj2);
                         chi_block -= (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
                 }
-                
-                // unload two-electron integrals if necessary
-//                 if (cmd_.outofcore)
-//                 {
-//                     ref_R_tr_dia.drop();
-//                 }
             }
             
             if (li == l1 and l == l2)
@@ -657,22 +624,8 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 if (f == 0.)
                     continue;
                 
-                // load two-electron integrals if necessary
-//                 SymDiaMatrix & ref_R_tr_dia = const_cast<SymDiaMatrix&>(s_rad_.R_tr_dia(lambda));
-//                 if (cmd_.outofcore)
-//                 {
-//                     # pragma omp critical
-//                     ref_R_tr_dia.hdfload();
-//                 }
-                
-//                 q_contrib -= Complex(f) * ref_R_tr_dia.dot(p_block);
+                // update block
                 q_contrib -= Complex(f) * s_rad_.R_tr_dia(lambda).dot(p_block, both, cmd_.parallel_dot);
-                
-                // unload two-electron integrals if necessary
-//                 if (cmd_.outofcore)
-//                 {
-//                     ref_R_tr_dia.drop();
-//                 }
             }
         }
         
@@ -747,21 +700,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-//     if (cmd_.outofcore and cmd_.parallel_block)
-//     {
-//         // load matrix from disk file
-//         # pragma omp critical
-//         dia_blocks_[iblock].hdfload();
-//     }
-    
-    // multiply
     q = dia_blocks_[iblock].dot(p, both, cmd_.parallel_dot);
-    
-//     if (cmd_.outofcore and cmd_.parallel_block)
-//     {
-//         // release memory
-//         dia_blocks_[iblock].drop();
-//     }
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
