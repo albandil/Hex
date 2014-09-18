@@ -1549,7 +1549,7 @@ SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
     // compute needed number of elements
     std::size_t vol = 0;
     for (int d : idiag_)
-        vol += n*n - d;
+        vol += n - d;
     
     // resize storage
     elems_.resize(vol);
@@ -2058,7 +2058,7 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
     SymDiaMatrix C (A.size() * B.size(), Cdiags);
     
     // for all A's and B's diagonals
-    # pragma omp parallel for collapse (2)
+//     # pragma omp parallel for collapse (2)
     for (int i = 0; i < (int)A.diag().size(); i++)
     for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
     {
@@ -2070,26 +2070,34 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
         int dB = (j < 0 ? -B.diag(std::abs(j)) : B.diag(j));
         Complex const * restrict pB = B.dptr(std::abs(j));
         
-        // C's diagonal label
+        // C's diagonal label and index
         int dC = dA * B.size() + dB;
+        int k = std::find(C.diag().begin(), C.diag().end(), dC) - C.diag().begin();
         
         // compute elements on C's current diagonal dC
         if (dC >= 0)
         {
             // C's diagonal pointer
-            Complex * const restrict pC = C.dptr(dC);
+            Complex * const restrict pC = C.dptr(k);
             
             // for all elements on A's diagonal dA
             for (std::size_t ia = 0; ia < A.size() - dA; ia++)
             {
                 // for all elements on B's diagonal dB
-                for (std::size_t ib = 0; ib < B.size() - dB; ib++)
+                for (std::size_t ib = 0; ib < B.size() - std::abs(dB); ib++)
                 {
                     // get position on the C's diagonal
                     std::size_t ic = ia * B.size() + ib;
                     
                     if (j < 0)
                         ic += B.diag(std::abs(j));
+                    
+                    if (dC == 11 and ic == 6)
+                    {
+                        std::cout << "Writing to C(dC=5,ic=6)" << std::endl;
+                        std::cout << "   A(dA=" << dA << ",ia=" << ia << ")" << std::endl;
+                        std::cout << "   B(dB=" << dB << ",ib=" << ib << ")" << std::endl;
+                    }
                     
                     // compute element
                     pC[ic] = pA[ia] * pB[ib];
@@ -2213,8 +2221,11 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
     RowMatrix<Complex> M(size(), size());
     
     // for all diagonals
-    for (int d : diag())
+    for (unsigned id = 0; id < diag().size(); id++)
     {
+        // diagonal label
+        int d = diag(id);
+        
         // main diagonal
         if ((d == 0) and (triangle & diagonal))
         {
@@ -2226,14 +2237,14 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
         if ((d != 0) and (triangle & strict_upper))
         {
             for (unsigned i = 0; i < size() - d; i++)
-                M(i,i+d) = dptr(d)[i];
+                M(i,i+d) = dptr(id)[i];
         }
         
         // lower triangle
         if ((d != 0) and (triangle & strict_lower))
         {
             for (unsigned i = 0; i < size() - d; i++)
-                M(i+d,i) = dptr(d)[i];
+                M(i+d,i) = dptr(id)[i];
         }
     }
     
