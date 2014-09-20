@@ -78,107 +78,6 @@ GiNaC::ex psi_nlm_poly
     return N_nl * R_nl * GiNaC::pow(GiNaC::numeric(2,n),l) * Y;
 }
 
-GiNaC::ex Wb_symb
-(
-    int n1, int l1, int m1,
-    int n2, int l2, int m2,
-    GiNaC::realsymbol const & kx,
-    GiNaC::realsymbol const & ky,
-    GiNaC::realsymbol const & kz
-)
-{
-    // This routine will compute integral
-    //                   -ik·r
-    //   W = Int ψf(r)* e     ψi(r) d³r
-    //
-    // There are four symbols that the basic integral
-    //            -ik·r  -ν|r| d³r      4π
-    //   J = Int e      e      ——— = —————————
-    //                          r    υ² + |k|²
-    // depends on:
-    //     ν  ... the combined exponential factor (1/n₁ + 1/n₂)
-    //     k+ ... component of momentum k₁ + ik₂
-    //     k- ...                       k₁ - ik₂
-    //     kz ... third component of momentum
-    // Derivative with respect to any of these parameters can be used to construct
-    // a different integrand.
-    
-    // the basic integral
-    GiNaC::possymbol k("k"), r("r"), nu("nu");
-    GiNaC::realsymbol rz("rz");
-    GiNaC::symbol rp("rp"), rm("rm"), kp("kp"), km("km");
-    GiNaC::ex J = 4*GiNaC::Pi / (nu*nu + kp*km + kz*kz);
-    
-    // calculate value of ν as a sum of two fractions
-    GiNaC::ex nu_val = GiNaC::numeric(1,n1) + GiNaC::numeric(1,n2);
-    
-    // construct the initial and final state (drop exponential factor which is handled separately)
-    GiNaC::ex psif = psi_nlm_poly(n1,l1,m1,r,rp,rm,rz);
-    GiNaC::ex psii = psi_nlm_poly(n2,l2,m2,r,rp,rm,rz);
-    
-    // calculate the product of the wave functions
-    GiNaC::ex poly = (psif.conjugate() * psii).expand();
-    
-    // this is the resulting integral
-    GiNaC::ex integral;
-    
-    // for all powers of r appearing in the polynomial 'poly'
-    for (int inu = poly.ldegree(r); inu <= poly.degree(r); inu++)
-    {
-        // extract factor in front of r^inu
-        GiNaC::ex nu_poly = poly.collect(r).coeff(r,inu);
-        
-        // (inu + 1)-times differentiate the basic integral and substitute
-        GiNaC::ex J_nu = J.diff(nu,inu+1).subs(nu == nu_val) * GiNaC::pow(-1,inu+1);
-        
-        // for all powers of r+ appearing in the polynomial 'nu_poly'
-        for (int irp = nu_poly.ldegree(rp); irp <= nu_poly.degree(rp); irp++)
-        {
-            // extract factor in front of ν^inu rp^irp
-            GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
-            
-            // irp-times differentiate the basic integral
-            GiNaC::ex J_nu_rp = J_nu.diff(km,irp) * GiNaC::pow(2*GiNaC::I,irp);
-            
-            // for all powers of r- appearing in the polynomial 'nu_rp_poly'
-            for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
-            {
-                // extract factor in front of ν^inu rp^irp rm^irm
-                GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
-                
-                // irm-times differentiate the basic integral
-                GiNaC::ex J_nu_rp_rm = J_nu_rp.diff(kp,irm) * GiNaC::pow(2*GiNaC::I,irm);
-                
-                // for all powers of r- appearing in the polynomial 'nu_rp_poly'
-                for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
-                {
-                    // extract factor in front of ν^inu rp^irp rm^irm rz^irz (it is a number)
-                    GiNaC::ex nu_rp_rm_rz_coef = nu_rp_rm_poly.coeff(rz,irz);
-                    
-                    // irz-times differentiate the basic integral
-                    GiNaC::ex J_nu_rp_rm_rz = J_nu_rp_rm.diff(kz,irz) * GiNaC::pow(GiNaC::I,irz);
-                    
-                    // add new term to the result
-                    integral += nu_rp_rm_rz_coef * J_nu_rp_rm_rz;
-                }
-            }
-        }
-    }
-    
-    // finally, correct the elastic case
-    if (n1 == n2 and l1 == l2 and m1 == m2)
-        integral -= 1;
-    
-//     Debug << format("⟨%d,%d,%d|W|%d,%d,%d⟩: ", n1, l1, m1, n2, l2, m2) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
-    
-    // return the integral in its normal form
-    return (integral / (k*k))
-           .subs(k == GiNaC::sqrt(kx * kx + ky * ky + kz * kz))
-           .subs(kp == kx + GiNaC::I * ky)
-           .subs(km == kx - GiNaC::I * ky)
-           .normal();
-}
-
 std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
 (
     int n1, int l1, int m1,
@@ -200,8 +99,6 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
     //     kz ... third component of momentum
     // Derivative with respect to any of these parameters can be used to construct
     // a different integrand.
-    
-    std::map<std::tuple<int,int,int,int,int>,Complex> res;
     
     //
     // Construct the product of wave functions.
@@ -263,6 +160,10 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
     // Compute derivative for every term of the product.
     //
     
+    // resulting terms (ν²+k²)^(-n) ν^a k₊^b k₋^c kz^d
+    std::map<std::tuple<int,int,int,int,int>,Complex> res;
+    
+    // for all terms
     for (auto term : terms)
     {
         // decode exponents
@@ -288,23 +189,11 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 // differentiate with respect to ν
                 if (a != 0)
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n,a-1,b,c,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n,a-1,b,c,d); auto it = rest.find(key);
                     rest[key] = -double(a) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n+1,a+1,b,c,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n+1,a+1,b,c,d); auto it = rest.find(key);
                     rest[key] = 2. * n * entry.second + (it == rest.end() ? 0. : it->second);
                 }
             }
@@ -325,23 +214,11 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 // differentiate with respect to k₋
                 if (c != 0)
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n,a,b,c-1,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n,a,b,c-1,d); auto it = rest.find(key);
                     rest[key] = Complex(0.,2.*c) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n+1,a,b+1,c,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n+1,a,b+1,c,d); auto it = rest.find(key);
                     rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
             }
@@ -362,23 +239,11 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 // differentiate with respect to k₊
                 if (b != 0)
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n,a,b-1,c,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n,a,b-1,c,d); auto it = rest.find(key);
                     rest[key] = Complex(0.,2.*b) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n+1,a,b,c+1,d);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n+1,a,b,c+1,d); auto it = rest.find(key);
                     rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
             }
@@ -399,23 +264,11 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
                 // differentiate with respect to kz
                 if (d != 0)
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n,a,b,c,d-1);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n,a,b,c,d-1); auto it = rest.find(key);
                     rest[key] = Complex(0.,d) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
                 {
-                    // create key for the new term
-                    auto key = std::make_tuple(n+1,a,b,c,d+1);
-                    
-                    // look for the term
-                    auto it = rest.find(key);
-                    
-                    // update the term
+                    auto key = std::make_tuple(n+1,a,b,c,d+1); auto it = rest.find(key);
                     rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
             }
@@ -441,29 +294,44 @@ std::map<std::tuple<int,int,int,int,int>,Complex> Wb_symb_in
 
 Complex eval_Wb (std::map<std::tuple<int,int,int,int,int>,Complex> const & poly, double nu, geom::vec3d const & k)
 {
-    double ksqr = k.x*k.x + k.y*k.y + k.z*k.z, Z = nu*nu + ksqr;
-    Complex kp(k.x,k.y), km(k.x,-k.y), kz = k.z;
+    // prepare some used variables
+    double kxysqr = k.x*k.x + k.y*k.y, ksqr = kxysqr + k.z*k.z;
+    double rho = std::sqrt(kxysqr), phi = std::atan2(k.y,k.x);
+    double J = 1. / (nu*nu + ksqr);
     
+    // evaluate all terms J^n ν^a k₊^b k₋^c kz^d
     Complex result = 0;
     for (auto term : poly)
     {
-        int n,a,b,c,d;
-        std::tie(n,a,b,c,d) = term.first;
-        result += term.second * std::pow(Z,-n) * std::pow(nu,a) * std::pow(kp,b) * std::pow(km,c) * std::pow(kz,d);
+        // extract exponents
+        int n,a,b,c,d; std::tie(n,a,b,c,d) = term.first;
+        
+        // contribution from this term
+        Complex contrib = term.second * gsl_pow_int(J,n);
+        
+        // add ν^a
+        if (a != 0)
+            contrib *= gsl_pow_int(nu,a);
+        
+        // add k₊^b k₋^c
+        if (b != 0 or c != 0)
+            contrib *= gsl_sf_pow_int(rho,b+c) * Complex(std::cos((b-c)*phi),std::sin((b-c)*phi));
+        
+        // add kz^d
+        if (d != 0)
+            contrib *= gsl_pow_int(k.z,d);
+        
+        // update sum
+        result += contrib;
     }
     
+    // return result
     return result / ksqr;
 }
 
-GiNaC::ex W_symb
+std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> W_symb_in
 (
-    int n, int l, int m,
-    GiNaC::realsymbol const & kx,
-    GiNaC::realsymbol const & ky,
-    GiNaC::realsymbol const & kz,
-    GiNaC::realsymbol const & qx,
-    GiNaC::realsymbol const & qy,
-    GiNaC::realsymbol const & qz
+    int n, int l, int m
 )
 {
     // This routine will compute integral
@@ -483,20 +351,19 @@ GiNaC::ex W_symb
     // a different integrand.
     
     // the basic integral
-    GiNaC::possymbol k("k"), r("r"), nu("nu"), q("q");
+    GiNaC::possymbol r("r");
     GiNaC::realsymbol rz("rz");
-    GiNaC::symbol rp("rp"), rm("rm"), kp("kp"), km("km"), qp("qp"), qm("qm");
-    GiNaC::ex I = GiNaC::pow(k*k+GiNaC::pow(nu-GiNaC::I*q,2),-GiNaC::I/q) /
-                  GiNaC::pow(nu*nu+(kp+qp)*(km+qm)+(kz+qz)*(kz+qz),1-GiNaC::I/q);
-    
-    // calculate value of ν as a sum of two fractions
-    GiNaC::ex nu_val = GiNaC::numeric(1,n);
+    GiNaC::symbol rp("rp"), rm("rm");
     
     // construct the initial and final state (drop exponential factor which is handled separately)
     GiNaC::ex psi = psi_nlm_poly(n,l,m,r, rp, rm, rz);
     
-    // this is the resulting integral
-    GiNaC::ex integral;
+    //
+    // Translate the symbolical form to list of exponent tuples.
+    //
+    
+    // list of exponent tuples (one tuple for every term of 'poly')
+    std::map<std::tuple<int,int,int,int>,Complex> terms;
     
     // for all powers of r appearing in the polynomial 'poly'
     for (int inu = psi.ldegree(r); inu <= psi.degree(r); inu++)
@@ -504,17 +371,11 @@ GiNaC::ex W_symb
         // extract factor in front of r^inu
         GiNaC::ex nu_poly = psi.collect(r).coeff(r,inu);
         
-        // (inu + 1)-times differentiate the basic integral and substitute
-        GiNaC::ex I_nu = I.diff(nu,inu+1).subs(nu == nu_val) * GiNaC::pow(-1,inu+1);
-        
         // for all powers of r+ appearing in the polynomial 'nu_poly'
         for (int irp = nu_poly.ldegree(rp); irp <= nu_poly.degree(rp); irp++)
         {
             // extract factor in front of ν^inu rp^irp
             GiNaC::ex nu_rp_poly = nu_poly.coeff(rp,irp);
-            
-            // irp-times differentiate the basic integral
-            GiNaC::ex I_nu_rp = I_nu.diff(km,irp) * GiNaC::pow(2*GiNaC::I,irp);
             
             // for all powers of r- appearing in the polynomial 'nu_rp_poly'
             for (int irm = nu_rp_poly.ldegree(rm); irm <= nu_rp_poly.degree(rm); irm++)
@@ -522,36 +383,243 @@ GiNaC::ex W_symb
                 // extract factor in front of ν^inu rp^irp rm^irm
                 GiNaC::ex nu_rp_rm_poly = nu_rp_poly.coeff(rm,irm);
                 
-                // irm-times differentiate the basic integral
-                GiNaC::ex I_nu_rp_rm = I_nu_rp.diff(kp,irm) * GiNaC::pow(2*GiNaC::I,irm);
-                
                 // for all powers of r- appearing in the polynomial 'nu_rp_poly'
                 for (int irz = nu_rp_rm_poly.ldegree(rz); irz <= nu_rp_rm_poly.degree(rz); irz++)
                 {
                     // extract factor in front of ν^inu rp^irp rm^irm rz^irz (it is a number)
                     GiNaC::ex nu_rp_rm_rz_coef = nu_rp_rm_poly.coeff(rz,irz);
-                    
-                    // irz-times differentiate the basic integral
-                    GiNaC::ex I_nu_rp_rm_rz = I_nu_rp_rm.diff(kz,irz) * GiNaC::pow(GiNaC::I,irz);
-                    
-                    // add new term to the result
-                    integral += nu_rp_rm_rz_coef * I_nu_rp_rm_rz;
+                    terms[std::make_tuple(inu,irp,irm,irz)] = Complex
+                    (
+                        GiNaC::ex_to<GiNaC::numeric>(GiNaC::real_part(nu_rp_rm_rz_coef.evalf())).to_double(),
+                        GiNaC::ex_to<GiNaC::numeric>(GiNaC::imag_part(nu_rp_rm_rz_coef.evalf())).to_double()
+                    );
+                } // irz
+            } // irm
+        } // irp
+    } // inu
+    
+    //
+    // Compute derivative for every term of the product.
+    //
+    
+    // resulting terms A^(-i/q-m) B^(-i/q-n) ν^a k₊^b k₋^c kz^d q^t q₊^u q₋^v qz^w
+    std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> res;
+    
+    // for all terms
+    for (auto term : terms)
+    {
+        // decode exponents
+        int inu, irp, irm, irz;
+        std::tie(inu, irp, irm, irz) = term.first;
+        
+        // resulting derivative for this particular term
+        std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> rest, tmp;
+        rest[std::make_tuple(0,1, 0,0,0,0, 0,0,0,0)] = term.second;
+        
+        // (inu + 1)-times differentiate the basic integral (-∂/∂ν)
+        for (int j = 0; j <= inu; j++)
+        {
+            // move current result to temporary storage
+            std::swap(rest,tmp); rest.clear();
+            
+            // differentiate all terms
+            for (auto entry : tmp)
+            {
+                // decode entry
+                int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
+                
+                // differentiate with respect to ν
+                if (a != 0)
+                {
+                    auto key = std::make_tuple(m,n, a-1,b,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = -double(a) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m+1,n, a+1,b,c,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (m != 0)
+                {
+                    auto key = std::make_tuple(m+1,n, a+1,b,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = (2.*m) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = 2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (m != 0)
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c,d, t+1,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*m) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a+1,b,c,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a+1,b,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = (2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
                 }
             }
         }
+        
+        // irp times differentiate the integral (2i∂/∂k₋)
+        for (int j = 0; j < irp; j++)
+        {
+            // move current result to temporary storage
+            std::swap(rest,tmp); rest.clear();
+            
+            // differentiate all terms
+            for (auto entry : tmp)
+            {
+                // decode entry
+                int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
+                
+                // differentiate with respect to k₋
+                if (c != 0)
+                {
+                    auto key = std::make_tuple(m,n, a,b,c-1,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.*c) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m+1,n, a,b+1,c,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = 2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (m != 0)
+                {
+                    auto key = std::make_tuple(m+1,n, a,b+1,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*m) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b+1,c,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = -2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t-1,u+1,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b+1,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t,u+1,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+            }
+        }
+        
+        // irm times differentiate the integral (2i∂/∂k₊)
+        for (int j = 0; j < irm; j++)
+        {
+            // move current result to temporary storage
+            std::swap(rest,tmp); rest.clear();
+            
+            // differentiate all terms
+            for (auto entry : tmp)
+            {
+                // decode entry
+                int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
+                
+                // differentiate with respect to k₊
+                if (b != 0)
+                {
+                    auto key = std::make_tuple(m,n, a,b-1,c,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.*b) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c+1,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = 2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (m != 0)
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c+1,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*m) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c+1,d, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = -2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t-1,u,v+1,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c+1,d, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t,u,v+1,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+            }
+        }
+        
+        // irz times differentiate the integral (i∂/∂kz)
+        for (int j = 0; j < irz; j++)
+        {
+            // move current result to temporary storage
+            std::swap(rest,tmp); rest.clear();
+            
+            // differentiate all terms
+            for (auto entry : tmp)
+            {
+                // decode entry
+                int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = entry.first;
+                
+                // differentiate with respect to kz
+                if (d != 0)
+                {
+                    auto key = std::make_tuple(m,n, a,b,c,d-1, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,d) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c,d+1, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = 2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (m != 0)
+                {
+                    auto key = std::make_tuple(m+1,n, a,b,c,d+1, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*m) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d+1, t-1,u,v,w); auto it = rest.find(key);
+                    rest[key] = -2. * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t-1,u,v,w+1); auto it = rest.find(key);
+                    rest[key] = Complex(0.,2.) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d+1, t,u,v,w); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+                if (n != 0)
+                {
+                    auto key = std::make_tuple(m,n+1, a,b,c,d, t,u,v,w+1); auto it = rest.find(key);
+                    rest[key] = Complex(0.,-2.*n) * entry.second + (it == rest.end() ? 0. : it->second);
+                }
+            }
+        }
+        
+        // add all new terms to result
+        for (auto t : rest)
+        {
+            // check if this term already exists
+            auto pt = res.find(t.first);
+            
+            // update term coefficient
+            res[t.first] = t.second + (pt != res.end() ? pt->second : 0.);
+        }
     }
     
-//     Debug << format("⟨%d,%d,%d|W|χ(q)⟩: ", n, l, m) << (integral / (k*k)).subs(kz == GiNaC::sqrt(k*k-kp*km)).normal() << std::endl;
-    
-    // return the integral in its normal form
-    return (integral / (k*k))
-           .subs(k == GiNaC::sqrt(kx * kx + ky * ky + kz * kz))
-           .subs(kp == kx + GiNaC::I * ky)
-           .subs(km == kx - GiNaC::I * ky)
-           .subs(q == GiNaC::sqrt(qx * qx + qy * qy + qz * qz))
-           .subs(qp == qx + GiNaC::I * qy)
-           .subs(qm == qx - GiNaC::I * qy)
-           .normal();
+    return res;
 }
 
 inline Complex WA (double k, double nu, double q)
@@ -575,7 +643,7 @@ Complex W_1s (geom::vec3d vk, geom::vec3d vq)
     double B = WB(vk,nu,vq);
     
     Complex B_A = B / A;
-    return 2.0 * iq * std::pow(B_A,iq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
+    return special::constant::two_inv_sqrt_pi * iq * std::pow(B_A,iq) * (Complex(-1.,q) * B_A + Complex(1.,q)) / (B * B * k * k);
 }
 
 Complex W_cont (int n, int l, int m, geom::vec3d vk, geom::vec3d vq)
@@ -584,6 +652,77 @@ Complex W_cont (int n, int l, int m, geom::vec3d vk, geom::vec3d vq)
         return W_1s(vk,vq);
     
     throw exception ("Matrix element ⟨χ⁻(q)|exp(-ik·r)|%d,%d,%d⟩ not implemented.", n, l, m);
+}
+
+Complex eval_W
+(
+    std::map<std::tuple<int,int,int,int,int,int,int,int,int,int>,Complex> const & poly,
+    double nu,
+    geom::vec3d const & vk,
+    geom::vec3d const & vq
+)
+{
+    // prepare some used variables
+    double kxysqr = vk.x*vk.x + vk.y*vk.y, ksqr = kxysqr + vk.z*vk.z,
+           kxy = std::sqrt(kxysqr), /*k = std::sqrt(ksqr),*/ kphi = std::atan2(vk.y,vk.x);
+    double qxysqr = vq.x*vq.x + vq.y*vq.y, qsqr = qxysqr + vq.z*vq.z,
+           qxy = std::sqrt(qxysqr), q = std::sqrt(qsqr), qphi = std::atan2(vq.y,vq.x);
+    
+    Complex A (ksqr + nu*nu - qsqr, -2*nu*q);
+    double absA = std::hypot(A.real(),A.imag()), argA = std::atan2(A.imag(),A.real());
+    double B = nu*nu + (vk.x+vq.x)*(vk.x+vq.x) + (vk.y+vq.y)*(vk.y+vq.y) + (vk.z+vq.z)*(vk.z+vq.z);
+    
+    // evaluate all terms A^(-m) B^(-n) ν^a k₊^b k₋^c kz^d q^t q₊^u q₋^v qz^w
+    Complex result = 0;
+    for (auto term : poly)
+    {
+        // extract exponents
+        int m,n,a,b,c,d,t,u,v,w; std::tie(m,n,a,b,c,d,t,u,v,w) = term.first;
+        
+        // contribution from this term
+        Complex contrib = term.second;
+        
+        // add A^(-m)
+        if (m != 0)
+            contrib *= Complex(std::cos(m*argA),-std::sin(m*argA)) / gsl_pow_int(absA,m);
+        
+        // add B^(-n)
+        if (n != 0)
+            contrib *= 1./gsl_pow_int(B,n);
+        
+        // add ν^a
+        if (a != 0)
+            contrib *= gsl_pow_int(nu,a);
+        
+        // add k₊^b k₋^c
+        if (b != 0 or c != 0)
+            contrib *= Complex(std::cos((b-c)*kphi),std::sin((b-c)*kphi)) * gsl_pow_int(kxy,b+c);
+        
+        // add kz^d
+        if (d != 0)
+            contrib *= gsl_pow_int(vk.z,d);
+        
+        // add q^t
+        if (t != 0)
+            contrib *= gsl_pow_int(q,t);
+        
+        // add q₊^u q₋^v
+        if (u != 0 or v != 0)
+            contrib *= Complex(std::cos((u-v)*qphi),std::sin((u-v)*qphi)) * gsl_pow_int(qxy,u+v);
+        
+        // add qz^w
+        if (w != 0)
+            contrib *= gsl_pow_int(vq.z,w);
+        
+        // update sum
+        result += contrib;
+    }
+    
+    // add missing factors
+    result *= std::pow(A/B,Complex(0.,-1./q)) / ksqr;
+    
+    // return result
+    return result;
 }
 
 cArrays PWBA2::FullTMatrix_direct
@@ -680,17 +819,17 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the off-shell integrand
                 Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vkn);
                 Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vkn);
-                Complex integrand_Ub_off = kn * kn * Wf * Wi;
+                Complex integrand_Ub_off = kn * kn * Wf * std::conj(Wi);
                 
                 // the value of the on-shell integrand
                 Complex Wfon = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
                 Complex Wion = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
-                Complex integrand_Ub_on = Qn * Qn * Wfon * Wion;
+                Complex integrand_Ub_on = Qn * Qn * Wfon * std::conj(Wion);
                 
                 // Jacobian
                 double Jac = 2. // for cos theta
-                            * special::constant::two_pi // for phi
-                            * Qon; // for Q
+                           * special::constant::two_pi // for phi
+                           * Qon; // for Q
                 
                 // evaluate integrand
                 return special::constant::two_inv_pi * Jac * (integrand_Ub_off - integrand_Ub_on) / (0.5*Qn*Qn - 0.5*kn*kn);
@@ -722,12 +861,12 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the off-shell integrand
                 Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vkn);
                 Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vkn);
-                Complex integrand_Ub_off = kn * kn * Wf * Wi;
+                Complex integrand_Ub_off = kn * kn * Wf * std::conj(Wi);
                 
                 // the value of the on-shell integrand
                 Complex Wfon = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
                 Complex Wion = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
-                Complex integrand_Ub_on = Qn * Qn * Wfon * Wion;
+                Complex integrand_Ub_on = Qn * Qn * Wfon * std::conj(Wion);
                 
                 // Jacobian
                 double Jac =  2. // for cos theta
@@ -778,11 +917,11 @@ cArrays PWBA2::FullTMatrix_direct
                 // the value of the on-shell integrand
                 Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
                 Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
-                Complex integrand_Wb = Complex(0.,-special::constant::pi) * Qn * Wf * Wi;
+                Complex integrand_Wb = Complex(0.,-special::constant::pi) * Qn * Wf * std::conj(Wi);
                 
                 // Jacobian
                 double Jac = 2. // for cos theta
-                        * special::constant::two_pi; // for phi
+                           * special::constant::two_pi; // for phi
                 
                 // evaluate integrand
                 return special::constant::two_inv_pi * Jac * integrand_Wb;
@@ -809,8 +948,11 @@ cArrays PWBA2::FullTMatrix_direct
         {
             std::cout << underline(format("Intermediate state CONTINUUM")) << std::endl << std::endl;
             
+            auto Wcf = W_symb_in(Nf,Lf,Mf);
+            auto Wci = W_symb_in(Ni,Li,Mi);
+            
             // U-integrand (real part of propagator)
-            auto integrand_U_wrap_lin = [Ni,Li,Mi,ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
+            auto integrand_U_wrap_lin = [Ni,Nf,ki,kf,vki,vkf,Qon,Etot,Wcf,Wci](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 6);
@@ -834,13 +976,13 @@ cArrays PWBA2::FullTMatrix_direct
                 geom::vec3d vkn = kn * n2, vknon = knon * n2;
                 
                 // the value of the off-shell integrand
-                double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
+                double norm = 4. / (qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                Complex Wf = eval_W(Wcf,1./Nf,vkf-vkn,vqn), Wi = std::conj(eval_W(Wci,1./Ni,vki-vkn,vqn));
                 Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
                 
                 // the value of the on-shell integrand
-                double normon = 4. / (special::constant::pi * qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = W_cont(Ni,Li,Mi,vkf-vknon,vqnon), Wion = std::conj(W_cont(Ni,Li,Mi,vki-vknon,vqnon));
+                double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
+                Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
                 Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
                 
                 // Jacobian
@@ -856,7 +998,7 @@ cArrays PWBA2::FullTMatrix_direct
             };
             
             // U-integrand (real part of propagator)
-            auto integrand_U_wrap_log = [Ni,Li,Mi,ki,kf,vki,vkf,Qon,Etot](int n, double const * coords) -> Complex
+            auto integrand_U_wrap_log = [Ni,Nf,ki,kf,vki,vkf,Qon,Etot,Wcf,Wci](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 6);
@@ -883,13 +1025,13 @@ cArrays PWBA2::FullTMatrix_direct
                 geom::vec3d vkn = kn * n2, vknon = knon * n2;
                 
                 // the value of the off-shell integrand
-                double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
+                double norm = 4. / (qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                Complex Wf = eval_W(Wcf,1./Nf,vkf-vkn,vqn), Wi = std::conj(eval_W(Wci,1./Ni,vki-vkn,vqn));
                 Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
                 
                 // the value of the on-shell integrand
-                double normon = 4. / (special::constant::pi * qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = W_cont(Ni,Li,Mi,vkf-vknon,vqnon), Wion = std::conj(W_cont(Ni,Li,Mi,vki-vknon,vqnon));
+                double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
+                Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
                 Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
                 
                 // Jacobian
@@ -908,24 +1050,24 @@ cArrays PWBA2::FullTMatrix_direct
             G.setMaxLevel(10);
             G.setGlobEpsAbs(0);
             
-            std::cout << underline(format("Sparse grid integration of continuum U for theta = %g, phi = %g", theta, phi)) << std::endl;
+            std::cout << format("  Sparse grid integration of continuum U for theta = %g, phi = %g", theta, phi) << std::endl;
             
             // integrate U on 6-dimensional sparse grid
-            std::cout << std::endl << "Linear integrand for Q = 0 .. " << Qon << std::endl;
+            std::cout << std::endl << "  Linear integrand for Q = 0 .. " << Qon << std::endl;
             G.integrate_adapt<6>(integrand_U_wrap_lin, spgrid::d6l4n257, spgrid::d6l5n737);
             fU += G.result();
             nEvalU += G.evalcount();
             
             // integrate U on 6-dimensional sparse grid
-            std::cout << std::endl << "Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
+            std::cout << std::endl << "  Compactified integrand for Q = " << Qon << " .. inf" << std::endl;
             G.integrate_adapt<6>(integrand_U_wrap_log, spgrid::d6l4n257, spgrid::d6l5n737);
             fU += G.result();
             nEvalU += G.evalcount();
+            
             std::cout << std::endl;
-            G.setGlobEpsAbs(0);
             
             // iW-integrand (imag part of propagator)
-            auto integrand_W_wrap = [Ni,Li,Mi,ki,kf,vki,vkf,Etot,Qon](int n, double const * coords) -> Complex
+            auto integrand_W_wrap = [Ni,Nf,ki,kf,vki,vkf,Etot,Qon,Wcf,Wci](int n, double const * coords) -> Complex
             {
                 // check dimensions
                 assert(n == 5);
@@ -944,8 +1086,8 @@ cArrays PWBA2::FullTMatrix_direct
                 geom::vec3d vkn = { kn * sintheta2 * std::cos(phi2), kn * sintheta2 * std::sin(phi2), kn * costheta2 };
                 
                 // the value of the integrand
-                double norm = 4. / (special::constant::pi * qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = W_cont(Ni,Li,Mi,vkf-vkn,vqn), Wi = std::conj(W_cont(Ni,Li,Mi,vki-vkn,vqn));
+                double norm = 4. / (qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                Complex Wf = eval_W(Wcf,1./Nf,vkf-vkn,vqn), Wi = std::conj(eval_W(Wci,1./Ni,vki-vkn,vqn));
                 Complex integrand_W = Complex(0.,-special::constant::pi) * norm * Wf * Wi;
                 
                 // Jacobian
