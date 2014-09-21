@@ -367,6 +367,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // allocate storage
     R_tr_dia_.resize(lambdas.size());
     
+#if defined(_OPENMP)
     #pragma omp parallel
     {
         #pragma omp master
@@ -378,6 +379,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                       << " threads.\n";
         }
     }
+#endif
     
     // shorthands
     int Nspline = bspline_.Nspline();

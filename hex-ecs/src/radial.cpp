@@ -30,7 +30,7 @@ inline double damp (Complex r, Complex R)
         return 0.;
     
     // else damp using tanh(x) distribution
-    return tanh(0.125 * (R.real() - r.real()));
+    return std::tanh(0.125 * (R.real() - r.real()));
 }
 
 rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
@@ -41,7 +41,7 @@ rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
     
     // quadrature order
     // NOTE : must match that in RadialIntegrals::computeMi !
-    int Npts = std::max(2, bspline_.order() + abs(lambda) + 1);
+    int Npts = std::max(2, bspline_.order() + std::abs(lambda) + 1);
     
     // output arrays
     rArray data (iknotmax);
@@ -183,10 +183,11 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 double logscale = 0.; // logarithm of the scale
                 
                 // use at least 2nd order
-                int points = std::max (2, order + abs(a) + 1);
+                int points = std::max(2, order + std::abs(a) + 1);
                 
                 // integrate
-                integral = g_.quadMFP (
+                integral = g_.quadMFP
+                (
                     this, &RadialIntegrals::M_integrand,       // integrand pointer
                     points, iknot, xa, xb,                     // integration parameters
                     i, j, a, iknot, iknotmax, logscale         // data to pass to the integrator
@@ -366,10 +367,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     R_tr_dia_.resize(lambdas.size());
     
     // print information
+#if defined(_OPENMP)
     #pragma omp parallel
     #pragma omp master
     std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using " 
               << omp_get_num_threads() << " threads." << std::endl;
+#endif
     
     // shorthands
     int Nspline = bspline_.Nspline();

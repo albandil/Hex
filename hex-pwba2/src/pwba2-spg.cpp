@@ -671,6 +671,7 @@ Complex eval_W
     Complex A (ksqr + nu*nu - qsqr, -2*nu*q);
     double absA = std::hypot(A.real(),A.imag()), argA = std::atan2(A.imag(),A.real());
     double B = nu*nu + (vk.x+vq.x)*(vk.x+vq.x) + (vk.y+vq.y)*(vk.y+vq.y) + (vk.z+vq.z)*(vk.z+vq.z);
+    double log_abs_A_B_over_q = std::log(absA / B) / q;
     
     // evaluate all terms A^(-m) B^(-n) ν^a k₊^b k₋^c kz^d q^t q₊^u q₋^v qz^w
     Complex result = 0;
@@ -719,7 +720,8 @@ Complex eval_W
     }
     
     // add missing factors
-    result *= std::pow(A/B,Complex(0.,-1./q)) / ksqr;
+//     result *= std::pow(A/B,Complex(0.,-1./q)) / ksqr;
+    result *= Complex(std::cos(log_abs_A_B_over_q),-std::sin(log_abs_A_B_over_q)) * std::exp(argA/q) / ksqr;
     
     // return result
     return result;

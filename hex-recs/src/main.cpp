@@ -250,8 +250,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
             }
             
             // custom conjugate gradients callback-based solver
+            current_solution = cArray(chi.size());
+            unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
-            std::cout << "\t   i | time        | residual        | max & avg block precond. iter." << std::endl;
+            std::cout << "\t   i | time        | residual        | min max avg block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
                 chi,                      // right-hand side
