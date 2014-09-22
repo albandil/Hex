@@ -2067,9 +2067,10 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
     SymDiaMatrix C (A.size() * B.size(), Cdiags);
     
     // for all A's and B's diagonals
+    int nA = A.diag().size(), nB = B.diag().size();
     # pragma omp parallel for collapse (2)
-    for (int i = 0; i < (int)A.diag().size(); i++)
-    for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
+    for (int i = 0; i <= nA - 1; i++)
+    for (int j = -nB + 1; j <= nB - 1; j++)
     {
         // A's diagonal label and pointer
         int dA = A.diag(i);

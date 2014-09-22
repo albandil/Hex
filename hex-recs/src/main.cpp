@@ -256,13 +256,13 @@ if (cmd.itinerary & CommandLine::StgSolve)
             std::cout << "\t   i | time        | residual        | min max avg block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks<cArray,cArrayView>
             (
-                chi,                      // right-hand side
-                current_solution,         // on input, the initial guess, on return, the solution
-                cmd.itertol,              // requested precision, |A·x - b|² < ε·|b|²
-                0,                        // minimal iteration count
-                (inp.maxell+1) * Nspline, // maximal iteration count
-                apply_preconditioner,     // preconditioner callback
-                matrix_multiply           // matrix multiplication callback
+                chi,                    // right-hand side
+                current_solution,       // on input, the initial guess, on return, the solution
+                cmd.itertol,            // requested precision, |A·x - b|² < ε·|b|²
+                0,                      // minimal iteration count
+                max_iter,               // maximal iteration count
+                apply_preconditioner,   // preconditioner callback
+                matrix_multiply         // matrix multiplication callback
             );
             std::cout << "\tEnd CG callback\n";
             

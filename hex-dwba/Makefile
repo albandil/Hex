@@ -82,7 +82,7 @@ obj/%.o: src/%.cpp
 	$(CXX) -c $(CXXFLAGS) $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
-	rm -f $(OBJECTS) $(DEPENDENCIES) bin/dwba
+	rm -f $(OBJECTS) $(DEPENDENCIES) bin/hex-dwba
 
 doc:
 	doxygen

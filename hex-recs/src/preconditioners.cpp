@@ -660,16 +660,21 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
+    unsigned ang_size = ang_.size();
     
     // clear all output segments that are going to be referenced by this process
-    for (unsigned ill = 0; ill < ang_.size(); ill++)
+    for (unsigned ill = 0; ill < ang_size; ill++)
         if (par_.isMyWork(ill))
             cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
     
     // multiply "p" by the matrix of the system
-    # pragma omp parallel for schedule (dynamic,1) collapse(2) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < ang_.size(); ill++)
-    for (unsigned illp = 0; illp < ang_.size(); illp++)
+#if !defined(__INTEL_COMPILER) // Intel C++ seems to break 'collapse'
+    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block) collapse(2)
+#else
+    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+#endif
+    for (unsigned ill = 0; ill < ang_size; ill++)
+    for (unsigned illp = 0; illp < ang_size; illp++)
     if (par_.isMyWork(ill))
     {
         // row and column multi-index

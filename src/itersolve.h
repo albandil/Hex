@@ -29,7 +29,7 @@
  * by a different method, if necessary; for example when the created array needs
  * to be registered at GPU first.
  */
-inline cArray default_new_complex_array (size_t n)
+inline cArray default_new_complex_array (std::size_t n)
 {
     return cArray(n);
 }
@@ -55,7 +55,7 @@ inline double default_compute_norm (const cArrayView x)
  */
 inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArrayView y)
 {
-    size_t N = x.size();
+    std::size_t N = x.size();
     assert (N == y.size());
     
     // accelerators
@@ -63,7 +63,7 @@ inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArr
     Complex const * const restrict py = y.data();
     
     // do the axby per element
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         px[i] = a * px[i] + b * py[i];
 }
 
@@ -177,7 +177,7 @@ unsigned cg_callbacks
     }
     
     // get size of the problem
-    size_t N = b.size();
+    std::size_t N = b.size();
     
     // residual; initialized to starting residual using the initial guess
     TArray r (std::move(new_array(N)));
