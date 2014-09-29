@@ -321,8 +321,7 @@ rArray Amplitudes::computeSigma_
 
 std::string current_time ()
 {
-    std::time_t result;
-    result = std::time(nullptr);
+    std::time_t result = std::time(nullptr);
     return std::asctime(std::localtime(&result));
 }
 

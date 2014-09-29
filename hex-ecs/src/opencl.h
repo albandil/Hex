@@ -178,6 +178,11 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
             for (std::size_t i = 0; i < n; i++)
                 (*this)[i] = x;
         }
+        CLArray (std::size_t n, T const * px) : CLArrayView<T>(n, Alloc::alloc(n))
+        {
+            for (std::size_t i = 0; i < n; i++)
+                (*this)[i] = px[i];
+        }
         CLArray (ArrayView<T> v, std::size_t i = 0, std::size_t n = 0)
             : CLArrayView<T>(((n == 0) ? v.size() : n), Alloc::alloc((n == 0) ? v.size() : n))
         {
@@ -234,7 +239,7 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
         //
         
         std::size_t size () const                   { return CLArrayView<T>::size();        }
-        T const & operator [] (std::size_t i) const      { return CLArrayView<T>::operator[](i); }
+        T const & operator [] (std::size_t i) const { return CLArrayView<T>::operator[](i); }
         T & operator [] (std::size_t i)             { return CLArrayView<T>::operator[](i); }
         T const * data () const                     { return CLArrayView<T>::data();        }
         T * data ()                                 { return CLArrayView<T>::data();        }

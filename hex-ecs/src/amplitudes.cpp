@@ -15,6 +15,7 @@
 #include <complex>
 #include <cstring>
 #include <cstdlib>
+#include <ctime>
 #include <regex>
 #include <vector>
 
@@ -31,13 +32,11 @@
 #include "matrix.h"
 #include "version.h"
 
-std::string current_time() 
+std::string current_time () 
 {
-    std::time_t result;
-    result = std::time(NULL);
+    std::time_t result = std::time(nullptr);
     return std::asctime(std::localtime(&result));
 }
-
 
 void Amplitudes::extract ()
 {
@@ -59,7 +58,7 @@ void Amplitudes::extract ()
         
         // check if the right hand side will be zero for this instate
         bool allowed = false;
-        for (int l = abs(li - inp_.L); l <= li + inp_.L; l++)
+        for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
         {
             // does this combination conserve parity?
             if ((inp_.L + li + l) % 2 != inp_.Pi)
@@ -311,10 +310,10 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
         // As recommended by Bartlett, we will compute several amplitudes
         // separated by π/(n*kf[ie]) near the R₀ turning point.
         double wavelength = special::constant::pi / kf[ie];
-        char const * HEX_RHO = getenv("HEX_RHO");
-        char const * HEX_SAMPLES = getenv("HEX_SAMPLES");
-        int samples = (HEX_SAMPLES == nullptr) ? 10 : atoi(HEX_SAMPLES);
-        double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : atof(HEX_RHO);
+        char const * HEX_RHO = std::getenv("HEX_RHO");
+        char const * HEX_SAMPLES = std::getenv("HEX_SAMPLES");
+        int samples = (HEX_SAMPLES == nullptr) ? 10 : std::atoi(HEX_SAMPLES);
+        double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : std::atof(HEX_RHO);
         
         // skip impact energies with undefined outgoing momentum
         if (std::isnan(kf[ie]))
@@ -468,7 +467,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
     int order   = bspline.order();               // B-spline order
     
     // determine evaluation radius
-    char const * HEX_RHO = getenv("HEX_RHO");
+    char const * HEX_RHO = std::getenv("HEX_RHO");
     double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : std::atof(HEX_RHO);
     
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)

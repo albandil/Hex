@@ -248,10 +248,10 @@ kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y
  */
 kernel void kron_dot1
 (
-    global double2 const * restrict A,
-    global double2 const * restrict B,
-    global double2 const * restrict v,
-    global double2       * restrict C
+    global double2 const * const restrict A,
+    global double2 const * const restrict B,
+    global double2 const * const restrict v,
+    global double2       * const restrict C
 )
 {
     // get worker's segment index (0 <= i < NSPLINE)
@@ -269,10 +269,10 @@ kernel void kron_dot1
 }
 kernel void kron_dot2
 (
-    global double2 const * restrict A,
-    global double2 const * restrict B,
-    global double2       * restrict w,
-    global double2 const * restrict C
+    global double2 const * const restrict A,
+    global double2 const * const restrict B,
+    global double2       * const restrict w,
+    global double2 const * const restrict C
 )
 {
     // get worker's segment index (0 <= i < NSPLINE)
@@ -291,9 +291,9 @@ kernel void kron_dot2
 kernel void kron_div
 (
     double2 E,
-    global double2 const * restrict D1,
-    global double2 const * restrict D2,
-    global double2       * restrict y
+    global double2 const * const restrict D1,
+    global double2 const * const restrict D2,
+    global double2       * const restrict y
 )
 {
     // get worker's segment index (0 <= i < NSPLINE)

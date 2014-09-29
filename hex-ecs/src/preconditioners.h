@@ -354,9 +354,6 @@ class GPUCGPreconditioner : public NoPreconditioner
         
         // diagonal parts of one-electron hamiltonians
         std::vector<CLArray<Complex>> Dl_;
-        
-        // current preconditioner energy
-        Complex E_;
 };
 #endif
 

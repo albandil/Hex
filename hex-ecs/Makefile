@@ -160,4 +160,7 @@ obj/%.o: src/%.cpp
 src/kernels_cl.c: src/kernels.cl
 	xxd -i src/kernels.cl | tail -n+2 | head -n-2 > src/kernels_cl.c
 
+src/slater_cl.c: src/slater.cl
+	xxd -i src/slater.cl | tail -n+2 | head -n-2 > src/slater_cl.c
+
 -include $(wildcard obj/*.dep)

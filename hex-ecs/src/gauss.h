@@ -18,25 +18,9 @@
 
 #include "bspline.h"
 
-/**
- * @brief Gauss-Legendre quadrature.
- * 
- * This class's purpose is aid in fixed-order Gauss-Legendre quadrature.
- * It is constructed above a B-spline environment, which is passed to the
- * constructor. The functions "p_points" and "p_weights" return evaluation nodes
- * and weights, respectively, and the functions "quad" do the fixed-order
- * quadrature itself. Every call to p_points or p_weights resuts in call
- * to gauss_nodes_and_weights, which uses GSL to get the requested data.
- * The computed nodes and weights are stored in a cache table to allow
- * faster subsequent computations.
- */
-class GaussLegendre
+class GaussLegendreData
 {
     public:
-        
-        // constructor
-        GaussLegendre(Bspline const & bspline)
-            : bspline_(bspline) {}
         
         /**
          * @brief Retrieve Gauss-Legendre data.
@@ -50,7 +34,33 @@ class GaussLegendre
          * @param vw     On return, the corresponding Gauss-Legendre weights.
          */
         int gauss_nodes_and_weights (int points, const double* &vx, const double* &vw) const;
+    
+    private:
+        
+        // precomputed nodes and weights, common to all instances
+        static std::vector<std::pair<double*,double*>> data_;
+};
 
+/**
+ * @brief Gauss-Legendre quadrature.
+ * 
+ * This class's purpose is aid in fixed-order Gauss-Legendre quadrature.
+ * It is constructed above a B-spline environment, which is passed to the
+ * constructor. The functions "p_points" and "p_weights" return evaluation nodes
+ * and weights, respectively, and the functions "quad" do the fixed-order
+ * quadrature itself. Every call to p_points or p_weights resuts in call
+ * to gauss_nodes_and_weights, which uses GSL to get the requested data.
+ * The computed nodes and weights are stored in a cache table to allow
+ * faster subsequent computations.
+ */
+class GaussLegendre : public GaussLegendreData
+{
+    public:
+        
+        // constructor
+        GaussLegendre(Bspline const & bspline)
+            : bspline_(bspline) {}
+            
         /**
          * @brief Get Gauss-Legendre quadrature points in interval.
          * 
@@ -175,9 +185,6 @@ class GaussLegendre
 
         // B-spline environment
         Bspline const & bspline_;
-        
-        // precomputed nodes and weights, common to all instances
-        static std::vector<std::pair<double*,double*>> data_;
 };
 
 #endif

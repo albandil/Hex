@@ -178,6 +178,9 @@ class Bspline
         // getters
         
         /// B-spline knot sequence.
+        inline cArrayView t () const { return cArrayView(Nknot_, t_); }
+        
+        /// B-spline knot sequence.
         inline Complex const & t (int i) const { return *(t_ + i); }
         
         /// Number of B-splines.

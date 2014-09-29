@@ -741,7 +741,7 @@ void GPUCGPreconditioner::setup ()
     int maxell = inp_.maxell;
     unsigned long req = ((maxell+1) * (Nspline + 2*Nspline*Nspline) + (2*order+1)*(2*order+1)*Nspline*Nspline + 3*Nspline*Nspline) * 16;
     
-    std::cout << "Setting up OpenCL environment\n";
+    std::cout << "Setting up OpenCL environment" << std::endl;
     char text [1000];
     
     // use platform 0
@@ -749,7 +749,7 @@ void GPUCGPreconditioner::setup ()
     clGetPlatformInfo (platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
     std::cout << "\tplatform: " << text << " ";
     clGetPlatformInfo (platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")\n";
+    std::cout << "(" << text << ")" << std::endl;
     clGetPlatformInfo (platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
     std::cout << "\tavailable version: " << text << std::endl;
     
@@ -759,17 +759,17 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo (device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
     std::cout << "\tdevice: " << text << " ";
     clGetDeviceInfo (device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")\n";
+    std::cout << "(" << text << ")" << std::endl;
     cl_ulong size;
     clGetDeviceInfo (device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tlocal memory size: " << size/1024 << " kiB\n";
+    std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
     clGetDeviceInfo (device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
-    std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)\n";
+    std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)" << std::endl;
     clGetDeviceInfo (device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax compute units: " << size << "\n";
+    std::cout << "\tmax compute units: " << size << std::endl;
     clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax work group size: " << size << "\n\n";
+    std::cout << "\tmax work group size: " << size << std::endl << std::endl;
     
     // choose (e.g.) the largest workgroup
     // NOTE : This may not be the most efficient choice.
@@ -802,12 +802,12 @@ void GPUCGPreconditioner::setup ()
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
     if (status != CL_SUCCESS)
     {
-        std::cout << "\nSource:\n" << source << "\n";
-        std::cout << "\nCommand line:\n" << flags.str() << "\n\n";
+        std::cout << std::endl << "Source:" << std::endl << source << std::endl;
+        std::cout << std::endl << "Command line:" << std::endl << flags.str() << std::endl << std::endl;
         
         char log [100000];
         clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
-        std::cout << "clGetProgramBuildInfo: log \n" << log << "\n";
+        std::cout << "clGetProgramBuildInfo: log" << std::endl << log << std::endl;
         
         throw exception ("Failed to initialize OpenCL.");
     }
@@ -924,7 +924,7 @@ void GPUCGPreconditioner::update (double E)
         }
     }
     
-    std::cout << "ok\n";
+    std::cout << "ok" << std::endl;
 }
 
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -939,7 +939,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // some OpenCL auxiliary storage arrays (used by kernels for temporary data)
     CLArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
     CLArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-    CLArray<Complex> tmA (Nspline * Nspline);                  tmA.connect (context_, CL_MEM_READ_WRITE);
+    CLArray<Complex> tmA (Nspline * Nspline);                  tmA.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
     
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
@@ -953,7 +953,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             block_[ill].hdfload();
         }
         
-        // create OpenCL representation of segment views + transfer data to GPU memory
+        // create OpenCL representation of segmetruent views + transfer data to GPU memory
         CLArrayView<Complex> rsegment (r, ill * Nsegsiz, Nsegsiz);  rsegment.connect (context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         CLArrayView<Complex> zsegment (z, ill * Nsegsiz, Nsegsiz);  zsegment.connect (context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
@@ -978,10 +978,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     a * x + b * y -> z
-            clSetKernelArg (axby_, 0, sizeof(a),      &a);
-            clSetKernelArg (axby_, 1, sizeof(cl_mem), &x.handle());
-            clSetKernelArg (axby_, 2, sizeof(b),      &b);
-            clSetKernelArg (axby_, 3, sizeof(cl_mem), &y.handle());
+            clSetKernelArg (axby_, 0, sizeof(Complex), &a);
+            clSetKernelArg (axby_, 1, sizeof(cl_mem),  &x.handle());
+            clSetKernelArg (axby_, 2, sizeof(Complex), &b);
+            clSetKernelArg (axby_, 3, sizeof(cl_mem),  &y.handle());
             clEnqueueNDRangeKernel (queue_, axby_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish (queue_);
         };
@@ -1024,7 +1024,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clEnqueueNDRangeKernel (queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish (queue_);
         };
-        auto inner_prec = [&](const CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
+        auto inner_prec = [&](/*const*/ CLArrayView<Complex> x, CLArrayView<Complex> y) -> void
         {
             // multiply by approximate inverse block
             

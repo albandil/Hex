@@ -25,6 +25,10 @@
 #include "special.h"
 #include "matrix.h"
 
+#ifndef NO_OPENCL
+#include "opencl.h"
+#endif
+
 class weightEdgeDamp
 {
     public:
@@ -361,6 +365,27 @@ class RadialIntegrals
         
         // Gauss-Legendre integrator
         GaussLegendre g_;
+        
+#ifndef NO_OPENCL
+        
+        // OpenCL setup
+        void setup_gpu_ ();
+        
+        // OpenCL data
+        mutable CLArray<Complex> R_gpu_;
+        CLArray<double> xIn0_, wIn0_, xOut0_, wOut0_;
+        CLArray<Complex> t_;
+        
+        // OpenCL environment
+        cl_platform_id platform_;
+        cl_device_id device_;
+        cl_context context_;
+        cl_command_queue queue_;
+        cl_program program_;
+        
+        cl_kernel rint_;
+        
+#endif // NO_OPENCL
         
         //
         // matrices

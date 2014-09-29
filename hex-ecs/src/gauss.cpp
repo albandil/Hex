@@ -21,12 +21,12 @@
 #include "gauss.h"
 #include "misc.h"
 
-std::vector<std::pair<double*,double*>> GaussLegendre::data_ = {
+std::vector<std::pair<double*,double*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr),  // n = 0
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
-int GaussLegendre::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
+int GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
 {
     // enforce at least second order rule
     if (points < 2)

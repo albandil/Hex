@@ -17,6 +17,10 @@
 #include <vector>
 #include <tuple>
 
+#ifndef NO_OPENCL
+#include "opencl.h"
+#endif
+
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
@@ -132,10 +136,28 @@ Complex RadialIntegrals::computeR
     
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
-
+    
+/*#ifndef NO_OPENCL
+    // compute the diagonal integrals (off-load to GPU)
+    int idx[4] = {a, b, c, d};
+    std::size_t gsize = bspline_.Nreknot() - 1;
+    clSetKernelArg(rint_, 0, 4*sizeof(int),     idx);
+    clSetKernelArg(rint_, 1,   sizeof(int),     &lambda);
+    clSetKernelArg(rint_, 2,   sizeof(cl_mem),  &t_.handle());
+    clSetKernelArg(rint_, 3,   sizeof(cl_mem),  &xIn0_.handle());
+    clSetKernelArg(rint_, 4,   sizeof(cl_mem),  &wIn0_.handle());
+    clSetKernelArg(rint_, 5,   sizeof(cl_mem),  &xOut0_.handle());
+    clSetKernelArg(rint_, 6,   sizeof(cl_mem),  &wOut0_.handle());
+    clSetKernelArg(rint_, 7,   sizeof(cl_mem),  &R_gpu_.handle());
+    clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &gsize, nullptr, 0, nullptr, nullptr);
+    R_gpu_.EnqueueDownload(queue_);
+    clFinish(queue_);
+    Rtr_Labcd_diag = sum(R_gpu_);
+#else*/
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
     for (int iknot = 0; iknot < (int)Nreknot - 1; iknot++)
         Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
+/*#endif*/
     
     // Further parts are a bit cryptical, because we are using precomputed
     // (partial, per knot) integral moments, which are quite compactly stored

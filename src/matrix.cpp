@@ -1981,7 +1981,7 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     // - "restricted" for maximization of the cache usage
     // - "aligned" to convince the auto-vectorizer of the worth of the vectorization using SIMD
     // Note that:
-    //    - cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary
+    //    - cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary (= 32 bytes = 256 bits)
     //    - GCC needs -fcx-limited-range to auto-vectorize 'complex' operations
     // The option -fcx-limited-range will inhibit some run-time range checking, so, technically,
     // some 'complex' operations may overflow. However, e.g. GNU Fortran compiler never(!) checks

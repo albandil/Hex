@@ -82,6 +82,11 @@
 		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/slater.cpp" />
+		<Unit filename="src/slater_cl.c">
+			<Option compilerVar="CC" />
+			<Option compile="0" />
+			<Option link="0" />
+		</Unit>
 		<Unit filename="src/special.cpp" />
 		<Unit filename="src/special.h" />
 		<Unit filename="src/version.cpp" />
