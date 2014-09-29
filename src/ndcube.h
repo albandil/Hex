@@ -45,6 +45,10 @@ template <int dim> class ndCube
             "Dimension of the n-cube has to be at least 1."
         );
         
+        //
+        // Constructors
+        //
+        
         ndCube (double edge = 1.)
             : origin_(dim),
               edge_(edge),
@@ -71,6 +75,10 @@ template <int dim> class ndCube
                 origin_[i] = (*iter++);
             edge_ = (*iter++);
         }
+        
+        //
+        // Subdivision
+        //
         
         /**
          * @brief Subdivision of the cube.
@@ -112,13 +120,23 @@ template <int dim> class ndCube
             return subcubes;
         }
         
-        // getters
+        //
+        // Getters
+        //
         
+        /// Coordinates of the origin of the cube.
         std::vector<double> const & origin () const { return origin_; }
+        
+        /// Length of edge of the cube.
         double edge () const { return edge_; }
+        
+        /// Volume of the hypercube.
         double volume () const { return std::pow(edge_, dim); }
+        
+        /// Subdivision history.
         std::vector<std::bitset<dim>> history () const { return history_; }
         
+        /// Coordinates of the centre of the cube.
         std::vector<double> centre () const
         {
             std::vector<double> coords = origin_;
@@ -127,6 +145,7 @@ template <int dim> class ndCube
             return coords;
         }
         
+        /// Number of vertices for 'dim'-dimensional cube.
         static int nVertex () { return special::pow2(dim); }
         
     private:
@@ -137,7 +156,16 @@ template <int dim> class ndCube
         /// Length of an edge.
         double edge_;
         
-        /// Subdivision history.
+        /**
+         * @brief Subdivision history.
+         * 
+         * This vector contains one element for every refinement that took place, starting from some
+         * original cube. Every element has exactly 'D' fields (equal to zero or one each), where 'D'
+         * is the dimension count. For a given dimension, zero indicates equal coordinate of origin and
+         * suborigin, whereas one indicates that the suborigin has been shifted to half of the edge.
+         * Strings of zeros and ones from stacked history entries compose binary numbers (less than one)
+         * which uniquely define position of the suborigin.
+         */
         std::vector<std::bitset<dim>> history_;
 };
 

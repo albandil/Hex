@@ -810,7 +810,7 @@ template <class T> class SparseGrid
                     # pragma omp for schedule (static)
                     for (auto itID = bisectIDs.begin(); itID < bisectIDs.end(); itID++)
                     {
-                        // subdivide this domain
+                        // subdivide this domain into 2^dim subcubes
                         for (dCube const & c : oldDomains[*itID].cube.subdivide())
                         {
                             // compute also the rough estimate of integral in this new cell 'c'

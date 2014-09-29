@@ -773,7 +773,7 @@ cArrays PWBA2::FullTMatrix_direct
         G.setMinLevel(1);       // ... do at least one subdivision
         G.setLocEpsRel(1e-5);   // ... if the rules are equal up to 1e-5 (relative)
         G.setLocEpsAbs(1e-9);   // ... if the rules are equal up to 1e-9 (absolute)
-        G.setGlobEpsRel(1e-6);  // ... if the extrapolated relative contribution to the whole domain is within 1e-6
+        G.setGlobEpsRel(1e-7);  // ... if the extrapolated relative contribution to the whole domain is within 1e-6
         G.setGlobEpsAbs(0);     // ... if the extrapolated contribution to the whole domain is within ... [not used]
         G.setVerbose(true);     // print detailed progress information
         G.setParallel(true);    // evaluate integration domains in parallel
@@ -886,13 +886,13 @@ cArrays PWBA2::FullTMatrix_direct
             
             // integrate U on 3-dimensional sparse grid
             std::cout << std::endl<< "  Linear integrand for Q = 0 .. " << Qon << std::endl;
-            G.integrate_adapt<3>(integrand_Ub_wrap_lin, spgrid::d3l4n39, spgrid::d3l5n87);
+            G.integrate_adapt<3>(integrand_Ub_wrap_lin, spgrid::d3l4n39, spgrid::d3l6n135);
             fUb_contrib = G.result();
             nEvalUb += G.evalcount();
             
             // integrate U on 3-dimensional sparse grid
             std::cout << std::endl<< "  Compactified integrand for Q = " << Qon << " .. ∞" << std::endl;
-            G.integrate_adapt<3>(integrand_Ub_wrap_log, spgrid::d3l4n39, spgrid::d3l5n87);
+            G.integrate_adapt<3>(integrand_Ub_wrap_log, spgrid::d3l4n39, spgrid::d3l6n135);
             fUb_contrib += G.result();
             nEvalUb += G.evalcount();
             
