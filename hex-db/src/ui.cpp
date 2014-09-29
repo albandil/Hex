@@ -31,7 +31,6 @@ const std::string HelpText =
     "\t--dump <file>      Export all contents as a SQL batch file.\n"
     "\t--update           Update derived quantities e.g. after manual import using \"sqlite3\".\n"
     "\t--optimize         Execute VACUUM command, i.e. minimize the occupied space.\n"
-    "\t--avail            Print out available data.\n"
     "\t--<var>            Compute/retrieve scattering variable <var>.\n"
     "\t--vars             Display all available scattering variables.\n"
     "\t--<param> <val>    Set scattering parameter <param> to the value <val>.\n"
@@ -76,7 +75,7 @@ void print_help_and_exit()
     std::cout << logo(" ") << std::endl;
     std::cout << "=== Database interface program ===" << std::endl;
     std::cout << std::endl << HelpText;
-    exit(0);
+    std::exit(0);
 }
 
 int main(int argc, char* argv[])
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
     // program parameters
     std::string dbname = "hex.db", sqlfile, dumpfile;
     bool create_new = false, doupdate = false, doimport = false;
-    bool dooptimize = false, doavail = false;
+    bool dooptimize = false;
     
     // scattering variables to compute
     std::vector<std::string> vars;
@@ -108,7 +107,6 @@ int main(int argc, char* argv[])
         "import", "i",   1, [ & ](std::string opt) -> bool { doimport = true; sqlfile = opt; return true; },
         "update", "u",   0, [ & ](std::string opt) -> bool { doupdate = true; return true; },
         "optimize", "o", 0, [ & ](std::string opt) -> bool { dooptimize = true; return true; },
-        "avail", "a",    0, [ & ](std::string opt) -> bool { doavail = true; return true; },
         "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
         "vars", "v",     0, [ & ](std::string opt) -> bool
         {
@@ -153,7 +151,7 @@ int main(int argc, char* argv[])
             else
             {
                 std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                abort();
+                std::abort();
             }
             return true;
         },
@@ -166,7 +164,7 @@ int main(int argc, char* argv[])
             else
             {
                 std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                abort();
+                std::abort();
             }
             return true;
         },
@@ -179,7 +177,7 @@ int main(int argc, char* argv[])
             else
             {
                 std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                abort();
+                std::abort();
             }
             return true;
         },
@@ -227,17 +225,17 @@ int main(int argc, char* argv[])
     if (create_new and exists)
     {
         std::cerr << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
-        exit(-1);
+        std::exit(-1);
     }
     
     if (not create_new and not exists)
     {
         std::cerr << "The file \"" << dbname << "\" does not exist. Please create a new database first or use existing one." << std::endl;
-        exit(-1);
+        std::exit(-1);
     }
     
     // open the database, if it is going to be used
-    if (create_new or doimport or doupdate or dooptimize or doavail or not dumpfile.empty() or not vars.empty())
+    if (create_new or doimport or doupdate or dooptimize or not dumpfile.empty() or not vars.empty())
         initialize(dbname.c_str());
     
     // create new database if asked to
@@ -255,10 +253,6 @@ int main(int argc, char* argv[])
     // vacuum
     if (dooptimize)
         optimize();
-    
-    // print out available data
-    if (doavail)
-        avail();
     
     // dump contents of "tmat" table
     if (not dumpfile.empty())
