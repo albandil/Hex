@@ -168,11 +168,13 @@ class RadialIntegrals
          * 
          * @return Value of Rtr.
          */
-        Complex computeR (
+        Complex computeR
+        (
             int lambda,
             int i, int j, int k, int l,
             cArray const & Mtr_L,
-            cArray const & Mtr_mLm1
+            cArray const & Mtr_mLm1,
+            bool gpu
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
@@ -180,7 +182,8 @@ class RadialIntegrals
         void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
         void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
         
-        void allSymmetries (
+        void allSymmetries
+        (
             int i, int j, int k, int l,
             Complex Rijkl_tr,
             NumberArray<long> & R_tr_i,
@@ -384,6 +387,8 @@ class RadialIntegrals
         cl_program program_;
         
         cl_kernel rint_;
+        
+        std::size_t max_local_;
         
 #endif // NO_OPENCL
         

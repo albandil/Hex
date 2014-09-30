@@ -18,7 +18,7 @@
 // Complex arithmetic.                                                       //
 // ------------------------------------------------------------------------- //
 
-inline double2 cmul (double2 a, double2 b)
+double2 cmul (const double2 a, const double2 b)
 {
     // c = a * b
     double2 c;
@@ -27,7 +27,7 @@ inline double2 cmul (double2 a, double2 b)
     return c;
 }
 
-double2 cdiv (double2 a, double2 b)
+double2 cdiv (const double2 a, const double2 b)
 {
     // c = a / b
     double2 c;
@@ -36,11 +36,12 @@ double2 cdiv (double2 a, double2 b)
     return c;
 }
 
-double2 cpow (double2 a, double x)
+double2 cpow (const double2 a, const double x)
 {
     // b = a ^ x
     double2 b;
-    double phi = x * atan2(a.y,a.x), r = pow(a.x * a.x + a.y * a.y, 0.5 * x);
+    const double phi = x * atan2(a.y,a.x);
+    const double r = pow(a.x * a.x + a.y * a.y, 0.5 * x);
     b.x = r * cos(phi);
     b.y = r * sin(phi);
     return b;
@@ -50,135 +51,167 @@ double2 cpow (double2 a, double x)
 // B-spline evaluation.                                                      //
 // ------------------------------------------------------------------------- //
 
-void B
+/**
+ * @brief Evaluate single B-spline.
+ * 
+ * This function evaluates a single B-spline on a given knot.
+ */
+double2 B_single
 (
     constant double2 const * const restrict t,
-    int i, int iknot, int n,
-    double2 const * const restrict x,
-    double2       * const restrict y
+    const int i,
+    const int iknot,
+    const double2 x
 )
 {
-    double2 z[ORDER + 1];
+    // FIXME Assuming ORDER = 4
     
-    for (int u = 0; u < n; u++)
-    {
-        // initialize temporary array "z" with zero-order B-splines
-        for (int j = 0; j <= ORDER; j++)
-        {
-            z[j] = ((i + j == iknot) ? (1) : (0));
-        }
-        
-        // compose higher-order B-splines
-        for (int k = 1; k <= ORDER; k++)
-        {
-            for (int j = 0; j <= ORDER - k; j++)
-            {
-                double2 res = 0;
-                
-                if (t[i+j+k].x != t[i+j].x || t[i+j+k].y != t[i+j].y)
-                    res = res + cmul(z[j], cdiv(x[u] - t[i+j], t[i+j+k] - t[i+j]));
-                
-                if (t[i+j+k+1].x != t[i+j+1].x || t[i+j+k+1].y != t[i+j+1].y)
-                    res = res + cmul(z[j+1], cdiv(t[i+j+k+1] - x[u], t[i+j+k+1] - t[i+j+1]));
-                
-                z[j] = res;
-            }
-        }
-        
-        // save result
-        y[u] = z[0];
-    }
+    // compute zero-order B-splines (k = 0)
+    double2 b0, b1, b2, b3, b4;
+    b0.x = (i + 0 == iknot ? 1.0 : 0.0);
+    b1.x = (i + 1 == iknot ? 1.0 : 0.0);
+    b2.x = (i + 2 == iknot ? 1.0 : 0.0);
+    b3.x = (i + 3 == iknot ? 1.0 : 0.0);
+    b4.x = (i + 4 == iknot ? 1.0 : 0.0);
+    
+    // compute first-order B-splines (k = 1)
+    b0 = ((t[i+1] == t[i+0]) ? 0.0 : cmul(b0,cdiv(x-t[i+0],t[i+1]-t[i+0])))
+       + ((t[i+2] == t[i+1]) ? 0.0 : cmul(b1,cdiv(t[i+2]-x,t[i+2]-t[i+1])));
+    b1 = ((t[i+2] == t[i+1]) ? 0.0 : cmul(b1,cdiv(x-t[i+1],t[i+2]-t[i+1])))
+       + ((t[i+3] == t[i+2]) ? 0.0 : cmul(b2,cdiv(t[i+3]-x,t[i+3]-t[i+2])));
+    b2 = ((t[i+3] == t[i+2]) ? 0.0 : cmul(b2,cdiv(x-t[i+2],t[i+3]-t[i+2])))
+       + ((t[i+4] == t[i+3]) ? 0.0 : cmul(b3,cdiv(t[i+4]-x,t[i+4]-t[i+3])));
+    b3 = ((t[i+4] == t[i+3]) ? 0.0 : cmul(b3,cdiv(x-t[i+3],t[i+4]-t[i+3])))
+       + ((t[i+5] == t[i+4]) ? 0.0 : cmul(b4,cdiv(t[i+5]-x,t[i+5]-t[i+4])));
+    
+    // compute second-order B-splines (k = 2)
+    b0 = ((t[i+2] == t[i+0]) ? 0.0 : cmul(b0,cdiv(x-t[i+0],t[i+2]-t[i+0])))
+       + ((t[i+3] == t[i+1]) ? 0.0 : cmul(b1,cdiv(t[i+3]-x,t[i+3]-t[i+1])));
+    b1 = ((t[i+3] == t[i+1]) ? 0.0 : cmul(b1,cdiv(x-t[i+1],t[i+3]-t[i+1])))
+       + ((t[i+4] == t[i+2]) ? 0.0 : cmul(b2,cdiv(t[i+4]-x,t[i+4]-t[i+2])));
+    b2 = ((t[i+4] == t[i+2]) ? 0.0 : cmul(b2,cdiv(x-t[i+2],t[i+4]-t[i+2])))
+       + ((t[i+5] == t[i+3]) ? 0.0 : cmul(b3,cdiv(t[i+5]-x,t[i+5]-t[i+3])));
+    
+    // compute third-order B-splines (k = 3)
+    b0 = ((t[i+3] == t[i+0]) ? 0.0 : cmul(b0,cdiv(x-t[i+0],t[i+3]-t[i+0])))
+       + ((t[i+4] == t[i+1]) ? 0.0 : cmul(b1,cdiv(t[i+4]-x,t[i+4]-t[i+1])));
+    b1 = ((t[i+4] == t[i+1]) ? 0.0 : cmul(b1,cdiv(x-t[i+1],t[i+4]-t[i+1])))
+       + ((t[i+5] == t[i+2]) ? 0.0 : cmul(b2,cdiv(t[i+5]-x,t[i+5]-t[i+2])));
+    
+    // compute fourth-order B-spline (k = 4)
+    b0 = ((t[i+4] == t[i+0]) ? 0.0 : cmul(b0,cdiv(x-t[i+0],t[i+4]-t[i+0])))
+       + ((t[i+5] == t[i+1]) ? 0.0 : cmul(b1,cdiv(t[i+5]-x,t[i+5]-t[i+1])));
+    
+    return b0;
 }
 
 // ------------------------------------------------------------------------- //
 // Radial integral functions.                                                //
 // ------------------------------------------------------------------------- //
 
-double damp (double2 b, double2 a, double R)
+/**
+ * @brief Damping factor.
+ * 
+ * Factor that will damp the potential.
+ */
+double damp (const double2 b, const double2 a, const double R)
 {
     // compute hyperradius
-    double r = hypot(b.x, a.x);
+    const double r = hypot(b.x, a.x);
     
     // if sufficiently far, return clean zero
-    if (r > R)
-        return 0.;
-    
     // else damp using tanh(x) distribution
-    return tanh(0.125 * (R - r));
+    return return (r > R) ? 0.0 : tanh(0.125 * (R - r));
 }
 
+/**
+ * @brief Triangular part of the two-electron ("Slater") integral.
+ * 
+ * This kernel should be called in the following way:
+ * - One work-group per knot.
+ * - Work-group size equal to (or larger than) the outer quadrature node count.
+ * 
+ * @param idx    R-integral four-index (i,j,k,l).
+ * @param lambda Multipole moment (angular momentum transfer).
+ * @param t      Knot sequence.
+ * @param xIn0   Inner Gauss-Legendre quadrature nodes.
+ * @param wIn0   Inner Gauss-Legendre quadrature weights.
+ * @param xOut0  Outer Gauss-Legendre quadrature nodes.
+ * @param wOut0  Outer Gauss-Legendre quadrature weights.
+ * @param R_out  Output array for knot contributions.
+ * 
+ * The length of the array R_out should be equal to (or larger than) the
+ * work-group count.
+ */
 kernel void R_integral
 (
-// R-integral four-index
     const int4 idx,
-// multipole moment (angular momentum transfer)
     const int lambda,
-// knot sequence
-    constant double2 const * const t,
-// inner Gauss-Legendre quadrature rule
-    constant double const * const xIn0,
-    constant double const * const wIn0,
-// outer Gauss-Legendre quadrature rule
-    constant double const * const xOut0,
-    constant double const * const wOut0,
-// output array for knot contributions
-    global double2 * const restrict R_out
+    constant double2 const * const restrict t,
+    constant double  const * const restrict xIn0,
+    constant double  const * const restrict wIn0,
+    constant double  const * const restrict xOut0,
+    constant double  const * const restrict wOut0,
+    global   double2       * const restrict R_out
 )
 {
-    // get knot
-    const int iknot = get_global_id(0);
+    // get knot and outer quadrature node index
+    const int iknot = get_group_id(0);
+    const int ioutp = get_local_id(0);
+    
+    // get evaluation points count
+    const int nIn  = ORDER + lambda + 1;
+    const int nOut = ORDER + lambda + 10;
     
     // resulting contribution to the integral
-    double2 R = 0;
+    // - one knot per work-group
+    // - one quadrature point per in-group (local) worker
+    local double2 R_local[NOUTMAX];
     
     // compute only if the interval is non-empty
-    if (t[iknot+1].x != t[iknot].x || t[iknot+1].y != t[iknot].y)
+    if (!(t[iknot+1] == t[iknot]) && ioutp < NOUTMAX)
     {
-        // get evaluation points count
-        const int nIn  = ORDER + lambda + 1;
-        const int nOut = ORDER + lambda + 10;
-        
-        // evaluation points and weights for interval
+        // evaluation points and weights for (outer) interval
         //     x in (t[iknot],t[iknot+1])
-        double2 xOut[NOUTMAX], wOut[NOUTMAX];
-        for (int u = 0; u < nOut; u++)
-        {
-            xOut[u] = t[iknot] + (t[iknot+1] - t[iknot]) * xOut0[u];
-            wOut[u] = (t[iknot+1] - t[iknot]) * wOut0[u];
-        }
+        const double2 xOut = (t[iknot+1] - t[iknot]) * xOut0[u] + t[iknot];
+        const double2 wOut = (t[iknot+1] - t[iknot]) * wOut0[u];
         
         // evaluate outer B-splines
-        double2 values_i[NOUTMAX], values_j[NOUTMAX];
-        B(t, idx.x, iknot, nOut, xOut, values_i);
-        B(t, idx.y, iknot, nOut, xOut, values_j);
+        const double2 values_i = B_single(t, idx.x, iknot, xOut[ioutp]);
+        const double2 values_j = B_single(t, idx.y, iknot, xOut[ioutp]);
         
-        // evaluate outer integral, fill output array
-        for (int u = 0; u < nOut; u++)
+        // for all inner points
+        double2 evalIn = 0.;
+        for (int v = 0; v < nIn; v++)
         {
-            // evaluation points and weights for interval
+            // evaluation points and weights for (inner) interval
             //     y in (t[iknot],x)
-            double2 xIn[NINMAX], wIn[NINMAX];
-            for (int v = 0; v < nIn; v++)
-            {
-                xIn[v] = t[iknot] + (xOut[u] - t[iknot]) * xIn0[v];
-                wIn[v] = (xOut[u] - t[iknot]) * wIn0[v];
-            }
+            const double2 xIn = (xOut[ioutp] - t[iknot]) * xIn0[v] + t[iknot];
+            const double2 wIn = (xOut[ioutp] - t[iknot]) * wIn0[v];
             
-            // evaluate B-splines
-            double2 values_k[NINMAX], values_l[NINMAX];
-            B(t, idx.z, iknot, nIn, xIn, values_k);
-            B(t, idx.w, iknot, nIn, xIn, values_l);
+            // evaluate inner B-splines
+            const double values_k = B_single(t, idx.z, iknot, xIn[v]);
+            const double values_l = B_single(t, idx.w, iknot, xIn[v]);
             
-            // evaluate inner integral
-            double2 evalIn = 0;
-            for (int v = 0; v < nIn; v++)
-                evalIn += cmul(wIn[v], cmul(values_k[v], cmul(values_l[v], cpow(cdiv(xIn[v],xOut[u]),lambda)))) * damp(xIn[v], 0, t[IKNOTMAX].x);
-            
-            // evaluate outer integral
-            R += cmul(wOut[u], cmul(values_i[u], cmul(values_j[u], cdiv(evalIn,xOut[u])))) * damp(0, xOut[u], t[IKNOTMAX].x);
+            // update inner integral
+            evalIn += cmul(wIn,cmul(values_k,cmul(values_l,cpow(cdiv(xIn,xOut),lambda)))) * damp(xIn, 0, t[IKNOTMAX].x);
         }
+        
+        // evaluate outer integral
+        R_local[ioutp] = cmul(wOut,cmul(values_i,cmul(values_j,cdiv(evalIn,xOut)))) * damp(0, xOut, t[IKNOTMAX].x);
     }
     
-    // store the result
-    R_out[iknot] = R;
+    // wait for local memory flush
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // master worker will reduce the contributions from this work-group
+    if (ioutp == 0)
+    {
+        double2 R = 0.;
+        
+        for (int ipt = 0; ipt < nOut; ipt++)
+            R = R + R_local[ipt];
+        
+        R_out[iknot] = R;
+    }
 }

@@ -64,7 +64,8 @@ class CommandLine
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), itertol(1e-8),
-              prec_itertol(1e-8), parallel_dot(false), parallel_block(true)
+              prec_itertol(1e-8), parallel_dot(false), parallel_block(true),
+              gpu_slater(false)
         {
             // get command line options
             parse(argc, argv);
@@ -119,6 +120,9 @@ class CommandLine
         
         /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
         bool parallel_block;
+        
+        /// Whether to compute diagonal two-electron integrals using OpenCL.
+        bool gpu_slater;
 };
 
 /**

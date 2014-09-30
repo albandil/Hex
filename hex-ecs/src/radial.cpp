@@ -366,10 +366,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // allocate storage
     R_tr_dia_.resize(lambdas.size());
     
-/*#ifndef NO_OPENCL
-    // prepare GPU kernels for computation of diagonal R-integrals
-    setup_gpu_();
-#endif*/
+#ifndef NO_OPENCL
+    if (cmd.gpu_slater)
+    {
+        // prepare GPU kernels for computation of diagonal R-integrals
+        setup_gpu_();
+    }
+#endif
     
     // print information
 #if defined(_OPENMP)
@@ -405,35 +408,37 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
         Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
         
-/*#ifndef NO_OPENCL
-        // set up outer quadrature rule for GPU
-        std::size_t Nouter = bspline_.order() + lambda + 10;    // outer quadrature points count
-        const double *pxOut, *pwOut;
-        g_.GaussLegendreData::gauss_nodes_and_weights(Nouter, pxOut, pwOut);
-        xOut0_.disconnect(); xOut0_ = rArrayView(Nouter, const_cast<double*>(pxOut)); xOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-        wOut0_.disconnect(); wOut0_ = rArrayView(Nouter, const_cast<double*>(pwOut)); wOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-        
-        // set up inner quadrature rule for GPU
-        std::size_t Ninner = bspline_.order() + lambda + 1;     // inner quadrature points count
-        const double *pxIn, *pwIn;
-        g_.GaussLegendreData::gauss_nodes_and_weights(Ninner, pxIn,  pwIn);
-        xIn0_.disconnect(); xIn0_ = rArrayView(Nouter, const_cast<double*>(pxIn)); xIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-        wIn0_.disconnect(); wIn0_ = rArrayView(Nouter, const_cast<double*>(pwIn)); wIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-#endif*/
+#ifndef NO_OPENCL
+        if (cmd.gpu_slater)
+        {
+            // set up outer quadrature rule for GPU
+            std::size_t Nouter = bspline_.order() + lambda + 10;    // outer quadrature points count
+            const double *pxOut, *pwOut;
+            g_.GaussLegendreData::gauss_nodes_and_weights(Nouter, pxOut, pwOut);
+            xOut0_.disconnect(); xOut0_ = rArrayView(Nouter, const_cast<double*>(pxOut)); xOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+            wOut0_.disconnect(); wOut0_ = rArrayView(Nouter, const_cast<double*>(pwOut)); wOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+            
+            // set up inner quadrature rule for GPU
+            std::size_t Ninner = bspline_.order() + lambda + 1;     // inner quadrature points count
+            const double *pxIn, *pwIn;
+            g_.GaussLegendreData::gauss_nodes_and_weights(Ninner, pxIn,  pwIn);
+            xIn0_.disconnect(); xIn0_ = rArrayView(Nouter, const_cast<double*>(pxIn)); xIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+            wIn0_.disconnect(); wIn0_ = rArrayView(Nouter, const_cast<double*>(pwIn)); wIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+        }
+#endif
         
         // elements of R_tr
         lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
         cArray R_tr_v, th_R_tr_v;
         
-/*#ifdef NO_OPENCL*/
-        # pragma omp parallel default(none) \
+        # pragma omp parallel default (none) \
             private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
             firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
-            shared (R_tr_i, R_tr_j, R_tr_v)
+            shared (R_tr_i, R_tr_j, R_tr_v, cmd) \
+            if (!cmd.gpu_slater)
         {
             // for all B-spline pairs
-            # pragma omp for schedule(dynamic,1)
-/*#endif*/
+            # pragma omp for schedule (dynamic,1)
             for (int i = 0; i < Nspline; i++)
             for (int j = 0; j < Nspline; j++)
             {
@@ -446,7 +451,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                         continue;
                     
                     // evaluate B-spline integral
-                    Complex Rijkl_tr = computeR (lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+                    Complex Rijkl_tr = computeR (lambda, i, j, k, l, Mtr_L, Mtr_mLm1, cmd.gpu_slater);
                     
                     // store all symmetries
                     allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
@@ -460,9 +465,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
                 R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
             }
-/*#ifdef NO_OPENCL*/
         }
-/*#endif*/
         
         // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
@@ -556,6 +559,7 @@ void RadialIntegrals::setup_gpu_ ()
     std::cout << "\tmax compute units: " << size << std::endl;
     clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax work group size: " << size << std::endl << std::endl;
+    max_local_ = size;
     
     // create context and command queue
     context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);

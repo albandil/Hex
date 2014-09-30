@@ -118,6 +118,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
                     "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
+                    "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL                             \n"
                     "                                                                                                                  \n"
                 ;
                 exit(0);
@@ -219,6 +220,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // un-parallelize preconditioning
                 parallel_block = false;
+                return true;
+            },
+        "gpu-slater", "", 0, [&](std::string optarg) -> bool
+            {
+                // compute diagonal two-electron integrals using OpenCL
+                gpu_slater = true;
                 return true;
             },
         

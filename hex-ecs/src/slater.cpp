@@ -121,7 +121,8 @@ Complex RadialIntegrals::computeR
 (
     int lambda,
     int a, int b, int c, int d,
-    cArray const & Mtr_L, cArray const & Mtr_mLm1
+    cArray const & Mtr_L, cArray const & Mtr_mLm1,
+    bool gpu
 ) const
 {
     int order = bspline_.order();
@@ -137,27 +138,45 @@ Complex RadialIntegrals::computeR
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
     
-/*#ifndef NO_OPENCL
-    // compute the diagonal integrals (off-load to GPU)
-    int idx[4] = {a, b, c, d};
-    std::size_t gsize = bspline_.Nreknot() - 1;
-    clSetKernelArg(rint_, 0, 4*sizeof(int),     idx);
-    clSetKernelArg(rint_, 1,   sizeof(int),     &lambda);
-    clSetKernelArg(rint_, 2,   sizeof(cl_mem),  &t_.handle());
-    clSetKernelArg(rint_, 3,   sizeof(cl_mem),  &xIn0_.handle());
-    clSetKernelArg(rint_, 4,   sizeof(cl_mem),  &wIn0_.handle());
-    clSetKernelArg(rint_, 5,   sizeof(cl_mem),  &xOut0_.handle());
-    clSetKernelArg(rint_, 6,   sizeof(cl_mem),  &wOut0_.handle());
-    clSetKernelArg(rint_, 7,   sizeof(cl_mem),  &R_gpu_.handle());
-    clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &gsize, nullptr, 0, nullptr, nullptr);
-    R_gpu_.EnqueueDownload(queue_);
-    clFinish(queue_);
-    Rtr_Labcd_diag = sum(R_gpu_);
-#else*/
-    // sum the diagonal (iknot_x = iknot_y = iknot) contributions
-    for (int iknot = 0; iknot < (int)Nreknot - 1; iknot++)
-        Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
-/*#endif*/
+#ifndef NO_OPENCL
+    // compute the diagonal triangle integrals (off-load to GPU)
+    if (gpu)
+    {
+        // setup kernel arguments
+        std::size_t Ngroups = bspline_.Nreknot() - 1;
+        std::size_t local_size = max_local_;
+        std::size_t global_size = Ngroups * local_size;
+        clSetKernelArg(rint_, 1,   sizeof(int),     &lambda);
+        clSetKernelArg(rint_, 2,   sizeof(cl_mem),  &t_.handle());
+        clSetKernelArg(rint_, 3,   sizeof(cl_mem),  &xIn0_.handle());
+        clSetKernelArg(rint_, 4,   sizeof(cl_mem),  &wIn0_.handle());
+        clSetKernelArg(rint_, 5,   sizeof(cl_mem),  &xOut0_.handle());
+        clSetKernelArg(rint_, 6,   sizeof(cl_mem),  &wOut0_.handle());
+        clSetKernelArg(rint_, 7,   sizeof(cl_mem),  &R_gpu_.handle());
+        
+        // run first triangle
+        int idx1[4] = {a, c, b, d};
+        clSetKernelArg(rint_, 0, 4*sizeof(int),     idx1);
+        clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &global_size, &local_size, 0, nullptr, nullptr);
+        R_gpu_.EnqueueDownload(queue_);
+        clFinish(queue_);
+        Rtr_Labcd_diag += sum(R_gpu_);
+        
+        // run second triangle
+        int idx2[4] = {b, d, a, c};
+        clSetKernelArg(rint_, 0, 4*sizeof(int),     idx2);
+        clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &global_size, &local_size, 0, nullptr, nullptr);
+        R_gpu_.EnqueueDownload(queue_);
+        clFinish(queue_);
+        Rtr_Labcd_diag += sum(R_gpu_);
+    }
+    else
+#endif
+    {
+        // sum the diagonal (iknot_x = iknot_y = iknot) contributions
+        for (int iknot = 0; iknot < Nreknot - 1; iknot++)
+            Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
+    }
     
     // Further parts are a bit cryptical, because we are using precomputed
     // (partial, per knot) integral moments, which are quite compactly stored
@@ -166,19 +185,19 @@ Complex RadialIntegrals::computeR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a - order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a - order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b - order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b - order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
-    for (int ix = 0; ix < (int)Nreknot - 1; ix++)
+    for (int ix = 0; ix < Nreknot - 1; ix++)
     {
         for (int iy = ix + 1; iy < (int)Nreknot - 1; iy++)
         {
             // ix < iy
-            if (a <= ix and ix <= a + (int)order and
-                b <= iy and iy <= b + (int)order)
+            if (a <= ix and ix <= a + order and
+                b <= iy and iy <= b + order)
             {
                 Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
                 if (std::isfinite(lg.imag()))
@@ -186,8 +205,8 @@ Complex RadialIntegrals::computeR
             }
             
             // ix > iy (by renaming the ix,iy indices)
-            if (b <= ix and ix <= b + (int)order and
-                a <= iy and iy <= a + (int)order)
+            if (b <= ix and ix <= b + order and
+                a <= iy and iy <= a + order)
             {
                 Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
                 if (std::isfinite(lg.imag()))
