@@ -64,11 +64,7 @@ std::vector<std::string> const & IonizationF::SQL_Update () const
     return cmd;
 }
 
-bool IonizationF::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

@@ -15,29 +15,10 @@
 #include <vector>
 
 #include "../arrays.h"
+#include "../interfaces.h"
 #include "../special.h"
 #include "../variables.h"
 #include "../version.h"
-
-//
-// forward declaration of recycled subroutines from other variables
-//
-
-extern cArray scattering_amplitude
-(
-    sqlitepp::session & db,
-    int ni, int li, int mi,
-    int nf, int lf, int mf,
-    int S, double E, rArray const & angles
-);
-
-extern rArray differential_cross_section
-(
-    sqlitepp::session & db,
-    int ni, int li, int mi,
-    int nf, int lf, int mf,
-    int S, double E, rArray const & angles
-);
 
 //
 // StokesParameters members
@@ -52,7 +33,7 @@ const std::vector<std::string> StokesParameters::Dependencies = {
 };
 const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
 
-bool StokesParameters::initialize(sqlitepp::session & db) const
+bool StokesParameters::initialize (sqlitepp::session & db) const
 {
     return true;
 }
@@ -69,11 +50,7 @@ std::vector<std::string> const & StokesParameters::SQL_Update () const
     return cmd;
 }
 
-bool StokesParameters::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool StokesParameters::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -120,19 +97,24 @@ bool StokesParameters::run
     //    <.> ... stands for averaging over spin states, i.e.
     //        <a> = [ a(S=0) + 3a(S=1) ] / 4
     
+    rArray scaled_angles = angles * afactor;
+    
     // compute scattering amplitudes
-    cArray f0_singlet = scattering_amplitude(db, ni,0,0, nf,1,0, 0, Ei, angles * afactor);
-    cArray f0_triplet = scattering_amplitude(db, ni,0,0, nf,1,0, 1, Ei, angles * afactor);
-    cArray f1_singlet = scattering_amplitude(db, ni,0,0, nf,1,1, 0, Ei, angles * afactor);
-    cArray f1_triplet = scattering_amplitude(db, ni,0,0, nf,1,1, 1, Ei, angles * afactor);
+    cArray f0_singlet, f0_triplet, f1_singlet, f1_triplet;
+    scattering_amplitude(ni,0,0, nf,1,0, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_singlet.data()));
+    scattering_amplitude(ni,0,0, nf,1,0, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_triplet.data()));
+    scattering_amplitude(ni,0,0, nf,1,1, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_singlet.data()));
+    scattering_amplitude(ni,0,0, nf,1,1, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_triplet.data()));
     
     // compute differential cross sections
-    rArray dcs = differential_cross_section(db, ni,0,0, nf,1, 0, 0, Ei, angles * afactor)
-               + differential_cross_section(db, ni,0,0, nf,1, 1, 0, Ei, angles * afactor)
-               + differential_cross_section(db, ni,0,0, nf,1,-1, 0, Ei, angles * afactor)
-               + differential_cross_section(db, ni,0,0, nf,1, 0, 1, Ei, angles * afactor)
-               + differential_cross_section(db, ni,0,0, nf,1, 1, 1, Ei, angles * afactor)
-               + differential_cross_section(db, ni,0,0, nf,1,-1, 1, Ei, angles * afactor);
+    rArray dcs_p0s, dcs_pps, dcs_pms, dcs_p0t, dcs_ppt, dcs_pmt;
+    differential_cross_section(ni,0,0, nf,1, 0, 0, Ei, angles.size(), scaled_angles.data(), dcs_p0s.data());
+    differential_cross_section(ni,0,0, nf,1, 1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pps.data());
+    differential_cross_section(ni,0,0, nf,1,-1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pms.data());
+    differential_cross_section(ni,0,0, nf,1, 0, 1, Ei, angles.size(), scaled_angles.data(), dcs_p0t.data());
+    differential_cross_section(ni,0,0, nf,1, 1, 1, Ei, angles.size(), scaled_angles.data(), dcs_ppt.data());
+    differential_cross_section(ni,0,0, nf,1,-1, 1, Ei, angles.size(), scaled_angles.data(), dcs_pmt.data());
+    rArray dcs = dcs_p0s + dcs_pps + dcs_pms + dcs_p0t + dcs_ppt + dcs_pmt;
     
     // compute basic parameters
     rArray lambda = (0.25 * abs(f0_singlet*f0_singlet) + 0.75 * abs(f0_triplet*f0_triplet)) / dcs * (kf/ki);

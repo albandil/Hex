@@ -63,11 +63,7 @@ std::vector<std::string> const & BornFullTMatrix::SQL_Update () const
     return cmd;
 }
 
-bool BornFullTMatrix::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool BornFullTMatrix::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

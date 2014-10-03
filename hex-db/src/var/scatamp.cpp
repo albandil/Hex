@@ -46,9 +46,17 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
     return cmd;
 }
 
-cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
+void scattering_amplitude
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E,
+    int N,
+    double const * const angles,
+    double * const result
+)
 {
-    cArray amplitudes(angles.size()), amplitudesb(angles.size()), bornf(angles.size());
+    cArray amplitudes(N), amplitudesb(N), bornf(N);
     
     // total angular momentum projection (given by axis orientation)
     int M = mi;
@@ -135,7 +143,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
             // update value of "f"
             Complex Tmatrix  = interpolate(db_Ei, db_T_ell, {E})[0];
             Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
-            for (std::size_t i = 0; i < angles.size(); i++)
+            for (int i = 0; i < N; i++)
             {
                 Complex Y = -0.5*special::constant::inv_pi * special::sphY(ell, std::abs(M-mf), angles[i], 0.);
                 
@@ -174,7 +182,7 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         coeffs.fromBlob(cheb);
         db_bornf.push_back(Chebyshev<double,Complex>(coeffs, -1., 1.));
     }
-    for (std::size_t i = 0; i < angles.size(); i++)
+    for (int i = 0; i < N; i++)
     {
         // evaluate all energies for this angle
         cArray TE (db_Ei.size());
@@ -185,18 +193,11 @@ cArray scattering_amplitude (sqlitepp::session & db, int ni, int li, int mi, int
         bornf[i] = -0.5*special::constant::inv_pi * (TE.size() > 0 ? interpolate(db_Ei, TE, { E })[0] : 0.);
     }
     
-    //
-    // return corrected expansion
-    //
-    
-    return bornf + (amplitudes - amplitudesb);
+    // return correct expansion
+    cArrayView(N, reinterpret_cast<Complex*>(result)) = bornf + (amplitudes - amplitudesb);
 }
 
-bool ScatteringAmplitude::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -229,7 +230,17 @@ bool ScatteringAmplitude::run
     }
     
     // the scattering amplitudes
-    cArray amplitudes = scattering_amplitude(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
+    rArray scaled_angles = angles * afactor;
+    cArray amplitudes(angles.size());
+    scattering_amplitude
+    (
+        ni,li,mi,
+        nf,lf,mf,
+        S, E,
+        angles.size(),
+        scaled_angles.data(),
+        reinterpret_cast<double*>(amplitudes.data())
+    );
     
     // write out
     std::cout << logo("#") <<

@@ -108,11 +108,7 @@ std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
     return cmd;
 }
 
-bool CompleteCrossSection::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

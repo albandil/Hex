@@ -180,11 +180,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
     return cmd;
 }
 
-bool IntegralCrossSection::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

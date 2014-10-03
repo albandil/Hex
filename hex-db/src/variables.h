@@ -178,7 +178,6 @@ public:
     /// write out requested data
     virtual bool run
     (
-        sqlitepp::session & db,
         std::map<std::string,std::string> const & params
     ) const = 0;
 };
@@ -255,7 +254,6 @@ private:
 \
         bool run \
         ( \
-            sqlitepp::session & db, \
             std::map<std::string,std::string> const & params \
         ) const; \
 };
@@ -307,5 +305,8 @@ AddNewVariableClass(SpinAsymmetry);
 
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;
+
+/// forward declaration of the global database handle
+extern sqlitepp::session db;
 
 #endif

@@ -47,11 +47,7 @@ std::vector<std::string> const & IonizationAmplitude::SQL_Update () const
     return cmd;
 }
 
-bool IonizationAmplitude::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

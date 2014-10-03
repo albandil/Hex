@@ -14,23 +14,12 @@
 #include <string>
 #include <vector>
 
-#include <sqlitepp/sqlitepp.hpp>
-
+#include "../interfaces.h"
 #include "../interpolate.h"
 #include "../special.h"
 #include "../variables.h"
 #include "../version.h"
 
-
-/* * * * * * * * * * * * * * External prototypes * * * * * * * * * * * * * * */
-rArray differential_cross_section
-(
-    sqlitepp::session & db,
-    int ni, int li, int mi,
-    int nf, int lf, int mf,
-    int S, double E,
-    rArray const & angles
-);
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
@@ -60,11 +49,7 @@ std::vector<std::string> const & SpinAsymmetry::SQL_Update () const
     return cmd;
 }
 
-bool SpinAsymmetry::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -95,8 +80,9 @@ bool SpinAsymmetry::run
     }
     
     // compute cross sections
-    rArray dcs0 = differential_cross_section (db, ni,li,mi, nf,lf,mf, 0, E, angles * afactor);
-    rArray dcs1 = differential_cross_section (db, ni,li,mi, nf,lf,mf, 1, E, angles * afactor);
+    rArray scaled_angles = angles * afactor, dcs0(angles.size()), dcs1(angles.size());
+    differential_cross_section (ni,li,mi, nf,lf,mf, 0, E, angles.size(), scaled_angles.data(), dcs0.data());
+    differential_cross_section (ni,li,mi, nf,lf,mf, 1, E, angles.size(), scaled_angles.data(), dcs1.data());
     
     // compute spin asymetry
     rArray asy = (dcs0 - dcs1) / (dcs0 + 3. * dcs1);

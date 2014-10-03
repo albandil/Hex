@@ -45,11 +45,7 @@ std::vector<std::string> const & TotalCrossSection::SQL_CreateTable () const
     return cmd;
 }
 
-bool TotalCrossSection::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

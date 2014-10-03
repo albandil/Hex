@@ -304,7 +304,7 @@ int run
         }
         
         // try to compute the results
-        if (not var->run(db, sdata))
+        if (not var->run(sdata))
         {
             // this can easily happen
             throw exception ("Computation of \"%s\" failed.", varname.c_str());

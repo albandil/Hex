@@ -46,11 +46,7 @@ std::vector<std::string> const & CollisionStrength::SQL_Update () const
     return cmd;
 }
 
-bool CollisionStrength::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

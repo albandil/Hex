@@ -50,17 +50,23 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
     return cmd;
 }
 
-rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int mi, int nf, int lf, int mf, int S, double E, rArray const & angles)
+void differential_cross_section
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S,
+    double E,
+    int N,
+    double const * const angles,
+    double       * const dcs
+)
 {
-    // the scattering amplitudes
-    rArray dcs (angles.size());
-    
     double ki = sqrt(E);
     double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
     
     // check if this is an allowed transition
     if (not std::isfinite(ki) or not std::isfinite(kf))
-        return dcs;
+        return;
     
     int ell;
     double Ei, sum_Re_T_ell, sum_Im_T_ell, sum_Re_TBorn_ell, sum_Im_TBorn_ell;
@@ -108,7 +114,7 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
     
     // terminate if no data
     if (E_ell.empty())
-        return dcs;
+        return;
     
     //
     // load angle dependent Born T-matrices
@@ -145,7 +151,7 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
     //
     
     // for all angles
-    for (unsigned i = 0; i < angles.size(); i++)
+    for (int i = 0; i < N; i++)
     {
         rArray e;       // energies
         cArray f,fb,fB; // amplitudes
@@ -174,18 +180,11 @@ rArray differential_cross_section (sqlitepp::session & db, int ni, int li, int m
         fB = interpolate(E_arr, fB0, e);
         
         // intepolate corrected differential cross section
-        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { E })[0];
+        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { E })[0] * kf * (2 * S + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
     }
-    
-    // normalize
-    return dcs * kf * (2 * S + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
 }
 
-bool DifferentialCrossSection::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -218,7 +217,8 @@ bool DifferentialCrossSection::run
     }
     
     // compute cross section
-    rArray dcs = differential_cross_section(db, ni,li,mi, nf,lf,mf, S, E, angles * afactor);
+    rArray scaled_angles = angles * afactor, dcs(angles.size());
+    differential_cross_section(ni,li,mi, nf,lf,mf, S, E, angles.size(), scaled_angles.data(), dcs.data());
     
     // write out
     std::cout << logo("#") <<

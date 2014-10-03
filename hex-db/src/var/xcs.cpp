@@ -28,7 +28,7 @@ const std::vector<std::string> ExtrapolatedCrossSection::Dependencies = {
 };
 const std::vector<std::string> ExtrapolatedCrossSection::VecDependencies = { "Ei" };
 
-bool ExtrapolatedCrossSection::initialize(sqlitepp::session & db) const
+bool ExtrapolatedCrossSection::initialize (sqlitepp::session & db) const
 {
     return true;
 }
@@ -45,11 +45,7 @@ std::vector<std::string> const & ExtrapolatedCrossSection::SQL_Update () const
     return cmd;
 }
 
-bool ExtrapolatedCrossSection::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata
-) const
+bool ExtrapolatedCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
