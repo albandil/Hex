@@ -173,8 +173,7 @@ class RadialIntegrals
             int lambda,
             int i, int j, int k, int l,
             cArray const & Mtr_L,
-            cArray const & Mtr_mLm1,
-            bool gpu
+            cArray const & Mtr_mLm1
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
@@ -222,9 +221,11 @@ class RadialIntegrals
                 cArray ws = g_.p_weights(points, bspline_.t(iknot), bspline_.t(iknot+1));
                 
                 // evaluate the hydrogenic function
-                std::transform(
+                std::transform
+                (
                     xs.begin(), xs.end(), evalP.begin(),
-                    [ = ](Complex x) -> Complex {
+                    [ = ](Complex x) -> Complex
+                    {
                         gsl_sf_result R;
                         if (gsl_sf_hydrogenicR_e(n, l, 1., x.real(), &R) == GSL_EUNDRFLW)
                             return 0.;
@@ -386,7 +387,7 @@ class RadialIntegrals
         cl_command_queue queue_;
         cl_program program_;
         
-        cl_kernel rint_;
+        cl_kernel Rint_;
         
         std::size_t max_local_;
         

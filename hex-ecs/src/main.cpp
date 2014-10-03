@@ -82,7 +82,7 @@ int main (int argc, char* argv[])
     if (inp.Ei.empty() or inp.instates.empty() or inp.outstates.empty())
     {
         std::cout << "Nothing to compute." << std::endl;
-        exit(0);
+        std::exit(0);
     }
     
     // 
@@ -128,7 +128,7 @@ int main (int argc, char* argv[])
             std::cout << "(" << l1 << "," << sum - l1 << ") ";
             coupled_states.push_back(std::make_pair(l1, sum - l1));
         }
-        std::cout << "\n";
+        std::cout << std::endl;
     }
     
     std::cout << "\t-> The matrix of the set contains " << coupled_states.size()
@@ -138,7 +138,7 @@ int main (int argc, char* argv[])
     if (coupled_states.empty())
         std::exit(0);
     
-    std::cout << "\n";
+    std::cout << std::endl;
     
     //
     // Zip solution file into VTK geometry if told so
@@ -193,7 +193,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     // Solve the equations
     //
     
-    std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << "\n";
+    std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << std::endl;
     double prevE = special::constant::Nan, E = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
@@ -282,7 +282,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 prec->update(E);
             
             // create right hand side
-            std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << "\n";
+            std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
             cArray chi (coupled_states.size() * Nspline * Nspline);
             prec->rhs(chi, ie, instate, Spin);
             

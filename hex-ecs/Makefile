@@ -46,11 +46,11 @@ OPENMPILIBS =
 # OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
 # ---------------------------------------------------------------------------- #
 
-# OPENCLFLAGS = -DNO_OPENCL
+OPENCLFLAGS = -DNO_OPENCL
 
 # - for AMD OpenCL
-OPENCLFLAGS = -I/opt/AMDAPPSDK-2.9-1/include
-OPENCLLIBS = -L/opt/AMDAPPSDK-2.9-1/lib/x86_64 -lOpenCL
+# OPENCLFLAGS = -I/opt/AMDAPPSDK-2.9-1/include
+# OPENCLLIBS = -L/opt/AMDAPPSDK-2.9-1/lib/x86_64 -lOpenCL
 
 # - for Intel OpenCL
 # OPENCLFLAGS = -I/opt/intel/opencl-1.2-4.4.0.117/include
@@ -113,12 +113,15 @@ CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = -g $(CXXRILIS)
 
-FILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
-	matrix preconditioners radial slater special version
+CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
+           matrix preconditioners radial slater special version
+OCLFILES = preconditioners slater
 
-SOURCES = $(patsubst %,src/%.cpp,$(FILES))
-OBJECTS = $(patsubst %,obj/%.o,$(FILES))
-DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
+OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
+DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
+OCLSOURCES   = $(patsubst %,src/%.cl, $(CXXFILES))
+KERNELS      = $(patsubst %,src/%.inc,$(OCLFILES))
 
 all: pollversion bin/hex-ecs
 
@@ -142,25 +145,22 @@ dist:
 	rm -rf hex-ecs/
 
 clean:
-	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES)
+	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES) $(KERNELS)
 
 allclean: clean docclean distclean
 
 distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
-bin/hex-ecs: $(OBJECTS)
+bin/hex-ecs: $(KERNELS) $(OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $^ $(LFLAGS) -o $@
+	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
+
+src/%.inc: src/%.cl
+	xxd -i $< | tail -n+2 | head -n-2 > $@
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
-
-src/kernels_cl.c: src/kernels.cl
-	xxd -i src/kernels.cl | tail -n+2 | head -n-2 > src/kernels_cl.c
-
-src/slater_cl.c: src/slater.cl
-	xxd -i src/slater.cl | tail -n+2 | head -n-2 > src/slater_cl.c
 
 -include $(wildcard obj/*.dep)

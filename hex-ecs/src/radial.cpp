@@ -203,7 +203,7 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 int y_2 = i - (j - order);
                 int z_2 = iknot - j;
                 
-                // save to m- and s-matrix
+                // save to m-matrix
                 Complex lg = ((integral == 0.) ? Complex(0.,special::constant::Inf) : std::log(integral) + logscale);
                 m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = lg;
                 m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = lg;
@@ -371,16 +371,23 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     {
         // prepare GPU kernels for computation of diagonal R-integrals
         setup_gpu_();
+        
+        // print information
+        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using OpenCL." << std::endl;
     }
 #endif
-    
-    // print information
+    if (!cmd.gpu_slater)
+    {
+        // print information
 #if defined(_OPENMP)
-    #pragma omp parallel
-    #pragma omp master
-    std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using " 
-              << omp_get_num_threads() << " threads." << std::endl;
+        #pragma omp parallel
+        #pragma omp master
+        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using " 
+                << omp_get_num_threads() << " threads." << std::endl;
+#else
+        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using single thread." << std::endl;
 #endif
+    }
     
     // shorthands
     int Nspline = bspline_.Nspline();
@@ -401,16 +408,28 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             continue; // no need to compute
         }
         
-        // logarithms of partial integral moments
-        cArray Mtr_L, Mtr_mLm1;
-        
-        // compute partial moments
-        Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-        Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+        // elements of R_tr
+        lArray R_tr_i, R_tr_j;
+        cArray R_tr_v;
         
 #ifndef NO_OPENCL
         if (cmd.gpu_slater)
         {
+            // NOTE : This needs to be fixed.
+            if (order != 4)
+                throw exception ("Computation of radial integrals on GPU is implemented only for B-spline order equal to 4.");
+            
+            // logarithms of partial integral moments
+            CLArray<Complex> Mtr_L, Mtr_mLm1;
+            
+            // compute partial moments
+            Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+            Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+            
+            // uload partial moments
+            Mtr_L.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+            Mtr_mLm1.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
+            
             // set up outer quadrature rule for GPU
             std::size_t Nouter = bspline_.order() + lambda + 10;    // outer quadrature points count
             const double *pxOut, *pwOut;
@@ -424,21 +443,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             g_.GaussLegendreData::gauss_nodes_and_weights(Ninner, pxIn,  pwIn);
             xIn0_.disconnect(); xIn0_ = rArrayView(Nouter, const_cast<double*>(pxIn)); xIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
             wIn0_.disconnect(); wIn0_ = rArrayView(Nouter, const_cast<double*>(pwIn)); wIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-        }
-#endif
-        
-        // elements of R_tr
-        lArray R_tr_i, R_tr_j, th_R_tr_i, th_R_tr_j;
-        cArray R_tr_v, th_R_tr_v;
-        
-        # pragma omp parallel default (none) \
-            private (th_R_tr_i, th_R_tr_j, th_R_tr_v) \
-            firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
-            shared (R_tr_i, R_tr_j, R_tr_v, cmd) \
-            if (!cmd.gpu_slater)
-        {
-            // for all B-spline pairs
-            # pragma omp for schedule (dynamic,1)
+            
+            // set up indices
+            iArray idx_R;
             for (int i = 0; i < Nspline; i++)
             for (int j = 0; j < Nspline; j++)
             {
@@ -450,20 +457,107 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     if (i > j and k > l)
                         continue;
                     
-                    // evaluate B-spline integral
-                    Complex Rijkl_tr = computeR (lambda, i, j, k, l, Mtr_L, Mtr_mLm1, cmd.gpu_slater);
-                    
-                    // store all symmetries
-                    allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
+                    // add index 4-tuple
+                    idx_R.push_back(i); 
+                    idx_R.push_back(j);
+                    idx_R.push_back(k);
+                    idx_R.push_back(l);
                 }
             }
             
-            # pragma omp critical
+            // copy indices to in-out array (NOTE : assuming sizeof(Complex) = 4*sizeof(int))
+            R_gpu_.disconnect(); R_gpu_ = cArrayView(idx_R.size()/4, reinterpret_cast<Complex*>(idx_R.data())); R_gpu_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE);
+            
+            // setup GPU kernel arguments
+            clSetKernelArg(Rint_, 0, sizeof(int),    &lambda);
+            clSetKernelArg(Rint_, 2, sizeof(cl_mem), &t_.handle());
+            clSetKernelArg(Rint_, 3, sizeof(cl_mem), &xIn0_.handle());
+            clSetKernelArg(Rint_, 4, sizeof(cl_mem), &wIn0_.handle());
+            clSetKernelArg(Rint_, 5, sizeof(cl_mem), &xOut0_.handle());
+            clSetKernelArg(Rint_, 6, sizeof(cl_mem), &wOut0_.handle());
+            clSetKernelArg(Rint_, 7, sizeof(cl_mem), &Mtr_L.handle());
+            clSetKernelArg(Rint_, 8, sizeof(cl_mem), &Mtr_mLm1.handle());
+            clSetKernelArg(Rint_, 9, sizeof(cl_mem), &R_gpu_.handle());
+            
+            // run the kernel in a sequence of 1024-item calls
+            cl_ulong todo = R_gpu_.size(), done = 0, maxchunk = 1024, chunk;
+            while (done < todo)
             {
-                // merge the thread local arrays
-                R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end());
-                R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
-                R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
+                chunk = std::min(todo - done, maxchunk);
+                clSetKernelArg(Rint_, 1, sizeof(cl_ulong), &done);
+                clEnqueueNDRangeKernel(queue_, Rint_, 1, nullptr, &chunk, nullptr, 0, nullptr, nullptr);
+                clFinish(queue_);
+                done += chunk;
+                std::cout << "\r\tcomputing: " << format("%.2f %%", done * 100. / todo) << std::flush;
+            }
+            R_gpu_.EnqueueDownload(queue_);
+            clFinish(queue_);
+            
+            // expand symmetries
+            Complex * R_ptr = R_gpu_.begin();
+            for (int i = 0; i < Nspline; i++)
+            for (int j = 0; j < Nspline; j++)
+            {
+                // for all nonzero, nonsymmetry R-integrals
+                for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
+                for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
+                {
+                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
+                    if (i > j and k > l)
+                        continue;
+                    
+                    // store all symmetries
+                    allSymmetries(i, j, k, l, *R_ptr++, R_tr_i, R_tr_j, R_tr_v);
+                }
+            }
+        }
+        else
+#endif
+        {
+            // logarithms of partial integral moments
+            cArray Mtr_L, Mtr_mLm1;
+            
+            // compute partial moments
+            Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+            Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+            
+            # pragma omp parallel default (none) \
+                firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
+                shared (R_tr_i, R_tr_j, R_tr_v, cmd, std::cout, std::cerr) \
+                if (!cmd.gpu_slater)
+            {
+                // per-thread elements of R_tr
+                lArray th_R_tr_i, th_R_tr_j;
+                cArray th_R_tr_v;
+                
+                // for all B-spline pairs
+                # pragma omp for schedule (dynamic,1)
+                for (int i = 0; i < Nspline; i++)
+                for (int j = 0; j < Nspline; j++)
+                {
+                    // for all nonzero, nonsymmetry R-integrals
+                    for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
+                    for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
+                    {
+                        // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
+                        if (i > j and k > l)
+                            continue;
+                        
+                        // evaluate B-spline integral
+                        Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+                        
+                        // store all symmetries
+                        allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
+                    }
+                }
+                
+                # pragma omp critical
+                {
+                    // merge the thread local arrays
+                    R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end());
+                    R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
+                    R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
+                }
             }
         }
         
@@ -471,7 +565,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
         R_tr_dia_[lambda].hdfsave(R_name, true, 10);
         
-        std::cout << "\t- integrals for λ = " << lambda << " computed\n";
+        std::cout << "\r\t- integrals for λ = " << lambda << " computed\n";
     }
     
 #ifndef NO_MPI
@@ -520,9 +614,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 #endif
 }
 
+#ifndef NO_OPENCL
 // kernels' source as byte array, generated by "xxd" from the CL source
 char slater_cl [] = {
-    #include "slater_cl.c"
+    #include "slater.inc"
     , 0x00 // terminate the string by zero
 };
 
@@ -576,13 +671,7 @@ void RadialIntegrals::setup_gpu_ ()
     
     // build program
     program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&slater_source), nullptr, nullptr);
-    
-    std::cout << "Create program DONE.\n";
-    std::cout << "Flags: " << flags.str() << std::endl;
-    
     clBuildProgram (program_, 1, &device_, flags.str().c_str(), nullptr, nullptr);
-    
-    std::cout << "Build DONE.\n";
     
     cl_build_status status;
     clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
@@ -599,17 +688,10 @@ void RadialIntegrals::setup_gpu_ ()
     }
     
     // set program entry point
-    rint_ = clCreateKernel(program_, "R_integral", nullptr);
-    
-    std::cout << "Kernel DONE.\n";
+    Rint_ = clCreateKernel(program_, "R_integral", nullptr);
     
     // create and connect B-spline knot array
     t_ = bspline_.t();
     t_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_WRITE_ONLY);
-    
-    // create and connect the data array
-    R_gpu_ = cArray(bspline_.Nreknot() - 1);
-    R_gpu_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_WRITE_ONLY);
-    
-    std::cout << "Setup DONE\n";
 }
+#endif // NO_OPENCL

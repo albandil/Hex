@@ -48,13 +48,15 @@ template <class T> class CLArrayView : public ArrayView<T>
         //
         
         CLArrayView ()
-            : ArrayView<T>(), cl_handle_(nullptr) { /*std::cout << "Init Default\n";*/ }
+            : ArrayView<T>(), cl_handle_(nullptr) { }
         CLArrayView (std::size_t n, T const * ptr)
-            : ArrayView<T>(n, const_cast<T*>(ptr)), cl_handle_(nullptr) { /*std::cout << "Init from ptr.\n";*/ }
+            : ArrayView<T>(n, const_cast<T*>(ptr)), cl_handle_(nullptr) { }
         CLArrayView (ArrayView<T> v, std::size_t i = 0, std::size_t n = 0)
-            : ArrayView<T>(v, i, n), cl_handle_(nullptr) { /*std::cout << "Init from ArrayView\n";*/ }
+            : ArrayView<T>(v, i, n), cl_handle_(nullptr) { }
         CLArrayView (CLArrayView<T> const & v)
-            : ArrayView<T>(v), cl_handle_(v.cl_handle_) { /*std::cout << "Init from CLArrayView\n";*/ }
+            : ArrayView<T>(v), cl_handle_(v.cl_handle_) { }
+        CLArrayView (ArrayView<T> && v)
+            : ArrayView<T>(v), cl_handle_(nullptr) { }
         CLArrayView (CLArrayView<T> && v)
             : ArrayView<T>(), cl_handle_(nullptr)
         {
@@ -195,6 +197,10 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
             for (auto it = list.begin(); it != list.end(); it++)
                 (*this)[i++] = *it;
         }
+        CLArray (ArrayView<T> && rvrf) : CLArrayView<T>(std::move(rvrf))
+        {
+            // nothing to do
+        }
         CLArray (CLArray<T,Alloc> && rvrf) : CLArrayView<T>(std::move(rvrf))
         {
             // nothing to do
@@ -209,6 +215,7 @@ template <class T, class Alloc = PlainAllocator<T>> class CLArray : public CLArr
             // realloc memory if needed
             if (size() != v.size())
             {
+                // resize
                 Alloc::free(data());
                 ArrayView<T>::array_ = Alloc::alloc(v.size());
                 ArrayView<T>::N_ = v.size();

@@ -77,9 +77,9 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
     {
         out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_.quadMFP
         (
-                 this, &RadialIntegrals::R_inner_integrand,                    // integrand pointers
-                 points2, iknot, bspline_.t(iknot), in[u],                     // integrator parameters
-                 k, l, L, iknot, iknotmax, in[u]                               // integrand data
+            this, &RadialIntegrals::R_inner_integrand,                    // integrand pointers
+            points2, iknot, bspline_.t(iknot), in[u],                     // integrator parameters
+            k, l, L, iknot, iknotmax, in[u]                               // integrand data
         );
     }
 }
@@ -121,8 +121,7 @@ Complex RadialIntegrals::computeR
 (
     int lambda,
     int a, int b, int c, int d,
-    cArray const & Mtr_L, cArray const & Mtr_mLm1,
-    bool gpu
+    cArray const & Mtr_L, cArray const & Mtr_mLm1
 ) const
 {
     int order = bspline_.order();
@@ -138,45 +137,9 @@ Complex RadialIntegrals::computeR
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
     
-#ifndef NO_OPENCL
-    // compute the diagonal triangle integrals (off-load to GPU)
-    if (gpu)
-    {
-        // setup kernel arguments
-        std::size_t Ngroups = bspline_.Nreknot() - 1;
-        std::size_t local_size = max_local_;
-        std::size_t global_size = Ngroups * local_size;
-        clSetKernelArg(rint_, 1,   sizeof(int),     &lambda);
-        clSetKernelArg(rint_, 2,   sizeof(cl_mem),  &t_.handle());
-        clSetKernelArg(rint_, 3,   sizeof(cl_mem),  &xIn0_.handle());
-        clSetKernelArg(rint_, 4,   sizeof(cl_mem),  &wIn0_.handle());
-        clSetKernelArg(rint_, 5,   sizeof(cl_mem),  &xOut0_.handle());
-        clSetKernelArg(rint_, 6,   sizeof(cl_mem),  &wOut0_.handle());
-        clSetKernelArg(rint_, 7,   sizeof(cl_mem),  &R_gpu_.handle());
-        
-        // run first triangle
-        int idx1[4] = {a, c, b, d};
-        clSetKernelArg(rint_, 0, 4*sizeof(int),     idx1);
-        clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &global_size, &local_size, 0, nullptr, nullptr);
-        R_gpu_.EnqueueDownload(queue_);
-        clFinish(queue_);
-        Rtr_Labcd_diag += sum(R_gpu_);
-        
-        // run second triangle
-        int idx2[4] = {b, d, a, c};
-        clSetKernelArg(rint_, 0, 4*sizeof(int),     idx2);
-        clEnqueueNDRangeKernel (queue_, rint_, 1, nullptr, &global_size, &local_size, 0, nullptr, nullptr);
-        R_gpu_.EnqueueDownload(queue_);
-        clFinish(queue_);
-        Rtr_Labcd_diag += sum(R_gpu_);
-    }
-    else
-#endif
-    {
-        // sum the diagonal (iknot_x = iknot_y = iknot) contributions
-        for (int iknot = 0; iknot < Nreknot - 1; iknot++)
-            Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
-    }
+    // sum the diagonal (iknot_x = iknot_y = iknot) contributions
+    for (int iknot = 0; iknot < Nreknot - 1; iknot++)
+        Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
     
     // Further parts are a bit cryptical, because we are using precomputed
     // (partial, per knot) integral moments, which are quite compactly stored
