@@ -51,7 +51,7 @@ extern aUnit Aunits;
 /**
  * Run the computations.
  */
-int run
+int hex_run
 (
     std::vector<std::string> const & vars,
     std::map<std::string,std::string> const & sdata

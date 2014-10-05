@@ -108,34 +108,40 @@ std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
     return cmd;
 }
 
-bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata) const
+void hex_complete_cross_section_
+(
+    int * ni, int * li, int * mi,
+    int * nf, int * lf, int * mf,
+    int * N, double * energies,
+    double * ccs, int * n
+)
 {
-    // manage units
-    double efactor = change_units(Eunits, eUnit_Ry);
-    double lfactor = change_units(lUnit_au, Lunits);
-    
-    // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    
-    // energies and cross sections
     double E, sigma, sigmab, sigmaB;
-    rArray energies, E_arr, sigma_arr, sigmab_arr, EB_arr, sigmaB_arr;
+    rArray E_arr, sigma_arr, sigmab_arr, EB_arr, sigmaB_arr;
     
-    // get energy / energies
-    try {
+    // if there is nothing to compute, return
+    if (*N == 0)
+        return;
+    
+    // get number of all energies
+    if (*energies < 0 and n != nullptr)
+    {
+        sqlitepp::statement st(db);
+        st << "SELECT COUNT(DISTINCT Ei) FROM " + IntegralCrossSection::Id + " "
+                "WHERE ni = :ni "
+                "  AND li = :li "
+                "  AND mi = :mi "
+                "  AND nf = :nf "
+                "  AND lf = :lf "
+                "  AND mf = :mf ",
+            sqlitepp::into(*n),
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
+        st.exec();
         
-        // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
-        // are there more energies specified using the STDIN ?
-        energies = readStandardInput<double>();
+        // if a reallocation is needed, return
+        if (*N != *n)
+            return;
     }
     
     //
@@ -154,8 +160,8 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
             "GROUP BY Ei "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmab),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
     
     // retrieve data
     while (st.exec())
@@ -164,6 +170,10 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         sigma_arr.push_back(sigma);
         sigmab_arr.push_back(sigmab);
     }
+    
+    // terminate if no data
+    if (E_arr.empty())
+        return;
     
     //
     // get the whole Born cross section
@@ -180,8 +190,8 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
             "  AND mf = :mf "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigmaB),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
     
     // retrieve data
     while (stb.exec())
@@ -191,8 +201,94 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     }
     
     //
-    // compute and write output
+    // interpolate
     //
+    
+    // threshold for ionization
+    double Eion = 1./((*ni)*(*ni));
+    
+    // negative energy indicates output of all available cross sections
+    if (*energies < 0.)
+    {
+        // interpolate Born cross section to partial waves' energies
+        rArray sigmaBorn = (*energies < Eion) ? 
+            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_linear) :
+            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_cspline);
+        
+        // correct energies
+        rArrayView(*N,energies) = E_arr;
+        
+        // correct cross sections by Born
+        rArrayView(*N,ccs) = sigmaBorn + sigma_arr - sigmab_arr;
+    }
+    else
+    {
+        // interpolate for given 'energies'
+        rArray ccs0 = (*energies < Eion) ? 
+            interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_linear) :
+            interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_cspline);
+        rArray ccsb = (*energies < Eion) ? 
+            interpolate_real(E_arr, sigmab_arr, rArray(*N,energies), gsl_interp_linear) :
+            interpolate_real(E_arr, sigmab_arr, rArray(*N,energies), gsl_interp_cspline);
+        rArray ccsB = (*energies < Eion) ? 
+            interpolate_real(EB_arr, sigmaB_arr, rArray(*N,energies), gsl_interp_linear) :
+            interpolate_real(EB_arr, sigmaB_arr, rArray(*N,energies), gsl_interp_cspline);
+        
+        // corrected cross section
+        rArrayView(*N,ccs) = ccsB + (ccs0 - ccsb);
+    }
+}
+
+bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata) const
+{
+    // manage units
+    double efactor = change_units(Eunits, eUnit_Ry);
+    double lfactor = change_units(lUnit_au, Lunits);
+    
+    // scattering event parameters
+    int ni = As<int>(sdata, "ni", Id);
+    int li = As<int>(sdata, "li", Id);
+    int mi = As<int>(sdata, "mi", Id);
+    int nf = As<int>(sdata, "nf", Id);
+    int lf = As<int>(sdata, "lf", Id);
+    int mf = As<int>(sdata, "mf", Id);
+    
+    // energies and cross sections
+    rArray energies;
+    
+    // get energy / energies
+    try {
+        
+        // is there a single energy specified using command line ?
+        energies.push_back(As<double>(sdata, "Ei", Id));
+        
+    } catch (std::exception e) {
+        
+        // are there more energies specified using the STDIN ?
+        energies = readStandardInput<double>();
+    }
+    
+    // energies in Rydbergs
+    rArray scaled_energies = energies * efactor;
+    
+    // complete cross section array
+    rArray ccs(energies.size());
+    
+    // resize arrays if all energies are requester
+    if (energies[0] < 0)
+    {
+        int N;
+        
+        // get number of energies
+        hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N);
+        
+        // resize
+        scaled_energies.resize(N); scaled_energies[0] = -1;
+        ccs.resize(N);
+    }
+    
+    // retrieve requested energies
+    hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
     
     // write header
     std::cout << logo("#") <<
@@ -203,45 +299,9 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         "# \n" <<
         "# E\t σ\n";
     
-    // terminate if no data
-    if (E_arr.empty())
-        return true;
-    
-    // threshold for ionization
-    double Eion = 1./(ni*ni);
-    
-    // negative energy indicates output of all available cross sections
-    if (energies[0] < 0.)
-    {
-        // interpolate Born cross section to partial waves' energies
-        rArray sigmaBorn = (efactor * energies.front() < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_cspline);
-        
-        // output corrected cross section
-        for (std::size_t i = 0; i < E_arr.size(); i++)
-            std::cout << E_arr[i] / efactor << "\t" << (sigmaBorn[i] + (sigma_arr[i] - sigmab_arr[i])) * lfactor * lfactor << "\n";
-    }
-    else
-    {
-        // interpolate for given 'energies'
-        rArray ccs = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-        rArray ccsb = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_cspline);
-        rArray ccsB = (efactor * energies.front() < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, energies * efactor, gsl_interp_cspline);
-        
-        // corrected cross section
-        rArray cs = ccsB + (ccs - ccsb);
-        
-        // output
-        for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << (std::isfinite(cs[i]) ? cs[i] * lfactor * lfactor : 0.) << "\n";
-    }
+    // write data
+    for (std::size_t i = 0; i < scaled_energies.size(); i++)
+        std::cout << scaled_energies[i]/efactor << "\t" << (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << std::endl;
     
     return true;
 }

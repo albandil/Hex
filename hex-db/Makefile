@@ -65,13 +65,15 @@ FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-VARS = ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs \
-       stokes asy bornf
+VARS = asy ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes bornf
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
 
-all: pollversion exe
+HEXDBLIB = libhex-db.so
+HEXDBEXE = hex-db
+
+all: pollversion lib exe test
 
 pollversion:
 	@touch src/version.cpp
@@ -93,24 +95,29 @@ dist:
 	rm -rf hex-db/
 
 clean:
-	rm -f obj/*.o obj/*.dep bin/hex-db*
+	+make -C test $(MAKECMDGOALS)
+	rm -f obj/*.o obj/*.dep bin/hex-db* lib/*
 
 distclean:
 	rm -rf hex-db hex-db-*.tar.gz
 
 allclean: clean distclean docclean
 
-exe: bin/hex-db
+exe: bin/$(HEXDBEXE)
 
-lib: bin/hex-db.so
+lib: lib/$(HEXDBLIB)
 
-bin/hex-db: obj/ui.o $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
+test: lib/$(HEXDBLIB)
+	+make -C $@ $(MAKECMDGOALS)
+
+bin/$(HEXDBEXE): obj/ui.o lib/$(HEXDBLIB).0
 	@mkdir -p $(@D)
-	$(CXX) $^ $(LFLAGS) -o $@
+	$(CXX) $^ -L$(shell pwd)/lib/ -lhex-db $(LFLAGS) -o $@
 
-bin/hex-db.so: $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
+lib/$(HEXDBLIB): $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
-	$(CXX) $^ $(LFLAGS) -fPIC -shared -o $@
+	$(CXX) $^ $(LFLAGS) -fPIC -shared -Wl,-soname,$(HEXDBLIB).0 -o $@.0
+	cd lib && ln -fs $(HEXDBLIB).0 $(HEXDBLIB) && cd ..
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)

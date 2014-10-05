@@ -46,20 +46,18 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
     return cmd;
 }
 
-void scattering_amplitude
+void hex_scattering_amplitude_
 (
-    int ni, int li, int mi,
-    int nf, int lf, int mf,
-    int S, double E,
-    int N,
-    double const * const angles,
-    double * const result
+    int * ni, int * li, int * mi,
+    int * nf, int * lf, int * mf,
+    int * S, double * E, int * N,
+    double * angles, double * result
 )
 {
-    cArray amplitudes(N), amplitudesb(N), bornf(N);
+    cArray amplitudes(*N), amplitudesb(*N), bornf(*N);
     
     // total angular momentum projection (given by axis orientation)
-    int M = mi;
+    int M = *mi;
     
     // get maximal partial wave angular momentum
     int max_L;
@@ -73,9 +71,9 @@ void scattering_amplitude
            "  AND mf = :mf "
            "  AND  S = :S  ",
         sqlitepp::into(max_L),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(S);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+        sqlitepp::use(*S);
     st3.exec();
     
     //
@@ -98,13 +96,13 @@ void scattering_amplitude
                "  AND  L = :L  "
                "  AND  S = :S  ",
             sqlitepp::into(max_ell),
-            sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-            sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-            sqlitepp::use(L), sqlitepp::use(S);
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+            sqlitepp::use(L), sqlitepp::use(*S);
         st1.exec();
         
         // for all outgoing partial waves
-        for (int ell = std::abs(M - mf); ell <= max_ell; ell++)
+        for (int ell = std::abs(M - *mf); ell <= max_ell; ell++)
         {
             // get all relevant lines from database
             double Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell;
@@ -126,9 +124,9 @@ void scattering_amplitude
                 sqlitepp::into(Ei),
                 sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
                 sqlitepp::into(Re_TBorn_ell), sqlitepp::into(Im_TBorn_ell),
-                sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-                sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-                sqlitepp::use(ell), sqlitepp::use(L), sqlitepp::use(S);
+                sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+                sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+                sqlitepp::use(ell), sqlitepp::use(L), sqlitepp::use(*S);
             while ( st2.exec() )
             {
                 db_Ei.push_back(Ei);
@@ -141,11 +139,11 @@ void scattering_amplitude
                 continue;
             
             // update value of "f"
-            Complex Tmatrix  = interpolate(db_Ei, db_T_ell, {E})[0];
-            Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {E})[0] : 0.);
-            for (int i = 0; i < N; i++)
+            Complex Tmatrix  = interpolate(db_Ei, db_T_ell, {*E})[0];
+            Complex Tmatrixb = (db_TBorn_ell.size() > 0 ? interpolate(db_Ei, db_TBorn_ell, {*E})[0] : 0.);
+            for (int i = 0; i < (*N); i++)
             {
-                Complex Y = -0.5*special::constant::inv_pi * special::sphY(ell, std::abs(M-mf), angles[i], 0.);
+                Complex Y = -0.5*special::constant::inv_pi * special::sphY(ell, std::abs(M-*mf), angles[i], 0.);
                 
                 amplitudes[i]  += Tmatrix  * Y;
                 amplitudesb[i] += Tmatrixb * Y;
@@ -170,8 +168,8 @@ void scattering_amplitude
            "  AND lf = :lf "
            "  AND mf = :mf ",
         sqlitepp::into(Ei), sqlitepp::into(cheb),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
     while ( st4.exec() )
     {
         // add new energy
@@ -182,7 +180,7 @@ void scattering_amplitude
         coeffs.fromBlob(cheb);
         db_bornf.push_back(Chebyshev<double,Complex>(coeffs, -1., 1.));
     }
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < (*N); i++)
     {
         // evaluate all energies for this angle
         cArray TE (db_Ei.size());
@@ -190,11 +188,11 @@ void scattering_amplitude
             TE[i] = db_bornf[i].clenshaw(std::cos(angles[i]), db_bornf[i].tail(1e-10));
         
         // interpolate
-        bornf[i] = -0.5*special::constant::inv_pi * (TE.size() > 0 ? interpolate(db_Ei, TE, { E })[0] : 0.);
+        bornf[i] = -0.5*special::constant::inv_pi * (TE.size() > 0 ? interpolate(db_Ei, TE, { *E })[0] : 0.);
     }
     
     // return correct expansion
-    cArrayView(N, reinterpret_cast<Complex*>(result)) = bornf + (amplitudes - amplitudesb);
+    cArrayView(*N, reinterpret_cast<Complex*>(result)) = bornf + (amplitudes - amplitudesb);
 }
 
 bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) const
@@ -232,7 +230,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
     // the scattering amplitudes
     rArray scaled_angles = angles * afactor;
     cArray amplitudes(angles.size());
-    scattering_amplitude
+    hex_scattering_amplitude
     (
         ni,li,mi,
         nf,lf,mf,

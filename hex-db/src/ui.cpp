@@ -75,10 +75,10 @@ void print_help_and_exit()
     std::cout << logo(" ") << std::endl;
     std::cout << "=== Database interface program ===" << std::endl;
     std::cout << std::endl << HelpText;
-    std::exit(0);
+    std::exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char* argv[])
+int main (int argc, char* argv[])
 {
     // if no parameters are given, print usage and return
     if (argc == 1)
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
             std::cout << "(name)\t\t(description)" << std::endl;
             for (Variable const * var : vlist)
                 std::cout << var->id() << "\t\t" << var->description() << std::endl;
-            return true;
+            std::exit(EXIT_SUCCESS);
         },
         "params", "p",   1, [ & ](std::string opt) -> bool
         {
@@ -136,9 +136,9 @@ int main(int argc, char* argv[])
                 std::cout << "\n\nof which one of the following can be read from the standard input:\n\n\t";
                 for (std::string v : (*it)->vdeps())
                     std::cout << v << " ";
-                std::cout << "\n\n";
+                std::cout << std::endl << std::endl;
             }
-            return true;
+            std::exit(EXIT_SUCCESS);
         },
         "Eunits", "", 1, [ & ](std::string opt) -> bool
         { 
@@ -225,43 +225,43 @@ int main(int argc, char* argv[])
     if (create_new and exists)
     {
         std::cerr << "The file \"" << dbname << "\" already exists. Please eiher delete it or use another name for the new database." << std::endl;
-        std::exit(-1);
+        std::exit(EXIT_FAILURE);
     }
     
     if (not create_new and not exists)
     {
         std::cerr << "The file \"" << dbname << "\" does not exist. Please create a new database first or use existing one." << std::endl;
-        std::exit(-1);
+        std::exit(EXIT_FAILURE);
     }
     
     // open the database, if it is going to be used
     if (create_new or doimport or doupdate or dooptimize or not dumpfile.empty() or not vars.empty())
-        initialize(dbname.c_str());
+        hex_initialize(dbname.c_str());
     
     // create new database if asked to
     if (create_new)
-        create_new_database();
+        hex_new();
     
     // import SQL data
     if (doimport)
-        import(sqlfile.c_str());
+        hex_import(sqlfile.c_str());
     
     // update
     if (doupdate)
-        update();
+        hex_update();
     
     // vacuum
     if (dooptimize)
-        optimize();
+        hex_optimize();
     
     // dump contents of "tmat" table
     if (not dumpfile.empty())
-        dump(dumpfile.c_str());
+        hex_dump(dumpfile.c_str());
     
     // is there anything more to do?
     if (vars.empty())
         return 0;
     
     // retrieve all requested data
-    return run (vars, sdata);
+    return hex_run (vars, sdata);
 }

@@ -36,7 +36,7 @@ eUnit Eunits = eUnit_Ry;
 lUnit Lunits = lUnit_au;
 aUnit Aunits = aUnit_deg;
 
-void initialize (const char* dbname)
+void hex_initialize_ (const char* dbname)
 {
     // open database
     db.open(dbname);
@@ -51,7 +51,7 @@ void initialize (const char* dbname)
         var->initialize(db);
 }
 
-void create_new_database ()
+void hex_new_ ()
 {
     // create tables
     for (const Variable* var : vlist)
@@ -78,7 +78,7 @@ void create_new_database ()
     }
 }
 
-void import (const char* sqlname)
+void hex_import_ (const char* sqlname)
 {
     // open file, if necessary
     std::ifstream ifs;
@@ -175,7 +175,7 @@ void import (const char* sqlname)
     std::cout << "\rThe SQL batch file has been successfully imported." << std::endl;
 }
 
-void update ()
+void hex_update_ ()
 {
     for (const Variable* var : vlist)
     {
@@ -206,7 +206,7 @@ void update ()
     std::cout << "\rThe database has been successfully updated." << std::endl;
 }
 
-void optimize ()
+void hex_optimize_ ()
 {
     sqlitepp::statement st(db);
     st << "VACUUM";
@@ -222,7 +222,7 @@ void optimize ()
     }
 }
 
-void dump (const char* dumpfile)
+void hex_dump_ (const char* dumpfile)
 {
     sqlitepp::statement st(db);
     std::string dumpline, dumpcmd =
@@ -284,7 +284,7 @@ void dump (const char* dumpfile)
     }
 }
 
-int run
+int hex_run
 (
     std::vector<std::string> const & vars,
     std::map<std::string,std::string> const & sdata

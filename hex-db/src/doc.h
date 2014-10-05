@@ -79,7 +79,7 @@
   As soon as there are some data to import, one will run
  
   <pre>
-  bin/hex-db --import <SQL_batch_file> --update
+  bin/hex-db --import &lt;SQL_batch_file&gt; --update
   </pre>
  
   If the external libraries are installed in non-standard locations, one needs to
@@ -128,7 +128,7 @@
     @f[
         \sigma_{i \rightarrow f}^{LS} = \frac{k_f}{k_i} \frac{2S + 1}{4}
         \int_{4\pi} |f_{i \rightarrow f}^{LS}|^2 \mathrm{d}\Omega
-        = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2} \sum_\ell |T_{fi,\ell}^{Lm_iS}|^2 \ ,
+        = \frac{k_f}{k_i} \frac{2S+1}{16\pi^2} \sum_{\ell L'} T_{fi,\ell}^{Lm_iS}T_{fi,\ell}^{L'm_iS*} \ ,
     @f]
   - the “complete” integral cross section
     @f[

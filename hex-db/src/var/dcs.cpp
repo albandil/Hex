@@ -50,19 +50,16 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
     return cmd;
 }
 
-void differential_cross_section
+void hex_differential_cross_section_
 (
-    int ni, int li, int mi,
-    int nf, int lf, int mf,
-    int S,
-    double E,
-    int N,
-    double const * const angles,
-    double       * const dcs
+    int * ni, int * li, int * mi,
+    int * nf, int * lf, int * mf,
+    int * S, double * E, int * N,
+    double * angles, double * dcs
 )
 {
-    double ki = sqrt(E);
-    double kf = sqrt(E - 1./(ni*ni) + 1./(nf*nf));
+    double ki = std::sqrt((*E));
+    double kf = std::sqrt((*E) - 1./((*ni)*(*ni)) + 1./((*nf)*(*nf)));
     
     // check if this is an allowed transition
     if (not std::isfinite(ki) or not std::isfinite(kf))
@@ -93,9 +90,9 @@ void differential_cross_section
         sqlitepp::into(ell), sqlitepp::into(Ei),
         sqlitepp::into(sum_Re_T_ell), sqlitepp::into(sum_Im_T_ell),
         sqlitepp::into(sum_Re_TBorn_ell), sqlitepp::into(sum_Im_TBorn_ell),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(S);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+        sqlitepp::use(*S);
     
     // load data using the statement
     while (st.exec())
@@ -133,8 +130,8 @@ void differential_cross_section
            "  AND mf = :mf "
            "ORDER BY Ei ASC",
         sqlitepp::into(Ei), sqlitepp::into(cheb),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
-        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
     while (stb.exec())
     {
         // add new energy
@@ -151,7 +148,7 @@ void differential_cross_section
     //
     
     // for all angles
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < (*N); i++)
     {
         rArray e;       // energies
         cArray f,fb,fB; // amplitudes
@@ -180,7 +177,7 @@ void differential_cross_section
         fB = interpolate(E_arr, fB0, e);
         
         // intepolate corrected differential cross section
-        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { E })[0] * kf * (2 * S + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
+        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { *E })[0] * kf * (2 * (*S) + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
     }
 }
 
@@ -218,7 +215,7 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     
     // compute cross section
     rArray scaled_angles = angles * afactor, dcs(angles.size());
-    differential_cross_section(ni,li,mi, nf,lf,mf, S, E, angles.size(), scaled_angles.data(), dcs.data());
+    hex_differential_cross_section(ni,li,mi, nf,lf,mf, S, E, angles.size(), scaled_angles.data(), dcs.data());
     
     // write out
     std::cout << logo("#") <<

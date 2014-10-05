@@ -216,12 +216,13 @@
         <!-- hidden element containing the output from hex-db -->
 <?php
             include "hexdbexe.inc";    // defines $hexdbexe
+            include "hexdblib.inc";    // defines $hexdblib
             include "hexdbdat.inc";    // defines $hexdbdat
             
             if (isset($_POST["qty"]) and isset($_POST["view"]))
             {
                 // prepare Hex-db command line
-                $hexcmdline = $hexdbexe . " --database=" . $hexdbdat . " --" . $_POST["qty"];
+                $hexcmdline = "LD_PRELOAD=\"" . $hexdblib . "\" " . $hexdbexe . " --database=" . $hexdbdat . " --" . $_POST["qty"];
                 if (isset($_POST["ni"])) $hexcmdline = $hexcmdline . " --ni=" . $_POST["ni"];
                 if (isset($_POST["li"])) $hexcmdline = $hexcmdline . " --li=" . $_POST["li"];
                 if (isset($_POST["mi"])) $hexcmdline = $hexcmdline . " --mi=" . $_POST["mi"];
