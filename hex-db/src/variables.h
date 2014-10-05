@@ -303,6 +303,9 @@ AddNewVariableClass(StokesParameters);
 /// Create class for spin asymmetry (asy)
 AddNewVariableClass(SpinAsymmetry);
 
+/// Create class for Born T-matrix (tmatb)
+AddNewVariableClass(TMatrixB);
+
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;
 

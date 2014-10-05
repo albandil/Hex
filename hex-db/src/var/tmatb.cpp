@@ -62,12 +62,7 @@ std::vector<std::string> const & TMatrixB::SQL_Update () const
     return cmd;
 }
 
-bool TMatrixB::run
-(
-    sqlitepp::session & db,
-    std::map<std::string,std::string> const & sdata,
-    bool subtract_born
-) const
+bool TMatrixB::run (std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);

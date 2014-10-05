@@ -65,7 +65,7 @@ FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-VARS = asy ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes bornf
+VARS = asy ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes bornf tmatb
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
@@ -85,9 +85,10 @@ docclean:
 	rm -rf html
 
 dist:
-	mkdir -p hex-db/libs
+	mkdir -p hex-db/libs hex-db/test
 	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-db/
 	cp --recursive libs/sqlitepp hex-db/libs
+	cp test/test-hexdb-lib-c.c test/test-hexdb-lib-f.f95 test/Makefile hex-db/test
 	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-db/Makefile
 	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-db/Makefile
 	sed -i "s/\.\.\/media\///g" hex-db/Doxyfile
