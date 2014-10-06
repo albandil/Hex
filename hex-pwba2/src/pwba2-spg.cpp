@@ -1122,5 +1122,5 @@ cArrays PWBA2::FullTMatrix_direct
     std::cout << table.str() << std::endl;
     
     // for now, exit
-    std::exit(0);
+    std::exit(EXIT_SUCCESS);
 }

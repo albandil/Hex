@@ -29,7 +29,7 @@ namespace geom
  * @brief N-dimensional cube.
  * 
  * This class wraps some utility functions for work with n-dimensional cubes.
- * The attributes keep the origin and edge length of the cube. The core routine
+ * The attributes subdivision history of the original unit hypercube. The core routine
  * used in Hex is the member function @ref subdivide, which decomposes the cube
  * into a set of 2^dim smaller cubes by cutting every edge in the middle. This
  * is used in the adaptive sparse grid integrator @ref spgrid::SparseGrid.
@@ -49,32 +49,9 @@ template <int dim> class ndCube
         // Constructors
         //
         
-        ndCube (double edge = 1.)
-            : origin_(dim),
-              edge_(edge),
-              history_({0})
-        {}
+        ndCube () : history_({0}) {}
         
-        ndCube (std::vector<double> const & origin, double edge, std::vector<std::bitset<dim>> history)
-            : origin_(origin),
-              edge_(edge),
-              history_(history)
-        {}
-        
-        ndCube (std::initializer_list<double> list)
-            : origin_(dim),
-              edge_(0.),
-              history_(0)
-        {
-            // first n-tuple is position of origin, then one number is edge length
-            assert(list.size() == dim + 1);
-            
-            // copy initializer data
-            auto iter = list.begin();
-            for (int i = 0; i < dim; i++)
-                origin_[i] = (*iter++);
-            edge_ = (*iter++);
-        }
+        ndCube (std::vector<std::bitset<dim>> history) : history_(history) {}
         
         //
         // Subdivision
@@ -89,7 +66,6 @@ template <int dim> class ndCube
         std::vector<ndCube<dim>> subdivide () const
         {
             std::vector<ndCube<dim>> subcubes;
-            std::vector<double> suborigin(dim);
             
             // copy the subdivision history and append a new element for this subdivision
             std::vector<std::bitset<dim>> new_history(history_.size() + 1);
@@ -98,23 +74,12 @@ template <int dim> class ndCube
             
             for (int i = 0; i < nVertex(); i++)
             {
-                // get coordinates of the sub-origin
+                // get subdivision history of the sub-cube
                 for (int j = 0; j < dim; j++)
-                {
-                    suborigin[j] = origin_[j] + ((i & special::pow2(j)) != 0 ? 1 : 0) * 0.5 * edge_;
-                    subhistory[j] = (i & special::pow2(j));
-                }
+                    subhistory[j] = (i bitand special::pow2(j));
                 
                 // add sub-cube
-                subcubes.push_back
-                (
-                    ndCube<dim>
-                    (
-                        suborigin,
-                        0.5 * edge_,
-                        new_history
-                    )
-                );
+                subcubes.push_back(ndCube<dim>(new_history));
             }
             
             return subcubes;
@@ -125,13 +90,31 @@ template <int dim> class ndCube
         //
         
         /// Coordinates of the origin of the cube.
-        std::vector<double> const & origin () const { return origin_; }
+        std::vector<double> const origin () const
+        {
+            std::vector<double> coords(dim,0.0);
+            double edge_length = 1.0;
+            for (int i = 1; i < history_.size(); i++)
+            {
+                // update edge length for this subdivision level
+                edge_length *= 0.5;
+                
+                // for all coordinates
+                for (int j = 0; j < dim; j++)
+                {
+                    // check if this coordinate is shifted with respect to sub-origin
+                    if (history_[i][j] == 1)
+                        coords[j] += edge_length;
+                }
+            }
+            return coords;
+        }
         
         /// Length of edge of the cube.
-        double edge () const { return edge_; }
+        double edge () const { return std::pow(0.5, history_.size() - 1); }
         
         /// Volume of the hypercube.
-        double volume () const { return std::pow(edge_, dim); }
+        double volume () const { return std::pow(0.5, dim * (history_.size() - 1)); }
         
         /// Subdivision history.
         std::vector<std::bitset<dim>> history () const { return history_; }
@@ -139,9 +122,9 @@ template <int dim> class ndCube
         /// Coordinates of the centre of the cube.
         std::vector<double> centre () const
         {
-            std::vector<double> coords = origin_;
+            std::vector<double> coords = origin();
             for (double & coord : coords)
-                coord += 0.5 * edge_;
+                coord += 0.5 * edge();
             return coords;
         }
         
@@ -149,12 +132,6 @@ template <int dim> class ndCube
         static int nVertex () { return special::pow2(dim); }
         
     private:
-        
-        /// Coordinates of the cube's origin.
-        std::vector<double> origin_;
-        
-        /// Length of an edge.
-        double edge_;
         
         /**
          * @brief Subdivision history.
@@ -189,12 +166,5 @@ template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> co
 }
 
 }; // namespace geom
-
-// some abbreviations
-#define Unit_2Cube geom::ndCube<2>()
-#define Unit_3Cube geom::ndCube<3>()
-#define Unit_4Cube geom::ndCube<4>()
-#define Unit_5Cube geom::ndCube<5>()
-#define Unit_6Cube geom::ndCube<6>()
 
 #endif // HEX_NDCUBE

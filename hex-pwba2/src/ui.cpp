@@ -124,7 +124,7 @@ int main (int argc, char* argv[])
                 out << sample_input;
                     
                 out.close();
-                exit(0);
+                std::exit(EXIT_SUCCESS);
             },
         "help", "h", 0, [](std::string optarg) -> bool
             {
@@ -138,7 +138,7 @@ int main (int argc, char* argv[])
                     "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
                     "                                                                                                                  \n"
                 ;
-                exit(0);
+                std::exit(EXIT_SUCCESS);
             },
         "input", "i", 1, [&](std::string optarg) -> bool
             {

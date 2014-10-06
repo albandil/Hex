@@ -63,8 +63,6 @@ template <int d> class order_bitsets
             return d < 8 * sizeof(unsigned long) ?
                     u.to_ulong() < v.to_ulong() : u.to_string() < v.to_string() ;
         }
-        
-        
 };
 
 /**
@@ -546,10 +544,11 @@ template <class T> class SparseGrid
          * the template parameter of the class).
          * 
          * @param F Function to integrate.
-         * @param domain N-dimensional cube (integration volume).
          * @param i Sparse grid type.
+         * @param domain N-dimensional cube (integration volume) which is a subdivision of the unit cube.
+         *               This argument is optional; default is unit hyper-cube.
          */
-        template <class Functor, int dim> T integrate_fixed (Functor F, geom::ndCube<dim> const & domain, SparseGridId i) const
+        template <class Functor, int dim> T integrate_fixed (Functor F, SparseGridId i, geom::ndCube<dim> const & domain = geom::ndCube<dim>()) const
         {
             // check that the chosen sparse grid is available
             assert(nodes.find(i) != nodes.end());
@@ -562,6 +561,10 @@ template <class T> class SparseGrid
             std::vector<double>::const_iterator px = nodes.at(i).x.begin();
             std::vector<double>::const_iterator pw = nodes.at(i).w.begin();
             
+            // domain extent
+            std::vector<double> origin = domain.origin();
+            double edge = domain.edge();
+            
             // compute fixed-point quadrature
             T res = 0, eval = 0;
             double orphaned_weights = 0;
@@ -570,7 +573,7 @@ template <class T> class SparseGrid
                 // compute translated and scaled node coordinates
                 double x[dim];
                 for (int k = 0; k < dim; k++)
-                    x[k] = domain.origin()[k] + (*px++) * domain.edge();
+                    x[k] = origin[k] + (*px++) * edge;
                 
                 // evaluate function at the node
                 eval = F(dim,x);
@@ -598,7 +601,7 @@ template <class T> class SparseGrid
         /**
          * @brief Adaptive sparse-grid quadrature.
          * 
-         * This function will integrate the function 'F' a 'dim'-dimensional cube.
+         * This function will integrate the function 'F' a 'dim'-dimensional unit cube.
          * Two sparse grids have to be specified. For every integration sub-cell
          * the integral of the function 'F' is estimated by these two quadrature
          * rules and whenever the change is within the tolerances, the result of the
@@ -619,12 +622,10 @@ template <class T> class SparseGrid
          * @param F Function to integrate.
          * @param ruleLow Low-order rule for error estimation.
          * @param ruleHigh High-order rule for error estimation.
-         * @param root N-dimensional cube (integration volume); default is unit hypercube.
          */
         template <int dim, class Functor> bool integrate_adapt
         (
-            Functor F, SparseGridId ruleLow, SparseGridId ruleHigh,
-            geom::ndCube<dim> root = geom::ndCube<dim>()
+            Functor F, SparseGridId ruleLow, SparseGridId ruleHigh
         )
         {
             // synonym for 'dim'-dimensional cube
@@ -642,7 +643,7 @@ template <class T> class SparseGrid
             T finalEstimate = 0;
             
             // unprocessed subdomains of the integration domain
-            std::vector<tDomain> domains = {{ root, false, integrate_fixed(F, root, ruleLow) }};
+            std::vector<tDomain> domains = {{ geom::ndCube<dim>(), false, integrate_fixed(F, ruleLow, geom::ndCube<dim>()) }};
             
             // VTK debug data (only used when write_vtk_ == true)
             std::map<std::vector<std::bitset<dim>>,T,order_vector_of_bitsets<dim>> vtk;
@@ -699,7 +700,7 @@ template <class T> class SparseGrid
                     for (auto dom = domains.begin(); dom < domains.end(); dom++)
                     {
                         // compute the fine estimate for this domain
-                        T fineEstimate = integrate_fixed(F, dom->cube, ruleHigh);
+                        T fineEstimate = integrate_fixed(F, ruleHigh, dom->cube);
                         thread_neval += nodes.at(ruleHigh).n;
                         
                         // check absolute local convergence
@@ -814,7 +815,7 @@ template <class T> class SparseGrid
                         for (dCube const & c : oldDomains[*itID].cube.subdivide())
                         {
                             // compute also the rough estimate of integral in this new cell 'c'
-                            thread_domains.push_back({ c, false, integrate_fixed(F, c, ruleLow) });
+                            thread_domains.push_back({ c, false, integrate_fixed(F, ruleLow, c) });
                             
                             // update (per-thread) evaluation count and cell count
                             thread_neval += Nlow;
@@ -918,11 +919,11 @@ template <class T> class SparseGrid
                 for (auto ptsubs : point_histories)
                 {
                     // compute coordinates of this point given its subdivision history
-                    std::vector<double> coords = root.origin();
+                    std::vector<double> coords(dim);
                     for (unsigned sub = 0; sub < ptsubs.size(); sub++)
                     for (int axis = 0; axis < dim; axis++)
                     if (ptsubs[sub][axis])
-                        coords[axis] += root.edge() * std::pow(0.5,sub);
+                        coords[axis] += std::pow(0.5,sub);
                     
                     // write exactly three coordinates, even in the lower-dimensional case (VTK wants it this way)
                     for (unsigned axis = 0; axis < dim; axis++)
