@@ -6,9 +6,32 @@
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
 		<Build>
-			<Target title="Release">
+			<Target title="lib">
+				<Option output="bin/hex-db" imp_lib="lib/libhex-db.a" def_file="lib/libhex-db.def" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-std=c++11" />
+					<Add option="-Wall" />
+					<Add option="-DNDEBUG" />
+					<Add option="-DNO_LAPACK" />
+					<Add option="-DNO_HDF" />
+					<Add directory="../win-include" />
+					<Add directory="libs" />
+				</Compiler>
+				<Linker>
+					<Add library="..\win-libraries\libsqlite3.a" />
+					<Add library="..\win-libraries\libgsl.a" />
+					<Add library="..\win-libraries\libfftw3.a" />
+				</Linker>
+			</Target>
+			<Target title="exe">
 				<Option output="bin/hex-db" prefix_auto="1" extension_auto="1" />
-				<Option object_output="obj/" />
+				<Option object_output="obj" />
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
@@ -27,66 +50,241 @@
 					<Add library="..\win-libraries\libfftw3.a" />
 					<Add library="..\win-libraries\libgsl.a" />
 					<Add library="..\win-libraries\libsqlite3.a" />
+					<Add library="lib\libhex-db.a" />
+				</Linker>
+			</Target>
+			<Target title="test-c">
+				<Option output="bin/hex-db-test-C" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Linker>
+					<Add option="-lgfortran" />
+					<Add library="lib\libhex-db.a" />
+				</Linker>
+			</Target>
+			<Target title="test-f">
+				<Option output="bin/hex-db-test-Fortran" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Linker>
+					<Add option="-lgfortran" />
+					<Add library="lib\libhex-db.a" />
 				</Linker>
 			</Target>
 		</Build>
-		<Unit filename="libs/sqlitepp/binders.cpp" />
-		<Unit filename="libs/sqlitepp/binders.hpp" />
-		<Unit filename="libs/sqlitepp/converters.hpp" />
-		<Unit filename="libs/sqlitepp/exception.cpp" />
-		<Unit filename="libs/sqlitepp/exception.hpp" />
-		<Unit filename="libs/sqlitepp/into.hpp" />
-		<Unit filename="libs/sqlitepp/query.cpp" />
-		<Unit filename="libs/sqlitepp/query.hpp" />
-		<Unit filename="libs/sqlitepp/session.cpp" />
-		<Unit filename="libs/sqlitepp/session.hpp" />
-		<Unit filename="libs/sqlitepp/sqlitepp.hpp" />
-		<Unit filename="libs/sqlitepp/statement.cpp" />
-		<Unit filename="libs/sqlitepp/statement.hpp" />
-		<Unit filename="libs/sqlitepp/string.cpp" />
-		<Unit filename="libs/sqlitepp/string.hpp" />
-		<Unit filename="libs/sqlitepp/transaction.cpp" />
-		<Unit filename="libs/sqlitepp/transaction.hpp" />
-		<Unit filename="libs/sqlitepp/unicode.hpp" />
-		<Unit filename="libs/sqlitepp/use.hpp" />
-		<Unit filename="src/arrays.cpp" />
-		<Unit filename="src/arrays.h" />
-		<Unit filename="src/arrithm.h" />
-		<Unit filename="src/chebyshev.h" />
-		<Unit filename="src/clenshawcurtis.h" />
-		<Unit filename="src/cmdline.h" />
-		<Unit filename="src/compact.h" />
-		<Unit filename="src/complex.h" />
-		<Unit filename="src/hex-db.cpp" />
-		<Unit filename="src/hex-db.h" />
+		<VirtualTargets>
+			<Add alias="All" targets="lib;exe;test-c;test-f;" />
+		</VirtualTargets>
+		<Unit filename="libs/sqlitepp/binders.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/binders.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/converters.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/exception.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/exception.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/into.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/query.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/query.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/session.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/session.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/sqlitepp.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/statement.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/statement.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/string.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/string.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/transaction.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/transaction.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/unicode.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="libs/sqlitepp/use.hpp">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/arrays.cpp">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/arrays.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/arrithm.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/chebyshev.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/clenshawcurtis.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/cmdline.h">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/compact.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/complex.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/doc.h">
+			<Option target="lib" />
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/hex-db.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/hex-db.h">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
 		<Unit filename="src/interfaces.h" />
-		<Unit filename="src/interpolate.h" />
-		<Unit filename="src/memory.h" />
-		<Unit filename="src/misc.h" />
-		<Unit filename="src/special.cpp" />
-		<Unit filename="src/special.h" />
-		<Unit filename="src/ui.cpp" />
-		<Unit filename="src/var/asy.cpp" />
-		<Unit filename="src/var/bornf.cpp" />
-		<Unit filename="src/var/ccs.cpp" />
-		<Unit filename="src/var/colls.cpp" />
-		<Unit filename="src/var/dcs.cpp" />
-		<Unit filename="src/var/ics.cpp" />
-		<Unit filename="src/var/ionamp.cpp" />
-		<Unit filename="src/var/ionf.cpp" />
-		<Unit filename="src/var/momtf.cpp" />
-		<Unit filename="src/var/scatamp.cpp" />
-		<Unit filename="src/var/stokes.cpp" />
-		<Unit filename="src/var/tcs.cpp" />
-		<Unit filename="src/var/tdcs.cpp" />
-		<Unit filename="src/var/tmat.cpp" />
-		<Unit filename="src/var/xcs.cpp" />
-		<Unit filename="src/variables.cpp" />
-		<Unit filename="src/variables.h" />
-		<Unit filename="src/vec3d.cpp" />
-		<Unit filename="src/vec3d.h" />
-		<Unit filename="src/version.cpp" />
-		<Unit filename="src/version.h" />
+		<Unit filename="src/interpolate.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/memory.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/misc.h">
+			<Option target="exe" />
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/special.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/special.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/ui.cpp">
+			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/var/asy.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/bornf.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/ccs.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/colls.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/dcs.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/ics.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/ionamp.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/ionf.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/momtf.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/scatamp.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/stokes.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/tcs.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/tdcs.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/tmat.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/tmatb.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/xcs.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/variables.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/variables.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/vec3d.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/vec3d.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/version.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/version.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="test/test-hexdb-lib-c.c">
+			<Option compilerVar="CC" />
+			<Option target="test-c" />
+		</Unit>
+		<Unit filename="test/test-hexdb-lib-f.f95">
+			<Option weight="0" />
+			<Option target="test-f" />
+		</Unit>
 		<Extensions>
 			<code_completion />
 			<envvars />

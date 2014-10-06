@@ -21,25 +21,26 @@
 					<Add option="-DNO_OPENCL" />
 					<Add option="-DNO_PNG" />
 					<Add directory="../win-include" />
+					<Add directory='&quot;c:/Program Files/Microsoft MPI/Inc&quot;' />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add library="../win-libraries/libgsl.a" />
-					<Add library="../win-libraries/libumfpack.a" />
-					<Add library="../win-libraries/liblapack.a" />
-					<Add library="../win-libraries/libcholmod.a" />
-					<Add library="../win-libraries/libccolamd.a" />
-					<Add library="../win-libraries/libamd.a" />
-					<Add library="../win-libraries/libcamd.a" />
-					<Add library="../win-libraries/libcolamd.a" />
-					<Add library="../win-libraries/libmetis.a" />
-					<Add library="../win-libraries/libgsl.a" />
-					<Add library="../win-libraries/libhdf5.a" />
-					<Add library="../win-libraries/libfftw3.a" />
-					<Add library="../win-libraries/libblas.a" />
+					<Add option="-fopenmp" />
+					<Add library="..\win-libraries\libgsl.a" />
+					<Add library="..\win-libraries\libumfpack.a" />
+					<Add library="..\win-libraries\liblapack.a" />
+					<Add library="..\win-libraries\libcholmod.a" />
+					<Add library="..\win-libraries\libccolamd.a" />
+					<Add library="..\win-libraries\libamd.a" />
+					<Add library="..\win-libraries\libcamd.a" />
+					<Add library="..\win-libraries\libcolamd.a" />
+					<Add library="..\win-libraries\libmetis.a" />
+					<Add library="..\win-libraries\libhdf5.a" />
+					<Add library="..\win-libraries\libfftw3.a" />
+					<Add library="..\win-libraries\libblas.a" />
+					<Add library="..\win-libraries\libmsmpi.a" />
 					<Add library="gfortran" />
 					<Add library="dl" />
-					<Add option="-fopenmp" />
 				</Linker>
 			</Target>
 		</Build>
@@ -62,14 +63,9 @@
 		<Unit filename="src/hdffile.h" />
 		<Unit filename="src/hydrogen.cpp" />
 		<Unit filename="src/hydrogen.h" />
-		<Unit filename="src/input.cpp" />
-		<Unit filename="src/input.h" />
+		<Unit filename="src/io.cpp" />
+		<Unit filename="src/io.h" />
 		<Unit filename="src/itersolve.h" />
-		<Unit filename="src/kernels_cl.c">
-			<Option compilerVar="CC" />
-			<Option compile="0" />
-			<Option link="0" />
-		</Unit>
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/matrix.cpp" />
 		<Unit filename="src/matrix.h" />
@@ -82,11 +78,6 @@
 		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/slater.cpp" />
-		<Unit filename="src/slater_cl.c">
-			<Option compilerVar="CC" />
-			<Option compile="0" />
-			<Option link="0" />
-		</Unit>
 		<Unit filename="src/special.cpp" />
 		<Unit filename="src/special.h" />
 		<Unit filename="src/version.cpp" />
