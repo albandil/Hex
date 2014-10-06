@@ -502,7 +502,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
                 std::cerr << "Errors while evaluating Coulomb function:" << std::endl;
                 std::cerr << "\terr1 = " << err1 << std::endl;
                 std::cerr << "\terr2 = " << err2 << std::endl;
-                exit(-1);
+                std::exit(EXIT_FAILURE);
             }
             ///
             

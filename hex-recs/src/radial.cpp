@@ -401,7 +401,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // link and unload the disk file if out of core computation is active
             if (cmd.outofcore)
             {
-                R_tr_dia_[lambda].link(R_name);
+                R_tr_dia_[lambda].hdflink(R_name);
 //                 R_tr_dia_[lambda].drop();
             }
             
@@ -461,7 +461,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // link and unload the disk file if out of core computation is active
         if (cmd.outofcore)
         {
-            R_tr_dia_[lambda].link(R_name);
+            R_tr_dia_[lambda].hdflink(R_name);
 //             R_tr_dia_[lambda].drop();
         }
         

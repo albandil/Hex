@@ -762,7 +762,7 @@ void CsrMatrix::write (const char* filename) const
     out.close();
 }
 
-void CsrMatrix::link (std::string name)
+void CsrMatrix::hdflink (std::string name)
 {
     name_ = name;
 }
@@ -2329,7 +2329,7 @@ cArray SymDiaMatrix::toPaddedCols () const
     return padr;
 }
 
-void SymDiaMatrix::link (std::string name)
+void SymDiaMatrix::hdflink (std::string name)
 {
     name_ = name;
 }

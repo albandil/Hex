@@ -82,7 +82,7 @@ int main (int argc, char* argv[])
     if (inp.Ei.empty() or inp.instates.empty() or inp.outstates.empty())
     {
         std::cout << "Nothing to compute." << std::endl;
-        std::exit(0);
+        std::exit(EXIT_SUCCESS);
     }
     
     // 
@@ -136,7 +136,7 @@ int main (int argc, char* argv[])
     
     // skip if there is nothing to compute
     if (coupled_states.empty())
-        std::exit(0);
+        std::exit(EXIT_SUCCESS);
     
     std::cout << std::endl;
     

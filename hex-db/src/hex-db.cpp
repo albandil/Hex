@@ -72,7 +72,7 @@ void hex_new_ ()
             
             std::cerr << "ERROR: Creation of tables failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
             std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-            std::exit(-1);
+            std::exit(EXIT_FAILURE);
             
         }
     }
@@ -92,7 +92,7 @@ void hex_import_ (const char* sqlname)
     if (not is.good())
     {
         std::cerr << "ERROR: Cannot open file \"" << sqlname << "\"" << std::endl;
-        std::exit(-1);
+        std::exit(EXIT_FAILURE);
     }
     
     // line numbers (current and total)
@@ -161,7 +161,7 @@ void hex_import_ (const char* sqlname)
             
                 std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       [Line " << line << "] Failed SQL command was: \"" << cmd1 << "\"" << std::endl;
-                std::exit(-1);
+                std::exit(EXIT_FAILURE);
                 
             }
         }
@@ -198,7 +198,7 @@ void hex_update_ ()
                 
                 std::cerr << "ERROR: Update failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-                std::exit(-1);
+                std::exit(EXIT_FAILURE);
                 
             }
         }
@@ -217,7 +217,7 @@ void hex_optimize_ ()
     } catch (sqlitepp::exception & e) {
         
         std::cerr << "ERROR: Database optimizaion failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-        std::exit(-1);
+        std::exit(EXIT_FAILURE);
         
     }
 }
@@ -255,7 +255,7 @@ void hex_dump_ (const char* dumpfile)
             if (outfile.bad())
             {
                 std::cerr << "Couldn't open file \"" << dumpfile << "\".\n";
-                exit(-1);
+                std::exit(EXIT_FAILURE);
             }
         }
         
@@ -279,7 +279,7 @@ void hex_dump_ (const char* dumpfile)
         
         std::cerr << "ERROR: Dump failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         std::cerr << "       Failed SQL command was: \"" << dumpcmd << "\"" << std::endl;
-        std::exit(-1);
+        std::exit(EXIT_FAILURE);
         
     }
 }

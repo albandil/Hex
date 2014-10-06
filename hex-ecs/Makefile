@@ -1,6 +1,5 @@
 .PHONY: all doc docclean clean allclean pollversion dist distclean
 
-
 ################################################################################
 # Editable section                                                             #
 
@@ -35,12 +34,12 @@ SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
 # OpenMPI environment (optional, use -DNO_MPI to omit)                         #
 # ---------------------------------------------------------------------------- #
 
-OPENMPIFLAGS = -DNO_MPI
-OPENMPILIBS =
+# OPENMPIFLAGS = -DNO_MPI
+# OPENMPILIBS =
 
 # - for repository release
-# OPENMPIFLAGS = -I/usr/lib64/mpi/gcc/openmpi/include
-# OPENMPILIBS = -L/usr/lib64/mpi/gcc/openmpi/lib64 -lmpi -lmpi_cxx
+OPENMPIFLAGS = $(shell mpic++ --showme:compile)
+OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
@@ -93,47 +92,61 @@ FFTWLIBS = -lfftw3
 # ---------------------------------------------------------------------------- #
 
 # PNGPPFLAGS = -DNO_PNG
+# PNGPPFLIBS =
+
 PNGPPFLAGS = -I./libs
 PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 
 
+# compiler flags
 CFLAGS += $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
           $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
 
+# linker flags
 LFLAGS += $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
           $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
+# git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
+# DEBUG and RELEASE variants
 CXXDEBUG = -g $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
+# choose between DEBUG and RELEASE compiler flags
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = -g $(CXXRILIS)
 
+# source files
 CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
            matrix preconditioners radial slater special version
 OCLFILES = preconditioners slater
 
+# sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
 OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
 OCLSOURCES   = $(patsubst %,src/%.cl, $(CXXFILES))
-KERNELS      = $(patsubst %,src/%.inc,$(OCLFILES))
+OCLKERNELS   = $(patsubst %,src/%.inc,$(OCLFILES))
 
+# build all targets
 all: pollversion bin/hex-ecs
 
+# dummy target to force update of git revision
 pollversion:
 	@touch src/version.cpp
 
+# build documentation from source comments using Doxygen
 doc:
 	doxygen
 
+# remove documentation
 docclean:
 	rm -rf html
 
+# make distribution archive
 dist:
 	mkdir -p hex-ecs/libs
 	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-ecs/
@@ -144,23 +157,30 @@ dist:
 	tar --create --gzip --file=hex-ecs-$(GIT_COMMIT).tar.gz hex-ecs
 	rm -rf hex-ecs/
 
+# remove build files
 clean:
-	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES) $(KERNELS)
+	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES) $(OCLKERNELS)
 
+# remove everything (build files, documentation and distribution files)
 allclean: clean docclean distclean
 
+# remove distribution files
 distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
-bin/hex-ecs: $(KERNELS) $(OBJECTS)
+# main program target
+bin/hex-ecs: $(OCLKERNELS) $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
 
+# CL -> INC rule (convert OpenCL sources to C byte array)
 src/%.inc: src/%.cl
 	xxd -i $< | tail -n+2 | head -n-2 > $@
 
+# CPP -> O rule (compile source files)
 obj/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
+# include generated source dependencied
 -include $(wildcard obj/*.dep)

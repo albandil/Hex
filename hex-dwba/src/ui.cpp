@@ -78,7 +78,7 @@ int main (int argc, char *argv[])
             if (param == std::string("help"))
             {
                 std::cout << std::endl << help_text << std::endl;
-                exit (0);
+                std::exit(EXIT_SUCCESS);
             }
             else if (param == std::string("nodistort"))
             {
@@ -115,7 +115,7 @@ int main (int argc, char *argv[])
     if (params.size() < 7)
     {
         std::cout << std::endl << help_text << std::endl;
-        exit(0);
+        std::exit(EXIT_SUCCESS);
     }
     
     // atomic quantum numbers

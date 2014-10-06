@@ -896,7 +896,7 @@ public:
                 // check output
                 if (status != UMFPACK_OK)
                 {
-                    std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << "\n";
+                    std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << std::endl;
                     umfpack_zl_report_status(0, status);
                 }
             }
@@ -918,6 +918,12 @@ public:
          * a specific filename.
          */
         void link (std::string name) { filename_ = name; }
+        void unlink () { filename_.clear(); }
+        
+        /**
+         * @brief Name of the linked disk file.
+         */
+        std::string name () const { return filename_; }
         
         /**
          * @brief Save Numeric object to a disk file.
@@ -933,7 +939,7 @@ public:
                 throw exception ("[LUft::save] Invalid numeric object.");
             
             if (err == UMFPACK_ERROR_file_IO)
-                throw exception ("[LUft::save] I/O error.");
+                throw exception ("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
         }
         void save () const
         {
@@ -946,19 +952,23 @@ public:
          * The expected format is the format of umfpack_zl_save_numeric.
          */
         //@{
-        void load (std::string name)
+        void load (std::string name, bool throw_on_io_failure = true)
         {
             long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_out_of_memory)
                 throw exception ("[LUft::load] Out of memory.");
             
-            if (err == UMFPACK_ERROR_file_IO)
-                throw exception ("[LUft::save] I/O error.");
+            if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
+                throw exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
         }
         void load ()
         {
-            load (filename_);
+            load (filename_, true);
+        }
+        void silent_load ()
+        {
+            load (filename_, false);
         }
         //@}
         
@@ -1028,7 +1038,13 @@ public:
      * Set a default I/O file that will be used if any of the functions
      * @ref hdfload or @ref hdfsave will be used without an explicit filename.
      */
-    void link (std::string name);
+    void hdflink (std::string name);
+    void unlink () { name_.clear(); }
+    
+    /**
+     * Get linked HDF name.
+     */
+    std::string hdfname () const { return name_; }
     
     /**
      * Save matrix to HDF file.
@@ -1831,10 +1847,10 @@ public:
     //
     
     /// Link matrix to a disk file.
-    void link (std::string name);
+    void hdflink (std::string name);
     
     /// Return the name of the linked disk file.
-    std::string linkedto () const { return name_; }
+    std::string hdfname () const { return name_; }
     
     /**
      * @brief Load from file.

@@ -513,16 +513,16 @@ class ILUCGPreconditioner : public CGPreconditioner
             AngularBasis const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol) {}
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol), csr_blocks_(ll.size()), lu_(ll.size()) {}
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
         virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (cArrayView chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        virtual void setup () { CGPreconditioner::setup(); }
         
         // declare own definitions
-        virtual void setup ();
         virtual void update (double E);
         
         // inner CG callback (needed by parent)

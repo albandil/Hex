@@ -381,7 +381,7 @@ void NoPreconditioner::setup ()
     half_D_minus_Mm1_tr_kron_S_ = half_D_minus_Mm1_tr_.kron(s_rad_.S());
     S_kron_half_D_minus_Mm1_tr_ = s_rad_.S().kron(half_D_minus_Mm1_tr_);
     
-    std::cout << "ok\n\n";
+    std::cout << "ok" << std::endl << std::endl;
     
     // resize arrays
     dia_blocks_.resize(l1_l2_.size());
@@ -430,7 +430,7 @@ void NoPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link diagonal block to a disk file
-            dia_blocks_[ill].link(format("dblk-%d.ooc", ill));
+            dia_blocks_[ill].hdflink(format("dblk-%d.ooc", ill));
             
             // save diagonal block to disk
             # pragma omp critical   
@@ -442,7 +442,7 @@ void NoPreconditioner::update (double E)
     }
     
     par_.wait();
-    std::cout << "ok\n";
+    std::cout << "ok" << std::endl;
 }
 
 void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
@@ -1161,7 +1161,7 @@ void SSORCGPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // link to a disk file
-            SSOR_[ill].link(format("ssor-%d.ooc"));
+            SSOR_[ill].hdflink(format("ssor-%d.ooc"));
             
             // save to the file
             # pragma omp critical
@@ -1302,11 +1302,17 @@ void ILUCGPreconditioner::update (double E)
     {
         // release outdated LU factorizations
         for (auto & lu : lu_)
+        {
             lu.drop();
+            lu.unlink();
+        }
         
         // release outdated CSR diagonal blocks
         for (auto & csr : csr_blocks_)
+        {
             csr.drop();
+            csr.unlink();
+        }
     }
     
     // update parent
@@ -1317,26 +1323,19 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 {
     // load data from linked disk files
     if (cmd_.outofcore)
-    # pragma omp critical
     {
+        # pragma omp critical
         csr_blocks_[iblock].hdfload();
-        lu_[iblock].load();
+        # pragma omp critical
+        lu_[iblock].silent_load();
     }
     
     // check that the factorization is loaded
     if (lu_[iblock].size() == 0)
     {
-        // load diagonal block from disk (if OOC)
-        if (cmd_.outofcore)
-        # pragma omp critical
-            dia_blocks_[iblock].hdfload();
-        
         // create CSR block
+        // NOTE : dia_blocks_[iblock] is loaded by CGPreconditioner::precondition
         csr_blocks_[iblock] = dia_blocks_[iblock].tocoo().tocsr();
-        
-        // release memory
-        if (cmd_.outofcore)
-            dia_blocks_[iblock].drop();
         
         // start timer
         Timer timer;
@@ -1354,9 +1353,9 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
             lu_[iblock].size() / 1048576                            // final memory size
         );
         
-        // release memory
-        if (cmd_.outofcore)
-            csr_blocks_[iblock].drop();
+        // save the diagonal block
+        csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
+        csr_blocks_[iblock].hdfsave();
     }
     
     // precondition by LU
@@ -1365,10 +1364,16 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // release memory
     if (cmd_.outofcore)
     {
-        // link to a disk file
-        lu_[iblock].link(format("lu-%d.ooc", iblock));
-        # pragma omp critical
-        lu_[iblock].save();
+        // link to a disk file and save (if not already done)
+        if (lu_[iblock].name().size() == 0)
+        {
+            lu_[iblock].link(format("lu-%d.ooc", iblock));
+            # pragma omp critical
+            lu_[iblock].save();
+        }
+        
+        // release memory objects
         lu_[iblock].drop();
+        csr_blocks_[iblock].drop();
     }
 }

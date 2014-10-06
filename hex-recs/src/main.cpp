@@ -84,7 +84,7 @@ int main (int argc, char* argv[])
     if (inp.Ei.empty() or inp.instates.empty() or inp.outstates.empty())
     {
         std::cout << "Nothing to compute." << std::endl;
-        exit(0);
+        std::exit(EXIT_SUCCESS);
     }
     
     //
@@ -147,9 +147,9 @@ int main (int argc, char* argv[])
     
     // skip if there is nothing to compute
     if (ang.empty())
-        exit(0);
+        std::exit(EXIT_SUCCESS);
     
-    std::cout << "\n";
+    std::cout << std::endl;
     
     //
     // Zip solution file into VTK geometry if told so

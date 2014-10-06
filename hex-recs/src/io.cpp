@@ -81,7 +81,7 @@ void CommandLine::parse (int argc, char* argv[])
                 out << sample_input;
                     
                 out.close();
-                std::exit(0);
+                std::exit(EXIT_SUCCESS);
             },
         "input", "i", 1, [&](std::string optarg) -> bool
             {
@@ -120,7 +120,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--concurrent-factorizations <number>   how many LU preconditioner factorizations to run simultaneously          \n"
                     "                                                                                                                  \n"
                 ;
-                exit(0);
+                std::exit(EXIT_SUCCESS);
             },
         "zipfile", "z", 1, [&](std::string optarg) -> bool
             {
@@ -206,8 +206,8 @@ void CommandLine::parse (int argc, char* argv[])
                     std::cout << Preconditioners::name(i) << "\n";
                     std::cout << "\t" << Preconditioners::description(i) << "\n";
                 }
-                std::cout << "\n";
-                exit (0);
+                std::cout << std::endl;
+                std::exit(EXIT_SUCCESS);
             },
         "parallel-dot", "", 0, [&](std::string optarg) -> bool
             {
