@@ -118,7 +118,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
                     "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
+#ifndef NO_OPENCL
                     "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL                             \n"
+#endif
                     "                                                                                                                  \n"
                 ;
                 std::exit(EXIT_SUCCESS);
