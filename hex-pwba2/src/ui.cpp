@@ -204,25 +204,42 @@ int main (int argc, char* argv[])
     rArray grid = linspace(0., Rmax, N + 1);
     
     // echo input data
-    std::cout << "Quantum state parameters:" << std::endl;
-    std::cout << "\t- total angular momentum: L = " << L << (partial_wave ? "" : " (not used)") << std::endl;
-    std::cout << "\t- total parity: Π = " << Pi << (partial_wave ? "" : " (not used)") << std::endl;
-    std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
-    std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
-    std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
-    std::cout << "\t- total energy: Etot = " << Etot << std::endl;
-    std::cout << std::endl;
-    std::cout << "Grid parameters:" << std::endl;
-    std::cout << "\t- grid length: Rmax = " << Rmax << std::endl;
-    std::cout << "\t- grid total samples: N = " << N << std::endl;
-    std::cout << "\t- grid spacing: h = " << Rmax / N << std::endl;
-    std::cout << std::endl;
-    std::cout << "Intermediate atomic states:" << std::endl;
-    std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
-    std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
-    std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
-    std::cout << "\t- integrate allowed states: " << (integrate_allowed ? "yes" : "no") << std::endl;
-    std::cout << "\t- integrate forbidden states: " << (integrate_forbidden ? "yes" : "no") << std::endl;
+    if (partial_wave)
+    {
+        std::cout << "Quantum state parameters:" << std::endl;
+        std::cout << "\t- total angular momentum: L = " << L << std::endl;
+        std::cout << "\t- total parity: Π = " << Pi << std::endl;
+        std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
+        std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
+        std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
+        std::cout << "\t- total energy: Etot = " << Etot << std::endl;
+        std::cout << std::endl;
+        std::cout << "Grid parameters:" << std::endl;
+        std::cout << "\t- grid length: Rmax = " << Rmax << std::endl;
+        std::cout << "\t- grid total samples: N = " << N << std::endl;
+        std::cout << "\t- grid spacing: h = " << Rmax / N << std::endl;
+        std::cout << std::endl;
+        std::cout << "Intermediate atomic states:" << std::endl;
+        std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
+        std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
+        std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
+        std::cout << "\t- integrate allowed states: " << (integrate_allowed ? "yes" : "no") << std::endl;
+        std::cout << "\t- integrate forbidden states: " << (integrate_forbidden ? "yes" : "no") << std::endl;
+    }
+    else
+    {
+        std::cout << "Quantum state parameters:" << std::endl;
+        std::cout << "\t- initial atomic state: Ni = " << Ni << ", Li = " << Li << std::endl;
+        std::cout << "\t- final atomic state: Nf = " << Nf << ", Lf = " << Lf << std::endl;
+        std::cout << "\t- impact energy: Ei = " << ki * ki << std::endl;
+        std::cout << "\t- total energy: Etot = " << Etot << std::endl;
+        std::cout << std::endl;
+        std::cout << "Intermediate atomic states:" << std::endl;
+        std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
+        std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
+//         std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
+        std::cout << "\t- integrate continuum states: " << (integrate_allowed ? "yes" : "no") << std::endl;
+    }
     
     if (partial_wave)
     {
