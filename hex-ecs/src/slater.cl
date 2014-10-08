@@ -10,6 +10,8 @@
  *                                                                           *
 \* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
+
 // Define the following macros:
 //   -D ORDER=...
 //   -D IKNOTMAX=...  (Nreknot-1)
@@ -167,11 +169,11 @@ kernel void R_integral
 (
     const int lambda,
     const ulong offset,
-    global double2 const * const restrict t,
-    global double  const * const restrict xIn0,
-    global double  const * const restrict wIn0,
-    global double  const * const restrict xOut0,
-    global double  const * const restrict wOut0,
+    constant double2 const * const restrict t,
+    constant double  const * const restrict xIn0,
+    constant double  const * const restrict wIn0,
+    constant double  const * const restrict xOut0,
+    constant double  const * const restrict wOut0,
     global double2 const * const restrict Mtr_L,
     global double2 const * const restrict Mtr_mLm1,
     global double2 * const restrict idx_R
