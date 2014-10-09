@@ -67,6 +67,18 @@ const std::string sample_input =
     "  1       1\n"
 ;
 
+const std::string help_text = 
+    "                                                                                                                  \n"
+    "Available switches (short forms in parentheses):                                                                  \n"
+    "                                                                                                                  \n"
+    "\t--example                 (-e)  create sample input file                                                        \n"
+    "\t--help                    (-h)  display this help                                                               \n"
+    "\t--input <filename>        (-i)  use custom input file                                                           \n"
+    "\t--direct-integrate        (-d)  compute exact second-order T-matrix for given angle                             \n"
+    "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
+    "                                                                                                                  \n"
+;
+
 void parse_input_file
 (
     std::ifstream & inf,
@@ -106,8 +118,10 @@ int main (int argc, char* argv[])
     // input file
     std::ifstream inputfile;
     
+    // computation mode
+    bool partial_wave = false, direct_integrate = false;
+    
     // parse command line
-    bool partial_wave = false;
     ParseCommandLine
     (
         argc, argv,
@@ -129,15 +143,7 @@ int main (int argc, char* argv[])
         "help", "h", 0, [](std::string optarg) -> bool
             {
                 // print usage information
-                std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                                  \n"
-                    "                                                                                                                  \n"
-                    "\t--example                 (-e)  create sample input file                                                        \n"
-                    "\t--help                    (-h)  display this help                                                               \n"
-                    "\t--input <filename>        (-i)  use custom input file                                                           \n"
-                    "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
-                    "                                                                                                                  \n"
-                ;
+                std::cout << help_text << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
         "input", "i", 1, [&](std::string optarg) -> bool
@@ -155,6 +161,12 @@ int main (int argc, char* argv[])
                 partial_wave = true;
                 return true;
             },
+        "direct-integrate", "d", 0, [&](std::string optarg) -> bool
+            {
+                // compute multidimensional integral
+                direct_integrate = true;
+                return true;
+            },
         
         [](std::string opt, std::string optarg) -> bool
             {
@@ -165,6 +177,19 @@ int main (int argc, char* argv[])
                 );
             }
     );
+    
+    // check mode
+    if (direct_integrate and partial_wave)
+    {
+        std::cout << "Please select either --partial-wave or --direct-integrate, not both." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+    if (not direct_integrate and not partial_wave)
+    {
+        // print usage information
+        std::cout << help_text << std::endl;
+        std::exit(EXIT_SUCCESS);
+    }
     
     // check input file
     if (not inputfile.is_open())

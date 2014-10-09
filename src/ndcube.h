@@ -44,14 +44,70 @@ template <int dim> class ndCube
             dim > 0,
             "Dimension of the n-cube has to be at least 1."
         );
+        static_assert
+        (
+            dim <= 8,
+            "Dimension of the n-cube has to be at most 8."
+        );
         
         //
-        // Constructors
+        // Constructors & destructor
         //
         
-        ndCube () : history_({0}) {}
+        ndCube () : lvl_(0), history_(nullptr) {}
         
-        ndCube (std::vector<std::bitset<dim>> history) : history_(history) {}
+        ndCube (ndCube<dim> const & cube) : ndCube(cube.lvl_, cube.history_) {}
+        
+        ndCube (ndCube<dim> && cube) : ndCube()
+        {
+            std::swap(lvl_, cube.lvl_);
+            std::swap(history_, cube.history_);
+        }
+        
+        ndCube (int lvl, char const * history) : lvl_(lvl), history_(nullptr)
+        {
+            if (lvl > 0)
+            {
+                history_ = new char [lvl_];
+                std::memcpy(history_, history, lvl_ * sizeof(char));
+            }
+        }
+        
+        ~ndCube ()
+        {
+            if (history_ != nullptr)
+                delete [] history_;
+        }
+        
+        //
+        // Assignment operator
+        //
+        
+        ndCube<dim> & operator= (ndCube<dim> const & cube)
+        {
+            // delete current data
+            if (history_ != nullptr)
+            {
+                assert(history_ != cube.history_);
+                delete [] history_;
+            }
+            
+            if (cube.lvl_ == 0)
+            {
+                // assignment of empty structure
+                lvl_ = 0;
+                history_ = nullptr;
+            }
+            else
+            {
+                // valid assignment
+                lvl_ = cube.lvl_;
+                history_ = new char [lvl_];
+                std::memcpy(history_, cube.history_, lvl_);
+            }
+            
+            return *this;
+        }
         
         //
         // Subdivision
@@ -67,19 +123,24 @@ template <int dim> class ndCube
         {
             std::vector<ndCube<dim>> subcubes;
             
-            // copy the subdivision history and append a new element for this subdivision
-            std::vector<std::bitset<dim>> new_history(history_.size() + 1);
-            std::copy(history_.begin(), history_.end(), new_history.begin());
-            std::bitset<dim> & subhistory = new_history.back();
+            // new subdivision history for sub-cubes
+            char new_history[lvl_ + 1];
             
+            // copy the current subdivision history and append a new element for new subdivision
+            if (lvl_ > 0)
+                std::memcpy(new_history, history_, lvl_ * sizeof(char));
+            
+            // the last subdivision info
+            char & subhistory = *(new_history + lvl_);
+            
+            // for all vertices (there is a sub-cube adjacent to each of them)
             for (int i = 0; i < nVertex(); i++)
             {
-                // get subdivision history of the sub-cube
-                for (int j = 0; j < dim; j++)
-                    subhistory[j] = (i bitand special::pow2(j));
+                // get subdivision history of this sub-cube
+                subhistory = i;
                 
                 // add sub-cube
-                subcubes.push_back(ndCube<dim>(new_history));
+                subcubes.push_back(ndCube<dim>(lvl_ + 1, new_history));
             }
             
             return subcubes;
@@ -94,7 +155,7 @@ template <int dim> class ndCube
         {
             std::vector<double> coords(dim,0.0);
             double edge_length = 1.0;
-            for (int i = 1; i < history_.size(); i++)
+            for (int i = 0; i < lvl_; i++)
             {
                 // update edge length for this subdivision level
                 edge_length *= 0.5;
@@ -103,7 +164,7 @@ template <int dim> class ndCube
                 for (int j = 0; j < dim; j++)
                 {
                     // check if this coordinate is shifted with respect to sub-origin
-                    if (history_[i][j] == 1)
+                    if ((history_[i] & special::pow2(j)) != 0)
                         coords[j] += edge_length;
                 }
             }
@@ -111,13 +172,16 @@ template <int dim> class ndCube
         }
         
         /// Length of edge of the cube.
-        double edge () const { return std::pow(0.5, history_.size() - 1); }
+        double edge () const { return std::pow(0.5, lvl_); }
         
         /// Volume of the hypercube.
-        double volume () const { return std::pow(0.5, dim * (history_.size() - 1)); }
+        double volume () const { return std::pow(0.5, dim * lvl_); }
+        
+        /// Subdivision level.
+        int level () const { return lvl_; }
         
         /// Subdivision history.
-        std::vector<std::bitset<dim>> history () const { return history_; }
+        char const * history () const { return history_; }
         
         /// Coordinates of the centre of the cube.
         std::vector<double> centre () const
@@ -134,6 +198,11 @@ template <int dim> class ndCube
     private:
         
         /**
+         * @brief Subdivision level.
+         */
+        char lvl_;
+        
+        /**
          * @brief Subdivision history.
          * 
          * This vector contains one element for every refinement that took place, starting from some
@@ -143,7 +212,7 @@ template <int dim> class ndCube
          * Strings of zeros and ones from stacked history entries compose binary numbers (less than one)
          * which uniquely define position of the suborigin.
          */
-        std::vector<std::bitset<dim>> history_;
+        char * history_;
 };
 
 /**
@@ -155,6 +224,8 @@ template <int dim> class ndCube
  */
 template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> const & dCube)
 {
+    if (dCube.level() > 0)
+        os << int(*(dCube.history())) << " ";
     os << "[(";
     for (int i = 0; i < dim; i++)
         if (i == 0) os << dCube.origin()[i]; else os << "," << dCube.origin()[i];
