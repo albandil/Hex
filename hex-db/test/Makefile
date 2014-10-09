@@ -1,6 +1,13 @@
 all: test-hexdb-lib-c test-hexdb-lib-f
+allclean: clean
+
 clean:
 	rm -f *.o test-hexdb-lib-c test-hexdb-lib-f
+
+doc: ;
+docclean: ;
+dist: ;
+distclean: ;
 
 #
 # C test
