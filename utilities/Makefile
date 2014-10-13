@@ -14,5 +14,5 @@ doc dist distclean :
 
 $(SUBDIRS)::
 	@echo $@ $(MAKECMDGOALS)
+	mkdir -p bin
 	+make -C $@ $(MAKECMDGOALS)
-	mkdir -p bin; cd bin; ln -fs ../$@/$@ .

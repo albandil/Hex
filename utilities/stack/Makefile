@@ -1,9 +1,9 @@
 .PHONY: all clean
 
-all: stack
+all: ../bin/hex-stack
 
-stack: stack.cpp
-	g++ -std=c++11 -O2 stack.cpp -o stack
+../bin/hex-stack: stack.cpp
+	g++ -std=c++11 -O2 $< -o $@
 
 clean:
-	rm -rf stack
+	rm -rf ../bin/hex-stack
