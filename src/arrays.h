@@ -33,6 +33,7 @@
 #define HEX_ARRAYS
 
 #include <cassert>
+#include <cmath>
 #include <complex>
 #include <cstdlib>
 #include <cstring>
@@ -470,8 +471,8 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             }
             
             // swap content
-            std::swap (ArrayView<T>::N_, b.ArrayView<T>::N_);
-            std::swap (ArrayView<T>::array_, b.ArrayView<T>::array_);
+            std::swap(ArrayView<T>::N_, b.ArrayView<T>::N_);
+            std::swap(ArrayView<T>::array_, b.ArrayView<T>::array_);
             
             return *this;
         }
@@ -611,7 +612,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 
                 if (size() > 0)
                 {
-                    memcpy (new_array, data(), size() * sizeof(T));
+                    std::memcpy(new_array, data(), size() * sizeof(T));
                     Alloc::free (ArrayView<T>::array_);
                 }
                 
@@ -766,7 +767,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 T* new_array = Alloc::alloc(Nres_);
                 
                 // copy original data
-                memcpy(new_array, data(), size() * sizeof(T));
+                std::memcpy(new_array, data(), size() * sizeof(T));
                 
                 // destroy original array
                 if (data() != nullptr)
@@ -790,7 +791,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         /// Fill array with zeros.
         void clear ()
         {
-            memset(ArrayView<T>::array_, 0, size() * sizeof(T));
+            std::memset(ArrayView<T>::array_, 0, size() * sizeof(T));
         }
         
         /// Reset array: deallocate everything, resize to zero.
@@ -1054,11 +1055,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             // read zero blocks
             if (zero_blocks.resize(hdf.size("zero_blocks")))
-                if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
-                    return false;
+            if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+                return false;
                 
-                // get data size
-                std::size_t size = hdf.size("array");
+            // get data size
+            std::size_t size = hdf.size("array");
             
             // scale size if this is a complex array
             if (typeid(T) == typeid(Complex))
@@ -1153,10 +1154,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             {
                 int start = nonzero_blocks[2*iblock];
                 int end = nonzero_blocks[2*iblock+1];
-                carray.append (
-                    begin() + start,
-                    begin() + end
-                );
+                carray.append(begin() + start, begin() + end);
             }
             
             return std::make_tuple(zero_blocks,carray);
@@ -1184,7 +1182,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             // resize and clean internal storage
             NumberArray<DataType> unpack(final_size);
-            memset(&(unpack[0]), 0, final_size * sizeof(T));
+            std::memset(&(unpack[0]), 0, final_size * sizeof(T));
             
             // copy nonzero chunks
             int this_end = 0;   // index of last updated element in "this"
@@ -1195,7 +1193,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 int zero_end = zero_blocks[2*i+1];
                 
                 // append nonzero data before this zero block
-                memcpy (
+                std::memcpy
+                (
                     &(unpack[0]) + this_end,
                     begin() + load_end,
                     (zero_start - this_end) * sizeof(T)
@@ -1207,7 +1206,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             }
             
             // append remaining data
-            memcpy (
+            std::memcpy
+            (
                 &(unpack[0]) + this_end,
                 begin() + load_end,
                 (final_size - this_end) * sizeof(T)
@@ -1586,7 +1586,7 @@ template <typename T> T min (const ArrayView<T> a)
     for (T const * it = a.begin(); it != a.end(); it++)
         if (*it < z)
             z = *it;
-        return z;
+    return z;
 }
 
 /// Maximal element of array.
@@ -1596,89 +1596,61 @@ template <typename T> T max (const ArrayView<T> a)
     for (T const * it = a.begin(); it != a.end(); it++)
         if (*it > z)
             z = *it;
-        return z;
+    return z;
 }
 
-/// Return per-element power.
-template <typename T> NumberArray<T> pow (NumberArray<T> const & u, double e)
-{
-    NumberArray<T> v(u.size());
-    
-    auto iu = u.begin();
-    auto iv = v.begin();
-    
-    while (iu != u.end())
-        *(iv++) = std::pow(*(iu++), e);
-    
-    return v;
+#define DEFINE_FUN_1ARR(fun,kern)           \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> in                   \
+)                                           \
+{                                           \
+    std::size_t N = in.size();              \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(in[i]);               \
+    return out;                             \
 }
 
-/// Return per-element power.
-template <typename T> Array<T> pow (Array<T> const & u, double e)
-{
-    Array<T> v(u.size());
-    
-    auto iu = u.begin();
-    auto iv = v.begin();
-    
-    while (iu != u.end())
-        *(iv++) = std::pow(*(iu++), e);
-    
-    return v;
+#define DEFINE_FUN_1ARR_1DBL(fun,kern)      \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> in,                  \
+    double y                                \
+)                                           \
+{                                           \
+    std::size_t N = in.size();              \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(in[i],y);             \
+    return out;                             \
 }
 
-/// Return per-element square root.
-template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::sqrt(A[i]);
-    
-    return B;
+#define DEFINE_FUN_2ARR(fun,kern)           \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> a,                   \
+    const ArrayView<T> b                    \
+)                                           \
+{                                           \
+    assert(a.size() == b.size());           \
+    std::size_t N = a.size();               \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(a[i],b[i]);           \
+    return out;                             \
 }
 
-/// Return per-element sine.
-template <class T> NumberArray<T> sin (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::sin(A[i]);
-    
-    return B;
-}
-
-/// Return per-element arcsine.
-template <class T> NumberArray<T> asin (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::asin(A[i]);
-    
-    return B;
-}
-
-/// Return per-element cosine.
-template <class T> NumberArray<T> cos (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::cos(A[i]);
-    
-    return B;
-}
+DEFINE_FUN_1ARR(exp,std::exp);
+DEFINE_FUN_1ARR(sin,std::sin);
+DEFINE_FUN_1ARR(cos,std::cos);
+DEFINE_FUN_1ARR(asin,std::asin);
+DEFINE_FUN_1ARR(sqrt,std::sqrt);
+DEFINE_FUN_2ARR(atan2,std::atan2);
+DEFINE_FUN_1ARR_1DBL(pow,std::pow);
 
 /// Return per-element hypot.
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
-/// Return per-element atan2.
-NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B);
 /// Return per-element square of absolute value.
 NumberArray<double> sqrabs (NumberArray<Complex> const & A);
 /// Return per-element real part.

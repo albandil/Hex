@@ -295,7 +295,10 @@ rArray interpolate_riccati_bessel_j
 {
     return x.transform
     (
-        [&](double r) -> double { return special::ric_j(l,k*r); }
+        [&](double r) -> double
+        {
+            return special::ric_j(l,k*r);
+        }
     );
 }
 
@@ -310,7 +313,7 @@ rArray interpolate_riccati_bessel_y
         [&](double r) -> double
         {
             if (k == 0. or r == 0.)
-                return l == 0 ? 1 : 0;
+                return l == 0 ? 1. : 0.;
             else
                 return -special::ric_n(l,k*r);
         }
@@ -325,7 +328,10 @@ rArray interpolate_riccati_bessel_iscaled
 {
     return x.transform
     (
-        [&](double r) -> double { return special::ric_i_scaled(l,k*r); }
+        [&](double r) -> double
+        {
+            return special::ric_i_scaled(l,k*r);
+        }
     );
 }
 
@@ -437,7 +443,7 @@ double Idir_forbidden
 (
     rArray const & grid,
     rArray const & jf, rArray const & Vfn,
-    rArray const & iscaled_n, rArray const & kscaled_n,
+    rArray const & iscaled_n, rArray const & kscaled_n, double kn,
     rArray const & ji, rArray const & Vni
 )
 {
@@ -481,7 +487,7 @@ double Idir_forbidden
         }
         
         // add properly scaled contribution
-        contrib *= std::exp(-h*d);
+        contrib *= std::exp(-kn*h*d);
         suma += contrib;
         
         // check convergence (do not blindly integrate everything)
@@ -502,6 +508,8 @@ Complex Idir_nBound_allowed
 {
     Complex result = 0;
     
+    double nrm = std::sqrt(1. / kn);
+    
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
     
@@ -518,12 +526,18 @@ Complex Idir_nBound_allowed
         if (ff == 0. or fi == 0.)
             continue;
         
+        // evaluate initial / final radial part of the projectile partial wave
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        
+        // evaluate initial / final multipole potential
         rArray Vfn = std::move(interpolate_bound_bound_potential(grid, lambdaf, Nf, Lf, Nn, Ln));
         rArray Vni = std::move(interpolate_bound_bound_potential(grid, lambdai, Nn, Ln, Ni, Li));
-        rArray jn = std::move(interpolate_riccati_bessel_j(grid, ln, kn));
-        rArray yn = std::move(interpolate_riccati_bessel_y(grid, ln, kn));
+        
+        // evaluate the Green function terms (Bessel functions "jn" and "yn")
+        // NOTE : Assuming kn > 0.
+        rArray jn = interpolate_riccati_bessel_j(grid, ln, kn) * nrm;
+        rArray yn = interpolate_riccati_bessel_y(grid, ln, kn) * nrm;
         
         // check finiteness (use asymptotic form if out)
         rArray yn_ji = yn * ji;
@@ -539,21 +553,24 @@ Complex Idir_nBound_allowed
                 yn_jf[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*lf+1) * std::pow(kn,-ln) * std::pow(kf,lf+1) * std::pow(grid[i],lf+1-ln);
         }
         
-        Complex inte = Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
+        // finally integrate
+        Complex inte = -Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
         
+        // comment this result
         std::cout << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d), intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
+        // update result
         result += ff * fi * inte;
     }
     
     return result;
 }
 
-Complex Idir_nBound_forbidden
+double Idir_nBound_forbidden
 (
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
@@ -561,7 +578,9 @@ Complex Idir_nBound_forbidden
     int Ni, int Li, double ki, int li
 )
 {
-    Complex result = 0;
+    double result = 0;
+    
+    double nrm = std::sqrt(1. / kappan);
     
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
@@ -579,21 +598,30 @@ Complex Idir_nBound_forbidden
         if (ff == 0. or fi == 0.)
             continue;
         
+        // evaluate initial / final radial part of the projectile partial wave
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        
+        // evaluate initial / final multipole potential
         rArray Vfn = std::move(interpolate_bound_bound_potential(grid, lambdaf, Nf, Lf, Nn, Ln));
         rArray Vni = std::move(interpolate_bound_bound_potential(grid, lambdai, Nn, Ln, Ni, Li));
-        rArray iscaled_n = std::move(interpolate_riccati_bessel_iscaled(grid, ln, kappan));
-        rArray kscaled_n = std::move(interpolate_riccati_bessel_kscaled(grid, ln, kappan));
         
-        Complex inte = 2. / special::constant::pi * Complex(0., -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, ji, Vni));
+        // evaluate the Green function terms (Bessel functions "in" and "kn")
+        // NOTE : Assuming kappan > 0.
+        rArray iscaled_n = interpolate_riccati_bessel_iscaled(grid, ln, kappan) * nrm;
+        rArray kscaled_n = interpolate_riccati_bessel_kscaled(grid, ln, kappan) * nrm;
         
+        // finally integrate
+        double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, kappan, ji, Vni);
+        
+        // comment this result
         std::cout << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
-            lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kappan, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
+            lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kappan, ln, Nf, Lf, kf, lf, inte, 0.
         ) << std::endl;
         
+        // update result
         result += ff * fi * inte;
     }
     
@@ -610,6 +638,11 @@ Complex Idir_nFree_allowed
 {
     Complex result = 0;
     
+    double nrm = std::sqrt(1. / kn);
+    
+    // check if kn is small enough for asymptotics
+    bool kn_is_small = (kn * grid.back() < 1e-6);
+    
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
     
@@ -626,14 +659,28 @@ Complex Idir_nFree_allowed
         if (ff == 0. or fi == 0.)
             continue;
         
+        // evaluate initial / final radial part of the projectile partial wave
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        
+        // evaluate initial / final multipole potential
         rArray Vfn = std::move(interpolate_bound_free_potential(grid, lambdaf, Nf, Lf, Kn, Ln));
         rArray Vni = std::move(interpolate_free_bound_potential(grid, lambdai, Kn, Ln, Ni, Li));
-        rArray jn = std::move(interpolate_riccati_bessel_j(grid, ln, kn));
-        rArray yn = std::move(interpolate_riccati_bessel_y(grid, ln, kn));
         
-        // check finiteness (use asymptotic form if out)
+        // evaluate the Green function terms (Bessel functions "jn" and "yn")
+        // and cancel dependence on "kn" if too small (using Bessel function asymptotics)
+        rArray jn = (
+            kn_is_small ? // can we use the "jn" Bessel function asymptotic form?
+            pow(grid,ln+1) / gsl_sf_doublefact(2*ln+1) :                // yes
+            interpolate_riccati_bessel_j(grid, ln, kn) * nrm            // no
+        );
+        rArray yn = (
+            kn_is_small ?  // can we use the "yn" Bessel function asymptotic form?
+            pow(grid,-ln) * gsl_sf_doublefact(std::max(0,2*ln-1)) :     // yes
+            interpolate_riccati_bessel_y(grid, ln, kn) * nrm            // no
+        );
+        
+        // check finiteness of product (use asymptotic form of the product if not finite)
         rArray yn_ji = yn * ji;
         for (unsigned i = 1; i < yn_ji.size(); i++)
         {
@@ -647,21 +694,28 @@ Complex Idir_nFree_allowed
                 yn_jf[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*lf+1) * std::pow(kn,-ln) * std::pow(kf,lf+1) * std::pow(grid[i],lf+1-ln);
         }
         
-        Complex inte = Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
+        // finally integrate
+        Complex inte = -Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
         
+        // if we cancelled small kn, we need to throw away nonsensial imaginary part, where this can't be done
+        if (kn_is_small)
+            inte.imag(0.);
+        
+        // comment this result
         std::cout << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
         ) << std::endl;
         
+        // update result
         result += ff * fi * inte;
     }
     
     return result;
 }
 
-Complex Idir_nFree_forbidden
+double Idir_nFree_forbidden
 (
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
@@ -669,7 +723,12 @@ Complex Idir_nFree_forbidden
     int Ni, int Li, double ki, int li
 )
 {
-    Complex result = 0;
+    double result = 0;
+    
+    double nrm = std::sqrt(1. / kappan);
+    
+    // check if kn is small enough for asymptotics
+    bool kn_is_small = (kappan * grid.back() < 1e-6);
     
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
@@ -687,21 +746,38 @@ Complex Idir_nFree_forbidden
         if (ff == 0. or fi == 0.)
             continue;
         
+        // evaluate initial / final radial part of the projectile partial wave
         rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
         rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        
+        // evaluate initial / final multipole potential
         rArray Vfn = std::move(interpolate_bound_free_potential(grid, lambdaf, Nf, Lf, Kn, Ln));
         rArray Vni = std::move(interpolate_free_bound_potential(grid, lambdai, Kn, Ln, Ni, Li));
-        rArray iscaled_n = std::move(interpolate_riccati_bessel_iscaled(grid, ln, kappan));
-        rArray kscaled_n = std::move(interpolate_riccati_bessel_kscaled(grid, ln, kappan));
         
-        Complex inte = 2. / special::constant::pi * Complex(0., -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, ji, Vni));
+        // evaluate the Green function terms (Bessel functions "in" and "kn")
+        // and cancel dependence on "kn" if too small (using Bessel function asymptotics)
+        rArray iscaled_n = (
+            kn_is_small ? // can we use the "in" Bessel function asymptotic form?
+            pow(grid,ln+1) :                                            // yes
+            interpolate_riccati_bessel_iscaled(grid, ln, kappan) * nrm  // no
+        );
+        rArray kscaled_n = (
+            kn_is_small ? // can we use the "kn" Bessel function asymptotic form?
+            pow(grid,-ln) :                                             // yes
+            interpolate_riccati_bessel_kscaled(grid, ln, kappan) * nrm  // no
+        );
         
+        // finally integrate
+        double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, kappan, ji, Vni);
+        
+        // comment this result
         std::cout << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
-            lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kappan, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
+            lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kappan, ln, Nf, Lf, kf, lf, inte, 0.
         ) << std::endl;
         
+        // update result
         result += ff * fi * inte;
     }
     

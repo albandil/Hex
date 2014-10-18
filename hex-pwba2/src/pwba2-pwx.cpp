@@ -110,26 +110,26 @@ cArrays PWBA2::PartialWave_direct
                         double kn = std::sqrt(en);
                         
                         // integrate
-                        bound_contrib += Idir_nBound_allowed
+                        bound_contrib += 2. * Idir_nBound_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Nn, Ln, kn, ln,
                             Ni, Li, ki, li
-                        ) * (-2. / kn);
+                        );
                     }
                     else
                     {
                         double kappan = std::sqrt(-en);
                         
                         // integrate
-                        bound_contrib += Idir_nBound_forbidden
+                        bound_contrib += 2. * Idir_nBound_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Nn, Ln, kappan, ln,
                             Ni, Li, ki, li
-                        ) * (-2. / kappan);
+                        );
                     }
                 }
                 
@@ -138,71 +138,56 @@ cArrays PWBA2::PartialWave_direct
                 //
                 
                 Complex allowed_contrib = 0;
+                std::cout << "\n\tAllowed intermediate states" << std::endl;
                 if (integrate_allowed)
                 {
-                    std::cout << "\n\tAllowed intermediate states" << std::endl;
-                    auto allowed_energy_contribution = [&](double En) -> Complex
+                    auto allowed_energy_contribution = [&](double Kn) -> Complex
                     {
-                        // define limit; however, it is never used
-                        if (En == 0 or En == Etot)
-                            return 0.;
-                        
-                        // get momentum of the intermediate hydrogen continuum state
-                        double Kn = std::sqrt(En);
-                            
                         // get momentum of the projectile
-                        double kn = std::sqrt(Etot - En);
+                        double kn = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return Idir_nFree_allowed
+                        return Kn == 0. ? 0. : 2. * Kn * Kn * Idir_nFree_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kn, ln,
                             Ni, Li, ki, li
-                        ) * (-Kn / kn);
+                        );
                     };
                     
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
                     CCa.setVerbose(verbose, "\t\tcc");
                     CCa.setEps(1e-5); // relative tolerance
-                    allowed_contrib += CCa.integrate(0., std::min(Enmax, Etot));
+                    allowed_contrib += CCa.integrate(0., std::sqrt(std::min(Enmax, Etot)));
                 }
                 
                 //
                 // integrate over forbidden free states (Kn^2 > ki^2 - 1/Ni^2)
                 //
                 
-                Complex forbidden_contrib = 0;
+                double forbidden_contrib = 0;
+                std::cout << "\n\tForbidden intermediate states" << std::endl;
                 if (integrate_forbidden and Etot < Enmax)
                 {
-                    std::cout << "\n\tForbidden intermediate states" << std::endl;
-                    auto forbidden_energy_contribution = [&](double En) -> Complex
+                    auto forbidden_energy_contribution = [&](double Kn) -> double
                     {
-                        // define limit; however, it is never used
-                        if (En == Etot)
-                            return 0.;
-                        
-                        // get momentum of the intermediate hydrogen continuum state
-                        double Kn = std::sqrt(En);
-                        
                         // get momentum of the projectile
-                        double kappan = std::sqrt(En - Etot);
+                        double kappan = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return Idir_nFree_forbidden
+                        return Kn == 0. ? 0. : 2. * Kn * Kn * Idir_nFree_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kappan, ln,
                             Ni, Li, ki, li
-                        ) * (-Kn / kappan);
-                            
+                        );
                     };
-                    ClenshawCurtis<decltype(forbidden_energy_contribution),Complex> CCf(forbidden_energy_contribution);
+                    ClenshawCurtis<decltype(forbidden_energy_contribution),double> CCf(forbidden_energy_contribution);
                     CCf.setVerbose(verbose, "\t\tcc");
                     CCf.setEps(1e-5); // relative tolerance
-                    forbidden_contrib += CCf.integrate(Etot, Enmax);
+                    forbidden_contrib += CCf.integrate(std::sqrt(Etot), std::sqrt(Enmax));
                 }
                 
                 // update T-matrix

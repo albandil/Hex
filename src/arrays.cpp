@@ -74,19 +74,6 @@ NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> co
     return C;
 }
 
-NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B)
-{
-    assert(A.size() == B.size());
-    
-    std::size_t N = A.size();
-    NumberArray<double> C (N);
-
-    for (std::size_t i = 0; i < N; i++)
-        C[i] = atan2(A[i], B[i]);
-
-    return C;
-}
-
 NumberArray<double> sqrabs (NumberArray<Complex> const & A)
 {
     std::size_t N = A.size();

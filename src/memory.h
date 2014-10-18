@@ -55,7 +55,7 @@ template <class T> class PlainAllocator
          * The elements will be constructed by the implicit constructor.
          * @param n Number of items to allocate.
          */
-        static T * alloc (size_t n)
+        static T * alloc (std::size_t n)
         {
             return new T[n]();
         }

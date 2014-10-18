@@ -103,7 +103,7 @@ Complex Idir_nBound_allowed
     int Ni, int Li, double ki, int li
 );
 
-Complex Idir_nBound_forbidden
+double Idir_nBound_forbidden
 (
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
@@ -119,7 +119,7 @@ Complex Idir_nFree_allowed
     int Ni, int Li, double ki, int li
 );
 
-Complex Idir_nFree_forbidden
+double Idir_nFree_forbidden
 (
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
