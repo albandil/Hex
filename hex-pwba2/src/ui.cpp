@@ -92,6 +92,7 @@ const std::string help_text =
     "                                                                                                                  \n"
     "\t--example                 (-e)  create sample input file                                                        \n"
     "\t--help                    (-h)  display this help                                                               \n"
+    "\t--verbose                 (-v)  make the program richly comment all steps                                       \n"
     "\t--input <filename>        (-i)  use custom input file                                                           \n"
     "\t--direct-integrate        (-d)  compute exact second-order T-matrix for given angle                             \n"
     "\t--partial-wave            (-w)  compute only contribution of single partial wave                                \n"
@@ -140,6 +141,9 @@ int main (int argc, char* argv[])
     // computation mode
     bool partial_wave = false, direct_integrate = false;
     
+    // verbosity level
+    bool verbose = false;
+    
     // parse command line
     ParseCommandLine
     (
@@ -184,6 +188,12 @@ int main (int argc, char* argv[])
             {
                 // compute multidimensional integral
                 direct_integrate = true;
+                return true;
+            },
+        "verbose", "v", 0, [&](std::string optarg) -> bool
+            {
+                // verbose output
+                verbose = true;
                 return true;
             },
         
@@ -308,28 +318,31 @@ int main (int argc, char* argv[])
     if (ef < 0)
     {
         std::cout << "Excitation from Ni = " << Ni << " to Nf = " << Nf << " is not possible at given energy.";
-        return 1;
+        return EXIT_FAILURE;
     }
     
     // final momentum
     double kf = std::sqrt(ef);
     
     // check grid spacing
-    double min_wavelength = 2 * special::constant::pi / std::sqrt(Enmax);
-    std::cout << "There are " << min_wavelength / (Rmax / N) << " grid samples per shortest wavelength." << std::endl;
-    if (Rmax / N > min_wavelength / 10)
-        std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
-    std::cout << std::endl;
+    if (partial_wave)
+    {
+        double min_wavelength = 2 * special::constant::pi / std::sqrt(Enmax);
+        std::cout << "There are " << min_wavelength / (Rmax / N) << " grid samples per shortest wavelength." << std::endl;
+        if (Rmax / N > min_wavelength / 10)
+            std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
+        std::cout << std::endl;
+    }
     
     // outgoing electron partial T-matrices
     cArrays Tdir =
         partial_wave ?
-        PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, integrate_allowed, integrate_forbidden) :
-        PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, integrate_allowed, integrate_forbidden);
+        PWBA2::PartialWave_direct(grid, L, Pi, Ni, Li, ki, Nf, Lf, kf, nL, maxNn, Enmax, integrate_allowed, integrate_forbidden, verbose) :
+        PWBA2::FullTMatrix_direct(grid, Ni, Li, ki, Nf, Lf, kf, maxNn, nL, Enmax, integrate_allowed, integrate_forbidden, verbose);
     
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
     std::cout << std::endl;
     
-    return 0;
+    return EXIT_SUCCESS;
 }

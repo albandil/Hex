@@ -44,7 +44,8 @@ namespace PWBA2
         int Ni, int Li, double ki,
         int Nf, int Lf, double kf,
         int nL, int maxNn, double Enmax,
-        bool integrate_allowed, bool integrate_forbidden
+        bool integrate_allowed, bool integrate_forbidden,
+        bool verbose
     );
     
     cArrays FullTMatrix_direct
@@ -53,7 +54,8 @@ namespace PWBA2
         int Ni, int Li, double ki,
         int Nf, int Lf, double kf,
         int maxNn, int maxLn, double maxEn,
-        bool integrate_allowed, bool integrate_forbidden
+        bool integrate_allowed, bool integrate_forbidden,
+        bool verbose
     );
     
 }; /* namespace PWBA2 */

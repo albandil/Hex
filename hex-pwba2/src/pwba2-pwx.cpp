@@ -50,7 +50,8 @@ cArrays PWBA2::PartialWave_direct
     int Ni, int Li, double ki,
     int Nf, int Lf, double kf,
     int nL, int maxNn, double Enmax,
-    bool integrate_allowed, bool integrate_forbidden
+    bool integrate_allowed, bool integrate_forbidden,
+    bool verbose
 )
 {
     cArrays Tdir;
@@ -163,7 +164,7 @@ cArrays PWBA2::PartialWave_direct
                     };
                     
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
-                    CCa.setVerbose(true, "\t\tcc");
+                    CCa.setVerbose(verbose, "\t\tcc");
                     CCa.setEps(1e-5); // relative tolerance
                     allowed_contrib += CCa.integrate(0., std::min(Enmax, Etot));
                 }
@@ -199,6 +200,8 @@ cArrays PWBA2::PartialWave_direct
                             
                     };
                     ClenshawCurtis<decltype(forbidden_energy_contribution),Complex> CCf(forbidden_energy_contribution);
+                    CCf.setVerbose(verbose, "\t\tcc");
+                    CCf.setEps(1e-5); // relative tolerance
                     forbidden_contrib += CCf.integrate(Etot, Enmax);
                 }
                 

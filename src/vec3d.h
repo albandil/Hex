@@ -32,6 +32,7 @@
 #ifndef HEX_VEC3D
 #define HEX_VEC3D
 
+#include <cmath>
 #include <iostream>
 
 namespace geom
@@ -42,33 +43,55 @@ class vec3d
 {
     public:
         
+        /// Components.
         double x, y, z;
         
         /// Dot product.
-        static double dot (vec3d const & u, vec3d const & v);
+        inline static double dot (vec3d const & u, vec3d const & v)
+          { return u.x*v.x + u.y*v.y + u.z*v.z; }
 
         /// Cross product.
-        static vec3d cross (vec3d const & u, vec3d const & v);
+        inline static vec3d cross (vec3d const & u, vec3d const & v)
+          { return vec3d({ u.y * v.z - u.z * v.y, u.z * v.x - u.x * v.z, u.x * v.y - u.y * v.x}); }
         
         /// Vector length.
-        static double norm (vec3d const & v);
+        inline static double norm (vec3d const & v)
+          { return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z); }
         
         /// Return normal vector.
-        static vec3d normalize (vec3d const & v);
+        inline static vec3d normalize (vec3d const & v)
+          { double n = norm(v); return vec3d ({ n * v.x, n * v.y, n * v.z }); }
 };
+
+//
+// Vector arithmetic
+//
+
+/// Vector addition.
+inline vec3d operator + (vec3d const & u, vec3d const & v)
+  { return vec3d ({ u.x + v.x, u.y + v.y, u.z + v.z }); }
+
+/// Vector subraction.
+inline vec3d operator - (vec3d const & u, vec3d const & v)
+  { return vec3d ({ u.x - v.x, u.y - v.y, u.z - v.z }); }
+
+/// Vector scaling.
+inline vec3d operator * (vec3d const & u, double a)
+  { return vec3d ({ a * u.x, a * u.y, a * u.z }); }
+
+/// Vector scaling.
+inline vec3d operator * (double a, vec3d const & u)
+  { return vec3d ({ a * u.x, a * u.y, a * u.z }); }
+
+//
+// Stream input / output
+//
 
 /// Write to stream.
 std::ostream & operator << (std::ostream & os, vec3d const & v);
 
 /// Read from stream.
 std::istream & operator >> (std::istream & is, vec3d & v);
-
-/// Vector difference.
-vec3d operator - (vec3d const & u, vec3d const & v);
-
-/// Vector scaling.
-vec3d operator * (vec3d const & u, double a);
-vec3d operator * (double a, vec3d const & u);
 
 }; // namespace geom
 

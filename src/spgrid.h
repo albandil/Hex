@@ -1014,7 +1014,7 @@ template <class T> class SparseGrid
                     default (shared) \
                     shared (pos,globalEstimate) \
                     firstprivate (i_pos)
-                for (int i = 0; i < bisectIDs.size(); i++)
+                for (unsigned i = 0; i < bisectIDs.size(); i++)
                 {
                     // get next domain ID
                     # pragma omp critical
