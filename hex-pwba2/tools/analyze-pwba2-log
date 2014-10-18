@@ -1,0 +1,102 @@
+#!/bin/bash
+
+if [[ "$1" == "" ]]
+then
+    echo "Usage:"
+    echo "    ./analyze-pwba2-log <logfile>"
+    exit 0
+fi
+
+if [[ ! -f "$1" ]]
+then
+    echo "No log file \"$1\"."
+    exit 1
+fi
+
+export LC_NUMERIC=en_GB.utf8
+
+sections=$(cat $1 | grep -n "^li =" | cut -f1 -d:)
+Nsections=$(echo "$sections" | wc -l)
+
+DIR="$1-data"
+mkdir -p $DIR
+
+for i in $(seq 1 $Nsections)
+do
+    begin=$(echo $sections | awk "{ print \$$i }")
+    end=$(($(echo $sections | awk "{ print \$$(($i+1)) }")-1))
+    
+    echo "i = $i : lines $begin ... $end"
+    
+    if [[ $i == $Nsections ]]
+    then
+        subset=$(cat $1 | tail -n +$begin)
+    else
+        subset=$(cat $1 | head -$end | tail -n +$begin)
+    fi
+    
+    bound_begin=$(echo "$subset" | grep -n "Bound intermediate states" | cut -f1 -d:)
+    allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
+    forbidden_begin=$(echo "$subset" | grep -n "Forbidden intermediate states" | cut -f1 -d:)
+    
+    bound_subset=$(echo "$subset" | head -$allowed_begin | tail -n +$bound_begin)
+    allowed_subset=$(echo "$subset" | head -$forbidden_begin | tail -n +$allowed_begin)
+    forbidden_subset=$(echo "$subset" | tail -n +$forbidden_begin)
+    
+    echo "$bound_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print -1/($10*$10), $20, $21 }' | sort -n | uniq > $DIR/$i-bound.log
+    echo "$allowed_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  > $DIR/$i-allowed.log
+    echo "$forbidden_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  > $DIR/$i-forbidden.log
+done
+
+cat > "$1-plot.gp" <<EOF
+#!/usr/bin/gnuplot
+
+maxL = $Nsections
+
+set multiplot title "PWBA-2 T-matrix contributions from intermediate states"
+set grid
+unset ylabel
+unset yrange
+set tmargin 4
+
+set xlabel "E [Ry]"
+set ylabel "T-matrix contribution [at.u.]"
+
+set title "Real part of T - bound intermediate states"
+set origin 0,0.5
+set size 0.333,0.5
+unset key
+plot for [i=1:maxL] \\
+    sprintf("$DIR/%d-bound.log",i) \\
+    using 1:2 with linespoints pointtype 7 pointsize 1 \\
+    title sprintf("%d", i)
+
+set title "Real part of T - continuum intermediate states"
+set origin 0.333,0.5
+set size 0.666,0.5
+set key outside right top box width 2 height 1
+plot for [i=1:maxL] \\
+    sprintf("< cat $DIR/%d-allowed.log $DIR/%d-forbidden.log",i,i) \\
+    using (\$1):(0.5*\$1*\$1*\$2) with lines \\
+    title sprintf("%d", i)
+
+set title "Imag part of T - bound intermediate states"
+set origin 0,0
+set size 0.333,0.5
+unset key
+plot for [i=1:maxL] \\
+    sprintf("$DIR/%d-bound.log",i) \\
+    using (\$1):(\$1 < 0 ? \$3 : 0.5*\$1*\$1*\$3) with linespoints pointtype 7 pointsize 1 \\
+    title sprintf("%d", i)
+
+set title "Imag part of T - continuum intermediate states"
+set origin 0.333,0
+set size 0.666,0.5
+set key outside right top box width 2 height 1
+plot for [i=1:maxL] \\
+    sprintf("< cat $DIR/%d-allowed.log $DIR/%d-forbidden.log",i,i) \\
+    using (\$1):(0.5*\$1*\$1*\$3) with lines \\
+    title sprintf("%d", i)
+
+unset multiplot
+EOF
