@@ -47,9 +47,6 @@
 #include "special.h"
 #include "spgrid.h"
 
-#include "clenshawcurtis.h"
-#include "gausskronrod.h"
-
 GiNaC::ex rl_Y
 (
     int l, int m,

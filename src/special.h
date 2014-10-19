@@ -87,9 +87,8 @@ const double euler           = M_EULER;    // γ
 const double alpha           = GSL_CONST_NUM_FINE_STRUCTURE; // α
 const double alpha_sqr       = alpha*alpha; // α²
 
-// other special numbers
-const double Inf = std::numeric_limits<double>::infinity();
-const double Nan = std::numeric_limits<double>::quiet_NaN();
+const double Inf = std::numeric_limits<double>::infinity();     // +∞
+const double Nan = std::numeric_limits<double>::quiet_NaN();    // NaN
 
 }; // end of namespace "special::constant"
 
@@ -276,7 +275,11 @@ inline int pow3 (unsigned i)
  * The method used comes from Ikebe Y.: <i>The zeros of regular Coulomb wave
  * functions and of their derivatives</i>, Math. Comp. <b>29</b>, 131 (1975)
  * 878-887. It uses eigenvalues of a special tridiagonal matrix. The eigenvalues
- * are computed using the standard Lapack function DSTEV .
+ * are computed using the standard Lapack function DSTEV.
+ * 
+ * The calculation proceeds in iterations. In every iteration the size of the
+ * matrix to be diagonalized is doubled, until the first 'nzeros' eigenvalues
+ * converge. For large number of zeros this can be very time consuming.
  */
 int coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel = 1e-8);
 

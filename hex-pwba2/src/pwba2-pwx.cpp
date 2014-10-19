@@ -38,6 +38,7 @@
 #include "arrays.h"
 #include "clenshawcurtis.h"
 #include "complex.h"
+#include "gausskronrod.h"
 #include "misc.h"
 #include "pwba2.h"
 #include "radial.h"
@@ -134,20 +135,24 @@ cArrays PWBA2::PartialWave_direct
                 }
                 
                 //
-                // integrate over allowed free states (Kn^2 < ki^2 - 1/Ni^2)
+                // integrate over allowed free states (0 <= Kn^2 <= ki^2 - 1/Ni^2)
                 //
                 
                 Complex allowed_contrib = 0;
-                std::cout << "\n\tAllowed intermediate states" << std::endl;
+                std::cout << std::endl << "\tAllowed intermediate states" << std::endl;
                 if (integrate_allowed)
                 {
                     auto allowed_energy_contribution = [&](double Kn) -> Complex
                     {
+                        // boundary values
+                        if (Kn == 0)
+                            return 0.;
+                        
                         // get momentum of the projectile
                         double kn = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return Kn == 0. ? 0. : 2. * Kn * Kn * Idir_nFree_allowed
+                        return 2. * Kn * Kn * Idir_nFree_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -156,27 +161,32 @@ cArrays PWBA2::PartialWave_direct
                         );
                     };
                     
-                    ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CCa(allowed_energy_contribution);
-                    CCa.setVerbose(verbose, "\t\tcc");
-                    CCa.setEps(1e-5); // relative tolerance
-                    allowed_contrib += CCa.integrate(0., std::sqrt(std::min(Enmax, Etot)));
+                    // use complex Clenshaw-Curtis integrator
+                    ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CC(allowed_energy_contribution);
+                    CC.setVerbose(verbose, "\t\tcc");
+                    CC.setEps(1e-5); // relative tolerance
+                    allowed_contrib += CC.integrate(0., std::sqrt(std::min(Enmax, Etot)));
                 }
                 
                 //
-                // integrate over forbidden free states (Kn^2 > ki^2 - 1/Ni^2)
+                // integrate over forbidden free states (ki^2 - 1/Ni^2 <= Kn^2 <= +Inf)
                 //
                 
                 double forbidden_contrib = 0;
-                std::cout << "\n\tForbidden intermediate states" << std::endl;
+                std::cout << std::endl << "\tForbidden intermediate states" << std::endl;
                 if (integrate_forbidden and Etot < Enmax)
                 {
                     auto forbidden_energy_contribution = [&](double Kn) -> double
                     {
+                        // boundary values
+                        if (Kn == 0 or not std::isfinite(Kn))
+                            return 0.;
+                        
                         // get momentum of the projectile
                         double kappan = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return Kn == 0. ? 0. : 2. * Kn * Kn * Idir_nFree_forbidden
+                        return 2. * Kn * Kn * Idir_nFree_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -184,10 +194,14 @@ cArrays PWBA2::PartialWave_direct
                             Ni, Li, ki, li
                         );
                     };
-                    ClenshawCurtis<decltype(forbidden_energy_contribution),double> CCf(forbidden_energy_contribution);
-                    CCf.setVerbose(verbose, "\t\tcc");
-                    CCf.setEps(1e-5); // relative tolerance
-                    forbidden_contrib += CCf.integrate(std::sqrt(Etot), std::sqrt(Enmax));
+                    
+                    // use real compactified Gauss-Kronrod integrator
+                    GaussKronrod<decltype(forbidden_energy_contribution)> GK(forbidden_energy_contribution);
+                    GK.integrate(std::sqrt(Etot), special::constant::Inf);
+                    GK.setEpsRel(1e-5);
+                    if (not GK.ok())
+                        throw exception ("Integration of forbidden contribution failed (%s).", GK.status().c_str());
+                    forbidden_contrib += GK.result();
                 }
                 
                 // update T-matrix

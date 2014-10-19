@@ -84,8 +84,7 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
     
     // memory array
     double oldzeros[nzeros];
-    for (int i = 0; i < nzeros; i++)
-        oldzeros[i] = 0;
+    std::memset(oldzeros, 0, sizeof(oldzeros));
     
     // for different sizes of the tridiagonal matrix
     for (int n = nzeros; ; n *= 2)
@@ -93,7 +92,17 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
         // compose diagonal
         double d[n];
         for (int i = 1; i <= n; i++)
+        {
+            // compute diagonal element
             d[i-1] = -eta / ((L+i)*(L+i+1));
+            
+            // if the new element is zero, terminate and assume convergence
+            if (not std::isfinite(d[i-1]) or d[i-1] == 0.)
+            {
+                std::cerr << "Warning: The Coulomb nodes are approximate." << std::endl;
+                return n / 2;
+            }
+        }
         
         // compose subdiagonal
         double e[n-1];

@@ -137,23 +137,20 @@ rArray interpolate_bound_free_potential
     double rmax = x.back();
     rArray V(N);
     
-    // Coulomb function scaled by hydrogen orbital
-    rArray PF(N);
-    for (unsigned i = 0; i < N; i++)
-    {
-        PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
-    }
-    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-    gsl_spline_init (spline, x.data(), PF.data(), N);
+    // number of Coulomb zeros within the range of grid "x" (initial guess)
+    unsigned nzeros = Kb * x.back() / (2 * special::constant::pi);
     
-    // precompute Coulomb zeros within the range of "x"
-    int nzeros = Kb * x.back() / (2 * special::constant::pi); // initial guess
+    // calculate the Coulomb zeros
     rArray zeros;
     do
     {
         // double the necessary zero count
         nzeros = 2 * (1 + nzeros);
         zeros.resize(nzeros);
+        
+        // for large frequencies 'Kb' the integral will be almost zero, so lets check already here
+        if (nzeros > N / 2)
+            return rArray(N,0.);
         
         // compute zeros of the Coulomb function
         special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
@@ -164,6 +161,15 @@ rArray interpolate_bound_free_potential
     // the classical turning point for non-S-waves
     double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
     
+    // Coulomb function scaled by hydrogen orbital
+    rArray PF(N);
+    for (unsigned i = 0; i < N; i++)
+    {
+        PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
+    }
+    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, x.data(), PF.data(), N);
+    
     // compute the integrals
     if (lambda == 0)
     {
@@ -172,6 +178,7 @@ rArray interpolate_bound_free_potential
             // setup accelerator for value search (for every thread)
             gsl_interp_accel * acc = gsl_interp_accel_alloc ();
             
+            // evaluate potential at grid point 'y'
             auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros,spline,&acc](double y) -> double
             {
                 // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
@@ -199,11 +206,12 @@ rArray interpolate_bound_free_potential
                 return Q.result();
             };
             
-            // evaluate potential in all grid points
+            // evaluate potential at all grid points
             # pragma omp for schedule (dynamic)
             for (unsigned i = 0; i < N; i++)
                 V[i] = potential(x[i]);
             
+            // release memory
             gsl_interp_accel_free(acc);
         }
     }
@@ -214,6 +222,7 @@ rArray interpolate_bound_free_potential
             // setup accelerator for value search (for every thread)
             gsl_interp_accel * acc = gsl_interp_accel_alloc ();
             
+            // evaluate potential at grid point 'y'
             auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x,spline,&acc](double y) -> double
             {
                 // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
@@ -266,6 +275,7 @@ rArray interpolate_bound_free_potential
             for (unsigned i = 0; i < N; i++)
                 V[i] = potential(x[i]);
             
+            // release memory
             gsl_interp_accel_free(acc);
         }
     }
@@ -284,6 +294,7 @@ rArray interpolate_free_bound_potential
     double Ka, int La, int Nb, int Lb
 )
 {
+    // the potential is real, so just return the transpose
     return interpolate_bound_free_potential (x, lambda, Nb, Lb, Ka, La);
 }
 

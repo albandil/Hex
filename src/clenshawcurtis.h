@@ -64,7 +64,7 @@ public:
      * @param  f Function to integrate of the signature FType(*)(double x).
      */ 
     ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
-        Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
+        Limit(false), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
         vName("[ClenshawCurtis_ff]"), Throw(true) {}
     
     /// Get relative tolerance.
@@ -156,6 +156,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
+            cc_G.setVerbose(Verbose, vName);
             
             // integrate
             return -cc_G.integrate_ff(-1., 1., n);    // (-∞,x2)->(1,-1)
@@ -176,6 +177,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
+            cc_G.setVerbose(Verbose, vName);
             
             // integrate
             return cc_G.integrate_ff(-1., 1., n);    // (x1,+∞)->(-1,1)

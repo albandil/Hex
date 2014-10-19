@@ -74,7 +74,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
         double EpsRel;
         
         /// Limit on subdivision.
-        size_t Limit;
+        std::size_t Limit;
         
         /// Integration workspace pointer.
         gsl_integration_workspace * Workspace;
@@ -85,7 +85,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
     public:
         
         // constructor
-        GaussKronrod (Functor f, size_t limit = 1000)
+        GaussKronrod (Functor f, std::size_t limit = 1000)
             : Integrand(f), Result(special::constant::Nan), AbsErr(special::constant::Nan),
               Ok(false), EpsAbs(0.), EpsRel(1e-5), Limit(limit),
               Workspace(gsl_integration_workspace_alloc(Limit)) {}
@@ -120,19 +120,8 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
          * from GSL (that is, in this case, nothing than C-port of QuadPack).
          * 
          * You can compute improper integrals. For specifying "infinity" as
-         * one or both bounds use either
-         * 
-          @code
-              std::numeric_limits<double>::infinity()
-          @endcode
-         * 
-         * for positive infinity or
-         * 
-          @code
-              -std::numeric_limits<double>::infinity()
-          @endcode
-         * 
-         * for negative infinity.
+         * one or both bounds use either special::constant::Inf for positive infinity or
+         * -special::constant::Inf for negative infinity.
          * 
          * @return The value of "Ok" (i.e. whether the last integration has
          * been successful according to the library).

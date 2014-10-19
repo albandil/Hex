@@ -32,6 +32,7 @@
 #ifndef HEX_DIOPHANTINE
 #define HEX_DIOPHANTINE
 
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -40,28 +41,60 @@
 #include "misc.h"
 #include "special.h"
 
+/**
+ * @brief Abstract base for node integrators.
+ * 
+ * This class is the base class for so called "node integrators", which compute
+ * integral as a sum of sub-integrals from specific sub-intervals. For example the
+ * sub-intervals can be given by zeros of some special function occuring in the
+ * integrand. This particular class defines the integration algorithm; however,
+ * it is general and not intended for direct use -- the member function that returns
+ * the n-th node is pure virtual and expected to be defined in some derived class.
+ * See e.g. @ref FixedNodeIntegrator for example of such class.
+ */
 template <class Functor, class Integrator>
 class NodeIntegrator
 {
     private:
         
+        /// Integration rule to use on sub-intervals.
         Integrator Q_;
+        
+        /// Function to integrate (double -> double).
         Functor f_;
         
+        /// Result of integration.
         double result_;
+        
+        /// Whether the integration went all right.
         bool ok_;
+        
+        /// Error text if the integration failed.
         std::string status_;
         
+        /// Absolute tolerance.
         double epsabs_;
+        
+        /// Relative tolerance.
         double epsrel_;
+        
+        /// Maximum number of nodes to use.
         int limit_;
         
     
     public:
         
+        //
+        // constructor
+        //
+        
         NodeIntegrator (Functor f)
             : Q_(f),  f_(f), result_(0), ok_(true), status_(),
               epsabs_(1e-8), epsrel_(1e-6), limit_(1000) {}
+        
+        //
+        // getters and setters
+        //
         
         double result () const { return result_; }
         bool ok () const { return ok_; }
@@ -76,9 +109,32 @@ class NodeIntegrator
         int limit () const { return limit_; }
         void setLimit (double n) { limit_ = n; }
         
+        //
+        // redefinable node getters
+        //
+        
+        /// Get n-th node.
         virtual double nthNode (int n) const = 0;
+        
+        /// Get end of classically forbidden region (= exponential rise, no nodes).
         virtual double turningPoint () const { return 0; }
         
+        //
+        // integration routine
+        //
+        
+        /**
+         * @brief Integration routine.
+         * 
+         * The function will compute integral of function over the specified finite (!) interval.
+         * The integration in the potential classically forbidden region is done by simple
+         * trapezoidal rule which is refined up to the convergence. The rest is integrated
+         * node-to-node by the supplied integrator class (see e.g. @ref GaussKronrod or
+         * @ref ClenshawCurtis).
+         * 
+         * @todo Use Romberg integration in the classically forbidden region instead of the plain
+         * trapezoidal integration.
+         */
         bool integrate (double a, double b)
         {
             // initialize
@@ -104,7 +160,7 @@ class NodeIntegrator
                     double estimate = special::integral::trapz(grid, eval);
                     
                     // check iteration limit
-                    if ((int)log2(samples) == limit_)
+                    if ((int)std::log2(samples) == limit_)
                     {
                         throw exception
                         (
@@ -137,7 +193,7 @@ class NodeIntegrator
             if (prevR == b)
                 return ok_;
             
-            // for all integration parcels (nodes of the Bessel function)
+            // for all integration parcels (nodes)
             for (int inode = 1; inode < limit_; inode++)
             {
                 // get integration bounds
@@ -177,6 +233,12 @@ class NodeIntegrator
         }
 };
 
+/**
+ * @brief Bessel node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the Bessel function
+ * zeros as the integration nodes.
+ */
 template <class Functor, class Integrator>
 class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
 {
@@ -211,6 +273,12 @@ class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         int l_;
 };
 
+/**
+ * @brief Coulomb node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the Coulomb function
+ * zeros as the integration nodes.
+ */
 template <class Functor, class Integrator>
 class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
 {
@@ -263,13 +331,22 @@ class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         mutable double * zeros_;
 };
 
+/**
+ * @brief Fixed node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the node array supplied
+ * by the user.
+ */
 template <class Functor, class Integrator>
 class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
 {
     public:
         
         FixedNodeIntegrator (Functor f, const rArrayView zeros, double rt = 0)
-            : NodeIntegrator<Functor,Integrator>(f), zeros_(zeros), rt_(rt) {}
+            : NodeIntegrator<Functor,Integrator>(f), zeros_(zeros), rt_(rt)
+        {
+            NodeIntegrator<Functor,Integrator>::setLimit(zeros_.size());
+        }
         
         virtual double nthNode (int n) const
         {
@@ -288,9 +365,6 @@ class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         };
         
     private:
-        
-        double k_;
-        int l_;
         
         const rArray zeros_;
         double rt_;
