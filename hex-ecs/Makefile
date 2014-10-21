@@ -45,7 +45,7 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
 # ---------------------------------------------------------------------------- #
 
-# OPENCLFLAGS = -DNO_OPENCL
+OPENCLFLAGS = -DNO_OPENCL
 
 # - for AMD OpenCL
 # OPENCLFLAGS = -I/opt/AMDAPPSDK-2.9-1/include
@@ -56,8 +56,8 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
 
 # - for NVidia OpenCL
-OPENCLFLAGS = -I/usr/include/nvidia-current/
-OPENCLLIBS = -lOpenCL
+# OPENCLFLAGS = -I/usr/include/nvidia-current/
+# OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
 # HDF                                                                          #
