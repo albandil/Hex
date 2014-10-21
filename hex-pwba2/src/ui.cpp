@@ -135,6 +135,9 @@ int main (int argc, char* argv[])
     // disable fatal GSL errors
     gsl_set_error_handler_off();
     
+    // disable buffering of the standard output (-> immediate logging)
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    
     // input file
     std::ifstream inputfile;
     
