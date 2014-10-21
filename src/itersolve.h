@@ -39,6 +39,7 @@
 #include "complex.h"
 #include "matrix.h"
 #include "misc.h"
+#include "special.h"
 
 /**
  * @brief Return new complex array.
@@ -492,6 +493,300 @@ int cgs_callbacks
     }
     
     return i;
+}
+
+template
+<
+    class TArray,
+    class TArrayView,
+    class Preconditioner,
+    class MatrixMultiplication,
+    class NewArray      = decltype(default_new_complex_array),
+    class AxbyOperation = decltype(default_complex_axby),
+    class ScalarProduct = decltype(operator|<Complex>),
+    class ComputeNorm   = decltype(default_compute_norm)
+>
+int minres_callbacks
+(
+        const TArrayView b,
+              TArrayView x,
+                  double tol,
+                unsigned min_iterations,
+                unsigned max_iterations,
+          Preconditioner apply_preconditioner,
+    MatrixMultiplication matrix_multiply,
+                    bool verbose        = true,
+                NewArray new_array      = default_new_complex_array,
+           AxbyOperation axby           = default_complex_axby,
+           ScalarProduct scalar_product = operator|<Complex>,
+             ComputeNorm compute_norm   = default_compute_norm
+)
+{
+    Timer timer;
+    
+    // compute norm of the right hand side
+    double bnorm = compute_norm(b);
+    
+    // trivial solution for zero right hand side
+    if (bnorm == 0)
+    {
+        x.fill(0.);
+        return 0;
+    }
+    
+    // get size of the problem
+    std::size_t N = b.size();
+    
+    std::vector<std::string> msg(11);
+    msg[0]  = " beta1 = 0.  The exact solution is  x = 0 ";
+    msg[1]  = " A solution to Ax = b was found, given tol ";
+    msg[2]  = " A least-squares solution was found, given tol ";
+    msg[3]  = " Reasonable accuracy achieved, given eps ";
+    msg[4]  = " x has converged to an eigenvector ";
+    msg[5]  = " acond has exceeded 0.1/eps ";
+    msg[6]  = " The iteration limit was reached ";
+    msg[7]  = " A  does not define a symmetric matrix ";
+    msg[8]  = " M  does not define a symmetric matrix ";
+    msg[9]  = " M  does not define a pos-def preconditioner ";
+    msg[10] = " beta2 = 0.  If M = I, b and x are eigenvectors ";
+
+    int istop(0), itn(0);
+    double Anorm(0.0), Acond(0.0), Arnorm(0.0);
+    double rnorm(0.0), ynorm(0.0);
+    bool done(false);
+
+    // Step 1
+    /*
+     * Set up y and v for the first Lanczos vector v1.
+     * y = beta1 P' v1, where P = C^(-1).
+     * v is really P'v1
+     */
+    
+    // residual; initialized to starting residual using the initial guess
+    TArray r1 (std::move(new_array(N)));
+    matrix_multiply(x, r1); // r = A x
+    axby (-1., r1, 1., b); // r = b - r
+    rnorm = compute_norm(r1);
+    
+    if (verbose)
+    {
+        std::cout << '\t';
+        std::cout << std::setw(4) << std::right << 0;
+        std::cout << " | ";
+        std::cout << std::setw(11) << std::left << timer.nice_time();
+        std::cout << " | ";
+        std::cout << std::setw(15) << std::left << rnorm / bnorm;
+    }
+    
+    // apply preconditioner
+    TArray y (std::move(new_array(N)));
+    apply_preconditioner(r1, y);
+    
+    if (verbose)
+            std::cout << std::endl;
+
+    double beta1 = std::abs(scalar_product(r1, y));
+    
+    // Test for an indefined preconditioner
+    // If b = 0 exactly stop with x = x0.
+
+    if(beta1 < 0.0)
+    {
+        istop = 9;
+        done = true;
+    }
+    else
+    {
+        if(beta1 == 0.0)
+        {
+            done = true;
+        }
+        else
+            beta1 = std::sqrt(beta1); // Normalize y to get v1 later
+    }
+    
+    // STEP 2
+    /* Initialize other quantities */
+    double oldb = 0., beta = beta1, dbar = 0., epsln = 0., oldeps = 0.;
+    double qrnorm = beta1, phi = 0., phibar = beta1, rhs1 = beta1;
+    double rhs2 = 0., tnorm2 = 0., ynorm2 = 0.;
+    double cs = -1., sn = 0.;
+    double gmax = 0., gmin = std::numeric_limits<double>::max();
+    double alpha = 0., gamma = 0.;
+    double delta = 0., gbar = 0.;
+    double z = 0.;
+    
+    TArray v(std::move(new_array(N)));
+    TArray w(std::move(new_array(N)));
+    TArray w1(std::move(new_array(N)));
+    TArray w2(std::move(new_array(N)));
+    TArray r2(std::move(new_array(N)));
+    
+    // r2 = r1
+    axby(0., r2, 1., r1);
+    
+    /* Main Iteration */
+    if (!done)
+    {
+        for (itn = 0; itn < max_iterations; ++itn)
+        {
+            // STEP 3
+            /*
+            -----------------------------------------------------------------
+            Obtain quantities for the next Lanczos vector vk+1, k = 1, 2,...
+            The general iteration is similar to the case k = 1 with v0 = 0:
+            
+            p1      = Operator * v1  -  beta1 * v0,
+            alpha1  = v1'p1,
+            q2      = p2  -  alpha1 * v1,
+            beta2^2 = q2'q2,
+            v2      = (1/beta2) q2.
+            
+            Again, y = betak P vk,  where  P = C**(-1).
+            .... more description needed.
+            -----------------------------------------------------------------
+             */
+            double s = 1./beta; //Normalize previous vector (in y)
+            axby(0., v, s, y);
+            
+            matrix_multiply(v,y);
+            
+            if (itn > 0)
+                axby(1., y, -beta/oldb, r1);
+            
+            alpha = std::abs(scalar_product(v,y));   // alphak
+            axby(1., y, -alpha/beta, r2);
+            axby(0., r1, 1., r2);
+            axby(0., r2, 1., y);
+            
+            if (verbose)
+            {
+                std::cout << '\t';
+                std::cout << std::setw(4) << std::right << itn + 2;
+                std::cout << " | ";
+                std::cout << std::setw(11) << std::left << timer.nice_time();
+                std::cout << " | ";
+                std::cout << std::setw(15) << std::left << rnorm / bnorm;
+            }
+            
+            apply_preconditioner(r2,y);
+            
+            if (verbose)
+                std::cout << std::endl;
+            
+            oldb = beta; //oldb = betak
+            beta = std::abs(scalar_product(r2,y));
+            
+            if(beta < 0)
+            {
+                istop = 9;
+                break;
+            }
+            
+            beta = std::sqrt(beta);
+            tnorm2 += alpha*alpha + oldb*oldb + beta*beta;
+            
+            if (itn == 0)    //Initialize a few things
+            {
+                if  (beta/beta1 < 10.0 * special::constant::eps)
+                    istop = 10;
+            }
+            
+            // Apply previous rotation Q_{k-1} to get
+            // [delta_k epsln_{k+1}] = [cs sn]  [dbar_k 0]
+            // [gbar_k   dbar_{k+1}]   [sn -cs] [alpha_k beta_{k+1}].
+            oldeps = epsln;
+            delta  = cs*dbar + sn*alpha;
+            gbar   = sn*dbar - cs*alpha;
+            epsln  =           sn*beta;
+            dbar   =         - cs*beta;
+            double root = std::sqrt(gbar * gbar + dbar * dbar);
+            Arnorm = phibar * root; // ||Ar_{k-1}||
+            
+            // Compute next plane rotation Q_k
+            gamma = std::sqrt(gbar * gbar + beta * beta); // gamma_k
+            gamma = std::max(gamma, special::constant::eps);
+            cs = gbar / gamma;                     // c_k
+            sn = beta / gamma;                     // s_k
+            phi = cs * phibar;                     // phi_k
+            phibar = sn * phibar;                  // phibar_{k+1}
+            
+            // Update x
+            double denom = 1. / gamma;
+            axby(0., w1, 1., w2);
+            axby(0., w2, 1, w);
+            axby(0., w, -oldeps, w1);
+            axby(1., w, -delta, w2);
+            axby(1., w, denom, v);
+            axby(1., x, phi, w);
+
+            // go round again
+            gmax    = std::max(gmax, gamma);
+            gmin    = std::min(gmin, gamma);
+            z       = rhs1/gamma;
+            rhs1    = rhs2 - delta*z;
+            rhs2    =      - epsln*z;
+            
+            // Estimate various norms
+            
+            Anorm = std::sqrt(tnorm2);
+            ynorm2 = std::abs(scalar_product(x,x));
+            ynorm = std::sqrt(ynorm2);
+            double epsa = Anorm * special::constant::eps;
+            double epsx = epsa * ynorm;
+            double epsr = Anorm * ynorm * tol;
+            double diag = gbar;
+            if (0 == diag)
+                diag = epsa;
+            
+            qrnorm = phibar;
+            rnorm  = qrnorm;
+            double test1 = 0., test2 = 0.;
+            test1  = rnorm / (Anorm * ynorm); // ||r||/(||A|| ||x||)
+            test2  = root / Anorm;         // ||A r_{k-1}|| / (||A|| ||r_{k-1}||)
+            
+            // Estimate cond(A)
+            /*
+             In this version we look at the diagonals of  R  in the
+             factorization of the lower Hessenberg matrix,  Q * H = R,
+             where H is the tridiagonal matrix from Lanczos with one
+             extra row, beta(k+1) e_k^T.
+             */
+            Acond = gmax / gmin;
+            
+            //See if any of the stopping criteria is satisfied
+            if (0 == istop)
+            {
+                double t1 = 1. + test1, t2 = 1. + test2; //This test work if tol < eps
+                if (t2 <= 1.) istop = 2;
+                if (t1 <= 1.) istop = 1;
+                
+                if (itn >= max_iterations - 1) istop = 6;
+                if (Acond >= 0.1 / special::constant::eps) istop = 4;
+                if (epsx >= beta1)   istop = 3;
+                if (test2 <= tol)    istop = 2;
+                if (test1 <= tol)    istop = 1;
+            }
+            
+            if (0 != istop)
+                break;
+            
+        }
+    }
+    
+    // Display final status
+    {
+        std::cout << std::setfill('-') << std::setw(80) << "-" << "\n";
+        std::cout << msg[istop] << "\n";
+        std::cout << " Number of iterations: " << itn << "\n";
+        std::cout << " Anorm = " << Anorm << "\t Acond = " << Acond << "\n";
+        std::cout << " rnorm = " << rnorm << "\t ynorm = " << ynorm << "\n";
+        std::cout << " Arnorm = " << Arnorm << "\n";
+        std::cout << std::setfill('-') << std::setw(80) << "-" << std::endl;
+        std::cout << std::setfill(' ');
+    }
+
+    return itn;
 }
 
 #endif
