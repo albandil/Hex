@@ -163,6 +163,7 @@ rArray interpolate_bound_free_potential
     
     // Coulomb function scaled by hydrogen orbital
     rArray PF(N);
+    # pragma omp parallel for firstprivate(N,Na,La,Kb,Lb) shared(x,PF) schedule(dynamic,100)
     for (unsigned i = 0; i < N; i++)
     {
         PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
@@ -192,16 +193,17 @@ rArray interpolate_bound_free_potential
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>> Q(integrand,zeros,rt);
+                FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>,double> Q(integrand,zeros,rt);
                 Q.setEpsAbs(0);
                 Q.integrate(y, rmax);
                 if (not Q.ok())
                 {
-                    throw exception
+                    std::cerr << format
                     (
                         "Bound-free potential V[0]{%d,%d->%g,%d} integration failed for r = %g (\"%s\").",
                         Na, La, Kb, Lb, y, Q.status().c_str()
-                    );
+                    ) << std::endl;
+                    std::terminate();
                 }
                 return Q.result();
             };
@@ -236,16 +238,17 @@ rArray interpolate_bound_free_potential
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>> Q1(integrand1,zeros,rt);
+                FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt);
                 Q1.setEpsAbs(0);
                 Q1.integrate(0., y);
                 if (not Q1.ok())
                 {
-                    throw exception
+                    std::cerr << format
                     (
                         "Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").",
                         lambda, Na, La, Kb, Lb, y, Q1.status().c_str()
-                    );
+                    ) << std::endl;
+                    std::terminate();
                 }
                 
                 // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
@@ -255,16 +258,17 @@ rArray interpolate_bound_free_potential
                 };
                 
                 // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>> Q2(integrand2,zeros,rt);
+                FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt);
                 Q2.setEpsAbs(0);
                 Q2.integrate(y, rmax);
                 if (not Q2.ok())
                 {
-                    throw exception
+                    std::cerr << format
                     (
                         "Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").",
                         lambda, Na, La, Kb, Lb, y, Q2.status().c_str()
-                    );
+                    ) << std::endl;
+                    std::terminate();
                 }
                 
                 return (Q1.result() + Q2.result()) / y;

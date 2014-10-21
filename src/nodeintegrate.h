@@ -52,7 +52,7 @@
  * the n-th node is pure virtual and expected to be defined in some derived class.
  * See e.g. @ref FixedNodeIntegrator for example of such class.
  */
-template <class Functor, class Integrator>
+template <class Functor, class Integrator, class T>
 class NodeIntegrator
 {
     private:
@@ -60,11 +60,11 @@ class NodeIntegrator
         /// Integration rule to use on sub-intervals.
         Integrator Q_;
         
-        /// Function to integrate (double -> double).
+        /// Function to integrate (T -> T).
         Functor f_;
         
         /// Result of integration.
-        double result_;
+        T result_;
         
         /// Whether the integration went all right.
         bool ok_;
@@ -90,13 +90,13 @@ class NodeIntegrator
         
         NodeIntegrator (Functor f)
             : Q_(f),  f_(f), result_(0), ok_(true), status_(),
-              epsabs_(1e-8), epsrel_(1e-6), limit_(1000) {}
+              epsabs_(1e-8), epsrel_(1e-6), limit_(1024) {}
         
         //
         // getters and setters
         //
         
-        double result () const { return result_; }
+        T result () const { return result_; }
         bool ok () const { return ok_; }
         std::string const & status () const { return status_; }
         
@@ -132,8 +132,10 @@ class NodeIntegrator
          * node-to-node by the supplied integrator class (see e.g. @ref GaussKronrod or
          * @ref ClenshawCurtis).
          * 
-         * @todo Use Romberg integration in the classically forbidden region instead of the plain
-         * trapezoidal integration.
+         * @todo Use Romberg integration (or some other extrapolation procedure) in the classically
+         * forbidden region instead of the plain trapezoidal integration.
+         * 
+         * @todo Make the logarithmic grid adaptive in some sense. (?)
          */
         bool integrate (double a, double b)
         {
@@ -149,23 +151,32 @@ class NodeIntegrator
             double rt = this->turningPoint();
             if (rt != 0 and a < rt)
             {
+                // get bounds of the classically forbidden region
                 double r0 = a;
                 double r1 = std::min(rt,b);
                 
-                double quotient = 0.75; // FIXME variable ?
-                for (int samples = 8; ; samples *= 2)
+                // logarithmic grid ratio parameter
+                // TODO : Make it variable.
+                double quotient = 0.75;
+                
+                // for different subdivision
+                for (std::size_t samples = 2; ; samples *= 2)
                 {
+                    // spread logarithmically
                     rArray grid = geomspace(r0,r1,samples,quotient);
-                    rArray eval = grid.transform(f_);
-                    double estimate = special::integral::trapz(grid, eval);
+                    
+                    // evaluate function
+                    NumberArray<T> eval = grid.transform(f_);
+                    
+                    // trapezoidally integrate
+                    // TODO : Some kind of extrapolation.
+                    T estimate = special::integral::trapz(grid, eval);
                     
                     // check iteration limit
-                    if ((int)std::log2(samples) == limit_)
+                    if (samples >= limit_)
                     {
-                        throw exception
-                        (
-                            "Cannot integrate classically forbidden region - reached maximal number of iterations."
-                        );
+                        result_ = estimate;
+                        break;
                     }
                     
                     // check convergence
@@ -175,10 +186,10 @@ class NodeIntegrator
                         break;
                     }
                     
-                    // check hopelessness
-                    if (estimate == 0 and result_ == 0)
+                    // check if the integral is probably clean zero
+                    if (estimate == 0)
                     {
-                        // this is probably hopeless...
+                        result_ = estimate;
                         break;
                     }
                     
@@ -209,8 +220,8 @@ class NodeIntegrator
                     break;
                 
                 // shrink integration interval, if necessary
-                rmin = std::max (a, rmin);
-                rmax = std::min (rmax, b);
+                rmin = std::max(a, rmin);
+                rmax = std::min(rmax, b);
                 
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
@@ -225,7 +236,8 @@ class NodeIntegrator
                 prevR = rmax;
                 
                 // check convergence
-                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or std::abs(Q_.result()) < epsrel_ * std::abs(result_))
+                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or
+                    std::abs(Q_.result()) < epsrel_ * std::abs(result_))
                     break;
             }
             
@@ -239,13 +251,13 @@ class NodeIntegrator
  * This class derives from @ref NodeIntegrator and uses the Bessel function
  * zeros as the integration nodes.
  */
-template <class Functor, class Integrator>
-class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+template <class Functor, class Integrator, class T>
+class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         BesselNodeIntegrator (Functor f, double k, int l)
-            : NodeIntegrator<Functor,Integrator>(f), k_(k), l_(l) {}
+            : NodeIntegrator<Functor,Integrator,T>(f), k_(k), l_(l) {}
         
         virtual double nthNode (int n) const
         {
@@ -279,13 +291,13 @@ class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
  * This class derives from @ref NodeIntegrator and uses the Coulomb function
  * zeros as the integration nodes.
  */
-template <class Functor, class Integrator>
-class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+template <class Functor, class Integrator, class T>
+class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         CoulombNodeIntegrator (Functor f, double k, int l)
-            : NodeIntegrator<Functor,Integrator>(f), k_(k), l_(l), nzeros_(0), zeros_(nullptr) {}
+            : NodeIntegrator<Functor,Integrator,T>(f), k_(k), l_(l), nzeros_(0), zeros_(nullptr) {}
         
         ~CoulombNodeIntegrator()
         {
@@ -337,15 +349,15 @@ class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
  * This class derives from @ref NodeIntegrator and uses the node array supplied
  * by the user.
  */
-template <class Functor, class Integrator>
-class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+template <class Functor, class Integrator, class T>
+class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         FixedNodeIntegrator (Functor f, const rArrayView zeros, double rt = 0)
-            : NodeIntegrator<Functor,Integrator>(f), zeros_(zeros), rt_(rt)
+            : NodeIntegrator<Functor,Integrator,T>(f), zeros_(zeros), rt_(rt)
         {
-            NodeIntegrator<Functor,Integrator>::setLimit(zeros_.size());
+            NodeIntegrator<Functor,Integrator,T>::setLimit(zeros_.size());
         }
         
         virtual double nthNode (int n) const
