@@ -195,7 +195,7 @@ template <class T> class ArrayView
             double sqrnorm = 0.;
             for (T const & x : *this)
                 sqrnorm += sqrabs(x);
-            return sqrt(sqrnorm);
+            return std::sqrt(sqrnorm);
         }
 };
 

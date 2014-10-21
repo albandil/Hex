@@ -89,6 +89,7 @@ const double alpha_sqr       = alpha*alpha; // α²
 
 const double Inf = std::numeric_limits<double>::infinity();     // +∞
 const double Nan = std::numeric_limits<double>::quiet_NaN();    // NaN
+const double eps = std::numeric_limits<double>::epsilon();      // machine precision
 
 }; // end of namespace "special::constant"
 
@@ -236,7 +237,7 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
  * 
  * The power is computed as a corresponding bit shift of 1.
  */
-inline constexpr unsigned pow2 (unsigned i)
+inline constexpr unsigned long long pow2 (unsigned long long i)
 {
     return 1 << i;
 }
@@ -248,9 +249,9 @@ inline constexpr unsigned pow2 (unsigned i)
  * The rest is computed plainly by std::pow (so it is not fast
  * anymore).
  */
-inline int pow3 (unsigned i)
+inline unsigned long long pow3 (unsigned long long i)
 {
-    static const int pow3_table[10] = {
+    static const unsigned long long pow3_table[10] = {
         /* 3^0 */ 1,
         /* 3^1 */ 3,
         /* 3^2 */ 3*3,
@@ -263,7 +264,7 @@ inline int pow3 (unsigned i)
         /* 3^9 */ 3*3*3*3*3*3*3*3*3
     };
     
-    return (i < 10 ? pow3_table[i] : (int)std::pow(3,i));
+    return (i < 10 ? pow3_table[i] : (unsigned long long)std::pow(3,i));
 }
 
 /**

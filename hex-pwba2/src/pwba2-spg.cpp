@@ -789,16 +789,16 @@ cArrays PWBA2::FullTMatrix_direct
         
         // criteria to stop integration cell currently being processed
         G.setMinLevel(1);       // ... do at least one subdivision
-        G.setLocEpsRel(1e-5);   // ... if the rules are equal up to 1e-5 (relative)
-        G.setLocEpsAbs(1e-9);   // ... if the rules are equal up to 1e-9 (absolute)
-        G.setGlobEpsRel(1e-7);  // ... if the extrapolated relative contribution to the whole domain is within 1e-6
+        G.setLocEpsRel(1e-4);   // ... if the rules are equal up to 1e-4 (relative)
+        G.setLocEpsAbs(1e-8);   // ... if the rules are equal up to 1e-8 (absolute)
+        G.setGlobEpsRel(1e-6);  // ... if the extrapolated relative contribution to the whole domain is within 1e-6
         G.setGlobEpsAbs(0);     // ... if the extrapolated contribution to the whole domain is within ... [not used]
         G.setVerbose(verbose);  // print detailed progress information
         G.setParallel(true);    // evaluate integration domains in parallel
         G.setPrefix("    ");    // output formatting prefix
         
         // marching integration tolerance
-        double marchingEpsRel = 1e-5;   // ... stop if curr. section contributes less than 1e-5 of the curr. estimate
+        double marchingEpsRel = 1e-4;   // ... stop if curr. section contributes less than 1e-4 of the curr. estimate
         double marchingEpsAbs = 0;      // ... allow any absolute contribution of a marching section
         
         // results (bound/continuum intermediate states, real/imag parts of propagator)
