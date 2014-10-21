@@ -48,7 +48,7 @@ do
     echo "$forbidden_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  > $DIR/$i-forbidden.log
 done
 
-rm "$1-plot.gp"
+rm -f "$1-plot.gp"
 
 #
 # Header
