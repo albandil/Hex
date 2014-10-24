@@ -52,8 +52,8 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 CXXRILIS = $(CFLAGS) -O3 -fcx-limited-range -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
 CXXDEBUG = $(CFLAGS) -g -pg -fcx-limited-range -DNO_HDF -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-# CXXFLAGS = $(CXXDEBUG)
-CXXFLAGS = -g $(CXXRILIS)
+CXXFLAGS = $(CXXDEBUG)
+# CXXFLAGS = -g $(CXXRILIS)
 
 FILES = arrays hydrogen pwba2-pwx pwba2-spg radial special spgrid \
         ui vec3d version

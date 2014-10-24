@@ -33,6 +33,7 @@
 #include <gsl/gsl_spline.h>
 
 #include "arrays.h"
+#include "cfract.h"
 #include "complex.h"
 #include "gausskronrod.h"
 #include "hydrogen.h"
@@ -88,7 +89,6 @@ rArray interpolate_bound_bound_potential
             return suma1 - suma2 / y;
         };
         
-        # pragma omp parallel for
         for (unsigned i = 0; i < N; i++)
             V[i] = Norm * potential(x[i]);
     }
@@ -117,7 +117,6 @@ rArray interpolate_bound_bound_potential
             return suma1 * std::pow(y, -lambda-1) + suma2 * std::pow(y, lambda);
         };
         
-        # pragma omp parallel for
         for (unsigned i = 0; i < N; i++)
             V[i] = Norm * potential(x[i]);
     }
@@ -163,7 +162,6 @@ rArray interpolate_bound_free_potential
     
     // Coulomb function scaled by hydrogen orbital
     rArray PF(N);
-    # pragma omp parallel for firstprivate(N,Na,La,Kb,Lb) shared(x,PF) schedule(dynamic,100)
     for (unsigned i = 0; i < N; i++)
     {
         PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
@@ -174,114 +172,106 @@ rArray interpolate_bound_free_potential
     // compute the integrals
     if (lambda == 0)
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,rt,rmax,spline)
+        // setup accelerator for value search (for every thread)
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        
+        // evaluate potential at grid point 'y'
+        auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros,spline,&acc](double y) -> double
         {
-            // setup accelerator for value search (for every thread)
-            gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+            // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
+            if (y == 0.)
+                return 0;
             
-            // evaluate potential at grid point 'y'
-            auto potential = [Na,La,Kb,Lb,N,rt,rmax,zeros,spline,&acc](double y) -> double
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ = 0
+            auto integrand = [Na,La,y,Kb,Lb,spline,&acc](double x) -> double
             {
-                // use zero potential in the origin (should be Inf, but that would spreads NaNs in PC arithmeric)
-                if (y == 0.)
-                    return 0;
-                
-                // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ = 0
-                auto integrand = [Na,La,y,Kb,Lb,spline,&acc](double x) -> double
-                {
-                    return gsl_spline_eval(spline, x, acc) * (y - x) / (y * x);
-                };
-                
-                // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>,double> Q(integrand,zeros,rt);
-                Q.setEpsAbs(0);
-                Q.integrate(y, rmax);
-                if (not Q.ok())
-                {
-                    std::cerr << format
-                    (
-                        "Bound-free potential V[0]{%d,%d->%g,%d} integration failed for r = %g (\"%s\").",
-                        Na, La, Kb, Lb, y, Q.status().c_str()
-                    ) << std::endl;
-                    std::terminate();
-                }
-                return Q.result();
+                return gsl_spline_eval(spline, x, acc) * (y - x) / (y * x);
             };
             
-            // evaluate potential at all grid points
-            # pragma omp for schedule (dynamic)
-            for (unsigned i = 0; i < N; i++)
-                V[i] = potential(x[i]);
-            
-            // release memory
-            gsl_interp_accel_free(acc);
-        }
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand),GaussKronrod<decltype(integrand)>,double> Q(integrand,zeros,rt);
+            Q.setEpsAbs(0);
+            Q.integrate(y, rmax);
+            if (not Q.ok())
+            {
+                std::cerr << format
+                (
+                    "Bound-free potential V[0]{%d,%d->%g,%d} integration failed for r = %g (\"%s\").",
+                    Na, La, Kb, Lb, y, Q.status().c_str()
+                ) << std::endl;
+                std::terminate();
+            }
+            return Q.result();
+        };
+        
+        // evaluate potential at all grid points
+        for (unsigned i = 0; i < N; i++)
+            V[i] = potential(x[i]);
+        
+        // release memory
+        gsl_interp_accel_free(acc);
     }
     else
     {
-        # pragma omp parallel firstprivate (Na,La,Kb,Lb,N,lambda,rt,rmax,spline)
+        // setup accelerator for value search (for every thread)
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        
+        // evaluate potential at grid point 'y'
+        auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x,spline,&acc](double y) -> double
         {
-            // setup accelerator for value search (for every thread)
-            gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+            // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
+            if (y == 0.)
+                return 0;
             
-            // evaluate potential at grid point 'y'
-            auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x,spline,&acc](double y) -> double
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
+            auto integrand1 = [Na,La,Kb,Lb,lambda,y,spline,&acc](double x) -> double
             {
-                // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
-                if (y == 0.)
-                    return 0;
-                
-                // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
-                auto integrand1 = [Na,La,Kb,Lb,lambda,y,spline,&acc](double x) -> double
-                {
-                    return gsl_spline_eval(spline, x, acc) * std::pow(x/y,lambda);
-                };
-                
-                // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt);
-                Q1.setEpsAbs(0);
-                Q1.integrate(0., y);
-                if (not Q1.ok())
-                {
-                    std::cerr << format
-                    (
-                        "Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").",
-                        lambda, Na, La, Kb, Lb, y, Q1.status().c_str()
-                    ) << std::endl;
-                    std::terminate();
-                }
-                
-                // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
-                auto integrand2 = [&](double x) -> double
-                {
-                    return gsl_spline_eval(spline, x, acc) * std::pow(y/x,lambda+1);
-                };
-                
-                // integrate per node of the Coulomb function (precomputed before)
-                FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt);
-                Q2.setEpsAbs(0);
-                Q2.integrate(y, rmax);
-                if (not Q2.ok())
-                {
-                    std::cerr << format
-                    (
-                        "Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").",
-                        lambda, Na, La, Kb, Lb, y, Q2.status().c_str()
-                    ) << std::endl;
-                    std::terminate();
-                }
-                
-                return (Q1.result() + Q2.result()) / y;
+                return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(x/y,lambda);
             };
             
-            // evaluate potential in all grid points
-            # pragma omp for schedule (dynamic)
-            for (unsigned i = 0; i < N; i++)
-                V[i] = potential(x[i]);
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt);
+            Q1.setEpsAbs(0);
+            Q1.integrate(0., y);
+            if (not Q1.ok())
+            {
+                std::cerr << format
+                (
+                    "Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").",
+                    lambda, Na, La, Kb, Lb, y, Q1.status().c_str()
+                ) << std::endl;
+                std::terminate();
+            }
             
-            // release memory
-            gsl_interp_accel_free(acc);
-        }
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
+            auto integrand2 = [&](double x) -> double
+            {
+                return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(y/x,lambda + 1);
+            };
+            
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt);
+            Q2.setEpsAbs(0);
+            Q2.integrate(y, rmax);
+            if (not Q2.ok())
+            {
+                std::cerr << format
+                (
+                    "Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").",
+                    lambda, Na, La, Kb, Lb, y, Q2.status().c_str()
+                ) << std::endl;
+                std::terminate();
+            }
+            
+            return (Q1.result() + Q2.result()) / y;
+        };
+        
+        // evaluate potential in all grid points
+        for (unsigned i = 0; i < N; i++)
+            V[i] = potential(x[i]);
+        
+        // release memory
+        gsl_interp_accel_free(acc);
     }
     
     // free allocated memory
@@ -381,7 +371,6 @@ Complex Idir_allowed
     rArray inner_lower(N), inner_lower_int(N), inner_higher_re(N), inner_higher_re_int(N);
     double sum_outer_re = 0, sum_outer_im = 0;
     
-    # pragma omp parallel for firstprivate (N)
     for (std::size_t i = 1; i < N; i++)
     {
         inner_lower[i] = Vni[i] * jn[i] * ji[i];
@@ -389,30 +378,24 @@ Complex Idir_allowed
     }
     
     // low integral
-    # pragma omp parallel firstprivate (N)
-    {
-        gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
-        gsl_spline_init(spline, grid.data(), inner_lower.data(), N);
-        gsl_interp_accel * acc = gsl_interp_accel_alloc();
-        
-        // compute forward partial sums
-        # pragma omp for
-        for (std::size_t i = 0; i < N; i++)
-            inner_lower_int[i] = gsl_spline_eval_integ(spline, grid.front(), grid[i], acc);
-        
-        gsl_interp_accel_free(acc);
-        gsl_spline_free(spline);
-    }
+    gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
+    gsl_spline_init(spline, grid.data(), inner_lower.data(), N);
+    gsl_interp_accel * acc = gsl_interp_accel_alloc();
+    
+    // compute forward partial sums
+    for (std::size_t i = 0; i < N; i++)
+        inner_lower_int[i] = gsl_spline_eval_integ(spline, grid.front(), grid[i], acc);
+    
+    gsl_interp_accel_free(acc);
+    gsl_spline_free(spline);
     
     // high integral
-    # pragma omp parallel firstprivate (N)
     {
         gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
         gsl_spline_init(spline, grid.data(), inner_higher_re.data(), N);
         gsl_interp_accel * acc = gsl_interp_accel_alloc();
         
         // compute backward partial sums
-        # pragma omp for
         for (std::size_t i = 0; i < N; i++)
             inner_higher_re_int[i] = gsl_spline_eval_integ(spline, grid[i], grid.back(), acc);
         
@@ -421,34 +404,29 @@ Complex Idir_allowed
     }
     
     // outer integral (real and imaginary)
-    # pragma omp parallel sections
     {
-        # pragma omp section
-        {
-            rArray outer_re = Vfn * (inner_lower_int * yn_jf + inner_higher_re_int * jf * jn);
-            
-            gsl_interp_accel * acc = gsl_interp_accel_alloc();
-            gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
-            gsl_spline_init(spline, grid.data(), outer_re.data(), N);
-            
-            sum_outer_re = gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
-            
-            gsl_spline_free(spline);
-            gsl_interp_accel_free(acc);
-        }
-        # pragma omp section
-        {
-            rArray outer_im = Vfn * jf * jn;
-            
-            gsl_interp_accel * acc = gsl_interp_accel_alloc();
-            gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
-            gsl_spline_init(spline, grid.data(), outer_im.data(), N);
-            
-            sum_outer_im = inner_lower_int.back() * gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
-            
-            gsl_spline_free(spline);
-            gsl_interp_accel_free(acc);
-        }
+        rArray outer_re = Vfn * (inner_lower_int * yn_jf + inner_higher_re_int * jf * jn);
+    
+        gsl_interp_accel * acc = gsl_interp_accel_alloc();
+        gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
+        gsl_spline_init(spline, grid.data(), outer_re.data(), N);
+        
+        sum_outer_re = gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
+        
+        gsl_spline_free(spline);
+        gsl_interp_accel_free(acc);
+    }
+    {
+        rArray outer_im = Vfn * jf * jn;
+        
+        gsl_interp_accel * acc = gsl_interp_accel_alloc();
+        gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
+        gsl_spline_init(spline, grid.data(), outer_im.data(), N);
+        
+        sum_outer_im = inner_lower_int.back() * gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
+        
+        gsl_spline_free(spline);
+        gsl_interp_accel_free(acc);
     }
     
     return Complex (sum_outer_re, sum_outer_im);
@@ -467,7 +445,6 @@ double Idir_forbidden
     
     rArray fpart(N),  ipart(N);
     
-    # pragma omp parallel for firstprivate (N)
     for (unsigned i = 0; i < N; i++)
     {
         fpart[i] = jf[i] * Vfn[i];
@@ -478,7 +455,6 @@ double Idir_forbidden
     unsigned last_diagonal = N/2;
     
     // index "d" runs across the contours x - y = konst
-    // TODO : parallelize using OpenMP
     // TODO : use spline integration along and across the diagonals
     for (unsigned d = 0; d < last_diagonal; d++)
     {
@@ -518,7 +494,8 @@ Complex Idir_nBound_allowed
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     int Nn, int Ln, double kn, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log
 )
 {
     Complex result = 0;
@@ -572,7 +549,7 @@ Complex Idir_nBound_allowed
         Complex inte = -Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
         
         // comment this result
-        std::cout << format
+        log << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d), intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
@@ -590,7 +567,8 @@ double Idir_nBound_forbidden
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     int Nn, int Ln, double kappan, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log
 )
 {
     double result = 0;
@@ -630,7 +608,7 @@ double Idir_nBound_forbidden
         double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, kappan, ji, Vni);
         
         // comment this result
-        std::cout << format
+        log << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%d %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Nn, Ln, kappan, ln, Nf, Lf, kf, lf, inte, 0.
@@ -648,7 +626,8 @@ Complex Idir_nFree_allowed
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     double Kn, int Ln, double kn, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log
 )
 {
     Complex result = 0;
@@ -717,7 +696,7 @@ Complex Idir_nFree_allowed
             inte.imag(0.);
         
         // comment this result
-        std::cout << format
+        log << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
@@ -735,7 +714,8 @@ double Idir_nFree_forbidden
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     double Kn, int Ln, double kappan, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log
 )
 {
     double result = 0;
@@ -786,7 +766,7 @@ double Idir_nFree_forbidden
         double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, kappan, ji, Vni);
         
         // comment this result
-        std::cout << format
+        log << format
         (
             "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
             lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kappan, ln, Nf, Lf, kf, lf, inte, 0.

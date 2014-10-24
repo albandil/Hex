@@ -391,9 +391,6 @@ template <class T, int dim> class Domains
             {
                 try
                 {
-//                     if (N_ > 10000)
-//                         throw std::bad_alloc();
-                    
                     // try to add new element to memory
                     data_.insert(data_.end(), data, data + nbytes_);
                 }
@@ -421,7 +418,7 @@ template <class T, int dim> class Domains
                     // check that the file has been created successfully
                     if (file_ == nullptr)
                     {
-                        std::perror(format("Error while opening \"%s\": ", filename_));
+                        std::perror(format("Error while opening \"%s\": ", filename_).c_str());
                         std::exit(EXIT_FAILURE);
                     }
                     

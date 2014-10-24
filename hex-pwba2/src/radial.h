@@ -32,6 +32,8 @@
 #ifndef HEX_PWBA2_RADIAL_H
 #define HEX_PWBA2_RADIAL_H
 
+#include <iostream>
+
 #include "arrays.h"
 
 /**
@@ -152,7 +154,8 @@ Complex Idir_nBound_allowed
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     int Nn, int Ln, double kn, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log = std::cout
 );
 
 double Idir_nBound_forbidden
@@ -160,7 +163,8 @@ double Idir_nBound_forbidden
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     int Nn, int Ln, double kappan, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log = std::cout
 );
 
 Complex Idir_nFree_allowed
@@ -168,7 +172,8 @@ Complex Idir_nFree_allowed
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     double Kn, int Ln, double kn, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log = std::cout
 );
 
 double Idir_nFree_forbidden
@@ -176,7 +181,8 @@ double Idir_nFree_forbidden
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,
     double Kn, int Ln, double kappan, int ln,
-    int Ni, int Li, double ki, int li
+    int Ni, int Li, double ki, int li,
+    std::ostream & log = std::cout
 );
 
 #endif

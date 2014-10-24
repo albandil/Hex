@@ -35,6 +35,10 @@
 
 #include <gsl/gsl_errno.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "arrays.h"
 #include "cmdline.h"
 #include "pwba2.h"
@@ -154,12 +158,12 @@ int main (int argc, char* argv[])
         
         "example", "e", 0, [&](std::string optarg) -> bool
             {
-                std::cout << "Writing sample input file to \"example.inp\".\n\n";
+                std::cout << "Writing sample input file to \"example.inp\"." << std::endl << std::endl;
                 
                 // produce sample input file
                 std::ofstream out("example.inp");
-                if (out.bad())
-                    throw exception ("Error: Cannot write to \"example.inp\"\n");
+                if (not out.good())
+                    throw exception ("Error: Cannot write to \"example.inp\".");
                 
                 out << sample_input;
                     
@@ -177,7 +181,7 @@ int main (int argc, char* argv[])
                 // set custom input file
                 inputfile.open(optarg);
                 if (not inputfile.good())
-                    throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                    throw exception ("Error: Input file \"%s\" not found.", optarg.c_str());
                 std::cout << "Using input file \"" << optarg << "\"." << std::endl << std::endl;
                 return true;
             },
@@ -213,7 +217,7 @@ int main (int argc, char* argv[])
     // check mode
     if (direct_integrate and partial_wave)
     {
-        std::cout << "Please select either --partial-wave or --direct-integrate, not both." << std::endl;
+        std::cout << "Please select either --partial-wave, or --direct-integrate, not both." << std::endl;
         std::exit(EXIT_FAILURE);
     }
     if (not direct_integrate and not partial_wave)
@@ -230,7 +234,14 @@ int main (int argc, char* argv[])
         std::cout << "Using input file \"" << filename << "\"." << std::endl << std::endl;
         inputfile.open(filename);
         if (not inputfile.good())
-            throw exception ("Error: Input file \"%s\" not found.\n", filename);
+        {
+            std::cout << "Cannot open the file \"" << filename << "\"." << std::endl;
+            std::cout << std::endl;
+            std::cout << "Either (1) provide input settings in the file \"ecs.inp\", " << std::endl;
+            std::cout << "    or (2) give another name using the '--input' command line option." << std::endl;
+            std::cout << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
     }
     
     // grid parameters
@@ -279,7 +290,6 @@ int main (int argc, char* argv[])
         std::cout << "Intermediate atomic states:" << std::endl;
         std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
         std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
-        std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
         std::cout << "\t- integrate allowed states: " << (integrate_allowed ? "yes" : "no") << std::endl;
         std::cout << "\t- integrate forbidden states: " << (integrate_forbidden ? "yes" : "no") << std::endl;
     }
@@ -294,7 +304,6 @@ int main (int argc, char* argv[])
         std::cout << "Intermediate atomic states:" << std::endl;
         std::cout << "\t- maximal bound state principal quantum number: maxNn = " << maxNn << std::endl;
         std::cout << "\t- maximal intermediate angular momentum sum (- L): nL = " << nL << std::endl;
-//         std::cout << "\t- maximal energy: Enmax = " << Enmax << std::endl;
         std::cout << "\t- integrate continuum states: " << (integrate_allowed ? "yes" : "no") << std::endl;
     }
     
@@ -336,6 +345,13 @@ int main (int argc, char* argv[])
             std::cout << "Warning: Grid is not sufficiently fine!" << std::endl;
         std::cout << std::endl;
     }
+    
+    // write thread information
+#ifdef _OPENMP
+    # pragma omp parallel
+    # pragma omp master
+    std::cout << "Using " << omp_get_num_threads() << " OpenMP threads for the calculation." << std::endl << std::endl;
+#endif
     
     // outgoing electron partial T-matrices
     cArrays Tdir =

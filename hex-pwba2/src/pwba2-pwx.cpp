@@ -83,22 +83,41 @@ cArrays PWBA2::PartialWave_direct
                 continue;
             }
             
-            for (int ell = 0; ell <= nL; ell++)
-            for (int Ln = ell; Ln <= ell + L + Pi; Ln++)
+            # pragma omp parallel for schedule (dynamic,1)
+            for (int i = 0; i < (nL + 1) * (L + Pi + 1); i++)
             {
+                // extract helper variables
+                int ell = i / (L + Pi + 1); // i.e. 0 <= ell <= nL
+                int iLn = i % (L + Pi + 1); // i.e. 0 <= iLn <= L + Pi;
+                
+                // compute intermediate angular momenta
+                int Ln = ell + iLn; // i.e. ell <= L <= ell + L + Pi
                 int ln = 2 * ell + L + Pi - Ln;
+                
+                // create unique output stream for this thread
+                std::string filename = format("pwba2-pwx-L%d-Pi%d-(%d,%d).log", L, Pi, Ln, ln);
+                std::ofstream log (0);
+                if (verbose) log.open(filename);
                 
                 // conserve parity
                 if ((L + Ln + ln) % 2 != Pi)
                 {
-                    std::cout << "\tSkipping ln = " << ln << " due to parity conservation." << std::endl;
+                    # pragma omp critical
+                    std::cout << "Skipping ln = " << ln << " due to parity conservation." << std::endl;
                     continue;
                 }
                 
-                std::cout << "\nli = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
+                # pragma omp critical
+                {
+                    std::cout << "li = " << li << ", (Ln,ln) = (" << Ln << "," << ln << ")" << std::endl;
+                    log << "li = " << li << ", Ln = " << Ln << ", ln = " << ln << std::endl << std::endl;
+                    if (verbose)
+                        std::cout << "\t-> writing debug output to file \"" << filename << "\"" << std::endl;
+                    std::cout << std::endl;
+                }
                 
                 // sum over bound states
-                std::cout << "\tBound intermediate states" << std::endl;
+                log << "\tBound intermediate states" << std::endl;
                 Complex bound_contrib = 0;
                 for (int Nn = Ln + 1; Nn <= maxNn; Nn++)
                 {
@@ -116,7 +135,8 @@ cArrays PWBA2::PartialWave_direct
                             grid, L,
                             Nf, Lf, kf, lf,
                             Nn, Ln, kn, ln,
-                            Ni, Li, ki, li
+                            Ni, Li, ki, li,
+                            log
                         );
                     }
                     else
@@ -129,7 +149,8 @@ cArrays PWBA2::PartialWave_direct
                             grid, L,
                             Nf, Lf, kf, lf,
                             Nn, Ln, kappan, ln,
-                            Ni, Li, ki, li
+                            Ni, Li, ki, li,
+                            log
                         );
                     }
                 }
@@ -139,7 +160,7 @@ cArrays PWBA2::PartialWave_direct
                 //
                 
                 Complex allowed_contrib = 0;
-                std::cout << std::endl << "\tAllowed intermediate states" << std::endl;
+                log << std::endl << "\tAllowed intermediate states" << std::endl;
                 if (integrate_allowed)
                 {
                     auto allowed_energy_contribution = [&](double Kn) -> Complex
@@ -157,13 +178,14 @@ cArrays PWBA2::PartialWave_direct
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kn, ln,
-                            Ni, Li, ki, li
+                            Ni, Li, ki, li,
+                            log
                         );
                     };
                     
                     // use complex Clenshaw-Curtis integrator
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CC(allowed_energy_contribution);
-                    CC.setVerbose(verbose, "\t\tcc");
+                    CC.setVerbose(verbose, "\t\tcc", log);
                     CC.setEps(1e-5); // relative tolerance
                     allowed_contrib += CC.integrate(0., std::sqrt(std::min(Enmax, Etot)));
                 }
@@ -173,7 +195,7 @@ cArrays PWBA2::PartialWave_direct
                 //
                 
                 double forbidden_contrib = 0;
-                std::cout << std::endl << "\tForbidden intermediate states" << std::endl;
+                if (verbose) log << std::endl << "\tForbidden intermediate states" << std::endl;
                 if (integrate_forbidden and Etot < Enmax)
                 {
                     auto forbidden_energy_contribution = [&](double Kn) -> double
@@ -191,7 +213,8 @@ cArrays PWBA2::PartialWave_direct
                             grid, L,
                             Nf, Lf, kf, lf,
                             Kn, Ln, kappan, ln,
-                            Ni, Li, ki, li
+                            Ni, Li, ki, li,
+                            log
                         );
                     };
                     
@@ -200,27 +223,34 @@ cArrays PWBA2::PartialWave_direct
                     GK.integrate(std::sqrt(Etot), special::constant::Inf);
                     GK.setEpsRel(1e-5);
                     if (not GK.ok())
-                        throw exception ("Integration of forbidden contribution failed (%s).", GK.status().c_str());
+                    {
+                        # pragma omp critical
+                        std::cerr << "Integration of forbidden contribution failed (" << GK.status() << ").";
+                        std::terminate();
+                    }
                     forbidden_contrib += GK.result();
                 }
                 
                 // update T-matrix
                 Complex contrib = bound_contrib + allowed_contrib + forbidden_contrib;
+                # pragma omp critical
                 Tdir_lf_li += contrib;
                 
                 // convergence check for Ln-loop (and high angular momenta)
-                if (Ln > 5 and Ln != ell + L + Pi and std::abs(contrib) < 1e-8 * std::abs(Tdir_lf_li))
-                {
-                    std::cout << "\t\tSkipping the following values of Ln due to negligible contribution: ";
-                    for (int LLn = Ln + 1; LLn <= ell + L + Pi; LLn++)
-                        std::cout << LLn << ' ';
-                    std::cout << std::endl;
-                    break;
-                }
+//                 if (Ln > 5 and Ln != ell + L + Pi and std::abs(contrib) < 1e-8 * std::abs(Tdir_lf_li))
+//                 {
+//                     std::cout << "\t\tSkipping the following values of Ln due to negligible contribution: ";
+//                     for (int LLn = Ln + 1; LLn <= ell + L + Pi; LLn++)
+//                         std::cout << LLn << ' ';
+//                     std::cout << std::endl;
+//                     break;
+//                 }
             }
             
+            // calculate angular factor
             Complex factor = std::pow(Complex(0.,1.),li-lf) * std::pow(4*special::constant::pi, 1.5) * std::sqrt(2*li + 1.);
             
+            // evaluate T-matrix for all transitions between available magnetic sublevels
             for (int Mi = -Li; Mi <= Li; Mi++)
             for (int Mf = -Lf; Mf <= Lf; Mf++)
             {

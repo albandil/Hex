@@ -20,13 +20,12 @@ Nsections=$(echo "$sections" | wc -l)
 
 DIR="$1-data"
 mkdir -p $DIR
+rm -f $DIR/summary
 
 for i in $(seq 1 $Nsections)
 do
     begin=$(echo $sections | awk "{ print \$$i }")
     end=$(($(echo $sections | awk "{ print \$$(($i+1)) }")-1))
-    
-    echo "i = $i : lines $begin ... $end"
     
     if [[ $i == $Nsections ]]
     then
@@ -34,6 +33,9 @@ do
     else
         subset=$(cat $1 | head -$end | tail -n +$begin)
     fi
+    
+    echo "i = $i : lines $begin ... $end" | tee -a $DIR/summary
+    echo "$subset" | head -1 >> $DIR/summary
     
     bound_begin=$(echo "$subset" | grep -n "Bound intermediate states" | cut -f1 -d:)
     allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
@@ -128,7 +130,8 @@ set grid y2
 set xtics (sprintf("%g",Xmax) -1, sprintf("%g",Xmax + 1) 0, "∞" 1) left
 plot [-1:1] [Ymin:Ymax] for [i=1:maxL] \\
     sprintf("$DIR/%d-forbidden.log",i) \\
-    using ((\$1-Xmax-1)/(\$1-Xmax+1)):(0.5*\$1*\$1*\$2) with lines
+    using ((\$1-Xmax-1)/(\$1-Xmax+1)):(\$1*\$1*\$2/(\$1-Xmax+1)**2) with lines
+#   using ((\$1-Xmax-1)/(\$1-Xmax+1)):(0.5*\$1*\$1*\$2) with lines
 set xtics autofreq
 set ytics
 unset y2tics
@@ -157,8 +160,8 @@ cat >> "$1-plot.gp" <<EOF
 set title "Re T - forbidden"
 set xlabel "E [Ry]"
 set ylabel "T-matrix contribution [at.u.]"
-set origin 0.666,0.5
-set size 0.333,0.5
+set origin 0.333,0
+set size 0.666,1
 set xtics ("0" -1, "1" 0, "∞" 1)
 plot [-1:1] [:] for [i=1:maxL] \\
     sprintf("$DIR/%d-forbidden.log",i) \\

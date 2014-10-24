@@ -42,6 +42,8 @@
 /**
  * @brief Lapack routine: Eigenvalues, eigenvectors of a symmetric tridiagonal matrix.
  * 
+ * Eigenvalues, eigenvectors of a symmetric tridiagonal matrix.
+ * 
  * DSTEV computes the eigenvalues and, optionally, the left and/or right
  * eigenvectors of other matrices.
  * 

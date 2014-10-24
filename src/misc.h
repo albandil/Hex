@@ -290,15 +290,21 @@ template <class T> constexpr T const & larger_of (T const & a, T const & b)
  * 
  * This function takes an arbitrary number of parameters. It is expected that
  * the first one is the formatting string (printf-like syntax). All the
- * arguments are sent to snprintf without change. This functions returns
- * a pointer to a static character string.
- * 
- * @note The maximal size of the string is hard-coded to 1024 characters.
+ * arguments are sent to snprintf without change.
  */
-template <class ...Params> char const * format (Params ...p)
+template <class ...Params> std::string format (Params ...p)
 {
-    static char text[1024];
-    snprintf(text, sizeof(text), p...);
+    // calculate the necessary space
+    unsigned n = std::snprintf(nullptr, 0, p...);
+    
+    // allocate the string
+    std::string text;
+    text.resize(n);
+    
+    // compose the text
+    std::snprintf(&text[0], n + 1, p...);
+    
+    // return the text
     return text;
 }
 
