@@ -41,10 +41,16 @@
 
 const std::string ScatteringAmplitude::Id = "scatamp";
 const std::string ScatteringAmplitude::Description = "Scattering amplitude.";
-const std::vector<std::string> ScatteringAmplitude::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "S", "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> ScatteringAmplitude::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the amplitude."}
 };
 const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "theta" };
 

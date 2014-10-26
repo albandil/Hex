@@ -145,16 +145,28 @@ int main (int argc, char* argv[])
             
             if (it == vlist.end())
             {
-                std::cout << "No such variable \"" << opt << "\"\n";
+                std::cout << "No such variable \"" << opt << "\"" << std::endl;
             }
             else
             {
-                std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
-                for (std::string v : (*it)->deps())
-                    std::cout << v << " ";
-                std::cout << "\n\nof which one of the following can be read from the standard input:\n\n\t";
+                std::cout << std::endl;
+                std::cout << "Variable \"" << opt << "\" uses the following parameters:" << std::endl;
+                std::cout << std::endl;
+                
+                OutputTable table;
+                table.setAlignment(OutputTable::left, OutputTable::left);
+                table.setWidth(20,20);
+                for (auto v : (*it)->deps())
+                    table.write(v.first, v.second);
+                
+                std::cout << std::endl;
+                
+                std::cout << "of which one of the following can be read from the standard input:" << std::endl;;
+                std::cout << std::endl;
+                
                 for (std::string v : (*it)->vdeps())
                     std::cout << v << " ";
+                
                 std::cout << std::endl << std::endl;
             }
             std::exit(EXIT_SUCCESS);
@@ -216,8 +228,16 @@ int main (int argc, char* argv[])
             // try to find it in the variable dependencies
             for (const Variable* var : vlist)
             {
-                std::vector<std::string> const & deps = var->deps();
-                if (std::find(deps.begin(), deps.end(), arg) != deps.end())
+                // scan the dependencies for 'arg'
+                bool this_arg_is_needed = false;
+                for (auto iter = var->deps().begin(); iter != var->deps().end(); iter++)
+                {
+                    if (iter->first == arg)
+                        this_arg_is_needed = true;
+                }
+                
+                // if this parameter has been found, process it furher
+                if (this_arg_is_needed)
                 {
                     // check parameter
                     if (par.empty())
@@ -231,7 +251,7 @@ int main (int argc, char* argv[])
                     return true;
                 }
             }
-
+            
             return false;
         }
     );

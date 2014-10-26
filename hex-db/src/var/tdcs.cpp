@@ -43,9 +43,13 @@
 
 const std::string TripleDifferentialCrossSection::Id = "tdcs";
 const std::string TripleDifferentialCrossSection::Description = "Triple differential ionization cross section.";
-const std::vector<std::string> TripleDifferentialCrossSection::Dependencies = {
-    "ni", "li", "mi", 
-    "S", "Ei", "dirs"
+const std::vector<std::pair<std::string,std::string>> TripleDifferentialCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(ε₁,θ₁,φ₁) (ε₂,θ₂,φ₂)'."}
 };
 const std::vector<std::string> TripleDifferentialCrossSection::VecDependencies = { "dirs" };
 

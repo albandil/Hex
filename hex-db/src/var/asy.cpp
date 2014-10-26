@@ -44,10 +44,15 @@
 
 const std::string SpinAsymmetry::Id = "asy";
 const std::string SpinAsymmetry::Description = "Spin asymetry.";
-const std::vector<std::string> SpinAsymmetry::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> SpinAsymmetry::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the spin asymetry."}
 };
 const std::vector<std::string> SpinAsymmetry::VecDependencies = { "theta" };
 

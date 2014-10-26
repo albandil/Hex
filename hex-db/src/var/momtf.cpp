@@ -40,10 +40,15 @@
 
 const std::string MomentumTransfer::Id = "momtf";
 const std::string MomentumTransfer::Description = "Momentum transfer.";
-const std::vector<std::string> MomentumTransfer::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "S", "Ei"
+const std::vector<std::pair<std::string,std::string>> MomentumTransfer::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> MomentumTransfer::VecDependencies = { "Ei" };
 

@@ -45,10 +45,15 @@
 
 const std::string BornFullTMatrix::Id = "bornf";
 const std::string BornFullTMatrix::Description = "Full second Born T-matrix (angle dependent).";
-const std::vector<std::string> BornFullTMatrix::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf", 
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> BornFullTMatrix::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the amplitude."}
 };
 const std::vector<std::string> BornFullTMatrix::VecDependencies = { "theta" };
 

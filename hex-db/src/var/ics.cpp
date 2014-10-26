@@ -93,11 +93,16 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 const std::string IntegralCrossSection::Id = "ics";
 const std::string IntegralCrossSection::Description = "Integral cross section.";
-const std::vector<std::string> IntegralCrossSection::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "L", "S",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> IntegralCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 

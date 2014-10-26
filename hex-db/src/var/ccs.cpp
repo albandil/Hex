@@ -85,10 +85,14 @@ void db_bornICS (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 const std::string CompleteCrossSection::Id = "ccs";
 const std::string CompleteCrossSection::Description = "Complete cross section (L- and S-summed integral cross section).";
-const std::vector<std::string> CompleteCrossSection::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> CompleteCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 

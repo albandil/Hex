@@ -45,10 +45,12 @@
 
 const std::string StokesParameters::Id = "stokes";
 const std::string StokesParameters::Description = "Reduced Stokes parameters for the ns->n'p transition.";
-const std::vector<std::string> StokesParameters::Dependencies = {
-    "ni", /* li = 0, mi = 0 */
-    "nf", /* lf = 1, |mf| ≤ 1 */
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> StokesParameters::Dependencies = {
+    {"ni", "Initial atomic principal quantum number; the state (ni,0,0) is used."},
+    {"nf", "Final atomic principal quantum number; the states (nf,1,*) are used."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"beta", "Angle between impact direction and the quantization axis."},
+    {"theta", "Scattering angles for which to compute the Stokes parameters."}
 };
 const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
 

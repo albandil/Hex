@@ -44,11 +44,16 @@
 
 const std::string DifferentialCrossSection::Id = "dcs";
 const std::string DifferentialCrossSection::Description = "Differential cross section.";
-const std::vector<std::string> DifferentialCrossSection::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "S",
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> DifferentialCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the cross section."}
 };
 const std::vector<std::string> DifferentialCrossSection::VecDependencies = { "theta" };
 

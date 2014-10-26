@@ -40,11 +40,17 @@
 
 const std::string TMatrix::Id = "tmat";
 const std::string TMatrix::Description = "T-matrix.";
-const std::vector<std::string> TMatrix::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "L", "S",
-    "Ei", "ell"
+const std::vector<std::pair<std::string,std::string>> TMatrix::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"ell", "Outgoing projectile partial wave angular momentum."}
 };
 const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
 

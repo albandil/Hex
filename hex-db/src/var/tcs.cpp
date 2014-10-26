@@ -40,10 +40,14 @@
 
 const std::string TotalCrossSection::Id = "tcs";
 const std::string TotalCrossSection::Description = "Total cross section.";
-const std::vector<std::string> TotalCrossSection::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> TotalCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> TotalCrossSection::VecDependencies = { "Ei" };
 

@@ -183,8 +183,8 @@ public:
     /// SQL statements that update the table after insetion of new data.
     virtual std::vector<std::string> const & SQL_Update() const = 0;
     
-    /// List of all scattering event parameters that have to be specified by user.
-    virtual std::vector<std::string> const & deps() const = 0;
+    /// List of all scattering event parameters (with description) that have to be specified by user.
+    virtual std::vector<std::pair<std::string,std::string>> const & deps() const = 0;
     
     /// List of vectorizable scattering event parameters that have to be specified by user.
     virtual std::vector<std::string> const & vdeps() const = 0;
@@ -262,8 +262,8 @@ private:
         static const std::string Description; \
         std::string const & description () const { return Description; } \
 \
-        static const std::vector<std::string> Dependencies; \
-        std::vector<std::string> const & deps () const { return Dependencies; } \
+        static const std::vector<std::pair<std::string,std::string>> Dependencies; \
+        std::vector<std::pair<std::string,std::string>> const & deps () const { return Dependencies; } \
 \
         static const std::vector<std::string> VecDependencies; \
         std::vector<std::string> const & vdeps () const { return VecDependencies; } \

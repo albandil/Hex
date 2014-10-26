@@ -40,10 +40,14 @@
 
 const std::string ExtrapolatedCrossSection::Id = "xcs";
 const std::string ExtrapolatedCrossSection::Description = "Extrapolated cross section (using Aitken Δ²-process).";
-const std::vector<std::string> ExtrapolatedCrossSection::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> ExtrapolatedCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> ExtrapolatedCrossSection::VecDependencies = { "Ei" };
 

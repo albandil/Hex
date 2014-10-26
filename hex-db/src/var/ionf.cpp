@@ -44,11 +44,16 @@
 
 const std::string IonizationF::Id = "ionf";
 const std::string IonizationF::Description = "Ionization amplitude radial part.";
-const std::vector<std::string> IonizationF::Dependencies = {
-    "ni", "li", "mi", 
-    "L", "S",
-    "Ei", "l1", "l2",
-    "Eshare"
+const std::vector<std::pair<std::string,std::string>> IonizationF::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"l1", "Atomic electron orbital momentum in the final state."},
+    {"l2", "Projectile orbital momentum in the final state."},
+    {"Eshare", "Energy fraction (atomic vs projectile electron) in the final state."}
 };
 const std::vector<std::string> IonizationF::VecDependencies = { "Eshare" };
 
