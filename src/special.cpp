@@ -715,6 +715,37 @@ double special::Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int 
     return Sum;
 }
 
+double Wigner_d (int two_j, int two_ma, int two_mb, double beta)
+{
+    if (std::abs(two_ma) > two_j or (two_j + two_ma) % 2 != 0 or
+        std::abs(two_mb) > two_j or (two_j + two_mb) % 2 != 0)
+        return 0;
+    
+    int j_plus_ma = (two_j + two_ma) / 2;
+    int j_plus_mb = (two_j + two_mb) / 2;
+    int j_minus_ma = (two_j - two_ma) / 2;
+    int j_minus_mb = (two_j - two_mb) / 2;
+    int mb_minus_ma = (two_mb - two_ma) / 2;
+    
+    double cos_beta_half = std::cos(0.5 * beta);
+    double sin_beta_half = std::sin(0.5 * beta);
+    double suma = 0;
+    
+    for (int s = std::max(0,-mb_minus_ma); s <= std::min(j_plus_ma,j_minus_mb); s++)
+    {
+        suma += ((mb_minus_ma + s) % 2 == 0 ? 1. : -1.) / (
+            gsl_sf_fact(j_plus_ma - s) * gsl_sf_fact(s) *
+            gsl_sf_fact(mb_minus_ma + s) * gsl_sf_fact(j_minus_mb - s)
+        ) * gsl_sf_pow_int(cos_beta_half,two_j-mb_minus_ma-2*s) *
+        gsl_sf_pow_int(sin_beta_half,mb_minus_ma+2*s);
+    }
+    
+    return suma * std::sqrt(
+        gsl_sf_fact(j_plus_mb) * gsl_sf_fact(j_minus_mb) *
+        gsl_sf_fact(j_plus_ma) * gsl_sf_fact(j_minus_ma)
+    );
+}
+
 double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
 {
     double A = Wigner6j(l1, l2, L, l2p, l1p, lambda);

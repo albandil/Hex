@@ -798,6 +798,11 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
 //@}
 
 /**
+ * @brief Small Wigner d-matrix.
+ */
+double Wigner_d (int two_j, int two_ma, int two_mb, double beta);
+
+/**
  * @return Value of @f$ f(\lambda,l_1,l_2,l_1',l_2',L) @f$.
  */
 double computef (int lambda, int l1, int l2, int l1p, int l2p, int L);
