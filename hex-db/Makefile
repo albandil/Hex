@@ -115,6 +115,8 @@ bin/$(HEXDBEXE): obj/ui.o lib/$(HEXDBLIB).0
 	@mkdir -p $(@D)
 	$(CXX) $^ -L$(shell pwd)/lib/ -lhex-db $(LFLAGS) -o $@
 
+lib/$(HEXDBLIB).0: lib/$(HEXDBLIB)
+
 lib/$(HEXDBLIB): $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)
 	$(CXX) $^ $(LFLAGS) -fPIC -shared -Wl,-soname,$(HEXDBLIB).0 -o $@.0
