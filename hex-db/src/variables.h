@@ -283,6 +283,9 @@ AddNewVariableClass(TMatrix);
 /// Create class for scattering amplitude (scatamp)
 AddNewVariableClass(ScatteringAmplitude);
 
+/// Create class for scattering amplitude with arbitrary impact direction (scatamp-dir)
+AddNewVariableClass(ScatteringAmplitudeDir);
+
 /// Create class for differential cross section (dcs)
 AddNewVariableClass(DifferentialCrossSection);
 

@@ -160,7 +160,7 @@ class NodeIntegrator
                 double quotient = 0.75;
                 
                 // for different subdivision
-                for (std::size_t samples = 2; ; samples *= 2)
+                for (int samples = 2; ; samples *= 2)
                 {
                     // spread logarithmically
                     rArray grid = geomspace(r0,r1,samples,quotient);

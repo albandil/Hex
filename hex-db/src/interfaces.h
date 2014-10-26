@@ -200,6 +200,92 @@ inline void hex_scattering_amplitude
 }
 
 /**
+   @brief Scattering anplitude for non-aligned impact direction (Fortran).
+   
+   This function will evaluate the scattering amplitude when the projectile is coming in a
+   direction different from the quantization axis, i.e. when
+   @f[
+       \mathbf{k}_i \neq (0, 0, k_i) \,.
+   @f]
+   In that case the of the scattering amplitude can be computed using Wigner d-function
+   and all possible amplitudes from scattering between various magnetic levels. The reason
+   for this is that such situation is equivalent to a change of the quantization axis by the
+   same amount. To be precise, it is
+   @f[
+       T_{n_f l_f m_f \leftarrow n_i l_i m_i} = \sum_{m_i' m_f'}
+       d_{m_i' m_i}^{l_i} d_{m_f' m_f}^{l_f \ast} T_{n_f l_f m_f' \leftarrow n_i l_i m_i'} \,.
+   @f]
+   
+   Fortran prototype equivalent to
+   @code{.f90}
+   subroutine scattering_amplitude (ni,li,mi,nf,lf,mf,S,E,N,angles,result)
+     integer, intent(in) :: ni,li,mi
+     integer, intent(in) :: nf,lf,mf
+     integer, intent(int) :: S,N
+     double precision, intent(in)     :: E
+     double precision, dimension(N)   :: angles
+     double precision, dimension(2*N) :: result
+   @endcode
+   
+   @param ni Initial atomic principal quantum number.
+   @param li Initial atomic orbital quantum number.
+   @param mi Initial atomic magnetic quantum number.
+   @param nf Final atomic principal quantum number.
+   @param lf Final atomic orbital quantum number.
+   @param mf Final atomic magnetic quantum number.
+   @param S Total spin (0 = singlet, 1 = triplet).
+   @param E Impact energy in Rydbergs.
+   @param N Sample count.
+   @param beta Impact angle.
+   @param angles Real array of length N containing scattering angles.
+   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+*/
+void hex_scattering_amplitude_dir_
+(
+    int * ni, int * li, int * mi,
+    int * nf, int * lf, int * mf,
+    int * S, double * E, int * N,
+    double * beta, double * angles, double * result
+);
+
+/**
+   @brief Scattering anplitude for non-aligned impact direction (C).
+   
+   C prototype.
+   
+   See @ref hex_scattering_amplitude_dir_ for theory.
+   
+   @param ni Initial atomic principal quantum number.
+   @param li Initial atomic orbital quantum number.
+   @param mi Initial atomic magnetic quantum number.
+   @param nf Final atomic principal quantum number.
+   @param lf Final atomic orbital quantum number.
+   @param mf Final atomic magnetic quantum number.
+   @param S Total spin (0 = singlet, 1 = triplet).
+   @param E Impact energy in Rydbergs.
+   @param N Sample count.
+   @param beta Impact angle.
+   @param angles Real array of length N containing scattering angles.
+   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+*/
+inline void hex_scattering_amplitude_dir
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E, int N,
+    double beta, double * angles, double * result
+)
+{
+    hex_scattering_amplitude_dir_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &S, &E, &N,
+        &beta, angles, result
+    );
+}
+
+/**
    @brief Differential cross section (Fortran).
    
    Fortran prototype equivalent to

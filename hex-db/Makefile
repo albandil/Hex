@@ -65,7 +65,7 @@ FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-VARS = asy ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes bornf tmatb
+VARS = asy ccs colls dcs xcs ics momtf scatamp scatamp-dir tcs tmat ionf ionamp tdcs stokes bornf tmatb
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))

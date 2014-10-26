@@ -50,6 +50,43 @@
 #include <type_traits>
 #include <string>
 
+//
+// Restricted pointers.
+// - allow some compiler optimizations on arrays
+//
+
+#ifndef restrict
+#ifdef __GNUC__
+    #define restrict __restrict
+#else
+    #define restrict
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
+#endif
+#endif
+
+/**
+ * @brief printf-like formatting.
+ * 
+ * This function takes an arbitrary number of parameters. It is expected that
+ * the first one is the formatting string (printf-like syntax). All the
+ * arguments are sent to snprintf without change.
+ */
+template <class ...Params> std::string format (Params ...p)
+{
+    // calculate the necessary space
+    unsigned n = std::snprintf(nullptr, 0, p...);
+    
+    // allocate the string
+    std::string text;
+    text.resize(n);
+    
+    // compose the text
+    std::snprintf(&text[0], n + 1, p...);
+    
+    // return the text
+    return text;
+}
+
 /**
  * @brief Exception class.
  * 
@@ -70,58 +107,19 @@ public:
     
     /// Constructor.
     template <class ...Params> exception (Params ...p)
-    {
-        // get requested size
-        int size = snprintf(nullptr, 0, p...);
-        
-        // allocate buffer
-        message = new char [size + 1];
-        
-        // printf to the allocated storage
-        snprintf(message, size + 1, p...);
-    }
-    
-    /// Destructor.
-    virtual ~exception() noexcept
-    {
-        delete [] message;
-    }
+        : message_(format(p...)) { }
     
     /// Return pointer to the exception text.
-    const char* what() const noexcept (true)
+    const char* what () const noexcept (true)
     {
-        return message;
+        return message_.c_str();
     }
     
 private:
     
     /// Text of the exception.
-    char * message;
+    std::string message_;
 };
-
-//
-// Restricted pointers.
-// - allow some compiler optimizations on arrays
-//
-
-#ifndef restrict
-#ifdef __GNUC__
-    #define restrict __restrict
-#else
-    #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
-#endif
-#endif
-
-//
-// Memory alignment.
-// - supports intrinsic compiler optimization, mainly the usage of SIMD instructions (AVX etc.)
-// - enabled only for Linux systems (those ought to posess "posix_memalign", which is used)
-//
-
-#ifndef __linux__
-    #define NO_ALIGN
-#endif
 
 //
 // List all complex types.
@@ -283,29 +281,6 @@ template <typename T, class ...Params> T mmax (T x, Params ...p)
 template <class T> constexpr T const & larger_of (T const & a, T const & b)
 {
     return (a > b) ? a : b;
-}
-
-/**
- * @brief printf-like formatting.
- * 
- * This function takes an arbitrary number of parameters. It is expected that
- * the first one is the formatting string (printf-like syntax). All the
- * arguments are sent to snprintf without change.
- */
-template <class ...Params> std::string format (Params ...p)
-{
-    // calculate the necessary space
-    unsigned n = std::snprintf(nullptr, 0, p...);
-    
-    // allocate the string
-    std::string text;
-    text.resize(n);
-    
-    // compose the text
-    std::snprintf(&text[0], n + 1, p...);
-    
-    // return the text
-    return text;
 }
 
 /**
@@ -504,24 +479,24 @@ class Timer
 };
 
 /**
- * @brief Output table.
- * 
- * This class enables table-formatted output. An example code is
- * @code
- * std::ofstream file ("output.txt");
- * OutputTable table (file);
- * table.setWidth (5, 5);
- * table.setAlign (OutputTable::left, OutputTable::right);
- * table.write ("abc", "xyz");
- * table.write (10, 17.5);
- * table.write (" x", "xx");
- * @endcode
- * The resulting output will be
- * @code
- * abc    xyz
- * 10    17.5
- *  x      xx
- * @endcode
+   @brief Output table.
+   
+   This class enables table-formatted output. An example code is
+   @code
+   std::ofstream file ("output.txt");
+   OutputTable table (file);
+   table.setWidth (5, 5);
+   table.setAlign (OutputTable::left, OutputTable::right);
+   table.write ("abc", "xyz");
+   table.write (10, 17.5);
+   table.write (" x", "xx");
+   @endcode
+   The resulting output will be
+   @code
+   abc    xyz
+   10    17.5
+    x      xx
+   @endcode
  */
 class OutputTable
 {
@@ -662,21 +637,21 @@ template <class T> class Range
 };
 
 /**
- * @brief Underline text.
- * 
- * This simple function will count characters in the supplied text string,
- * append a new-line character and a group of '-' characters whose number
- * will be equal to the length of the supplied text. It supports UTF-8, so
- * the following code
+   @brief Underline text.
+   
+   This simple function will count characters in the supplied text string,
+   append a new-line character and a group of '-' characters whose number
+   will be equal to the length of the supplied text. It supports UTF-8, so
+   the following code
    @code
        std::cout << underline("Title containing UTF-8 characters αβγδ") << std::endl;
    @endcode
- * will produce the output
+   will produce the output
    @verbatim
        Title containing UTF-8 characters αβγδ
        --------------------------------------
    @endverbatim
- * It may be necessary to set the user locale, first, using the function call
+   It may be necessary to set the user locale, first, using the function call
    @code
        std::setlocale(LC_ALL, "en_GB.utf8");
    @endcode

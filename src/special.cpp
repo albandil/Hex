@@ -715,7 +715,7 @@ double special::Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int 
     return Sum;
 }
 
-double Wigner_d (int two_j, int two_ma, int two_mb, double beta)
+double special::Wigner_d (int two_j, int two_ma, int two_mb, double beta)
 {
     if (std::abs(two_ma) > two_j or (two_j + two_ma) % 2 != 0 or
         std::abs(two_mb) > two_j or (two_j + two_mb) % 2 != 0)

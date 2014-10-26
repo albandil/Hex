@@ -41,6 +41,7 @@ VariableList::VariableList () :
         new TMatrix,
         new BornFullTMatrix,
         new ScatteringAmplitude,
+        new ScatteringAmplitudeDir,
         new DifferentialCrossSection,
         new IntegralCrossSection,
         new CompleteCrossSection,
