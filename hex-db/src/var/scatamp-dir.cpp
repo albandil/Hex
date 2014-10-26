@@ -50,7 +50,9 @@ const std::vector<std::pair<std::string,std::string>> ScatteringAmplitudeDir::De
     {"mf",    "Final atomic magnetic quantum number."                     },
     {"S",     "Total spin of atomic + projectile electron."               },
     {"Ei",    "Projectile impact energy (Rydberg)."                       },
-    {"beta",  "Angle between impact direction and the quantization axis." },
+    {"alpha", "Quantization axis orientation (1st Euler angle)."          },
+    {"beta",  "Quantization axis orientation (2nd Euler angle)."          },
+    {"gamma", "Quantization axis orientation (3rd Euler angle)."          },
     {"theta", "Scattering angles for which to compute the amplitude."     }
 };
 const std::vector<std::string> ScatteringAmplitudeDir::VecDependencies = { "theta" };
@@ -77,14 +79,16 @@ void hex_scattering_amplitude_dir_
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
     int * S, double * E, int * N,
-    double * beta, double * angles, double * result
+    double * alpha, double * beta, double * gamma,
+    double * angles, double * result
 )
 {
-    // clean the output storage
-    std::memset(result, 0, (*N) * sizeof(Complex));
+    // set up and clean the output storage
+    cArrayView resarr(*N,reinterpret_cast<Complex*>(result));
+    resarr.fill(0.);
     
     // create the scattering amplitudes (for one term of the sum)
-    double amplitudes[2*(*N)];
+    cArray amplitudes(*N, 0.);
     
     // sum over all initial and final magnetic quantum numbers
     for (int mi_ = -(*li); mi_ <= (*li); mi_++)
@@ -97,16 +101,19 @@ void hex_scattering_amplitude_dir_
             nf,lf,&mf_,
             S, E,
             N, angles,
-            amplitudes
+            reinterpret_cast<double*>(amplitudes.data())
         );
         
         // calculate the Wigner d-matrix factors
         double di = special::Wigner_d(2*(*li),2*(*mi),2*mi_,*beta);
         double df = special::Wigner_d(2*(*lf),2*(*mf),2*mf_,*beta);
         
-        // contribute to the result; update per component thanks to real d's
-        for (int i = 0; i < 2 * (*N); i++)
-            result[i] += di * df * amplitudes[i];
+        // calculate the whole transformation factor (D-matrices)
+        Complex D = std::exp(Complex(0.,(*alpha)*((*mf) - (*mi)))) * di * df *
+                    std::exp(Complex(0.,(*gamma)*(  mf_ -   mi_)));
+        
+        // contribute to the result
+        resarr += D * amplitudes;
     }
 }
 
@@ -124,9 +131,11 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
     int nf = As<int>(sdata, "nf", Id);
     int lf = As<int>(sdata, "lf", Id);
     int mf = As<int>(sdata, "mf", Id);
-    int  S = As<int>(sdata, "S", Id);
-    double E = As<double>(sdata, "Ei", Id) * efactor;
-    double beta = As<double>(sdata, "beta", Id) * afactor;
+    int  S = As<int>(sdata, "S",  Id);
+    double E     = As<double>(sdata, "Ei",    Id) * efactor;
+    double alpha = As<double>(sdata, "alpha", Id) * afactor;
+    double beta  = As<double>(sdata, "beta",  Id) * afactor;
+    double gamma = As<double>(sdata, "gamma", Id) * afactor;
     
     // angles
     rArray angles;
@@ -154,7 +163,7 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
         nf,lf,mf,
         S, E,
         angles.size(),
-        beta,
+        alpha, beta, gamma,
         scaled_angles.data(),
         reinterpret_cast<double*>(amplitudes.data())
     );
@@ -165,7 +174,7 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n"
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
         "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits) << "\n"
-        "#     impact angle = " << beta << " " << unit_name(Aunits) << "\n"
+        "#     impact direction = (" << beta << "," << gamma << ") " << unit_name(Aunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
         "# \n"
         "# θ\t Re f\t Im f\n";

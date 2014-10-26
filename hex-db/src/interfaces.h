@@ -213,7 +213,7 @@ inline void hex_scattering_amplitude
    same amount. To be precise, it is
    @f[
        T_{n_f l_f m_f \leftarrow n_i l_i m_i} = \sum_{m_i' m_f'}
-       d_{m_i' m_i}^{l_i} d_{m_f' m_f}^{l_f \ast} T_{n_f l_f m_f' \leftarrow n_i l_i m_i'} \,.
+       D_{m_i' m_i}^{l_i} D_{m_f' m_f}^{l_f \ast} T_{n_f l_f m_f' \leftarrow n_i l_i m_i'} \,.
    @f]
    
    Fortran prototype equivalent to
@@ -236,7 +236,9 @@ inline void hex_scattering_amplitude
    @param S Total spin (0 = singlet, 1 = triplet).
    @param E Impact energy in Rydbergs.
    @param N Sample count.
-   @param beta Impact angle.
+   @param alpha Impact angle (first of Euler angles).
+   @param beta Impact angle (second of Euler angles).
+   @param gamma Impact angle (third of Euler angles).
    @param angles Real array of length N containing scattering angles.
    @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
 */
@@ -245,7 +247,8 @@ void hex_scattering_amplitude_dir_
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
     int * S, double * E, int * N,
-    double * beta, double * angles, double * result
+    double * alpha, double * beta, double * gamma,
+    double * angles, double * result
 );
 
 /**
@@ -264,7 +267,9 @@ void hex_scattering_amplitude_dir_
    @param S Total spin (0 = singlet, 1 = triplet).
    @param E Impact energy in Rydbergs.
    @param N Sample count.
-   @param beta Impact angle.
+   @param alpha Impact angle (first of Euler angles).
+   @param beta Impact angle (second of Euler angles).
+   @param gamma Impact angle (third of Euler angles).
    @param angles Real array of length N containing scattering angles.
    @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
 */
@@ -273,7 +278,8 @@ inline void hex_scattering_amplitude_dir
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int S, double E, int N,
-    double beta, double * angles, double * result
+    double alpha, double beta, double gamma,
+    double * angles, double * result
 )
 {
     hex_scattering_amplitude_dir_
@@ -281,7 +287,8 @@ inline void hex_scattering_amplitude_dir
         &ni, &li, &mi,
         &nf, &lf, &mf,
         &S, &E, &N,
-        &beta, angles, result
+        &alpha, &beta, &gamma,
+        angles, result
     );
 }
 
