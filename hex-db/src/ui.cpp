@@ -129,9 +129,13 @@ int main (int argc, char* argv[])
         "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
         "vars", "v",     0, [ & ](std::string opt) -> bool
         {
-            std::cout << "(name)\t\t(description)" << std::endl;
+            OutputTable table;
+            table.setAlignment(OutputTable::left, OutputTable::left);
+            table.setWidth(20,40);
+            table.write("(name)", "(description)");
             for (Variable const * var : vlist)
-                std::cout << var->id() << "\t\t" << var->description() << std::endl;
+                table.write(var->id(), var->description());
+            
             std::exit(EXIT_SUCCESS);
         },
         "params", "p",   1, [ & ](std::string opt) -> bool
@@ -155,7 +159,7 @@ int main (int argc, char* argv[])
                 
                 OutputTable table;
                 table.setAlignment(OutputTable::left, OutputTable::left);
-                table.setWidth(20,20);
+                table.setWidth(20,40);
                 for (auto v : (*it)->deps())
                     table.write(v.first, v.second);
                 
