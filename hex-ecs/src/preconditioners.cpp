@@ -1373,8 +1373,12 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         );
         
         // save the diagonal block
-        csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
-        csr_blocks_[iblock].hdfsave();
+        if (cmd_.outofcore)
+        {
+            csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
+            # pragma omp critical
+            csr_blocks_[iblock].hdfsave();
+        }
     }
     
     // precondition by LU
