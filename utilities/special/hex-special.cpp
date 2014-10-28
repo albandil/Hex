@@ -194,6 +194,38 @@ int run_Coulomb (int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
+int run_Wigner9j (int argc, char* argv[])
+{
+    if (argc < 11)
+    {
+        std::cout << std::endl << "Usage:" << std::endl;
+        std::cout << "\t./hex-special Wigner9j <2*ja> <2*jb> <2*jc> <2*jd> <2*je> <2*jf> <2*jg> <2*jh> <2*ji>" << std::endl << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    int two_ja = std::atoi(argv[2]), two_jb = std::atoi(argv[3]), two_jc = std::atoi(argv[4]);
+    int two_jd = std::atoi(argv[5]), two_je = std::atoi(argv[6]), two_jf = std::atoi(argv[7]);
+    int two_jg = std::atoi(argv[8]), two_jh = std::atoi(argv[9]), two_ji = std::atoi(argv[10]);
+    
+    double w9j = gsl_sf_coupling_9j
+    (
+        two_ja, two_jb, two_jc,
+        two_jd, two_je, two_jf,
+        two_jg, two_jh, two_ji
+    );
+    
+    std::cout << format
+    (
+        "Wigner9j(%g,%g,%g; %g,%g,%g; %g,%g,%g) = %g",
+        0.5 * two_ja, 0.5 * two_jb, 0.5 * two_jc,
+        0.5 * two_jd, 0.5 * two_je, 0.5 * two_jf,
+        0.5 * two_jg, 0.5 * two_jh, 0.5 * two_ji,
+        w9j
+    ) << std::endl;
+    
+    return EXIT_SUCCESS;
+}
+
 int main (int argc, char* argv[])
 {
     std::string name = (argc > 1 ? argv[1] : "help");
@@ -201,22 +233,24 @@ int main (int argc, char* argv[])
     
     if (needHelp)
     {
-        std::cout << "\nEvaluates a special function as implemented in Hex.\n";
-        std::cout << "\nUsage:\n\t./hex-special <name> [options]\n\n";
-        std::cout << "Available functions:\n";
+        std::cout << std::endl << "Evaluates a special function as implemented in Hex." << std::endl;
+        std::cout << std::endl << "Usage:" << std::endl << "\t./hex-special <name> [options]" << std::endl;
+        std::cout << std::endl << "Available functions:" << std::endl;
     }
     
     Use(f);             // reduced matrix element factor
     Use(ClebschGordan); // Clebsch-Gordan coefficient
     Use(Gaunt);         // Gaunt coefficient
     Use(Y);             // spherical harmonic
-    Use(Coulomb)        // Coulomb function
+    Use(Coulomb);       // Coulomb function
+    Use(Wigner9j);      // Wigner 9j-coefficient
     
     if (needHelp)
     {
+        std::cout << std::endl;
         std::cout << "By calling \"./hex-special <name>\" (i.e. without further arguments) "
-                      "you will receive detailed information on the chosen special function."
-                  << std::endl << std::endl;
+                      "you will receive detailed information on the chosen special function.";
+        std::cout << std::endl << std::endl;
     }
     else
     {
