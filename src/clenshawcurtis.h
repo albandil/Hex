@@ -248,8 +248,12 @@ public:
             fvals.resize(2*N + 1);
             ftraf.resize(2*N);
             
-            // create plan
-            fftw_plan plan = fftw_plan_dft_1d
+            // create plan (thread-safe)
+            fftw_plan plan;
+#ifdef _OPENMP
+            # pragma omp critical
+#endif
+            plan = fftw_plan_dft_1d
             (
                 2*N,
                 reinterpret_cast<fftw_complex*>(&fvals[0]),
@@ -289,10 +293,16 @@ public:
                 fvals[N] = fvals_prev[N/2];
             }
             
+            // append element
             coefs.resize(N + 1);
 
             // compute coefficients using FFT/DCT-I
             fftw_execute(plan);
+            
+            // delete plan (thread-safe)
+#ifdef _OPENMP
+            # pragma omp critical
+#endif
             fftw_destroy_plan(plan);
             
             // create type-correct pointer
