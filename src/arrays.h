@@ -55,10 +55,10 @@
 #include "misc.h"
 
 // Forward declaration of Array (unaligned array of items).
-template < class T, class Alloc = PlainAllocator<T> > class Array;
+template < class T, class Alloc_ = PlainAllocator<T> > class Array;
 
-// Forward declaration of NumberArray (256bit-aligned array of numbers -> AVX).
-template < class T, class Alloc = AlignedAllocator<T,32u> > class NumberArray;
+// Forward declaration of NumberArray (512bit-aligned array of numbers -> AVX2).
+template < class T, class Alloc_ = AlignedAllocator<T,NUMBER_ARRAY_ALIGNMENT/8u> > class NumberArray;
 
 /**
  * @brief Array view.
@@ -212,7 +212,7 @@ template <class T> class ArrayView
  * - Basic iterator interface simillar to STL containers -- methods begin(),
  *   end(), and thus also the ability to appear in the range-based for loops.
  */
-template <class T, class Alloc> class Array : public ArrayView<T>
+template <class T, class Alloc_> class Array : public ArrayView<T>
 {
     public:
         
@@ -220,7 +220,8 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
-    
+        typedef Alloc_ Alloc;
+        
     public:
     
         // constructors, creates an empty array
@@ -492,7 +493,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
  * - a collection of overloaded arithmetic operators (sum of two arrays,
  *   difference, multiplication by a number etc.)
  */
-template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
+template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
 {
     public:
         
@@ -500,6 +501,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
+        typedef Alloc_ Alloc;
         
     protected:
         

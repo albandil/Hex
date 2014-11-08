@@ -49,6 +49,16 @@ template <class T> class PlainAllocator
     public:
         
         /**
+         * @brief Get alignment of a type.
+         * 
+         * Return alignment of the allocated array in bytes.
+         */
+        static std::size_t align ()
+        {
+            return std::alignment_of<T>::value;
+        }
+        
+        /**
          * @brief Allocate array.
          * 
          * This method will allocate fields of the data type T.
@@ -89,9 +99,11 @@ template <class T> class PlainAllocator
  * autovectorization, which can utilize SIMD instruction of the CPU and
  * speed up the operation on the arrays.
  */
-template <class T, size_t alignment = std::alignment_of<T>::value> class AlignedAllocator
+template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class AlignedAllocator
 {
     public:
+        
+        static const std::size_t alignment = alignment_;
         
         /**
          * @brief Allocate aligned memory.
@@ -123,7 +135,7 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
                 return nullptr;
             
             // get the alignment and raise it to nearest multiple of sizeof(void*)
-            std::size_t align = std::max(alignment, alignof(max_align_t));
+            std::size_t align = std::max(alignment_, alignof(max_align_t));
             if (align % sizeof(void*) != 0)
                 align += sizeof(void*) - align % sizeof(void*);
             
@@ -213,5 +225,8 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
 };
+
+// number array alignment (512 bits ~ AVX2)
+#define NUMBER_ARRAY_ALIGNMENT 512u
 
 #endif /* HEX_MEMORY */
