@@ -1706,6 +1706,9 @@ public:
             }
         }
         
+        // update diagonal pointers
+        setup_dptrs_();
+        
         return *this;
     }
 
