@@ -78,7 +78,7 @@ int main (int argc, char* argv[])
     H5::Exception::dontPrint();
     
     // disable buffering of the standard output (-> immediate logging)
-    setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     
     // get input from command line
     CommandLine cmd (argc, argv);
@@ -129,7 +129,7 @@ int main (int argc, char* argv[])
     int Nspline = bspline.Nspline();
     
     // info
-    std::cout << "B-spline solver count: " << Nspline << "\n\n";
+    std::cout << "B-spline solver count: " << Nspline << std::endl << std::endl;
     
     //
     // Setup angular data -------------------------------------------------- //

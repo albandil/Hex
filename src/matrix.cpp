@@ -131,9 +131,9 @@ template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<
     
     // get restricted and aligned pointers for fast access
 #if defined(__GNUC__) || defined(__INTEL_COMPILER)
-    double const * const restrict pA = (double*) __builtin_assume_aligned (A.data().data(), 32u);
-    double const * const restrict pB = (double*) __builtin_assume_aligned (B.data().data(), 32u);
-    double       * const restrict pC = (double*) __builtin_assume_aligned (C.data().data(), 32u);
+    double const * const restrict pA = (double*) __builtin_assume_aligned (A.data().data(), NumberArray<double>::Alloc::alignment);
+    double const * const restrict pB = (double*) __builtin_assume_aligned (B.data().data(), NumberArray<double>::Alloc::alignment);
+    double       * const restrict pC = (double*) __builtin_assume_aligned (C.data().data(), NumberArray<double>::Alloc::alignment);
 #else
     double const * const restrict pA = A.data().data();
     double const * const restrict pB = B.data().data();
@@ -2006,9 +2006,9 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     // some 'complex' operations may overflow. However, e.g. GNU Fortran compiler never(!) checks
     // for overflows, so why should we here, when we do not expect any.
 #if defined(__GNUC__) || defined(__INTEL_COMPILER)
-    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(res.data(),    32u);
-    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(elems_.data(), 32u);
-    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(B.data(),      32u);
+    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(res.data(),    NumberArray<Complex>::Alloc::alignment);
+    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(elems_.data(), NumberArray<Complex>::Alloc::alignment);
+    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(B.data(),      NumberArray<Complex>::Alloc::alignment);
 #else
     Complex       *       restrict rp_res    = &res[0];
     Complex const *       restrict rp_elems_ = &elems_[0];
