@@ -16,5 +16,5 @@ dist: $(SUBDIRS)
 	@mkdir -p release
 	cp hex-db/hex-db-$(GIT_COMMIT).tar.gz \
 	   hex-dwba/hex-dwba-$(GIT_COMMIT).tar.gz \
-	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \     release/
+	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz     release/
 
