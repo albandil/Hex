@@ -659,7 +659,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     }
     
     // synchronize across processes
-    par_.sync (q, Nspline * Nspline, l1_l2_.size());
+    par_.sync(q.data(), Nspline * Nspline, l1_l2_.size());
 }
 
 void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -719,7 +719,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // synchronize across processes
-    par_.sync (z, Nspline * Nspline, l1_l2_.size());
+    par_.sync(z.data(), Nspline * Nspline, l1_l2_.size());
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -1094,10 +1094,10 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
             false,                  // verbose output
-            new_opencl_array,       // return array that is initialized and connected to GPU
+            compute_norm,           // evaluate norm of the vector
             axby_operation,         // a*x+b*y -> z operation
             scalar_product,         // scalar product of two CL arrays
-            compute_norm            // evaluate norm of the vector
+            new_opencl_array        // return array that is initialized and connected to GPU
         );
         
         // download data arrays from the GPU
@@ -1128,7 +1128,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // synchronize across processes
-    par_.sync (z, Nspline * Nspline, l1_l2_.size());
+    par_.sync(z.data(), Nspline * Nspline, l1_l2_.size());
 }
 
 #endif

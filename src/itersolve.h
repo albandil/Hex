@@ -163,10 +163,10 @@ template
     class TArrayView,
     class Preconditioner,
     class MatrixMultiplication,
-    class NewArray      = decltype(default_new_complex_array),
+    class ComputeNorm   = decltype(default_compute_norm),
     class AxbyOperation = decltype(default_complex_axby),
     class ScalarProduct = decltype(operator|<Complex>),
-    class ComputeNorm   = decltype(default_compute_norm)
+    class NewArray      = decltype(default_new_complex_array)
 >
 unsigned cg_callbacks
 (
@@ -178,10 +178,10 @@ unsigned cg_callbacks
           Preconditioner apply_preconditioner,
     MatrixMultiplication matrix_multiply,
                     bool verbose        = true,
-                NewArray new_array      = default_new_complex_array,
+             ComputeNorm compute_norm   = default_compute_norm,
            AxbyOperation axby           = default_complex_axby,
            ScalarProduct scalar_product = operator|<Complex>,
-             ComputeNorm compute_norm   = default_compute_norm
+                NewArray new_array      = default_new_complex_array
 )
 {
     Timer timer;
@@ -501,10 +501,10 @@ template
     class TArrayView,
     class Preconditioner,
     class MatrixMultiplication,
-    class NewArray      = decltype(default_new_complex_array),
+    class ComputeNorm   = decltype(default_compute_norm),
     class AxbyOperation = decltype(default_complex_axby),
     class ScalarProduct = decltype(operator|<Complex>),
-    class ComputeNorm   = decltype(default_compute_norm)
+    class NewArray      = decltype(default_new_complex_array)
 >
 int minres_callbacks
 (
@@ -516,10 +516,10 @@ int minres_callbacks
           Preconditioner apply_preconditioner,
     MatrixMultiplication matrix_multiply,
                     bool verbose        = true,
-                NewArray new_array      = default_new_complex_array,
+             ComputeNorm compute_norm   = default_compute_norm,
            AxbyOperation axby           = default_complex_axby,
            ScalarProduct scalar_product = operator|<Complex>,
-             ComputeNorm compute_norm   = default_compute_norm
+                NewArray new_array      = default_new_complex_array
 )
 {
     Timer timer;

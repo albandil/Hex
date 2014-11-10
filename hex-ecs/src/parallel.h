@@ -139,13 +139,15 @@ class Parallel
          * present on the (i % Nproc_)-th process. That process will be used as the broadcast root.
          * This behaviour is compatible with the member function @ref isMyWork.
          * 
-         * @param array Array to synchronize,
+         * @param array Pointer to data array to synchronize.
          * @param chunksize Size of the per-process segment.
          * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
          *               will be synchronized. If there are some elements more, they will be left
          *               untouched (and un-broadcast).
+         * 
+         * It is expected that the array has length equal or greater than chunksize * Nchunk.
          */
-        template <class T> void sync (ArrayView<T> array, std::size_t chunksize, std::size_t Nchunk) const
+        template <class T> void sync (T* array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifndef NO_MPI
             if (active_)
@@ -155,9 +157,9 @@ class Parallel
                     // relevant process will broadcast this chunk's data
                     MPI_Bcast
                     (
-                        array.data() + ichunk * chunksize,
-                        chunksize,
-                        MPI_DOUBLE_COMPLEX,
+                        array + ichunk * chunksize,
+                        typeinfo<T>::ncmpt * chunksize, // ... how many doubles to b-cast
+                        MPI_DOUBLE,
                         ichunk % Nproc_,
                         MPI_COMM_WORLD
                     );
