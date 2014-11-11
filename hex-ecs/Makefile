@@ -9,7 +9,8 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
+#CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
+CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mavx
 LFLAGS = -fopenmp -fPIC
 
 # ---------------------------------------------------------------------------- #
@@ -91,11 +92,11 @@ FFTWLIBS = -lfftw3
 # PNG++ (optional, use -DNO_PNG to omit)                                       #
 # ---------------------------------------------------------------------------- #
 
-# PNGPPFLAGS = -DNO_PNG
-# PNGPPFLIBS =
+PNGPPFLAGS = -DNO_PNG
+PNGPPFLIBS =
 
-PNGPPFLAGS = -I./libs
-PNGPPLIBS = -lpng
+# PNGPPFLAGS = -I./libs
+# PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 
