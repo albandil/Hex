@@ -121,14 +121,16 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     rArray scaled_angles = angles * afactor;
     
     // compute scattering amplitudes
-    cArray f0_singlet, f0_triplet, f1_singlet, f1_triplet;
+    cArray f0_singlet(angles.size()), f0_triplet(angles.size());
+    cArray f1_singlet(angles.size()), f1_triplet(angles.size());
     hex_scattering_amplitude(ni,0,0, nf,1,0, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_singlet.data()));
     hex_scattering_amplitude(ni,0,0, nf,1,0, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f0_triplet.data()));
     hex_scattering_amplitude(ni,0,0, nf,1,1, 0, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_singlet.data()));
     hex_scattering_amplitude(ni,0,0, nf,1,1, 1, Ei, angles.size(), scaled_angles.data(), reinterpret_cast<double*>(f1_triplet.data()));
     
     // compute differential cross sections
-    rArray dcs_p0s, dcs_pps, dcs_pms, dcs_p0t, dcs_ppt, dcs_pmt;
+    rArray dcs_p0s(angles.size()), dcs_pps(angles.size()), dcs_pms(angles.size());
+    rArray dcs_p0t(angles.size()), dcs_ppt(angles.size()), dcs_pmt(angles.size());
     hex_differential_cross_section(ni,0,0, nf,1, 0, 0, Ei, angles.size(), scaled_angles.data(), dcs_p0s.data());
     hex_differential_cross_section(ni,0,0, nf,1, 1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pps.data());
     hex_differential_cross_section(ni,0,0, nf,1,-1, 0, Ei, angles.size(), scaled_angles.data(), dcs_pms.data());
