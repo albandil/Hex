@@ -210,10 +210,34 @@ else
 if (cmd.itinerary & CommandLine::StgSolve)
 {
     // CG preconditioner callback
-    auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
+    auto apply_preconditioner = [ & ](cArray & r, cArray & z) -> void
+    {
+        // synchronize the residual vector across the nodes by broadcasting master's data
+        par.sync(r.data(), r.size(), 1);
+        
+        // MPI-distributed preconditioning
+        prec->precondition(r, z);
+    };
     
     // CG matrix multiplication callback
-    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
+    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+    {
+        // MPI-distributed multiplication
+        prec->multiply(p, q);
+    };
+    
+    // CG norm function that broadcasts master's result to all nodes
+    auto compute_norm = [ & ](cArray const & r) -> double
+    {
+        // compute node-local norm of 'r'
+        double rnorm = r.norm();
+        
+        // impose also master's value of the norm on the other nodes
+        par.sync(&rnorm, 1, 1);
+        
+        // return norm of master's 'r'
+        return rnorm;
+    };
     
     //
     // Solve the equations
@@ -343,7 +367,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 max_iter,               // maximal iteration count
                 apply_preconditioner,   // preconditioner callback
                 matrix_multiply,        // matrix multiplication callback
-                true                    // verbose output
+                true,                   // verbose output
+                compute_norm            // how to evaluate norm of an array
             );
             
             if (iterations >= max_iter)

@@ -109,7 +109,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     hex_differential_cross_section (ni,li,mi, nf,lf,mf, 1, E, angles.size(), scaled_angles.data(), dcs1.data());
     
     // compute spin asymetry
-    rArray asy = (dcs0 - dcs1) / (dcs0 + 3. * dcs1);
+    rArray asy = (dcs0 - dcs1 / 3.) / (dcs0 + dcs1);
     
     // substitute possible "nan"-s and "inf"-s by zeros
     for (double & x : asy)

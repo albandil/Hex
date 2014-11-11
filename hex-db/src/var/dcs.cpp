@@ -180,9 +180,9 @@ void hex_differential_cross_section_
         // for all projectile angular momenta : sum partial wave arrays
         for (int l = 0; l < (int)E_ell.size(); l++)
         {
-            Complex Y = special::sphY(l,mi-mf,angles[i],0);
-            merge (e, f, E_ell[l], T_E_ell[l] * Y);
-            merge (e, fb, E_ell[l], Tb_E_ell[l] * Y);
+            Complex Y = special::sphY(l,(*mi)-(*mf),angles[i],0);
+            merge(e, f, E_ell[l], T_E_ell[l] * Y);
+            merge(e, fb, E_ell[l], Tb_E_ell[l] * Y);
         }
         
         // skip empty cases
