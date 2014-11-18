@@ -313,7 +313,11 @@
 //             fwrite($pipes2[0], "set terminal svg mouse jsdir \"http://gnuplot.sourceforge.net/demo_svg_4.6/\" size 500,300\n"); // SVG
             fwrite($pipes2[0], "set terminal png size 500,300\n"); // PNG
             fwrite($pipes2[0], "unset key\n");
-            fwrite($pipes2[0], "set xlabel \"Ei [" . $Eunits . "]\"\n");
+            
+            if (in_array($var, array("scatamp", "dcs", "asy")))
+                fwrite($pipes2[0], "set xlabel \"angle [" . $Aunits . "]\"\n");
+            else
+                fwrite($pipes2[0], "set xlabel \"Ei [" . $Eunits . "]\"\n");
             
             if ($var == "colls")
                 fwrite($pipes2[0], "set ylabel \"omega\"\n");
