@@ -37,6 +37,8 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "misc.h"
+
 /**
  * @brief Basic memory allocator.
  * 
@@ -144,7 +146,15 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             std::size_t bytes = elems * sizeof(T) + sizeof(std::uintptr_t) + align;
             
             // allocate memory pool
-            void * root = std::malloc(bytes);
+            void * root;
+            try
+            {
+                root = new char [bytes];
+            }
+            catch (std::bad_alloc const & err)
+            {
+                throw exception ("Insufficent memory (unable to allocate next %ld bytes).", bytes);
+            }
             std::uintptr_t root_address = (std::uintptr_t)root;
             
             // compute padding
@@ -183,7 +193,7 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
                 std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t*>(origin) - 1);
                 
                 // free the whole memory pool
-                std::free(reinterpret_cast<T*>(root_address));
+                delete [] reinterpret_cast<char*>(root_address);
             }
         }
         
