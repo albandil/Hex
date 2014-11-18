@@ -1626,7 +1626,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        throw exception ("[SymDiaMatrix::operator+=] Unequal sizes!");
+        throw exception ("[SymDiaMatrix::operator+=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))
@@ -1839,10 +1839,10 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
 {
     if (n_ != B.n_)
-        throw exception ("[SymDiaMatrix] Unequal ranks.");
+        throw exception ("[SymDiaMatrix] Unequal ranks (%d != %d).", n_, B.n_);
     if (idiag_.size() != B.idiag_.size())
         throw exception ("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
-    for (size_t i = 0; i < idiag_.size(); i++)
+    for (std::size_t i = 0; i < idiag_.size(); i++)
         if (idiag_[i] != B.idiag_[i])
             throw exception ("[SymDiaMatrix] Unequal distribution of diagonals.");
     return true;
