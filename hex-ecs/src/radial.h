@@ -365,7 +365,7 @@ class RadialIntegrals
             return res;
         }
         
-        Bspline const & bspline() const { return bspline_; }
+        Bspline const & bspline () const { return bspline_; }
         
         SymDiaMatrix const & D() const { return D_; }
         SymDiaMatrix const & S() const { return S_; }
@@ -373,13 +373,13 @@ class RadialIntegrals
         SymDiaMatrix const & Mm1_tr() const { return Mm1_tr_; }
         SymDiaMatrix const & Mm2() const { return Mm2_; }
         
-        SymDiaMatrix const & R_tr_dia(unsigned i) const
+        SymDiaMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
-        std::size_t maxlambda() const { return R_tr_dia_.size() - 1; }
+        std::size_t maxlambda () const { return R_tr_dia_.size() - 1; }
         
     private:
         

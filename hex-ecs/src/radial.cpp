@@ -382,8 +382,10 @@ void RadialIntegrals::setupOneElectronIntegrals ()
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
-    // allocate storage
+    // allocate storage and associate names
     R_tr_dia_.resize(lambdas.size());
+    for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
+        R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
     
 #ifndef NO_OPENCL
     if (cmd.gpu_slater)
@@ -420,10 +422,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             continue;
         
         // look for precomputed data on disk
-        std::string R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
-        if (R_tr_dia_[lambda].hdfload(R_name))
+        if (R_tr_dia_[lambda].hdfload())
         {
-            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_name << "\"\n";
+            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
             continue; // no need to compute
         }
         
@@ -582,7 +583,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         
         // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
         R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
-        R_tr_dia_[lambda].hdfsave(R_name, true, 10);
+        R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
+        if (cmd.outofcore)
+            R_tr_dia_[lambda].drop();
         
         std::cout << "\r\t- integrals for λ = " << lambda << " computed\n";
     }
@@ -595,6 +598,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         {
             // get owner process of this multipole
             int owner = lambda % par.Nproc();
+            
+            // reload dropped data
+            if (par.iproc() == owner and cmd.outofcore)
+                R_tr_dia_[lambda].hdfload();
             
             // get dimensions
             int diagsize = R_tr_dia_[lambda].diag().size();
@@ -616,16 +623,21 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             
             // reconstruct objects
             R_tr_dia_[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
+            R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
             
+            // non-owners will update log and save file (if not already done)
             if (owner != par.iproc())
             {
                 std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << "\n";
                 
                 // save to disk (if the file doesn't already exist)
-                std::string R_name = format ("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda);
-                if (not HDFFile(R_name, HDFFile::readonly).valid())
-                    R_tr_dia_[lambda].hdfsave(R_name, true, 10);
+                if (not HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid())
+                    R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
             }
+            
+            // everyone will drop data, if out-of-core mode is on
+            if (cmd.outofcore)
+                R_tr_dia_[lambda].drop();
         }
         
         MPI_Barrier(MPI_COMM_WORLD);

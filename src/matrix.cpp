@@ -1609,6 +1609,13 @@ SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
     setup_dptrs_();
 }
 
+SymDiaMatrix::SymDiaMatrix (std::string filename)
+    : name_(filename)
+{
+    # pragma omp critical
+    hdfload();
+}
+
 void SymDiaMatrix::setup_dptrs_()
 {
     // set data pointers for all (upper and lower) diagonals

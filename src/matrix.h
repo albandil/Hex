@@ -1670,6 +1670,9 @@ public:
     /// Move constructor.
     SymDiaMatrix (SymDiaMatrix && A);
     
+    /// Constructor - HDF loader.
+    SymDiaMatrix (std::string filename);
+    
     /**
      * @brief Plain symmetrical populator.
      *
@@ -1873,6 +1876,9 @@ public:
     
     /// Return the name of the linked disk file.
     std::string hdfname () const { return name_; }
+    
+    /// Return content of the 'name' file as a new SymDiaMatrix object.
+    SymDiaMatrix hdfget () const { return SymDiaMatrix(name_); }
     
     /**
      * @brief Load from file.

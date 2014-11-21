@@ -439,7 +439,7 @@ void NoPreconditioner::update (double E)
                 continue;
             
             // add two-electron contributions
-            Hdiag += f * s_rad_.R_tr_dia(lambda);
+            Hdiag += (cmd_.outofcore ? f * s_rad_.R_tr_dia(lambda).hdfget() : f * s_rad_.R_tr_dia(lambda));
         }
         
         // finalize the matrix
@@ -550,14 +550,14 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 // add the contributions
                 if (f1 != 0.)
                 {
-                    chi_block += (prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1);
+                    chi_block += (prefactor * f1) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj1) : s_rad_.R_tr_dia(lambda).dot(Pj1));
                 }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-                        chi_block += (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
+                        chi_block += (prefactor * f2) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2) : s_rad_.R_tr_dia(lambda).dot(Pj2));
                     else
-                        chi_block -= (prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2);
+                        chi_block -= (prefactor * f2) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2) : s_rad_.R_tr_dia(lambda).dot(Pj2));
                 }
             }
             
@@ -590,72 +590,73 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         if (par_.isMyWork(ill))
             cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
     
-    // multiply "p" by the matrix of the system
-#if !defined(__INTEL_COMPILER) // Intel C++ seems to break 'collapse'
-    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block) collapse(2)
-#else
+    // multiply "p" by the diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-#endif
     for (int ill = 0;  ill < Nang;  ill++)
-    for (int illp = 0; illp < Nang; illp++)
-    if (par_.isMyWork(ill))
     {
-        // row multi-index
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
-        
-        // column multi-index
-        int l1p = l1_l2_[illp].first;
-        int l2p = l1_l2_[illp].second;
-        
-        // product segment contribution
-        cArray q_contrib (Nspline * Nspline);
+        if (cmd_.outofcore)
+        {
+            // read diagonal block from a linked file
+            # pragma omp critical
+            dia_blocks_[ill].hdfload();
+        }
         
         // copy-from segment of "p"
-        cArrayView p_block (p, illp * Nspline * Nspline, Nspline * Nspline);
+        cArrayView p_block (p, ill * Nspline * Nspline, Nspline * Nspline);
         
-        // multiply by hamiltonian terms
-        if (ill == illp)
-        {
-            if (cmd_.outofcore)
-            {
-                // read diagonal block from a linked file
-                # pragma omp critical
-                dia_blocks_[ill].hdfload();
-            }
-            
-            // use the diagonal block for multiplication
-            q_contrib += dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot);
-            
-            if (cmd_.outofcore)
-            {
-                // release the memory
-                dia_blocks_[ill].drop();
-            }
-        }
-        else
-        {
-            // compute the offdiagonal block
-            for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-            {
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // check finiteness
-                if (not std::isfinite(f))
-                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // check non-zero
-                if (f == 0.)
-                    continue;
-                
-                // update block
-                q_contrib -= Complex(f) * s_rad_.R_tr_dia(lambda).dot(p_block, both, cmd_.parallel_dot);
-            }
-        }
+        // use the diagonal block for multiplication
+        cArrayView (q, ill * Nspline * Nspline, Nspline * Nspline) += dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot);
         
-        // safely update shared output array "q"
-        # pragma omp critical
-        cArrayView (q, ill * Nspline * Nspline, Nspline * Nspline) += q_contrib;
+        if (cmd_.outofcore)
+        {
+            // release the memory
+            dia_blocks_[ill].drop();
+        }
+    }
+    
+    // multiply "p" by the off-diagonal blocks
+    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+    for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    {
+        // get relevant positions of this block
+        for (int ill = 0;  ill < Nang;  ill++)
+        for (int illp = 0; illp < Nang; illp++)
+        if (par_.isMyWork(ill))
+        {
+            // skip diagonal
+            if (ill == illp)
+                continue;
+            
+            // row multi-index
+            int l1 = l1_l2_[ill].first;
+            int l2 = l1_l2_[ill].second;
+            
+            // column multi-index
+            int l1p = l1_l2_[illp].first;
+            int l2p = l1_l2_[illp].second;
+            
+            // calculate angular integral
+            double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+            if (not std::isfinite(f))
+                throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+            
+            // check non-zero
+            if (f == 0.)
+                continue;
+            
+            // copy-from segment of "p"
+            cArrayView p_block (p, illp * Nspline * Nspline, Nspline * Nspline);
+            
+            // calculate product
+            cArray product = (
+                cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(p_block, both, cmd_.parallel_dot)
+                               : s_rad_.R_tr_dia(lambda).dot(p_block, both, cmd_.parallel_dot)
+            );
+            
+            // update array
+            # pragma omp critical
+            cArrayView (q, ill * Nspline * Nspline, Nspline * Nspline) += Complex(f) * product;
+        }
     }
     
     // synchronize across processes
