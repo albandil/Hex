@@ -51,7 +51,8 @@ std::string help_text =
     "\t--help           display this help\n"
     "\t--nodistort      compute only plane wave Born approximation\n"
     "\t--nodirect       skip computation of direct T-matrix\n"
-    "\t--noexchange     skip computation of exchange T-matrix\n";
+    "\t--noexchange     skip computation of exchange T-matrix\n"
+    "\t--subtract       generate SQL batch file for Born subtraction\n";
 
 int main (int argc, char *argv[])
 {
@@ -81,7 +82,7 @@ int main (int argc, char *argv[])
     // parse command line
     //
     
-    bool distort = true, direct = true, exchange = true;
+    bool distort = true, direct = true, exchange = true, subtract = false;
     std::vector<const char*> params;
     for (int iarg = 1; iarg < argc; iarg++)
     {
@@ -113,6 +114,11 @@ int main (int argc, char *argv[])
             {
                 std::cout << "Not computing exchange contribution." << std::endl;
                 exchange = false;
+            }
+            else if (param == std::string("subtract"))
+            {
+                std::cout << "Calculating Born subtraction data." << std::endl;
+                subtract = true;
             }
             else
             {
@@ -271,19 +277,52 @@ int main (int argc, char *argv[])
                     // output SQL batch commands for singlet and triplet
                     if (T_singlet != 0.)
                     {
-                        out << format
-                        (
-                            "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
-                            Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
-                        );
+                        if (subtract)
+                        {
+                            out << format
+                            (
+                                "UPDATE \"tmat\" "
+                                "SET Re_TBorn_ell = %e, Im_TBorn_ell = %e "
+                                "WHERE ni = %d AND li = %d AND mi = %d AND "
+                                "      nf = %d AND lf = %d AND mf = %d AND "
+                                "       L = %d AND  S = %d AND Ei = %g AND "
+                                "     ell = %d\n",
+                                T_singlet.real(), T_singlet.imag(), Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf
+                            );
+                        }
+                        else
+                        {
+                            out << format
+                            (
+                                "INSERT OR REPLACE INTO \"tmat\" "
+                                "VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                                Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
+                            );
+                        }
                     }
                     if (T_triplet != 0.)
                     {
-                        out << format
-                        (
-                            "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
-                            Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
-                        );
+                        if (subtract)
+                        {
+                            out << format
+                            (
+                                "UPDATE \"tmat\" "
+                                "SET Re_TBorn_ell = %e, Im_TBorn_ell = %e "
+                                "WHERE ni = %d AND li = %d AND mi = %d AND "
+                                "      nf = %d AND lf = %d AND mf = %d AND "
+                                "       L = %d AND  S = %d AND Ei = %g AND "
+                                "     ell = %d\n",
+                                T_triplet.real(), T_triplet.imag(), Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf
+                            );
+                        }
+                        else
+                        {
+                            out << format
+                            (
+                                "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                                Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
+                            );
+                        }
                     }
                 }
                 
