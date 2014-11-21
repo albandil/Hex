@@ -1257,10 +1257,9 @@ void SepCGPreconditioner::setup ()
     RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
     
     // diagonalize one-electron hamiltonians for all angular momenta
+    # pragma omp parallel for schedule(dynamic,1)
     for (int l = 0; l <= inp_.maxell; l++)
     {
-        std::cout << "\tH(l=" << l << ") " << std::flush;
-        
         // compose the one-electron hamiltonian
         ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
         
@@ -1282,7 +1281,9 @@ void SepCGPreconditioner::setup ()
             Dlmat(i,i) = Dl_[l][i];
             invDlmat(i,i) = 1.0 / Dl_[l][i];
         }
-        std::cout << "factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
+        
+        # pragma omp critical
+        std::cout << "\tH(l=" << l << ") factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
     }
     
     std::cout << std::endl;
