@@ -687,15 +687,17 @@ class Preconditioners
          * in "preconditioners.h" and "preconditioners.cpp").
          */
         typedef std::tuple <
-            ILUCGPreconditioner,        // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
-            NoPreconditioner,           // No preconditioner.
-            CGPreconditioner,           // Solve diagonal blocks by non-preconditioned CG iterations.
-            JacobiCGPreconditioner,     // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+            ILUCGPreconditioner         // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
+            , NoPreconditioner          // No preconditioner.
+            , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
+            , JacobiCGPreconditioner    // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
 #ifndef NO_OPENCL
-            GPUCGPreconditioner,        // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
+            , GPUCGPreconditioner       // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
 #endif
-            SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
-            SepCGPreconditioner         // Solve diagonal blocks by separate electrons preconditioned CG iterations.
+            , SSORCGPreconditioner      // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+#ifndef NO_LAPACK
+            , SepCGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
+#endif
         > AvailableTypes;
         
         /**

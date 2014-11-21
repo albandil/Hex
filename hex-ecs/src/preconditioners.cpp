@@ -1217,6 +1217,7 @@ void SSORCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
     }
 }
 
+#ifndef NO_LAPACK
 const std::string SepCGPreconditioner::name = "sep";
 const std::string SepCGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by separated electrons hamiltonian.";
 
@@ -1311,6 +1312,7 @@ void SepCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // precondition
     z = kron_dot(SCl1, SCl2, kron_dot(Cl1S, Cl2S, r) / diag);
 }
+#endif
 
 const std::string ILUCGPreconditioner::name = "ILU";
 const std::string ILUCGPreconditioner::description = "Block inversion using ILU-preconditioned conjugate gradients. The drop tolerance can be given as the --droptol parameter.";
