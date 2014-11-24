@@ -586,6 +586,12 @@ inline Complex ric_h_plus (int n, double x)
 
 /**
  * @brief Spherical harmonic function.
+ * 
+ * The definition of the spherical harmonics implemented by GSL is used. This means
+ * the standard definition without the Condon-Shortley phase. This means for example
+ * that @f$ Y_{1,-1}(\vartheta,0) = Y_{1,-1}(\vartheta,0) @f$, whereas with the Condon-Shortley
+ * phase the two values would differ by sign. Generaly, this convention cen be retrieved from the
+ * Condon-Shortley convention by multiplying by the factor @f$ (-1)^{\max (0,m)} @f$.
  */
 Complex sphY (int l, int m, double theta, double phi);
 
