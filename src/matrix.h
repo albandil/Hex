@@ -42,7 +42,9 @@
 #include <png++/png.hpp>
 #endif
 
+#ifndef NO_UMFPACK
 #include <umfpack.h>
+#endif
 
 #include "arrays.h"
 #include "complex.h"
