@@ -14,6 +14,13 @@ CFLAGS = -Wall -std=c++11 -fPIC
 LFLAGS = 
 
 # ---------------------------------------------------------------------------- #
+# GiNaC                                                                        #
+# ---------------------------------------------------------------------------- #
+
+GINACFLAGS =
+GINACLIBS = -lcln -lginac
+
+# ---------------------------------------------------------------------------- #
 # SQLite3                                                                      #
 # ---------------------------------------------------------------------------- #
 
@@ -44,23 +51,23 @@ FFTWLIBS = -lfftw3
 ################################################################################
 
 
-CFLAGS += $(SQLITEFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
-LFLAGS += $(SQLITELIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS)
+CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
+LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-# CXXFLAGS = $(CXXDEBUG)
-CXXFLAGS = $(CXXRILIS)
+CXXFLAGS = $(CXXDEBUG)
+# CXXFLAGS = $(CXXRILIS)
 
 SQLITEPP = libs/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,libs/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
-FILES = arrays hex-db special variables vec3d version
+FILES = arrays hex-db born special variables vec3d version
 FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
