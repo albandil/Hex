@@ -80,13 +80,13 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    double E = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    double E = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // angles
     rArray angles;
@@ -95,7 +95,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
         
     } catch (std::exception e) {
         

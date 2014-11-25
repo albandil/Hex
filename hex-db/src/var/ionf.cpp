@@ -95,19 +95,19 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int  L = As<int>(sdata,  "L", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    int l1 = As<int>(sdata, "l1", Id);
-    int l2 = As<int>(sdata, "l2", Id);
-    double Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int  L = Conv<int>(sdata,  "L", Id);
+    int  S = Conv<int>(sdata,  "S", Id);
+    int l1 = Conv<int>(sdata, "l1", Id);
+    int l2 = Conv<int>(sdata, "l2", Id);
+    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // read energy sharing (in user units)
     rArray Eshare;
     try {
-        Eshare.push_back(As<double>(sdata, "Eshare", Id));
+        Eshare.push_back(Conv<double>(sdata, "Eshare", Id));
     } catch (std::exception e) {
         Eshare = readStandardInput<double>();
     }

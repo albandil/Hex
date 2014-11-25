@@ -77,14 +77,14 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
 //     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    int  L = As<int>(sdata, "L", Id);
-    int  S = As<int>(sdata, "S", Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    int  L = Conv<int>(sdata, "L", Id);
+    int  S = Conv<int>(sdata, "S", Id);
     
     // energies and cross sections
     double E, sigma, sigmab;
@@ -94,7 +94,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         

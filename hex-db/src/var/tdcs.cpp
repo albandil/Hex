@@ -78,11 +78,11 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    double Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int  S = Conv<int>(sdata,  "S", Id);
+    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // read directions
     //  dirs.first  = ( theta1, phi1, E1frac )
@@ -90,7 +90,7 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     // NOTE: energy fractions will be normalized to become on-shell
     std::vector<std::pair<geom::vec3d,geom::vec3d>> dirs;
     try {
-        dirs.push_back(As<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
+        dirs.push_back(Conv<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
     } catch (exception e) {
         dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }

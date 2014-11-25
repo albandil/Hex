@@ -89,120 +89,16 @@ void hex_differential_cross_section_
     if (not std::isfinite(ki) or not std::isfinite(kf))
         return;
     
-    int ell;
-    double Ei, sum_Re_T_ell, sum_Im_T_ell, sum_Re_TBorn_ell, sum_Im_TBorn_ell;
-    rArrays E_ell;
-    cArrays T_E_ell, Tb_E_ell;
+    // get scattering amplitudes
+    cArray amplitudes(*N);
+    hex_scattering_amplitude_
+    (
+        ni, li, mi, nf, lf, mf, S, E, N, angles,
+        reinterpret_cast<double*>(amplitudes.data())
+    );
     
-    //
-    // load partial wave contributions
-    //
-    
-    // sum over L
-    sqlitepp::statement st(db);
-    st << "SELECT ell, Ei, SUM(Re_T_ell), SUM(Im_T_ell), SUM(Re_TBorn_ell), SUM(Im_TBorn_ell) "
-          "FROM " + TMatrix::Id + " "
-          "WHERE ni = :ni "
-          "  AND li = :li "
-          "  AND mi = :mi "
-          "  AND nf = :nf "
-          "  AND lf = :lf "
-          "  AND mf = :mf "
-          "  AND  S = :S  "
-          "GROUP BY ell, Ei "
-          "ORDER BY ell ASC, Ei ASC",
-        sqlitepp::into(ell), sqlitepp::into(Ei),
-        sqlitepp::into(sum_Re_T_ell), sqlitepp::into(sum_Im_T_ell),
-        sqlitepp::into(sum_Re_TBorn_ell), sqlitepp::into(sum_Im_TBorn_ell),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
-        sqlitepp::use(*S);
-    
-    // load data using the statement
-    while (st.exec())
-    {
-        while ((int)E_ell.size() <= ell)
-        {
-            E_ell.push_back(rArray());
-            T_E_ell.push_back(cArray());
-            Tb_E_ell.push_back(cArray());
-        }
-        
-        E_ell[ell].push_back(Ei);
-        T_E_ell[ell].push_back(Complex(sum_Re_T_ell,sum_Im_T_ell));
-        Tb_E_ell[ell].push_back(Complex(sum_Re_TBorn_ell,sum_Im_TBorn_ell));
-    }
-    
-    // terminate if no data
-    if (E_ell.empty())
-        return;
-    
-    //
-    // load angle dependent Born T-matrices
-    //
-    
-    std::string cheb;
-    rArray E_arr;
-    std::vector<Chebyshev<double,Complex>> bornT_arr;
-    sqlitepp::statement stb(db);
-    stb << "SELECT Ei, cheb FROM " + BornFullTMatrix::Id + " "
-           "WHERE ni = :ni "
-           "  AND li = :li "
-           "  AND mi = :mi "
-           "  AND nf = :nf "
-           "  AND lf = :lf "
-           "  AND mf = :mf "
-           "ORDER BY Ei ASC",
-        sqlitepp::into(Ei), sqlitepp::into(cheb),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
-    while (stb.exec())
-    {
-        // add new energy
-        E_arr.push_back(Ei);
-        
-        // decode Chebyshev expansion
-        cArray coeffs;
-        coeffs.fromBlob(cheb);
-        bornT_arr.push_back(Chebyshev<double,Complex>(coeffs, -1, 1));
-    }
-    
-    //
-    // compute corrected cross sections
-    //
-    
-    // for all angles
-    for (int i = 0; i < (*N); i++)
-    {
-        rArray e;       // energies
-        cArray f,fb,fB; // amplitudes
-        
-        // for all projectile angular momenta : sum partial wave arrays
-        for (int l = 0; l < (int)E_ell.size(); l++)
-        {
-            Complex Y = special::sphY(l,(*mi)-(*mf),angles[i],0);
-            merge(e, f, E_ell[l], T_E_ell[l] * Y);
-            merge(e, fb, E_ell[l], Tb_E_ell[l] * Y);
-        }
-        
-        // skip empty cases
-        if (e.empty())
-            continue;
-        
-        // also, determine the angle-dependent Born T-matrix
-        cArray fB0;
-        double cosTheta = std::cos(angles[i]);
-        
-        // evaluate Chebyshev expansions for this angle
-        for (unsigned j = 0; j < E_arr.size(); j++)
-            fB0.push_back(bornT_arr[j].clenshaw(cosTheta, bornT_arr[j].tail(1e-8)));
-        
-        // interpolate angle-dependent Born T-matrices to partial wave energies ('e')
-        fB = interpolate(E_arr, fB0, e);
-        
-        // intepolate corrected differential cross section
-        dcs[i] = interpolate(e, sqrabs(fB + f - fb), { *E })[0] * kf * (2 * (*S) + 1) / (std::pow(4 * special::constant::pi, 2) * ki);
-    }
+    // calculate differential cross section
+    rArrayView(*N, dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
 }
 
 bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata) const
@@ -213,14 +109,14 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    int  S = As<int>(sdata, "S", Id);
-    double E = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    int  S = Conv<int>(sdata, "S", Id);
+    double E = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // angles
     rArray angles;
@@ -229,7 +125,7 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
         
     } catch (std::exception e) {
         

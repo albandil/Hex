@@ -75,9 +75,9 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
     
     // energies and cross sections
     double E, sigma, sigmab, sigmaB;
@@ -87,7 +87,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         

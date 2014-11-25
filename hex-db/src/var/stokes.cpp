@@ -78,9 +78,9 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(ni*ni) + 1./(nf*nf));
     
@@ -91,7 +91,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
         
     } catch (std::exception e) {
         

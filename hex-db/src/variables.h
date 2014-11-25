@@ -137,7 +137,7 @@ template<typename T> std::vector<T> readStandardInput ()
  * @param name Identification of the calling authority for use in error
  *             message if the entry is not find.
  */
-template <typename T> T As
+template <typename T> T Conv
 (
     std::map<std::string,std::string> const & dict,
     std::string const & keyword,
