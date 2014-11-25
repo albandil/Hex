@@ -584,34 +584,25 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     int Nang = l1_l2_.size();
+    int Nchunk = Nspline * Nspline;
     
     // clear all output segments that are going to be referenced by this process
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
         if (par_.isMyWork(ill))
-            cArrayView(q, ill * Nspline * Nspline, Nspline * Nspline).fill(0);
+            cArrayView(q, ill * Nchunk, Nchunk).fill(0);
     
     // multiply "p" by the diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
     for (int ill = 0;  ill < Nang;  ill++)
     {
-        if (cmd_.outofcore)
-        {
-            // read diagonal block from a linked file
-            # pragma omp critical
-            dia_blocks_[ill].hdfload();
-        }
-        
         // copy-from segment of "p"
-        cArrayView p_block (p, ill * Nspline * Nspline, Nspline * Nspline);
+        cArrayView p_block (p, ill * Nchunk, Nchunk);
         
         // use the diagonal block for multiplication
-        cArrayView (q, ill * Nspline * Nspline, Nspline * Nspline) += dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot);
-        
-        if (cmd_.outofcore)
-        {
-            // release the memory
-            dia_blocks_[ill].drop();
-        }
+        cArrayView (q, ill * Nchunk, Nchunk) += (
+            cmd_.outofcore ? dia_blocks_[ill].hdfget().dot(p_block, both, cmd_.parallel_dot)
+                           : dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot)
+        );
     }
     
     // multiply "p" by the off-diagonal blocks
@@ -645,7 +636,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 continue;
             
             // copy-from segment of "p"
-            cArrayView p_block (p, illp * Nspline * Nspline, Nspline * Nspline);
+            cArrayView p_block (p, illp * Nchunk, Nchunk);
             
             // calculate product
             cArray product = (
@@ -655,12 +646,12 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // update array
             # pragma omp critical
-            cArrayView (q, ill * Nspline * Nspline, Nspline * Nspline) += Complex(f) * product;
+            cArrayView (q, ill * Nchunk, Nchunk) += Complex(f) * product;
         }
     }
     
     // synchronize across processes
-    par_.sync(q.data(), Nspline * Nspline, l1_l2_.size());
+    par_.sync(q.data(), Nchunk, l1_l2_.size());
 }
 
 void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -1146,20 +1137,10 @@ void JacobiCGPreconditioner::update (double E)
     # pragma omp parallel for
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        if (cmd_.outofcore)
-        {
-            // load DIA block from linked disk file
-            # pragma omp critical
-            dia_blocks_[ill].hdfload();
-        }
-        
-        invd_[ill] = 1. / dia_blocks_[ill].main_diagonal();
-        
-        if (cmd_.outofcore)
-        {
-            // release memory
-            dia_blocks_[ill].drop();
-        }
+        invd_[ill] = (
+            cmd_.outofcore ? 1. / dia_blocks_[ill].hdfget().main_diagonal()
+                           : 1. / dia_blocks_[ill].main_diagonal()
+        );
     }
     
     par_.wait();
