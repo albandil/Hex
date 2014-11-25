@@ -284,9 +284,9 @@ int main (int argc, char *argv[])
                                 "UPDATE \"tmat\" "
                                 "SET Re_TBorn_ell = %e, Im_TBorn_ell = %e "
                                 "WHERE ni = %d AND li = %d AND mi = %d AND "
-                                "      nf = %d AND lf = %d AND mf = %d AND "
-                                "       L = %d AND  S = %d AND Ei = %g AND "
-                                "     ell = %d\n",
+                                      "nf = %d AND lf = %d AND mf = %d AND "
+                                      "L = %d AND  S = %d AND Ei = %g AND "
+                                      "ell = %d\n",
                                 T_singlet.real(), T_singlet.imag(), Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf
                             );
                         }
@@ -309,9 +309,9 @@ int main (int argc, char *argv[])
                                 "UPDATE \"tmat\" "
                                 "SET Re_TBorn_ell = %e, Im_TBorn_ell = %e "
                                 "WHERE ni = %d AND li = %d AND mi = %d AND "
-                                "      nf = %d AND lf = %d AND mf = %d AND "
-                                "       L = %d AND  S = %d AND Ei = %g AND "
-                                "     ell = %d\n",
+                                      "nf = %d AND lf = %d AND mf = %d AND "
+                                      "L = %d AND  S = %d AND Ei = %g AND "
+                                      "ell = %d\n",
                                 T_triplet.real(), T_triplet.imag(), Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf
                             );
                         }

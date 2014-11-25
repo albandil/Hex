@@ -694,6 +694,10 @@ Complex Idir_nFree_allowed
         if (kn_is_small)
             inte.imag(0.);
         
+        // also, the real part may have exploded
+        if (not std::isfinite(inte.real()))
+            inte.real(0.);
+        
         // comment this result
         log << format
         (

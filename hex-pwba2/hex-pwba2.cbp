@@ -33,6 +33,8 @@
 		<Unit filename="src/arrays.cpp" />
 		<Unit filename="src/arrays.h" />
 		<Unit filename="src/arrithm.h" />
+		<Unit filename="src/born.cpp" />
+		<Unit filename="src/born.h" />
 		<Unit filename="src/clenshawcurtis.h" />
 		<Unit filename="src/cmdline.h" />
 		<Unit filename="src/compact.h" />
@@ -46,7 +48,7 @@
 		<Unit filename="src/pwba2-pwx.cpp" />
 		<Unit filename="src/pwba2-spg.cpp" />
 		<Unit filename="src/pwba2.h" />
-    		<Unit filename="src/radial.cpp" />
+		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/special.cpp" />
 		<Unit filename="src/special.h" />
