@@ -27,6 +27,8 @@
 					<Add library="..\win-libraries\libsqlite3.a" />
 					<Add library="..\win-libraries\libgsl.a" />
 					<Add library="..\win-libraries\libfftw3.a" />
+					<Add library="..\win-libraries\libginac.a" />
+					<Add library="..\win-libraries\libcln.a" />
 				</Linker>
 			</Target>
 			<Target title="exe">
@@ -50,6 +52,8 @@
 					<Add library="..\win-libraries\libfftw3.a" />
 					<Add library="..\win-libraries\libgsl.a" />
 					<Add library="..\win-libraries\libsqlite3.a" />
+					<Add library="..\win-libraries\libginac.a" />
+					<Add library="..\win-libraries\libcln.a" />
 					<Add library="lib\libhex-db.a" />
 				</Linker>
 			</Target>
@@ -179,6 +183,12 @@
 		<Unit filename="src/complex.h">
 			<Option target="lib" />
 			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/born.cpp"/>
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/born.h" />
+			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/doc.h">
 			<Option target="lib" />
