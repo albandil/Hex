@@ -755,10 +755,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
          * to the end of the array. If the reserved storage is large enough,
          * no reallocation will take place.
          */
-        template <class InputIterator> void append
-        (
-            InputIterator first, InputIterator last
-        )
+        template <class InputIterator> void append (InputIterator first, InputIterator last)
         {
             if (size() + last - first > (int)Nres_)
             {
@@ -782,6 +779,10 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             // copy new elements
             for (InputIterator it = first; it != last; it++)
                 (*this)[ArrayView<T>::N_++] = *it;
+        }
+        void append (const ArrayView<T> a)
+        {
+            append(a.begin(), a.end());
         }
         
         /// Check that size equals to zero.
