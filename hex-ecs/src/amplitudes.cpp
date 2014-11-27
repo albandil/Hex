@@ -335,7 +335,7 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
         double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : std::atof(HEX_RHO);
         
         // skip impact energies with undefined outgoing momentum
-        if (std::isnan(kf[ie]))
+        if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
             continue;
         
         for (int n = 1; n <= samples; n++)
