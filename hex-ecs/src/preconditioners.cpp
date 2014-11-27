@@ -586,11 +586,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
-    // clear all output segments that are going to be referenced by this process
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-        if (par_.isMyWork(ill))
-            cArrayView(q, ill * Nchunk, Nchunk).fill(0);
-    
     // multiply "p" by the diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
     for (int ill = 0;  ill < Nang;  ill++)
@@ -599,7 +594,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         cArrayView p_block (p, ill * Nchunk, Nchunk);
         
         // use the diagonal block for multiplication
-        cArrayView (q, ill * Nchunk, Nchunk) += (
+        cArrayView (q, ill * Nchunk, Nchunk) = (
             cmd_.outofcore ? dia_blocks_[ill].hdfget().dot(p_block, both, cmd_.parallel_dot)
                            : dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot)
         );
@@ -646,7 +641,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // update array
             # pragma omp critical
-            cArrayView (q, ill * Nchunk, Nchunk) += Complex(f) * product;
+            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * product;
         }
     }
     
