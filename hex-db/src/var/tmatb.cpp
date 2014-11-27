@@ -151,7 +151,10 @@ bool TMatrixB::run (std::map<std::string,std::string> const & sdata) const
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data for this transition." << std::endl;
         return true;
+    }
     
     // interpolate
     cArray T_out = interpolate(E_arr, T_arr, energies * efactor);
@@ -163,14 +166,21 @@ bool TMatrixB::run (std::map<std::string,std::string> const & sdata) const
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     L = " << L << ", S = " << S << ", ℓ = " << ell << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\t Re T\t Im T\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "Re T     ", "Im T     ");
+    table.write("# ---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < energies.size(); i++)
     {
-        std::cout << 
-            energies[i] << "\t" << 
-            T_out[i].real()*lfactor << "\t" <<
-            T_out[i].imag()*lfactor << "\n";
+        table.write
+        (
+            energies[i],
+            T_out[i].real()*lfactor,
+            T_out[i].imag()*lfactor
+        );
     }
     
     return true;

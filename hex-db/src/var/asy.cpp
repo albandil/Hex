@@ -124,10 +124,15 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     E = " << E/efactor << " " << unit_name(Eunits)
-                     << " ordered by angle in " << unit_name(Aunits) << "\n" <<
-        "# θ\t dσ\n";
+                     << " ordered by angle in " << unit_name(Aunits) << "\n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "asymetry ");
+    table.write("# ---------", "---------");
+    
     for (std::size_t i = 0; i < angles.size(); i++)
-        std::cout << angles[i] << "\t" << asy[i] << "\t" << dcs0[i] << "\t" << dcs1[i] << "\n";
+        table.write(angles[i], asy[i]);
     
     return true;
 }

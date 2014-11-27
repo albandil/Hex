@@ -197,14 +197,18 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata) con
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "#\n" <<
-        "# E\tη\n";
+        "#\n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "momtrans.");
+    table.write("# ---------", "---------");
     
     if (energies[0] < 0.)
     {
         // negative energy indicates full output
         for (std::size_t i = 0; i < eta_energies.size(); i++)
-            std::cout << eta_energies[i] / efactor << "\t" << eta[i] * lfactor * lfactor << "\n";
+            table.write(eta_energies[i] / efactor, eta[i] * lfactor * lfactor);
     }
     else
     {
@@ -213,7 +217,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata) con
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << eta[i] * lfactor * lfactor << "\n";
+            table.write(energies[i], eta[i] * lfactor * lfactor);
     }
     
     return true;

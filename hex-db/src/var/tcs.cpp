@@ -101,7 +101,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sum(sigma), sum(sigmaB) FROM " + CompleteCrossSection::Id + " "
+    st << "SELECT Ei, sum(sigma), sum(sigmaB) FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -149,12 +149,19 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
         "# Total cross section in " << unit_name(Lunits) << " for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\t σ\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "sigma    ");
+    table.write("# ---------", "---------");
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data for this transition." << std::endl;
         return true;
+    }
     
     // threshold for ionization
     double Eion = 1./(ni*ni);
@@ -169,7 +176,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
         
         // output corrected cross section
         for (std::size_t i = 0; i < E_arr.size(); i++)
-            std::cout << E_arr[i] / efactor << "\t" << (sigmaBorn[i] + (sigma_arr[i] - sigmab_arr[i])) * lfactor * lfactor << "\n";
+            table.write(E_arr[i] / efactor, (sigmaBorn[i] + (sigma_arr[i] - sigmab_arr[i])) * lfactor * lfactor);
     }
     else
     {
@@ -189,7 +196,7 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << (std::isfinite(cs[i]) ? cs[i] * lfactor * lfactor : 0.) << "\n";
+            table.write(energies[i], (std::isfinite(cs[i]) ? cs[i] * lfactor * lfactor : 0.));
     }
     
     return true;

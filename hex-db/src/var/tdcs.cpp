@@ -209,8 +209,13 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     S = " << S << ", Ei = " << Ei / efactor << " " << unit_name(Eunits) << "\n" <<
         "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
-        "# \n" <<
-        "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tdσ/dΩ₁dΩ₂dE₂\tθ\tφ\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(45, 45, 15, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# first electron directions", "second electron directions", "TDCS     ", "theta    ", "phi      ");
+    table.write("# -------------------------", "--------------------------", "---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < dirs.size(); i++)
     {
         // projectile direction
@@ -237,12 +242,14 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
         double theta = std::acos (geom::vec3d::dot(e2,ez));
         double phi   = std::atan2(geom::vec3d::dot(e2,ey),geom::vec3d::dot(e2,ex));
         
-        std::cout << 
-            dirs[i].first << "\t" << 
-            dirs[i].second << "\t" << 
-            tdcs[i]*lfactor*lfactor << "\t" <<
-            theta/afactor << "\t" <<
-            phi/afactor << "\n";
+        table.write
+        (
+            dirs[i].first,
+            dirs[i].second,
+            tdcs[i]*lfactor*lfactor,
+            theta/afactor,
+            phi/afactor
+        );
     }
     
     return true;

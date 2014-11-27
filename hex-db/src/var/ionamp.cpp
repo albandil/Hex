@@ -155,7 +155,10 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data for this transition." << std::endl;
         return true;
+    }
     
     // for all directions and energy shares evaluate the amplitude
     cArray ampls(dirs.size());
@@ -219,15 +222,22 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
-        "# \n" <<
-        "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tRe F\tIm F\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(45, 45, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# first electron directions", "second electron directions", "Re F     ", "Im F     ");
+    table.write("# -------------------------", "--------------------------", "---------", "---------");
+    
     for (std::size_t i = 0; i < dirs.size(); i++)
     {
-        std::cout << 
-            dirs[i].first << "\t" << 
-            dirs[i].second<< "\t" << 
-            ampls[i].real()*lfactor << "\t" <<
-            ampls[i].imag()*lfactor << "\n";
+        table.write
+        (
+            dirs[i].first,
+            dirs[i].second,
+            ampls[i].real()*lfactor,
+            ampls[i].imag()*lfactor
+        );
     }
     
     return true;

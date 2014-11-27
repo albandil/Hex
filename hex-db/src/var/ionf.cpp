@@ -188,14 +188,21 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
         "# and impact energy\n" <<
         "#     Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by energy share " << 
-        "# \n" <<
-        "# Eshare\t Re f\t Im f\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# Eshare   ", "Re f     ", "Im f     ");
+    table.write("# ---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < Eshare.size(); i++)
     {
-        std::cout << 
-            Eshare[i] << "\t" << 
-            f_out[i].real()*lfactor << "\t" <<
-            f_out[i].imag()*lfactor << "\n";
+        table.write
+        (
+            Eshare[i],
+            f_out[i].real()*lfactor,
+            f_out[i].imag()*lfactor
+        );
     }
     
     return true;

@@ -47,7 +47,6 @@ const std::vector<std::pair<std::string,std::string>> TMatrix::Dependencies = {
     {"nf", "Final atomic principal quantum number."},
     {"lf", "Final atomic orbital quantum number."},
     {"mf", "Final atomic magnetic quantum number."},
-    {"L", "Total orbital momentum of atomic + projectile electron."},
     {"S", "Total spin of atomic + projectile electron."},
     {"Ei", "Projectile impact energy (Rydberg)."},
     {"ell", "Outgoing projectile partial wave angular momentum."}
@@ -102,7 +101,6 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     int nf = Conv<int>(sdata, "nf", Id);
     int lf = Conv<int>(sdata, "lf", Id);
     int mf = Conv<int>(sdata, "mf", Id);
-    int  L = Conv<int>(sdata,  "L", Id);
     int  S = Conv<int>(sdata,  "S", Id);
     int ell= Conv<int>(sdata, "ell",Id);
     
@@ -126,23 +124,23 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     
     // create query statement
     sqlitepp::statement st(db);
-    st << "SELECT Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell, FROM " + TMatrix::Id + " "
+    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell), SUM(Re_TBorn_ell), SUM(Im_TBorn_ell) FROM " + TMatrix::Id + " "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
           "  AND nf = :nf "
           "  AND lf = :lf "
           "  AND mf = :mf "
-          "  AND  L = :L  "
           "  AND  S = :S  "
           "  AND ell=:ell "
+          "GROUP BY L, Ei "
           "ORDER BY Ei ASC",
        sqlitepp::into(E),
        sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
        sqlitepp::into(Re_TBorn_ell), sqlitepp::into(Im_TBorn_ell),
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-       sqlitepp::use(L), sqlitepp::use(S), sqlitepp::use(ell);
+       sqlitepp::use(S), sqlitepp::use(ell);
     
     // get T-matrices
     rArray E_arr;
@@ -156,28 +154,48 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data fot this selection." << std::endl;
         return true;
+    }
     
-    // interpolate
-    cArray T_out = interpolate(E_arr, T_arr, energies * efactor);
-    cArray Tb_out = interpolate(E_arr, Tb_arr, energies * efactor);
+    // get T-matrices
+    cArray T_out, Tb_out;
+    if (energies.size() > 0 and energies[0] < 0)
+    {
+        // use all
+        energies = E_arr;
+        T_out = T_arr;
+        Tb_out = Tb_arr;
+    }
+    else
+    {
+        // interpolate
+        T_out = interpolate(E_arr, T_arr, energies * efactor);
+        Tb_out = interpolate(E_arr, Tb_arr, energies * efactor);
+    }
     
     // write out
     std::cout << logo("#") <<
         "# T-matrices in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-        "#     L = " << L << ", S = " << S << ", ℓ = " << ell << "\n" <<
+        "#     S = " << S << ", ℓ = " << ell << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\tRe T\tIm T\tRe TBorn\tIm TBorn\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "Re T     ", "Im T     ", "Re TBorn ", "Im TBorn ");
+    table.write("# ---------", "---------", "---------", "---------", "---------");
     for (std::size_t i = 0; i < energies.size(); i++)
     {
-        std::cout << energies[i] << "\t" << 
-            T_out[i].real()*lfactor << "\t" <<
-            T_out[i].imag()*lfactor << "\t" <<
-            Tb_out[i].real()*lfactor << "\t" <<
-            Tb_out[i].imag()*lfactor << std::endl;
+        table.write
+        (
+            energies[i],
+            T_out[i].real()*lfactor,  T_out[i].imag()*lfactor,
+            Tb_out[i].real()*lfactor, Tb_out[i].imag()*lfactor
+        );
     }
     
     return true;

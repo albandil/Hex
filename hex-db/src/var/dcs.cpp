@@ -143,10 +143,14 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     S = " << S << ", E = " << E/efactor << " " << unit_name(Eunits)
-                     << " ordered by angle in " << unit_name(Aunits) << "\n" <<
-        "# θ\t dσ\n";
+                     << " ordered by angle in " << unit_name(Aunits) << "\n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "dcs      ");
+    table.write("# ---------", "---------");
     for (std::size_t i = 0; i < angles.size(); i++)
-        std::cout << angles[i] << "\t" << dcs[i]*lfactor*lfactor << "\n";
+        table.write(angles[i], dcs[i]*lfactor*lfactor);
     
     return true;
 }

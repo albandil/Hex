@@ -268,8 +268,12 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "#\n" <<
-        "# E\tσ\tσBorn\n";
+        "#\n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "sigma    ", "sigmaBorn");
+    table.write("# ---------", "---------", "---------");
     
     // terminate if no data
     if (E_arr.empty())
@@ -279,7 +283,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     {
         // negative energy indicates full output
         for (std::size_t i = 0; i < E_arr.size(); i++)
-            std::cout << E_arr[i] / efactor << "\t" << sigma_arr[i] * lfactor * lfactor << "\n";
+            table.write(E_arr[i] / efactor, sigma_arr[i] * lfactor * lfactor);
     }
     else
     {
@@ -296,7 +300,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << std::endl;
+            table.write(energies[i], ics[i] * lfactor * lfactor, icsB[i] * lfactor * lfactor);
     }
     
     return true;

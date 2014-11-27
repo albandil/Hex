@@ -178,14 +178,20 @@ bool BornFullTMatrix::run (std::map<std::string,std::string> const & sdata) cons
         "# and impact energy\n" <<
         "#     Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by angle in " << unit_name(Aunits) <<
-        "# \n" <<
-        "# angle\t Re TB\t Im TB\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "Re TBorn ", "Im TBorn ");
+    table.write("# ---------", "---------", "---------");
     for (std::size_t i = 0; i < angles.size(); i++)
     {
-        std::cout << 
-            angles[i] << "\t" << 
-            T_out[i].real()*lfactor << "\t" <<
-            T_out[i].imag()*lfactor << "\n";
+        table.write
+        (
+            angles[i],
+            T_out[i].real()*lfactor,
+            T_out[i].imag()*lfactor
+        );
     }
     
     return true;

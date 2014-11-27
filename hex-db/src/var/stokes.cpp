@@ -159,21 +159,22 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
         "#     nf = " << nf << ", lf = " << 1 << ",\n"
         "#     E = " << Ei/efactor << " " << unit_name(Eunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
-        "# \n"
-        "# θ\t λ\t R\t I\t P₁\t P₂\t P₃\t Pl\t γ\t P⁺\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "lambda   ", "R        ", "I        ", "P1       ", "P2       ", "P3       ", "Pl       ", "gamma    ", "P+       ");
+    table.write("# ---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < angles.size(); i++)
     {
-        std::cout << 
-            angles[i] << "\t" << 
-            lambda[i] << "\t" <<
-            R[i] << "\t" <<
-            I[i] << "\t" <<
-            P1[i] << "\t" <<
-            P2[i] << "\t" <<
-            P3[i] << "\t" <<
-            Pl[i] << "\t" <<
-            gamma[i] / afactor << "\t" <<
-            Pplus[i] << "\n";
+        table.write
+        (
+            angles[i],
+            lambda[i], R[i], I[i],
+            P1[i], P2[i], P3[i],
+            Pl[i], gamma[i] / afactor, Pplus[i]
+        );
     }
     
     return true;

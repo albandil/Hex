@@ -134,8 +134,12 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\tΩ\tΩBorn\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "omega    ", "omegaB   ");
+    table.write("# ---------", "---------", "---------");
     
     // terminate if no data
     if (E_arr.size() == 0)
@@ -156,7 +160,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
             double OmegaB = E_arr[i] * (2*li+1) * sigmab_arr[i] / cs_prefactor;
             
             // print collisions strengths
-            std::cout << E_arr[i] / efactor << "\t" << Omega << "\t" << OmegaB << "\n";
+            table.write(E_arr[i] / efactor, Omega, OmegaB);
         }
     }
     else
@@ -183,7 +187,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << omegas[i] << "\t" << omegasB[i] << "\n";
+            table.write(energies[i], omegas[i], omegasB[i]);
     }
     
     return true;

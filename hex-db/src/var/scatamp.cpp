@@ -203,7 +203,7 @@ void hex_scattering_amplitude_
     // get lowest and highest partial wave
     int min_ell, max_ell;
     sqlitepp::statement st(db);
-    st << "SELECT MIN(ell), MAX(ell) FROM " + TMatrix::Id + " "
+    st << "SELECT MIN(ell), MAX(L)-lf FROM " + TMatrix::Id + " "
            "WHERE ni = :ni "
            "  AND li = :li "
            "  AND mi = :mi "
@@ -233,8 +233,8 @@ void hex_scattering_amplitude_
             // prepare selection statement
             sqlitepp::statement st1(db);
             // WARNING Sign convention changed.
-            st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::Id + " "
-//             st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + TMatrix::Id + " "
+//             st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::Id + " "
+            st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + TMatrix::Id + " "
                 "WHERE ni = :ni "
                 "  AND li = :li "
                 "  AND mi = :mi "
@@ -290,12 +290,12 @@ void hex_scattering_amplitude_
                     // extrapolate T_ell for elastic scattering [~ L⁻³]
                     tmatrices.push_back(tmatrices.back() * gsl_sf_pow_int((ell-1.)/ell,3));
                 }
-                else if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
+                else /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
                 {
                     // dipole transitions are special, they will need to be Born-subtracted
                     break;
                 }
-                else
+                else*/
                 {
                     // extrapolate T_ell for inelastic scattering [use geometric series]
                     double extra_re = tmatrices.back(0).real() * tmatrices.back(0).real() / tmatrices.back(1).real();
@@ -324,8 +324,8 @@ void hex_scattering_amplitude_
     }
     
     // finally, Born-subtract dipole transition
-    if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
-        results += -FirstBornFullTMatrix(*ni, *li, *mi, *nf, *lf, *mf, *E, rArrayView(*N,angles)) / special::constant::two_pi;
+    /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
+        results += -FirstBornFullTMatrix(*ni, *li, *mi, *nf, *lf, *mf, *E, rArrayView(*N,angles)) / special::constant::two_pi;*/
 }
 
 bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) const
@@ -394,19 +394,25 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n"
         "#     S = " << S << ", E = " << E/efactor << unit_name(Eunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
-        "# \n"
-        "# θ\t Re f\t Im f\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "Re f     ", "Im f     ", "Re f [DB]", "Im f [DB]", "Re f [1B]", "Im f [1B]");
+    table.write("# ---------", "---------", "---------", "---------", "---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < angles.size(); i++)
     {
-        std::cout << 
-            angles[i] << "\t" << 
-            amplitudes[i].real() * lfactor << "\t" <<
-            amplitudes[i].imag() * lfactor << "\t" <<
-            amplitudesBorn[i].real() * lfactor << "\t" <<
-            amplitudesBorn[i].imag() * lfactor << "\t" <<
-            bampl[i].real() * lfactor << "\t" <<
-            bampl[i].imag() * lfactor << "\t" <<
-            std::endl;
+        table.write
+        (
+            angles[i],
+            amplitudes[i].real() * lfactor,
+            amplitudes[i].imag() * lfactor,
+            amplitudesBorn[i].real() * lfactor,
+            amplitudesBorn[i].imag() * lfactor,
+            bampl[i].real() * lfactor,
+            bampl[i].imag() * lfactor
+        );
     }
     
     return true;

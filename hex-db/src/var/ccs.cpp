@@ -163,7 +163,7 @@ void hex_complete_cross_section_
         st.exec();
         
         // if a reallocation is needed, return
-        if (*N != *n)
+        if (*N != *n or ccs == nullptr)
             return;
     }
     
@@ -297,7 +297,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     // complete cross section array
     rArray ccs(energies.size());
     
-    // resize arrays if all energies are requester
+    // resize arrays if all energies are requested
     if (energies[0] < 0)
     {
         int N;
@@ -306,12 +306,15 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N);
         
         // resize
-        scaled_energies.resize(N); scaled_energies[0] = -1;
+        scaled_energies.resize(N);
         ccs.resize(N);
+        if (N > 0)
+            scaled_energies[0] = -1;
     }
     
     // retrieve requested energies
-    hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
+    if (scaled_energies.size() > 0)
+        hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
     
     // write header
     std::cout << logo("#") <<
@@ -319,12 +322,19 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\t σ\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "sigma    ");
+    table.write("# ---------", "---------");
+    
+    if (scaled_energies.size() == 0)
+        std::cout << "#\n# The database contains no relevant data." << std::endl;
     
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
-        std::cout << scaled_energies[i]/efactor << "\t" << (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << std::endl;
+        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.));
     
     return true;
 }
