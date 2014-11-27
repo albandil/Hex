@@ -451,16 +451,18 @@ void InputFile::read (std::ifstream & inf)
     // construct energy sequence
     for (unsigned i = 0; i < Ei_begin.size(); i++)
     {
-        Ei = concatenate
-        (
-            Ei,
-            linspace
+        if (Ei_samples[i] > 0)
+        {
+            Ei.append
             (
-                Ei_begin[i],
-                Ei_end[i],
-                Ei_samples[i]
-            )
-        );
+                linspace
+                (
+                    Ei_begin[i],
+                    Ei_end[i],
+                    Ei_samples[i]
+                )
+            );
+        }
     }
     
     // print info
