@@ -173,28 +173,23 @@ Complex RadialIntegrals::computeR
     Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
-    for (int ix = 0; ix < Nreknot - 1; ix++)
+    
+    // ix < iy
+    for (int ix = a; ix <= a + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(b,ix+1); iy <= b + order and iy < Nreknot - 1; iy++)
     {
-        for (int iy = ix + 1; iy < (int)Nreknot - 1; iy++)
-        {
-            // ix < iy
-            if (a <= ix and ix <= a + order and
-                b <= iy and iy <= b + order)
-            {
-                Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
-                if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp(lg);
-            }
-            
-            // ix > iy (by renaming the ix,iy indices)
-            if (b <= ix and ix <= b + order and
-                a <= iy and iy <= a + order)
-            {
-                Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
-                if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp(lg);
-            }
-        }
+        Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
+        if (std::isfinite(lg.imag()))
+            Rtr_Labcd_offdiag += std::exp(lg);
+    }
+    
+    // ix > iy (by renaming the ix,iy indices)
+    for (int ix = b; ix <= b + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(a,ix+11); iy <= a + order and iy < Nreknot - 1; iy++)
+    {
+        Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
+        if (std::isfinite(lg.imag()))
+            Rtr_Labcd_offdiag += std::exp(lg);
     }
     
     // sum the diagonal and offdiagonal contributions
