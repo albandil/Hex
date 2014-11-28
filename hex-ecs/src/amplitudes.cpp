@@ -279,7 +279,8 @@ void Amplitudes::writeICS_files ()
             Hydrogen::stateName(T.ni,T.li,T.mi).c_str(),
             Hydrogen::stateName(T.nf,T.lf,T.mf).c_str()
         );
-        fS0 << std::setw(15) << header; fS1 << std::setw(15) << header;
+        fS0 << std::setw(15) << header;
+        fS1 << std::setw(15) << header;
     }
     fS0 << std::endl << std::setw(15) << "----------";
     fS1 << std::endl << std::setw(15) << "----------";
@@ -294,7 +295,8 @@ void Amplitudes::writeICS_files ()
     // print data (cross sections)
     for (unsigned ie = 0; ie < inp_.Ei.size(); ie++)
     {
-        fS0 << std::setw(15) << inp_.Ei[ie]; fS1 << inp_.Ei[ie];
+        fS0 << std::setw(15) << inp_.Ei[ie];
+        fS1 << std::setw(15) << inp_.Ei[ie];
         
         for (auto data : sigma_S)
         {
@@ -305,11 +307,13 @@ void Amplitudes::writeICS_files ()
             fS0 << std::setw(15) << (std::isfinite(sigma_S0[ie]) ? sigma_S0[ie] : 0.);
             fS1 << std::setw(15) << (std::isfinite(sigma_S1[ie]) ? sigma_S1[ie] : 0.);
         }
-        fS0 << std::endl; fS1 << std::endl;
+        fS0 << std::endl;
+        fS1 << std::endl;
     }
         
     // finish writing
-    fS0.close(); fS1.close();
+    fS0.close();
+    fS1.close();
 }
 
 std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
