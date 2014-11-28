@@ -465,16 +465,26 @@ class SSORCGPreconditioner : public CGPreconditioner
 };
 
 /**
+ * @brief KPA-preconditioned CG-preconditioner.
  * 
+ * This nested preconditioner simplifies the Hamiltonian matrix by omitting electron-electron
+ * interaction. The block of the matrix can then be written as a sum of simple Kronecker products
+ * @f[
+ *     \mathsf{A} = E\mathsf{S}\otimes\mathsf{S}
+ *      - \mathsf{H}_1\otimes\mathsf{S}
+ *      - \mathsf{S}\otimes\mathsf{H}_2 \,,
+ * @f]
+ * which can be easily diagonalized (only diagonalization of the small matrices are needed)
+ * and so also inverted, which we need for solution of the equations.
  */
-class SepCGPreconditioner : public CGPreconditioner
+class KPACGPreconditioner : public CGPreconditioner
 {
     public:
         
         static const std::string name;
         static const std::string description;
         
-        SepCGPreconditioner
+        KPACGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
@@ -696,7 +706,7 @@ class Preconditioners
 #endif
             , SSORCGPreconditioner      // Solve diagonal blocks by SSOR-preconditioned CG iterations.
 #ifndef NO_LAPACK
-            , SepCGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
+            , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
 #endif
         > AvailableTypes;
         
