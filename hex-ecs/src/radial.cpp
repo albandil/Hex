@@ -425,6 +425,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (R_tr_dia_[lambda].hdfload())
         {
             std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
+            if (cmd.outofcore)
+                R_tr_dia_[lambda].drop();
             continue; // no need to compute
         }
         
