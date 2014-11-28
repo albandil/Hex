@@ -157,7 +157,12 @@ void Amplitudes::writeSQL_files ()
         
     // write header
     fsql << logo("--");
-    fsql << "-- File generated on " << current_time() << "--" << std::endl;
+    fsql << "-- File generated on " << current_time();
+    fsql << "--" << std::endl;
+    fsql << "-- Partial T-matrices for use in the database interface program \"hex-db\"." << std::endl;
+    fsql << "-- Use for example:" << std::endl;
+    fsql << "--    > hex-db --new --database hex.db --import " << ossfile.str().c_str() << " --update" << std::endl;
+    fsql << "--" << std::endl;
     fsql << "BEGIN TRANSACTION;" << std::endl;
         
     // for all discrete transitions data
@@ -249,8 +254,19 @@ void Amplitudes::writeICS_files ()
     std::ofstream fS0 (format("ics-n%d-L%d-S0-Pi%d.dat", inp_.ni, inp_.L, inp_.Pi));
     std::ofstream fS1 (format("ics-n%d-L%d-S1-Pi%d.dat", inp_.ni, inp_.L, inp_.Pi));
     
-    // print table header
-    fS0 << "#E[Ry]\t"; fS1 << "#E[Ry]\t"; 
+    // write singlet file header
+    fS0 << logo("#");
+    fS0 << "# File generated on " << current_time() << "#" << std::endl;
+    fS0 << "# Singlet partial cross sections." << std::endl  << "#" << std::endl;
+    
+    // write triplet file header
+    fS1 << logo("#");
+    fS1 << "# File generated on " << current_time() << "#" << std::endl;
+    fS1 << "# Triplet partial cross sections." << std::endl << "#" << std::endl;
+    
+    // print column headers
+    fS0 << std::left << std::setw(15) << "# E[Ry]";
+    fS1 << std::left << std::setw(15) << "# E[Ry]";
     for (auto data : sigma_S)
     {
         // get transition
@@ -259,18 +275,26 @@ void Amplitudes::writeICS_files ()
         // write transition
         std::string header = format
         (
-            "%s-%s\t",
+            "%s-%s",
             Hydrogen::stateName(T.ni,T.li,T.mi).c_str(),
             Hydrogen::stateName(T.nf,T.lf,T.mf).c_str()
         );
-        fS0 << header; fS1 << header;
+        fS0 << std::setw(15) << header; fS1 << std::setw(15) << header;
     }
-    fS0 << std::endl; fS1 << std::endl;
+    fS0 << std::endl << std::setw(15) << "----------";
+    fS1 << std::endl << std::setw(15) << "----------";
+    for (auto data : sigma_S)
+    {
+        fS0 << std::setw(15) << "----------";
+        fS1 << std::setw(15) << "----------";
+    }
+    fS0 << std::endl;
+    fS1 << std::endl;
     
     // print data (cross sections)
     for (unsigned ie = 0; ie < inp_.Ei.size(); ie++)
     {
-        fS0 << inp_.Ei[ie] << '\t'; fS1 << inp_.Ei[ie] << '\t';
+        fS0 << std::setw(15) << inp_.Ei[ie]; fS1 << inp_.Ei[ie];
         
         for (auto data : sigma_S)
         {
@@ -278,8 +302,8 @@ void Amplitudes::writeICS_files ()
             rArray const & sigma_S0 = data.second.first;
             rArray const & sigma_S1 = data.second.second;
             
-            fS0 << (std::isfinite(sigma_S0[ie]) ? sigma_S0[ie] : 0.) << '\t';
-            fS1 << (std::isfinite(sigma_S1[ie]) ? sigma_S1[ie] : 0.) << '\t';
+            fS0 << std::setw(15) << (std::isfinite(sigma_S0[ie]) ? sigma_S0[ie] : 0.);
+            fS1 << std::setw(15) << (std::isfinite(sigma_S1[ie]) ? sigma_S1[ie] : 0.);
         }
         fS0 << std::endl; fS1 << std::endl;
     }
