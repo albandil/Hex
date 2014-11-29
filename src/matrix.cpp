@@ -724,9 +724,9 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
     );
     if (status != 0)
     {
-        std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
+        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << "\n";
         umfpack_zl_report_status(0, status);
-        abort();
+        std::exit(EXIT_FAILURE);
     }
     
     // do some factorizations
@@ -740,7 +740,7 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
     {
         std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
         umfpack_zl_report_status(0, status);
-        abort();
+        std::exit(EXIT_FAILURE);
     }
     
     // release unused data

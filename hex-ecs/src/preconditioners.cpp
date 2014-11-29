@@ -388,20 +388,6 @@ void NoPreconditioner::setup ()
     s_rad_.setupOneElectronIntegrals();
     s_rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
     
-    std::cout << "Creating Kronecker products... ";
-    
-    // Kronecker products
-    S_kron_S_   = s_rad_.S().kron(s_rad_.S());
-    S_kron_Mm1_tr_ = s_rad_.S().kron(s_rad_.Mm1_tr());
-    S_kron_Mm2_ = s_rad_.S().kron(s_rad_.Mm2());
-    Mm1_tr_kron_S_ = s_rad_.Mm1_tr().kron(s_rad_.S());
-    Mm2_kron_S_ = s_rad_.Mm2().kron(s_rad_.S());
-    half_D_minus_Mm1_tr_ = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
-    half_D_minus_Mm1_tr_kron_S_ = half_D_minus_Mm1_tr_.kron(s_rad_.S());
-    S_kron_half_D_minus_Mm1_tr_ = s_rad_.S().kron(half_D_minus_Mm1_tr_);
-    
-    std::cout << "ok" << std::endl << std::endl;
-    
     // resize arrays
     dia_blocks_.resize(l1_l2_.size());
 }
@@ -410,6 +396,14 @@ void NoPreconditioner::update (double E)
 {
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     E_ = E;
+    
+    // necessary Kronecker products
+    SymDiaMatrix S_kron_S   = s_rad_.S().kron(s_rad_.S());
+    SymDiaMatrix S_kron_Mm2 = s_rad_.S().kron(s_rad_.Mm2());
+    SymDiaMatrix Mm2_kron_S = s_rad_.Mm2().kron(s_rad_.S());
+    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
+    SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(s_rad_.S());
+    SymDiaMatrix S_kron_half_D_minus_Mm1_tr = s_rad_.S().kron(half_D_minus_Mm1_tr);
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
@@ -420,10 +414,10 @@ void NoPreconditioner::update (double E)
         
         // one-electron parts
         SymDiaMatrix Hdiag =
-            half_D_minus_Mm1_tr_kron_S_
-            + (0.5*l1*(l1+1)) * Mm2_kron_S_
-            + S_kron_half_D_minus_Mm1_tr_
-            + (0.5*l2*(l2+1)) * S_kron_Mm2_;
+            half_D_minus_Mm1_tr_kron_S
+            + (0.5*l1*(l1+1)) * Mm2_kron_S
+            + S_kron_half_D_minus_Mm1_tr
+            + (0.5*l2*(l2+1)) * S_kron_Mm2;
         
         // two-electron part
         for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -443,7 +437,7 @@ void NoPreconditioner::update (double E)
         }
         
         // finalize the matrix
-        dia_blocks_[ill] = E * S_kron_S_ - Hdiag;
+        dia_blocks_[ill] = E * S_kron_S - Hdiag;
         
         // if out-of-core is enabled, dump the matrix to disk
         if (cmd_.outofcore)
@@ -472,6 +466,10 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
+    
+    // necessary Kronecker products
+    SymDiaMatrix S_kron_Mm1_tr = s_rad_.S().kron(s_rad_.Mm1_tr());
+    SymDiaMatrix Mm1_tr_kron_S = s_rad_.Mm1_tr().kron(s_rad_.S());
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps = s_rad_.overlapj
@@ -564,16 +562,16 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             if (li == l1 and l == l2)
             {
                 // direct contribution
-                chi_block -= prefactor * S_kron_Mm1_tr_.dot(Pj1);
+                chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1);
             }
             
             if (li == l2 and l == l1)
             {
                 // exchange contribution with the correct sign
                 if (Sign > 0)
-                    chi_block -= prefactor * Mm1_tr_kron_S_.dot(Pj2);
+                    chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2);
                 else
-                    chi_block += prefactor * Mm1_tr_kron_S_.dot(Pj2);
+                    chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2);
             }
         }
     }
@@ -859,13 +857,16 @@ void GPUCGPreconditioner::setup ()
     RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
     RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
     
+    // necessary Kronecker product
+    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
+    
     // diagonalize one-electron hamiltonians for all angular momenta
     for (int l = 0; l <= maxell; l++)
     {
         std::cout << "\tH(l=" << l << ") " << std::flush;
         
         // compose the one-electron hamiltonian
-        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
+        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
         
         // symmetrically transform by inverse square root of the overlap matrix
         RowMatrix<Complex> tHl = invsqrtS * Hl * ColMatrix<Complex>(invsqrtS);
@@ -1233,12 +1234,15 @@ void KPACGPreconditioner::setup ()
     RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
     RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
     
+    // necessary Kronecker product
+    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
+    
     // diagonalize one-electron hamiltonians for all angular momenta
     # pragma omp parallel for schedule(dynamic,1)
     for (int l = 0; l <= inp_.maxell; l++)
     {
         // compose the one-electron hamiltonian
-        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr_ + (0.5*l*(l+1)) * rad().Mm2()).torow() );
+        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
         
         // symmetrically transform by inverse square root of the overlap matrix
         RowMatrix<Complex> tHl = invsqrtS * Hl * ColMatrix<Complex>(invsqrtS);

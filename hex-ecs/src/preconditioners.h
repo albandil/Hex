@@ -265,11 +265,6 @@ class NoPreconditioner : public PreconditionerBase
             
         // radial integrals for the solution
         RadialIntegrals s_rad_;
-            
-        // Kronecker products
-        SymDiaMatrix S_kron_S_, S_kron_Mm1_tr_, S_kron_Mm2_, Mm1_tr_kron_S_,
-            Mm2_kron_S_, half_D_minus_Mm1_tr_, half_D_minus_Mm1_tr_kron_S_,
-            S_kron_half_D_minus_Mm1_tr_;
 };
 
 /**
