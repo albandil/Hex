@@ -25,15 +25,15 @@ Here is the list of the libraries with versions that were used:
             Optional, can be eluded by -DNO_MPI.
             Used for distributed parallellization (hex-ecs --mpi).
 
- * HDF 1.8.11
+ * HDF 1.8.13
             Needed, obtainable from 
                 http://www.hdfgroup.org/HDF5/release/obtain5.html
             Used for intermediate output of results.
             The C++ version of the library is used. If custom-compiling, use
                 ./configure --enable-cxx
 
- * UMFPACK 5.6.1
-            Needed, obtainable as a part of SuiteSparse from 
+ * UMFPACK 5.6.2
+            Needed, obtainable as a part of SuiteSparse 4.3.1 from 
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 

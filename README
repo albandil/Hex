@@ -12,6 +12,7 @@ Third-party libraries:
     CLN 1.3.4
     FFTW 3.3.4
     GiNaC 1.6.2
+    HDF5 1.8.13
     
 Optional dependencies:
     png++ 0.2.5             (included in libs/, works e.g. with libpng 1.6.6)
