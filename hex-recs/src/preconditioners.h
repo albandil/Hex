@@ -316,75 +316,6 @@ class CGPreconditioner : public NoPreconditioner
 };
 
 /**
- * @brief CG iteration-based preconditioner (GPU variant).
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-#ifndef NO_OPENCL
-class GPUCGPreconditioner : public NoPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        GPUCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
-        virtual void setup ();
-        virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (const cArrayView r, cArrayView z) const;
-        
-    private:
-        
-        // diagonal blocks
-        mutable std::vector<cArray> block_;
-        
-        // OpenCL environment
-        cl_platform_id platform_;
-        cl_device_id device_;
-        cl_context context_;
-        cl_command_queue queue_;
-        cl_program program_;
-        
-        // size of a workgroup
-        std::size_t Nlocal_;
-        
-        // computational kernels
-        cl_kernel mmul_;
-        cl_kernel amul_;
-        cl_kernel axby_;
-        cl_kernel vnrm_;
-        cl_kernel norm_;
-        cl_kernel spro_;
-        cl_kernel krd1_, krd2_, krdv_;
-        
-        // auxiliary matrices
-        std::vector<CLArray<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
-        
-        // diagonal parts of one-electron hamiltonians
-        std::vector<CLArray<Complex>> Dl_;
-        
-        // current preconditioner energy
-        Complex E_;
-};
-#endif
-
-/**
  * @brief Jacobi-preconditioned CG-based preconditioner.
  * 
  * Enhances CGPreconditioner conjugate gradients solver by Jacobi (diagonal) preconditioning.
@@ -597,9 +528,6 @@ class Preconditioners
             NoPreconditioner,           // No preconditioner.
             CGPreconditioner,           // Solve diagonal blocks by non-preconditioned CG iterations.
             JacobiCGPreconditioner,     // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
-#ifndef NO_OPENCL
-            GPUCGPreconditioner,        // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
-#endif
             SSORCGPreconditioner,       // Solve diagonal blocks by SSOR-preconditioned CG iterations.
             SepCGPreconditioner         // Solve diagonal blocks by separate electrons preconditioned CG iterations.
         > AvailableTypes;
