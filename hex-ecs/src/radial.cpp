@@ -576,15 +576,15 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 # pragma omp critical
                 {
                     // merge the thread local arrays
-                    R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end());
-                    R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end());
-                    R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end());
+                    R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end()); th_R_tr_i.clear();
+                    R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end()); th_R_tr_j.clear();
+                    R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end()); th_R_tr_v.clear();
                 }
             }
         }
         
         // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
-        R_tr_dia_[lambda] = CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper);
+        R_tr_dia_[lambda] = std::move(CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper));
         R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
         if (cmd.outofcore)
             R_tr_dia_[lambda].drop();
@@ -624,7 +624,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
             
             // reconstruct objects
-            R_tr_dia_[lambda] = SymDiaMatrix(Nspline * Nspline, diag, data);
+            R_tr_dia_[lambda] = std::move(SymDiaMatrix(Nspline * Nspline, diag, data));
             R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
             
             // non-owners will update log and save file (if not already done)
