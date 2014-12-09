@@ -9,8 +9,7 @@
 
 CXX = g++
 
-#CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
-CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mavx
+CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
 LFLAGS = -fopenmp -fPIC
 
 # ---------------------------------------------------------------------------- #
