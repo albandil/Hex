@@ -587,6 +587,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     // multiply "p" by the diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
     for (int ill = 0;  ill < Nang;  ill++)
+    if (par_.isMyWork(ill))
     {
         // copy-from segment of "p"
         cArrayView p_block (p, ill * Nchunk, Nchunk);
