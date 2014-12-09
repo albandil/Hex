@@ -133,7 +133,7 @@ class Parallel
         }
         
         /**
-         * @brief Synchronize across processes.
+         * @brief Synchronize across processes by composition.
          * 
          * Synchronize array across processes. It is assumed that i-th chunk of the array is
          * present on the (i % Nproc_)-th process. That process will be used as the broadcast root.
@@ -164,6 +164,51 @@ class Parallel
                         MPI_COMM_WORLD
                     );
                 }
+            }
+#endif
+        }
+        
+        /**
+         * @brief Synchronize across processes by summing.
+         * 
+         * Synchronize array across processes by summing. There are no assumptions on what
+         * segment is on which node. The whole arrays are broadcasted and summed on every node.
+         * 
+         * @param array Pointer to data array to synchronize.
+         * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
+         *               will be synchronized. If there are some elements more, they will be left
+         *               untouched (and un-broadcast).
+         * 
+         * It is expected that the array has length equal or greater than chunksize * Nchunk.
+         */
+        template <class T> void syncsum (T* array, std::size_t N) const
+        {
+#ifndef NO_MPI
+            if (active_)
+            {
+                NumberArray<T> tmp(N);
+                MPI_Status status;
+                
+                // slaves will send their data to master
+                if (not IamMaster())
+                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, iproc_, MPI_COMM_WORLD);
+                
+                // master will receive and sum the data ...
+                if (IamMaster())
+                {
+                    // for all non-master processes
+                    for (unsigned i = 1; i < Nproc_; i++)
+                    {
+                        // receive data from a particular slave into 'tmp'
+                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
+                        
+                        // sum the arrays
+                        ArrayView<T>(N, array) += tmp;
+                    }
+                }
+                
+                // ... and broadcast the result back to all the slaves
+                MPI_Bcast(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
             }
 #endif
         }

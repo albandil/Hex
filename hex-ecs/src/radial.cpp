@@ -638,7 +638,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             }
             
             // everyone will drop data, if out-of-core mode is on
-            if (cmd.outofcore)
+            if (cmd.outofcore or not cmd.cache_radint)
                 R_tr_dia_[lambda].drop();
         }
         

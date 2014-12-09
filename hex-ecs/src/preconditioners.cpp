@@ -433,7 +433,7 @@ void NoPreconditioner::update (double E)
                 continue;
             
             // add two-electron contributions
-            Hdiag += (cmd_.outofcore ? f * s_rad_.R_tr_dia(lambda).hdfget() : f * s_rad_.R_tr_dia(lambda));
+            Hdiag += (cmd_.cache_radint ? f * s_rad_.R_tr_dia(lambda) : f * s_rad_.R_tr_dia(lambda).hdfget());
         }
         
         // finalize the matrix
@@ -548,14 +548,14 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 // add the contributions
                 if (f1 != 0.)
                 {
-                    chi_block += (prefactor * f1) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj1) : s_rad_.R_tr_dia(lambda).dot(Pj1));
+                    chi_block += (prefactor * f1) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj1) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj1));
                 }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-                        chi_block += (prefactor * f2) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2) : s_rad_.R_tr_dia(lambda).dot(Pj2));
+                        chi_block += (prefactor * f2) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj2) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2));
                     else
-                        chi_block -= (prefactor * f2) * (cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2) : s_rad_.R_tr_dia(lambda).dot(Pj2));
+                        chi_block -= (prefactor * f2) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj2) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2));
                 }
             }
             
@@ -584,6 +584,9 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
+    // clear output array
+    std::memset(q.data(), 0, q.size() * sizeof(Complex));
+    
     // multiply "p" by the diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
     for (int ill = 0;  ill < Nang;  ill++)
@@ -602,11 +605,19 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     // multiply "p" by the off-diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
     for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    if (par_.isMyWork(lambda))
     {
+        // get reference to radial integrals cache object
+        SymDiaMatrix const & R_tr_dia_mem = s_rad_.R_tr_dia(lambda);
+        
+        // load radial integrals from disk, if memory cache is disabled
+        SymDiaMatrix R_tr_dia_disc;
+        if (not cmd_.cache_radint)
+            R_tr_dia_disc = std::move(R_tr_dia_mem.hdfget());
+        
         // get relevant positions of this block
         for (int ill = 0;  ill < Nang;  ill++)
         for (int illp = 0; illp < Nang; illp++)
-        if (par_.isMyWork(ill))
         {
             // skip diagonal
             if (ill == illp)
@@ -634,8 +645,8 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // calculate product
             cArray product = (
-                cmd_.outofcore ? s_rad_.R_tr_dia(lambda).hdfget().dot(p_block, both, cmd_.parallel_dot)
-                               : s_rad_.R_tr_dia(lambda).dot(p_block, both, cmd_.parallel_dot)
+                cmd_.cache_radint ? R_tr_dia_mem.dot(p_block, both, cmd_.parallel_dot)
+                                  : R_tr_dia_disc.dot(p_block, both, cmd_.parallel_dot)
             );
             
             // update array
@@ -644,8 +655,8 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         }
     }
     
-    // synchronize across processes
-    par_.sync(q.data(), Nchunk, l1_l2_.size());
+    // synchronize across processes by summing individual contributions
+    par_.syncsum(q.data(), Nchunk * l1_l2_.size());
 }
 
 void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const

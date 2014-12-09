@@ -134,6 +134,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--prec-tolerance <number> (-t)  tolerance for the conjugate gradients preconditioner                            \n"
                     "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
                     "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
+                    "\t--no-radial-cache         (-r)  do not keep two-electron radial integrals in memory and save RAM (slower)       \n"
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
                     "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
                     "\t--concurrent-factorizations <number>   how many LU preconditioner factorizations to run simultaneously          \n"
@@ -189,6 +190,13 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use out-of-core functionality: store diagonal blocks on disk
                 outofcore = true;
+                cache_radint = false;
+                return true;
+            },
+        "no-radint-cache", "r", 0, [&](std::string optarg) -> bool
+            {
+                // do not keep two-electron radial integrals in memory
+                cache_radint = false;
                 return true;
             },
         "drop-tolerance", "d", 1, [&](std::string optarg) -> bool
