@@ -166,17 +166,18 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
     int Nspline = bspline_.Nspline();
     int order = bspline_.order();
     
-    int i, j, iknot;
-    std::size_t size = Nspline * (2 * order + 1) * (order + 1);
-    
     // (logarithms of) partial integral moments
-    cArray m (size, Complex(0.,special::constant::Inf));
+    cArray m
+    (
+        Nspline * (2 * order + 1) * (order + 1),
+        Complex(0.,special::constant::Inf)
+    );
     
     // for all B-splines
-    for (i = 0; i < (int)Nspline; i++)
+    for (int i = 0; i < (int)Nspline; i++)
     {
         // for all B-splines (use symmetry)
-        for (j = i; j <= i + (int)order and j < (int)Nspline; j++)
+        for (int j = i; j <= i + (int)order and j < (int)Nspline; j++)
         {
             // determine relevant knots
             int ileft = j;
@@ -187,7 +188,7 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 iright = iknotmax;
             
             // for all relevant knots
-            for (iknot = ileft; iknot < iright; iknot++)
+            for (int iknot = ileft; iknot < iright; iknot++)
             {
                 // get integration boundaries
                 Complex xa = bspline_.t(iknot);
@@ -223,9 +224,12 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 int z_2 = iknot - j;
                 
                 // save to m-matrix
-                Complex lg = ((integral == 0.) ? Complex(0.,special::constant::Inf) : std::log(integral) + logscale);
-                m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = lg;
-                m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = lg;
+                if (integral != 0.)
+                {
+                    Complex lg = std::log(integral) + logscale;
+                    m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = lg;
+                    m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = lg;
+                }
             }
         }
     }
@@ -430,9 +434,18 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             continue; // no need to compute
         }
         
-        // elements of R_tr
-        lArray R_tr_i, R_tr_j;
-        cArray R_tr_v;
+        // preallocate and clear the matrix of the integrals
+        R_tr_dia_[lambda].size() = Nspline * Nspline;
+        R_tr_dia_[lambda].diag().clear();
+        std::size_t size = 0;
+        for (int i = 0; i <= order; i++)
+        for (int j = std::max(0, i * Nspline - order); j <= i * Nspline + order; j++)
+        {
+            R_tr_dia_[lambda].diag().push_back(j);
+            size += Nspline * Nspline - j;
+        }
+        R_tr_dia_[lambda].data().resize(size);
+        R_tr_dia_[lambda].update();
         
 #ifndef NO_OPENCL
         if (cmd.gpu_slater)
@@ -529,7 +542,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                         continue;
                     
                     // store all symmetries
-                    allSymmetries(i, j, k, l, *R_ptr++, R_tr_i, R_tr_j, R_tr_v);
+                    allSymmetries(i, j, k, l, *R_ptr++, R_tr_dia_[lambda]);
                 }
             }
         }
@@ -543,15 +556,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
             Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
             
-            # pragma omp parallel default (none) \
-                firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) \
-                shared (R_tr_i, R_tr_j, R_tr_v, cmd, std::cout, std::cerr) \
-                if (!cmd.gpu_slater)
+            # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) if (!cmd.gpu_slater)
             {
-                // per-thread elements of R_tr
-                lArray th_R_tr_i, th_R_tr_j;
-                cArray th_R_tr_v;
-                
                 // for all B-spline pairs
                 # pragma omp for schedule (dynamic,1)
                 for (int i = 0; i < Nspline; i++)
@@ -569,27 +575,19 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                         Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
                         
                         // store all symmetries
-                        allSymmetries(i, j, k, l, Rijkl_tr, th_R_tr_i, th_R_tr_j, th_R_tr_v);
+                        # pragma omp critical
+                        allSymmetries(i, j, k, l, Rijkl_tr, R_tr_dia_[lambda]);
                     }
-                }
-                
-                # pragma omp critical
-                {
-                    // merge the thread local arrays
-                    R_tr_i.append(th_R_tr_i.begin(), th_R_tr_i.end()); th_R_tr_i.clear();
-                    R_tr_j.append(th_R_tr_j.begin(), th_R_tr_j.end()); th_R_tr_j.clear();
-                    R_tr_v.append(th_R_tr_v.begin(), th_R_tr_v.end()); th_R_tr_v.clear();
                 }
             }
         }
         
-        // create matrices and save them to disk; use only upper part of the matrix R as we haven't computed whole lower part anyway
-        R_tr_dia_[lambda] = std::move(CooMatrix(Nspline*Nspline, Nspline*Nspline, R_tr_i, R_tr_j, R_tr_v).todia(upper));
+        // save matrix to disk
         R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
         if (cmd.outofcore)
             R_tr_dia_[lambda].drop();
         
-        std::cout << "\r\t- integrals for λ = " << lambda << " computed\n";
+        std::cout << "\r\t- integrals for λ = " << lambda << " computed" << std::endl;
     }
     
 #ifndef NO_MPI
@@ -645,6 +643,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         MPI_Barrier(MPI_COMM_WORLD);
     }
 #endif
+
+    std::cout << std::endl;
 }
 
 #ifndef NO_OPENCL

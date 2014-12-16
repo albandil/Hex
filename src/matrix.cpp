@@ -2117,13 +2117,13 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
             Complex * const restrict pC = C.dptr(k);
             
             // for all elements on A's diagonal dA
-            for (std::size_t ia = 0; ia < A.size() - dA; ia++)
+            for (int ia = 0; ia < A.size() - dA; ia++)
             {
                 // for all elements on B's diagonal dB
-                for (std::size_t ib = 0; ib < B.size() - std::abs(dB); ib++)
+                for (int ib = 0; ib < B.size() - std::abs(dB); ib++)
                 {
                     // get position on the C's diagonal
-                    std::size_t ic = ia * B.size() + ib;
+                    int ic = ia * B.size() + ib;
                     
                     if (j < 0)
                         ic += B.diag(std::abs(j));
@@ -2255,21 +2255,21 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
         // main diagonal
         if ((d == 0) and (triangle & diagonal))
         {
-            for (unsigned i = 0; i < size(); i++)
+            for (int i = 0; i < size(); i++)
                 M(i,i) = main_diagonal()[i];
         }
         
         // upper triangle
         if ((d != 0) and (triangle & strict_upper))
         {
-            for (unsigned i = 0; i < size() - d; i++)
+            for (int i = 0; i < size() - d; i++)
                 M(i,i+d) = dptr(id)[i];
         }
         
         // lower triangle
         if ((d != 0) and (triangle & strict_lower))
         {
-            for (unsigned i = 0; i < size() - d; i++)
+            for (int i = 0; i < size() - d; i++)
                 M(i+d,i) = dptr(id)[i];
         }
     }

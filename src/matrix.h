@@ -1216,11 +1216,13 @@ public:
     
     CooMatrix()
         : m_(0), n_(0), sorted_(true) {}
-    CooMatrix(size_t m, size_t n)
+    CooMatrix(std::size_t m, std::size_t n)
         : m_(m), n_(n), sorted_(true) {}
     CooMatrix(CooMatrix const & A)
         : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
-    CooMatrix(size_t m, size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
+    CooMatrix(std::size_t m, std::size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
+    CooMatrix(std::size_t m, std::size_t n, NumberArray<long> && i, NumberArray<long> && j, NumberArray<Complex> && x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**
@@ -1716,6 +1718,12 @@ public:
         
         return *this;
     }
+    
+    void update ()
+    {
+        // update diagonal pointers
+        setup_dptrs_();
+    }
 
     //
     // Destructor
@@ -1735,6 +1743,36 @@ public:
     //
     // Getters
     //
+    
+    Complex operator() (int i, int j) const
+    {
+        // get diagonal label
+        int d = std::abs(i-j);
+        
+        // get diagonal index
+        int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        
+        // check that this diagonal exists
+        assert(id < idiag_.size());
+        
+        // get corresponding element
+        return dptrs_[id][std::min(i,j)];
+    }
+    
+    Complex & operator() (int i, int j)
+    {
+        // get diagonal label
+        int d = std::abs(i-j);
+        
+        // get diagonal index
+        int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        
+        // check that this diagonal exists
+        assert(id < idiag_.size());
+        
+        // get corresponding element
+        return dptrs_[id][std::min(i,j)];
+    }
     
     /**
      * @brief Diagonal indices.
@@ -1796,7 +1834,8 @@ public:
      * Return row/column count. The matrix is symmetric and so both
      * counts are equal.
      */
-    std::size_t size () const { return n_; }
+    int size () const { return n_; }
+    int & size () { return n_; }
     
     /**
      * @brief Bandwidth.

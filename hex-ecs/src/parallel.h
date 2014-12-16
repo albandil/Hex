@@ -197,7 +197,7 @@ class Parallel
                 if (IamMaster())
                 {
                     // for all non-master processes
-                    for (unsigned i = 1; i < Nproc_; i++)
+                    for (int i = 1; i < Nproc_; i++)
                     {
                         // receive data from a particular slave into 'tmp'
                         MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);

@@ -185,7 +185,7 @@ Complex RadialIntegrals::computeR
     
     // ix > iy (by renaming the ix,iy indices)
     for (int ix = b; ix <= b + order and ix < Nreknot - 1; ix++)
-    for (int iy = std::max(a,ix+11); iy <= a + order and iy < Nreknot - 1; iy++)
+    for (int iy = std::max(a,ix+1); iy <= a + order and iy < Nreknot - 1; iy++)
     {
         Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
         if (std::isfinite(lg.imag()))
@@ -200,9 +200,7 @@ void RadialIntegrals::allSymmetries
 (
     int i, int j, int k, int l,
     Complex Rijkl_tr,
-    NumberArray<long> & R_tr_i,
-    NumberArray<long> & R_tr_j,
-    NumberArray<Complex> & R_tr_v
+    SymDiaMatrix & R_tr_dia
 ) const
 {
     // shorthand
@@ -210,52 +208,40 @@ void RadialIntegrals::allSymmetries
     
     {
         // store the integral
-        R_tr_i.push_back(i * Nspline + j);
-        R_tr_j.push_back(k * Nspline + l);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(i * Nspline + j, k * Nspline + l) = Rijkl_tr;
     }
     
     if (i != k) // i.e. i < k
     {
         // swap i <-> k (symmetry 1)
-        R_tr_i.push_back(k * Nspline + j);
-        R_tr_j.push_back(i * Nspline + l);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(k * Nspline + j, i * Nspline + l) = Rijkl_tr;
     }
     
     if (j != l) // i.e. j < l
     {
         // swap j <-> l (symmetry 2)
-        R_tr_i.push_back(i * Nspline + l);
-        R_tr_j.push_back(k * Nspline + j);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(i * Nspline + l, k * Nspline + j) = Rijkl_tr;
     }
     
     if (i != j or k != l) // i.e. i < j or k < l
     {
         // swap i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(j * Nspline + i);
-        R_tr_j.push_back(l * Nspline + k);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(j * Nspline + i, l * Nspline + k) = Rijkl_tr;
     }
     
     if (i != k and (i != j or k != l)) // i.e. i < k and (i < j or k < l)
     {
         // swap i <-> k (symmetry 1) and i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(l * Nspline + i);
-        R_tr_j.push_back(j * Nspline + k);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(l * Nspline + i, j * Nspline + k) = Rijkl_tr;
     }
     
     if (j != l and (i != j or k != l)) // i.e. j < l and (i < j or k < l)
     {
         // swap j <-> l (symmetry 2) and i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(j * Nspline + k);
-        R_tr_j.push_back(l * Nspline + i);
-        R_tr_v.push_back(Rijkl_tr);
+        R_tr_dia(j * Nspline + k, l * Nspline + i) = Rijkl_tr;
     }
     
-    // NOTE there are two more symmetries, (1)+(2) and (1)+(2)+(3),
+    // NOTE : There are two more symmetries, (1)+(2) and (1)+(2)+(3),
     // but we don't need those for the construction of a symmetrical
-    // matrix, so we will not store them at all
+    // matrix.
 }

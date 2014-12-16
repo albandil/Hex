@@ -204,9 +204,7 @@ class RadialIntegrals
         (
             int i, int j, int k, int l,
             Complex Rijkl_tr,
-            NumberArray<long> & R_tr_i,
-            NumberArray<long> & R_tr_j,
-            NumberArray<Complex> & R_tr_v
+            SymDiaMatrix & R_tr_dia
         ) const;
         
         /** Compute P-overlaps
