@@ -584,7 +584,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         
         // save matrix to disk
         R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
-        if (cmd.outofcore)
+        if (cmd.outofcore or not cmd.cache_radint)
             R_tr_dia_[lambda].drop();
         
         std::cout << "\r\t- integrals for λ = " << lambda << " computed" << std::endl;

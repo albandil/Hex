@@ -116,8 +116,8 @@ CXXDEBUG = -g $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # choose between DEBUG and RELEASE compiler flags
-CXXFLAGS = $(CXXDEBUG)
-# CXXFLAGS = -g $(CXXRILIS)
+# CXXFLAGS = $(CXXDEBUG)
+CXXFLAGS = -g $(CXXRILIS)
 
 # source files
 CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
