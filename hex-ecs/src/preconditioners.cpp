@@ -32,6 +32,10 @@
 #include <iostream>
 #include <set>
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 #include "arrays.h"
 #include "gauss.h"
 #include "itersolve.h"
@@ -1377,8 +1381,20 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         }
     }
     
+#ifdef _OPENMP
+    // disable parallel nesting if the factorizations run concurrently
+    bool nested = omp_get_nested();
+    if (cmd_.parallel_block)
+        omp_set_nested(false);
+#endif
+    
     // precondition by LU
     z = lu_[iblock].solve(r);
+    
+#ifdef _OPENMP
+    // restore the prevoius nested flag
+    omp_set_nested(nested);
+#endif
     
     // release memory
     if (cmd_.outofcore)
