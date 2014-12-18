@@ -1994,7 +1994,7 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
 {
     // check dimensions
     if ((int)B.size() != n_)
-        throw exception ("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec).", n_, B.size());
+        throw exception ("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n_, B.size());
     
     // size of the matrix
     int Nrows = n_;
