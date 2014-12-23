@@ -401,14 +401,6 @@ void NoPreconditioner::update (double E)
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     E_ = E;
     
-    // necessary Kronecker products
-    SymDiaMatrix S_kron_S   = s_rad_.S().kron(s_rad_.S());
-    SymDiaMatrix S_kron_Mm2 = s_rad_.S().kron(s_rad_.Mm2());
-    SymDiaMatrix Mm2_kron_S = s_rad_.Mm2().kron(s_rad_.S());
-    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
-    SymDiaMatrix half_D_minus_Mm1_tr_kron_S = half_D_minus_Mm1_tr.kron(s_rad_.S());
-    SymDiaMatrix S_kron_half_D_minus_Mm1_tr = s_rad_.S().kron(half_D_minus_Mm1_tr);
-    
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
@@ -417,11 +409,11 @@ void NoPreconditioner::update (double E)
         int l2 = l1_l2_[ill].second;
         
         // one-electron parts
-        SymDiaMatrix Hdiag =
-            half_D_minus_Mm1_tr_kron_S
-            + (0.5*l1*(l1+1)) * Mm2_kron_S
-            + S_kron_half_D_minus_Mm1_tr
-            + (0.5*l2*(l2+1)) * S_kron_Mm2;
+        dia_blocks_[ill] = E * s_rad_.S().kron(s_rad_.S());
+        dia_blocks_[ill] -= 0.5 * (s_rad_.D() - s_rad_.Mm1_tr()).kron(s_rad_.S());
+        dia_blocks_[ill] -= (0.5 * l1 * (l1 + 1)) * s_rad_.Mm2().kron(s_rad_.S());
+        dia_blocks_[ill] -= s_rad_.S().kron((0.5 * s_rad_.D() - s_rad_.Mm1_tr()));
+        dia_blocks_[ill] -= (0.5 * l2 * (l2 + 1)) * s_rad_.S().kron(s_rad_.Mm2());
         
         // two-electron part
         for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -437,11 +429,8 @@ void NoPreconditioner::update (double E)
                 continue;
             
             // add two-electron contributions
-            Hdiag += (cmd_.cache_radint ? f * s_rad_.R_tr_dia(lambda) : f * s_rad_.R_tr_dia(lambda).hdfget());
+            dia_blocks_[ill] -= (cmd_.cache_radint ? f * s_rad_.R_tr_dia(lambda) : f * s_rad_.R_tr_dia(lambda).hdfget());
         }
-        
-        // finalize the matrix
-        dia_blocks_[ill] = E * S_kron_S - Hdiag;
         
         // if out-of-core is enabled, dump the matrix to disk
         if (cmd_.outofcore)
