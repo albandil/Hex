@@ -1296,8 +1296,20 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     diag -= outer_product(Dl1, cArray(Dl2.size(),1.));
     diag -= outer_product(cArray(Dl1.size(),1.), Dl2);
     
+#ifdef _OPENMP
+    // disable parallel nesting if the preconditioning runs concurrently
+    bool nested = omp_get_nested();
+    if (cmd_.parallel_block)
+        omp_set_nested(false);
+#endif
+    
     // precondition
     z = kron_dot(SCl1, SCl2, kron_dot(Cl1S, Cl2S, r) / diag);
+
+#ifdef _OPENMP
+    // restore previous nesting state
+    omp_set_nested(nested);
+#endif
 }
 #endif
 
