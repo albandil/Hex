@@ -410,7 +410,7 @@ void NoPreconditioner::update (double E)
         
         // one-electron parts
         dia_blocks_[ill] = E * s_rad_.S().kron(s_rad_.S());
-        dia_blocks_[ill] -= 0.5 * (s_rad_.D() - s_rad_.Mm1_tr()).kron(s_rad_.S());
+        dia_blocks_[ill] -= (0.5 * s_rad_.D() - s_rad_.Mm1_tr()).kron(s_rad_.S());
         dia_blocks_[ill] -= (0.5 * l1 * (l1 + 1)) * s_rad_.Mm2().kron(s_rad_.S());
         dia_blocks_[ill] -= s_rad_.S().kron((0.5 * s_rad_.D() - s_rad_.Mm1_tr()));
         dia_blocks_[ill] -= (0.5 * l2 * (l2 + 1)) * s_rad_.S().kron(s_rad_.Mm2());
