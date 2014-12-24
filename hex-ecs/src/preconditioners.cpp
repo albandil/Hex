@@ -665,9 +665,12 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // copy-from segment of "p"
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
+            // product
+            cArray product = std::move(pR_tr_dia->dot(p_block, both, cmd_.parallel_dot));
+            
             // update array
             # pragma omp critical
-            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * pR_tr_dia->dot(p_block, both, cmd_.parallel_dot);
+            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * product;
         }
     }
     

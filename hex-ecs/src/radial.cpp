@@ -606,7 +606,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             int owner = lambda % par.Nproc();
             
             // reload dropped data
-            if (par.iproc() == owner and cmd.outofcore)
+            if (par.isMyWork(lambda) and not cmd.cache_own_radint)
                 R_tr_dia_[lambda].hdfload();
             
             // get dimensions
@@ -632,7 +632,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
             
             // non-owners will update log and save file (if not already done)
-            if (owner != par.iproc())
+            if (not par.isMyWork(lambda))
             {
                 std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << std::endl;
                 
