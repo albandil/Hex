@@ -2146,7 +2146,7 @@ SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 
 cArray SymDiaMatrix::lowerSolve (const cArrayView b) const
 {
-    assert(size() == b.size());
+    assert(size() == (int)b.size());
     
     // the solution; handle the unit diagonal by using "b" right away
     cArray x = b;
@@ -2187,7 +2187,7 @@ cArray SymDiaMatrix::lowerSolve (const cArrayView b) const
 
 cArray SymDiaMatrix::upperSolve (const cArrayView b) const
 {
-    assert(size() == b.size());
+    assert(size() == (int)b.size());
     
     // the solution; handle the unit diagonal by using "b" right away
     cArray x = b;

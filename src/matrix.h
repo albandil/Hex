@@ -1753,7 +1753,7 @@ public:
         int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
         
         // check that this diagonal exists
-        assert(id < idiag_.size());
+        assert(id < (int)idiag_.size());
         
         // get corresponding element
         return dptrs_[id][std::min(i,j)];
@@ -1768,7 +1768,7 @@ public:
         int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
         
         // check that this diagonal exists
-        assert(id < idiag_.size());
+        assert(id < (int)idiag_.size());
         
         // get corresponding element
         return dptrs_[id][std::min(i,j)];
