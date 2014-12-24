@@ -422,16 +422,20 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
         // this process will only compute a subset of radial integrals
-        if (lambda % par.Nproc() != par.iproc())
+        if (not par.isMyWork(lambda))
             continue;
         
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfload())
         {
             std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
-            if (cmd.outofcore)
+            
+            // release from memory
+            if (not cmd.cache_own_radint)
                 R_tr_dia_[lambda].drop();
-            continue; // no need to compute
+            
+            // no need to compute
+            continue;
         }
         
         // preallocate and clear the matrix of the integrals
@@ -586,7 +590,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
         
         // release the integrals from memory if requested
-        if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
+        if (not cmd.cache_own_radint)
             R_tr_dia_[lambda].drop();
         
         std::cout << "\t- integrals for λ = " << lambda << " computed" << std::endl;
@@ -637,9 +641,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
             }
             
-            // release the integrals from memory if
-            // a) we are running fully out-of-core calculation
-            // b) the user explicitly allowed dropping radial data that are not owned by the process
+            // release the integrals from memory if requested
             if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
                 R_tr_dia_[lambda].drop();
         }
