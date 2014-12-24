@@ -418,6 +418,7 @@ void NoPreconditioner::update (double E)
         // two-electron part
         for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
+            // calculate angular integral
             Complex f = special::computef(lambda,l1,l2,l1,l2,inp_.L);
             
             // check that the "f" coefficient is valid (no factorial overflow etc.)
@@ -428,8 +429,20 @@ void NoPreconditioner::update (double E)
             if (f == 0.)
                 continue;
             
+            // get radial integrals from memory
+            SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
+            
+            // get radial integrals from disk
+            SymDiaMatrix R_tr_dia_disk;
+            if (not (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint)))
+            {
+                // load radial integrals and replace the pointer
+                R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
+                pR_tr_dia = &R_tr_dia_disk;
+            }
+            
             // add two-electron contributions
-            dia_blocks_[ill] -= (cmd_.cache_radint ? f * s_rad_.R_tr_dia(lambda) : f * s_rad_.R_tr_dia(lambda).hdfget());
+            dia_blocks_[ill] -= f * (*pR_tr_dia);
         }
         
         // if out-of-core is enabled, dump the matrix to disk
@@ -538,17 +551,29 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (f1 == 0. and f2 == 0.)
                     continue;
                 
+                // get radial integrals from memory
+                SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
+            
+                // get radial integrals from disk
+                SymDiaMatrix R_tr_dia_disk;
+                if (not (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint)))
+                {
+                    // load radial integrals and replace the pointer
+                    R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
+                    pR_tr_dia = &R_tr_dia_disk;
+                }
+                
                 // add the contributions
                 if (f1 != 0.)
                 {
-                    chi_block += (prefactor * f1) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj1) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj1));
+                    chi_block += (prefactor * f1) * pR_tr_dia->dot(Pj1);
                 }
                 if (f2 != 0.)
                 {
                     if (Sign > 0)
-                        chi_block += (prefactor * f2) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj2) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2));
+                        chi_block += (prefactor * f2) * pR_tr_dia->dot(Pj2);
                     else
-                        chi_block -= (prefactor * f2) * (cmd_.cache_radint ? s_rad_.R_tr_dia(lambda).dot(Pj2) : s_rad_.R_tr_dia(lambda).hdfget().dot(Pj2));
+                        chi_block -= (prefactor * f2) * pR_tr_dia->dot(Pj2);
                 }
             }
             
@@ -600,13 +625,17 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
     if (par_.isMyWork(lambda))
     {
-        // get reference to radial integrals cache object
-        SymDiaMatrix const & R_tr_dia_mem = s_rad_.R_tr_dia(lambda);
+        // get radial integrals from memory
+        SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
         
-        // load radial integrals from disk, if memory cache is disabled
-        SymDiaMatrix R_tr_dia_disc;
-        if (not cmd_.cache_radint)
-            R_tr_dia_disc = std::move(R_tr_dia_mem.hdfget());
+        // get radial integrals from disk
+        SymDiaMatrix R_tr_dia_disk;
+        if (not cmd_.cache_own_radint)
+        {
+            // load radial integrals and replace the pointer
+            R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
+            pR_tr_dia = &R_tr_dia_disk;
+        }
         
         // get relevant positions of this block
         for (int ill = 0;  ill < Nang;  ill++)
@@ -636,15 +665,9 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // copy-from segment of "p"
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
-            // calculate product
-            cArray product = (
-                cmd_.cache_radint ? R_tr_dia_mem.dot(p_block, both, cmd_.parallel_dot)
-                                  : R_tr_dia_disc.dot(p_block, both, cmd_.parallel_dot)
-            );
-            
             // update array
             # pragma omp critical
-            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * product;
+            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * pR_tr_dia->dot(p_block, both, cmd_.parallel_dot);
         }
     }
     

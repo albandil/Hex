@@ -523,7 +523,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 clEnqueueNDRangeKernel(queue_, Rint_, 1, nullptr, &chunk, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
                 done += chunk;
-                std::cout << "\r\tcomputing: " << format("%.2f %%", done * 100. / todo) << std::flush;
+                std::cout << "\tcomputing: " << format("%.2f %%", done * 100. / todo) << "\r" << std::flush;
             }
             R_gpu_.EnqueueDownload(queue_);
             clFinish(queue_);
@@ -584,10 +584,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         
         // save matrix to disk
         R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
-        if (cmd.outofcore or not cmd.cache_radint)
+        
+        // release the integrals from memory if requested
+        if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
             R_tr_dia_[lambda].drop();
         
-        std::cout << "\r\t- integrals for λ = " << lambda << " computed" << std::endl;
+        std::cout << "\t- integrals for λ = " << lambda << " computed" << std::endl;
     }
     
 #ifndef NO_MPI
@@ -628,15 +630,17 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // non-owners will update log and save file (if not already done)
             if (owner != par.iproc())
             {
-                std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << "\n";
+                std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << std::endl;
                 
                 // save to disk (if the file doesn't already exist)
                 if (not HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid())
                     R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
             }
             
-            // everyone will drop data, if out-of-core mode is on
-            if (cmd.outofcore or not cmd.cache_radint)
+            // release the integrals from memory if
+            // a) we are running fully out-of-core calculation
+            // b) the user explicitly allowed dropping radial data that are not owned by the process
+            if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
                 R_tr_dia_[lambda].drop();
         }
         

@@ -82,7 +82,7 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
-              droptol(1e-8), itinerary(StgNone), outofcore(false), cache_radint(true),
+              droptol(1e-8), itinerary(StgNone), outofcore(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(true),
               gpu_slater(false)
         {
@@ -129,7 +129,8 @@ class CommandLine
         bool outofcore;
         
         /// Whether to keep radial integrals in memory.
-        bool cache_radint;
+        bool cache_all_radint;
+        bool cache_own_radint;
         
         /// Tolerance for terminating iterative solution.
         double itertol;

@@ -115,33 +115,34 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                                  \n"
-                    "                                                                                                                  \n"
-                    "\t--example                 (-e)  create sample input file                                                        \n"
-                    "\t--help                    (-h)  display this help                                                               \n"
-                    "\t--input <filename>        (-i)  use custom input file                                                           \n"
-                    "\t--zipfile <filename>      (-z)  solution file to zip                                                            \n"
-                    "\t--zipcount <number>       (-n)  zip samples                                                                     \n"
-                    "\t--zipmax <number>         (-R)  maximal radius to use for solution zipping                                      \n"
+                    "Available switches (short forms in parentheses):                                                                                                         \n"
+                    "                                                                                                                                                         \n"
+                    "\t--example                 (-e)  Create sample input file.                                                                                              \n"
+                    "\t--help                    (-h)  Display this help.                                                                                                     \n"
+                    "\t--input <filename>        (-i)  Use custom input file.                                                                                                 \n"
+                    "\t--zipfile <filename>      (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
+                    "\t--zipcount <number>       (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
+                    "\t--zipmax <number>         (-R)  Maximal radius to use for solution zipping.                                                                            \n"
 #ifndef NO_MPI
-                    "\t--mpi                     (-m)  use MPI                                                                         \n"
+                    "\t--mpi                     (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
-                    "\t--stg-integ               (-a)  only do radial integrals                                                        \n"
-                    "\t--stg-integ-solve         (-b)  only do integrals & solve                                                       \n"
-                    "\t--stg-extract             (-c)  only extract amplitudes                                                         \n"
-                    "\t--preconditioner <name>   (-p)  preconditioner to use (default: ILU)                                            \n"
-                    "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
-                    "\t--tolerance <number>      (-T)  tolerance for the conjugate gradients solver                                    \n"
-                    "\t--prec-tolerance <number> (-t)  tolerance for the conjugate gradients preconditioner                            \n"
-                    "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
-                    "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
-                    "\t--no-radial-cache         (-r)  do not keep two-electron radial integrals in memory and save RAM (slower)       \n"
-                    "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
-                    "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
+                    "\t--stg-integ               (-a)  Only calculate needed radial integrals.                                                                                \n"
+                    "\t--stg-integ-solve         (-b)  Only calculate integrals and the solution.                                                                             \n"
+                    "\t--stg-extract             (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
+                    "\t--preconditioner <name>   (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
+                    "\t--list-preconditioners    (-P)  List available preconditioners with short description of each.                                                         \n"
+                    "\t--tolerance <number>      (-T)  Set tolerance for the conjugate gradients solver.                                                                      \n"
+                    "\t--prec-tolerance <number> (-t)  Set tolerance for the conjugate gradients preconditioner.                                                              \n"
+                    "\t--drop-tolerance <number> (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
+                    "\t--out-of-core             (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
+                    "\t--own-radial-cache        (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
+                    "\t--no-radial-cache         (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
+                    "\t--parallel-dot                  OpenMP-parallelize SpMV operations.                                                                                    \n"
+                    "\t--no-parallel-block             Disable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplicaiton).                   \n"
 #ifndef NO_OPENCL
-                    "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL                             \n"
+                    "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL.                                                                   \n"
 #endif
-                    "                                                                                                                  \n"
+                    "                                                                                                                                                         \n"
                 ;
                 std::exit(EXIT_SUCCESS);
             },
@@ -189,17 +190,26 @@ void CommandLine::parse (int argc, char* argv[])
                 itinerary = StgExtract;
                 return true;
             },
-        "out-of-core", "O", 0, [&](std::string optarg) -> bool
+        "own-radial-cache", "w", 0, [&](std::string optarg) -> bool
             {
-                // use out-of-core functionality: store diagonal blocks on disk
-                outofcore = true;
-                cache_radint = false;
+                // do not cache un-'owned' two-electron radial integrals in memory
+                cache_own_radint = true;
+                cache_all_radint = false;
                 return true;
             },
         "no-radial-cache", "r", 0, [&](std::string optarg) -> bool
             {
-                // do not keep two-electron radial integrals in memory
-                cache_radint = false;
+                // do not cache any two-electron radial integrals in memory at all
+                cache_own_radint = false;
+                cache_all_radint = false;
+                return true;
+            },
+        "out-of-core", "O", 0, [&](std::string optarg) -> bool
+            {
+                // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
+                cache_all_radint = false;
+                cache_own_radint = false;
+                outofcore = true;
                 return true;
             },
         "drop-tolerance", "d", 1, [&](std::string optarg) -> bool
