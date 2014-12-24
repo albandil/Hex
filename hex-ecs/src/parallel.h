@@ -63,9 +63,27 @@ class Parallel
             : active_(active), iproc_(0), Nproc_(1)
         {
 #ifndef NO_MPI
-            MPI_Init (argc, argv);
-            MPI_Comm_size (MPI_COMM_WORLD, &Nproc_);
-            MPI_Comm_rank (MPI_COMM_WORLD, &iproc_);
+    #ifndef _OPENMP
+            // initialize MPI
+            MPI_Init(argc, argv);
+    #else
+            // initialize MPI compatible with OpenMP
+            int req_flag = MPI_THREAD_FUNNELED, prov_flag;
+            MPI_Init_thread(argc, argv, req_flag, &prov_flag);
+    #endif
+            
+            // get number of processes and ID of this process
+            MPI_Comm_size(MPI_COMM_WORLD, &Nproc_);
+            MPI_Comm_rank(MPI_COMM_WORLD, &iproc_);
+            
+    #ifdef _OPENMP
+            // check thread support
+            if (prov_flag == MPI_THREAD_SINGLE)
+            {
+                std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_FUNNELED. ";
+                std::cout << "Every MPI process will thus run only on a single core." << std::endl;
+            }
+    #endif
 #else
             active_ = false;
 #endif
