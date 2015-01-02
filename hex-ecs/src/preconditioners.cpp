@@ -728,13 +728,16 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             dia_blocks_[ill].drop();
     }
     
+    // broadcast inner preconditioner iterations
+    par_.sync(n.data(), 1, l1_l2_.size());
+    
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
     std::cout << std::setw(4) << (*std::min_element(n.begin(), n.end()));
     std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
     std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
-    // synchronize across processes
+    // synchronize data across processes
     par_.sync(z.data(), Nspline * Nspline, l1_l2_.size());
 }
 
@@ -1271,6 +1274,18 @@ void KPACGPreconditioner::setup ()
     // diagonalize one-electron hamiltonians for all angular momenta
     for (int l = 0; l <= inp_.maxell; l++)
     {
+        // check if this angular momentum is needed by some of the blocks owned by this process
+        bool need_l = false;
+        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        {
+            if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
+                need_l = true;
+        }
+        
+        // skip the angular momentum if no owned diagonal block needs it
+        if (not need_l)
+            continue;
+        
         // compose the one-electron hamiltonian
         ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
         

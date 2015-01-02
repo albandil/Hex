@@ -165,24 +165,28 @@ class Parallel
          * 
          * It is expected that the array has length equal or greater than chunksize * Nchunk.
          */
-        template <class T> void sync (T* array, std::size_t chunksize, std::size_t Nchunk) const
+        void sync (int * array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifndef NO_MPI
             if (active_)
-            {
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
-                {
-                    // relevant process will broadcast this chunk's data
-                    MPI_Bcast
-                    (
-                        array + ichunk * chunksize,
-                        typeinfo<T>::ncmpt * chunksize, // ... how many doubles to b-cast
-                        MPI_DOUBLE,
-                        ichunk % Nproc_,
-                        MPI_COMM_WORLD
-                    );
-                }
-            }
+                    MPI_Bcast(array + ichunk * chunksize, chunksize, MPI_INT, ichunk % Nproc_, MPI_COMM_WORLD);
+#endif
+        }
+        void sync (double * array, std::size_t chunksize, std::size_t Nchunk) const
+        {
+#ifndef NO_MPI
+            if (active_)
+                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
+                    MPI_Bcast(array + ichunk * chunksize, chunksize, MPI_DOUBLE, ichunk % Nproc_, MPI_COMM_WORLD);
+#endif
+        }
+        void sync (Complex * array, std::size_t chunksize, std::size_t Nchunk) const
+        {
+#ifndef NO_MPI
+            if (active_)
+                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
+                    MPI_Bcast(array + ichunk * chunksize, 2 * chunksize, MPI_DOUBLE, ichunk % Nproc_, MPI_COMM_WORLD);
 #endif
         }
         

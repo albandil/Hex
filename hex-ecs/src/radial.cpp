@@ -610,18 +610,16 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             MPI_Bcast(&diagsize, 1, MPI_INT, owner, MPI_COMM_WORLD);
             MPI_Bcast(&datasize, 1, MPI_INT, owner, MPI_COMM_WORLD);
             
-            // get arrays
-            iArray diag = R_tr_dia_[lambda].diag();
-            cArray data = R_tr_dia_[lambda].data();
-            diag.resize(diagsize);
-            data.resize(datasize);
+            // resize arrays
+            R_tr_dia_[lambda].diag().resize(diagsize);
+            R_tr_dia_[lambda].data().resize(datasize);
             
-            // master will broadcast arrays
-            MPI_Bcast(&diag[0], diag.size(), MPI_INT, owner, MPI_COMM_WORLD);
-            MPI_Bcast(&data[0], data.size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
+            // owner will broadcast arrays
+            MPI_Bcast(R_tr_dia_[lambda].diag().data(), diagsize, MPI_INT, owner, MPI_COMM_WORLD);
+            MPI_Bcast(R_tr_dia_[lambda].data().data(), datasize, MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
             
             // reconstruct objects
-            R_tr_dia_[lambda] = std::move(SymDiaMatrix(Nspline * Nspline, diag, data));
+            R_tr_dia_[lambda].update();
             R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
             
             // non-owners will update log and save file (if not already done)
