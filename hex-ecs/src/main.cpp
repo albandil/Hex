@@ -38,6 +38,10 @@
 
 #include <gsl/gsl_errno.h>
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 #include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
@@ -82,6 +86,20 @@ int main (int argc, char* argv[])
     
     // get input from command line
     CommandLine cmd (argc, argv);
+    
+#ifdef _OPENMP
+    // set OpenMP parallel nesting (avoid oversubscription)
+    // - disable for concurrent diagonal block preconditioning
+    // - enable for sequential diagonal block preconditioning
+    omp_set_nested(!cmd.parallel_block);
+    # pragma omp parallel
+    # pragma omp master
+    {
+        std::cout << "OpenMP environment:" << std::endl;
+        std::cout << "\tthreads: " << omp_get_num_threads() << std::endl;
+        std::cout << "\tnesting: " << (omp_get_nested() ? "on" : "off") << std::endl;
+    }
+#endif
     
     // setup MPI
     Parallel par (&argc, &argv, cmd.parallel);

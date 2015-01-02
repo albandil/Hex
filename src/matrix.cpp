@@ -57,6 +57,22 @@
 //
 
 // Matrix-matrix multiplication.
+extern "C" void dgemm_
+(
+    char * TRANSA, 
+    char * TRANSB, 
+    int * M, 
+    int * N, 
+    int * K, 
+    double * ALPHA, 
+    double * A, 
+    int * LDA, 
+    double * B, 
+    int * LDB, 
+    double * BETA, 
+    double * C, 
+    int * LDC 
+);
 extern "C" void zgemm_
 (
     char * TRANSA, 
@@ -119,34 +135,61 @@ extern "C" void zgeev_
 // specialization of multiplication of real dense row-major ("C-like") matrices
 template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B)
 {
-    // check sanity
-    if (A.cols() != B.rows());
+    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
+    // =>
+    // C(col) = (A'(col) B(col))' = B'(col) A(col)
+    
+    if (A.cols() != B.rows())
         throw exception ("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+    
+    // dimensions
+    int m = B.cols(), n = A.cols(), k = A.rows();
     
     // create output matrix
     RowMatrix<double> C (A.rows(), B.cols());
-    
-    // get sizes
-    int m = A.rows(), n = B.cols(), r = A.cols();
-    
-    // get restricted and aligned pointers for fast access
-#if defined(__GNUC__) || defined(__INTEL_COMPILER)
-    double const * const restrict pA = (double*) __builtin_assume_aligned (A.data().data(), NumberArray<double>::Alloc::alignment);
-    double const * const restrict pB = (double*) __builtin_assume_aligned (B.data().data(), NumberArray<double>::Alloc::alignment);
-    double       * const restrict pC = (double*) __builtin_assume_aligned (C.data().data(), NumberArray<double>::Alloc::alignment);
-#else
-    double const * const restrict pA = A.data().data();
-    double const * const restrict pB = B.data().data();
-    double       * const restrict pC = C.data().data();
-#endif /* defined(__GNUC__) || defined(__INTEL_COMPILER) */
-    
-    // multiply
-    for (int i = 0; i < m; i++)
-    for (int j = 0; j < n; j++)
-    for (int k = 0; k < r; k++)
-        pC[i * n + j] += pA[i * r + k] * pB[j * r + k];
-    
+        
+    // use the BLAS-3 routine
+    char transA = 'T', transB = 'N';
+    double alpha = 1, beta = 0;
+    dgemm_
+    (
+        &transA, &transB, &m, &n, &k,
+        &alpha, const_cast<double*>(B.data().data()), &k,
+                const_cast<double*>(A.data().data()), &k,
+        &beta, C.data().data(), &m
+    );
+
     // return result
+    return C;
+}
+
+template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B)
+{
+    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
+    // =>
+    // C(col) = (A'(col) B(col))' = B'(col) A(col)
+    
+    if (A.cols() != B.rows())
+        throw exception ("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+    
+    // dimensions
+    int m = B.cols(), n = A.cols(), k = B.rows();
+    
+    // output matrix
+    RowMatrix<Complex> C (A.rows(), B.cols());
+    
+    // use the BLAS-3 routine
+    char transA = 'T', transB = 'N';
+    Complex alpha = 1, beta = 0;
+    zgemm_
+    (
+        &transA, &transB, &m, &n, &k,
+        &alpha, const_cast<Complex*>(B.data().data()), &k,
+                const_cast<Complex*>(A.data().data()), &k,
+        &beta, C.data().data(), &m
+    );
+    
+    // return resulting matrix
     return C;
 }
 
@@ -2005,9 +2048,9 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     
     // data pointers
     // - "restricted" for maximization of the cache usage
-    // - "aligned" to convince the auto-vectorizer of the worth of the vectorization using SIMD
+    // - "aligned" to convince the auto-vectorizer of the worth of the vectorization using SIMD (e.g. AVX2)
     // Note that:
-    //    - cArray (= NumberArray<Complex>) is aligned on 2*sizeof(Complex) boundary (= 32 bytes = 256 bits)
+    //    - cArray (= NumberArray<Complex>) is aligned on 4*sizeof(Complex) boundary (= 64 bytes = 512 bits)
     //    - GCC needs -fcx-limited-range to auto-vectorize 'complex' operations
     // The option -fcx-limited-range will inhibit some run-time range checking, so, technically,
     // some 'complex' operations may overflow. However, e.g. GNU Fortran compiler never(!) checks

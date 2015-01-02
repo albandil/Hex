@@ -526,7 +526,7 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
 /**
  * @brief Dense matrix multiplication.
  */
-template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
+/*template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
     assert(A.cols() == B.rows());
     
@@ -566,7 +566,14 @@ template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, Col
     
     // return result
     return C;
+}*/
+
+template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
+{
+    throw exception ("Don't know how to multipy matrices of type %s.", typeid(Type).name);
 }
+template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B);
+template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B);
 
 /**
  * @brief Matrix parts.
@@ -1869,6 +1876,13 @@ public:
      *
      * This is a key member of the structure, defining e.g. the speed of conjugate
      * gradients and evaluation of the scattering amplitudes.
+     *
+     * @todo The performance of this routine (which accesses the data in a predictible,
+     * consecutive fashion) is mostly limited by the memory bandwidth.
+     * The routine could be slightly optimized if a "packed" version of the data
+     * structure was chosen, so that the right hand side would be loaded into processor cache
+     * only once for every dense band in the matrix (and not for every diagonal as in
+     * the present version).
      * 
      * @param B Dense matrix. It is supposed to be stored by columns and to have
      *          dimensions n times k, where n is the column count of (*this) matrix.

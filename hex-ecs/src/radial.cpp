@@ -398,20 +398,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         setup_gpu_();
         
         // print information
-        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using OpenCL." << std::endl;
+        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ") using OpenCL." << std::endl;
     }
 #endif
     if (!cmd.gpu_slater)
     {
         // print information
-#if defined(_OPENMP)
-        #pragma omp parallel
-        #pragma omp master
-        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using " 
-                << omp_get_num_threads() << " threads." << std::endl;
-#else
-        std::cout << "Precomputing multipole integrals (λ = 0 .. " << lambdas.size() - 1 << ") using single thread." << std::endl;
-#endif
+        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
     }
     
     // shorthands
@@ -428,7 +421,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfload())
         {
-            std::cout << "\t- integrals for λ = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
+            std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
             
             // release from memory
             if (not cmd.cache_own_radint)
@@ -593,7 +586,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (not cmd.cache_own_radint)
             R_tr_dia_[lambda].drop();
         
-        std::cout << "\t- integrals for λ = " << lambda << " computed" << std::endl;
+        std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
     }
     
 #ifndef NO_MPI
@@ -634,7 +627,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // non-owners will update log and save file (if not already done)
             if (not par.isMyWork(lambda))
             {
-                std::cout << "\t- integrals for λ = " << lambda << " acquired from process " << owner << std::endl;
+                std::cout << "\t- integrals for lambda = " << lambda << " acquired from process " << owner << std::endl;
                 
                 // save to disk (if the file doesn't already exist)
                 if (not HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid())

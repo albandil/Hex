@@ -1269,7 +1269,6 @@ void KPACGPreconditioner::setup ()
     SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
     
     // diagonalize one-electron hamiltonians for all angular momenta
-    # pragma omp parallel for schedule(dynamic,1)
     for (int l = 0; l <= inp_.maxell; l++)
     {
         // compose the one-electron hamiltonian
@@ -1281,10 +1280,11 @@ void KPACGPreconditioner::setup ()
         // diagonalize the transformed matrix
         ColMatrix<Complex> ClL, ClR;
         std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
+        ColMatrix<Complex> invClR = ClR.invert();
         
         // store the data
         invsqrtS_Cl_[l] = invsqrtS * ClR;
-        invCl_invsqrtS_[l] = RowMatrix<Complex>(ClR.invert()) * ColMatrix<Complex>(invsqrtS);
+        invCl_invsqrtS_[l] = RowMatrix<Complex>(invClR) * ColMatrix<Complex>(invsqrtS);
         
         // covert Dl to matrix form and print verification
         ColMatrix<Complex> Dlmat(Dl_[l].size()), invDlmat(Dl_[l].size());
@@ -1294,8 +1294,7 @@ void KPACGPreconditioner::setup ()
             invDlmat(i,i) = 1.0 / Dl_[l][i];
         }
         
-        # pragma omp critical
-        std::cout << "\tH(l=" << l << ") factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * ClR.invert()).data()).norm() << std::endl;
+        std::cout << "\tH(l=" << l << ") factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
     }
     
     std::cout << std::endl;
@@ -1317,25 +1316,23 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     cArray const & Dl1 = Dl_[l1];
     cArray const & Dl2 = Dl_[l2];
     
-    // construct common diagonal
-    cArray diag (Dl1.size() * Dl2.size(), E_);
-    diag -= outer_product(Dl1, cArray(Dl2.size(),1.));
-    diag -= outer_product(cArray(Dl1.size(),1.), Dl2);
+    // dimensions
+    int N1 = Dl1.size(), N2 = Dl2.size();
     
-#ifdef _OPENMP
-    // disable parallel nesting if the preconditioning runs concurrently
-    bool nested = omp_get_nested();
-    if (cmd_.parallel_block)
-        omp_set_nested(false);
-#endif
+    // the common diagonal
+    cArray diag (N1 * N2, E_);
+    
+    // fill the diagonal (diag = E I × I - D1 × I - I × D2)
+    # pragma omp parallel for if (cmd_.parallel_dot)
+    for (int i = 0; i < N1 * N2; i++)
+        diag[i] -= Dl1[i / N2] + Dl2[i % N2];
     
     // precondition
-    z = kron_dot(SCl1, SCl2, kron_dot(Cl1S, Cl2S, r) / diag);
-
-#ifdef _OPENMP
-    // restore previous nesting state
-    omp_set_nested(nested);
-#endif
+    z = kron_dot(Cl1S, Cl2S, r);
+    # pragma omp parallel for if (cmd_.parallel_dot)
+    for (int i = 0; i < N1 * N2; i++)
+        z[i] /= diag[i];
+    z = kron_dot(SCl1, SCl2, z);
 }
 #endif
 
@@ -1408,20 +1405,8 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         }
     }
     
-#ifdef _OPENMP
-    // disable parallel nesting if the factorizations run concurrently
-    bool nested = omp_get_nested();
-    if (cmd_.parallel_block)
-        omp_set_nested(false);
-#endif
-    
     // precondition by LU
     z = lu_[iblock].solve(r);
-    
-#ifdef _OPENMP
-    // restore the prevoius nested flag
-    omp_set_nested(nested);
-#endif
     
     // release memory
     if (cmd_.outofcore)
