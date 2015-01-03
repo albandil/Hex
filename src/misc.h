@@ -50,6 +50,10 @@
 #include <type_traits>
 #include <string>
 
+#ifndef NO_MPI
+    #include <mpi.h>
+#endif
+
 //
 // Restricted pointers.
 // - allow some compiler optimizations on arrays
@@ -689,6 +693,24 @@ inline std::string underline (std::string text)
  */
 template <class T> class typeinfo {};
 
+/// Data-type info class specialization for 'int'.
+template<> class typeinfo<int>
+{
+    public:
+        /// Component data type.
+        typedef int cmpttype;
+        
+        /// Component count.
+        static const std::size_t ncmpt = 1;
+        
+        /// Component getter.
+        static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
+#ifndef NO_MPI
+        /// MPI data type of a component.
+        static MPI_Datatype mpicmpttype () { return MPI_INT; }
+#endif
+};
+
 /// Data-type info class specialization for 'double'.
 template<> class typeinfo<double>
 {
@@ -701,6 +723,10 @@ template<> class typeinfo<double>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
+#ifndef NO_MPI
+        /// MPI data type of a component.
+        static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
+#endif
 };
 
 /// Data-type info class specialization for 'std::complex'.
@@ -715,6 +741,10 @@ template<> template<class T> class typeinfo<std::complex<T>>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
+#ifndef NO_MPI
+        /// MPI data type of a component.
+        static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
+#endif
 };
 
 #define Debug std::cout << __func__ << " (" << __LINE__ << "): "

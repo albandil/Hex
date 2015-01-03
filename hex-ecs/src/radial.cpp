@@ -593,6 +593,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // for all multipoles : synchronize
     if (par.active())
     {
+        par.wait();
+        
         for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
         {
             //

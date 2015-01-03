@@ -1331,33 +1331,20 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l1 = l1_l2_[iblock].first;
     int l2 = l1_l2_[iblock].second;
     
-    // get the diagonalization matrices
-    RowMatrix<Complex> const & Cl1S = invCl_invsqrtS_[l1];
-    RowMatrix<Complex> const & Cl2S = invCl_invsqrtS_[l2];
-    RowMatrix<Complex> const & SCl1 = invsqrtS_Cl_[l1];
-    RowMatrix<Complex> const & SCl2 = invsqrtS_Cl_[l2];
+    // dimension of the matrices
+    int Nspline = s_bspline_.Nspline();
     
-    // get one-electron eigenvalues
-    cArray const & Dl1 = Dl_[l1];
-    cArray const & Dl2 = Dl_[l2];
+    // multiply by the first Kronecker product
+    z = kron_dot(invCl_invsqrtS_[l1], invCl_invsqrtS_[l2], r);
     
-    // dimensions
-    int N1 = Dl1.size(), N2 = Dl2.size();
+    // divide by the diagonal
+    # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
+    for (int i = 0; i < Nspline; i++) 
+    for (int j = 0; j < Nspline; j++)
+        z[i * Nspline + j] /= E_ - Dl_[l1][i] - Dl_[l2][j];
     
-    // the common diagonal
-    cArray diag (N1 * N2, E_);
-    
-    // fill the diagonal (diag = E I × I - D1 × I - I × D2)
-    # pragma omp parallel for if (cmd_.parallel_dot)
-    for (int i = 0; i < N1 * N2; i++)
-        diag[i] -= Dl1[i / N2] + Dl2[i % N2];
-    
-    // precondition
-    z = kron_dot(Cl1S, Cl2S, r);
-    # pragma omp parallel for if (cmd_.parallel_dot)
-    for (int i = 0; i < N1 * N2; i++)
-        z[i] /= diag[i];
-    z = kron_dot(SCl1, SCl2, z);
+    // multiply by the second Kronecker product
+    z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
 }
 #endif
 

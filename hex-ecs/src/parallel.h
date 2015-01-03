@@ -165,28 +165,23 @@ class Parallel
          * 
          * It is expected that the array has length equal or greater than chunksize * Nchunk.
          */
-        void sync (int * array, std::size_t chunksize, std::size_t Nchunk) const
+        template <class T> void sync (T * array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifndef NO_MPI
             if (active_)
+            {
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
-                    MPI_Bcast(array + ichunk * chunksize, chunksize, MPI_INT, ichunk % Nproc_, MPI_COMM_WORLD);
-#endif
-        }
-        void sync (double * array, std::size_t chunksize, std::size_t Nchunk) const
-        {
-#ifndef NO_MPI
-            if (active_)
-                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
-                    MPI_Bcast(array + ichunk * chunksize, chunksize, MPI_DOUBLE, ichunk % Nproc_, MPI_COMM_WORLD);
-#endif
-        }
-        void sync (Complex * array, std::size_t chunksize, std::size_t Nchunk) const
-        {
-#ifndef NO_MPI
-            if (active_)
-                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
-                    MPI_Bcast(array + ichunk * chunksize, 2 * chunksize, MPI_DOUBLE, ichunk % Nproc_, MPI_COMM_WORLD);
+                {
+                    MPI_Bcast
+                    (
+                        array + ichunk * chunksize,
+                        chunksize * typeinfo<T>::ncmpt,
+                        typeinfo<T>::mpicmpttype(),
+                        ichunk % Nproc_,
+                        MPI_COMM_WORLD
+                    );
+                }
+            }
 #endif
         }
         
