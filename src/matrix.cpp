@@ -1656,7 +1656,8 @@ SymDiaMatrix::SymDiaMatrix (std::string filename)
     : name_(filename)
 {
     # pragma omp critical
-    hdfload();
+    if (not hdfload())
+        throw exception ("Unable to load from %s.", filename.c_str());
 }
 
 void SymDiaMatrix::setup_dptrs_()
@@ -1729,7 +1730,7 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        throw exception ("[SymDiaMatrix::operator-=] Unequal sizes!");
+        throw exception ("[SymDiaMatrix::operator-=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))

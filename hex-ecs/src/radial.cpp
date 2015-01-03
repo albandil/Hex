@@ -386,10 +386,17 @@ void RadialIntegrals::setupOneElectronIntegrals ()
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
+    // shorthands
+    int Nspline = bspline_.Nspline();
+    int order = bspline_.order();
+    
     // allocate storage and associate names
     R_tr_dia_.resize(lambdas.size());
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
+    {
+        R_tr_dia_[lambda].size() = Nspline * Nspline;
         R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
+    }
     
 #ifndef NO_OPENCL
     if (cmd.gpu_slater)
@@ -406,10 +413,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // print information
         std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
     }
-    
-    // shorthands
-    int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
     
     // for all multipoles : compute / load
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
