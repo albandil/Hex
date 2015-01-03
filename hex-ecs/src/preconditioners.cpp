@@ -1238,6 +1238,9 @@ void KPACGPreconditioner::setup ()
     NoPreconditioner::setup();
     
     std::cout << "Set up KPA preconditioner" << std::endl;
+    std::cout << "\tOverlap matrix factorization" << std::endl;
+    
+    Timer timer;
     
     // resize arrays
     invsqrtS_Cl_.resize(inp_.maxell + 1);
@@ -1261,8 +1264,9 @@ void KPACGPreconditioner::setup ()
         invDSsqrtmat(i,i) = 1.0 / std::sqrt(DS[i]);
     }
     
-    // NOTE : Now S = CR * DSmat * CR⁻¹
-    std::cout << "\tS factorization residual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
+    // Now S = CR * DSmat * CR⁻¹
+    std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
+    std::cout << "\t\tresidual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
     
     // compute √S and √S⁻¹
     RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
@@ -1285,6 +1289,10 @@ void KPACGPreconditioner::setup ()
         // skip the angular momentum if no owned diagonal block needs it
         if (not need_l)
             continue;
+        
+        // reset timer
+        std::cout << "\tOne-electron H factorization (l = " << l << ")" << std::endl;
+        timer.reset();
         
         // compose the one-electron hamiltonian
         ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
@@ -1309,7 +1317,9 @@ void KPACGPreconditioner::setup ()
             invDlmat(i,i) = 1.0 / Dl_[l][i];
         }
         
-        std::cout << "\tH(l=" << l << ") factorization residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
+        // Now Hl = ClR * Dlmat * ClR⁻¹
+        std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
+        std::cout << "\t\tresidual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
     }
     
     std::cout << std::endl;
