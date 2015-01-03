@@ -595,8 +595,19 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     {
         for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
         {
-            // get owner process of this multipole
-            int owner = lambda % par.Nproc();
+            //
+            // Check if all processes have this multipole matrix (e.g. due to a shared scratch).
+            //
+            
+            Array<int> haveR(par.Nproc());
+            haveR[par.iproc()] = HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid();
+            par.sync(haveR.data(), 1, par.Nproc());
+            if (all(haveR))
+                continue;
+            
+            //
+            // Synchronize radial integrals across processes.
+            //
             
             // reload dropped data
             if (par.isMyWork(lambda) and not cmd.cache_own_radint)
@@ -607,6 +618,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             int datasize = R_tr_dia_[lambda].data().size();
             
             // owner will broadcast dimensions
+            int owner = lambda % par.Nproc();
             MPI_Bcast(&diagsize, 1, MPI_INT, owner, MPI_COMM_WORLD);
             MPI_Bcast(&datasize, 1, MPI_INT, owner, MPI_COMM_WORLD);
             
@@ -620,7 +632,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             
             // reconstruct objects
             R_tr_dia_[lambda].update();
-            R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
             
             // non-owners will update log and save file (if not already done)
             if (not par.isMyWork(lambda))
@@ -637,7 +648,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 R_tr_dia_[lambda].drop();
         }
         
-        MPI_Barrier(MPI_COMM_WORLD);
+        par.wait();
     }
 #endif
 

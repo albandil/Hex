@@ -1720,6 +1720,13 @@ inline bool all (const ArrayView<bool> B)
         ok = ok and b;
     return ok;
 }
+inline bool all (const ArrayView<int> B)
+{
+    bool ok = true;
+    for (bool b : B)
+        ok = ok and b;
+    return ok;
+}
 
 /// Check if any value is "true".
 inline bool any(const ArrayView<bool> B)
