@@ -596,14 +596,26 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
         {
             //
-            // Check if all processes have this multipole matrix (e.g. due to a shared scratch).
+            // Check if all processes have this multipole matrix file (e.g. on a shared scratch).
             //
             
+            // boolean flags indicating accessibility of R_tr_dia[lambda].hdf file to the individual processes
             Array<int> haveR(par.Nproc());
+            
+            // check if the current process can access the radial matrix file and redistribute the flags to all processes the 
             haveR[par.iproc()] = HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid();
             par.sync(haveR.data(), 1, par.Nproc());
+            
+            // if everyone can read the file, load it into memory cache (if needed) and skip redistribution of the file
             if (all(haveR))
+            {
+                // non-owners : read the file, if needed
+                if (not par.isMyWork(lambda) and cmd.cache_all_radint)
+                    R_tr_dia_[lambda].hdfload();
+                
+                // skip redistribution of the radial integrals file
                 continue;
+            }
             
             //
             // Synchronize radial integrals across processes.
