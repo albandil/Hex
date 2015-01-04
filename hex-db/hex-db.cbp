@@ -20,6 +20,7 @@
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
+					<Add option="-DNO_MPI" />
 					<Add directory="../win-include" />
 					<Add directory="libs" />
 				</Compiler>
@@ -44,6 +45,7 @@
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
+					<Add option="-DNO_MPI" />
 					<Add directory="../win-include" />
 					<Add directory="libs" />
 				</Compiler>
