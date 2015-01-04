@@ -34,11 +34,10 @@
 #include <cmath>
 #include <cstdio>
 
-#include <omp.h>
-
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
+#include "opencl.h"
 #include "parallel.h"
 #include "radial.h"
 
@@ -688,35 +687,35 @@ void RadialIntegrals::setup_gpu_ ()
     char text [1000];
     
     // use platform 0
-    clGetPlatformIDs (1, &platform_, nullptr);
-    clGetPlatformInfo (platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
+    clGetPlatformIDs(1, &platform_, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
     std::cout << "\tplatform: " << text << " ";
-    clGetPlatformInfo (platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
-    clGetPlatformInfo (platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
     std::cout << "\tavailable version: " << text << std::endl;
     
     // use device 0
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
 //     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
-    clGetDeviceInfo (device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
     std::cout << "\tdevice: " << text << " ";
-    clGetDeviceInfo (device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
     cl_ulong size;
-    clGetDeviceInfo (device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB " << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax compute units: " << size << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax work group size: " << size << std::endl << std::endl;
     max_local_ = size;
     
     // create context and command queue
-    context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
-    queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
+    context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
+    queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
     
     // setup compile flags
     std::ostringstream flags;

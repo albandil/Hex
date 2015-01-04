@@ -199,7 +199,7 @@ kernel void R_integral
 )
 {
     //
-    // preparations
+    // Preparations.
     //
     
     // get worker's ID (= which two-electron integral to compute)
@@ -209,7 +209,7 @@ kernel void R_integral
     const int4 idx = as_int4(idx_R[iwork]);
     
     //
-    // the off-diagonal contribution to the integral
+    // The off-diagonal contribution to the integral.
     //
     
     double2 Rtr_Labcd_offdiag = 0.0;
@@ -219,30 +219,27 @@ kernel void R_integral
     global double2 const * const restrict Mtr_L_bd    = Mtr_L    + (idx.y * (2*ORDER+1) + idx.w - (idx.y-ORDER)) * (ORDER+1);
     global double2 const * const restrict Mtr_mLm1_bd = Mtr_mLm1 + (idx.y * (2*ORDER+1) + idx.w - (idx.y-ORDER)) * (ORDER+1);
     
-    for (int ix = 0; ix < IKNOTMAX; ix++)
+    // ix < iy
+    for (int ix = idx.x; ix <= idx.x + ORDER && ix < IKNOTMAX; ix++)
+    for (int iy = max(idx.y,ix+1); iy <= idx.y + ORDER && iy < IKNOTMAX; iy++)
     {
-        for (int iy = ix + 1; iy < IKNOTMAX; iy++)
-        {
-            // ix < iy
-            if (idx.x <= ix && ix <= idx.x + ORDER && idx.y <= iy && iy <= idx.y + ORDER)
-            {
-                const double2 lg = Mtr_L_ac[ix - idx.x] + Mtr_mLm1_bd[iy - idx.y];
-                if (isfinite(lg.y))
-                    Rtr_Labcd_offdiag += cexp(lg);
-            }
+        const double2 lg = Mtr_L_ac[ix - idx.x] + Mtr_mLm1_bd[iy - idx.y];
+        if (isfinite(lg.y))
+            Rtr_Labcd_offdiag += cexp(lg);
+    }
             
-            // ix > iy (by renaming the ix,iy indices)
-            if (idx.y <= ix && ix <= idx.y + ORDER && idx.x <= iy && iy <= idx.x + ORDER)
-            {
-                const double2 lg = Mtr_L_bd[ix - idx.y] + Mtr_mLm1_ac[iy - idx.x];
-                if (isfinite(lg.y))
-                    Rtr_Labcd_offdiag += cexp(lg);
-            }
-        }
+    // ix > iy (by renaming the ix,iy indices)
+    for (int ix = idx.y; ix <= idx.y + ORDER && ix < IKNOTMAX; ix++)
+    for (int iy = max(idx.x,ix+1); iy <= idx.x + ORDER && iy < IKNOTMAX; iy++)
+    {
+        const double2 lg = Mtr_L_bd[ix - idx.y] + Mtr_mLm1_ac[iy - idx.x];
+        if (isfinite(lg.y))
+            Rtr_Labcd_offdiag += cexp(lg);
     }
     
     //
-    // the diagonal contribution to the integral
+    // The diagonal contribution to the integral.
+    // NOTE : This is the bottle-neck due to the lot of blocked registers.
     // 
     
     double2 Rtr_Labcd_diag = 0.0;

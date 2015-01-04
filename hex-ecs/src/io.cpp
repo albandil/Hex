@@ -140,7 +140,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--no-parallel-block             Disable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplicaiton).                   \n"
 #ifndef NO_OPENCL
-                    "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL.                                                                   \n"
+                    "\t--gpu-slater                    compute diagonal two-electron integrals using OpenCL.                                                                   \n"
 #endif
                     "                                                                                                                                                         \n"
                 ;

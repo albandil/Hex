@@ -48,8 +48,8 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 OPENCLFLAGS = -DNO_OPENCL
 
 # - for AMD OpenCL
-# OPENCLFLAGS = -I/opt/AMDAPPSDK-2.9-1/include
-# OPENCLLIBS = -L/opt/AMDAPPSDK-2.9-1/lib/x86_64 -lOpenCL
+# OPENCLFLAGS = -I/opt/AMDAPPSDK-3.0-0-Beta/include
+# OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
 
 # - for Intel OpenCL
 # OPENCLFLAGS = -I/opt/intel/opencl-1.2-4.4.0.117/include
