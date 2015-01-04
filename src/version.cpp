@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2014, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -49,7 +49,7 @@ std::string logo (std::string esc)
         "%s     /  ___  /   | |/_/    / /\\ \\      \n"
         "%s    / /   / /    \\_\\      / /  \\ \\   \n"
         "%s                                         \n"
-        "%s             UK MFF (c) 2014             \n"
+        "%s             UK MFF (c) 2015             \n"
         "%s                                         \n"
         "%s          version: 1.04 %s               \n"
         "%s                                         \n",
