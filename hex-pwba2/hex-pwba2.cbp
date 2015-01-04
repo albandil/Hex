@@ -18,6 +18,7 @@
 					<Add option="-fexceptions" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_HDF" />
+					<Add option="-DNO_MPI" />
 					<Add option="-DNO_LAPACK" />
 					<Add directory="../win-include" />
 				</Compiler>
