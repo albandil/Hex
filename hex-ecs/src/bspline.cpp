@@ -44,16 +44,26 @@
 
 Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
 {
-    if (k == 0)
-        return  (i == iknot) ? 1. : 0.;
+    // value of the parent B-splines of the requested B-spline
+    Complex b[k + 1];
     
-    Complex A = bspline(i,   iknot, k-1, r);
-    Complex B = bspline(i+1, iknot, k-1, r);
+    // initialize zero-order B-splines
+    for (int n = 0; n <= k; n++)
+        b[n] = (i + n == iknot ? 1. : 0.);
     
-    Complex S1 = (t_[i+k]   != t_[i])   ? (r - t_[i]) / (t_[i+k] - t_[i]) : 0.;
-    Complex S2 = (t_[i+k+1] != t_[i+1]) ? (t_[i+k+1] - r) / (t_[i+k+1] - t_[i+1]) : 0.;
+    // calculate higher orders
+    for (int ord = 1; ord <= k; ord++)
+    {
+        // update splines
+        for (int n = 0; n <= k-ord; n++)
+        {
+            b[n] = (t_[i+ord+n] == t_[i+n] ? 0. : b[n] * (r-t_[i+n]) / (t_[i+ord+n]-t_[i+n]))
+                 + (t_[i+ord+n+1] == t_[i+n+1] ? 0. : b[n+1] * (t_[i+ord+n+1]-r) / (t_[i+ord+n+1]-t_[i+n+1]));
+        }
+    }
     
-    return A * S1 + B * S2;
+    // return the collected value of the requested B-spline
+    return b[0];
 }
 
 Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
