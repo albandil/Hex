@@ -2048,28 +2048,14 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     cArray res(Nrows);
     
     // data pointers
-    // - "restricted" for maximization of the cache usage
-    // - "aligned" to convince the auto-vectorizer of the worth of the vectorization using SIMD (e.g. AVX2)
-    // Note that:
-    //    - cArray (= NumberArray<Complex>) is aligned on 4*sizeof(Complex) boundary (= 64 bytes = 512 bits)
-    //    - GCC needs -fcx-limited-range to auto-vectorize 'complex' operations
-    // The option -fcx-limited-range will inhibit some run-time range checking, so, technically,
-    // some 'complex' operations may overflow. However, e.g. GNU Fortran compiler never(!) checks
-    // for overflows, so why should we here, when we do not expect any.
-#if defined(__GNUC__) || defined(__INTEL_COMPILER)
-    Complex       *       restrict rp_res    = (Complex*)__builtin_assume_aligned(res.data(),    NumberArray<Complex>::Alloc::alignment);
-    Complex const *       restrict rp_elems_ = (Complex*)__builtin_assume_aligned(elems_.data(), NumberArray<Complex>::Alloc::alignment);
-    Complex const * const restrict rp_B      = (Complex*)__builtin_assume_aligned(B.data(),      NumberArray<Complex>::Alloc::alignment);
-#else
     Complex       *       restrict rp_res    = &res[0];
     Complex const *       restrict rp_elems_ = &elems_[0];
     Complex const * const restrict rp_B      = &B[0];
-#endif
     
     // for all elements in the main diagonal
     if (triangle & diagonal)
     {
-       # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B) if (parallelize)
+        # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B) if (parallelize)
         for (int ielem = 0; ielem < Nrows; ielem++)
             rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     }
