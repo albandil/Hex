@@ -75,7 +75,7 @@ void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i
     
     // fill output array
     for (int k = 0; k < n; k++)
-        out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) * damp(in[k], 0, R);
+        out[k] = values_i[k] * values_j[k] * std::pow(in[k]/x,L) * damp(in[k], 0, R);
 }
 
 void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const
@@ -105,9 +105,8 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
 
 Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const
 {
-    // raise point count - this is not a poly!
-    // TODO Estimate the order.
-    int points = bspline_.order() + L + 10; 
+    // integration points (the integrand is a poly of order equal to the four times the order of B-splines)
+    int points = 2 * bspline_.order() + 1; 
     
     // integrate
     return g_.quadMFP
@@ -157,7 +156,7 @@ Complex RadialIntegrals::computeR
     Complex Rtr_Labcd_offdiag = 0;
     
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
-    for (int iknot = 0; iknot < Nreknot - 1; iknot++)
+    for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
         Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
     
     // Further parts are a bit cryptical, because we are using precomputed
