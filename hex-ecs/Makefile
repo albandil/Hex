@@ -9,8 +9,8 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
-LFLAGS = -fopenmp -fPIC
+CFLAGS = -fopenmp -Wall -mtune=native -march=native
+LFLAGS = -fopenmp
 
 # ---------------------------------------------------------------------------- #
 # Suite Sparse environment                                                     #
@@ -101,11 +101,11 @@ PNGPPFLIBS =
 
 
 # compiler flags
-CFLAGS += $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
+CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
           $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
 
 # linker flags
-LFLAGS += $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
+LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
           $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
