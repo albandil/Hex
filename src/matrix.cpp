@@ -2476,7 +2476,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
     
     // output vector
     cArray w(v.size());
-
+    
 #ifdef _OPENMP
     // concurrent result access locks
     std::vector<omp_lock_t> locks(size_);
@@ -2511,7 +2511,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
 #ifdef _OPENMP
             omp_set_lock(&locks[i]);
 #endif
-            w_view = prod;
+            w_view += prod;
 #ifdef _OPENMP
             omp_unset_lock(&locks[i]);
 #endif
