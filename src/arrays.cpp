@@ -259,3 +259,19 @@ rArray threshold (const rArrayView a, double eps)
     
     return b;
 }
+
+cArray interleave (const rArrayView re, const rArrayView im)
+{
+    if (re.size() != im.size())
+        throw exception ("Cannot interleave arrays of different sizes (%ld != %ld).", re.size(), im.size());
+    
+    cArray output (re.size());
+    
+    for (std::size_t i = 0; i < re.size(); i++)
+    {
+        output[i].real(re[i]);
+        output[i].imag(im[i]);
+    }
+    
+    return output;
+}

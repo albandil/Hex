@@ -391,9 +391,6 @@ void NoPreconditioner::setup ()
     // compute large radial integrals
     s_rad_.setupOneElectronIntegrals();
     s_rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
-    
-    // resize arrays
-    dia_blocks_.resize(l1_l2_.size());
 }
 
 void NoPreconditioner::update (double E)
@@ -405,18 +402,34 @@ void NoPreconditioner::update (double E)
     # pragma omp parallel for if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
+        // angular momenta
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
         
-        // one-electron parts
-        dia_blocks_[ill] = E * s_rad_.S().kron(s_rad_.S());
-        dia_blocks_[ill] -= (0.5 * s_rad_.D() - s_rad_.Mm1_tr()).kron(s_rad_.S());
-        dia_blocks_[ill] -= (0.5 * l1 * (l1 + 1)) * s_rad_.Mm2().kron(s_rad_.S());
-        dia_blocks_[ill] -= s_rad_.S().kron((0.5 * s_rad_.D() - s_rad_.Mm1_tr()));
-        dia_blocks_[ill] -= (0.5 * l2 * (l2 + 1)) * s_rad_.S().kron(s_rad_.Mm2());
+        // initialize diagonal block
+        dia_blocks_[ill] = BlockSymDiaMatrix
+        (
+            s_bspline_.Nspline(),       // block count (and size)
+            s_rad_.S().nzpattern(),     // block structure
+            format("dblk-%d.ooc", ill)  // scratch disk file name
+        );
+        
+        // one-electron parts; for all blocks
+        for (std::pair<int,int> pos : dia_blocks_[ill].structure())
+        {
+            // get block position
+            int i = pos.first, j = pos.second;
+            
+            // update the block
+            dia_blocks_[ill].block(i,j)  = E * s_rad_.S()(i,j) * s_rad_.S();
+            dia_blocks_[ill].block(i,j) -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
+            dia_blocks_[ill].block(i,j) -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S();
+            dia_blocks_[ill].block(i,j) -= s_rad_.S()(i,j) * (0.5 * s_rad_.D() - s_rad_.Mm1_tr());
+            dia_blocks_[ill].block(i,j) -= 0.5 * l2 * (l2 + 1) * s_rad_.S()(i,j) * s_rad_.Mm2();
+        }
         
         // two-electron part
-        for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
             // calculate angular integral
             Complex f = special::computef(lambda,l1,l2,l1,l2,inp_.L);
@@ -429,28 +442,25 @@ void NoPreconditioner::update (double E)
             if (f == 0.)
                 continue;
             
-            // get radial integrals from memory
-            SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
-            
-            // get radial integrals from disk
-            SymDiaMatrix R_tr_dia_disk;
-            if (not (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint)))
+            // for all blocks
+            for (std::pair<int,int> pos : dia_blocks_[ill].structure())
             {
-                // load radial integrals and replace the pointer
-                R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
-                pR_tr_dia = &R_tr_dia_disk;
-            }
+                // get block position
+                int i = pos.first, j = pos.second;
+                
+                // use radial integrals from memory ...
+                if (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint))
+                    dia_blocks_[ill].block(i,j) += (-f) * s_rad_.R_tr_dia(lambda).block(i,j);
             
-            // add two-electron contributions
-            dia_blocks_[ill] -= f * (*pR_tr_dia);
+                // ... or from disk
+                else
+                    dia_blocks_[ill].block(i,j) += (-f) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget();
+            }
         }
         
         // if out-of-core is enabled, dump the matrix to disk
         if (cmd_.outofcore)
         {
-            // link diagonal block to a disk file
-            dia_blocks_[ill].hdflink(format("dblk-%d.ooc", ill));
-            
             // save diagonal block to disk
             # pragma omp critical   
             dia_blocks_[ill].hdfsave();
@@ -474,8 +484,8 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     int Nspline = s_rad_.bspline().Nspline();
     
     // necessary Kronecker products
-    SymDiaMatrix S_kron_Mm1_tr = s_rad_.S().kron(s_rad_.Mm1_tr());
-    SymDiaMatrix Mm1_tr_kron_S = s_rad_.Mm1_tr().kron(s_rad_.S());
+//     SymDiaMatrix S_kron_Mm1_tr = s_rad_.S().kron(s_rad_.Mm1_tr());
+//     SymDiaMatrix Mm1_tr_kron_S = s_rad_.Mm1_tr().kron(s_rad_.S());
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps = s_rad_.overlapj
@@ -519,7 +529,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 continue;
             
             // (anti)symmetrization
-            int Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1 : -1;
+            double Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(Complex(0.,1.),l)
@@ -536,7 +546,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
             
             // skip angular forbidden right hand sides
-            for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
                 double f2 = special::computef(lambda, l1, l2, l, li, inp_.L);
@@ -551,46 +561,53 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (f1 == 0. and f2 == 0.)
                     continue;
                 
-                // get radial integrals from memory
-                SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
-            
-                // get radial integrals from disk
-                SymDiaMatrix R_tr_dia_disk;
-                if (not (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint)))
+                // for all sub-blocks of the radial integral matrix
+                for (std::pair<int,int> pos : s_rad_.R_tr_dia(lambda).structure())
                 {
-                    // load radial integrals and replace the pointer
-                    R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
-                    pR_tr_dia = &R_tr_dia_disk;
-                }
-                
-                // add the contributions
-                if (f1 != 0.)
-                {
-                    chi_block += (prefactor * f1) * pR_tr_dia->dot(Pj1);
-                }
-                if (f2 != 0.)
-                {
-                    if (Sign > 0)
-                        chi_block += (prefactor * f2) * pR_tr_dia->dot(Pj2);
-                    else
-                        chi_block -= (prefactor * f2) * pR_tr_dia->dot(Pj2);
+                    // block indices
+                    int i = pos.first, j = pos.second;
+                    
+                    // for both symmetric blocks (i,j) and (j,i)
+                    for (int sym = 0; sym < 2; sym++)
+                    {
+                        // source data segment
+                        cArrayView src1 (Pj1, j * Nspline, Nspline), src2 (Pj2, j * Nspline, Nspline);
+                        
+                        // target data segment
+                        cArrayView dst (chi_block, i * Nspline, Nspline);
+                        
+                        // use radial integrals from memory ...
+                        if (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint))
+                        {
+                            // add the contributions
+                            if (f1 != 0.) dst += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).block(i,j).dot(src1);
+                            if (f2 != 0.) dst += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).block(i,j).dot(src2);
+                        }
+                        
+                        // ... or from disk
+                        else
+                        {
+                            // add the contributions
+                            if (f1 != 0.) dst += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget().dot(src1);
+                            if (f2 != 0.) dst += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget().dot(src2);
+                        }
+                        
+                        // switch to the other symmetry
+                        std::swap(i,j);
+                        
+                        // terminate if this is a diagonal sub-block and there is no partner symmetric block
+                        if (i == j) break;
+                    }
                 }
             }
             
+            // direct contribution
             if (li == l1 and l == l2)
-            {
-                // direct contribution
-                chi_block -= prefactor * S_kron_Mm1_tr.dot(Pj1);
-            }
+                chi_block += (-prefactor       ) * kron_dot(s_rad_.S_d(), s_rad_.Mm1_tr_d(), Pj1);
             
+            // exchange contribution with the correct sign
             if (li == l2 and l == l1)
-            {
-                // exchange contribution with the correct sign
-                if (Sign > 0)
-                    chi_block -= prefactor * Mm1_tr_kron_S.dot(Pj2);
-                else
-                    chi_block += prefactor * Mm1_tr_kron_S.dot(Pj2);
-            }
+                chi_block += (-prefactor * Sign) * kron_dot(s_rad_.Mm1_tr_d(), s_rad_.S_d(), Pj2);
         }
     }
 }
@@ -613,31 +630,19 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // copy-from segment of "p"
         cArrayView p_block (p, ill * Nchunk, Nchunk);
         
-        // use the diagonal block for multiplication
-        cArrayView (q, ill * Nchunk, Nchunk) = (
-            cmd_.outofcore ? dia_blocks_[ill].hdfget().dot(p_block, both, cmd_.parallel_dot)
-                           : dia_blocks_[ill].dot(p_block, both, cmd_.parallel_dot)
-        );
+        // copy-to segment of "q"
+        cArrayView q_block (q, ill * Nchunk, Nchunk);
+        
+        // multiply
+        q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot, cmd_.outofcore);
     }
     
     // multiply "p" by the off-diagonal blocks
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-    for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
     if (par_.isMyWork(lambda))
     {
-        // get radial integrals from memory
-        SymDiaMatrix const * pR_tr_dia = &(s_rad_.R_tr_dia(lambda));
-        
-        // get radial integrals from disk
-        SymDiaMatrix R_tr_dia_disk;
-        if (not cmd_.cache_own_radint)
-        {
-            // load radial integrals and replace the pointer
-            R_tr_dia_disk = std::move(s_rad_.R_tr_dia(lambda).hdfget());
-            pR_tr_dia = &R_tr_dia_disk;
-        }
-        
-        // get relevant positions of this block
+        // assemble all source vectors to be multiplied
         for (int ill = 0;  ill < Nang;  ill++)
         for (int illp = 0; illp < Nang; illp++)
         {
@@ -662,15 +667,15 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             if (f == 0.)
                 continue;
             
-            // copy-from segment of "p"
+            // source segment of "p"
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
             // product
-            cArray product = std::move(pR_tr_dia->dot(p_block, both, cmd_.parallel_dot));
+            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block) );
             
             // update array
             # pragma omp critical
-            cArrayView (q, ill * Nchunk, Nchunk) += Complex(-f) * product;
+            cArrayView (q, ill * Nchunk, Nchunk) += product;
         }
     }
     
@@ -705,11 +710,6 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
-        // load the diagonal block
-        if (cmd_.outofcore)
-        # pragma omp critical
-            dia_blocks_[ill].hdfload();
-        
         // solve using the CG solver
         n[ill] = cg_callbacks < cArray, cArrayView >
         (
@@ -722,10 +722,6 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             inner_mmul,             // matrix multiplication
             false                   // verbose output
         );
-        
-        // unload diagonal block
-        if (cmd_.outofcore)
-            dia_blocks_[ill].drop();
     }
     
     // broadcast inner preconditioner iterations
@@ -743,7 +739,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-    q = dia_blocks_[iblock].dot(p, both, cmd_.parallel_dot);
+    q = dia_blocks_[iblock].dot(p, cmd_.parallel_dot, cmd_.outofcore);
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -751,10 +747,10 @@ void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) co
     z = r;
 }
 
-#ifndef NO_OPENCL
+#if 0 // #ifndef NO_OPENCL
 
 const std::string GPUCGPreconditioner::name = "gpu";
-const std::string GPUCGPreconditioner::description = "Block inversion using preconditioned conjugate gradients (GPU variant, uses KPA).";
+const std::string GPUCGPreconditioner::description = "Block inversion using preconditioned conjugate gradients (GPU variant, uses KPA) -- EXPERIMENTAL.";
 
 // kernels' source as byte array, generated by "xxd" from the CL source
 char kernels_cl [] = {
@@ -783,30 +779,30 @@ void GPUCGPreconditioner::setup ()
     char text [1000];
     
     // use platform 0
-    clGetPlatformIDs (1, &platform_, nullptr);
-    clGetPlatformInfo (platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
+    clGetPlatformIDs(1, &platform_, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
     std::cout << "\tplatform: " << text << " ";
-    clGetPlatformInfo (platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
-    clGetPlatformInfo (platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
     std::cout << "\tavailable version: " << text << std::endl;
     
     // use device 0
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
 //     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
-    clGetDeviceInfo (device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
     std::cout << "\tdevice: " << text << " ";
-    clGetDeviceInfo (device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
     cl_ulong size;
-    clGetDeviceInfo (device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
     std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)" << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax compute units: " << size << std::endl;
-    clGetDeviceInfo (device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
     std::cout << "\tmax work group size: " << size << std::endl << std::endl;
     
     // choose (e.g.) the largest workgroup
@@ -814,8 +810,8 @@ void GPUCGPreconditioner::setup ()
     Nlocal_ = size;
     
     // create context and command queue
-    context_ = clCreateContext (nullptr, 1, &device_, nullptr, nullptr, nullptr);
-    queue_ = clCreateCommandQueue (context_, device_, 0, nullptr);
+    context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
+    queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
     
     // setup the structure of the matrices
     iArray diags;
@@ -1155,6 +1151,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
 
 #endif
 
+/*
 const std::string JacobiCGPreconditioner::name = "Jacobi";
 const std::string JacobiCGPreconditioner::description = "Block inversion using conjugate gradients with nested Jacobi preconditioning.";
 
@@ -1228,6 +1225,7 @@ void SSORCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
         SSOR_[iblock].drop();
     }
 }
+*/
 
 #ifndef NO_LAPACK
 const std::string KPACGPreconditioner::name = "KPA";
@@ -1325,6 +1323,125 @@ void KPACGPreconditioner::setup ()
     std::cout << std::endl;
 }
 
+void KPACGPreconditioner::update (double E)
+{
+    E_ = E;
+    
+    // precompute diagonal blocks only if the lightweight mode is off
+    if (not cmd_.lightweight)
+        CGPreconditioner::update(E);
+}
+
+void KPACGPreconditioner::multiply (const cArrayView p, cArrayView q) const
+{
+    // use parent routine only if the lightweight mode is off
+    if (not cmd_.lightweight)
+    {
+        CGPreconditioner::multiply(p, q);
+    }
+    else
+    {
+        // shorthands
+        int Nspline = s_rad_.bspline().Nspline();
+        int Nang = l1_l2_.size();
+        int Nchunk = Nspline * Nspline;
+        
+        // clear output array
+        std::memset(q.data(), 0, q.size() * sizeof(Complex));
+        
+        // multiply "p" by the diagonal blocks
+        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+        for (int ill = 0;  ill < Nang;  ill++)
+        if (par_.isMyWork(ill))
+        {
+            // copy-from segment of "p"
+            cArrayView p_block (p, ill * Nchunk, Nchunk);
+            
+            // copy-to segment of "q"
+            cArrayView q_block (q, ill * Nchunk, Nchunk);
+            
+            // angular momenta
+            int l1 = l1_l2_[ill].first;
+            int l2 = l1_l2_[ill].second;
+            
+            // mutiply by the one-electron Kronecker product terms
+            q_block = E_ * kron_dot(s_rad_.S_d(), s_rad_.S_d(), p_block)
+                    - kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d(), s_rad_.S_d(), p_block)
+                    - kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d(), p_block)
+                    - l1*(l1+1.)*kron_dot(s_rad_.Mm2_d(), s_rad_.S_d(), p_block)
+                    - l2*(l2+1.)*kron_dot(s_rad_.S_d(), s_rad_.Mm2_d(), p_block);
+        }
+        
+        Debug << "a, q.norm() = " << q.norm() << "\n";
+        
+        // multiply "p" by the off-diagonal blocks
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        if (par_.isMyWork(lambda))
+        {
+            // right-hand side and result segments
+            cArrays p_segments;
+            iArray q_segments;
+            
+            // get all source/destination positions of this block
+            for (int ill = 0;  ill < Nang;  ill++)
+            for (int illp = 0; illp < Nang; illp++)
+            {
+                // skip diagonal
+                if (ill == illp)
+                    continue;
+                
+                // row multi-index
+                int l1 = l1_l2_[ill].first;
+                int l2 = l1_l2_[ill].second;
+                
+                // column multi-index
+                int l1p = l1_l2_[illp].first;
+                int l2p = l1_l2_[illp].second;
+                
+                // calculate angular integral
+                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                if (not std::isfinite(f))
+                    throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                
+                // check non-zero
+                if (f != 0.)
+                {
+                    // setup multiplication source ...
+                    p_segments.push_back((-f) * cArrayView(p, illp * Nchunk, Nchunk));
+                    
+                    // ... and destination
+                    q_segments.push_back(ill  * Nchunk);
+                }
+            }
+            
+            Debug<< "b\n";
+            
+            // multiply all segments by the current integral matrix
+            cArrays products = std::move(s_rad_.apply_R_matrix(lambda, p_segments));
+            
+            Debug << "c\n";
+            
+            // add products to the result vector
+            # pragma omp critical
+            for (unsigned iseg = 0; iseg < q_segments.size(); iseg++)
+            {
+//                 write_array(p_segments[iseg], format("p-seg-%d.txt", iseg).c_str());
+//                 write_array(products[iseg], format("product-%d.txt", iseg).c_str());
+                cArrayView(q, q_segments[iseg], Nchunk) += products[iseg];
+//                 write_array(q, format("q-%d", iseg).c_str());
+            }
+            
+            Debug << "d\n";
+//             std::exit(0);
+        }
+        
+        Debug << "q.norm() = " << q.norm() << std::endl;
+        
+        // synchronize across processes by summing individual contributions
+        par_.syncsum(q.data(), Nchunk * l1_l2_.size());
+    }
+}
+
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     // get angular momenta of this block
@@ -1346,6 +1463,66 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // multiply by the second Kronecker product
     z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
 }
+
+void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
+{
+    // use parent routine if the lightweight mode is off
+    if (not cmd_.lightweight)
+    {
+        CGPreconditioner::CG_mmul(iblock, p, q);
+    }
+    else
+    {
+        //
+        // Multiply by the diagonal block 'iblock' on the fly.
+        //
+        
+        // shorthands
+        int Nspline = s_rad_.bspline().Nspline();
+        int Nchunk = Nspline * Nspline;
+        
+        // copy-from segment of "p"
+        cArrayView p_block (p, iblock * Nchunk, Nchunk);
+        
+        // copy-to segment of "q"
+        cArrayView q_block (q, iblock * Nchunk, Nchunk);
+        
+        // angular momenta
+        int l1 = l1_l2_[iblock].first;
+        int l2 = l1_l2_[iblock].second;
+        
+        // mutiply by the one-electron Kronecker product terms
+        q_block  = E_ * kron_dot(s_rad_.S_d(), s_rad_.S_d(), p_block);
+        q_block -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d(), s_rad_.S_d(), p_block);
+        q_block -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d(), p_block);
+        q_block -= l1*(l1+1.)*kron_dot(s_rad_.Mm2_d(), s_rad_.S_d(), p_block);
+        q_block -= l2*(l2+1.)*kron_dot(s_rad_.S_d(), s_rad_.Mm2_d(), p_block);
+                
+        // multiply "p" by the two-electron blocks
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            // angular momenta
+            int l1 = l1_l2_[iblock].first;
+            int l2 = l1_l2_[iblock].second;
+            
+            // calculate angular integral
+            double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
+            if (not std::isfinite(f))
+                throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
+                
+            // check non-zero
+            if (f != 0.)
+            {
+                // get right-hand-side segment to multiply
+                cArrays p_segments = { (-f) * cArrayView(p, iblock * Nchunk, Nchunk) };
+                
+                // multiply the segment by the radial integral matrix and add the product to the result vector
+                cArrayView(q, iblock  * Nchunk, Nchunk) += s_rad_.apply_R_matrix(lambda, p_segments)[0];
+            }
+        }
+    }
+}
+
 #endif
 
 const std::string ILUCGPreconditioner::name = "ILU";
@@ -1389,8 +1566,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     if (lu_[iblock].size() == 0)
     {
         // create CSR block
-        // NOTE : dia_blocks_[iblock] is loaded by CGPreconditioner::precondition
-        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo().tocsr();
+        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo(cmd_.outofcore).tocsr();
         
         // start timer
         Timer timer;

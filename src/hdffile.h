@@ -69,12 +69,15 @@ public:
      * This flag is used in the constructor of HDFFile to specify
      * access mode to the file (read only, overwrite etc.).
      */
-    typedef enum {
+    typedef enum
+    {
+//         create,
         readonly,
         overwrite,
         failifexists,
         readwrite
-    } FileAccess;
+    }
+    FileAccess;
     
     /// Constructor from filename and access mode.
     HDFFile(std::string filename, FileAccess flag);
@@ -83,7 +86,7 @@ public:
     ~HDFFile();
     
     /// Get size of the dataset of valid file.
-    size_t size (std::string dataset) const;
+    std::size_t size (std::string dataset) const;
     
     /// load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, size_t length) const;
@@ -98,6 +101,9 @@ private:
     
     /// Pointer to the HDF structure.
     H5::H5File * file_;
+    
+    /// Prefix for dataset paths.
+    std::string prefix_;
     
     /// Whether the file is valid.
     bool valid_;

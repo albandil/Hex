@@ -38,9 +38,18 @@
 #include "hdffile.h"
 #include "misc.h"
 
-HDFFile::HDFFile(std::string filename, FileAccess flag)
-    : file_(nullptr), valid_(true)
+HDFFile::HDFFile (std::string filename, FileAccess flag)
+    : file_(nullptr), prefix_(), valid_(true)
 {
+    // separate filesystem path and dataset path (by semicolon)
+    std::size_t pos = filename.find(':');
+    if (pos != std::string::npos)
+    {
+        prefix_ = filename.substr(pos + 1);
+        filename.resize(pos);
+    }
+    
+    // try to open the file
     try
     {
         switch (flag)
@@ -66,7 +75,7 @@ HDFFile::HDFFile(std::string filename, FileAccess flag)
     }
 }
 
-HDFFile::~HDFFile()
+HDFFile::~HDFFile ()
 {
     if (file_ != nullptr)
     {
@@ -76,13 +85,14 @@ HDFFile::~HDFFile()
     }
 }
 
-size_t HDFFile::size(std::string dataset) const
+size_t HDFFile::size (std::string dataset) const
 {
     if (not valid_)
         return 0;
     
     try
     {
+        dataset = prefix_ + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         size_t length = dspc.getSimpleExtentNpoints();
@@ -94,67 +104,67 @@ size_t HDFFile::size(std::string dataset) const
     }
 }
 
-template<> bool HDFFile::read<int>(std::string dataset, int* buffer, size_t length) const
+template<> bool HDFFile::read<int> (std::string dataset, int* buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
 }
 
-template<> bool HDFFile::read<unsigned int>(std::string dataset, unsigned int * buffer, size_t length) const
+template<> bool HDFFile::read<unsigned int> (std::string dataset, unsigned int * buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
 }
 
-template<> bool HDFFile::read<long>(std::string dataset, long* buffer, size_t length) const
+template<> bool HDFFile::read<long> (std::string dataset, long* buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_LONG));
 }
 
-template<> bool HDFFile::read<unsigned long>(std::string dataset, unsigned long * buffer, size_t length) const
+template<> bool HDFFile::read<unsigned long> (std::string dataset, unsigned long * buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_ULONG));
 }
 
-template<> bool HDFFile::read<double>(std::string dataset, double* buffer, size_t length) const
+template<> bool HDFFile::read<double> (std::string dataset, double* buffer, size_t length) const
 {
     return read_(dataset, buffer, length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
 }
 
-template<> bool HDFFile::read<Complex>(std::string dataset, Complex* buffer, size_t length) const
+template<> bool HDFFile::read<Complex> (std::string dataset, Complex* buffer, size_t length) const
 {
     return read_(dataset, buffer, 2*length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
 }
 
-template<> bool HDFFile::write<int>(std::string dataset, int const * buffer, size_t length)
+template<> bool HDFFile::write<int> (std::string dataset, int const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
 }
 
-template<> bool HDFFile::write<unsigned int>(std::string dataset, unsigned int const * buffer, size_t length)
+template<> bool HDFFile::write<unsigned int> (std::string dataset, unsigned int const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
 }
 
-template<> bool HDFFile::write<long>(std::string dataset, long const * buffer, size_t length)
+template<> bool HDFFile::write<long> (std::string dataset, long const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_LONG));
 }
 
-template<> bool HDFFile::write<unsigned long>(std::string dataset, unsigned long const * buffer, size_t length)
+template<> bool HDFFile::write<unsigned long> (std::string dataset, unsigned long const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_ULONG));
 }
 
-template<> bool HDFFile::write<double>(std::string dataset, double const * buffer, size_t length)
+template<> bool HDFFile::write<double> (std::string dataset, double const * buffer, size_t length)
 {
     return write_(dataset, buffer, length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
 }
 
-template<> bool HDFFile::write<Complex>(std::string dataset, Complex const * buffer, size_t length)
+template<> bool HDFFile::write<Complex> (std::string dataset, Complex const * buffer, size_t length)
 {
     return write_(dataset, buffer, 2*length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
 }
 
-bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const
+bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const
 {
     if (not valid_)
         return false;
@@ -163,6 +173,7 @@ bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::Atom
         return true;
     try
     {
+        dataset = prefix_ + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         
@@ -179,7 +190,7 @@ bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::Atom
     }
 }
 
-bool HDFFile::write_(std::string dataset, void const * buffer, hsize_t length, H5::AtomType dtype)
+bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, H5::AtomType dtype)
 {
     if (not valid_)
         return false;
@@ -189,7 +200,9 @@ bool HDFFile::write_(std::string dataset, void const * buffer, hsize_t length, H
     
     try
     {
+        dataset = prefix_ + dataset;
         H5::DataSpace dspc(1, &length);
+        
         H5::DataSet dset = file_->createDataSet(dataset.c_str(), dtype, dspc);
         
         dset.write(buffer, dtype);

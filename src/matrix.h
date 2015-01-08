@@ -1861,6 +1861,15 @@ public:
      */
     bool is_compatible (SymDiaMatrix const & B) const;
     
+    /**
+     * @brief Non-zero pattern.
+     * 
+     * Return array of pairs of integers that indicate structurally non-zero positions
+     * within the matrix. Note that only the upper triangle positions are returned,
+     * because the matrix is otherwise structurally symmetrical.
+     */
+    std::vector<std::pair<int,int>> nzpattern () const;
+    
     //
     // Arithmetic and other operators
     //
@@ -1959,10 +1968,16 @@ public:
      * @return True on successful write, false otherwise.
      */
     //@{
-    bool hdfsave () const { return hdfsave (name_); }
-    bool hdfsave (std::string name, bool docompress = false, int consec = 10) const;
+    bool hdfsave (HDFFile::FileAccess flags = HDFFile::overwrite) const { return hdfsave (name_, flags); }
+    bool hdfsave
+    (
+        std::string name,
+        HDFFile::FileAccess flags = HDFFile::overwrite,
+        bool docompress = false,
+        std::size_t consec = 10
+    ) const;
     //@}
-
+    
     //
     // Conversions to other formats
     //
@@ -2077,6 +2092,160 @@ private:
      * @endverbatim
      */
     void setup_dptrs_();
+};
+
+class BlockSymDiaMatrix
+{
+    private:
+        
+        /// Name of HDF5 scratch disk file.
+        std::string diskfile_;
+        
+        /// Size of a matrix block and also of the block structure.
+        std::size_t size_;
+        
+        /// List of block positions (only upper part).
+        std::vector<std::pair<int,int>> structure_;
+        
+        /// Array of matrix blocks.
+        mutable SymDiaMatrix * blocks_;
+    
+    public:
+        
+        //
+        // Constructors.
+        //
+        
+        BlockSymDiaMatrix (int size = 0)
+            : diskfile_(), size_(size), blocks_(nullptr) {}
+        
+        /**
+         * @brief Main constructor.
+         * 
+         * @param Nblock Number of blocks in a row (column) of the block matrix.
+         * @param blocksize Number of element in a row (column) of every single block.
+         * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
+         * @param name Name of the optional scratch disk file.
+         */
+        BlockSymDiaMatrix (int size, std::vector<std::pair<int,int>> blockstructure, std::string name = "")
+            : diskfile_(name), size_(size), structure_(blockstructure), blocks_(nullptr)
+        {
+            // allocate (and resize) the blocks
+            blocks_ = new SymDiaMatrix[structure_.size()]();
+            
+            // set scratch names for the sub-matrices
+            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+            {
+                // block indices
+                int i = structure_[iblock].first, j = structure_[iblock].second;
+                
+                // compose scratch path
+                std::string hdfpath = format("%s:block_%d_%d_", diskfile_.c_str(), i, j);
+                
+                // set the path
+                blocks_[iblock].size() = size_;
+                blocks_[iblock].hdflink(hdfpath);
+            }
+        }
+        
+        /// Release memory (but keep size information).
+        void drop ()
+        {
+            for (std::size_t i = 0; i < structure_.size(); i++)
+                blocks_[i].drop();
+        }
+        
+        /// Get block structure (only upper part!).
+        std::vector<std::pair<int,int>> const & structure () const
+        {
+            return structure_;
+        }
+        
+        /// Access individual blocks.
+        SymDiaMatrix & block (int i, int j)
+        {
+            // find this block in the matrix structure
+            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+            {
+                if (structure_[iblock].first == std::min(i,j) and structure_[iblock].second == std::max(i,j))
+                    return blocks_[iblock];
+            }
+            
+            throw exception ("There is no block (%ld,%ld) in the block matrix.", i, j);
+        }
+        SymDiaMatrix const & block (int i, int j) const
+        {
+            // find this block in the matrix structure
+            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+            {
+                if (structure_[iblock].first == std::min(i,j) and structure_[iblock].second == std::max(i,j))
+                    return blocks_[iblock];
+            }
+            
+            throw exception ("There is no block (%ld,%ld) in the block matrix.", i, j);
+        }
+        
+        /// Access individual elements.
+        Complex & operator() (std::size_t i, std::size_t j)
+        {
+            // block and element position
+            std::size_t X = std::min(i,j) / size_, Y = std::max(i,j) / size_;
+            std::size_t x = std::min(i,j) % size_, y = std::max(i,j) % size_;
+            
+            // pick requested item
+            return block(X,Y)(x,y);
+        }
+        Complex operator() (std::size_t i, std::size_t j) const
+        {
+            // block and element position
+            std::size_t X = std::min(i,j) / size_, Y = std::max(i,j) / size_;
+            std::size_t x = std::min(i,j) % size_, y = std::max(i,j) % size_;
+            
+            // pick requested item
+            return block(X,Y)(x,y);
+        }
+        
+        //
+        // Arithmetic operators.
+        //
+        
+        /**
+         * @brief Multiply (block) vector by the matrix.
+         * 
+         * @param v Vector to multiply. It should be of equal size to the size of the matrix.
+         *          The result will be again of the same size.
+         * @param parallelize Multiply by several blocks at once (OpenMP used).
+         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
+         */
+        cArray dot (cArrayView v, bool parallelize = false, bool loadblocks = false) const;
+        
+        //
+        // Coversions to other matrix types.
+        //
+        
+        /**
+         * @brief Convert to COO format.
+         * 
+         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
+         */
+        CooMatrix tocoo (bool loadblocks = false) const;
+        
+        //
+        // Scratch file I/O.
+        //
+        
+        /// Get name of the scratch disk file.
+        std::string hdfname () const { return diskfile_; }
+        std::string & hdfname () { return diskfile_; }
+        
+        /// Check that the scratch disk file exists.
+        bool hdfcheck () const;
+        
+        /// Write all blocks from memory to the disk file.
+        bool hdfsave () const;
+        
+        /// Load data from disk to memory.
+        bool hdfload ();
 };
 
 // --------------------------------------------------------------------------//
@@ -2234,7 +2403,8 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
  * @param B Second matrix.
  */
 CooMatrix kron (CooMatrix const & A, CooMatrix const & B);
-SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
+BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
+cArray kron_dot (SymDiaMatrix const & A, SymDiaMatrix const & B, const cArrayView v);
 
 /**
  * Identity matrix.

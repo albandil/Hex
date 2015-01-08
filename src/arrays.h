@@ -1910,4 +1910,7 @@ template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 /// Drop small elements of array (replace by zero).
 rArray threshold (const rArrayView a, double eps);
 
+/// Combine real and imaginary parts.
+cArray interleave (const rArrayView re, const rArrayView im);
+
 #endif

@@ -45,7 +45,7 @@
 #include "matrix.h"
 
 #ifndef NO_OPENCL
-#include "opencl.h"
+    #include "opencl.h"
 #endif
 
 class weightEdgeDamp
@@ -200,15 +200,11 @@ class RadialIntegrals
         void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
         void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
         
-        void allSymmetries
-        (
-            int i, int j, int k, int l,
-            Complex Rijkl_tr,
-            SymDiaMatrix & R_tr_dia
-        ) const;
-        
-        /** Compute P-overlaps
+        /** 
+         * @brief Compute P-overlaps
+         * 
          * Compute overlap vector of B-splines vs. hydrogen Pnl function.
+         * 
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
          * @param weightf Weight function to multiply every value of the hydrogenic function.
@@ -371,13 +367,31 @@ class RadialIntegrals
         SymDiaMatrix const & Mm1_tr() const { return Mm1_tr_; }
         SymDiaMatrix const & Mm2() const { return Mm2_; }
         
-        SymDiaMatrix const & R_tr_dia (unsigned i) const
+        RowMatrix<Complex> const & D_d() const { return D_d_; }
+        RowMatrix<Complex> const & S_d() const { return S_d_; }
+        RowMatrix<Complex> const & Mm1_d() const { return Mm1_d_; }
+        RowMatrix<Complex> const & Mm1_tr_d() const { return Mm1_tr_d_; }
+        RowMatrix<Complex> const & Mm2_d() const { return Mm2_d_; }
+        
+        BlockSymDiaMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
-        std::size_t maxlambda () const { return R_tr_dia_.size() - 1; }
+        /**
+         * @brief Multiply vectors by matrix of two-electron integrals.
+         * 
+         * This routine will multiply several source vectors by the matrix of two-electron
+         * integrals for given multipole 'lambda'. The matrix elements are
+         * computed anew and applied directly to the vectors to minimize memory
+         * requirements. This method - instead of caching the whole integral
+         * matrix in memory or on disk - is used in the 'lightweight' mode,
+         * which can be requested by the command line option --lightweight.
+         */
+        cArrays apply_R_matrix (unsigned lambda, cArrays const & src) const;
+        
+        int maxlambda () const { return R_tr_dia_.size() - 1; }
         
     private:
         
@@ -415,7 +429,8 @@ class RadialIntegrals
         //
         
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
-        Array<SymDiaMatrix> R_tr_dia_;
+        RowMatrix<Complex> D_d_, S_d_, Mm1_d_, Mm1_tr_d_, Mm2_d_;
+        Array<BlockSymDiaMatrix> R_tr_dia_;
 };
 
 #endif

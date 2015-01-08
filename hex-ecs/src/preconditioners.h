@@ -230,7 +230,10 @@ class NoPreconditioner : public PreconditionerBase
             Bspline const & bspline,
             CommandLine const & cmd
         ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
-            s_bspline_(bspline), s_rad_(s_bspline_) {}
+            dia_blocks_(l1_l2_.size()), s_bspline_(bspline), s_rad_(s_bspline_)
+        {
+            // nothing to do
+        }
         
         virtual RadialIntegrals const & rad () const { return s_rad_; }
         
@@ -258,7 +261,7 @@ class NoPreconditioner : public PreconditionerBase
         std::vector<std::pair<int,int>> const & l1_l2_;
         
         // diagonal blocks in DIA format (these will be used in matrix multiplication)
-        mutable std::vector<SymDiaMatrix> dia_blocks_;
+        mutable std::vector<BlockSymDiaMatrix> dia_blocks_;
         
         // B-spline environment for the solution
         Bspline s_bspline_;
@@ -313,7 +316,7 @@ class CGPreconditioner : public NoPreconditioner
  * using the conjugate gradients solver (which itself is non-preconditioned).
  */
 #ifndef NO_OPENCL
-class GPUCGPreconditioner : public NoPreconditioner
+/*class GPUCGPreconditioner : public NoPreconditioner
 {
     public:
         
@@ -368,7 +371,7 @@ class GPUCGPreconditioner : public NoPreconditioner
         
         // diagonal parts of one-electron hamiltonians
         std::vector<CLArray<Complex>> Dl_;
-};
+};*/
 #endif
 
 /**
@@ -377,7 +380,7 @@ class GPUCGPreconditioner : public NoPreconditioner
  * Enhances CGPreconditioner conjugate gradients solver by Jacobi (diagonal) preconditioning.
  * This is done by redefining virtual function CG_prec.
  */
-class JacobiCGPreconditioner : public CGPreconditioner
+/*class JacobiCGPreconditioner : public CGPreconditioner
 {
     public:
         
@@ -413,7 +416,7 @@ class JacobiCGPreconditioner : public CGPreconditioner
         
         // inverse diagonals for every block
         cArrays invd_;
-};
+};*/
 
 /**
  * @brief SSOR-preconditioned CG-based preconditioner.
@@ -421,7 +424,7 @@ class JacobiCGPreconditioner : public CGPreconditioner
  * Enhances CGPreconditioner conjugate gradients solver by SSOR preconditioning.
  * This is done by redefining virtual function CG_prec.
  */
-class SSORCGPreconditioner : public CGPreconditioner
+/*class SSORCGPreconditioner : public CGPreconditioner
 {
     public:
         
@@ -457,7 +460,7 @@ class SSORCGPreconditioner : public CGPreconditioner
         
         // inverse diagonals for every block
         mutable std::vector<SymDiaMatrix> SSOR_;
-};
+};*/
 
 /**
  * @brief KPA-preconditioned CG-preconditioner.
@@ -494,16 +497,17 @@ class KPACGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
+        virtual void multiply (const cArrayView p, cArrayView q) const;
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        virtual void update (double E) { CGPreconditioner::update(E); }
+        virtual void update (double E);
         
         // declare own definitions
         virtual void setup ();
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         
@@ -573,7 +577,7 @@ class ILUCGPreconditioner : public CGPreconditioner
  * Choleski factorization preconditioning. This is done by redefining virtual function CG_prec.
  * This preconditioner probably won't work due to pivot breakdown.
  */
-class DICCGPreconditioner : public CGPreconditioner
+/*class DICCGPreconditioner : public CGPreconditioner
 {
     public: 
         
@@ -608,7 +612,7 @@ class DICCGPreconditioner : public CGPreconditioner
     private:
         
         std::vector<SymDiaMatrix> DIC_;
-};
+};*/
 
 /**
  * @brief SPAI-preconditioned CG-based preconditioner.
@@ -619,7 +623,7 @@ class DICCGPreconditioner : public CGPreconditioner
  * and its construction is rather slow. Moreover, it doesn't seem to work.
  */
 #ifndef NO_LAPACK
-class SPAICGPreconditioner : public CGPreconditioner
+/*class SPAICGPreconditioner : public CGPreconditioner
 {
     public:
         
@@ -655,7 +659,7 @@ class SPAICGPreconditioner : public CGPreconditioner
         
         // SPAIs for every diagonal block
         std::vector<CsrMatrix> spai_;
-};
+};*/
 #endif
 
 /**
@@ -695,11 +699,11 @@ class Preconditioners
             ILUCGPreconditioner         // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
             , NoPreconditioner          // No preconditioner.
             , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
-            , JacobiCGPreconditioner    // Solve diagonal blocks by Jacobi-preconditioned CG iterations.
+/*            , JacobiCGPreconditioner    // Solve diagonal blocks by Jacobi-preconditioned CG iterations.*/
 #ifndef NO_OPENCL
-            , GPUCGPreconditioner       // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).
+/*            , GPUCGPreconditioner       // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).*/
 #endif
-            , SSORCGPreconditioner      // Solve diagonal blocks by SSOR-preconditioned CG iterations.
+/*            , SSORCGPreconditioner      // Solve diagonal blocks by SSOR-preconditioned CG iterations.*/
 #ifndef NO_LAPACK
             , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
 #endif

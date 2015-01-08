@@ -1904,6 +1904,7 @@ bool SymDiaMatrix::hdfload (std::string name)
 #ifndef NO_HDF
     try
     {
+        // open the HDF file
         HDFFile hdf(name, HDFFile::readonly);
         if (not hdf.valid())
             return false;
@@ -1918,20 +1919,38 @@ bool SymDiaMatrix::hdfload (std::string name)
                 return false;
         
         // compressed array info
-        NumberArray<int> zero_blocks;
-        NumberArray<Complex> elements;
+        iArray zero_blocks_re, zero_blocks_im;
+        rArray elements_re, elements_im;
         
-        if (zero_blocks.resize(hdf.size("zero_blocks")))
-            if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+        // read data from file
+        if (zero_blocks_re.resize(hdf.size("zero_blocks_re")))
+            if (not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size()))
+                return false;
+        
+        if (zero_blocks_im.resize(hdf.size("zero_blocks_im")))
+            if (not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))
                 return false;
         
         // load compressed elements
-        if (elements.resize(hdf.size("x") / 2))
-            if (not hdf.read("x", &(elements[0]), elements.size()))
+        if (elements_re.resize(hdf.size("re")))
+            if (not hdf.read("re", &(elements_re[0]), elements_re.size()))
+                return false;
+        
+        if (elements_im.resize(hdf.size("im")))
+            if (not hdf.read("im", &(elements_im[0]), elements_im.size()))
                 return false;
         
         // decompress
-        elems_ = elements.decompress(zero_blocks);
+        elems_ = std::move
+        (
+            interleave
+            (
+                elements_re.decompress(zero_blocks_re),
+                elements_im.decompress(zero_blocks_im)
+            )
+        );
+        
+        // update matrix internals
         setup_dptrs_();
         return true;
     }
@@ -1944,14 +1963,14 @@ bool SymDiaMatrix::hdfload (std::string name)
 #endif
 }
 
-bool SymDiaMatrix::hdfsave (std::string name, bool docompress, int consec) const
+bool SymDiaMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool docompress, std::size_t consec) const
 {
 #ifndef NO_HDF
-    HDFFile hdf(name, HDFFile::overwrite);
-        
+    HDFFile hdf(name, flags);
+    
     if (not hdf.valid())
         return false;
-        
+    
     // write dimension and diagonal info
     if (not hdf.write("n", &n_, 1))
         return false;
@@ -1959,21 +1978,35 @@ bool SymDiaMatrix::hdfsave (std::string name, bool docompress, int consec) const
         return false;
     
     // compress elements array
-    NumberArray<int> zero_blocks;
-    NumberArray<Complex> elements;
+    iArray zero_blocks_re, zero_blocks_im;
+    rArray elements_re, elements_im;
     
     if (docompress)
-        std::tie(zero_blocks, elements) = elems_.compress(consec);
+    {
+        std::tie(zero_blocks_re, elements_re) = realpart(elems_).compress(consec);
+        std::tie(zero_blocks_im, elements_im) = imagpart(elems_).compress(consec);
+    }
     else
-        elements = elems_;
+    {
+        elements_re = std::move(realpart(elems_));
+        elements_im = std::move(imagpart(elems_));
+    }
     
     // write compressed elements array (if non-empty); check result
-    if (not zero_blocks.empty() and
-        not hdf.write("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+    if (not zero_blocks_re.empty() and
+        not hdf.write("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size()))
         return false;
     
-    if (not elements.empty() and
-        not hdf.write("x", &(elements[0]), elements.size()))
+    if (not zero_blocks_im.empty() and
+        not hdf.write("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))
+        return false;
+    
+    if (not elements_re.empty() and
+        not hdf.write("re", &(elements_re[0]), elements_re.size()))
+        return false;
+    
+    if (not elements_im.empty() and
+        not hdf.write("im", &(elements_im[0]), elements_im.size()))
         return false;
     
     return true;
@@ -2097,6 +2130,46 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     return res;
 }
 
+std::vector<std::pair<int,int>> SymDiaMatrix::nzpattern () const
+{
+    std::vector<std::pair<int,int>> nz;
+    nz.reserve(data().size());
+    
+    // for all diagonals
+    for (int d : idiag_)
+    {
+        // for all elements on the diagonal
+        for (int i = 0; i < n_ - d; i++)
+        {
+            // store this structural non-zero
+            nz.push_back(std::make_pair(i,i+d));
+        }
+    }
+    
+    return nz;
+}
+
+BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
+{
+    // only allow A and B of the same size
+    if (A.size() != B.size())
+        throw exception ("Matrices for the Kronecker product need to have the same size in current implementation, but %d != %d.", A.size(), B.size());
+    
+    // create result block matrix
+    BlockSymDiaMatrix C (A.size(), A.nzpattern());
+    
+    // for all blocks
+    for (std::pair<int,int> pos : A.nzpattern())
+    {
+        int i = pos.first, j = pos.second;
+        C.block(i,j) = std::move( A(i,j) * B );
+    }
+    
+    // return result
+    return C;
+}
+
+/*
 SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     iArray Cdiags;
@@ -2168,10 +2241,11 @@ SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
     // return final result
     return C;
 }
-
+*/
 SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
 {
-    return ::kron (*this, B);
+    Debug << "Not implemented" << std::endl;
+    std::abort();
 }
 
 cArray SymDiaMatrix::lowerSolve (const cArrayView b) const
@@ -2388,4 +2462,161 @@ cArray SymDiaMatrix::toPaddedCols () const
 void SymDiaMatrix::hdflink (std::string name)
 {
     name_ = name;
+}
+
+bool BlockSymDiaMatrix::hdfcheck () const
+{
+    return HDFFile(diskfile_, HDFFile::readonly).valid();
+}
+
+cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) const
+{
+    if (v.size() != size_ * size_)
+        throw exception ("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
+    
+    // output vector
+    cArray w(v.size());
+
+#ifdef _OPENMP
+    // concurrent result access locks
+    std::vector<omp_lock_t> locks(size_);
+    for (omp_lock_t & lock : locks)
+        omp_init_lock(&lock);
+#endif
+    
+    // for all blocks
+    # pragma omp parallel for if (parallelize)
+    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+    {
+        // it may be necessary to load the block from scratch
+        if (loadblocks)
+            blocks_[iblock].hdfload();
+        
+        // block indices
+        int i = structure_[iblock].first, j = structure_[iblock].second;
+        
+        // for both symmetric blocks
+        for (int sym = 0; sym < 2; sym++)
+        {
+            // source vector segment
+            cArrayView v_view (v, j * size_, size_);
+            
+            // calculate the product
+            cArray prod = blocks_[iblock].dot(v_view);
+            
+            // target vector segment
+            cArrayView w_view (w, i * size_, size_);
+            
+            // safely write to the shared output array
+#ifdef _OPENMP
+            omp_set_lock(&locks[i]);
+#endif
+            w_view = prod;
+#ifdef _OPENMP
+            omp_unset_lock(&locks[i]);
+#endif
+            
+            // skip the next symmetry if the block is on diagonal
+            if (i == j)
+                break;
+            
+            // the next symmetry
+            std::swap(i,j);
+        }
+        
+        // it may be necessary to drop the block from memory
+        if (loadblocks)
+            blocks_[iblock].drop();
+    }
+    
+    return w;
+}
+
+CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
+{
+    // number of structurally non-zero blocks (both upper and lower)
+    std::size_t nblocks = size_ + 2 * (structure_.size() - size_);
+    
+    // number of structurally non-zero elements (the structure is recursive)
+    std::size_t nelem = nblocks * nblocks;
+    
+    // allocate the ijv arrays
+    lArray I(nelem), J(nelem);  long *pI = I.data(), *pJ = J.data();
+    cArray V(nelem);            Complex *pV = V.data();
+    
+    // for all blocks
+    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+    {
+        // it may be necessary to load the block from scratch
+        if (loadblocks)
+            blocks_[iblock].hdfload();
+        
+        // block indices
+        int i = structure_[iblock].first, j = structure_[iblock].second;
+        
+        // for both symmetric blocks
+        for (int sym = 0; sym < 2; sym++)
+        {
+            // convert the block to COO format
+            CooMatrix coo = blocks_[iblock].tocoo();
+            
+            // copy all elements to whole-matrix arrays
+            for (std::size_t k = 0; k < nblocks; k++)
+            {
+                *pI++ = coo.i()[k] + i * size_;
+                *pJ++ = coo.j()[k] + j * size_;
+                *pV++ = coo.v()[k];
+            }
+            
+            // skip the next symmetry if the block is on diagonal
+            if (i == j)
+                break;
+            
+            // the next symmetry
+            std::swap(i,j);
+        }
+        
+        // it may be necessary to drop the block from memory
+        if (loadblocks)
+            blocks_[iblock].drop();
+    }
+    
+    // compose the final matrix
+    return CooMatrix
+    (
+        size_ * size_,  // number of rows
+        size_ * size_,  // number of columns
+        std::move(I),   // row indices
+        std::move(J),   // column indices
+        std::move(V)    // structurally nonzero matrix entries
+    );
+}
+
+bool BlockSymDiaMatrix::hdfsave () const
+{
+    // reset the file
+    HDFFile(diskfile_, HDFFile::overwrite);
+    
+    // save all blocks with compression of 10+ consecutive zeros
+    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+        if (not blocks_[iblock].hdfsave(blocks_[iblock].hdfname(), HDFFile::readwrite, true, 10))
+            return false;
+    
+    return true;
+}
+
+bool BlockSymDiaMatrix::hdfload ()
+{
+    // load all blocks
+    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+        if (not blocks_[iblock].hdfload())
+            return false;
+    
+    return true;
+}
+
+cArray kron_dot (SymDiaMatrix const & A, SymDiaMatrix const & B, const cArrayView v)
+{
+    Debug << "Not implemented." << std::endl;
+    std::abort();
 }

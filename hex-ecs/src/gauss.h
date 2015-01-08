@@ -127,11 +127,13 @@ class GaussLegendre : public GaussLegendreData
          *    t[iknot] <= x2 <= t[iknot+1]
          * @endcode
          */
-        template <class Functor, class... Data> Complex quad (
+        template <class Functor, class... Data> Complex quad
+        (
             Functor f,
             int points, int iknot, Complex x1, Complex x2,
             Data... data
-        ) const {
+        ) const
+        {
             // check boundaries
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
@@ -170,9 +172,13 @@ class GaussLegendre : public GaussLegendreData
          * result = quad (&a, &a::integrand, ...);
          * @endcode
          */
-        template <class ClassPtr, class Functor, class... Data> Complex quadMFP (
-            ClassPtr ptr, Functor f, int points, int iknot, Complex x1, Complex x2, Data... data
-        ) const {
+        template <class ClassPtr, class Functor, class... Data> Complex quadMFP
+        (
+            ClassPtr ptr, Functor f,
+            int points, int iknot, Complex x1, Complex x2,
+            Data... data
+        ) const
+        {
             // check boundaries
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())

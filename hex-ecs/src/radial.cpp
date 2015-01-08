@@ -33,6 +33,7 @@
 #include <complex>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 #include "arrays.h"
 #include "bspline.h"
@@ -364,22 +365,22 @@ void RadialIntegrals::setupOneElectronIntegrals ()
     std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
     D_.hdfload(D_name) or D_.populate (
         bspline_.order(), [=](int i, int j) -> Complex { return computeD(i, j, bspline_.Nknot() - 1); }
-    ).hdfsave(D_name);
+    ).hdfsave(D_name); D_d_ = D_.torow();
     
     // load/compute integral moments
     std::cout << "ok\n\nLoading/precomputing integral moments... " << std::flush;
     S_.hdfload(S_name) or S_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave(S_name);
+    ).hdfsave(S_name); S_d_ = S_.torow();
     Mm1_.hdfload(Mm1_name) or Mm1_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave(Mm1_name);
+    ).hdfsave(Mm1_name); Mm1_d_ = Mm1_.torow();
     Mm1_tr_.hdfload(Mm1_tr_name) or Mm1_tr_.populate (
         bspline_.order(),    [=](int m, int n) -> Complex { return computeM(-1, m, n, bspline_.Nreknot() - 1);}
-    ).hdfsave(Mm1_tr_name);
+    ).hdfsave(Mm1_tr_name); Mm1_tr_d_ = Mm1_tr_.torow();
     Mm2_.hdfload(Mm2_name) or Mm2_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave(Mm2_name);
+    ).hdfsave(Mm2_name); Mm2_d_ = Mm2_.torow();
     std::cout << "ok\n\n";
 }
 
@@ -393,8 +394,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     R_tr_dia_.resize(lambdas.size());
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
     {
-        R_tr_dia_[lambda].size() = Nspline * Nspline;
-        R_tr_dia_[lambda].hdflink(format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda));
+        R_tr_dia_[lambda] = BlockSymDiaMatrix
+        (
+            Nspline,            // block count (and size)
+            S_.nzpattern(),     // block structure
+            format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda) // HDF scratch disk file name
+        );
     }
     
 #ifndef NO_OPENCL
@@ -421,32 +426,25 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             continue;
         
         // look for precomputed data on disk
-        if (R_tr_dia_[lambda].hdfload())
+        if (R_tr_dia_[lambda].hdfcheck())
         {
             std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
             
-            // release from memory
-            if (not cmd.cache_own_radint)
-                R_tr_dia_[lambda].drop();
-            
-            // no need to compute
-            continue;
+            if (not cmd.cache_own_radint or R_tr_dia_[lambda].hdfload())
+                continue;
         }
         
-        // preallocate and clear the matrix of the integrals
-        R_tr_dia_[lambda].size() = Nspline * Nspline;
-        R_tr_dia_[lambda].diag().clear();
-        std::size_t size = 0;
-        for (int i = 0; i <= order; i++)
-        for (int j = std::max(0, i * Nspline - order); j <= i * Nspline + order; j++)
+        // initialize R_tr_dia matrix blocks structure using the overlap matrix
+        for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
         {
-            R_tr_dia_[lambda].diag().push_back(j);
-            size += Nspline * Nspline - j;
+            SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
+            
+            M.diag() = S_.diag();
+            M.data() = S_.data();
+            M.update();
         }
-        R_tr_dia_[lambda].data().resize(size);
-        R_tr_dia_[lambda].update();
         
-#ifndef NO_OPENCL
+#if 0 //ndef NO_OPENCL
         if (cmd.gpu_slater)
         {
             // NOTE : This needs to be fixed.
@@ -487,15 +485,37 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
                 for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
                 {
-                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
-                    if (i > j and k > l)
-                        continue;
+                    // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
+                    // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
+                    // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
+                    // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
                     
-                    // add index 4-tuple
-                    idx_R.push_back(i); 
-                    idx_R.push_back(j);
-                    idx_R.push_back(k);
-                    idx_R.push_back(l);
+                    // prepare the equivalent permutations
+                    int P[8][4] = {
+                        /* original    */ {i,j,k,l},
+                        /* symm. 1     */ {k,j,i,l},
+                        /* symm. 2     */ {i,l,k,j},
+                        /* symm. 3     */ {j,i,l,k},
+                        /* symm. 1+2   */ {k,l,i,j},
+                        /* symm. 1+3   */ {l,i,j,k},
+                        /* symm. 2+3   */ {j,k,l,i},
+                        /* symm. 1+2+3 */ {l,k,j,i}
+                    };
+                    
+                    // find the lexicographically first permutation (store its index in 'm')
+                    int m = 0;
+                    for (int n = 1; n < 8; n++)
+                        m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
+                    
+                    // only calculate the integral if this is the lexicographically first permutation
+                    if (m == 0)
+                    {
+                        // add index 4-tuple
+                        idx_R.push_back(i); 
+                        idx_R.push_back(j);
+                        idx_R.push_back(k);
+                        idx_R.push_back(l);
+                    }
                 }
             }
             
@@ -536,12 +556,36 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
                 for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
                 {
-                    // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
-                    if (i > j and k > l)
-                        continue;
+                    // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
+                    // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
+                    // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
+                    // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
                     
-                    // store all symmetries
-                    allSymmetries(i, j, k, l, *R_ptr++, R_tr_dia_[lambda]);
+                    // prepare the equivalent permutations
+                    int P[8][4] = {
+                        /* original    */ {i,j,k,l},
+                        /* symm. 1     */ {k,j,i,l},
+                        /* symm. 2     */ {i,l,k,j},
+                        /* symm. 3     */ {j,i,l,k},
+                        /* symm. 1+2   */ {k,l,i,j},
+                        /* symm. 1+3   */ {l,i,j,k},
+                        /* symm. 2+3   */ {j,k,l,i},
+                        /* symm. 1+2+3 */ {l,k,j,i}
+                    };
+                    
+                    // find the lexicographically first permutation (store its index in 'm')
+                    int m = 0;
+                    for (int n = 1; n < 8; n++)
+                        m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
+                    
+                    // only calculate the integral if this is the lexicographically first permutation
+                    if (m == 0)
+                    {
+                        // store all symmetries
+                        for (int n = 0; n < 8; n++)
+                            R_tr_dia_[lambda](P[n][0] * Nspline + P[n][1], P[n][2] * Nspline + P[n][3]) = *R_ptr;
+                        R_ptr++;
+                    }
                 }
             }
         }
@@ -555,7 +599,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
             Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
             
-            # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1) if (!cmd.gpu_slater)
+            # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1)
             {
                 // for all B-spline pairs
                 # pragma omp for schedule (dynamic,1)
@@ -566,23 +610,46 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
                     for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
                     {
-                        // skip symmetry ijkl <-> jilk (others are accounted for in the limits)
-                        if (i > j and k > l)
-                            continue;
+                        // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
+                        // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
+                        // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
+                        // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
                         
-                        // evaluate B-spline integral
-                        Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+                        // prepare the equivalent permutations
+                        int P[8][4] = {
+                            /* original    */ {i,j,k,l},
+                            /* symm. 1     */ {k,j,i,l},
+                            /* symm. 2     */ {i,l,k,j},
+                            /* symm. 3     */ {j,i,l,k},
+                            /* symm. 1+2   */ {k,l,i,j},
+                            /* symm. 1+3   */ {l,i,j,k},
+                            /* symm. 2+3   */ {j,k,l,i},
+                            /* symm. 1+2+3 */ {l,k,j,i}
+                        };
                         
-                        // store all symmetries
-                        # pragma omp critical
-                        allSymmetries(i, j, k, l, Rijkl_tr, R_tr_dia_[lambda]);
+                        // find the lexicographically first permutation (store its index in 'm')
+                        int m = 0;
+                        for (int n = 1; n < 8; n++)
+                            m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
+                        
+                        // only calculate the integral if this is the lexicographically first permutation
+                        if (m == 0)
+                        {
+                            // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+                            Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+                            
+                            // store all symmetries to the matrix
+                            # pragma omp critical
+                            for (int n = 0; n < 8; n++)
+                                R_tr_dia_[lambda](P[n][0] * Nspline + P[n][1], P[n][2] * Nspline + P[n][3]) = Rijkl_tr;
+                        }
                     }
                 }
             }
         }
         
         // save matrix to disk
-        R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
+        R_tr_dia_[lambda].hdfsave();
         
         // release the integrals from memory if requested
         if (not cmd.cache_own_radint)
@@ -607,7 +674,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             Array<int> haveR(par.Nproc());
             
             // check if the current process can access the radial matrix file and redistribute the flags to all processes the 
-            haveR[par.iproc()] = HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid();
+            haveR[par.iproc()] = R_tr_dia_[lambda].hdfcheck();
             par.sync(haveR.data(), 1, par.Nproc());
             
             // if everyone can read the file, load it into memory cache (if needed) and skip redistribution of the file
@@ -629,25 +696,26 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (par.isMyWork(lambda) and not cmd.cache_own_radint)
                 R_tr_dia_[lambda].hdfload();
             
-            // get dimensions
-            int diagsize = R_tr_dia_[lambda].diag().size();
-            int datasize = R_tr_dia_[lambda].data().size();
-            
-            // owner will broadcast dimensions
+            // determine owner
             int owner = lambda % par.Nproc();
-            MPI_Bcast(&diagsize, 1, MPI_INT, owner, MPI_COMM_WORLD);
-            MPI_Bcast(&datasize, 1, MPI_INT, owner, MPI_COMM_WORLD);
             
-            // resize arrays
-            R_tr_dia_[lambda].diag().resize(diagsize);
-            R_tr_dia_[lambda].data().resize(datasize);
-            
-            // owner will broadcast arrays
-            MPI_Bcast(R_tr_dia_[lambda].diag().data(), diagsize, MPI_INT, owner, MPI_COMM_WORLD);
-            MPI_Bcast(R_tr_dia_[lambda].data().data(), datasize, MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
-            
-            // reconstruct objects
-            R_tr_dia_[lambda].update();
+            // for all blocks of the matrix
+            for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
+            {
+                // get block to synchronize
+                SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
+                
+                // resize arrays (this won't change owner's data)
+                M.diag().resize(S_.diag().size());
+                M.data().resize(S_.data().size());
+                
+                // owner will broadcast arrays
+                MPI_Bcast(M.diag().data(), S_.diag().size(), MPI_INT,            owner, MPI_COMM_WORLD);
+                MPI_Bcast(M.data().data(), S_.data().size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
+                
+                // reconstruct objects
+                M.update();
+            }
             
             // non-owners will update log and save file (if not already done)
             if (not par.isMyWork(lambda))
@@ -655,8 +723,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 std::cout << "\t- integrals for lambda = " << lambda << " acquired from process " << owner << std::endl;
                 
                 // save to disk (if the file doesn't already exist)
-                if (not HDFFile(R_tr_dia_[lambda].hdfname(), HDFFile::readonly).valid())
-                    R_tr_dia_[lambda].hdfsave(R_tr_dia_[lambda].hdfname(), true, 10);
+                if (not R_tr_dia_[lambda].hdfcheck())
+                    R_tr_dia_[lambda].hdfsave();
             }
             
             // release the integrals from memory if requested
@@ -669,6 +737,79 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 #endif
 
     std::cout << std::endl;
+}
+
+cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & rhss) const
+{
+    // shorthands
+    int Nspline = bspline_.Nspline();
+    int order = bspline_.order();
+    
+    // logarithms of partial integral moments
+    cArray Mtr_L, Mtr_mLm1;
+    
+    // the products
+    cArrays ress;
+    for (unsigned i = 0; i < rhss.size(); i++)
+        ress.push_back(cArray(Nspline * Nspline));
+    
+    // compute partial moments
+    Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+    Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+    
+    # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1)
+    {
+        // for all B-spline pairs
+        # pragma omp for schedule (dynamic,1)
+        for (int i = 0; i < Nspline; i++)
+        for (int j = 0; j < Nspline; j++)
+        {
+            // for all nonzero, nonsymmetry R-integrals
+            for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
+            for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
+            {
+                // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
+                // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
+                // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
+                // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
+                
+                // prepare the equivalent permutations
+                int P[8][4] = {
+                    /* original    */ {i,j,k,l},
+                    /* symm. 1     */ {k,j,i,l},
+                    /* symm. 2     */ {i,l,k,j},
+                    /* symm. 3     */ {j,i,l,k},
+                    /* symm. 1+2   */ {k,l,i,j},
+                    /* symm. 1+3   */ {l,i,j,k},
+                    /* symm. 2+3   */ {j,k,l,i},
+                    /* symm. 1+2+3 */ {l,k,j,i}
+                };
+                
+                // find the lexicographically first permutation (store its index in 'm')
+                int m = 0;
+                for (int n = 1; n < 8; n++)
+                    m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
+                
+                // only calculate the integral if this is the lexicographically first permutation
+                if (m == 0)
+                {
+                    // evaluate B-spline integral of Bi(1) Bj(1) V(1,2) Bk(2) Bl(2)
+                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+                    
+                    // multiply all right-hand sides by the symmetrical elements
+                    # pragma omp critical
+                    for (unsigned iseg = 0; iseg < rhss.size(); iseg++)
+                    {
+                        for (int n = 0; n < 8; n++)
+                            ress[iseg][P[n][0] * Nspline + P[n][1]] += Rijkl_tr * rhss[iseg][P[n][2] * Nspline + P[n][3]];
+                    }
+                }
+            }
+        }
+    }
+    
+    // return result
+    return ress;
 }
 
 #ifndef NO_OPENCL
