@@ -26,9 +26,6 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
 SUITESPARSEFLAGS =
 SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
                   -lmetis -lsuitesparseconfig -lopenblas
-                  
-# - do not use openblas-specific functions
-# SUITESPARSEFLAGS = -DNO_OPENBLAS
 
 # ---------------------------------------------------------------------------- #
 # OpenMPI environment (optional, use -DNO_MPI to omit)                         #
@@ -104,14 +101,11 @@ CXXFLAGS = -g $(CXXRILIS)
 # source files
 CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
            matrix preconditioners radial slater special version
-OCLFILES = preconditioners slater
 
 # sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
 OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
-OCLSOURCES   = $(patsubst %,src/%.cl, $(CXXFILES))
-OCLKERNELS   = $(patsubst %,src/%.inc,$(OCLFILES))
 
 # build all targets
 all: pollversion bin/hex-ecs
@@ -141,7 +135,7 @@ dist:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES) $(OCLKERNELS)
+	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean distclean
@@ -151,7 +145,7 @@ distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
 # main program target
-bin/hex-ecs: $(OCLKERNELS) $(OBJECTS)
+bin/hex-ecs: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
 
