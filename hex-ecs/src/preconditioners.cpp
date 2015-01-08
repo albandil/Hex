@@ -385,7 +385,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false                   // verbose output
+            true                   // verbose output
         );
     }
     

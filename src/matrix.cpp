@@ -2492,7 +2492,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
     # pragma omp parallel for schedule (dynamic,1) if (parallelize)
     for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
     {
-        // it may be necessary to load the block from scratch
+        // it may be necessary to load the block from scratch file
         if (loadblocks)
             blocks_[iblock].hdfload();
         

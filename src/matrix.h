@@ -48,6 +48,7 @@
 
 #include "arrays.h"
 #include "complex.h"
+#include "hdffile.h"
 
 // forward declaration of classes in order to enable them as return types
 // of other classes before proper definition

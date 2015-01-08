@@ -307,15 +307,23 @@ unsigned cg_callbacks
  * @param verbose Whether to comment the progress to stdout.
  * @return Iteration count.
  */
-template <typename TFunctor1, typename TFunctor2>
-int bicgstab_callbacks
+template
+<
+    class TArray,
+    class TArrayView,
+    class Preconditioner,
+    class MatrixMultiplication
+>
+unsigned bicgstab_callbacks
 (
-    const cArrayView b, cArrayView x,
-    double eps,
-    int min_iterations, int max_iterations,
-    TFunctor1 apply_preconditioner,
-    TFunctor2 matrix_multiply,
-    bool verbose = false
+        const TArrayView b,
+              TArrayView x,
+                  double eps,
+                unsigned min_iterations,
+                unsigned max_iterations,
+          Preconditioner apply_preconditioner,
+    MatrixMultiplication matrix_multiply,
+                    bool verbose
 )
 {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -324,12 +332,15 @@ int bicgstab_callbacks
     int N = b.size();
     double bnorm = b.norm();
     
-    cArray x_im1(N), r_im1(N), rt(N), p_i(N), p_im1(N), v_im1(N), phat(N), v_i(N), s(N), shat(N), t(N), x_i(N), r_i(N);
-    Complex rho_im1, rho_im2, beta, alpha_i, alpha_im1, omega_i, omega_im1;
+    cArray p(N), r(N), rt(N), s(N), t(N), v(N), y(N), z(N);
+    Complex alpha = 1, beta = 1, rho = 1, rho_prev = 1, omega = 1;
     
-    x_im1 = x;
-    matrix_multiply(x_im1,r_im1);
-    rt = r_im1 = b - r_im1;
+    matrix_multiply(x,r);
+    rt = r = b - r;
+    
+    double rnorm = r.norm();
+    
+    Timer timer;
     
     int i;
     for (i = 1; i < max_iterations; i++)
@@ -338,62 +349,65 @@ int bicgstab_callbacks
         
         if (verbose)
         {
-            std::cout << "\t[Bi-CGSTAB] Residual relative magnitude after "
-                    << i << " iterations: " << r_im1.norm() / bnorm
-                    << " (" << sec.count()/60 << " min)\n";
+            std::cout << '\t';
+            std::cout << std::setw(4) << std::right << i;
+            std::cout << " | ";
+            std::cout << std::setw(11) << std::left << timer.nice_time();
+            std::cout << " | ";
+            std::cout << std::setw(15) << std::left << rnorm / bnorm;
         }
         
-        rho_im1 = (rt | r_im1);
-        if (std::abs(rho_im1) == 0.)
-            throw exception ("[Bi-CGSTAB] Failed, rho = 0.");
+        // 1.
+        rho = (rt | r);
         
-        if (i == 1)
-        {
-            p_i = r_im1;
-        }
-        else
-        {
-            beta = (rho_im1 / rho_im2) * (alpha_im1 / omega_im1);
-            p_i = r_im1 + beta * (p_im1 - omega_im1 * v_im1);
-        }
+        // 2.
+        beta = (rho / rho_prev) * (alpha / omega);
         
-        apply_preconditioner(p_i, phat);
-        matrix_multiply(phat, v_i);
-        alpha_i = rho_im1 / (rt | v_i);
-        s = r_im1 - alpha_i * v_i;
+        // 3.
+        p = r + beta * (p - omega * v);
         
-        if (s.norm() < eps * bnorm)
+        // 4.
+        apply_preconditioner(p, y);
+        
+        // 5.
+        matrix_multiply(y, v);
+        
+        // 6.
+        alpha = rho / (rt | v);
+        
+        // 7.
+        s = r - alpha * v;
+        
+        // 8.
+        apply_preconditioner(s, z);
+        
+        // 9.
+        matrix_multiply(z, t);
+        
+        // 10. (assumming K₁ = Id)
+        omega = (t | s) / (t | t);
+        
+        // 11.
+        x += alpha * y + omega * z;
+        
+        // 12. (check accuracy of x)
+        matrix_multiply(x, y);
+        rnorm = (y - b).norm();
+        if (verbose)
+            std::cout << std::endl;
+        if (not std::isfinite(rnorm))
         {
-            x = x_im1 + alpha_i * phat;
+            std::cout << "\t     The norm of the solution is not finite. Something went wrong!" << std::endl;
             break;
         }
+        if (rnorm < eps * bnorm)
+            return i;
         
-        apply_preconditioner(s, shat);
-        matrix_multiply(shat, t);
-        omega_i = (t|s) / (t|t);
+        // 13.
+        r = s - omega * t;
         
-        x_i = x_im1 + alpha_i * phat + omega_i * s;
-        r_i = s - omega_i * t;
-        
-        if (r_i.norm() < eps * bnorm)
-        {
-            x = x_i;
-            break;
-        }
-        
-        if (omega_i == 0.)
-            throw exception ("[Bi-CGSTAB] Solver failed, ω = 0.");
-        
-        // shift vectors
-        x_im1 = std::move(x_i);
-        r_im1 = std::move(r_i);
-        p_im1 = std::move(p_i);
-        v_im1 = std::move(v_i);
-        
-        // shift 
-        rho_im2 = rho_im1;
-        alpha_im1 = alpha_i;
-        omega_im1 = omega_i;
+        // Update indices.
+        rho_prev = rho;
     }
     
     return i;
