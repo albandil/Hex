@@ -563,6 +563,8 @@ bool CscMatrix::hdfsave (const char* name) const
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile file(name, HDFFile::overwrite);
         
         // write dimensions
@@ -586,6 +588,8 @@ bool CscMatrix::hdfsave (const char* name) const
             );
         }
         
+        hdfunlock_();
+        
         return true;
     }
     catch (...)
@@ -602,6 +606,8 @@ bool CscMatrix::hdfload (const char* name)
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -624,6 +630,8 @@ bool CscMatrix::hdfload (const char* name)
                 x_.size() * 2
             );
         }
+        
+        hdfunlock_();
         
         return true;
     }
@@ -838,6 +846,8 @@ bool CsrMatrix::hdfsave (std::string name) const
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
@@ -861,6 +871,8 @@ bool CsrMatrix::hdfsave (std::string name) const
             );
         }
         
+        hdfunlock_();
+        
         return true;
     }
     catch (...)
@@ -877,6 +889,8 @@ bool CsrMatrix::hdfload (std::string name)
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -899,6 +913,8 @@ bool CsrMatrix::hdfload (std::string name)
                 x_.size() * 2
             );
         }
+        
+        hdfunlock_();
         
         return true;
     }
@@ -1390,7 +1406,7 @@ void CooMatrix::write (const char* filename) const
 }
 
 
-CooMatrix CooMatrix::reshape (size_t m, size_t n) const
+CooMatrix CooMatrix::reshape (std::size_t m, std::size_t n) const
 {
     CooMatrix C = *this;
     
@@ -1427,7 +1443,7 @@ cArray CooMatrix::todense () const
     cArray v (m_ * n_);
     
     std::size_t N = i_.size();
-    for (size_t i = 0; i < N; i++)
+    for (std::size_t i = 0; i < N; i++)
         v[i_[i] + j_[i] * m_] += x_[i];
     
     return v;
@@ -1459,7 +1475,7 @@ CooMatrix CooMatrix::dot (const cArrayView B) const
     CooMatrix C(C_rows, C_cols);
     
     // for all elements of A
-    for (size_t i = 0; i < A_vol; i++)
+    for (std::size_t i = 0; i < A_vol; i++)
     {
         unsigned row = i_[i];
         unsigned col = j_[i];
@@ -1533,6 +1549,8 @@ bool CooMatrix::hdfsave (const char* name) const
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
@@ -1556,6 +1574,8 @@ bool CooMatrix::hdfsave (const char* name) const
             );
         }
         
+        hdfunlock_();
+        
         return true;
     }
     catch (...)
@@ -1574,6 +1594,8 @@ bool CooMatrix::hdfload (const char* name)
 #ifndef NO_HDF
     try
     {
+        hdflock_();
+        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -1597,6 +1619,8 @@ bool CooMatrix::hdfload (const char* name)
             );
         }
         
+        hdfunlock_();
+        
         return true;
     }
     catch (...)
@@ -1611,13 +1635,17 @@ bool CooMatrix::hdfload (const char* name)
 SymDiaMatrix::SymDiaMatrix ()
     : n_(0), elems_(0), idiag_(0), name_(), dptrs_(0)
 {
-    
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (int n)
     : n_(n), elems_(n), idiag_(0), name_(), dptrs_(0)
 {
-    
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
@@ -1633,6 +1661,10 @@ SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
     
     // setup diagonal pointers
     setup_dptrs_();
+    
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id, const cArrayView v)
@@ -1640,26 +1672,41 @@ SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id, const cArrayView v)
 {
     // setup diagonal pointers
     setup_dptrs_();
+    
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
-SymDiaMatrix::SymDiaMatrix(SymDiaMatrix const & A)
+SymDiaMatrix::SymDiaMatrix (SymDiaMatrix const & A)
     : n_(A.n_), elems_(A.elems_), idiag_(A.idiag_), name_()
 {
     // setup diagonal pointers
     setup_dptrs_();
+    
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
-SymDiaMatrix::SymDiaMatrix(SymDiaMatrix&& A)
+SymDiaMatrix::SymDiaMatrix (SymDiaMatrix&& A)
     : n_(std::move(A.n_)), elems_(std::move(A.elems_)), idiag_(std::move(A.idiag_)), name_(A.name_)
 {
     // setup diagonal pointers
     setup_dptrs_();
+
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (std::string filename)
     : name_(filename)
 {
-    # pragma omp critical
+#ifdef _OPENMP
+    omp_init_lock(&lock_);
+#endif
+    
     if (not hdfload())
         throw exception ("Unable to load from %s.", filename.c_str());
 }
@@ -1908,41 +1955,47 @@ bool SymDiaMatrix::hdfload (std::string name)
 #ifndef NO_HDF
     try
     {
+        // reserve the HDF file for the current thread
+        hdflock_();
+        
         // open the HDF file
         HDFFile hdf(name, HDFFile::readonly);
         if (not hdf.valid())
+        {
+            hdfunlock_();
             return false;
+        }
         
         // read dimension
         if (not hdf.read("n", &n_, 1))
+        {
+            hdfunlock_();
             return false;
+        }
         
         // read non-zero diagonal identificators
         if (idiag_.resize(hdf.size("idiag")))
+        {
             if (not hdf.read("idiag", &(idiag_[0]), idiag_.size()))
+            {
+                hdfunlock_();
                 return false;
+            }
+        }
         
         // compressed array info
         iArray zero_blocks_re, zero_blocks_im;
         rArray elements_re, elements_im;
         
         // read data from file
-        if (zero_blocks_re.resize(hdf.size("zero_blocks_re")))
-            if (not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size()))
-                return false;
-        
-        if (zero_blocks_im.resize(hdf.size("zero_blocks_im")))
-            if (not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))
-                return false;
-        
-        // load compressed elements
-        if (elements_re.resize(hdf.size("re")))
-            if (not hdf.read("re", &(elements_re[0]), elements_re.size()))
-                return false;
-        
-        if (elements_im.resize(hdf.size("im")))
-            if (not hdf.read("im", &(elements_im[0]), elements_im.size()))
-                return false;
+        if ((zero_blocks_re.resize(hdf.size("zero_blocks_re")) and not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
+            (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
+            (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
+            (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
+        {
+            hdfunlock_();
+            return false;
+        }
         
         // decompress
         elems_ = std::move
@@ -1956,10 +2009,15 @@ bool SymDiaMatrix::hdfload (std::string name)
         
         // update matrix internals
         setup_dptrs_();
+        
+        // allow other threads to access the file
+        hdfunlock_();
+        
         return true;
     }
     catch (H5::FileIException exc)
     {
+        hdfunlock_();
         return false;
     }
 #else /* NO_HDF */
@@ -1970,16 +2028,23 @@ bool SymDiaMatrix::hdfload (std::string name)
 bool SymDiaMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool docompress, std::size_t consec) const
 {
 #ifndef NO_HDF
+    hdflock_();
+    
     HDFFile hdf(name, flags);
     
     if (not hdf.valid())
+    {
+        hdfunlock_();
         return false;
+    }
     
     // write dimension and diagonal info
-    if (not hdf.write("n", &n_, 1))
+    if (not hdf.write("n", &n_, 1) or
+        not hdf.write("idiag", &(idiag_[0]), idiag_.size()))
+    {
+        hdfunlock_();
         return false;
-    if (not hdf.write("idiag", &(idiag_[0]), idiag_.size()))
-        return false;
+    }
     
     // compress elements array
     iArray zero_blocks_re, zero_blocks_im;
@@ -1997,22 +2062,20 @@ bool SymDiaMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool do
     }
     
     // write compressed elements array (if non-empty); check result
-    if (not zero_blocks_re.empty() and
-        not hdf.write("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size()))
+    if ((not zero_blocks_re.empty() and
+         not hdf.write("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
+       ((not zero_blocks_im.empty() and
+         not hdf.write("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))) or
+       ((not elements_re.empty() and
+         not hdf.write("re", &(elements_re[0]), elements_re.size()))) or
+       ((not elements_im.empty() and
+        not hdf.write("im", &(elements_im[0]), elements_im.size()))))
+    {
+        hdfunlock_();
         return false;
+    }
     
-    if (not zero_blocks_im.empty() and
-        not hdf.write("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))
-        return false;
-    
-    if (not elements_re.empty() and
-        not hdf.write("re", &(elements_re[0]), elements_re.size()))
-        return false;
-    
-    if (not elements_im.empty() and
-        not hdf.write("im", &(elements_im[0]), elements_im.size()))
-        return false;
-    
+    hdfunlock_();
     return true;
 #else /* NO_HDF */
     return false;
@@ -2482,7 +2545,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
     cArray w(v.size());
     
 #ifdef _OPENMP
-    // concurrent result access locks
+    // result vector concurrent access locks
     std::vector<omp_lock_t> locks(size_);
     for (omp_lock_t & lock : locks)
         omp_init_lock(&lock);
@@ -2494,7 +2557,11 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
     {
         // it may be necessary to load the block from scratch file
         if (loadblocks)
+        {
+            hdflock();
             blocks_[iblock].hdfload();
+            hdfunlock();
+        }
         
         // block indices
         int i = structure_[iblock].first, j = structure_[iblock].second;
@@ -2553,7 +2620,11 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
     {
         // it may be necessary to load the block from scratch
         if (loadblocks)
+        {
+            hdflock();
             blocks_[iblock].hdfload();
+            hdfunlock();
+        }
         
         // block indices
         int i = structure_[iblock].first, j = structure_[iblock].second;

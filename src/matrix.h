@@ -39,11 +39,15 @@
 #include <vector>
 
 #ifndef NO_PNG
-#include <png++/png.hpp>
+    #include <png++/png.hpp>
 #endif
 
 #ifndef NO_UMFPACK
-#include <umfpack.h>
+    #include <umfpack.h>
+#endif
+
+#ifdef _OPENMP
+    #include <omp.h>
 #endif
 
 #include "arrays.h"
@@ -617,14 +621,34 @@ public:
     
     // Constructors
     
-    CscMatrix()
-        : m_(0), n_(0) {}
-    CscMatrix(size_t m, size_t n)
-        : m_(m), n_(n) {}
-    CscMatrix(CscMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
-    CscMatrix(size_t m, size_t n, const lArrayView p, const lArrayView i, const cArrayView x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
+    CscMatrix ()
+        : m_(0), n_(0)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CscMatrix (std::size_t m, std::size_t n)
+        : m_(m), n_(n)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CscMatrix (CscMatrix const & A)
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CscMatrix (std::size_t m, std::size_t n, const lArrayView p, const lArrayView i, const cArrayView x)
+        : m_(m), n_(n), p_(p), i_(i), x_(x)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
     
     // Destructor
     
@@ -694,6 +718,22 @@ private:
     lArray i_;
     cArray x_;
     
+    // exclusive data file access for use of HDF5 with OpenMP
+#ifdef _OPENMP
+    mutable omp_lock_t lock_;
+#endif
+    void hdflock_ () const
+    {
+#ifdef _OPENMP
+        omp_set_lock(&lock_);
+#endif
+    }
+    void hdfunlock_ () const
+    {
+#ifdef _OPENMP
+        omp_unset_lock(&lock_);
+#endif
+    }
 };
 
 /**
@@ -711,24 +751,45 @@ private:
  * holds column indices of elements, which are stored in \c Ax and \c Az, real
  * ang imaginary part being separated.
  */
-class CsrMatrix {
+class CsrMatrix
+{
     
 public:
     
     // Constructors
     
-    CsrMatrix()
-        : m_(0), n_(0), name_() {}
-    CsrMatrix(size_t m, size_t n)
-        : m_(m), n_(n), name_() {}
-    CsrMatrix(CsrMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
-    CsrMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
+    CsrMatrix ()
+        : m_(0), n_(0), name_()
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CsrMatrix (std::size_t m, std::size_t n)
+        : m_(m), n_(n), name_()
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CsrMatrix (CsrMatrix const & A)
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_()
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CsrMatrix (std::size_t m, std::size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
+        : m_(m), n_(n), p_(p), i_(i), x_(x), name_()
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
     
     // Destructor
     
-    ~CsrMatrix() {}
+    ~CsrMatrix () {}
     
     /**
      * @brief Clear data.
@@ -757,7 +818,7 @@ public:
     cArray const & x () const { return x_; }
     
     // return absolute value of the (in absolute value) largest element
-    double norm() const;
+    double norm () const;
     
     /**
      * Write the matrix data to a file.
@@ -769,7 +830,7 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write(const char* filename) const;
+    void write (const char* filename) const;
     
 #ifndef NO_PNG
     /**
@@ -789,7 +850,7 @@ public:
             PngGenerator (CsrMatrix const * mat, double threshold);
             ~PngGenerator ();
             
-            png::byte* get_next_row (size_t pos);
+            png::byte* get_next_row (std::size_t pos);
             
         private:
             
@@ -1201,6 +1262,23 @@ private:
     
     // linked HDF file
     std::string name_;
+    
+    // exclusive data file access for use of HDF5 with OpenMP
+#ifdef _OPENMP
+    mutable omp_lock_t lock_;
+#endif
+    void hdflock_ () const
+    {
+#ifdef _OPENMP
+        omp_set_lock(&lock_);
+#endif
+    }
+    void hdfunlock_ () const
+    {
+#ifdef _OPENMP
+        omp_unset_lock(&lock_);
+#endif
+    }
 };
 
 
@@ -1216,22 +1294,48 @@ private:
  * contain its real and imaginary part. Same coordinates amy be used several
  * times; resulting element is then sum of these entries.
  */
-class CooMatrix {
+class CooMatrix
+{
     
 public:
     
     // Empty constructors
     
-    CooMatrix()
-        : m_(0), n_(0), sorted_(true) {}
-    CooMatrix(std::size_t m, std::size_t n)
-        : m_(m), n_(n), sorted_(true) {}
-    CooMatrix(CooMatrix const & A)
-        : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
-    CooMatrix(std::size_t m, std::size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
-    CooMatrix(std::size_t m, std::size_t n, NumberArray<long> && i, NumberArray<long> && j, NumberArray<Complex> && x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
+    CooMatrix ()
+        : m_(0), n_(0), sorted_(true)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CooMatrix (std::size_t m, std::size_t n)
+        : m_(m), n_(n), sorted_(true)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CooMatrix (CooMatrix const & A)
+        : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CooMatrix (std::size_t m, std::size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
+    CooMatrix (std::size_t m, std::size_t n, NumberArray<long> && i, NumberArray<long> && j, NumberArray<Complex> && x)
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false)
+    {
+#ifdef _OPENMP
+        omp_init_lock(&lock_);
+#endif
+    }
     
     /**
      * Copy constructor initialized from dense array.
@@ -1240,7 +1344,7 @@ public:
      * @param a Column-major ordered dense array with matrix elements.
      *          Only nonzero elements are copied into internal storage.
      */
-    template <class T> CooMatrix (size_t m, size_t n, T a) : m_(m), n_(n), sorted_(false)
+    template <class T> CooMatrix (std::size_t m, std::size_t n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
         size_t i = 0;
@@ -1266,7 +1370,7 @@ public:
     }
     
     // Destructor
-    ~CooMatrix() {}
+    ~CooMatrix () {}
     
     /// Convert 1×1 matrix to a complex number.
     operator Complex () const
@@ -1288,18 +1392,18 @@ public:
     
     // Getters
     
-    size_t rows() const { return m_; }
-    size_t cols() const { return n_; }
-    size_t size() const { return i_.size(); }
-    lArray const & i() const { return i_; }
-    lArray const & j() const { return j_; }
-    cArray const & v() const { return x_; }
+    std::size_t rows () const { return m_; }
+    std::size_t cols () const { return n_; }
+    std::size_t size () const { return i_.size(); }
+    lArray const & i () const { return i_; }
+    lArray const & j () const { return j_; }
+    cArray const & v () const { return x_; }
     
     /// Index operator. Returns the existing value or zero.
-    Complex operator() (size_t ix, size_t iy) const
+    Complex operator() (std::size_t ix, std::size_t iy) const
     {
-        for (size_t n = 0; n < i_.size(); n++)
-             if ((size_t)i_[n] == ix and (size_t)j_[n] == iy)
+        for (std::size_t n = 0; n < i_.size(); n++)
+             if ((std::size_t)i_[n] == ix and (std::size_t)j_[n] == iy)
                 return x_[n];
         return 0.;
     }
@@ -1316,13 +1420,13 @@ public:
      *  Complex (*) (long, long)
      * @endcode
      */
-    template <class Functor> CooMatrix& symm_populate_band (size_t d, Functor f)
+    template <class Functor> CooMatrix& symm_populate_band (std::size_t d, Functor f)
     {
         Complex val;
         
         for (size_t row = 0; row < m_; row++)
         {
-            for (size_t col = row; col < n_ and col - row <= d; col++)
+            for (std::size_t col = row; col < n_ and col - row <= d; col++)
             {
                 val = f(row,col);
                 
@@ -1360,9 +1464,9 @@ public:
     {
         Complex val;
         
-        for (size_t row = 0; row < m_; row++)
+        for (std::size_t row = 0; row < m_; row++)
         {
-            for (size_t col = 0; col < n_; col++)
+            for (std::size_t col = 0; col < n_; col++)
             {
                 val = f(row,col);
                 
@@ -1410,7 +1514,7 @@ public:
     }
     
     /// Transposition, implemented as an interchange of "i" and "j" data.
-    CooMatrix transpose() const
+    CooMatrix transpose () const
     {
         CooMatrix tr;
         
@@ -1453,7 +1557,7 @@ public:
         x_.append(A.x_.begin(), A.x_.end());
         
         // negate the newly added elements
-        for (size_t i = prev_size; i < x_.size(); i++)
+        for (std::size_t i = prev_size; i < x_.size(); i++)
             x_[i] = -x_[i];
         
         sorted_ = false;
@@ -1503,7 +1607,7 @@ public:
      * @brief Change dimension of the matrix.
      * @warning No row/column index range checking.
      */
-    void resize (size_t m, size_t n)
+    void resize (std::size_t m, std::size_t n)
     {
         m_ = m;
         n_ = n;
@@ -1519,23 +1623,23 @@ public:
      * @param m New row count.
      * @param n New column coount.
      */
-    CooMatrix reshape (size_t m, size_t n) const;
+    CooMatrix reshape (std::size_t m, std::size_t n) const;
     
     /// Convert matrix to dense column-major ordered 1D-array.
     cArray todense () const;
     
     /// Sort indices (by i_, then by j_)
-    void sort();
-    bool sorted() const { return sorted_; }
+    void sort ();
+    bool sorted () const { return sorted_; }
     
     /// Convert to CSC matrix.
-    CscMatrix tocsc() const;
+    CscMatrix tocsc () const;
     
     /// Convert to CSR matrix.
-    CsrMatrix tocsr() const;
+    CsrMatrix tocsr () const;
     
     /// Convert to dense matrix of a given underlying type.
-    template <typename DenseMatrixType> DenseMatrixType todense() const
+    template <typename DenseMatrixType> DenseMatrixType todense () const
     {
         DenseMatrixType M (rows(), cols());
         for (unsigned idx = 0; idx < x_.size(); idx++)
@@ -1544,13 +1648,13 @@ public:
     }
     
     /// Convert to dense matrix (row-ordered).
-    RowMatrix<Complex> torow() const
+    RowMatrix<Complex> torow () const
     {
         return todense<RowMatrix<Complex>>();
     }
     
     /// Convert to dense matrix (column-ordered).
-    ColMatrix<Complex> tocol() const
+    ColMatrix<Complex> tocol () const
     {
         return todense<ColMatrix<Complex>>();
     }
@@ -1562,7 +1666,7 @@ public:
      * "upper" for conversion of upper triangle and "both" for
      * conversion of the main diagonal only.
      */
-    SymDiaMatrix todia(MatrixTriangle triangle = lower) const;
+    SymDiaMatrix todia (MatrixTriangle triangle = lower) const;
     
     /**
      * @brief Solve matrix equation.
@@ -1573,7 +1677,7 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve (const cArrayView b, size_t eqs = 1) const
+    cArray solve (const cArrayView b, std::size_t eqs = 1) const
     {
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
@@ -1616,6 +1720,23 @@ private:
     cArray x_;
     
     bool sorted_;
+    
+    // exclusive data file access for use of HDF5 with OpenMP
+#ifdef _OPENMP
+    mutable omp_lock_t lock_;
+#endif
+    void hdflock_ () const
+    {
+#ifdef _OPENMP
+        omp_set_lock(&lock_);
+#endif
+    }
+    void hdfunlock_ () const
+    {
+#ifdef _OPENMP
+        omp_unset_lock(&lock_);
+#endif
+    }
 };
 
 /**
@@ -1969,7 +2090,7 @@ public:
      * @return True on successful write, false otherwise.
      */
     //@{
-    bool hdfsave (HDFFile::FileAccess flags = HDFFile::overwrite) const { return hdfsave (name_, flags); }
+    bool hdfsave (HDFFile::FileAccess flags = HDFFile::overwrite) const { return hdfsave(name_, flags); }
     bool hdfsave
     (
         std::string name,
@@ -2093,6 +2214,23 @@ private:
      * @endverbatim
      */
     void setup_dptrs_();
+    
+    // exclusive data file access for use of HDF5 with OpenMP
+#ifdef _OPENMP
+    mutable omp_lock_t lock_;
+#endif
+    void hdflock_ () const
+    {
+#ifdef _OPENMP
+        omp_set_lock(&lock_);
+#endif
+    }
+    void hdfunlock_ () const
+    {
+#ifdef _OPENMP
+        omp_unset_lock(&lock_);
+#endif
+    }
 };
 
 class BlockSymDiaMatrix
@@ -2110,7 +2248,12 @@ class BlockSymDiaMatrix
         
         /// Array of matrix blocks.
         mutable SymDiaMatrix * blocks_;
-    
+        
+#ifdef _OPENMP
+        // HDF scratch file access lock.
+        mutable omp_lock_t lock_;
+#endif
+        
     public:
         
         //
@@ -2118,7 +2261,12 @@ class BlockSymDiaMatrix
         //
         
         BlockSymDiaMatrix (int size = 0)
-            : diskfile_(), size_(size), blocks_(nullptr) {}
+            : diskfile_(), size_(size), blocks_(nullptr)
+        {
+#ifdef _OPENMP
+            omp_init_lock(&lock_);
+#endif
+        }
         
         /**
          * @brief Main constructor.
@@ -2147,6 +2295,10 @@ class BlockSymDiaMatrix
                 blocks_[iblock].size() = size_;
                 blocks_[iblock].hdflink(hdfpath);
             }
+            
+#ifdef _OPENMP
+            omp_init_lock(&lock_);
+#endif
         }
         
         /// Release memory (but keep size information).
@@ -2250,6 +2402,22 @@ class BlockSymDiaMatrix
         
         /// Load data from disk to memory.
         bool hdfload ();
+        
+        /// Require thread-exclusive disk file access.
+        void hdflock () const
+        {
+#ifdef _OPENMP
+            omp_set_lock(&lock_);
+#endif
+        }
+        
+        /// Give up thread-exclusive disk file access.
+        void hdfunlock () const
+        {
+#ifdef _OPENMP
+            omp_unset_lock(&lock_);
+#endif
+        }
 };
 
 // --------------------------------------------------------------------------//

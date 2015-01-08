@@ -116,7 +116,7 @@ void NoPreconditioner::update (double E)
                 // use radial integrals from memory ...
                 if (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint))
                     dia_blocks_[ill].block(i,j) += (-f) * s_rad_.R_tr_dia(lambda).block(i,j);
-            
+                
                 // ... or from disk
                 else
                     dia_blocks_[ill].block(i,j) += (-f) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget();
@@ -127,7 +127,6 @@ void NoPreconditioner::update (double E)
         if (cmd_.outofcore)
         {
             // save diagonal block to disk
-            # pragma omp critical   
             dia_blocks_[ill].hdfsave();
             
             // release memory
@@ -147,10 +146,6 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
-    
-    // necessary Kronecker products
-//     SymDiaMatrix S_kron_Mm1_tr = s_rad_.S().kron(s_rad_.Mm1_tr());
-//     SymDiaMatrix Mm1_tr_kron_S = s_rad_.Mm1_tr().kron(s_rad_.S());
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps = s_rad_.overlapj
@@ -421,7 +416,7 @@ void KPACGPreconditioner::setup ()
     NoPreconditioner::setup();
     
     std::cout << "Set up KPA preconditioner" << std::endl;
-    std::cout << "\tOverlap matrix factorization" << std::endl;
+    std::cout << "\t- Overlap matrix factorization" << std::endl;
     
     Timer timer;
     
@@ -474,7 +469,7 @@ void KPACGPreconditioner::setup ()
             continue;
         
         // reset timer
-        std::cout << "\tOne-electron H factorization (l = " << l << ")" << std::endl;
+        std::cout << "\t- One-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
         timer.reset();
         
         // compose the one-electron hamiltonian
@@ -501,8 +496,8 @@ void KPACGPreconditioner::setup ()
         }
         
         // Now Hl = ClR * Dlmat * ClR⁻¹
-        std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
-        std::cout << "\t\tresidual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
+        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        std::cout << "\t\t- residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
     }
     
     std::cout << std::endl;
@@ -563,7 +558,6 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // load data from linked disk files
     if (cmd_.outofcore)
     {
-        # pragma omp critical
         csr_blocks_[iblock].hdfload();
         # pragma omp critical
         lu_[iblock].silent_load();
@@ -595,7 +589,6 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         if (cmd_.outofcore)
         {
             csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
-            # pragma omp critical
             csr_blocks_[iblock].hdfsave();
         }
     }
