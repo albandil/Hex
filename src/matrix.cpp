@@ -37,15 +37,19 @@
 #include <vector>
 
 #ifndef NO_PNG
-#include <png++/png.hpp>
+    #include <png++/png.hpp>
 #endif
 
 #ifndef NO_UMFPACK
-#include <umfpack.h>
+    #include <umfpack.h>
+#endif
+
+#ifdef _OPENMP
+    #include <omp.h>
 #endif
 
 #ifndef NO_HDF
-#include "hdffile.h"
+    #include "hdffile.h"
 #endif
 
 #include "arrays.h"
@@ -2485,7 +2489,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
 #endif
     
     // for all blocks
-    # pragma omp parallel for if (parallelize)
+    # pragma omp parallel for schedule (dynamic,1) if (parallelize)
     for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
     {
         // it may be necessary to load the block from scratch
@@ -2592,10 +2596,17 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
     );
 }
 
+bool BlockSymDiaMatrix::hdfinit () const
+{
+    // reset the scratch file
+    HDFFile f(diskfile_, HDFFile::overwrite);
+    return f.valid();
+}
+
 bool BlockSymDiaMatrix::hdfsave () const
 {
-    // reset the file
-    HDFFile(diskfile_, HDFFile::overwrite);
+    // reset the scratch file
+    hdfinit();
     
     // save all blocks with compression of 10+ consecutive zeros
     for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)

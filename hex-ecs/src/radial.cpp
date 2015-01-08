@@ -38,7 +38,6 @@
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
-#include "opencl.h"
 #include "parallel.h"
 #include "radial.h"
 
@@ -388,7 +387,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 {
     // shorthands
     int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
     
     // allocate storage and associate names
     R_tr_dia_.resize(lambdas.size());
@@ -402,16 +400,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         );
     }
     
-#ifndef NO_OPENCL
-    if (cmd.gpu_slater)
-    {
-        // prepare GPU kernels for computation of diagonal R-integrals
-        setup_gpu_();
-        
-        // print information
-        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ") using OpenCL." << std::endl;
-    }
-#endif
     if (!cmd.gpu_slater)
     {
         // print information
@@ -428,7 +416,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
         {
-            std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
+            std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
             
             if (not cmd.cache_own_radint or R_tr_dia_[lambda].hdfload())
                 continue;
@@ -444,216 +432,53 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             M.update();
         }
         
-#if 0 //ndef NO_OPENCL
-        if (cmd.gpu_slater)
+        // also prepare the disk file, so that we can update it incrementally (per block)
+        R_tr_dia_[lambda].hdfinit();
+        
+        // logarithms of partial integral moments
+        cArray Mtr_L, Mtr_mLm1;
+        
+        // compute partial moments
+        Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+        Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+        
+        # pragma omp parallel firstprivate (lambda, Mtr_L, Mtr_mLm1)
         {
-            // NOTE : This needs to be fixed.
-            if (order != 4)
-                throw exception ("Computation of radial integrals on GPU is implemented only for B-spline order equal to 4.");
+            // get recursive structure
+            std::vector<std::pair<int,int>> const & structure = R_tr_dia_[lambda].structure();
             
-            // logarithms of partial integral moments
-            CLArray<Complex> Mtr_L, Mtr_mLm1;
-            
-            // compute partial moments
-            Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-            Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
-            
-            // uload partial moments
-            Mtr_L.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            Mtr_mLm1.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            
-            // set up outer quadrature rule for GPU
-            std::size_t Nouter = bspline_.order() + lambda + 10;    // outer quadrature points count
-            const double *pxOut, *pwOut;
-            g_.GaussLegendreData::gauss_nodes_and_weights(Nouter, pxOut, pwOut);
-            xOut0_.disconnect(); xOut0_ = rArrayView(Nouter, const_cast<double*>(pxOut)); xOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            wOut0_.disconnect(); wOut0_ = rArrayView(Nouter, const_cast<double*>(pwOut)); wOut0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            
-            // set up inner quadrature rule for GPU
-            std::size_t Ninner = bspline_.order() + lambda + 1;     // inner quadrature points count
-            const double *pxIn, *pwIn;
-            g_.GaussLegendreData::gauss_nodes_and_weights(Ninner, pxIn,  pwIn);
-            xIn0_.disconnect(); xIn0_ = rArrayView(Nouter, const_cast<double*>(pxIn)); xIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            wIn0_.disconnect(); wIn0_ = rArrayView(Nouter, const_cast<double*>(pwIn)); wIn0_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY);
-            
-            // set up indices
-            iArray idx_R;
-            for (int i = 0; i < Nspline; i++)
-            for (int j = 0; j < Nspline; j++)
+            // for all blocks of the radial matrix
+            # pragma omp for schedule (dynamic,1)
+            for (std::vector<std::pair<int,int>>::const_iterator it_block_pos = structure.begin(); it_block_pos < structure.end(); it_block_pos++)
             {
-                // for all nonzero, nonsymmetry R-integrals
-                for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
-                for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
+                // block indices
+                int i = it_block_pos->first, k = it_block_pos->second;
+                
+                // get block reference
+                SymDiaMatrix & block = R_tr_dia_[lambda].block(i,k);
+                
+                // for all elements in the symmetrical block
+                for (std::pair<int,int> const & elemt_pos : structure)
                 {
-                    // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
-                    // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
-                    // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
-                    // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
+                    // element indices
+                    int j = elemt_pos.first, l = elemt_pos.second;
                     
-                    // prepare the equivalent permutations
-                    int P[8][4] = {
-                        /* original    */ {i,j,k,l},
-                        /* symm. 1     */ {k,j,i,l},
-                        /* symm. 2     */ {i,l,k,j},
-                        /* symm. 3     */ {j,i,l,k},
-                        /* symm. 1+2   */ {k,l,i,j},
-                        /* symm. 1+3   */ {l,i,j,k},
-                        /* symm. 2+3   */ {j,k,l,i},
-                        /* symm. 1+2+3 */ {l,k,j,i}
-                    };
+                    // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
                     
-                    // find the lexicographically first permutation (store its index in 'm')
-                    int m = 0;
-                    for (int n = 1; n < 8; n++)
-                        m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
-                    
-                    // only calculate the integral if this is the lexicographically first permutation
-                    if (m == 0)
-                    {
-                        // add index 4-tuple
-                        idx_R.push_back(i); 
-                        idx_R.push_back(j);
-                        idx_R.push_back(k);
-                        idx_R.push_back(l);
-                    }
+                    // update matrix (no other thread accesses this block)
+                    block(j,l) = Rijkl_tr;
                 }
-            }
-            
-            // copy indices to in-out array (NOTE : assuming sizeof(Complex) = 4*sizeof(int))
-            R_gpu_.disconnect(); R_gpu_ = cArrayView(idx_R.size()/4, reinterpret_cast<Complex*>(idx_R.data())); R_gpu_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE);
-            
-            // setup GPU kernel arguments
-            clSetKernelArg(Rint_, 0, sizeof(int),    &lambda);
-            clSetKernelArg(Rint_, 2, sizeof(cl_mem), &t_.handle());
-            clSetKernelArg(Rint_, 3, sizeof(cl_mem), &xIn0_.handle());
-            clSetKernelArg(Rint_, 4, sizeof(cl_mem), &wIn0_.handle());
-            clSetKernelArg(Rint_, 5, sizeof(cl_mem), &xOut0_.handle());
-            clSetKernelArg(Rint_, 6, sizeof(cl_mem), &wOut0_.handle());
-            clSetKernelArg(Rint_, 7, sizeof(cl_mem), &Mtr_L.handle());
-            clSetKernelArg(Rint_, 8, sizeof(cl_mem), &Mtr_mLm1.handle());
-            clSetKernelArg(Rint_, 9, sizeof(cl_mem), &R_gpu_.handle());
-            
-            // run the kernel in a sequence of 1024-item calls
-            cl_ulong todo = R_gpu_.size(), done = 0, maxchunk = 256, chunk;
-            while (done < todo)
-            {
-                chunk = std::min(todo - done, maxchunk);
-                clSetKernelArg(Rint_, 1, sizeof(cl_ulong), &done);
-                clEnqueueNDRangeKernel(queue_, Rint_, 1, nullptr, &chunk, nullptr, 0, nullptr, nullptr);
-                clFinish(queue_);
-                done += chunk;
-                std::cout << "\tcomputing: " << format("%.2f %%", done * 100. / todo) << "\r" << std::flush;
-            }
-            R_gpu_.EnqueueDownload(queue_);
-            clFinish(queue_);
-            
-            // expand symmetries
-            Complex * R_ptr = R_gpu_.begin();
-            for (int i = 0; i < Nspline; i++)
-            for (int j = 0; j < Nspline; j++)
-            {
-                // for all nonzero, nonsymmetry R-integrals
-                for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
-                for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
-                {
-                    // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
-                    // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
-                    // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
-                    // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
-                    
-                    // prepare the equivalent permutations
-                    int P[8][4] = {
-                        /* original    */ {i,j,k,l},
-                        /* symm. 1     */ {k,j,i,l},
-                        /* symm. 2     */ {i,l,k,j},
-                        /* symm. 3     */ {j,i,l,k},
-                        /* symm. 1+2   */ {k,l,i,j},
-                        /* symm. 1+3   */ {l,i,j,k},
-                        /* symm. 2+3   */ {j,k,l,i},
-                        /* symm. 1+2+3 */ {l,k,j,i}
-                    };
-                    
-                    // find the lexicographically first permutation (store its index in 'm')
-                    int m = 0;
-                    for (int n = 1; n < 8; n++)
-                        m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
-                    
-                    // only calculate the integral if this is the lexicographically first permutation
-                    if (m == 0)
-                    {
-                        // store all symmetries
-                        for (int n = 0; n < 8; n++)
-                            R_tr_dia_[lambda](P[n][0] * Nspline + P[n][1], P[n][2] * Nspline + P[n][3]) = *R_ptr;
-                        R_ptr++;
-                    }
-                }
+                
+                // write the finished block to disk
+                # pragma omp critical
+                block.hdfsave(block.hdfname(), HDFFile::readwrite, true, 10);
+                
+                // release the integrals from memory if requested
+                if (not cmd.cache_own_radint)
+                    block.drop();
             }
         }
-        else
-#endif
-        {
-            // logarithms of partial integral moments
-            cArray Mtr_L, Mtr_mLm1;
-            
-            // compute partial moments
-            Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-            Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
-            
-            # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1)
-            {
-                // for all B-spline pairs
-                # pragma omp for schedule (dynamic,1)
-                for (int i = 0; i < Nspline; i++)
-                for (int j = 0; j < Nspline; j++)
-                {
-                    // for all nonzero, nonsymmetry R-integrals
-                    for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
-                    for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
-                    {
-                        // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
-                        // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
-                        // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
-                        // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
-                        
-                        // prepare the equivalent permutations
-                        int P[8][4] = {
-                            /* original    */ {i,j,k,l},
-                            /* symm. 1     */ {k,j,i,l},
-                            /* symm. 2     */ {i,l,k,j},
-                            /* symm. 3     */ {j,i,l,k},
-                            /* symm. 1+2   */ {k,l,i,j},
-                            /* symm. 1+3   */ {l,i,j,k},
-                            /* symm. 2+3   */ {j,k,l,i},
-                            /* symm. 1+2+3 */ {l,k,j,i}
-                        };
-                        
-                        // find the lexicographically first permutation (store its index in 'm')
-                        int m = 0;
-                        for (int n = 1; n < 8; n++)
-                            m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
-                        
-                        // only calculate the integral if this is the lexicographically first permutation
-                        if (m == 0)
-                        {
-                            // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-                            Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-                            
-                            // store all symmetries to the matrix
-                            # pragma omp critical
-                            for (int n = 0; n < 8; n++)
-                                R_tr_dia_[lambda](P[n][0] * Nspline + P[n][1], P[n][2] * Nspline + P[n][3]) = Rijkl_tr;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // save matrix to disk
-        R_tr_dia_[lambda].hdfsave();
-        
-        // release the integrals from memory if requested
-        if (not cmd.cache_own_radint)
-            R_tr_dia_[lambda].drop();
         
         std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
     }
@@ -673,7 +498,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // boolean flags indicating accessibility of R_tr_dia[lambda].hdf file to the individual processes
             Array<int> haveR(par.Nproc());
             
-            // check if the current process can access the radial matrix file and redistribute the flags to all processes the 
+            // check if the current process can access the radial matrix file and redistribute the flags to all processes
             haveR[par.iproc()] = R_tr_dia_[lambda].hdfcheck();
             par.sync(haveR.data(), 1, par.Nproc());
             
@@ -692,9 +517,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // Synchronize radial integrals across processes.
             //
             
-            // reload dropped data
-            if (par.isMyWork(lambda) and not cmd.cache_own_radint)
-                R_tr_dia_[lambda].hdfload();
+            // non-owners : initialize scratch file
+            if (not R_tr_dia_[lambda].hdfcheck())
+                R_tr_dia_[lambda].hdfinit();
             
             // determine owner
             int owner = lambda % par.Nproc();
@@ -702,34 +527,36 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // for all blocks of the matrix
             for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
             {
-                // get block to synchronize
+                // all : get block to synchronize
                 SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
                 
-                // resize arrays (this won't change owner's data)
+                // owner : reload potentionally dropped data
+                if (par.isMyWork(lambda) and not cmd.cache_own_radint)
+                    M.hdfload();
+                
+                // all : resize arrays (this won't change owner's data)
                 M.diag().resize(S_.diag().size());
                 M.data().resize(S_.data().size());
                 
-                // owner will broadcast arrays
+                // owner : broadcast arrays to non-owners
                 MPI_Bcast(M.diag().data(), S_.diag().size(), MPI_INT,            owner, MPI_COMM_WORLD);
                 MPI_Bcast(M.data().data(), S_.data().size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
                 
-                // reconstruct objects
+                // all : reconstruct object (this won't change owner's data)
                 M.update();
-            }
-            
-            // non-owners will update log and save file (if not already done)
-            if (not par.isMyWork(lambda))
-            {
-                std::cout << "\t- integrals for lambda = " << lambda << " acquired from process " << owner << std::endl;
                 
-                // save to disk (if the file doesn't already exist)
-                if (not R_tr_dia_[lambda].hdfcheck())
-                    R_tr_dia_[lambda].hdfsave();
+                // non-owners : save the block if the file didn't exist before
+                if (not haveR[par.iproc()])
+                    M.hdfsave();
+                
+                // all : release the block from memory if requested
+                if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
+                    M.drop();
             }
             
-            // release the integrals from memory if requested
-            if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
-                R_tr_dia_[lambda].drop();
+            // non-owners : update log
+            if (not par.isMyWork(lambda))
+                std::cout << "\t- integrals for lambda = " << lambda << " acquired from process " << owner << std::endl;
         }
         
         par.wait();
@@ -738,158 +565,3 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 
     std::cout << std::endl;
 }
-
-cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & rhss) const
-{
-    // shorthands
-    int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
-    
-    // logarithms of partial integral moments
-    cArray Mtr_L, Mtr_mLm1;
-    
-    // the products
-    cArrays ress;
-    for (unsigned i = 0; i < rhss.size(); i++)
-        ress.push_back(cArray(Nspline * Nspline));
-    
-    // compute partial moments
-    Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-    Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
-    
-    # pragma omp parallel firstprivate (Nspline, order, lambda, Mtr_L, Mtr_mLm1)
-    {
-        // for all B-spline pairs
-        # pragma omp for schedule (dynamic,1)
-        for (int i = 0; i < Nspline; i++)
-        for (int j = 0; j < Nspline; j++)
-        {
-            // for all nonzero, nonsymmetry R-integrals
-            for (int k = i; k <= i + order and k < Nspline; k++) // enforce i ≤ k
-            for (int l = j; l <= j + order and l < Nspline; l++) // enforce j ≤ l
-            {
-                // We only want to compute the integral for one of the symmetric permutation of the indices i,j,k,l.
-                // So, we prepare all 8 possible permutations of i,j,k,l (of 24 total) allowed by the symmetry relations
-                // and calculate the integral only if the current permutation is the lexicographically first one. Its value will be then
-                // assigned to all other positions within the radial integral matrix, in accord with the symmetry relations.
-                
-                // prepare the equivalent permutations
-                int P[8][4] = {
-                    /* original    */ {i,j,k,l},
-                    /* symm. 1     */ {k,j,i,l},
-                    /* symm. 2     */ {i,l,k,j},
-                    /* symm. 3     */ {j,i,l,k},
-                    /* symm. 1+2   */ {k,l,i,j},
-                    /* symm. 1+3   */ {l,i,j,k},
-                    /* symm. 2+3   */ {j,k,l,i},
-                    /* symm. 1+2+3 */ {l,k,j,i}
-                };
-                
-                // find the lexicographically first permutation (store its index in 'm')
-                int m = 0;
-                for (int n = 1; n < 8; n++)
-                    m = (std::lexicographical_compare(P[n],P[n]+4,P[m],P[m]+4) ? n : m);
-                
-                // only calculate the integral if this is the lexicographically first permutation
-                if (m == 0)
-                {
-                    // evaluate B-spline integral of Bi(1) Bj(1) V(1,2) Bk(2) Bl(2)
-                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-                    
-                    // multiply all right-hand sides by the symmetrical elements
-                    # pragma omp critical
-                    for (unsigned iseg = 0; iseg < rhss.size(); iseg++)
-                    {
-                        for (int n = 0; n < 8; n++)
-                            ress[iseg][P[n][0] * Nspline + P[n][1]] += Rijkl_tr * rhss[iseg][P[n][2] * Nspline + P[n][3]];
-                    }
-                }
-            }
-        }
-    }
-    
-    // return result
-    return ress;
-}
-
-#ifndef NO_OPENCL
-// kernels' source as byte array, generated by "xxd" from the CL source
-char slater_cl [] = {
-    #include "slater.inc"
-    , 0x00 // terminate the string by zero
-};
-
-// pointer to the source; to be used in setup
-char * slater_source = &slater_cl[0];
-
-void RadialIntegrals::setup_gpu_ ()
-{
-    std::cout << "Setting up OpenCL environment" << std::endl;
-    char text [1000];
-    
-    // use platform 0
-    clGetPlatformIDs(1, &platform_, nullptr);
-    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tplatform: " << text << " ";
-    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
-    std::cout << "\tavailable version: " << text << std::endl;
-    
-    // use device 0
-    clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
-//     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
-    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tdevice: " << text << " ";
-    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    cl_ulong size;
-    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB " << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax compute units: " << size << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax work group size: " << size << std::endl << std::endl;
-    max_local_ = size;
-    
-    // create context and command queue
-    context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
-    queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
-    
-    // setup compile flags
-    std::ostringstream flags;
-    flags << " -cl-fast-relaxed-math ";
-    flags << " -D ORDER="     << bspline_.order()   << " ";
-    flags << " -D NSPLINE="   << bspline_.Nspline() << " ";
-    flags << " -D NOUTMAX="   << bspline_.order()+maxlambda()+10 << " ";
-    flags << " -D NINMAX="    << bspline_.order()+maxlambda()+1  << " ";
-    flags << " -D IKNOTMAX="  << bspline_.Nreknot()-1 << " ";
-    
-    // build program
-    program_ = clCreateProgramWithSource (context_, 1, const_cast<const char**>(&slater_source), nullptr, nullptr);
-    clBuildProgram (program_, 1, &device_, flags.str().c_str(), nullptr, nullptr);
-    
-    cl_build_status status;
-    clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr);
-    if (status != CL_SUCCESS)
-    {
-        std::cout << std::endl << "Source:" << std::endl << slater_source << std::endl;
-        std::cout << std::endl << "Command line:" << std::endl << flags.str() << std::endl << std::endl;
-        
-        char log [100000];
-        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, sizeof(log), log, nullptr);
-        std::cout << "clGetProgramBuildInfo: log" << std::endl << log << std::endl;
-        
-        throw exception ("Failed to initialize OpenCL.");
-    }
-    
-    // set program entry point
-    Rint_ = clCreateKernel(program_, "R_integral", nullptr);
-    
-    // create and connect B-spline knot array
-    t_ = bspline_.t();
-    t_.connect(context_, CL_MEM_COPY_HOST_PTR | CL_MEM_WRITE_ONLY);
-}
-#endif // NO_OPENCL

@@ -36,10 +36,6 @@
 #include <vector>
 #include <tuple>
 
-#ifndef NO_OPENCL
-#include "opencl.h"
-#endif
-
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"

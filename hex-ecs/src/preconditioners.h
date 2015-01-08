@@ -39,110 +39,6 @@
 #include "radial.h"
 #include "parallel.h"
 
-#ifndef NO_OPENCL
-    #include "opencl.h"
-#endif
-
-/**
- * @brief Sparse incomplete Cholesky decomposition.
- * 
- * This routine computes the LDL-decomposition of a symmetric matrix,
- * @f[
- *     A = L D L^T \ ,
- * @f]
- * where @f$ L @f$ is a lower triangular matrix normalized so that it has
- * units on the diagonal and @f$ D @f$ is a diagonal matrix.
- * 
- * @param A Matrix elements in the form of a consecutive array @f$ \left\{a_i\right\}_{i=1}^N @f$
- *          as in
- *          @f[
- *                   \pmatrix
- *                   {
- *                       a_1 &     &     &        &       \cr
- *                       a_2 & a_3 &     &        &       \cr
- *                       a_4 & a_5 & a_6 &        &       \cr
- *                       a_7 & a_8 & a_9 & a_{10} &       \cr
- *                       \vdots &   &     &        & \ddots \cr
- *                   }
- *          @f]
- *          Whenever @f$ a_k @f$ is equal to zero, it is (or can be) omitted from the input array.
- * @param I %Array of column indices (one for every element of A).
- * @param P %Array of row pointers, i.e. starting positions of rows of A. For dense matrix
- *          it would be 0, 1, 3, 6, 10, ... The last element must be equal to the length
- *          of both A and I.
- * 
- * @return The elements of @f$ L @f$ (below diagonal) and @f$ D @f$ (at diagonal) with the
- *         exact sparse pattern as the input array A, i.e. specified by I and P arrays.
- */
-cArray iChol (cArrayView const & A, lArrayView const & I, lArrayView const & P);
-
-/**
- * @brief DIC preconditioner.
- * 
- * Setup the diagonal incomplete Cholesky preconditioner. It is a essentially the original
- * matrix with a preconditioned diagonal and the strict upper and lower triangles normalized
- * by the preconditioned diagonal, i.e. a matrix
- * @f[
- *     \mathbf{P} = \mathbf{\tilde{L}}_\mathbf{A} + \mathbf{D}^{-1} + \mathbf{\tilde{L}}_\mathbf{A}^T
- * @f]
- * for the preconditioner
- * @f[
- *     \mathbf{M} = (\mathbf{D} + \mathbf{L}_\mathbf{A})
- *                  \mathbf{D}^{-1}
- *                  (\mathbf{D} + \mathbf{U}_\mathbf{A})
- *                =  (1 + \mathbf{\tilde{U}}_\mathbf{A}^T)
- *                  \mathbf{D}
- *                  (1 + \mathbf{\tilde{U}}_\mathbf{A})
- * @f]
- * The formula for the elements of @f$ \mathbf{D} @f$ is
- * @f[
- *     d_i = a_{ii} - \sum_{k < i} a_{ik} d_{k}^{-1} a_{ki} \ ,
- * @f]
- * and is to be evaluated along the diagonal, re-using the just computed values @f$ d_i @f$.
- * Hence, the access pattern in dense matrix would be
- * @f[
- *     \pmatrix {
- *        \ast &      &      & \ast &     &     \cr
- *             & \ast &      & \ast &     &     \cr
- *             &      & \ast & \ast &     &     \cr
- *        \ast & \ast & \ast &    ? &     &     \cr
- *             &      &      &      &     &     \cr
- *             &      &      &      &     &     \cr
- *     }
- * @f]
- * In the case of the sparse SymDiaMatrix, the asterisks will occur only on the nonzero
- * diagonals.
- * 
- * @note The same preconditioner can be used for unsymmetric matrix. Then it is called
- *       DILU (diagonal incomplete LU factorization). This function, though, is implemented
- *       symmetrically (as the input is symmetrical by definition of the type).
- * 
- * @param A Matrix in SymDiaMatrix format that is to be preconditioned.
- * @return The DIC preconditioner of the symmetric matrix.
- */
-SymDiaMatrix DIC (SymDiaMatrix const & A);
-
-/**
- * @brief SSOR preconditioner.
- * 
- * Symmetric successive over-relaxation preconditioner for @f$ \omega = 1 @f$.
- * (Essentially symmetrized Gauss-Seidel). The resulting matrix contains
- * normalized lower (and upper) triangle and in the place of the unit diagonal
- * is the inverse diagonal of @f$ \mathbf{A} @f$. So, having the preconditioner
- */
-SymDiaMatrix SSOR (SymDiaMatrix const & A);
-
-/**
- * @brief SPAI preconditioner.
- * 
- * Compute sparse aproximate inverse of a given symmetrix diagonal matrix A. The sparse
- * structure of the SPAI is set by the second parameter that contains list of non-lower
- * diagonal indices (greater than or equal to zero).
- * 
- * This function uses Lapack routine ZGELSD.
- */
-CooMatrix SPAI (SymDiaMatrix const & A, const iArrayView diagonals);
-
 /**
  * @brief Preconditioner template.
  * 
@@ -309,160 +205,6 @@ class CGPreconditioner : public NoPreconditioner
 };
 
 /**
- * @brief CG iteration-based preconditioner (GPU variant).
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-#ifndef NO_OPENCL
-/*class GPUCGPreconditioner : public NoPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        GPUCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
-        virtual void setup ();
-        virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (const cArrayView r, cArrayView z) const;
-        
-    private:
-        
-        // diagonal blocks
-        mutable std::vector<cArray> block_;
-        
-        // OpenCL environment
-        cl_platform_id platform_;
-        cl_device_id device_;
-        cl_context context_;
-        cl_command_queue queue_;
-        cl_program program_;
-        
-        // size of a workgroup
-        std::size_t Nlocal_;
-        
-        // computational kernels
-        cl_kernel mmul_;
-        cl_kernel amul_;
-        cl_kernel axby_;
-        cl_kernel vnrm_;
-        cl_kernel norm_;
-        cl_kernel spro_;
-        cl_kernel krd1_, krd2_, krdv_;
-        
-        // auxiliary matrices
-        std::vector<CLArray<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
-        
-        // diagonal parts of one-electron hamiltonians
-        std::vector<CLArray<Complex>> Dl_;
-};*/
-#endif
-
-/**
- * @brief Jacobi-preconditioned CG-based preconditioner.
- * 
- * Enhances CGPreconditioner conjugate gradients solver by Jacobi (diagonal) preconditioning.
- * This is done by redefining virtual function CG_prec.
- */
-/*class JacobiCGPreconditioner : public CGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        JacobiCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), invd_(ll.size())
-        {
-            // nothing more to do
-        }
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
-        virtual void setup () { CGPreconditioner::setup(); }
-        
-        // declare own definitions
-        virtual void update (double E);
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const { z = invd_[iblock] * r; }
-        
-    protected:
-        
-        // inverse diagonals for every block
-        cArrays invd_;
-};*/
-
-/**
- * @brief SSOR-preconditioned CG-based preconditioner.
- * 
- * Enhances CGPreconditioner conjugate gradients solver by SSOR preconditioning.
- * This is done by redefining virtual function CG_prec.
- */
-/*class SSORCGPreconditioner : public CGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        SSORCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), SSOR_(ll.size())
-        {
-            // nothing more to do
-        }
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi, ienergy, instate, Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p, q); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r, z); }
-        virtual void setup () { CGPreconditioner::setup(); }
-        
-        // declare own definitions
-        virtual void update (double E);
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        
-    protected:
-        
-        // inverse diagonals for every block
-        mutable std::vector<SymDiaMatrix> SSOR_;
-};*/
-
-/**
  * @brief KPA-preconditioned CG-preconditioner.
  * 
  * This nested preconditioner simplifies the Hamiltonian matrix by omitting electron-electron
@@ -497,17 +239,16 @@ class KPACGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const;
+        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        virtual void update (double E);
+        virtual void update (double E) { CGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         
@@ -571,98 +312,6 @@ class ILUCGPreconditioner : public CGPreconditioner
 };
 
 /**
- * @brief DIC-preconditioned CG-based preconditioner.
- * 
- * Enhances CGPreconditioner conjugate gradients solver by diagonal incomplete
- * Choleski factorization preconditioning. This is done by redefining virtual function CG_prec.
- * This preconditioner probably won't work due to pivot breakdown.
- */
-/*class DICCGPreconditioner : public CGPreconditioner
-{
-    public: 
-        
-        static const std::string name;
-        static const std::string description;
-        
-        DICCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (double E);
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const
-        {
-            z = DIC_[iblock].upperSolve( DIC_[iblock].dot( DIC_[iblock].lowerSolve(r), diagonal ) );
-        }
-        
-    private:
-        
-        std::vector<SymDiaMatrix> DIC_;
-};*/
-
-/**
- * @brief SPAI-preconditioned CG-based preconditioner.
- * 
- * Enhances CGPreconditioner conjugate gradients solver by sparse approximate inverse
- * preconditioning. This is done by redefining virtual function CG_prec.
- * This preconditioner requires Lapack (for dense least squares problems)
- * and its construction is rather slow. Moreover, it doesn't seem to work.
- */
-#ifndef NO_LAPACK
-/*class SPAICGPreconditioner : public CGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        SPAICGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd) {}
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (double E);
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const
-        {
-            z = spai_[iblock].dot(r);
-        }
-        
-    private:
-        
-        // SPAIs for every diagonal block
-        std::vector<CsrMatrix> spai_;
-};*/
-#endif
-
-/**
  * @brief Preconditioner traits.
  * 
  * This class is used for accessing all available preconditioners. Preconditioner types and objects
@@ -699,11 +348,6 @@ class Preconditioners
             ILUCGPreconditioner         // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
             , NoPreconditioner          // No preconditioner.
             , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
-/*            , JacobiCGPreconditioner    // Solve diagonal blocks by Jacobi-preconditioned CG iterations.*/
-#ifndef NO_OPENCL
-/*            , GPUCGPreconditioner       // Solve diagonal blocks by Jacobi-preconditioned CG iterations (GPU variant).*/
-#endif
-/*            , SSORCGPreconditioner      // Solve diagonal blocks by SSOR-preconditioned CG iterations.*/
 #ifndef NO_LAPACK
             , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
 #endif

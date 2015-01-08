@@ -2241,6 +2241,9 @@ class BlockSymDiaMatrix
         /// Check that the scratch disk file exists.
         bool hdfcheck () const;
         
+        /// Reset (= create empty) HDF scratch file needed when writing individual blocks.
+        bool hdfinit () const;
+        
         /// Write all blocks from memory to the disk file.
         bool hdfsave () const;
         
