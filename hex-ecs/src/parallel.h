@@ -151,6 +151,29 @@ class Parallel
         }
         
         /**
+         * @brief Broadcast array from owner to everyone.
+         */
+        template <class T> void bcast (int owner, NumberArray<T> & data) const
+        {
+            // owner : broadcast size
+            int size = data.size();
+            MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
+            
+            // all : resize data array
+            data.resize(size);
+            
+            // owner : broadcast data
+            MPI_Bcast
+            (
+                data.data(),
+                size * typeinfo<T>::ncmpt,
+                typeinfo<T>::mpicmpttype(),
+                owner,
+                MPI_COMM_WORLD
+            );
+        }
+        
+        /**
          * @brief Synchronize across processes by composition.
          * 
          * Synchronize array across processes. It is assumed that i-th chunk of the array is

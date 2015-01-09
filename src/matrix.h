@@ -2090,7 +2090,6 @@ public:
      * @return True on successful write, false otherwise.
      */
     //@{
-    bool hdfsave (HDFFile::FileAccess flags = HDFFile::overwrite) const { return hdfsave(name_, flags); }
     bool hdfsave
     (
         std::string name,
@@ -2098,6 +2097,15 @@ public:
         bool docompress = false,
         std::size_t consec = 10
     ) const;
+    bool hdfsave
+    (
+        HDFFile::FileAccess flags = HDFFile::overwrite,
+        bool docompress = false,
+        std::size_t consec = 10
+    ) const
+    {
+        return hdfsave(name_, flags, docompress, consec);
+    }
     //@}
     
     //

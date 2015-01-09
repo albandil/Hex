@@ -472,7 +472,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 
                 // write the finished block to disk
                 # pragma omp critical
-                block.hdfsave(block.hdfname(), HDFFile::readwrite, true, 10);
+                block.hdfsave(HDFFile::readwrite, true /* = with compression */);
                 
                 // release the integrals from memory if requested
                 if (not cmd.cache_own_radint)
@@ -527,27 +527,42 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             // for all blocks of the matrix
             for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
             {
+                // data arrays
+                rArray re, im;
+                iArray zero_re, zero_im;
+                
                 // all : get block to synchronize
                 SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
                 
-                // owner : reload potentionally dropped data
-                if (par.isMyWork(lambda) and not cmd.cache_own_radint)
-                    M.hdfload();
+                // owner : compress data and send them to others
+                if (par.isMyWork(lambda))
+                {
+                    // load block from disk if not cached
+                    if (not cmd.cache_own_radint)
+                        M.hdfload();
+                    
+                    // compress data
+                    std::tie(zero_re, re) = realpart(M.data()).compress(10);
+                    std::tie(zero_im, im) = imagpart(M.data()).compress(10);
+                }
                 
-                // all : resize arrays (this won't change owner's data)
-                M.diag().resize(S_.diag().size());
-                M.data().resize(S_.data().size());
+                // owner : broadcast data to everyone
+                par.bcast(owner, re);
+                par.bcast(owner, im);
+                par.bcast(owner, zero_re);
+                par.bcast(owner, zero_im);
                 
-                // owner : broadcast arrays to non-owners
-                MPI_Bcast(M.diag().data(), S_.diag().size(), MPI_INT,            owner, MPI_COMM_WORLD);
-                MPI_Bcast(M.data().data(), S_.data().size(), MPI_DOUBLE_COMPLEX, owner, MPI_COMM_WORLD);
-                
-                // all : reconstruct object (this won't change owner's data)
-                M.update();
+                // non-owners : reconstruct data
+                if (not par.isMyWork(lambda))
+                {
+                    M.diag() = S_.diag();
+                    M.data() = interleave(re.decompress(zero_re), im.decompress(zero_im));
+                    M.update();
+                }
                 
                 // non-owners : save the block if the file didn't exist before
                 if (not haveR[par.iproc()])
-                    M.hdfsave();
+                    M.hdfsave(HDFFile::readwrite, true /* = with compression */);
                 
                 // all : release the block from memory if requested
                 if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
