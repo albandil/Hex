@@ -2600,6 +2600,11 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) 
             blocks_[iblock].drop();
     }
     
+#ifdef _OPENMP
+    for (omp_lock_t & lock : locks)
+        omp_destroy_lock(&lock);
+#endif
+    
     return w;
 }
 
