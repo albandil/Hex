@@ -563,8 +563,6 @@ bool CscMatrix::hdfsave (const char* name) const
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile file(name, HDFFile::overwrite);
         
         // write dimensions
@@ -588,8 +586,6 @@ bool CscMatrix::hdfsave (const char* name) const
             );
         }
         
-        hdfunlock_();
-        
         return true;
     }
     catch (...)
@@ -606,8 +602,6 @@ bool CscMatrix::hdfload (const char* name)
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -630,8 +624,6 @@ bool CscMatrix::hdfload (const char* name)
                 x_.size() * 2
             );
         }
-        
-        hdfunlock_();
         
         return true;
     }
@@ -846,8 +838,6 @@ bool CsrMatrix::hdfsave (std::string name) const
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
@@ -871,8 +861,6 @@ bool CsrMatrix::hdfsave (std::string name) const
             );
         }
         
-        hdfunlock_();
-        
         return true;
     }
     catch (...)
@@ -889,8 +877,6 @@ bool CsrMatrix::hdfload (std::string name)
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -913,8 +899,6 @@ bool CsrMatrix::hdfload (std::string name)
                 x_.size() * 2
             );
         }
-        
-        hdfunlock_();
         
         return true;
     }
@@ -1549,8 +1533,6 @@ bool CooMatrix::hdfsave (const char* name) const
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile hdf(name, HDFFile::overwrite);
         
         // write dimensions
@@ -1574,8 +1556,6 @@ bool CooMatrix::hdfsave (const char* name) const
             );
         }
         
-        hdfunlock_();
-        
         return true;
     }
     catch (...)
@@ -1594,8 +1574,6 @@ bool CooMatrix::hdfload (const char* name)
 #ifndef NO_HDF
     try
     {
-        hdflock_();
-        
         HDFFile hdf(name, HDFFile::readonly);
         
         // read dimensions
@@ -1619,8 +1597,6 @@ bool CooMatrix::hdfload (const char* name)
             );
         }
         
-        hdfunlock_();
-        
         return true;
     }
     catch (...)
@@ -1634,19 +1610,11 @@ bool CooMatrix::hdfload (const char* name)
 
 SymDiaMatrix::SymDiaMatrix ()
     : n_(0), elems_(0), idiag_(0), name_(), dptrs_(0)
-{
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
-}
+{}
 
 SymDiaMatrix::SymDiaMatrix (int n)
     : n_(n), elems_(n), idiag_(0), name_(), dptrs_(0)
-{
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
-}
+{}
 
 SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
     : n_(n), idiag_(id), name_()
@@ -1661,10 +1629,6 @@ SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id)
     
     // setup diagonal pointers
     setup_dptrs_();
-    
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id, const cArrayView v)
@@ -1672,10 +1636,6 @@ SymDiaMatrix::SymDiaMatrix (int n, const iArrayView id, const cArrayView v)
 {
     // setup diagonal pointers
     setup_dptrs_();
-    
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (SymDiaMatrix const & A)
@@ -1683,10 +1643,6 @@ SymDiaMatrix::SymDiaMatrix (SymDiaMatrix const & A)
 {
     // setup diagonal pointers
     setup_dptrs_();
-    
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (SymDiaMatrix&& A)
@@ -1694,19 +1650,12 @@ SymDiaMatrix::SymDiaMatrix (SymDiaMatrix&& A)
 {
     // setup diagonal pointers
     setup_dptrs_();
-
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
 }
 
 SymDiaMatrix::SymDiaMatrix (std::string filename)
     : name_(filename)
 {
-#ifdef _OPENMP
-    omp_init_lock(&lock_);
-#endif
-    
+    # pragma omp critical
     if (not hdfload())
         throw exception ("Unable to load from %s.", filename.c_str());
 }
@@ -1950,38 +1899,27 @@ bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
     return true;
 }
 
-bool SymDiaMatrix::hdfload (std::string name)
-{
 #ifndef NO_HDF
+bool SymDiaMatrix::hdfload (HDFFile & hdf, std::string prefix)
+{
     try
     {
-        // reserve the HDF file for the current thread
-        hdflock_();
-        
-        // open the HDF file
-        HDFFile hdf(name, HDFFile::readonly);
+        // check the HDF file
         if (not hdf.valid())
-        {
-            hdfunlock_();
             return false;
-        }
+        
+        // set prefix
+        if (not prefix.empty())
+            hdf.prefix = prefix;
         
         // read dimension
         if (not hdf.read("n", &n_, 1))
-        {
-            hdfunlock_();
             return false;
-        }
         
         // read non-zero diagonal identificators
         if (idiag_.resize(hdf.size("idiag")))
-        {
             if (not hdf.read("idiag", &(idiag_[0]), idiag_.size()))
-            {
-                hdfunlock_();
                 return false;
-            }
-        }
         
         // compressed array info
         iArray zero_blocks_re, zero_blocks_im;
@@ -1992,10 +1930,7 @@ bool SymDiaMatrix::hdfload (std::string name)
             (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
             (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
             (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
-        {
-            hdfunlock_();
             return false;
-        }
         
         // decompress
         elems_ = std::move
@@ -2010,14 +1945,29 @@ bool SymDiaMatrix::hdfload (std::string name)
         // update matrix internals
         setup_dptrs_();
         
-        // allow other threads to access the file
-        hdfunlock_();
-        
         return true;
     }
     catch (H5::FileIException exc)
     {
-        hdfunlock_();
+        return false;
+    }
+}
+#endif
+
+bool SymDiaMatrix::hdfload (std::string name)
+{
+#ifndef NO_HDF
+    try
+    {
+        // open the HDF file
+        HDFFile hdf(name, HDFFile::readonly);
+        if (not hdf.valid())
+            return false;
+        
+        return hdfload(hdf);
+    }
+    catch (H5::FileIException exc)
+    {
         return false;
     }
 #else /* NO_HDF */
@@ -2028,23 +1978,15 @@ bool SymDiaMatrix::hdfload (std::string name)
 bool SymDiaMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool docompress, std::size_t consec) const
 {
 #ifndef NO_HDF
-    hdflock_();
-    
     HDFFile hdf(name, flags);
     
     if (not hdf.valid())
-    {
-        hdfunlock_();
         return false;
-    }
     
     // write dimension and diagonal info
     if (not hdf.write("n", &n_, 1) or
         not hdf.write("idiag", &(idiag_[0]), idiag_.size()))
-    {
-        hdfunlock_();
         return false;
-    }
     
     // compress elements array
     iArray zero_blocks_re, zero_blocks_im;
@@ -2070,12 +2012,8 @@ bool SymDiaMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool do
          not hdf.write("re", &(elements_re[0]), elements_re.size()))) or
        ((not elements_im.empty() and
         not hdf.write("im", &(elements_im[0]), elements_im.size()))))
-    {
-        hdfunlock_();
         return false;
-    }
     
-    hdfunlock_();
     return true;
 #else /* NO_HDF */
     return false;
@@ -2536,73 +2474,124 @@ bool BlockSymDiaMatrix::hdfcheck () const
     return HDFFile(diskfile_, HDFFile::readonly).valid();
 }
 
-cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool loadblocks) const
+cArray BlockSymDiaMatrix::dot
+(
+    cArrayView v
+    , bool parallelize
+#ifndef NO_HDF
+    , bool loadblocks
+#endif
+) const
 {
+    // check vector size
     if (v.size() != size_ * size_)
         throw exception ("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
     
-    // output vector
+    // check if matrix is empty
+    if (structure_.size() == 0)
+        return cArray (v.size());
+    
+    // create output vector
     cArray w(v.size());
     
-#ifdef _OPENMP
-    // result vector concurrent access locks
-    std::vector<omp_lock_t> locks(size_);
-    for (omp_lock_t & lock : locks)
-        omp_init_lock(&lock);
+#ifndef NO_HDF
+    // open data file for reading
+    HDFFile * hdf = nullptr;
+    if (loadblocks)
+        hdf = new HDFFile (diskfile_, HDFFile::readonly);
 #endif
     
-    // for all blocks
-    # pragma omp parallel for schedule (dynamic,1) if (parallelize)
-    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+    // the first and (one past) the last block of a diagonal
+    std::size_t beginblock = 0, endblock = 0;
+    
+    // for all diagonals
+    while (beginblock != structure_.size())
     {
-        // it may be necessary to load the block from scratch file
-        if (loadblocks)
+        // find the last block of the current diagonal
+        for (endblock = beginblock + 1; endblock < structure_.size(); endblock++)
         {
-            hdflock();
-            blocks_[iblock].hdfload();
-            hdfunlock();
-        }
-        
-        // block indices
-        int i = structure_[iblock].first, j = structure_[iblock].second;
-        
-        // for both symmetric blocks
-        for (int sym = 0; sym < 2; sym++)
-        {
-            // source vector segment
-            cArrayView v_view (v, j * size_, size_);
-            
-            // calculate the product
-            cArray prod = blocks_[iblock].dot(v_view);
-            
-            // target vector segment
-            cArrayView w_view (w, i * size_, size_);
-            
-            // safely write to the shared output array
-#ifdef _OPENMP
-            omp_set_lock(&locks[i]);
-#endif
-            w_view += prod;
-#ifdef _OPENMP
-            omp_unset_lock(&locks[i]);
-#endif
-            
-            // skip the next symmetry if the block is on diagonal
-            if (i == j)
+            // check if this block is on a different diagonal
+            if (structure_[endblock].second - structure_[endblock].first != structure_[beginblock].second - structure_[beginblock].first)
                 break;
-            
-            // the next symmetry
-            std::swap(i,j);
         }
         
-        // it may be necessary to drop the block from memory
+        // which diagonal is this?
+        std::size_t d = structure_[beginblock].second - structure_[beginblock].first;
+        
+#ifndef NO_HDF
         if (loadblocks)
-            blocks_[iblock].drop();
+        {
+            // sequentiall preload the whole diagonal
+            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+                blocks_[iblock].hdfload(*hdf, format("block_%ld_%ld_",structure_[iblock].first,structure_[iblock].second));
+        }
+#endif
+        
+        // multiply by the main diagonal
+        if (d == 0)
+        {
+            // for all blocks on the main diagonal
+            # pragma omp parallel for if (parallelize)
+            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+            {
+                // block index
+                std::size_t i = structure_[iblock].first;
+                
+                // calculate the product (also the symmetric position, if off diagonal)
+                cArrayView(w, i * size_, size_) += blocks_[iblock].dot(cArrayView(v, i * size_, size_));
+            }
+        }
+        
+        // multiply by the other diagonals (both symmetries)
+        if (d != 0)
+        {
+            // for all blocks on the side diagonal (upper blocks, i < j)
+            # pragma omp parallel for if (parallelize)
+            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+            {
+                // block indices
+                std::size_t i = structure_[iblock].first;
+                std::size_t j = structure_[iblock].second;
+                
+                // calculate the product (also the symmetric position, if off diagonal)
+                cArrayView(w, i * size_, size_) += blocks_[iblock].dot(cArrayView(v, j * size_, size_));
+            }
+            
+            // for all blocks on the side diagonal (lower blocks, i > j)
+            # pragma omp parallel for if (parallelize)
+            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+            {
+                // block indices
+                std::size_t i = structure_[iblock].first;
+                std::size_t j = structure_[iblock].second;
+                
+                // calculate the product (also the symmetric position, if off diagonal)
+                cArrayView(w, j * size_, size_) += blocks_[iblock].dot(cArrayView(v, i * size_, size_));
+            }
+        }
+        
+#ifndef NO_HDF
+        if (loadblocks)
+        {
+            // it may be necessary to drop the loaded blocks from memory
+            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+                blocks_[iblock].drop();
+        }
+#endif
+        
+        // move on to the next diagonal
+        beginblock = endblock;
     }
     
+<<<<<<< HEAD
 #ifdef _OPENMP
     for (omp_lock_t & lock : locks)
         omp_destroy_lock(&lock);
+=======
+#ifndef NO_HDF
+    if (loadblocks)
+        delete hdf;
+>>>>>>> 0b18dfc624572b52f3d8739eb733aec568e04c9b
 #endif
     
     return w;
@@ -2626,9 +2615,8 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
         // it may be necessary to load the block from scratch
         if (loadblocks)
         {
-            hdflock();
+            # pragma omp critical
             blocks_[iblock].hdfload();
-            hdfunlock();
         }
         
         // block indices

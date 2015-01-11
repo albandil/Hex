@@ -220,6 +220,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (not std::isfinite(f2))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
+<<<<<<< HEAD
                 // do we need to read the radial matrix scratch?
                 bool readfromdisk = not (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint));
                 
@@ -231,6 +232,21 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             }
             
             // calculate monopole term (direct/exchange contribution)
+=======
+                // whether we need to load the data from disk
+                bool fromdisk;
+                if (par_.isMyWork(lambda))
+                    fromdisk = not cmd_.cache_own_radint;
+                else
+                    fromdisk = not cmd_.cache_all_radint;
+                
+                // add multipole terms (direct/exchange)
+                if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot, fromdisk);
+                if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot, fromdisk);
+            }
+            
+            // add monopole terms (direct/exchange)
+>>>>>>> 0b18dfc624572b52f3d8739eb733aec568e04c9b
             if (li == l1 and l == l2)
                 chi_block += (-prefactor       ) * kron_dot(s_rad_.S_d(), s_rad_.Mm1_tr_d(), Pj1);
             if (li == l2 and l == l1)
@@ -298,7 +314,11 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
             // product
+<<<<<<< HEAD
             cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, cmd_.outofcore) );
+=======
+            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, not cmd_.cache_own_radint) );
+>>>>>>> 0b18dfc624572b52f3d8739eb733aec568e04c9b
             
             // update array
             # pragma omp critical

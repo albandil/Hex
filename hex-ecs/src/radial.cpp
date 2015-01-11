@@ -416,10 +416,17 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
         {
-            std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
-            
-            if (not cmd.cache_own_radint or R_tr_dia_[lambda].hdfload())
+            if (not cmd.cache_own_radint)
+            {
+                std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
                 continue;
+            }
+            
+            if (R_tr_dia_[lambda].hdfload())
+            {
+                std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
+                continue;
+            }
         }
         
         // initialize R_tr_dia matrix blocks structure using the overlap matrix

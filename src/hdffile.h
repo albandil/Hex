@@ -97,13 +97,13 @@ public:
     /// Check that the file is valid.
     bool valid () const { return valid_; }
     
+    /// Prefix for dataset paths.
+    std::string prefix;
+    
 private:
     
     /// Pointer to the HDF structure.
     H5::H5File * file_;
-    
-    /// Prefix for dataset paths.
-    std::string prefix_;
     
     /// Whether the file is valid.
     bool valid_;
