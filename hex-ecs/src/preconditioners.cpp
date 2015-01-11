@@ -217,9 +217,16 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (not std::isfinite(f2))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
+                // whether we need to load the data from disk
+                bool fromdisk;
+                if (par_.isMyWork(lambda))
+                    fromdisk = not cmd_.cache_own_radint;
+                else
+                    fromdisk = not cmd_.cache_all_radint;
+                
                 // add multipole terms (direct/exchange)
-                if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot, cmd_.outofcore);
-                if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot, cmd_.outofcore);
+                if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot, fromdisk);
+                if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot, fromdisk);
             }
             
             // add monopole terms (direct/exchange)
@@ -290,7 +297,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
             // product
-            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, cmd_.outofcore) );
+            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, not cmd_.cache_own_radint) );
             
             // update array
             # pragma omp critical

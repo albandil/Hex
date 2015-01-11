@@ -349,7 +349,7 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
         cArray solution;
         if (not reader.load(solution))
         {
-            std::cout << "File \"" << reader.name() << "\" not found." << std::endl;
+            std::cout << "\tFile \"" << reader.name() << "\" not found." << std::endl;
             continue;
         }
         
@@ -661,7 +661,7 @@ std::pair<cArrays,cArrays> Amplitudes::computeXi_ (Amplitudes::Transition T)
         cArray solution;
         if (not reader.load(solution))
         {
-            std::cout << "File \"" << reader.name() << "\" not found." << std::endl;
+            std::cout << "\tFile \"" << reader.name() << "\" not found." << std::endl;
             continue;
         }
         
