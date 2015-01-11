@@ -171,7 +171,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
         throw exception ("Unable to expand hydrogen bound orbital in B-splines!");
     
     // for all segments constituting the RHS
-    # pragma omp parallel for
+    # pragma omp parallel for if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
     {
         int l1 = l1_l2_[ill].first;
@@ -217,55 +217,14 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 if (not std::isfinite(f2))
                     throw exception ("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
-                // skip contribution if both coefficients are zero
-                if (f1 == 0. and f2 == 0.)
-                    continue;
-                
-                // for all sub-blocks of the radial integral matrix
-                for (std::pair<int,int> pos : s_rad_.R_tr_dia(lambda).structure())
-                {
-                    // block indices
-                    int i = pos.first, j = pos.second;
-                    
-                    // for both symmetric blocks (i,j) and (j,i)
-                    for (int sym = 0; sym < 2; sym++)
-                    {
-                        // source data segment
-                        cArrayView src1 (Pj1, j * Nspline, Nspline), src2 (Pj2, j * Nspline, Nspline);
-                        
-                        // target data segment
-                        cArrayView dst (chi_block, i * Nspline, Nspline);
-                        
-                        // use radial integrals from memory ...
-                        if (cmd_.cache_all_radint or (par_.isMyWork(lambda) and cmd_.cache_own_radint))
-                        {
-                            // add the contributions
-                            if (f1 != 0.) dst += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).block(i,j).dot(src1);
-                            if (f2 != 0.) dst += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).block(i,j).dot(src2);
-                        }
-                        
-                        // ... or from disk
-                        else
-                        {
-                            // add the contributions
-                            if (f1 != 0.) dst += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget().dot(src1);
-                            if (f2 != 0.) dst += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).block(i,j).hdfget().dot(src2);
-                        }
-                        
-                        // switch to the other symmetry
-                        std::swap(i,j);
-                        
-                        // terminate if this is a diagonal sub-block and there is no partner symmetric block
-                        if (i == j) break;
-                    }
-                }
+                // add multipole terms (direct/exchange)
+                if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot, cmd_.outofcore);
+                if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot, cmd_.outofcore);
             }
             
-            // direct contribution
+            // add monopole terms (direct/exchange)
             if (li == l1 and l == l2)
                 chi_block += (-prefactor       ) * kron_dot(s_rad_.S_d(), s_rad_.Mm1_tr_d(), Pj1);
-            
-            // exchange contribution with the correct sign
             if (li == l2 and l == l1)
                 chi_block += (-prefactor * Sign) * kron_dot(s_rad_.Mm1_tr_d(), s_rad_.S_d(), Pj2);
         }
@@ -331,7 +290,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             cArrayView p_block (p, illp * Nchunk, Nchunk);
             
             // product
-            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block) );
+            cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, cmd_.outofcore) );
             
             // update array
             # pragma omp critical
@@ -380,7 +339,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            true                   // verbose output
+            false                   // verbose output
         );
     }
     

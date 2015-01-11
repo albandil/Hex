@@ -39,13 +39,13 @@
 #include "misc.h"
 
 HDFFile::HDFFile (std::string filename, FileAccess flag)
-    : file_(nullptr), prefix_(), valid_(true)
+    : prefix(), file_(nullptr), valid_(true)
 {
     // separate filesystem path and dataset path (by semicolon)
     std::size_t pos = filename.find(':');
     if (pos != std::string::npos)
     {
-        prefix_ = filename.substr(pos + 1);
+        prefix = filename.substr(pos + 1);
         filename.resize(pos);
     }
     
@@ -92,7 +92,7 @@ size_t HDFFile::size (std::string dataset) const
     
     try
     {
-        dataset = prefix_ + dataset;
+        dataset = prefix + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         size_t length = dspc.getSimpleExtentNpoints();
@@ -173,7 +173,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, H5::Ato
         return true;
     try
     {
-        dataset = prefix_ + dataset;
+        dataset = prefix + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         
@@ -200,7 +200,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
     
     try
     {
-        dataset = prefix_ + dataset;
+        dataset = prefix + dataset;
         H5::DataSpace dspc(1, &length);
         
         H5::DataSet dset = file_->createDataSet(dataset.c_str(), dtype, dspc);

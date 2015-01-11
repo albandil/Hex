@@ -622,33 +622,13 @@ public:
     // Constructors
     
     CscMatrix ()
-        : m_(0), n_(0)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(0), n_(0) {}
     CscMatrix (std::size_t m, std::size_t n)
-        : m_(m), n_(n)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n) {}
     CscMatrix (CscMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
     CscMatrix (std::size_t m, std::size_t n, const lArrayView p, const lArrayView i, const cArrayView x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), p_(p), i_(i), x_(x) {}
     
     // Destructor
     
@@ -717,23 +697,6 @@ private:
     lArray p_;
     lArray i_;
     cArray x_;
-    
-    // exclusive data file access for use of HDF5 with OpenMP
-#ifdef _OPENMP
-    mutable omp_lock_t lock_;
-#endif
-    void hdflock_ () const
-    {
-#ifdef _OPENMP
-        omp_set_lock(&lock_);
-#endif
-    }
-    void hdfunlock_ () const
-    {
-#ifdef _OPENMP
-        omp_unset_lock(&lock_);
-#endif
-    }
 };
 
 /**
@@ -759,33 +722,13 @@ public:
     // Constructors
     
     CsrMatrix ()
-        : m_(0), n_(0), name_()
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(0), n_(0), name_() {}
     CsrMatrix (std::size_t m, std::size_t n)
-        : m_(m), n_(n), name_()
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), name_() {}
     CsrMatrix (CsrMatrix const & A)
-        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_()
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
     CsrMatrix (std::size_t m, std::size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
-        : m_(m), n_(n), p_(p), i_(i), x_(x), name_()
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     
     // Destructor
     
@@ -1262,23 +1205,6 @@ private:
     
     // linked HDF file
     std::string name_;
-    
-    // exclusive data file access for use of HDF5 with OpenMP
-#ifdef _OPENMP
-    mutable omp_lock_t lock_;
-#endif
-    void hdflock_ () const
-    {
-#ifdef _OPENMP
-        omp_set_lock(&lock_);
-#endif
-    }
-    void hdfunlock_ () const
-    {
-#ifdef _OPENMP
-        omp_unset_lock(&lock_);
-#endif
-    }
 };
 
 
@@ -1302,40 +1228,15 @@ public:
     // Empty constructors
     
     CooMatrix ()
-        : m_(0), n_(0), sorted_(true)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(0), n_(0), sorted_(true) {}
     CooMatrix (std::size_t m, std::size_t n)
-        : m_(m), n_(n), sorted_(true)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), sorted_(true) {}
     CooMatrix (CooMatrix const & A)
-        : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, NumberArray<long> && i, NumberArray<long> && j, NumberArray<Complex> && x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false)
-    {
-#ifdef _OPENMP
-        omp_init_lock(&lock_);
-#endif
-    }
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**
      * Copy constructor initialized from dense array.
@@ -1720,23 +1621,6 @@ private:
     cArray x_;
     
     bool sorted_;
-    
-    // exclusive data file access for use of HDF5 with OpenMP
-#ifdef _OPENMP
-    mutable omp_lock_t lock_;
-#endif
-    void hdflock_ () const
-    {
-#ifdef _OPENMP
-        omp_set_lock(&lock_);
-#endif
-    }
-    void hdfunlock_ () const
-    {
-#ifdef _OPENMP
-        omp_unset_lock(&lock_);
-#endif
-    }
 };
 
 /**
@@ -2076,6 +1960,9 @@ public:
     //@{
     bool hdfload () { return hdfload (name_); }
     bool hdfload (std::string name);
+#ifndef NO_HDF
+    bool hdfload (HDFFile & hdf, std::string prefix = "");
+#endif
     //@}
     
     /**
@@ -2222,23 +2109,6 @@ private:
      * @endverbatim
      */
     void setup_dptrs_();
-    
-    // exclusive data file access for use of HDF5 with OpenMP
-#ifdef _OPENMP
-    mutable omp_lock_t lock_;
-#endif
-    void hdflock_ () const
-    {
-#ifdef _OPENMP
-        omp_set_lock(&lock_);
-#endif
-    }
-    void hdfunlock_ () const
-    {
-#ifdef _OPENMP
-        omp_unset_lock(&lock_);
-#endif
-    }
 };
 
 class BlockSymDiaMatrix
@@ -2257,11 +2127,6 @@ class BlockSymDiaMatrix
         /// Array of matrix blocks.
         mutable SymDiaMatrix * blocks_;
         
-#ifdef _OPENMP
-        // HDF scratch file access lock.
-        mutable omp_lock_t lock_;
-#endif
-        
     public:
         
         //
@@ -2269,12 +2134,7 @@ class BlockSymDiaMatrix
         //
         
         BlockSymDiaMatrix (int size = 0)
-            : diskfile_(), size_(size), blocks_(nullptr)
-        {
-#ifdef _OPENMP
-            omp_init_lock(&lock_);
-#endif
-        }
+            : diskfile_(), size_(size), blocks_(nullptr) {}
         
         /**
          * @brief Main constructor.
@@ -2303,10 +2163,6 @@ class BlockSymDiaMatrix
                 blocks_[iblock].size() = size_;
                 blocks_[iblock].hdflink(hdfpath);
             }
-            
-#ifdef _OPENMP
-            omp_init_lock(&lock_);
-#endif
         }
         
         /// Release memory (but keep size information).
@@ -2378,7 +2234,13 @@ class BlockSymDiaMatrix
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
          */
-        cArray dot (cArrayView v, bool parallelize = false, bool loadblocks = false) const;
+        cArray dot
+        (
+            cArrayView v, bool parallelize = false
+#ifndef NO_HDF
+            , bool loadblocks = false
+#endif
+        ) const;
         
         //
         // Coversions to other matrix types.
@@ -2410,22 +2272,6 @@ class BlockSymDiaMatrix
         
         /// Load data from disk to memory.
         bool hdfload ();
-        
-        /// Require thread-exclusive disk file access.
-        void hdflock () const
-        {
-#ifdef _OPENMP
-            omp_set_lock(&lock_);
-#endif
-        }
-        
-        /// Give up thread-exclusive disk file access.
-        void hdfunlock () const
-        {
-#ifdef _OPENMP
-            omp_unset_lock(&lock_);
-#endif
-        }
 };
 
 // --------------------------------------------------------------------------//
