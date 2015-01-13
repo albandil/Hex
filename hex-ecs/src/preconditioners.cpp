@@ -195,6 +195,8 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             Complex prefactor = std::pow(Complex(0.,1.),l)
                               * std::sqrt(special::constant::two_pi * (2 * l + 1))
                               * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / inp_.ki[ie];
+            
+            // skip non-contributing terms
             if (prefactor == 0.)
                 continue;
             
@@ -208,6 +210,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             // skip angular forbidden right hand sides
             for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
+                // calculate angular integrals
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
                 double f2 = special::computef(lambda, l1, l2, l, li, inp_.L);
                 
