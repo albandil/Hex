@@ -35,10 +35,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
-#include <regex>
 #include <vector>
-
-#include <fftw3.h>
 
 #include "amplitudes.h"
 #include "arrays.h"
@@ -46,9 +43,9 @@
 #include "chebyshev.h"
 #include "clenshawcurtis.h"
 #include "hydrogen.h"
+#include "matrix.h"
 #include "radial.h"
 #include "special.h"
-#include "matrix.h"
 #include "version.h"
 
 std::string current_time () 
@@ -329,7 +326,6 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
     Complex const * const t = &(bspline_.t(0));   // B-spline knots
     int order   = bspline_.order();               // B-spline order
     int Nspline = bspline_.Nspline();             // B-spline count
-    int Nknot   = bspline_.Nknot();               // number of all knots
     int Nreknot = bspline_.Nreknot();             // number of real knots
     
     // compute final hydrogen orbital overlaps with B-spline basis
@@ -366,19 +362,15 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
         if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
             continue;
         
+        // evaluate radial part for all evaluation radii
+        # pragma omp parallel for
         for (int n = 1; n <= samples; n++)
         {
             // this is the evaluation point
             double eval_r = R0 - wavelength * n / samples;
             
             // determine knot
-            int eval_knot = std::lower_bound
-            (
-                t,                      // pointer to the first knot
-                t + Nknot,              // pointer to one after the last knot
-                Complex(eval_r, 0.),    // value to search
-                Complex_realpart_less   // ordering for complex numbers
-            ) - t;
+            int eval_knot = bspline_.knot(eval_r);
             
             // evaluate j and dj at far radius for all angular momenta up to maxell
             cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
@@ -391,13 +383,11 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
                 Complex val;
                 
                 // evaluate B-spline
-                val = bspline_.bspline(ispline, eval_knot-1, order, eval_r);
-                if (val != 0.)
+                if ((val = bspline_.bspline(ispline, eval_knot, order, eval_r)) != 0.)
                     Bspline_R0.add(ispline, 0, val);
                 
                 // evaluate B-spline derivative
-                val = bspline_.dspline(ispline, eval_knot-1, order, eval_r);
-                if (val != 0.)
+                if ((val = bspline_.dspline(ispline, eval_knot, order, eval_r)) != 0.)
                     Dspline_R0.add(ispline, 0, val);
             }
             
@@ -423,11 +413,13 @@ std::map<int,std::pair<cArray,cArray>> Amplitudes::computeLambda_
                 cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
                 
                 // initialize the storage (if needed)
+                # pragma omp critical
                 if (Lambda.find(ell) == Lambda.end())
                     Lambda[ell] = std::make_pair(cArray(Nenergy),cArray(Nenergy));
                 
                 // update value in the storage
                 Complex lambda = Sp.transpose().dot(PsiSc).dot(Wj[ell].todense()).todense()[0] / double(samples);
+                # pragma omp critical
                 if (Spin == 0)
                     (Lambda[ell].first)[ie] += lambda;
                 else
@@ -542,8 +534,6 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             double F1, F2, F1p, F2p;
             int err1 = special::coul_F(l1,k1,r1, F1,F1p);
             int err2 = special::coul_F(l2,k2,r2, F2,F2p);
-            
-            /// DEBUG
             if (err1 != GSL_SUCCESS or err2 != GSL_SUCCESS)
             {
                 std::cerr << "Errors while evaluating Coulomb function:" << std::endl;
@@ -551,7 +541,6 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
                 std::cerr << "\terr2 = " << err2 << std::endl;
                 std::exit(EXIT_FAILURE);
             }
-            ///
             
             double F1F2 = F1 * F2;
             double ddrho_F1F2 = 0.;

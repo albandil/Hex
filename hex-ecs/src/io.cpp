@@ -119,7 +119,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "                                                                                                                                                         \n"
                     "\t--example                 (-e)  Create sample input file.                                                                                              \n"
                     "\t--help                    (-h)  Display this help.                                                                                                     \n"
-                    "\t--input <filename>        (-i)  Use custom input file.                                                                                                 \n"
+                    "\t--input <filename>        (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
                     "\t--zipfile <filename>      (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
                     "\t--zipcount <number>       (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
                     "\t--zipmax <number>         (-R)  Maximal radius to use for solution zipping.                                                                            \n"
@@ -145,6 +145,18 @@ void CommandLine::parse (int argc, char* argv[])
 #ifndef NO_OPENCL
                     "\t--gpu-slater                    Compute diagonal two-electron integrals using OpenCL (EXPERIMENTAL).                                                   \n"
 #endif
+                    "                                                                                                                                                         \n"
+                    "There are also some environment variables that control the execution.                                                                                    \n"
+                    "                                                                                                                                                         \n"
+                    "\tOMP_NUM_THREADS     Number of OpenMP threads to use.                                                                                                   \n"
+                    "\t                    If empty, the physical number of hardware threads set by system is used.                                                           \n"
+                    "                                                                                                                                                         \n"
+                    "\tHEX_RHO             Scattering amplitude extraction distance (must be on the real part of the grid).                                                   \n"
+                    "\t                    If empty, the end of the real grid is used.                                                                                        \n"
+                    "                                                                                                                                                         \n"
+                    "\tHEX_SAMPLES         How many times to evaluate the amplitude in the vicinity of the evaluation point. The evaluations will be uniformly                \n"
+                    "\t                    spread over one wave-length of the scattered electron and averaged to suppress numerical errors.                                   \n"
+                    "\t                    If empty, 10 evaluations are used.                                                                                                 \n"
                     "                                                                                                                                                         \n"
                 ;
                 std::exit(EXIT_SUCCESS);
