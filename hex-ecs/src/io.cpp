@@ -287,6 +287,12 @@ void CommandLine::parse (int argc, char* argv[])
                 lightweight = true;
                 return true;
             },
+        "shared-scratch", "s", 0, [&](std::string optarg) -> bool
+            {
+                // precompute only the owned subset of radial integrals
+                shared_scratch = true;
+                return true;
+            },
         
         [&] (std::string optname, std::string optarg) -> bool
         {
