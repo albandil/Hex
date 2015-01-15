@@ -2166,11 +2166,10 @@ class BlockSymDiaMatrix
 #endif
         }
         
-        /// Release memory (but keep size information).
-        void drop ()
+        /// Is this object cached in memory?
+        bool inmemory () const
         {
-            inmemory_ = false;
-            data_.resize(0);
+            return inmemory_;
         }
         
         /// Get block structure (only upper part!).
