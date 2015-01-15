@@ -249,6 +249,7 @@ class KPACGPreconditioner : public CGPreconditioner
         
         // inner CG callback (needed by parent)
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         
     protected:
         

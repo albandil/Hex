@@ -89,10 +89,10 @@ public:
     std::size_t size (std::string dataset) const;
     
     /// load data from a valid file.
-    template <typename T> bool read (std::string dataset, T * buffer, size_t length) const;
+    template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const;
     
     /// Write data to a valid file.
-    template <typename T> bool write (std::string dataset, T const * data, size_t length);
+    template <typename T> bool write (std::string dataset, T const * data, std::size_t length, std::size_t offset = 0);
     
     /// Check that the file is valid.
     bool valid () const { return valid_; }
@@ -100,19 +100,25 @@ public:
     /// Prefix for dataset paths.
     std::string prefix;
     
+    /// Internal HDF object.
+    H5::H5File * file () { return file_; }
+    
 private:
     
     /// Pointer to the HDF structure.
     H5::H5File * file_;
     
+    /// Filename.
+    std::string name_;
+    
     /// Whether the file is valid.
     bool valid_;
     
     /// Auxiliary read function.
-    bool read_(std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const;
+    bool read_(std::string dataset, void * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype) const;
     
     /// Auxiliary write function.
-    bool write_(std::string dataset, void const * buffer, hsize_t length, H5::AtomType dtype);
+    bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype);
 };
 
 #endif

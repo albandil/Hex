@@ -575,7 +575,7 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
 
 template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
-    throw exception ("Don't know how to multipy matrices of type %s.", typeid(Type).name);
+    Exception("Don't know how to multipy matrices of type %s.", typeid(Type).name);
 }
 template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B);
 template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B);
@@ -969,10 +969,10 @@ public:
             long err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_invalid_Numeric_object)
-                throw exception ("[LUft::save] Invalid numeric object.");
+                Exception("[LUft::save] Invalid numeric object.");
             
             if (err == UMFPACK_ERROR_file_IO)
-                throw exception ("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
+                Exception("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
         }
         void save () const
         {
@@ -990,10 +990,10 @@ public:
             long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_out_of_memory)
-                throw exception ("[LUft::load] Out of memory.");
+                Exception ("[LUft::load] Out of memory.");
             
             if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
-                throw exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
+                Exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
         }
         void load ()
         {
@@ -1908,7 +1908,8 @@ public:
      *                 of the othwerwise symmetric matrix.
      * @param parallelize Whether to use OpenMP to parallelize the SpMV operation.
      */
-    cArray dot (const cArrayView B, MatrixTriangle triangle = both, bool parallelize = false) const;
+    cArray dot (const cArrayView B) const;
+    static cArray sym_dia_dot (int n_, const iArrayView idiag_, Complex const * rp_elems_, Complex const * rp_B);
     
     /**
      * @brief Back-substitution (lower).
@@ -2118,14 +2119,20 @@ class BlockSymDiaMatrix
         /// Name of HDF5 scratch disk file.
         std::string diskfile_;
         
+        /// Whether to keep in memory.
+        bool inmemory_;
+        
         /// Size of a matrix block and also of the block structure.
         std::size_t size_;
         
         /// List of block positions (only upper part).
         std::vector<std::pair<int,int>> structure_;
         
-        /// Array of matrix blocks.
-        mutable SymDiaMatrix * blocks_;
+        /// Diagonal labels.
+        iArray idiag_;
+        
+        /// Data array.
+        cArray data_;
         
     public:
         
@@ -2134,7 +2141,7 @@ class BlockSymDiaMatrix
         //
         
         BlockSymDiaMatrix (int size = 0)
-            : diskfile_(), size_(size), blocks_(nullptr) {}
+            : diskfile_(), inmemory_(true), size_(size), data_() {}
         
         /**
          * @brief Main constructor.
@@ -2144,32 +2151,26 @@ class BlockSymDiaMatrix
          * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymDiaMatrix (int size, std::vector<std::pair<int,int>> blockstructure, std::string name = "")
-            : diskfile_(name), size_(size), structure_(blockstructure), blocks_(nullptr)
+        BlockSymDiaMatrix (int size, std::vector<std::pair<int,int>> const & blockstructure, const iArrayView idiag, bool inmemory = true, std::string name = "")
+            : diskfile_(name), inmemory_(inmemory), size_(size), structure_(blockstructure), idiag_(idiag), data_()
         {
-            // allocate (and resize) the blocks
-            blocks_ = new SymDiaMatrix[structure_.size()]();
-            
-            // set scratch names for the sub-matrices
-            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
+            if (inmemory_)
             {
-                // block indices
-                int i = structure_[iblock].first, j = structure_[iblock].second;
-                
-                // compose scratch path
-                std::string hdfpath = format("%s:block_%d_%d_", diskfile_.c_str(), i, j);
-                
-                // set the path
-                blocks_[iblock].size() = size_;
-                blocks_[iblock].hdflink(hdfpath);
+                data_.resize(structure_.size() * structure_.size());
             }
+#ifdef NO_HDF
+            else
+            {
+                Exception("The program is not compiled with support for scratch-disk HDF files.");
+            }
+#endif
         }
         
         /// Release memory (but keep size information).
         void drop ()
         {
-            for (std::size_t i = 0; i < structure_.size(); i++)
-                blocks_[i].drop();
+            inmemory_ = false;
+            data_.resize(0);
         }
         
         /// Get block structure (only upper part!).
@@ -2179,48 +2180,8 @@ class BlockSymDiaMatrix
         }
         
         /// Access individual blocks.
-        SymDiaMatrix & block (int i, int j)
-        {
-            // find this block in the matrix structure
-            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
-            {
-                if (structure_[iblock].first == std::min(i,j) and structure_[iblock].second == std::max(i,j))
-                    return blocks_[iblock];
-            }
-            
-            throw exception ("There is no block (%ld,%ld) in the block matrix.", i, j);
-        }
-        SymDiaMatrix const & block (int i, int j) const
-        {
-            // find this block in the matrix structure
-            for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
-            {
-                if (structure_[iblock].first == std::min(i,j) and structure_[iblock].second == std::max(i,j))
-                    return blocks_[iblock];
-            }
-            
-            throw exception ("There is no block (%ld,%ld) in the block matrix.", i, j);
-        }
-        
-        /// Access individual elements.
-        Complex & operator() (std::size_t i, std::size_t j)
-        {
-            // block and element position
-            std::size_t X = std::min(i,j) / size_, Y = std::max(i,j) / size_;
-            std::size_t x = std::min(i,j) % size_, y = std::max(i,j) % size_;
-            
-            // pick requested item
-            return block(X,Y)(x,y);
-        }
-        Complex operator() (std::size_t i, std::size_t j) const
-        {
-            // block and element position
-            std::size_t X = std::min(i,j) / size_, Y = std::max(i,j) / size_;
-            std::size_t x = std::min(i,j) % size_, y = std::max(i,j) % size_;
-            
-            // pick requested item
-            return block(X,Y)(x,y);
-        }
+        cArray getBlock (int i) const;
+        void setBlock (int i, const cArrayView data);
         
         //
         // Arithmetic operators.
@@ -2234,13 +2195,7 @@ class BlockSymDiaMatrix
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
          */
-        cArray dot
-        (
-            cArrayView v, bool parallelize = false
-#ifndef NO_HDF
-            , bool loadblocks = false
-#endif
-        ) const;
+        cArray dot (cArrayView v, bool parallelize = false) const;
         
         //
         // Coversions to other matrix types.
@@ -2251,7 +2206,7 @@ class BlockSymDiaMatrix
          * 
          * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
          */
-        CooMatrix tocoo (bool loadblocks = false) const;
+        CooMatrix tocoo () const;
         
         //
         // Scratch file I/O.

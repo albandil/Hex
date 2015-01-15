@@ -144,7 +144,7 @@ template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<
     // C(col) = (A'(col) B(col))' = B'(col) A(col)
     
     if (A.cols() != B.rows())
-        throw exception ("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+        Exception("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
     
     // dimensions
     int m = B.cols(), n = A.cols(), k = A.rows();
@@ -174,7 +174,7 @@ template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatri
     // C(col) = (A'(col) B(col))' = B'(col) A(col)
     
     if (A.cols() != B.rows())
-        throw exception ("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+        Exception("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
     
     // dimensions
     int m = B.cols(), n = A.cols(), k = B.rows();
@@ -201,7 +201,7 @@ template<> ColMatrix<Complex> ColMatrix<Complex>::invert () const
 {
 #ifndef NO_LAPACK
     if (rows() != cols())
-        throw exception ("Only square matrices can be diagonalized.");
+        Exception("Only square matrices can be diagonalized.");
     int N = rows();
     
     ColMatrix<Complex> inv (*this);
@@ -251,7 +251,7 @@ template<> ColMatrix<Complex> ColMatrix<Complex>::invert () const
     
     return inv;
 #else
-    throw exception ("Cannot invert dense matrix without LAPACK support.");
+    Exception("Cannot invert dense matrix without LAPACK support.");
 #endif
 }
 
@@ -260,7 +260,7 @@ template<> std::tuple<cArray,ColMatrix<Complex>,ColMatrix<Complex>> ColMatrix<Co
 {
 #ifndef NO_LAPACK
     if (rows() != cols())
-        throw exception ("Only square matrices can be diagonalized.");
+        Exception("Only square matrices can be diagonalized.");
     int N = rows();
     
     ColMatrix<Complex> VL(N,N), VR(N,N);
@@ -321,7 +321,7 @@ template<> std::tuple<cArray,ColMatrix<Complex>,ColMatrix<Complex>> ColMatrix<Co
     
     return std::make_tuple(W,VL,VR);
 #else
-    throw exception ("Cannot diagonalize dense matrix without LAPACK support.");
+    Exception("Cannot diagonalize dense matrix without LAPACK support.");
 #endif
 }
 
@@ -1181,7 +1181,7 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
 {
     // check compatibility
     if (A.cols() != B.rows())
-        throw exception ("Wrong sizes for matrix multiplication: %d %d, %d %d.", A.rows(), A.cols(), B.rows(), B.cols());
+        Exception("Wrong sizes for matrix multiplication: %d %d, %d %d.", A.rows(), A.cols(), B.rows(), B.cols());
     
     // result arrays
     lArray Cp = { 0 }, Ci;
@@ -1487,7 +1487,7 @@ Complex CooMatrix::ddot (CooMatrix const & B) const
     
     // sort by i_ and j_
     if (not sorted() or not B.sorted())
-        throw exception("[CooMatrix] Sort matrices before ddot!");
+        Exception("[CooMatrix] Sort matrices before ddot!");
         
     Complex result = 0;
     
@@ -1657,7 +1657,7 @@ SymDiaMatrix::SymDiaMatrix (std::string filename)
 {
     # pragma omp critical
     if (not hdfload())
-        throw exception ("Unable to load from %s.", filename.c_str());
+        Exception("Unable to load from %s.", filename.c_str());
 }
 
 void SymDiaMatrix::setup_dptrs_()
@@ -1677,7 +1677,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        throw exception ("[SymDiaMatrix::operator+=] Unequal sizes (%ld != %ld)!", size(), B.size());
+        Exception("[SymDiaMatrix::operator+=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))
@@ -1730,7 +1730,7 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        throw exception ("[SymDiaMatrix::operator-=] Unequal sizes (%ld != %ld)!", size(), B.size());
+        Exception("[SymDiaMatrix::operator-=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))
@@ -1825,7 +1825,7 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     // check dimensions
     if (A.size() != B.size())
-        throw exception ("Cannot multiply matrices: A's column count != B's row count.");
+        Exception("Cannot multiply matrices: A's column count != B's row count.");
     
     // compute bandwidth, half-bandwidth and other parameters of the matrices
     int C_size = A.size();
@@ -1890,12 +1890,12 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
 {
     if (n_ != B.n_)
-        throw exception ("[SymDiaMatrix] Unequal ranks (%d != %d).", n_, B.n_);
+        Exception("[SymDiaMatrix] Unequal ranks (%d != %d).", n_, B.n_);
     if (idiag_.size() != B.idiag_.size())
-        throw exception ("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
+        Exception("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
     for (std::size_t i = 0; i < idiag_.size(); i++)
         if (idiag_[i] != B.idiag_[i])
-            throw exception ("[SymDiaMatrix] Unequal distribution of diagonals.");
+            Exception("[SymDiaMatrix] Unequal distribution of diagonals.");
     return true;
 }
 
@@ -2072,12 +2072,14 @@ CooMatrix SymDiaMatrix::tocoo (MatrixTriangle triangle) const
     return CooMatrix(n_, n_, i, j, v);
 }
 
-cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool parallelize) const
+cArray SymDiaMatrix::sym_dia_dot
+(
+    int n_,
+    const iArrayView idiag_,
+    Complex const * rp_elems_,
+    Complex const * rp_B
+)
 {
-    // check dimensions
-    if ((int)B.size() != n_)
-        throw exception ("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n_, B.size());
-    
     // size of the matrix
     int Nrows = n_;
     int Ndiag = idiag_.size();
@@ -2086,22 +2088,12 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
     cArray res(Nrows);
     
     // data pointers
-    Complex       *       restrict rp_res    = &res[0];
-    Complex const *       restrict rp_elems_ = &elems_[0];
-    Complex const * const restrict rp_B      = &B[0];
+    Complex * rp_res = &res[0];
     
     // for all elements in the main diagonal
-    if (triangle & diagonal)
-    {
-        # pragma omp parallel for default (none) schedule (static) firstprivate (Nrows,rp_res,rp_elems_,rp_B) if (parallelize)
-        for (int ielem = 0; ielem < Nrows; ielem++)
-            rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
-    }
+    for (int ielem = 0; ielem < Nrows; ielem++)
+        rp_res[ielem] = rp_elems_[ielem] * rp_B[ielem];
     
-    // if only diagonal multiplication has been requested, return the result
-    if (not (triangle & strict_upper) and not (triangle & strict_lower))
-        return res;
-
     // beginning of the first non-main diagonal
     rp_elems_ += Nrows;
     
@@ -2115,24 +2107,26 @@ cArray SymDiaMatrix::dot (const cArrayView B, MatrixTriangle triangle, bool para
         int Nelem = Nrows - idiag;
         
         // for all elements of the current diagonal
-        if (triangle & strict_upper)
-        {
-            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag) if (parallelize)
-            for (int ielem = 0; ielem < Nelem; ielem++)
-                rp_res[ielem]         += rp_elems_[ielem] * rp_B[ielem + idiag];
-        }
-        if (triangle & strict_lower)
-        {
-            # pragma omp parallel for default (none) schedule (static) firstprivate (Nelem,rp_res,rp_elems_,rp_B,idiag) if (parallelize)
-            for (int ielem = 0; ielem < Nelem; ielem++)
-                rp_res[ielem + idiag] += rp_elems_[ielem] * rp_B[ielem];
-        }
+        for (int ielem = 0; ielem < Nelem; ielem++)
+            rp_res[ielem]         += rp_elems_[ielem] * rp_B[ielem + idiag];
+        
+        for (int ielem = 0; ielem < Nelem; ielem++)
+            rp_res[ielem + idiag] += rp_elems_[ielem] * rp_B[ielem];
         
         // move to the beginning of the next diagonal
         rp_elems_ += Nelem;
     }
     
     return res;
+}
+
+cArray SymDiaMatrix::dot (const cArrayView B) const
+{
+    // check dimensions
+    if ((int)B.size() != n_)
+        Exception("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n_, B.size());
+    
+    return sym_dia_dot(n_, idiag_, &elems_[0], &B[0]);
 }
 
 std::vector<std::pair<int,int>> SymDiaMatrix::nzpattern () const
@@ -2154,11 +2148,11 @@ std::vector<std::pair<int,int>> SymDiaMatrix::nzpattern () const
     return nz;
 }
 
-BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
+/*BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     // only allow A and B of the same size
     if (A.size() != B.size())
-        throw exception ("Matrices for the Kronecker product need to have the same size in current implementation, but %d != %d.", A.size(), B.size());
+        Exception("Matrices for the Kronecker product need to have the same size in current implementation, but %d != %d.", A.size(), B.size());
     
     // create result block matrix
     BlockSymDiaMatrix C (A.size(), A.nzpattern());
@@ -2172,86 +2166,7 @@ BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
     
     // return result
     return C;
-}
-
-/*
-SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B)
-{
-    iArray Cdiags;
-    
-    // compose diagonals of the result
-    for (int i = 0; i < (int)A.diag().size(); i++)
-    for (int j = -(int)B.diag().size() + 1; j < (int)B.diag().size(); j++)
-    {
-        // A's diagonal label
-        int dA = A.diag(i);
-        
-        // B's diagonal label
-        int dB = (j < 0 ? -B.diag(std::abs(j)) : B.diag(j));
-        
-        // C's diagonal label
-        int dC = dA * B.size() + dB;
-        
-        // add the new diagonal
-        if (dC >= 0)
-            Cdiags.push_back(dC);
-    }
-    
-    // create result matrix
-    SymDiaMatrix C (A.size() * B.size(), Cdiags);
-    
-    // for all A's and B's diagonals
-    int nA = A.diag().size(), nB = B.diag().size();
-    # pragma omp parallel for collapse (2)
-    for (int i = 0; i <= nA - 1; i++)
-    for (int j = -nB + 1; j <= nB - 1; j++)
-    {
-        // A's diagonal label and pointer
-        int dA = A.diag(i);
-        Complex const * restrict pA = A.dptr(i);
-        
-        // B's diagonal label and pointer
-        int dB = (j < 0 ? -B.diag(std::abs(j)) : B.diag(j));
-        Complex const * restrict pB = B.dptr(std::abs(j));
-        
-        // C's diagonal label and index
-        int dC = dA * B.size() + dB;
-        int k = std::find(C.diag().begin(), C.diag().end(), dC) - C.diag().begin();
-        
-        // compute elements on C's current diagonal dC
-        if (dC >= 0)
-        {
-            // C's diagonal pointer
-            Complex * const restrict pC = C.dptr(k);
-            
-            // for all elements on A's diagonal dA
-            for (int ia = 0; ia < A.size() - dA; ia++)
-            {
-                // for all elements on B's diagonal dB
-                for (int ib = 0; ib < B.size() - std::abs(dB); ib++)
-                {
-                    // get position on the C's diagonal
-                    int ic = ia * B.size() + ib;
-                    
-                    if (j < 0)
-                        ic += B.diag(std::abs(j));
-                    
-                    // compute element
-                    pC[ic] = pA[ia] * pB[ib];
-                }
-            }
-        }
-    }
-    
-    // return final result
-    return C;
-}
-*/
-SymDiaMatrix SymDiaMatrix::kron (SymDiaMatrix const & B) const
-{
-    Debug << "Not implemented" << std::endl;
-    std::abort();
-}
+}*/
 
 cArray SymDiaMatrix::lowerSolve (const cArrayView b) const
 {
@@ -2474,18 +2389,11 @@ bool BlockSymDiaMatrix::hdfcheck () const
     return HDFFile(diskfile_, HDFFile::readonly).valid();
 }
 
-cArray BlockSymDiaMatrix::dot
-(
-    cArrayView v
-    , bool parallelize
-#ifndef NO_HDF
-    , bool loadblocks
-#endif
-) const
+cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
 {
     // check vector size
     if (v.size() != size_ * size_)
-        throw exception ("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
+        Exception("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
     
     // check if matrix is empty
     if (structure_.size() == 0)
@@ -2497,7 +2405,7 @@ cArray BlockSymDiaMatrix::dot
 #ifndef NO_HDF
     // open data file for reading
     HDFFile * hdf = nullptr;
-    if (loadblocks)
+    if (not inmemory_)
         hdf = new HDFFile (diskfile_, HDFFile::readonly);
 #endif
     
@@ -2518,12 +2426,24 @@ cArray BlockSymDiaMatrix::dot
         // which diagonal is this?
         std::size_t d = structure_[beginblock].second - structure_[beginblock].first;
         
+        // data characteristics for this block diagonal
+        std::size_t offset = beginblock * structure_.size();
+        std::size_t size = (endblock - beginblock) * structure_.size();
+        
+        // data view of this block diagonal
+        cArrayView view (size, const_cast<Complex*>(data_.data() + offset));
+        
 #ifndef NO_HDF
-        if (loadblocks)
+        cArray diskdata;
+        if (not inmemory_)
         {
-            // sequentiall preload the whole diagonal
-            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
-                blocks_[iblock].hdfload(*hdf, format("block_%ld_%ld_",structure_[iblock].first,structure_[iblock].second));
+            // read data from the disk
+            diskdata.resize(size);
+            if (not hdf->read("data", &diskdata[0], size, offset))
+                Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+            
+            // reset view to the new data
+            view.reset(size, diskdata.data());
         }
 #endif
         
@@ -2537,8 +2457,13 @@ cArray BlockSymDiaMatrix::dot
                 // block index
                 std::size_t i = structure_[iblock].first;
                 
-                // calculate the product (also the symmetric position, if off diagonal)
-                cArrayView(w, i * size_, size_) += blocks_[iblock].dot(cArrayView(v, i * size_, size_));
+                // calculate the product
+                cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
+                (
+                    size_, idiag_,
+                    view.data() + iblock * structure_.size(),
+                    v.data() + i * size_
+                );
             }
         }
         
@@ -2554,7 +2479,12 @@ cArray BlockSymDiaMatrix::dot
                 std::size_t j = structure_[iblock].second;
                 
                 // calculate the product (also the symmetric position, if off diagonal)
-                cArrayView(w, i * size_, size_) += blocks_[iblock].dot(cArrayView(v, j * size_, size_));
+                cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
+                (
+                    size_, idiag_,
+                    view.data() + (iblock - beginblock) * structure_.size(),
+                    v.data() + j * size_
+                );
             }
             
             // for all blocks on the side diagonal (lower blocks, i > j)
@@ -2566,32 +2496,28 @@ cArray BlockSymDiaMatrix::dot
                 std::size_t j = structure_[iblock].second;
                 
                 // calculate the product (also the symmetric position, if off diagonal)
-                cArrayView(w, j * size_, size_) += blocks_[iblock].dot(cArrayView(v, i * size_, size_));
+                cArrayView(w, j * size_, size_) += SymDiaMatrix::sym_dia_dot
+                (
+                    size_, idiag_,
+                    view.data() + (iblock - beginblock) * structure_.size(),
+                    v.data() + i * size_
+                );
             }
         }
-        
-#ifndef NO_HDF
-        if (loadblocks)
-        {
-            // it may be necessary to drop the loaded blocks from memory
-            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
-                blocks_[iblock].drop();
-        }
-#endif
         
         // move on to the next diagonal
         beginblock = endblock;
     }
     
 #ifndef NO_HDF
-    if (loadblocks)
+    if (not inmemory_)
         delete hdf;
 #endif
     
     return w;
 }
 
-CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
+CooMatrix BlockSymDiaMatrix::tocoo () const
 {
     // number of structurally non-zero blocks (both upper and lower)
     std::size_t nblocks = size_ + 2 * (structure_.size() - size_);
@@ -2603,15 +2529,33 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
     lArray I(nelem), J(nelem);  long *pI = I.data(), *pJ = J.data();
     cArray V(nelem);            Complex *pV = V.data();
     
+#ifndef NO_HDF
+    // open data file for reading
+    HDFFile * hdf = nullptr;
+    if (not inmemory_)
+        hdf = new HDFFile (diskfile_, HDFFile::readonly);
+#endif
+    
     // for all blocks
     for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
     {
-        // it may be necessary to load the block from scratch
-        if (loadblocks)
+        // data view of this block diagonal
+        cArrayView view (structure_.size(), const_cast<Complex*>(data_.data() + iblock * structure_.size()));
+        
+#ifndef NO_HDF
+        // it may be necessary to load the data from disk
+        cArray diskdata;
+        if (not inmemory_)
         {
-            # pragma omp critical
-            blocks_[iblock].hdfload();
+            // read data from the disk
+            diskdata.resize(structure_.size());
+            if (not hdf->read("data", &diskdata[0], structure_.size(), iblock * structure_.size()))
+                Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+            
+            // reset view to the new data
+            view.reset(structure_.size(), diskdata.data());
         }
+#endif
         
         // block indices
         int i = structure_[iblock].first, j = structure_[iblock].second;
@@ -2620,7 +2564,9 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
         for (int sym = 0; sym < 2; sym++)
         {
             // convert the block to COO format
-            CooMatrix coo = blocks_[iblock].tocoo();
+            CooMatrix coo = SymDiaMatrix(size_, idiag_, view).tocoo();
+            
+            assert(coo.v().size() == nblocks);
             
             // copy all elements to whole-matrix arrays
             for (std::size_t k = 0; k < nblocks; k++)
@@ -2637,10 +2583,6 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
             // the next symmetry
             std::swap(i,j);
         }
-        
-        // it may be necessary to drop the block from memory
-        if (loadblocks)
-            blocks_[iblock].drop();
     }
     
     // compose the final matrix
@@ -2654,38 +2596,102 @@ CooMatrix BlockSymDiaMatrix::tocoo (bool loadblocks) const
     );
 }
 
-bool BlockSymDiaMatrix::hdfinit () const
-{
-    // reset the scratch file
-    HDFFile f(diskfile_, HDFFile::overwrite);
-    return f.valid();
-}
-
 bool BlockSymDiaMatrix::hdfsave () const
 {
-    // reset the scratch file
-    hdfinit();
+    // open disk file
+    HDFFile hdf (diskfile_, HDFFile::overwrite);
     
-    // save all blocks with compression of 10+ consecutive zeros
-    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
-        if (not blocks_[iblock].hdfsave(blocks_[iblock].hdfname(), HDFFile::readwrite, true, 10))
-            return false;
+    // check success
+    if (not hdf.valid())
+        return false;
+    
+    // save data
+    if (not hdf.write("data", &data_[0], data_.size()))
+        return false;
     
     return true;
 }
 
 bool BlockSymDiaMatrix::hdfload ()
 {
-    // load all blocks
-    for (std::size_t iblock = 0; iblock < structure_.size(); iblock++)
-        if (not blocks_[iblock].hdfload())
-            return false;
+    // open disk file
+    HDFFile hdf (diskfile_, HDFFile::readonly);
+    
+    // check success
+    if (not hdf.valid())
+        return false;
+    
+    // allocate memory
+    data_.resize(structure_.size() * structure_.size());
+    
+    // read data
+    if (not hdf.read("data", &data_[0], data_.size()))
+        return false;
     
     return true;
 }
 
-cArray kron_dot (SymDiaMatrix const & A, SymDiaMatrix const & B, const cArrayView v)
+cArray BlockSymDiaMatrix::getBlock (int i) const
 {
-    Debug << "Not implemented." << std::endl;
-    std::abort();
+    if (inmemory_)
+    {
+        return data_.slice(i * structure_.size(), (i + 1) * structure_.size());
+    }
+    else
+    {
+        // open disk file
+        HDFFile hdf (diskfile_, HDFFile::readonly);
+        
+        // check success
+        if (not hdf.valid())
+            Exception("Cannot open file \"%s\".", diskfile_.c_str());
+        
+        // create output array
+        cArray data (structure_.size());
+        
+        // read data
+        if (not hdf.read("data", &data[0], structure_.size(), i * structure_.size()))
+            Exception("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+        
+        return data;
+    }
+}
+
+void BlockSymDiaMatrix::setBlock (int i, const cArrayView data)
+{
+    if (data.size() != structure_.size())
+        Exception("Wrong dimensions: %ld != %ld.", data.size(), structure_.size());
+    
+    if (inmemory_)
+    {
+        data_.slice(i * structure_.size(), (i + 1) * structure_.size()) = data;
+    }
+    else
+    {
+        // check that the file exists
+        HDFFile * phdf = new HDFFile (diskfile_, HDFFile::readwrite);
+        if (not phdf->valid())
+        {
+            // create a new file
+            phdf = new HDFFile (diskfile_, HDFFile::overwrite);
+            if (not phdf->valid())
+                Exception("Cannot open file \"%s\" or writing.", diskfile_.c_str());
+            
+            // initialize the dataset to its full length
+            phdf->write("data", (Complex*)nullptr, structure_.size() * structure_.size());
+        }
+        
+        // open disk file
+        HDFFile hdf (diskfile_, HDFFile::readwrite);
+        
+        // check success
+        if (not hdf.valid())
+            Exception("Cannot open file \"%s\".", diskfile_.c_str());
+        
+        // read data
+        if (not hdf.write("data", &data[0], structure_.size(), i * structure_.size()))
+            Exception("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+        
+        delete phdf;
+    }
 }

@@ -385,17 +385,27 @@ void RadialIntegrals::setupOneElectronIntegrals ()
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
+    // set number of two-electron integrals
+    R_tr_dia_.resize(lambdas.size());
+    
+    // abandon their computation, if not necessary
+    if (cmd.lightweight)
+        return;
+    
     // shorthands
     int Nspline = bspline_.Nspline();
     
     // allocate storage and associate names
-    R_tr_dia_.resize(lambdas.size());
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
     {
+        bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_all_radint) or cmd.cache_all_radint);
+        
         R_tr_dia_[lambda] = BlockSymDiaMatrix
         (
             Nspline,            // block count (and size)
             S_.nzpattern(),     // block structure
+            S_.diag(),          // non-zero diagonals
+            keep_in_memory,     // whether to keep in memory
             format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda) // HDF scratch disk file name
         );
     }
@@ -410,13 +420,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
         // this process will only compute a subset of radial integrals
-        if (not par.isMyWork(lambda))
-            continue;
+//         if (not par.isMyWork(lambda))
+//             continue;
         
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
         {
-            if (not cmd.cache_own_radint)
+            if (not par.isMyWork(lambda) or not cmd.cache_own_radint)
             {
                 std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
                 continue;
@@ -428,19 +438,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 continue;
             }
         }
-        
-        // initialize R_tr_dia matrix blocks structure using the overlap matrix
-        for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
-        {
-            SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
-            
-            M.diag() = S_.diag();
-            M.data() = S_.data();
-            M.update();
-        }
-        
-        // also prepare the disk file, so that we can update it incrementally (per block)
-        R_tr_dia_[lambda].hdfinit();
         
         // logarithms of partial integral moments
         cArray Mtr_L, Mtr_mLm1;
@@ -456,134 +453,107 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             
             // for all blocks of the radial matrix
             # pragma omp for schedule (dynamic,1)
-            for (std::vector<std::pair<int,int>>::const_iterator it_block_pos = structure.begin(); it_block_pos < structure.end(); it_block_pos++)
+            for (unsigned iblock = 0; iblock < structure.size(); iblock++)
             {
                 // block indices
-                int i = it_block_pos->first, k = it_block_pos->second;
+                int i = structure[iblock].first;
+                int k = structure[iblock].second;
                 
-                // get block reference
-                SymDiaMatrix & block = R_tr_dia_[lambda].block(i,k);
+                // create a new block of the radial integral matrix
+                cArray block (structure.size());
                 
                 // for all elements in the symmetrical block
-                for (std::pair<int,int> const & elemt_pos : structure)
+                for (unsigned n = 0; n < structure.size(); n++)
                 {
                     // element indices
-                    int j = elemt_pos.first, l = elemt_pos.second;
+                    int j = structure[n].first;
+                    int l = structure[n].second;
                     
                     // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-                    Complex Rijkl_tr = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-                    
-                    // update matrix (no other thread accesses this block)
-                    block(j,l) = Rijkl_tr;
+                    block[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
                 }
                 
                 // write the finished block to disk
                 # pragma omp critical
-                block.hdfsave(HDFFile::readwrite, true /* = with compression */);
-                
-                // release the integrals from memory if requested
-                if (not cmd.cache_own_radint)
-                    block.drop();
+                R_tr_dia_[lambda].setBlock(iblock, block);
             }
         }
         
         std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
     }
-    
-#ifndef NO_MPI
-    // for all multipoles : synchronize
-    if (par.active())
-    {
-        par.wait();
-        
-        for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
-        {
-            //
-            // Check if all processes have this multipole matrix file (e.g. on a shared scratch).
-            //
-            
-            // boolean flags indicating accessibility of R_tr_dia[lambda].hdf file to the individual processes
-            Array<int> haveR(par.Nproc());
-            
-            // check if the current process can access the radial matrix file and redistribute the flags to all processes
-            haveR[par.iproc()] = R_tr_dia_[lambda].hdfcheck();
-            par.sync(haveR.data(), 1, par.Nproc());
-            
-            // if everyone can read the file, load it into memory cache (if needed) and skip redistribution of the file
-            if (all(haveR))
-            {
-                // non-owners : read the file, if needed
-                if (not par.isMyWork(lambda) and cmd.cache_all_radint)
-                    R_tr_dia_[lambda].hdfload();
-                
-                // skip redistribution of the radial integrals file
-                continue;
-            }
-            
-            //
-            // Synchronize radial integrals across processes.
-            //
-            
-            // non-owners : initialize scratch file
-            if (not R_tr_dia_[lambda].hdfcheck())
-                R_tr_dia_[lambda].hdfinit();
-            
-            // determine owner
-            int owner = lambda % par.Nproc();
-            
-            // for all blocks of the matrix
-            for (std::pair<int,int> pos : R_tr_dia_[lambda].structure())
-            {
-                // data arrays
-                rArray re, im;
-                iArray zero_re, zero_im;
-                
-                // all : get block to synchronize
-                SymDiaMatrix & M = R_tr_dia_[lambda].block(pos.first,pos.second);
-                
-                // owner : compress data and send them to others
-                if (par.isMyWork(lambda))
-                {
-                    // load block from disk if not cached
-                    if (not cmd.cache_own_radint)
-                        M.hdfload();
-                    
-                    // compress data
-                    std::tie(zero_re, re) = realpart(M.data()).compress(10);
-                    std::tie(zero_im, im) = imagpart(M.data()).compress(10);
-                }
-                
-                // owner : broadcast data to everyone
-                par.bcast(owner, re);
-                par.bcast(owner, im);
-                par.bcast(owner, zero_re);
-                par.bcast(owner, zero_im);
-                
-                // non-owners : reconstruct data
-                if (not par.isMyWork(lambda))
-                {
-                    M.diag() = S_.diag();
-                    M.data() = interleave(re.decompress(zero_re), im.decompress(zero_im));
-                    M.update();
-                }
-                
-                // non-owners : save the block if the file didn't exist before
-                if (not haveR[par.iproc()])
-                    M.hdfsave(HDFFile::readwrite, true /* = with compression */);
-                
-                // all : release the block from memory if requested
-                if (not (cmd.cache_all_radint or (par.isMyWork(lambda) and cmd.cache_own_radint)))
-                    M.drop();
-            }
-            
-            // non-owners : update log
-            if (not par.isMyWork(lambda))
-                std::cout << "\t- integrals for lambda = " << lambda << " acquired from process " << owner << std::endl;
-        }
-        
-        par.wait();
-    }
-#endif
 
     std::cout << std::endl;
+}
+
+cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) const
+{
+    // logarithms of partial integral moments
+    cArray Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+    cArray Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+    
+    // number of source vectors
+    int N = src.size();
+    
+    // size of a block
+    std::size_t chunk = bspline_.Nspline();
+    
+    // output array (the product)
+    cArrays dst(N);
+    for (int n = 0; n < N; n++)
+        dst[n] = cArray(src[n].size());
+    
+    // get recursive structure
+    std::vector<std::pair<int,int>> structure = S_.nzpattern();
+    
+    // for all blocks of the radial matrix
+    # pragma omp parallel for firstprivate (structure, lambda, Mtr_L, Mtr_mLm1)
+    for (unsigned iblock = 0; iblock < structure.size(); iblock++)
+    {
+        // block indices
+        int i = structure[iblock].first;
+        int k = structure[iblock].second;
+        
+        // (i,k)-block data (= concatenated non-zero upper diagonals)
+        cArray block_ik (structure.size());
+        
+        // for all elements in the symmetrical block
+        for (unsigned n = 0; n < structure.size(); n++)
+        {
+            // element indices
+            int j = structure[n].first;
+            int l = structure[n].second;
+            
+            // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+            block_ik[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+        }
+        
+        // multiply all source vectors by this block
+        # pragma omp critical
+        for (int isrc = 0; isrc < N; isrc++)
+        {
+            // source and destination segment
+            dst[isrc].slice(i * chunk, (i + 1) * chunk) += SymDiaMatrix::sym_dia_dot
+            (
+                chunk,
+                S_.diag(),
+                block_ik.data(),
+                src[isrc].data() + k * chunk
+            );
+            
+            // take care of symmetric position of the off-diagonal block
+            if (i != k)
+            {
+                dst[isrc].slice(k * chunk, (k + 1) * chunk) += SymDiaMatrix::sym_dia_dot
+                (
+                    chunk,
+                    S_.diag(),
+                    block_ik.data(),
+                    src[isrc].data() + i * chunk
+                );
+            }
+        }
+    }
+    
+    // return result
+    return dst;
 }
