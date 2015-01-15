@@ -135,6 +135,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core             (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
                     "\t--own-radial-cache        (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache         (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
+                    "\t--shared-scratch          (-s)  Let every MPI process calculate only a subset of shared radial integrals.                                              \n"
 #ifndef NO_LAPACK
                     "\t--lightweight             (-l)  Avoid precalculating large matrices and only apply them on the fly (only available for KPA preconditioner).            \n"
 #endif

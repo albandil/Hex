@@ -84,7 +84,7 @@ class CommandLine
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(true),
-              gpu_slater(false), lightweight(false)
+              gpu_slater(false), lightweight(false), shared_scratch(false)
         {
             // get command line options
             parse(argc, argv);
@@ -149,6 +149,9 @@ class CommandLine
         
         /// Whether to avoid explicitly calculating big matrices and only apply them on the fly.
         bool lightweight;
+        
+        /// Whether to compute only a subset of radial integrals in shared scratch architecture.
+        bool shared_scratch;
 };
 
 /**

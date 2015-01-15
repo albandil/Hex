@@ -419,9 +419,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // for all multipoles : compute / load
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
-        // this process will only compute a subset of radial integrals
-//         if (not par.isMyWork(lambda))
-//             continue;
+        // if the radial integrals are shared, this process will only compute the owned subset of radial integrals
+        if (cmd.shared_scratch and not par.isMyWork(lambda))
+            continue;
         
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
@@ -485,7 +485,28 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         if (R_tr_dia_[lambda].inmemory())
             R_tr_dia_[lambda].hdfsave();
     }
-
+    
+    
+    // wait for completition of all processes
+    par.wait();
+    
+    // if this process skipped some lambda-s due to scratch sharing and still it needs them in memory, load them
+    if (cmd.shared_scratch and cmd.cache_all_radint)
+    {
+        for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
+        {
+            // skip own data (already loaded since calculation)
+            if (par.isMyWork(lambda))
+                continue;
+            
+            // load radial integrals
+            if (R_tr_dia_[lambda].hdfload())
+                std::cout << "\t- integrals for lambda = " << lambda << " loaded from shared file \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
+            else
+                Exception("Can't read shared radial integral file \"%s\".", R_tr_dia_[lambda].hdfname().c_str());
+        }
+    }
+    
     std::cout << std::endl;
 }
 

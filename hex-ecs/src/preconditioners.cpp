@@ -427,9 +427,9 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
-    std::cout << std::setw(4) << (*std::min_element(n.begin(), n.end()));
-    std::cout << std::setw(4) << (*std::max_element(n.begin(), n.end()));
-    std::cout << std::setw(4) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
+    std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
+    std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
+    std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // synchronize data across processes
     par_.sync(z.data(), Nspline * Nspline, l1_l2_.size());
