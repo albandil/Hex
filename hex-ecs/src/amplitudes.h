@@ -150,16 +150,16 @@ class Amplitudes
         Transition;
         
         // Λ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::map<int,std::pair<cArray,cArray>>> Lambda_Slp;
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Lambda_Slp;
         
         // T[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::map<int,std::pair<cArray,cArray>>> Tmat_Slp;
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Tmat_Slp;
         
         // σ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf)
         std::map<Transition,std::pair<rArray,rArray>> sigma_S;
         
-        // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and l1,l2
-        std::map<Transition,std::pair<cArrays,cArrays>> Xi_Sl1l2;
+        // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and (l1,l2)
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Xi_Sl1l2;
         
         /**
          * @brief Extract radial part of scattering amplitude.
@@ -176,7 +176,7 @@ class Amplitudes
          *        \mathrm{d}r_1 \ .
          * @f]
          */
-        std::map<int,std::pair<cArray,cArray>> computeLambda_ (Transition T);
+        void computeLambda_ (Transition T, const cArrayView solution, int ie, int Spin);
         
         /**
          * @brief Evaluate T-matrices.
@@ -191,7 +191,7 @@ class Amplitudes
          * (an item per impact energy) indexed by @f$ j' @f$ and @f$ l' @f$
          * (the angular momenta of the projectile).
          */
-        std::map<int,std::pair<cArray,cArray>> computeTmat_ (Transition T);
+        void computeTmat_ (Transition T);
         
         /**
          * @brief Extract radial part of ionization amplitude.
@@ -226,7 +226,7 @@ class Amplitudes
          * @param coupled_states List of all coupled-state angular momenta pairs.
          * @return Vector of radial integrals.
          */
-        std::pair<cArrays,cArrays> computeXi_ (Transition T);
+        void computeXi_ (Transition T, const cArrayView solution, int ie, int Spin);
         
         /**
          * @brief Evaluate cross sections.
@@ -234,9 +234,9 @@ class Amplitudes
          * This routine will reuse the T-matrices calculated by @ref computeTmat_
          * and compute the cross sections.
          */
-        std::pair<rArray,rArray> computeSigma_ (Transition T);
+        void computeSigma_ (Transition T);
         
-        std::pair<rArray,rArray> computeSigmaIon_ (Transition T);
+        void computeSigmaIon_ (Transition T);
         
         // B-spline environment
         Bspline const & bspline_;
