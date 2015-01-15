@@ -480,6 +480,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         }
         
         std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+        
+        // save to disk even if the integrals are to be cached
+        if (R_tr_dia_[lambda].inmemory())
+            R_tr_dia_[lambda].hdfsave();
     }
 
     std::cout << std::endl;
