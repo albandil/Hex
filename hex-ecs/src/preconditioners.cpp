@@ -161,6 +161,10 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     if (not std::isfinite(Pi_expansion.norm()))
         Exception("Unable to expand hydrogen bound orbital in B-splines!");
     
+    //
+    // Add two-electron part.
+    //
+    
     // for all segments constituting the RHS
     # pragma omp parallel for if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
@@ -199,7 +203,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
             
             // skip angular forbidden right hand sides
-            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++) if (par_.isMyWork(lambda))
             {
                 // calculate angular integrals
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
@@ -223,12 +227,56 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                     if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.apply_R_matrix(lambda, cArrays(1, Pj2))[0];
                 }
             }
+        }
+    }
+    
+    // sum all process' contributions
+    par_.syncsum(chi.data(), chi.size());
+    
+    //
+    // Add one-electron part.
+    //
+    
+    # pragma omp parallel for
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    {
+        int l1 = l1_l2_[ill].first;
+        int l2 = l1_l2_[ill].second;
+        
+        // setup storage
+        cArrayView chi_block (chi, ill * Nspline * Nspline, Nspline * Nspline);
+        
+        // for all allowed angular momenta (by momentum composition) of the projectile
+        for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+        {
+            // skip wrong parity
+            if ((inp_.L + li + l) % 2 != inp_.Pi)
+                continue;
+            
+            // (anti)symmetrization
+            double Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
+            
+            // compute energy- and angular momentum-dependent prefactor
+            Complex prefactor = std::pow(Complex(0.,1.),l)
+                              * std::sqrt(special::constant::two_pi * (2 * l + 1))
+                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / inp_.ki[ie];
+            
+            // skip non-contributing terms
+            if (prefactor == 0.)
+                continue;
+            
+            // pick the correct Bessel function expansion
+            cArrayView Ji_expansion (ji_expansion, l * Nspline, Nspline);
+            
+            // compute outer products of B-spline expansions
+            cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
+            cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
             
             // add monopole terms (direct/exchange)
             if (li == l1 and l == l2)
-                chi_block += (-prefactor       ) * kron_dot(s_rad_.S_d(), s_rad_.Mm1_tr_d(), Pj1);
+                chi_block += (-prefactor       ) * outer_product(s_rad_.S().dot(Pi_expansion), s_rad_.Mm1_tr().dot(Ji_expansion));
             if (li == l2 and l == l1)
-                chi_block += (-prefactor * Sign) * kron_dot(s_rad_.Mm1_tr_d(), s_rad_.S_d(), Pj2);
+                chi_block += (-prefactor * Sign) * outer_product(s_rad_.Mm1_tr().dot(Ji_expansion), s_rad_.S().dot(Pi_expansion));
         }
     }
 }
