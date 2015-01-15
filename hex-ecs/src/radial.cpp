@@ -506,7 +506,7 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) c
     std::vector<std::pair<int,int>> structure = S_.nzpattern();
     
     // for all blocks of the radial matrix
-    # pragma omp parallel for firstprivate (structure, lambda, Mtr_L, Mtr_mLm1)
+    # pragma omp parallel for firstprivate (structure, lambda, Mtr_L, Mtr_mLm1) schedule (dynamic, 1)
     for (unsigned iblock = 0; iblock < structure.size(); iblock++)
     {
         // block indices
