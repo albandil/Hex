@@ -199,7 +199,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
             // increment knot
             while ( ix->real() > t_[iknot+1].real() )
                 if (++iknot >= Nknot_)
-                    throw exception("Some evaluation points are outside of grid.");
+                    Exception("Some evaluation points are outside of grid.");
             
             // evaluate this spline at *ix
             evBx[ispline][ix-xleft] = bspline(ispline, iknot, order_, *ix);
@@ -237,7 +237,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
             // increment knot
             while ( iy->real() > t_[iknot+1].real() )
                 if (++iknot >= Nknot_)
-                    throw exception("Some evaluation points are outside of grid.");
+                    Exception("Some evaluation points are outside of grid.");
             
             // evaluate this spline at *ix
             evBy[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);

@@ -87,6 +87,13 @@ int main (int argc, char* argv[])
     // get input from command line
     CommandLine cmd (argc, argv);
     
+    // check some exclusive options
+    if (cmd.outofcore and cmd.parallel_block)
+    {
+        cmd.parallel_block = false;
+        std::cout << "Out-of-core calculation automatically adds --no-parallel-block." << std::endl << std::endl;
+    }
+    
 #ifdef _OPENMP
     // set OpenMP parallel nesting (avoid oversubscription)
     // - disable for concurrent diagonal block preconditioning
@@ -138,7 +145,7 @@ int main (int argc, char* argv[])
     
     // check ordering
     if (R0 >= Rmax)
-        throw exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
+        Exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
     
     // create B-splines
     Bspline bspline (inp.order, inp.rknots, inp.ecstheta, inp.cknots);
@@ -201,7 +208,7 @@ int main (int argc, char* argv[])
     
     PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
     if (prec == nullptr)
-        throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
+        Exception("Preconditioner %d not implemented.", cmd.preconditioner);
     
 // ------------------------------------------------------------------------- //
 //                                                                           //

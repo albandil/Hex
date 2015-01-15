@@ -263,7 +263,7 @@ rArray threshold (const rArrayView a, double eps)
 cArray interleave (const rArrayView re, const rArrayView im)
 {
     if (re.size() != im.size())
-        throw exception ("Cannot interleave arrays of different sizes (%ld != %ld).", re.size(), im.size());
+        Exception("Cannot interleave arrays of different sizes (%ld != %ld).", re.size(), im.size());
     
     cArray output (re.size());
     

@@ -36,8 +36,6 @@
 #include <string>
 #include <tuple>
 
-#include <omp.h>
-
 #include "arrays.h"
 #include "cmdline.h"
 #include "io.h"
@@ -96,7 +94,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (out.bad())
-                    throw exception ("Error: Cannot write to \"example.inp\"\n");
+                    Exception("Error: Cannot write to \"example.inp\"\n");
                 
                 out << sample_input;
                     
@@ -108,7 +106,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // set custom input file
                 inputfile.open(optarg);
                 if (not inputfile.good())
-                    throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                    Exception("Error: Input file \"%s\" not found.\n", optarg.c_str());
                 return true;
             },
         "help", "h", 0, [&](std::string optarg) -> bool
@@ -249,7 +247,7 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // preconditioner
                 if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
-                    throw exception("Unknown preconditioner \"%s\".", optarg.c_str());
+                    Exception("Unknown preconditioner \"%s\".", optarg.c_str());
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
@@ -282,7 +280,7 @@ void CommandLine::parse (int argc, char* argv[])
                 gpu_slater = true;
                 return true;
             },
-        "lightweight", "", 0, [&](std::string optarg) -> bool
+        "lightweight", "l", 0, [&](std::string optarg) -> bool
             {
                 // do not precompute large matrices but only construct and apply them on the fly
                 lightweight = true;
@@ -291,7 +289,7 @@ void CommandLine::parse (int argc, char* argv[])
         
         [&] (std::string optname, std::string optarg) -> bool
         {
-            throw exception ("Unknown switch \"%s\".", optname.c_str());
+            Exception("Unknown switch \"%s\".", optname.c_str());
         }
     );
 }
@@ -327,7 +325,7 @@ void InputFile::read (std::ifstream & inf)
         if (rknots_begin[i] > rknots_end[i])
         {
             std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
-            throw exception ("Inconsistent knot specification!");
+            Exception("Inconsistent knot specification!");
         }
         
         rArray new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
@@ -539,7 +537,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     
     // load the requested file
     if (not sol.hdfload(cmd.zipfile.c_str()))
-        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
+        Exception("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
     grid = linspace (0., cmd.zipmax, cmd.zipcount);

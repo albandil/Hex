@@ -319,14 +319,14 @@ int hex_run
         if ((var = vlist.get(varname)) == nullptr)
         {
             // this should never happen
-            throw exception ("Runtime error.");
+            Exception("Runtime error.");
         }
         
         // try to compute the results
         if (not var->run(sdata))
         {
             // this can easily happen
-            throw exception ("Computation of \"%s\" failed.", varname.c_str());
+            Exception("Computation of \"%s\" failed.", varname.c_str());
         }
     }
     

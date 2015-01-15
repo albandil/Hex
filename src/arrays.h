@@ -121,12 +121,19 @@ template <class T> class ArrayView
         
         // destructor
         ~ArrayView () {}
-    
+        
+        /// Change view.
+        void reset (std::size_t n, T * ptr)
+        {
+            N_ = n;
+            array_ = const_cast<T*>(ptr);
+        }
+        
         /// Assignment operator.
         ArrayView<T> & operator = (const ArrayView<T> v)
         {
             if (v.size() != size())
-                throw exception ("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N_);
+                Exception ("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N_);
             
             for (std::size_t i = 0; i < size(); i++)
                 array_[i] = v[i];
@@ -144,7 +151,7 @@ template <class T> class ArrayView
             if (i < size())
                 return array_[i];
             else
-                throw exception ("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
+                Exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
 #endif
         }
     
@@ -157,7 +164,7 @@ template <class T> class ArrayView
             if (i < size())
                 return array_[i];
             else
-                throw exception ("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
+                Exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
 #endif
         }
         
@@ -372,7 +379,7 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
             if (size() > 0)
                 return *(data() + (--ArrayView<T>::N_));
             else
-                throw exception ("Array has no element to pop!");
+                Exception("Array has no element to pop!");
         }
         
         /**
@@ -932,7 +939,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             // the second character outght to be "'"
             // the last character ought to be "'" as well
             if ((s[0] != 'x' and s[0] != 'X') or s[1] != '\'' or s.back() != '\'')
-                throw exception ("[NumberArray::fromBlob] Blob has wrong format, %s.", s.c_str());
+                Exception("[NumberArray::fromBlob] Blob has wrong format, %s.", s.c_str());
             
             // create substring
             std::string ss (s.begin() + 2, s.end() - 1);
@@ -1345,7 +1352,7 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
 template <typename T> NumberArray<T> logspace (T x0, T x1, std::size_t samples)
 {
     if (x0 <= 0 or x1 <= 0 or x1 < x0)
-        throw exception ("[logspace] It must be 0 < x1 <= x2 !");
+        Exception("[logspace] It must be 0 < x1 <= x2 !");
     
     NumberArray<T> grid(samples);
     

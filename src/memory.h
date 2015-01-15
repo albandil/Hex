@@ -159,7 +159,7 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
                        /* else */             format("%d GiB", bytes / 1024 / 1024 / 1024)
                     )));
                 
-                throw exception ("Insufficent memory (unable to allocate next %s).", strsize.c_str());
+                Exception("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
             std::uintptr_t root_address = (std::uintptr_t)root;
             

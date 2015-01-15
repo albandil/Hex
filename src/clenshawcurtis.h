@@ -272,12 +272,12 @@ public:
                     fvals[k] = fvals[2*N-k] = f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("%s \"%g\" when evaluating function at %g", vName.c_str(), std::abs(fvals[k]), std::cos(k * pi_over_N));
+                        Exception("%s \"%g\" when evaluating function at %g", vName.c_str(), std::abs(fvals[k]), std::cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
                 if (not std::isfinite(std::abs(fvals[N])))
-                    throw exception("%s \"%g\" when evaluating function at -1.", vName.c_str(), std::abs(fvals[N]));
+                    Exception("%s \"%g\" when evaluating function at -1.", vName.c_str(), std::abs(fvals[N]));
             }
             else
             {
@@ -288,7 +288,7 @@ public:
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("%s \"%g\" when evaluating function.", vName.c_str(), std::abs(fvals[k]));
+                        Exception("%s \"%g\" when evaluating function.", vName.c_str(), std::abs(fvals[k]));
                 }
                 fvals[N] = fvals_prev[N/2];
             }
@@ -323,7 +323,7 @@ public:
             }
             else
             {
-                throw exception("%s Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
+                Exception("%s Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
             }
             
             // sum the quadrature rule
@@ -369,7 +369,7 @@ public:
         {
             if (Throw)
             {
-                throw exception("%s Insufficient evaluation limit %d", vName.c_str(), maxN);
+                Exception("%s Insufficient evaluation limit %d", vName.c_str(), maxN);
             }
             else
             {

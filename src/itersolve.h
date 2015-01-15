@@ -475,7 +475,7 @@ int cgs_callbacks
         
         if (rho_1 == 0.)
         {
-            throw exception ("[cgs] Solver failes, ρ = 0.");
+            Exception("[cgs] Solver failes, ρ = 0.");
         }
         if (i == 1)
         {

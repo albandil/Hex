@@ -130,7 +130,7 @@ public:
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
         if (not std::isfinite(a) or not std::isfinite(b))
-            throw exception("[CompactificationF] Interval has to be finite!");
+            Exception("[CompactificationF] Interval has to be finite!");
     }
 
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
@@ -350,7 +350,7 @@ public:
         else if (not std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationL<Functor,FType> (f, b, limit, L);
         else
-            throw exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");
+            Exception("[CompactIntegrand] Compactification of (-∞,∞) interval is not implemeted.");
     }
 
     ~CompactIntegrand ()

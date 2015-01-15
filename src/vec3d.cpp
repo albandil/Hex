@@ -65,7 +65,7 @@ std::istream & operator >> (std::istream & is, vec3d & v)
         
         // check that we start with the opening parenthesis
         if (vec.empty() and c != '(')
-            throw exception("A specification of a vector has to start with '('!");
+            Exception("A specification of a vector has to start with '('!");
         
         // add character to the whole string
         vec.push_back(c);

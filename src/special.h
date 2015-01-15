@@ -124,7 +124,7 @@ template <class T> T trapz (NumberArray<T> const & x, NumberArray<T> const & y)
 template <class T> T simpson (double h, NumberArray<T> const & y)
 {
     if (y.size() % 2 != 0)
-        throw exception ("You need to use even number of grid points for Simpson integration.");
+        Exception("You need to use even number of grid points for Simpson integration.");
     
     T sum1 = 0, sum2 = 0;
     
@@ -196,13 +196,7 @@ template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double eps
         
         // check if we run out of allowed iterations
         if (n == maxiter)
-        {
-            throw exception
-            (
-                "Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",
-                maxiter
-            );
-        }
+            Exception("Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",maxiter);
     }
     
     // return the result

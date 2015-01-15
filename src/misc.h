@@ -91,6 +91,27 @@ template <class ...Params> std::string format (Params ...p)
     return text;
 }
 
+/// Debug output.
+#define Debug std::cout << __func__ << " (" << __FILE__ << ":" << __LINE__ << "): "
+
+/// Fatal error routine.
+#define Exception(...) TerminateWithException(__FILE__, __LINE__, __func__, __VA_ARGS__)
+
+/**
+ * @brief Fatal error routine.
+ * 
+ * Fatal error termination routine with easy printf-like interface.
+ * Use the macro @ref Exception to call this function with proper line number
+ * and function name.
+ */
+template <class ...Params> [[noreturn]] void TerminateWithException (const char* file, int line, const char* func, Params ...p)
+{
+    std::cerr << std::endl << std::endl;
+    std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
+    std::cerr << " *** " << format(p...) << std::endl;
+    std::terminate();
+}
+
 /**
  * @brief Exception class.
  * 
@@ -297,10 +318,7 @@ template <class T> constexpr T const & larger_of (T const & a, T const & b)
  */
 template <class T> T string_to (std::string str)
 {
-    throw exception
-    (
-        "Conversion of string to \"%s\" not implemented.", typeid(T).name()
-    );
+    Exception("Conversion of string to \"%s\" not implemented.", typeid(T).name());
 }
 
 /**
@@ -317,7 +335,7 @@ template <> inline int string_to (std::string str)
     
     // throw or return
     if (*tail != 0x0)
-        throw exception ("The string \"%s\" cannot be converted to integer number.", str.c_str());
+        Exception("The string \"%s\" cannot be converted to integer number.", str.c_str());
     else
         return val;
 }
@@ -336,7 +354,7 @@ template <> inline double string_to (std::string str)
     
     // throw or return
     if (*tail != 0x0)
-        throw exception ("The string \"%s\" cannot be converted to real number.", str.c_str());
+        Exception("The string \"%s\" cannot be converted to real number.", str.c_str());
     else
         return val;
 }
@@ -408,7 +426,7 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
         if (allowed_special & ReadItem<T>::asterisk)
             return ReadItem<T>({ T(0), ReadItem<T>::asterisk });
         else
-            throw exception ("Asterisk '*' not allowed here.");
+            Exception("Asterisk '*' not allowed here.");
     }
     
     // convert entry to type T
@@ -561,7 +579,7 @@ class OutputTable
                     out_ << std::left;
                     break;
                 case center:
-                    throw exception ("[OutputTable] Item centering not implemented yet!");
+                    Exception("[OutputTable] Item centering not implemented yet!");
                     break;
                 case right:
                     out_ << std::right;
@@ -625,14 +643,14 @@ template <class T> class Range
                 
                 // convert portions to the correct type
                 std::istringstream infirst(strfirst), inlast(strlast);
-                if (!(infirst >> first)) throw exception ("\"%s\" is not a number.", strfirst.c_str());
-                if (!(inlast >> last)) throw exception ("\"%s\" is not a number.", strlast.c_str());
+                if (!(infirst >> first)) Exception("\"%s\" is not a number.", strfirst.c_str());
+                if (!(inlast >> last)) Exception("\"%s\" is not a number.", strlast.c_str());
             }
             else
             {
                 // convert whole string to the correct type
                 std::istringstream in(Lin);
-                if (!(in >> first)) throw exception ("\"%s\" is not a number.", Lin.c_str());
+                if (!(in >> first)) Exception("\"%s\" is not a number.", Lin.c_str());
                 
                 // the first and last element is the same
                 last = first;
@@ -746,7 +764,5 @@ template<> template<class T> class typeinfo<std::complex<T>>
         static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
 #endif
 };
-
-#define Debug std::cout << __func__ << " (" << __LINE__ << "): "
 
 #endif
