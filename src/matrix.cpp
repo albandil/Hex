@@ -2451,7 +2451,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         if (d == 0)
         {
             // for all blocks on the main diagonal
-            # pragma omp parallel for if (parallelize)
+            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
             for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
             {
                 // block index
@@ -2471,7 +2471,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         if (d != 0)
         {
             // for all blocks on the side diagonal (upper blocks, i < j)
-            # pragma omp parallel for if (parallelize)
+            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
             for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
             {
                 // block indices
@@ -2488,7 +2488,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             }
             
             // for all blocks on the side diagonal (lower blocks, i > j)
-            # pragma omp parallel for if (parallelize)
+            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
             for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
             {
                 // block indices
