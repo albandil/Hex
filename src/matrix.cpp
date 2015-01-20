@@ -2410,103 +2410,125 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
 #endif
     
     // the first and (one past) the last block of a diagonal
-    std::size_t beginblock = 0, endblock = 0;
+    std::size_t beginblockd = 0, endblockd = 0;
     
     // for all diagonals
-    while (beginblock != structure_.size())
+    while (beginblockd != structure_.size())
     {
         // find the last block of the current diagonal
-        for (endblock = beginblock + 1; endblock < structure_.size(); endblock++)
+        for (endblockd = beginblockd + 1; endblockd < structure_.size(); endblockd++)
         {
             // check if this block is on a different diagonal
-            if (structure_[endblock].second - structure_[endblock].first != structure_[beginblock].second - structure_[beginblock].first)
+            if (structure_[endblockd].second - structure_[endblockd].first != structure_[beginblockd].second - structure_[beginblockd].first)
                 break;
         }
         
         // which diagonal is this?
-        std::size_t d = structure_[beginblock].second - structure_[beginblock].first;
+        std::size_t d = structure_[beginblockd].second - structure_[beginblockd].first;
         
-        // data characteristics for this block diagonal
-        std::size_t offset = beginblock * structure_.size();
-        std::size_t size = (endblock - beginblock) * structure_.size();
-        
-        // data view of this block diagonal
-        cArrayView view (size, const_cast<Complex*>(data_.data() + offset));
-        
-#ifndef NO_HDF
-        cArray diskdata;
+        // how many blocks from the current diagonal to process simultaneously (all if in memory)
+        std::size_t Nparblock = endblockd - beginblockd;
         if (not inmemory_)
         {
-            // read data from the disk
-            diskdata.resize(size);
-            if (not hdf->read("data", &diskdata[0], size, offset))
-                Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
-            
-            // reset view to the new data
-            view.reset(size, diskdata.data());
-        }
+#ifdef _OPENMP
+            // in parallel calculation use NUM_THREADS blocks at a time
+            # pragma omp parallel
+            Nparblock = omp_get_num_threads();
+#else
+            // in serial calculation use just one block at a time
+            Nparblock = 1;
 #endif
-        
-        // multiply by the main diagonal
-        if (d == 0)
-        {
-            // for all blocks on the main diagonal
-            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
-            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
-            {
-                // block index
-                std::size_t i = structure_[iblock].first;
-                
-                // calculate the product
-                cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
-                (
-                    size_, idiag_,
-                    view.data() + iblock * structure_.size(),
-                    v.data() + i * size_
-                );
-            }
         }
         
-        // multiply by the other diagonals (both symmetries)
-        if (d != 0)
+        // for all groups of blocks to process in parallel
+        for (std::size_t igroup = 0; igroup < (endblockd - beginblockd - 1) / Nparblock; igroup++)
         {
-            // for all blocks on the side diagonal (upper blocks, i < j)
-            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
-            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+            // blocks in this group
+            std::size_t beginblock = beginblockd + igroup * Nparblock;
+            std::size_t endblock = std::min(endblockd, beginblock + Nparblock);
+            
+            // data characteristics for this block diagonal
+            std::size_t offset = beginblock * structure_.size();
+            std::size_t size = (endblock - beginblock) * structure_.size();
+            
+            // data view of this block diagonal
+            cArrayView view (size, const_cast<Complex*>(data_.data() + offset));
+        
+#ifndef NO_HDF
+            cArray diskdata;
+            if (not inmemory_)
             {
-                // block indices
-                std::size_t i = structure_[iblock].first;
-                std::size_t j = structure_[iblock].second;
+                // read data from the disk
+                diskdata.resize(size);
+                if (not hdf->read("data", &diskdata[0], size, offset))
+                    Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
                 
-                // calculate the product (also the symmetric position, if off diagonal)
-                cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
-                (
-                    size_, idiag_,
-                    view.data() + (iblock - beginblock) * structure_.size(),
-                    v.data() + j * size_
-                );
+                // reset view to the new data
+                view.reset(size, diskdata.data());
+            }
+#endif
+            
+            // multiply by the main diagonal
+            if (d == 0)
+            {
+                // for all blocks on the main diagonal
+                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+                {
+                    // block index
+                    std::size_t i = structure_[iblock].first;
+                    
+                    // calculate the product
+                    cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
+                    (
+                        size_, idiag_,
+                        view.data() + (iblock - beginblock) * structure_.size(),
+                        v.data() + i * size_
+                    );
+                }
             }
             
-            // for all blocks on the side diagonal (lower blocks, i > j)
-            # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
-            for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+            // multiply by the other diagonals (both symmetries)
+            if (d != 0)
             {
-                // block indices
-                std::size_t i = structure_[iblock].first;
-                std::size_t j = structure_[iblock].second;
+                // for all blocks on the side diagonal (upper blocks, i < j)
+                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+                {
+                    // block indices
+                    std::size_t i = structure_[iblock].first;
+                    std::size_t j = structure_[iblock].second;
+                    
+                    // calculate the product (also the symmetric position, if off diagonal)
+                    cArrayView(w, i * size_, size_) += SymDiaMatrix::sym_dia_dot
+                    (
+                        size_, idiag_,
+                        view.data() + (iblock - beginblock) * structure_.size(),
+                        v.data() + j * size_
+                    );
+                }
                 
-                // calculate the product (also the symmetric position, if off diagonal)
-                cArrayView(w, j * size_, size_) += SymDiaMatrix::sym_dia_dot
-                (
-                    size_, idiag_,
-                    view.data() + (iblock - beginblock) * structure_.size(),
-                    v.data() + i * size_
-                );
+                // for all blocks on the side diagonal (lower blocks, i > j)
+                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
+                {
+                    // block indices
+                    std::size_t i = structure_[iblock].first;
+                    std::size_t j = structure_[iblock].second;
+                    
+                    // calculate the product (also the symmetric position, if off diagonal)
+                    cArrayView(w, j * size_, size_) += SymDiaMatrix::sym_dia_dot
+                    (
+                        size_, idiag_,
+                        view.data() + (iblock - beginblock) * structure_.size(),
+                        v.data() + i * size_
+                    );
+                }
             }
         }
         
         // move on to the next diagonal
-        beginblock = endblock;
+        beginblockd = endblockd;
     }
     
 #ifndef NO_HDF

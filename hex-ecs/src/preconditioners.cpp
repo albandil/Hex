@@ -423,8 +423,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         }
     }
     
-//     std::cout << "multiply : q.norm() = " << std::sqrt(sum(sqrabs(q))) << std::endl;
-    
     // synchronize across processes by summing individual contributions
     par_.syncsum(q.data(), Nchunk * l1_l2_.size());
 }
