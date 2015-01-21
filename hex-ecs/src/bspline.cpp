@@ -44,6 +44,10 @@
 
 Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
 {
+    // NOTE: The following bounds check is the caller's responsibility:
+    // if (r <= t_[i] or t_[i + k] <= r)
+    //    return 0.;
+    
     // value of the parent B-splines of the requested B-spline
     Complex b[k + 1];
     
@@ -57,8 +61,8 @@ Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
         // update splines
         for (int n = 0; n <= k-ord; n++)
         {
-            b[n] = (t_[i+ord+n] == t_[i+n] ? 0. : b[n] * (r-t_[i+n]) / (t_[i+ord+n]-t_[i+n]))
-                 + (t_[i+ord+n+1] == t_[i+n+1] ? 0. : b[n+1] * (t_[i+ord+n+1]-r) / (t_[i+ord+n+1]-t_[i+n+1]));
+            b[n] = (t_[i+ord+n]   == t_[i+n]   ? 0. : b[n]   * (r    -    t_[i+n]) / (t_[i+ord+n]   -   t_[i+n]))
+                 + (t_[i+ord+n+1] == t_[i+n+1] ? 0. : b[n+1] * (t_[i+ord+n+1] - r) / (t_[i+ord+n+1] - t_[i+n+1]));
         }
     }
     
@@ -86,10 +90,76 @@ Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
 // ----------------------------------------------------------------------- //
 
 
-void Bspline::B (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
+void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Complex * const restrict y) const
 {
-    for (int j = 0; j < n; j++)
-        y[j] = bspline(i, iknot, order_, x[j]);
+    // NOTE: The caller's responsibility is to check that all 'x' lie within the definition domain of the i-th B-spline.
+    
+    if (i + order_ + 1 < Nreknot_)
+    {
+        //
+        // All knots are real here => use real arithmetic.
+        //
+        
+        // value of the parent B-splines of the requested B-spline
+        double b[M][order_ + 1];
+        
+        // initialize zero-order B-splines
+        for (int m = 0; m < M; m++)
+        for (int n = 0; n <= order_; n++)
+            b[m][n] = (i + n == iknot ? 1. : 0.);
+        
+        // calculate higher orders
+        for (int ord = 1; ord <= order_; ord++)
+        {
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                double invden1 = (rknots_[i+ord+n]   == rknots_[i+n]   ? 0. : 1. / (rknots_[i+ord+n]   - rknots_[i+n]));
+                double invden2 = (rknots_[i+ord+n+1] == rknots_[i+n+1] ? 0. : 1. / (rknots_[i+ord+n+1] - rknots_[i+n+1]));
+                
+                // for all evaluation points
+                for (int m = 0; m < M; m++)
+                    b[m][n] = b[m][n] * (x[m].real() - rknots_[i+n]) * invden1 + b[m][n+1] * (rknots_[i+ord+n+1] - x[m].real()) * invden2;
+            }
+        }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m][0];
+    }
+    else
+    {
+        //
+        // Some knots are complex here => use complex arithmetic.
+        //
+        
+        // value of the parent B-splines of the requested B-spline
+        Complex b[M][order_ + 1];
+        
+        // initialize zero-order B-splines
+        for (int m = 0; m < M; m++)
+        for (int n = 0; n <= order_; n++)
+            b[m][n] = (i + n == iknot ? 1. : 0.);
+        
+        // calculate higher orders
+        for (int ord = 1; ord <= order_; ord++)
+        {
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0. : 1. / (t_[i+ord+n]   - t_[i+n]));
+                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0. : 1. / (t_[i+ord+n+1] - t_[i+n+1]));
+                
+                // for all evaluation points
+                for (int m = 0; m < M; m++)
+                    b[m][n] = b[m][n] * (x[m] - t_[i+n]) * invden1 + b[m][n+1] * (t_[i+ord+n+1] - x[m]) * invden2;
+            }
+        }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m][0];
+    }
 }
 
 void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
