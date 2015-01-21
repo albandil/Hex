@@ -2076,8 +2076,8 @@ cArray SymDiaMatrix::sym_dia_dot
 (
     int n_,
     const iArrayView idiag_,
-    Complex const * rp_elems_,
-    Complex const * rp_B
+    Complex const restrict * rp_elems_,
+    Complex const restrict * rp_B
 )
 {
     // size of the matrix
@@ -2088,7 +2088,7 @@ cArray SymDiaMatrix::sym_dia_dot
     cArray res(Nrows);
     
     // data pointers
-    Complex * rp_res = &res[0];
+    Complex restrict * rp_res = &res[0];
     
     // for all elements in the main diagonal
     for (int ielem = 0; ielem < Nrows; ielem++)
@@ -2433,7 +2433,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
 #ifdef _OPENMP
             // in parallel calculation use NUM_THREADS blocks at a time
             # pragma omp parallel
-            Nparblock = omp_get_num_threads();
+            Nparblock = std::min<unsigned>(Nparblock, omp_get_num_threads());
 #else
             // in serial calculation use just one block at a time
             Nparblock = 1;
@@ -2441,7 +2441,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         }
         
         // for all groups of blocks to process in parallel
-        for (std::size_t igroup = 0; igroup < (endblockd - beginblockd - 1) / Nparblock; igroup++)
+        for (std::size_t igroup = 0; igroup < (endblockd - beginblockd + 1) / Nparblock; igroup++)
         {
             // blocks in this group
             std::size_t beginblock = beginblockd + igroup * Nparblock;
@@ -2453,7 +2453,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             
             // data view of this block diagonal
             cArrayView view (size, const_cast<Complex*>(data_.data() + offset));
-        
+            
 #ifndef NO_HDF
             cArray diskdata;
             if (not inmemory_)
