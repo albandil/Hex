@@ -350,7 +350,7 @@ Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot) const
     return res;
 }
 
-void RadialIntegrals::setupOneElectronIntegrals ()
+void RadialIntegrals::setupOneElectronIntegrals (CommandLine const & cmd)
 {
     // create file names for this radial integrals
     char D_name[20], S_name[20], Mm1_name[20], Mm1_tr_name[20], Mm2_name[20];
@@ -364,23 +364,24 @@ void RadialIntegrals::setupOneElectronIntegrals ()
     std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
     D_.hdfload(D_name) or D_.populate (
         bspline_.order(), [=](int i, int j) -> Complex { return computeD(i, j, bspline_.Nknot() - 1); }
-    ).hdfsave(D_name); D_d_ = D_.torow();
+    ).hdfsave(D_name); if (cmd.lightweight) D_d_ = std::move(D_.torow());
+    std::cout << "ok" << std::endl << std::endl;
     
     // load/compute integral moments
-    std::cout << "ok\n\nLoading/precomputing integral moments... " << std::flush;
+    std::cout << "Loading/precomputing integral moments... " << std::flush;
     S_.hdfload(S_name) or S_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave(S_name); S_d_ = S_.torow();
+    ).hdfsave(S_name); if (cmd.lightweight) S_d_ = std::move(S_.torow());
     Mm1_.hdfload(Mm1_name) or Mm1_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave(Mm1_name); Mm1_d_ = Mm1_.torow();
+    ).hdfsave(Mm1_name); if (cmd.lightweight) Mm1_d_ = std::move(Mm1_.torow());
     Mm1_tr_.hdfload(Mm1_tr_name) or Mm1_tr_.populate (
         bspline_.order(),    [=](int m, int n) -> Complex { return computeM(-1, m, n, bspline_.Nreknot() - 1);}
-    ).hdfsave(Mm1_tr_name); Mm1_tr_d_ = Mm1_tr_.torow();
+    ).hdfsave(Mm1_tr_name); if (cmd.lightweight) Mm1_tr_d_ = std::move(Mm1_tr_.torow());
     Mm2_.hdfload(Mm2_name) or Mm2_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave(Mm2_name); Mm2_d_ = Mm2_.torow();
-    std::cout << "ok\n\n";
+    ).hdfsave(Mm2_name); if (cmd.lightweight) Mm2_d_ = std::move(Mm2_.torow());
+    std::cout << "ok" << std::endl << std::endl;
 }
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)

@@ -141,9 +141,6 @@ void CommandLine::parse (int argc, char* argv[])
 #endif
                     "\t--parallel-dot                  OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--no-parallel-block             Disable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplicaiton).                   \n"
-#ifndef NO_OPENCL
-                    "\t--gpu-slater                    Compute diagonal two-electron integrals using OpenCL (EXPERIMENTAL).                                                   \n"
-#endif
                     "                                                                                                                                                         \n"
                     "There are also some environment variables that control the execution.                                                                                    \n"
                     "                                                                                                                                                         \n"
@@ -291,6 +288,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // precompute only the owned subset of radial integrals
                 shared_scratch = true;
+                return true;
+            },
+        "reuse-dia-blocks", "", 0, [&](std::string optarg) -> bool
+            {
+                // load dia blocks from scratch files
+                reuse_dia_blocks = true;
                 return true;
             },
         

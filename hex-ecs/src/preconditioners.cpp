@@ -54,7 +54,7 @@ void NoPreconditioner::setup ()
     Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
     
     // compute one-electron radial integrals
-    s_rad_.setupOneElectronIntegrals();
+    s_rad_.setupOneElectronIntegrals(cmd_);
     
     // compute two-eletron radial integrals
     s_rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
@@ -88,6 +88,10 @@ void NoPreconditioner::update (double E)
             not cmd_.outofcore,         // keep in memory?
             format("dblk-%d.ooc", ill)  // scratch disk file name
         );
+        
+        // skip calculation if the disk file is already present
+        if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
+            continue;
         
         // one-electron parts; for all blocks
         for (unsigned iblock = 0; iblock < dia_blocks_[ill].structure().size(); iblock++)

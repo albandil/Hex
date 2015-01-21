@@ -73,7 +73,7 @@ class weightEndDamp
     public:
         
         // constructor
-        weightEndDamp(Bspline const & bspline)
+        weightEndDamp (Bspline const & bspline)
             : bspline_(bspline) {}
         
         // weight function
@@ -102,8 +102,8 @@ class RadialIntegrals
               Mm1_(bspline.Nspline()), Mm1_tr_(bspline.Nspline()), Mm2_(bspline.Nspline()) {}
         
         // public callable members
-        void setupOneElectronIntegrals();
-        void setupTwoElectronIntegrals(Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
+        void setupOneElectronIntegrals (CommandLine const & cmd);
+        void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
         
         /**
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$
@@ -112,7 +112,7 @@ class RadialIntegrals
          * @param j      B-spline index.
          * @param iknot  Interval index.
          */
-        Complex computeD_iknot(int i, int j, int iknot) const;
+        Complex computeD_iknot (int i, int j, int iknot) const;
         
         /**
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
@@ -120,7 +120,7 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeD(int i, int j, int maxknot = -1) const;
+        Complex computeD (int i, int j, int maxknot = -1) const;
         
         /**
          * Compute integral moment of coordinate power between the B-splines
@@ -132,7 +132,7 @@ class RadialIntegrals
          * @param iknot  Interval index.
          * @param R      Potential truncation point.
          */
-        Complex computeM_iknot(int a, int i, int j, int iknot, Complex R) const;
+        Complex computeM_iknot (int a, int i, int j, int iknot, Complex R) const;
         
         /**
          * Compute integral moment of coordinate power between the B-splines
@@ -142,7 +142,7 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeM(int a, int i, int j, int maxknot = 0) const;
+        Complex computeM (int a, int i, int j, int maxknot = 0) const;
         
         /**
          * Compute logarithms of integral moment of degree "a" for every B-spline pair and every
@@ -154,7 +154,7 @@ class RadialIntegrals
          * @param a Moment degree.
          * @param iknotmax Index of knot that terminates the integration range.
          */
-        cArray computeMi(int a, int iknotmax = 0) const;
+        cArray computeMi (int a, int iknotmax = 0) const;
         
         rArray computeScale (int a, int iknotmax = 0) const;
         
