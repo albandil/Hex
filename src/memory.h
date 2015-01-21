@@ -153,11 +153,11 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             }
             catch (std::bad_alloc const & err)
             {
-                std::string strsize = (bytes < 1204           ? format("%d B", bytes) :
-                    (bytes < 1024*1204      ? format("%d kiB", bytes / 1024) :
-                    (bytes < 1024*1024*1024 ? format("%d MiB", bytes / 1024 / 1024) :
-                       /* else */             format("%d GiB", bytes / 1024 / 1024 / 1024)
-                    )));
+                std::string strsize = (
+                    bytes < 1204           ? format("%d B", bytes) : (
+                    bytes < 1024*1204      ? format("%.2f kiB", bytes / 1024.) : (
+                    bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
+                      /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
                 
                 Exception("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
