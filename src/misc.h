@@ -50,6 +50,11 @@
 #include <type_traits>
 #include <string>
 
+#if (defined(__linux__) && defined(__GNUC__))
+    #include <execinfo.h>
+    #include <unistd.h>
+#endif
+
 #ifndef NO_MPI
     #include <mpi.h>
 #endif
@@ -106,9 +111,19 @@ template <class ...Params> std::string format (Params ...p)
  */
 template <class ...Params> [[noreturn]] void TerminateWithException (const char* file, int line, const char* func, Params ...p)
 {
+    // print error text
     std::cerr << std::endl << std::endl;
     std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
     std::cerr << " *** " << format(p...) << std::endl;
+    
+#if (defined(__linux__) && defined(__GNUC__))
+    // print stack trace
+    void * array[10];
+    std::size_t size = backtrace(array, 10);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+#endif
+    
+    // exit the program
     std::terminate();
 }
 

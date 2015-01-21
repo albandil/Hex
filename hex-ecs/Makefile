@@ -85,7 +85,7 @@ CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $
 
 # linker flags
 LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
-          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS) -rdynamic
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
