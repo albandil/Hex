@@ -427,7 +427,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
         {
-            if (not par.isMyWork(lambda) or not cmd.cache_own_radint)
+            if (/*not par.isMyWork(lambda) or*/ not cmd.cache_own_radint)
             {
                 std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
                 continue;

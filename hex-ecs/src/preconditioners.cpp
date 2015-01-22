@@ -93,13 +93,14 @@ void NoPreconditioner::update (double E)
         if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
             continue;
         
-        // one-electron parts; for all blocks
+        // for all blocks
         for (unsigned iblock = 0; iblock < dia_blocks_[ill].structure().size(); iblock++)
         {
             // get block position
             int i = dia_blocks_[ill].structure()[iblock].first;
             int j = dia_blocks_[ill].structure()[iblock].second;
             
+            // one-electron part
             cArray block = E * s_rad_.S()(i,j) * s_rad_.S().data();
             block -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S().data();
             block -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S().data();
@@ -165,19 +166,15 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
     if (not std::isfinite(Pi_expansion.norm()))
         Exception("Unable to expand hydrogen bound orbital in B-splines!");
     
-    //
-    // Add two-electron part.
-    //
-    
     // for all segments constituting the RHS
-    # pragma omp parallel for if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
         
         // setup storage
-        cArrayView chi_block (chi, ill * Nspline * Nspline, Nspline * Nspline);
+        cArrayView chi_block (chi, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
         chi_block.fill(0);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
@@ -207,7 +204,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
             
             // skip angular forbidden right hand sides
-            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++) if (par_.isMyWork(lambda))
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 // calculate angular integrals
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
@@ -231,50 +228,6 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                     if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.apply_R_matrix(lambda, cArrays(1, Pj2))[0];
                 }
             }
-        }
-    }
-    
-    // sum all process' contributions
-    par_.syncsum(chi.data(), chi.size());
-    
-    //
-    // Add one-electron part.
-    //
-    
-    # pragma omp parallel for
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-    {
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
-        
-        // setup storage
-        cArrayView chi_block (chi, ill * Nspline * Nspline, Nspline * Nspline);
-        
-        // for all allowed angular momenta (by momentum composition) of the projectile
-        for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
-        {
-            // skip wrong parity
-            if ((inp_.L + li + l) % 2 != inp_.Pi)
-                continue;
-            
-            // (anti)symmetrization
-            double Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
-            
-            // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(Complex(0.,1.),l)
-                              * std::sqrt(special::constant::two_pi * (2 * l + 1))
-                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / inp_.ki[ie];
-            
-            // skip non-contributing terms
-            if (prefactor == 0.)
-                continue;
-            
-            // pick the correct Bessel function expansion
-            cArrayView Ji_expansion (ji_expansion, l * Nspline, Nspline);
-            
-            // compute outer products of B-spline expansions
-            cArray Pj1 = outer_product(Pi_expansion, Ji_expansion);
-            cArray Pj2 = outer_product(Ji_expansion, Pi_expansion);
             
             // add monopole terms (direct/exchange)
             if (li == l1 and l == l2)
@@ -307,26 +260,29 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         if (par_.isMyWork(ill))
         {
             // copy-from segment of "p"
-            cArrayView p_block (p, ill * Nchunk, Nchunk);
+            cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
             // copy-to segment of "q"
-            cArrayView q_block (q, ill * Nchunk, Nchunk);
+            cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
             // multiply
             q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot);
         }
         
         // multiply "p" by the off-diagonal blocks
-        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        if (par_.isMyWork(lambda))
+        for (int ill = 0;  ill < Nang;  ill++)
         {
-            // for all blocks of the super-matrix
-            for (int ill = 0;  ill < Nang;  ill++)
+            // product of line of blocks with the source vector (-> one segment of destination vector)
+            cArray product (Nchunk);
+            
             for (int illp = 0; illp < Nang; illp++)
             {
                 // skip diagonal
                 if (ill == illp)
+                    continue;
+                
+                // skip segments not owned by this process
+                if (not par_.isMyWork(illp))
                     continue;
                 
                 // row multi-index
@@ -338,24 +294,35 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 int l2p = l1_l2_[illp].second;
                 
                 // calculate angular integral
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                if (not std::isfinite(f))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+                for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
+                {
+                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                    if (not std::isfinite(f))
+                        Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                    
+                    // check non-zero
+                    if (f == 0.)
+                        continue;
+                    
+                    // source segment of "p"
+                    cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
                 
-                // check non-zero
-                if (f == 0.)
-                    continue;
-                
-                // source segment of "p"
-                cArrayView p_block (p, illp * Nchunk, Nchunk);
-                
-                // product
-                cArray product = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
-                
-                // update array
-                # pragma omp critical
-                cArrayView (q, ill * Nchunk, Nchunk) += product;
+                    // calculate product
+                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
+                    
+                    // update collected product
+                    # pragma omp critical
+                    product += p0;
+                }
             }
+            
+            // sum all contributions to this destination segment on its owner node
+            par_.sum(product.data(), Nchunk, ill % par_.Nproc());
+            
+            // finally, owner will update its segment
+            if (par_.isMyWork(ill))
+                cArrayView (q, (ill / par_.Nproc()) * Nchunk, Nchunk) += product;
         }
     }
     else
@@ -370,10 +337,10 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         if (par_.isMyWork(ill))
         {
             // copy-from segment of "p"
-            cArrayView p_block (p, ill * Nchunk, Nchunk);
+            cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
             // copy-to segment of "q"
-            cArrayView q_block (q, ill * Nchunk, Nchunk);
+            cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
             // get block angular momemnta
             int l1 = l1_l2_[ill].first;
@@ -386,49 +353,57 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         }
         
         // multiply "p" by the off-diagonal blocks
-        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        if (par_.isMyWork(lambda))
+        for (int ill = 0;  ill < Nang;  ill++)
         {
-            // vectors to be multiplied
-            cArrays src;
+            // product of line of blocks with the source vector (-> one segment of destination vector)
+            cArray product (Nchunk);
             
-            // destination segments
-            iArray dst;
-            
-            // assemble all source vectors to be multiplied
-            for (int ill = 0;  ill < Nang;  ill++)
             for (int illp = 0; illp < Nang; illp++)
             {
-                // row and column multi-indices
-                int l1 = l1_l2_[ill].first, l2 = l1_l2_[ill].second;
-                int l1p = l1_l2_[illp].first, l2p = l1_l2_[illp].second;
+                // skip segments not owned by this process
+                if (not par_.isMyWork(illp))
+                    continue;
+                
+                // row multi-index
+                int l1 = l1_l2_[ill].first;
+                int l2 = l1_l2_[ill].second;
+                
+                // column multi-index
+                int l1p = l1_l2_[illp].first;
+                int l2p = l1_l2_[illp].second;
                 
                 // calculate angular integral
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                if (not std::isfinite(f))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // append source segment of "p" and the destination position
-                if (f != 0.)
+                # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
+                for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
                 {
-                    src.push_back((-f) * cArrayView(p, illp * Nchunk, Nchunk));
-                    dst.push_back(ill);
+                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                    if (not std::isfinite(f))
+                        Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                    
+                    // check non-zero
+                    if (f == 0.)
+                        continue;
+                    
+                    // source segment of "p"
+                    cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
+                
+                    // calculate product
+                    cArray p0 = std::move( (-f) * s_rad_.apply_R_matrix(lambda, cArrays(1, p_block))[0] );
+                    
+                    // update collected product
+                    # pragma omp critical
+                    product += p0;
                 }
             }
             
-            // multiply all source segments by R^lambda
-            src = std::move( s_rad_.apply_R_matrix(lambda, src) );
+            // sum all contributions to this destination segment on its owner node
+            par_.sum(product.data(), Nchunk, ill % par_.Nproc());
             
-            // update destination array
-            # pragma omp critical
-            for (unsigned i = 0; i < src.size(); i++)
-                cArrayView(q, dst[i] * Nchunk, Nchunk) += src[i];
+            // finally, owner will update its segment
+            if (par_.isMyWork(ill))
+                cArrayView (q, (ill / par_.Nproc()) * Nchunk, Nchunk) += product;
         }
     }
-    
-    // synchronize across processes by summing individual contributions
-    par_.syncsum(q.data(), Nchunk * l1_l2_.size());
 }
 
 void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -451,8 +426,8 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
         // create segment views
-        cArrayView rview (r, ill * Nspline * Nspline, Nspline * Nspline);
-        cArrayView zview (z, ill * Nspline * Nspline, Nspline * Nspline);
+        cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
+        cArrayView zview (z, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
         
         // wrappers around the callbacks
         auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
@@ -480,9 +455,6 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
     std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
     std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
-    
-    // synchronize data across processes
-    par_.sync(z.data(), Nspline * Nspline, l1_l2_.size());
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const

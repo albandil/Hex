@@ -164,8 +164,8 @@ template
     class Preconditioner,
     class MatrixMultiplication,
     class ComputeNorm   = decltype(default_compute_norm),
-    class AxbyOperation = decltype(default_complex_axby),
     class ScalarProduct = decltype(operator|<Complex>),
+    class AxbyOperation = decltype(default_complex_axby),
     class NewArray      = decltype(default_new_complex_array)
 >
 unsigned cg_callbacks
@@ -179,8 +179,8 @@ unsigned cg_callbacks
     MatrixMultiplication matrix_multiply,
                     bool verbose        = true,
              ComputeNorm compute_norm   = default_compute_norm,
-           AxbyOperation axby           = default_complex_axby,
            ScalarProduct scalar_product = operator|<Complex>,
+           AxbyOperation axby           = default_complex_axby,
                 NewArray new_array      = default_new_complex_array
 )
 {

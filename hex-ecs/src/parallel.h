@@ -77,7 +77,7 @@ class Parallel
                 if (prov_flag == MPI_THREAD_SINGLE)
                 {
                     std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_FUNNELED. ";
-                    std::cout << "Every MPI process will thus run only on a single core." << std::endl;
+                    std::cout << "Every MPI process may thus run only on a single core." << std::endl;
                 }
     #endif
                 // get number of processes and ID of this process
@@ -209,6 +209,43 @@ class Parallel
         }
         
         /**
+         * @brief Sum arrays to node.
+         * 
+         */
+        template <class T> void sum (T* array, std::size_t N, int owner = 0) const
+        {
+#ifndef NO_MPI
+            if (active_)
+            {
+                NumberArray<T> tmp(N);
+                MPI_Status status;
+                
+                // slaves will send their data to owner
+                if (iproc_ != owner)
+                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, owner, iproc_, MPI_COMM_WORLD);
+                
+                // master node will receive and sum the data
+                if (iproc_ == owner)
+                {
+                    // for all non-master processes
+                    for (int i = 0; i < Nproc_; i++)
+                    {
+                        // skip self
+                        if (i == iproc_)
+                            continue;
+                        
+                        // receive data from a particular node into 'tmp'
+                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
+                        
+                        // sum the arrays
+                        ArrayView<T>(N, array) += tmp;
+                    }
+                }
+            }
+#endif
+        }
+        
+        /**
          * @brief Synchronize across processes by summing.
          * 
          * Synchronize array across processes by summing. There are no assumptions on what
@@ -226,26 +263,8 @@ class Parallel
 #ifndef NO_MPI
             if (active_)
             {
-                NumberArray<T> tmp(N);
-                MPI_Status status;
-                
-                // slaves will send their data to master
-                if (not IamMaster())
-                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, iproc_, MPI_COMM_WORLD);
-                
-                // master will receive and sum the data ...
-                if (IamMaster())
-                {
-                    // for all non-master processes
-                    for (int i = 1; i < Nproc_; i++)
-                    {
-                        // receive data from a particular slave into 'tmp'
-                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
-                        
-                        // sum the arrays
-                        ArrayView<T>(N, array) += tmp;
-                    }
-                }
+                // master node will receive and sum the data ...
+                sum(array, N, 0);
                 
                 // ... and broadcast the result back to all the slaves
                 MPI_Bcast(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);

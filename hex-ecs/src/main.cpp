@@ -237,9 +237,6 @@ if (cmd.itinerary & CommandLine::StgSolve)
     // CG preconditioner callback
     auto apply_preconditioner = [ & ](cArray & r, cArray & z) -> void
     {
-        // synchronize the residual vector across the nodes by broadcasting master's data
-        par.sync(r.data(), r.size(), 1);
-        
         // MPI-distributed preconditioning
         prec->precondition(r, z);
     };
@@ -251,16 +248,29 @@ if (cmd.itinerary & CommandLine::StgSolve)
         prec->multiply(p, q);
     };
     
+    // CG scalar product function callback
+    auto scalar_product = [ & ](cArray const & x, cArray const & y) -> Complex
+    {
+        // compute node-local scalar product
+        Complex prod = (x|y);
+        
+        // colect products from other nodes
+        par.syncsum(&prod, 1);
+        
+        // return global scalar product
+        return prod;
+    };
+    
     // CG norm function that broadcasts master's result to all nodes
     auto compute_norm = [ & ](cArray const & r) -> double
     {
         // compute node-local norm of 'r'
         double rnorm = r.norm();
         
-        // impose also master's value of the norm on the other nodes
-        par.sync(&rnorm, 1, 1);
+        // collect norms from other nodes
+        par.syncsum(&rnorm, 1);
         
-        // return norm of master's 'r'
+        // return global norm
         return rnorm;
     };
     
@@ -358,11 +368,11 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
-            cArray chi (coupled_states.size() * Nspline * Nspline);
+            cArray chi ((coupled_states.size() / par.Nproc() + coupled_states.size() % par.Nproc()) * Nspline * Nspline);
             prec->rhs(chi, ie, instate, Spin);
             
             // compute and check norm of the right hand side vector
-            double chi_norm = chi.norm();
+            double chi_norm = compute_norm(chi);
             if (chi_norm == 0.)
             {
                 // this should not happen, hopefully we already checked
@@ -383,7 +393,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
-            unsigned iterations = cg_callbacks<cArray,cArrayView>
+            unsigned iterations = cg_callbacks < cArray, cArrayView >
             (
                 chi,                    // right-hand side
                 current_solution,       // on input, the initial guess, on return, the solution
@@ -393,7 +403,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 apply_preconditioner,   // preconditioner callback
                 matrix_multiply,        // matrix multiplication callback
                 true,                   // verbose output
-                compute_norm            // how to evaluate norm of an array
+                compute_norm,           // how to evaluate norm of an array
+                scalar_product          // how to calculate scalar product of two arrays
             );
             
             if (iterations >= max_iter)
@@ -406,8 +417,31 @@ if (cmd.itinerary & CommandLine::StgSolve)
             computations_done++;
             
             // save solution to disk (if valid)
-            if (std::isfinite(current_solution.norm()))
-                reader.save(current_solution);
+            if (std::isfinite(compute_norm(current_solution)))
+            {
+                if (par.active())
+                {
+                    // create whole solution array and copy the owned blocks
+                    cArray whole_solution (coupled_states.size() * Nspline * Nspline);
+                    for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
+                    {
+                        cArrayView(whole_solution, ill * Nspline * Nspline, Nspline * Nspline)
+                        = cArrayView(current_solution, ill / par.Nproc() * Nspline * Nspline, Nspline * Nspline);
+                    }
+                    
+                    // sum all solutions to master node (this will assemble all blocks)
+                    par.sum(whole_solution.data(), whole_solution.size(), 0);
+                    
+                    // master node will save the solution
+                    if (par.IamMaster())
+                        reader.save(whole_solution);
+                }
+                else
+                {
+                    // save the local solution
+                    reader.save(current_solution);
+                }
+            }
             
         } // end of For Spin, instate
         
