@@ -30,18 +30,13 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
-#include <set>
 
-#ifdef _OPENMP
-    #include <omp.h>
-#endif
-
-#include "arrays.h"
-#include "gauss.h"
-#include "itersolve.h"
-#include "misc.h"
-#include "preconditioners.h"
-#include "radial.h"
+#include "../arrays.h"
+#include "../gauss.h"
+#include "../misc.h"
+#include "../parallel.h"
+#include "../preconditioners.h"
+#include "../radial.h"
 
 const std::string NoPreconditioner::name = "none";
 const std::string NoPreconditioner::description = "\"Preconditioning\" by the identity matrix.";
@@ -65,11 +60,19 @@ void NoPreconditioner::update (double E)
     // update energy
     E_ = E;
     
-    // skip pre-calculation of the diagonal blocks in lightweight mode
-    if (cmd_.lightweight)
+    // skip pre-calculation of the diagonal blocks in full lightweight mode
+    if (cmd_.lightweight_full)
         return;
     
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
+    
+    // some accelerator data for the calculation of the radial integrals
+    cArrays Mtr_L(s_rad_.maxlambda() + 1), Mtr_mLm1(s_rad_.maxlambda() + 1);
+    if (cmd_.lightweight_radial_cache)
+    {
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            s_rad_.init_R_tr_dia_block(lambda, Mtr_L[lambda], Mtr_mLm1[lambda]);
+    }
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
@@ -122,7 +125,16 @@ void NoPreconditioner::update (double E)
                     continue;
             
                 // add two-electron term
-                block += (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                if (not cmd_.lightweight_radial_cache)
+                {
+                    // use precomputed block (from memory or from scratch file)
+                    block += (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                }
+                else
+                {
+                    // compute the data anew
+                    block += (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda]);
+                }
             }
             
             // save block
@@ -134,7 +146,7 @@ void NoPreconditioner::update (double E)
     std::cout << "ok" << std::endl;
 }
 
-void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
+void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
 {
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
@@ -174,8 +186,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
         int l2 = l1_l2_[ill].second;
         
         // setup storage
-        cArrayView chi_block (chi, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        chi_block.fill(0);
+        cArray chi_block (Nspline * Nspline);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
@@ -217,7 +228,7 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                     Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
                 // add multipole terms (direct/exchange)
-                if (not cmd_.lightweight)
+                if (not cmd_.lightweight_radial_cache)
                 {
                     if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot);
                     if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot);
@@ -234,6 +245,10 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
                 chi_block += (-prefactor       ) * outer_product(s_rad_.S().dot(Pi_expansion), s_rad_.Mm1_tr().dot(Ji_expansion));
             if (li == l2 and l == l1)
                 chi_block += (-prefactor * Sign) * outer_product(s_rad_.Mm1_tr().dot(Ji_expansion), s_rad_.S().dot(Pi_expansion));
+            
+            // update the right-hand side
+            # pragma omp critical
+            chi.append(chi_block.begin(), chi_block.end());
         }
     }
 }
@@ -248,7 +263,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     // clear output array
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
 
-    if (not cmd_.lightweight)
+    if (not cmd_.lightweight_radial_cache)
     {
         //
         // Simple multiplication by the super-matrix.
@@ -275,7 +290,9 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // product of line of blocks with the source vector (-> one segment of destination vector)
             cArray product (Nchunk);
             
+            # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
+            for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
             {
                 // skip diagonal
                 if (ill == illp)
@@ -294,27 +311,23 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 int l2p = l1_l2_[illp].second;
                 
                 // calculate angular integral
-                # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-                for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
-                {
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
-                    // check non-zero
-                    if (f == 0.)
-                        continue;
-                    
-                    // source segment of "p"
-                    cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
+                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                if (not std::isfinite(f))
+                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                 
-                    // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
-                    
-                    // update collected product
-                    # pragma omp critical
-                    product += p0;
-                }
+                // check non-zero
+                if (f == 0.)
+                    continue;
+                
+                // source segment of "p"
+                cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
+                
+                // calculate product
+                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
+                
+                // update collected product
+                # pragma omp critical
+                product += p0;
             }
             
             // sum all contributions to this destination segment on its owner node
@@ -331,11 +344,19 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // Lightweight mode multiplication
         //
         
+        std::cout << "Lightweight multiplication" << std::endl;
+        
+        // get one-electron matrix structure
+        std::vector<std::pair<int,int>> structure = s_rad_.S().nzpattern();
+        MPI_Status status;
+        
         // multiply "p" by the diagonal blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
         if (par_.isMyWork(ill))
         {
+            std::cout << "Diagonal block multiplication ill = " << ill << std::endl;
+            
             // copy-from segment of "p"
             cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
@@ -353,17 +374,22 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         }
         
         // multiply "p" by the off-diagonal blocks
-        for (int ill = 0;  ill < Nang;  ill++)
+        for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
         {
-            // product of line of blocks with the source vector (-> one segment of destination vector)
-            cArray product (Nchunk);
+            std::cout << "lambda = " << lambda << std::endl;
             
+            // coupling block positions and coefficients
+            iArrays dst_for_src(Nang), src_for_dst(Nang);
+            std::vector<std::tuple<int,int,double>> f_for_superblock;
+            
+            // initialize R-integrals
+            cArray Mtr_L, Mtr_mLm1;
+            s_rad_.init_R_tr_dia_block(lambda, Mtr_L, Mtr_mLm1);
+            
+            // determine which coupling blocks contain R[lambda]
+            for (int ill = 0;  ill < Nang;  ill++)
             for (int illp = 0; illp < Nang; illp++)
             {
-                // skip segments not owned by this process
-                if (not par_.isMyWork(illp))
-                    continue;
-                
                 // row multi-index
                 int l1 = l1_l2_[ill].first;
                 int l2 = l1_l2_[ill].second;
@@ -373,335 +399,187 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 int l2p = l1_l2_[illp].second;
                 
                 // calculate angular integral
-                # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-                for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
-                {
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
-                    // check non-zero
-                    if (f == 0.)
-                        continue;
-                    
-                    // source segment of "p"
-                    cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
+                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                if (not std::isfinite(f))
+                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                 
-                    // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.apply_R_matrix(lambda, cArrays(1, p_block))[0] );
-                    
-                    // update collected product
-                    # pragma omp critical
-                    product += p0;
+                // add this superblock to the task list
+                // TODO : Use symmetry.
+                if (f != 0.)
+                {
+                    dst_for_src[illp].push_back(ill);
+                    src_for_dst[ill].push_back(illp);
+                    f_for_superblock.push_back(std::make_tuple(ill,illp,f));
                 }
             }
             
-            // sum all contributions to this destination segment on its owner node
-            par_.sum(product.data(), Nchunk, ill % par_.Nproc());
+            // skip this multipole if no blocks use it (but shouldnot happen)
+            if (f_for_superblock.empty())
+                continue;
             
-            // finally, owner will update its segment
-            if (par_.isMyWork(ill))
-                cArrayView (q, (ill / par_.Nproc()) * Nchunk, Nchunk) += product;
+            // for all multiplication rounds (- evenly distribute subblocks between the processes)
+            for (int iroundblock = 0; iroundblock < (int)structure.size(); iroundblock += par_.Nproc())
+            {
+                std::cout << "\tiroundblock = " << iroundblock << std::endl;
+                
+                // necessary source vector data to be processed by this worker
+                cArrays srcdata(Nang), dstdata(Nang);
+                cArray buffer (Nspline);
+                
+                // we need to send source vector data from owners to the workers
+                for (int illp = 0; illp < (int)l1_l2_.size(); illp++)
+                {
+                    std::cout << "\t\tsending illp = " << illp << std::endl;
+                    
+                    // skip non-contributing couplings
+                    if (dst_for_src[illp].empty())
+                        continue;
+                    
+                    // for all sub-blocks of this round
+                    for (int idata = 0; idata < par_.Nproc() and iroundblock + idata < (int)structure.size(); idata++)
+                    {
+                        // get current sub-block index
+                        int isubblock = iroundblock + idata;
+                        
+                        // get sub-block indices
+                        int k = structure[isubblock].second;
+                        
+                        // owner of the source super-segment 'p(illp)' will send the sub-segment 'p(illp,k)' to the worker 'idata'
+                        if (par_.isMyWork(illp))
+                        {
+                            // prepare data to send
+                            std::memcpy
+                            (
+                                &buffer[0], // destination
+                                p.data() + (illp / par_.Nproc()) * Nspline * Nspline + k * Nspline, // source
+                                Nspline * sizeof(Complex) // byte size
+                            );
+                            
+                            // send the data
+                            MPI_Send
+                            (
+                                &buffer[0],     // data to send
+                                2 * Nspline,    // how many components
+                                MPI_DOUBLE,     // data type
+                                idata,          // destination process
+                                illp,           // tag (source segment angular numbers)
+                                MPI_COMM_WORLD  // communication context
+                            );
+                        }
+                        
+                        // current worker should receive the data into its buffer
+                        if (par_.iproc() == idata)
+                        {
+                            // receive the data
+                            MPI_Recv
+                            (
+                                &buffer[0],             // receive data into this array
+                                2 * Nspline,            // how many components
+                                MPI_DOUBLE,             // data type
+                                illp % par_.Nproc(),    // sender process ID
+                                illp,                   // tag
+                                MPI_COMM_WORLD,         // communication context
+                                &status                 // status info
+                            );
+                            
+                            // copy data to own storage
+                            srcdata[illp] = buffer;
+                        }
+                        
+                        par_.wait();
+                    }
+                }
+                
+                // calculate the R-integral sub-block (i,k)
+                cArray R_block_ik = s_rad_.calc_R_tr_dia_block
+                (
+                    lambda,
+                    structure[iroundblock + par_.iproc()].first,
+                    structure[iroundblock + par_.iproc()].second,
+                    Mtr_L, Mtr_mLm1
+                );
+                
+                // multiply all source vectors
+                // TODO : Use symmetry.
+                for (unsigned n = 0; n < f_for_superblock.size(); n++)
+                {
+                    // get superblock position and factor
+                    int ill  = std::get<0>(f_for_superblock[n]);
+                    int illp = std::get<1>(f_for_superblock[n]);
+                    double f = std::get<2>(f_for_superblock[n]);
+                    
+                    cArray product = SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), srcdata[illp].data());
+                    
+                    if (dstdata[ill].empty())
+                        dstdata[ill] = f * product;
+                    else
+                        dstdata[ill] += f * product;
+                }
+                
+                // now we need to send results to owners
+                for (int ill = 0; ill < (int)l1_l2_.size(); ill++)
+                {
+                    std::cout << "\t\treceiving ill = " << ill << std::endl;
+                    
+                    // skip non-contributing couplings
+                    if (src_for_dst[ill].empty())
+                        continue;
+                    
+                    // for all sub-blocks of this round
+                    for (int idata = 0; idata < par_.Nproc() and iroundblock + idata < (int)structure.size(); idata++)
+                    {
+                        // get current sub-block index
+                        int isubblock = iroundblock + idata;
+                        
+                        // get sub-block indices
+                        int i = structure[isubblock].first;
+                        
+                        // current worker will send the data
+                        if (par_.iproc() == idata)
+                        {
+                            // prepare the data to send
+                            std::memcpy
+                            (
+                                &buffer[0],                 // destination
+                                dstdata[ill].begin(),       // source
+                                Nspline * sizeof(Complex)   // byte size
+                            );
+                            
+                            // receive the data
+                            MPI_Send
+                            (
+                                &buffer[0],             // data to send
+                                2 * Nspline,            // how many components
+                                MPI_DOUBLE,             // data type
+                                ill % par_.Nproc(),     // destination process
+                                ill,                    // tag (destination segment angular numbers)
+                                MPI_COMM_WORLD          // communication context
+                            );
+                        }
+                        
+                        // owner of the destination super-segment 'q(ill)' will receive the sub-segment 'q(illp,i)' from the worker 'idata'
+                        if (par_.isMyWork(ill))
+                        {
+                            // send the data
+                            MPI_Recv
+                            (
+                                &buffer[0],     // receive data to this array
+                                2 * Nspline,    // how many components
+                                MPI_DOUBLE,     // data type
+                                idata,          // source process
+                                ill,            // tag (source segment angular numbers)
+                                MPI_COMM_WORLD, // communication context
+                                &status
+                            );
+                            
+                            // update the destination sub-segment
+                            cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + i * Nspline) -= buffer;
+                        }
+                        
+                        par_.wait();
+                    }
+                }
+            }
         }
-    }
-}
-
-void NoPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    z = r;
-}
-
-const std::string CGPreconditioner::name = "cg";
-const std::string CGPreconditioner::description = "Block inversion using plain conjugate gradients. Use --tolerance option to set the termination tolerance.";
-
-void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
-{
-    // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
-    
-    // iterations
-    iArray n (l1_l2_.size());
-    
-    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
-    {
-        // create segment views
-        cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        cArrayView zview (z, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        
-        // wrappers around the callbacks
-        auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
-        auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
-        
-        // solve using the CG solver
-        n[ill] = cg_callbacks < cArray, cArrayView >
-        (
-            rview,                  // rhs
-            zview,                  // solution
-            cmd_.prec_itertol,      // preconditioner tolerance
-            0,                      // min. iterations
-            Nspline * Nspline,      // max. iteration
-            inner_prec,             // preconditioner
-            inner_mmul,             // matrix multiplication
-            false                   // verbose output
-        );
-    }
-    
-    // broadcast inner preconditioner iterations
-    par_.sync(n.data(), 1, l1_l2_.size());
-    
-    // inner preconditioner info (max and avg number of iterations)
-    std::cout << " | ";
-    std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
-}
-
-void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
-{
-    q = dia_blocks_[iblock].dot(p, cmd_.parallel_dot);
-}
-
-void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
-{
-    z = r;
-}
-
-#ifndef NO_LAPACK
-const std::string KPACGPreconditioner::name = "KPA";
-const std::string KPACGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
-
-void KPACGPreconditioner::setup ()
-{
-    NoPreconditioner::setup();
-    
-    std::cout << "Set up KPA preconditioner" << std::endl;
-    std::cout << "\t- Overlap matrix factorization" << std::endl;
-    
-    Timer timer;
-    
-    // resize arrays
-    invsqrtS_Cl_.resize(inp_.maxell + 1);
-    invCl_invsqrtS_.resize(inp_.maxell + 1);
-    Dl_.resize(inp_.maxell + 1);
-    
-    // diagonalize overlap matrix
-    ColMatrix<Complex> S = s_rad_.S().torow().T();
-    ColMatrix<Complex> CL, CR; cArray DS;
-    std::tie(DS,CL,CR) = S.diagonalize();
-    ColMatrix<Complex> invCR = CR.invert();
-    
-    // convert eigenvalues to diagonal matrix
-    ColMatrix<Complex> DSmat(DS.size()), invDSmat(DS.size());
-    ColMatrix<Complex> DSsqrtmat(DS.size()), invDSsqrtmat(DS.size());
-    for (unsigned i = 0; i < DS.size(); i++)
-    {
-        DSmat(i,i) = DS[i];
-        DSsqrtmat(i,i) = std::sqrt(DS[i]);
-        invDSmat(i,i) = 1.0 / DS[i];
-        invDSsqrtmat(i,i) = 1.0 / std::sqrt(DS[i]);
-    }
-    
-    // Now S = CR * DSmat * CR⁻¹
-    std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
-    std::cout << "\t\tresidual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
-    
-    // compute √S and √S⁻¹
-    RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
-    RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
-    
-    // necessary Kronecker product
-    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
-    
-    // diagonalize one-electron hamiltonians for all angular momenta
-    for (int l = 0; l <= inp_.maxell; l++)
-    {
-        // check if this angular momentum is needed by some of the blocks owned by this process
-        bool need_l = false;
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-        {
-            if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
-                need_l = true;
-        }
-        
-        // skip the angular momentum if no owned diagonal block needs it
-        if (not need_l)
-            continue;
-        
-        // reset timer
-        std::cout << "\t- One-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
-        timer.reset();
-        
-        // compose the one-electron hamiltonian
-        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
-        
-        // symmetrically transform by inverse square root of the overlap matrix
-        RowMatrix<Complex> tHl = invsqrtS * Hl * ColMatrix<Complex>(invsqrtS);
-        
-        // diagonalize the transformed matrix
-        ColMatrix<Complex> ClL, ClR;
-        std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
-        ColMatrix<Complex> invClR = ClR.invert();
-        
-        // store the data
-        invsqrtS_Cl_[l] = invsqrtS * ClR;
-        invCl_invsqrtS_[l] = RowMatrix<Complex>(invClR) * ColMatrix<Complex>(invsqrtS);
-        
-        // covert Dl to matrix form and print verification
-        ColMatrix<Complex> Dlmat(Dl_[l].size()), invDlmat(Dl_[l].size());
-        for (unsigned i = 0; i < Dl_[l].size(); i++)
-        {
-            Dlmat(i,i) = Dl_[l][i];
-            invDlmat(i,i) = 1.0 / Dl_[l][i];
-        }
-        
-        // Now Hl = ClR * Dlmat * ClR⁻¹
-        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        std::cout << "\t\t- residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
-    }
-    
-    std::cout << std::endl;
-}
-
-void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
-{
-    // let the parent do it if lightweight mode is off
-    if (not cmd_.lightweight)
-    {
-        CGPreconditioner::CG_mmul(iblock, p, q);
-    }
-    else
-    {
-        // get block angular momemnta
-        int l1 = l1_l2_[iblock].first;
-        int l2 = l1_l2_[iblock].second;
-        
-        // multiply 'p' by the diagonal block (except for the two-electron term)
-        q  = kron_dot(Complex(E_) * s_rad_.S_d(), s_rad_.S_d(), p);
-        q -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l1 + 1.) * l1) * s_rad_.Mm2_d(), s_rad_.S_d(), p);
-        q -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l2 + 1.) * l2) * s_rad_.Mm2_d(), p);
-        
-        // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        {
-            // calculate angular integral
-            double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
-            if (not std::isfinite(f))
-                Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
-            
-            // multiply
-            if (f != 0.)
-                q -= s_rad_.apply_R_matrix(lambda, cArrays(1, f * p))[0];
-        }
-    }
-}
-
-void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
-{
-    // get angular momenta of this block
-    int l1 = l1_l2_[iblock].first;
-    int l2 = l1_l2_[iblock].second;
-    
-    // dimension of the matrices
-    int Nspline = s_bspline_.Nspline();
-    
-    // multiply by the first Kronecker product
-    z = kron_dot(invCl_invsqrtS_[l1], invCl_invsqrtS_[l2], r);
-    
-    // divide by the diagonal
-    # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
-    for (int i = 0; i < Nspline; i++) 
-    for (int j = 0; j < Nspline; j++)
-        z[i * Nspline + j] /= E_ - Dl_[l1][i] - Dl_[l2][j];
-    
-    // multiply by the second Kronecker product
-    z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
-}
-
-#endif
-
-const std::string ILUCGPreconditioner::name = "ILU";
-const std::string ILUCGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by Incomplete LU. The drop tolerance can be given as the --droptol parameter.";
-
-void ILUCGPreconditioner::update (double E)
-{
-    if (E != E_)
-    {
-        // release outdated LU factorizations
-        for (auto & lu : lu_)
-        {
-            lu.drop();
-            lu.unlink();
-        }
-        
-        // release outdated CSR diagonal blocks
-        for (auto & csr : csr_blocks_)
-        {
-            csr.drop();
-            csr.unlink();
-        }
-    }
-    
-    // update parent
-    CGPreconditioner::update(E);
-}
-
-void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
-{
-    // load data from linked disk files
-    if (cmd_.outofcore)
-    {
-        csr_blocks_[iblock].hdfload();
-        # pragma omp critical
-        lu_[iblock].silent_load();
-    }
-    
-    // check that the factorization is loaded
-    if (lu_[iblock].size() == 0)
-    {
-        // create CSR block
-        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo().tocsr();
-        
-        // start timer
-        Timer timer;
-        
-        // factorize the block and store it
-        lu_[iblock].transfer(csr_blocks_[iblock].factorize(droptol_));
-        
-        // print time and memory info for this block (one thread at a time)
-        # pragma omp critical
-        std::cout << std::endl << std::setw(37) << format
-        (
-            "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
-            iblock, l1_l2_[iblock].first, l1_l2_[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
-            timer.seconds() / 60, timer.seconds() % 60,             // factorization time
-            lu_[iblock].size() / 1048576                            // final memory size
-        );
-        
-        // save the diagonal block
-        if (cmd_.outofcore)
-        {
-            csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
-            csr_blocks_[iblock].hdfsave();
-        }
-    }
-    
-    // precondition by LU
-    z = lu_[iblock].solve(r);
-    
-    // release memory
-    if (cmd_.outofcore)
-    {
-        // link to a disk file and save (if not already done)
-        if (lu_[iblock].name().size() == 0)
-        {
-            lu_[iblock].link(format("lu-%d.ooc", iblock));
-            # pragma omp critical
-            lu_[iblock].save();
-        }
-        
-        // release memory objects
-        lu_[iblock].drop();
-        csr_blocks_[iblock].drop();
     }
 }

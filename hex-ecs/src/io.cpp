@@ -113,47 +113,48 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                                                                         \n"
-                    "                                                                                                                                                         \n"
-                    "\t--example                 (-e)  Create sample input file.                                                                                              \n"
-                    "\t--help                    (-h)  Display this help.                                                                                                     \n"
-                    "\t--input <filename>        (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
-                    "\t--zipfile <filename>      (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
-                    "\t--zipcount <number>       (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
-                    "\t--zipmax <number>         (-R)  Maximal radius to use for solution zipping.                                                                            \n"
+                    "Available switches (short forms in parentheses):                                                                                                          \n"
+                    "                                                                                                                                                          \n"
+                    "\t--example                  (-e)  Create sample input file.                                                                                              \n"
+                    "\t--help                     (-h)  Display this help.                                                                                                     \n"
+                    "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
+                    "\t--zipfile <filename>       (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
+                    "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
+                    "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
 #ifndef NO_MPI
-                    "\t--mpi                     (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
+                    "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
-                    "\t--stg-integ               (-a)  Only calculate needed radial integrals.                                                                                \n"
-                    "\t--stg-integ-solve         (-b)  Only calculate integrals and the solution.                                                                             \n"
-                    "\t--stg-extract             (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
-                    "\t--preconditioner <name>   (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
-                    "\t--list-preconditioners    (-P)  List available preconditioners with short description of each.                                                         \n"
-                    "\t--tolerance <number>      (-T)  Set tolerance for the conjugate gradients solver.                                                                      \n"
-                    "\t--prec-tolerance <number> (-t)  Set tolerance for the conjugate gradients preconditioner.                                                              \n"
-                    "\t--drop-tolerance <number> (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
-                    "\t--out-of-core             (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
-                    "\t--own-radial-cache        (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
-                    "\t--no-radial-cache         (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
-                    "\t--shared-scratch          (-s)  Let every MPI process calculate only a subset of shared radial integrals.                                              \n"
+                    "\t--stg-integ                (-a)  Only calculate needed radial integrals.                                                                                \n"
+                    "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
+                    "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
+                    "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
+                    "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
+                    "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver.                                                                      \n"
+                    "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner.                                                              \n"
+                    "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
+                    "\t--out-of-core              (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
+                    "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
+                    "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
+                    "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals.                                              \n"
+                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly.                                             \n"
 #ifndef NO_LAPACK
-                    "\t--lightweight             (-l)  Avoid precalculating large matrices and only apply them on the fly (only available for KPA preconditioner).            \n"
+                    "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
 #endif
-                    "\t--parallel-dot                  OpenMP-parallelize SpMV operations.                                                                                    \n"
-                    "\t--no-parallel-block             Disable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplicaiton).                   \n"
-                    "                                                                                                                                                         \n"
-                    "There are also some environment variables that control the execution.                                                                                    \n"
-                    "                                                                                                                                                         \n"
-                    "\tOMP_NUM_THREADS     Number of OpenMP threads to use.                                                                                                   \n"
-                    "\t                    If empty, the physical number of hardware threads set by system is used.                                                           \n"
-                    "                                                                                                                                                         \n"
-                    "\tHEX_RHO             Scattering amplitude extraction distance (must be on the real part of the grid).                                                   \n"
-                    "\t                    If empty, the end of the real grid is used.                                                                                        \n"
-                    "                                                                                                                                                         \n"
-                    "\tHEX_SAMPLES         How many times to evaluate the amplitude in the vicinity of the evaluation point. The evaluations will be uniformly                \n"
-                    "\t                    spread over one wave-length of the scattered electron and averaged to suppress numerical errors.                                   \n"
-                    "\t                    If empty, 10 evaluations are used.                                                                                                 \n"
-                    "                                                                                                                                                         \n"
+                    "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
+                    "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
+                    "                                                                                                                                                          \n"
+                    "There are also some environment variables that control the execution.                                                                                     \n"
+                    "                                                                                                                                                          \n"
+                    "\tOMP_NUM_THREADS     Number of OpenMP threads to use.                                                                                                    \n"
+                    "\t                    If empty, the physical number of hardware threads set by system is used.                                                            \n"
+                    "                                                                                                                                                          \n"
+                    "\tHEX_RHO             Scattering amplitude extraction distance (must be on the real part of the grid).                                                    \n"
+                    "\t                    If empty, the end of the real grid is used.                                                                                         \n"
+                    "                                                                                                                                                          \n"
+                    "\tHEX_SAMPLES         How many times to evaluate the amplitude in the vicinity of the evaluation point. The evaluations will be uniformly                 \n"
+                    "\t                    spread over one wave-length of the scattered electron and averaged to suppress numerical errors.                                    \n"
+                    "\t                    If empty, 10 evaluations are used.                                                                                                  \n"
+                    "                                                                                                                                                          \n"
                 ;
                 std::exit(EXIT_SUCCESS);
             },
@@ -266,10 +267,10 @@ void CommandLine::parse (int argc, char* argv[])
                 parallel_dot = true;
                 return true;
             },
-        "no-parallel-block", "", 0, [&](std::string optarg) -> bool
+        "parallel-block", "", 0, [&](std::string optarg) -> bool
             {
-                // un-parallelize preconditioning
-                parallel_block = false;
+                // parallelize preconditioning
+                parallel_block = true;
                 return true;
             },
         "gpu-slater", "", 0, [&](std::string optarg) -> bool
@@ -278,12 +279,20 @@ void CommandLine::parse (int argc, char* argv[])
                 gpu_slater = true;
                 return true;
             },
-        "lightweight", "l", 0, [&](std::string optarg) -> bool
+        "lightweight-radial-cache", "l", 0, [&](std::string optarg) -> bool
             {
-                // do not precompute large matrices but only construct and apply them on the fly
-                lightweight = true;
+                // do not precompute two-electron radial integral matrices but only apply them on the fly
+                lightweight_radial_cache = true;
                 return true;
             },
+#ifndef NO_LAPACK
+        "lightweight-full", "L", 0, [&](std::string optarg) -> bool
+            {
+                // do not precompute large matrices but only apply them on the fly
+                lightweight_full = lightweight_radial_cache = true;
+                return true;
+            },
+#endif
         "shared-scratch", "s", 0, [&](std::string optarg) -> bool
             {
                 // precompute only the owned subset of radial integrals

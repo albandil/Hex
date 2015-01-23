@@ -75,9 +75,9 @@ class PreconditionerBase
         virtual void update (double E) = 0;
         
         /**
-         * @brief Return the right-hand side.
+         * @brief Calculate the right-hand side.
          */
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const = 0;
+        virtual void rhs (cArray & chi, int ie, int instate, int Spin) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -100,217 +100,15 @@ class PreconditionerBase
         virtual void precondition (const cArrayView r, cArrayView z) const = 0;
 };
 
-/**
- * @brief Solution driver without actual preconditioner.
- * 
- * This class "preconditions" by identity matrix, but implements all other important
- * routines, that can be used by derived classes, namely:
- * - setup : Loads / computed radial integrals for construction of the matrix of the set
- *           and for the construction of the right-hand side.
- * - update : Creates the diagonal blocks.
- * - rhs : Composes the right-hand side.
- * - multiply : Multiplies a vector by the matrix of the set of equations.
- */
-class NoPreconditioner : public PreconditionerBase
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        NoPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
-            dia_blocks_(l1_l2_.size()), s_bspline_(bspline), s_rad_(s_bspline_)
-        {
-            // nothing to do
-        }
-        
-        virtual RadialIntegrals const & rad () const { return s_rad_; }
-        
-        virtual void setup ();
-        virtual void update (double E);
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const;
-        virtual void multiply (const cArrayView p, cArrayView q) const;
-        virtual void precondition (const cArrayView r, cArrayView z) const;
-        
-    protected:
-        
-        // energy
-        double E_;
-        
-        // command line switches
-        CommandLine const & cmd_;
-        
-        // parallel environment
-        Parallel const & par_;
-        
-        // input parameters
-        InputFile const & inp_;
-        
-        // coupled states
-        std::vector<std::pair<int,int>> const & l1_l2_;
-        
-        // diagonal blocks in DIA format (these will be used in matrix multiplication)
-        mutable std::vector<BlockSymDiaMatrix> dia_blocks_;
-        
-        // B-spline environment for the solution
-        Bspline s_bspline_;
-            
-        // radial integrals for the solution
-        RadialIntegrals s_rad_;
-};
+class NoPreconditioner;
+class CGPreconditioner;
+class KPAPreconditioner;
+class ILUPreconditioner;
 
-/**
- * @brief CG iteration-based preconditioner.
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-class CGPreconditioner : public NoPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        CGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (const cArrayView r, cArrayView z) const;
-        
-        // inner CG callbacks
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-};
-
-/**
- * @brief KPA-preconditioned CG-preconditioner.
- * 
- * This nested preconditioner simplifies the Hamiltonian matrix by omitting electron-electron
- * interaction. The block of the matrix can then be written as a sum of simple Kronecker products
- * @f[
- *     \mathsf{A} = E\mathsf{S}\otimes\mathsf{S}
- *      - \mathsf{H}_1\otimes\mathsf{S}
- *      - \mathsf{S}\otimes\mathsf{H}_2 \,,
- * @f]
- * which can be easily diagonalized (only diagonalization of the small matrices are needed)
- * and so also inverted, which we need for solution of the equations.
- */
-class KPACGPreconditioner : public CGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        KPACGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd),
-            invCl_invsqrtS_(inp.maxell+1), invsqrtS_Cl_(inp.maxell+1), Dl_(inp.maxell+1)
-        {
-            // nothing more to do
-        }
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        virtual void update (double E) { CGPreconditioner::update(E); }
-        
-        // declare own definitions
-        virtual void setup ();
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
-        
-    protected:
-        
-        // one-electron hamiltonian eigen-diagonalization
-        std::vector<RowMatrix<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
-        
-        // diagonal parts of one-electron hamiltonians
-        std::vector<cArray> Dl_;
-};
-
-/**
- * @brief ILU-preconditioned CG-based preconditioner.
- * 
- * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
- * preconditioning. This is done by redefining virtual function CG_prec. The factorization
- * is drop tolerance based and is computed by UMFPACK.
- */
-class ILUCGPreconditioner : public CGPreconditioner
-{
-    public:
-        
-        static const std::string name;
-        static const std::string description;
-        
-        ILUCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
-            CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol),
-            csr_blocks_(ll.size()), lu_(ll.size())
-        {
-            // nothing more to do
-        }
-        
-        // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArrayView chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
-        virtual void setup () { CGPreconditioner::setup(); }
-        
-        // declare own definitions
-        virtual void update (double E);
-        
-        // inner CG callback (needed by parent)
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        
-    protected:
-        
-        // drop tolarance for the factorizations
-        double droptol_;
-        
-        // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix> csr_blocks_;
-        
-        // LU decompositions of the CSR blocks
-        mutable std::vector<CsrMatrix::LUft> lu_;
-};
+#include "preconditioners/NoPreconditioner.h"
+#include "preconditioners/CGPreconditioner.h"
+#include "preconditioners/KPAPreconditioner.h"
+#include "preconditioners/ILUPreconditioner.h"
 
 /**
  * @brief Preconditioner traits.

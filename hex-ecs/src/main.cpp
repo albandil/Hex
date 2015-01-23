@@ -88,10 +88,14 @@ int main (int argc, char* argv[])
     CommandLine cmd (argc, argv);
     
     // check some exclusive options
-    if (cmd.outofcore and cmd.parallel_block)
+    if (cmd.parallel_block)
     {
-        cmd.parallel_block = false;
-        std::cout << "Out-of-core calculation automatically adds --no-parallel-block." << std::endl << std::endl;
+        if (cmd.outofcore)
+            Exception("The options --out-of-core and --parallel-block can't be used together because the HDF library is not thread-safe.");
+        if (cmd.lightweight_radial_cache)
+            Exception("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
+        if (cmd.parallel_dot)
+            Exception("Please use either --parallel-block or --parallel-dot, but not both.");
     }
     
 #ifdef _OPENMP
@@ -368,7 +372,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
-            cArray chi ((coupled_states.size() / par.Nproc() + coupled_states.size() % par.Nproc()) * Nspline * Nspline);
+            cArray chi;
             prec->rhs(chi, ie, instate, Spin);
             
             // compute and check norm of the right hand side vector

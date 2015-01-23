@@ -364,23 +364,23 @@ void RadialIntegrals::setupOneElectronIntegrals (CommandLine const & cmd)
     std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
     D_.hdfload(D_name) or D_.populate (
         bspline_.order(), [=](int i, int j) -> Complex { return computeD(i, j, bspline_.Nknot() - 1); }
-    ).hdfsave(D_name); if (cmd.lightweight) D_d_ = std::move(D_.torow());
+    ).hdfsave(D_name); if (cmd.lightweight_radial_cache) D_d_ = std::move(D_.torow());
     std::cout << "ok" << std::endl << std::endl;
     
     // load/compute integral moments
     std::cout << "Loading/precomputing integral moments... " << std::flush;
     S_.hdfload(S_name) or S_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave(S_name); if (cmd.lightweight) S_d_ = std::move(S_.torow());
+    ).hdfsave(S_name); if (cmd.lightweight_radial_cache) S_d_ = std::move(S_.torow());
     Mm1_.hdfload(Mm1_name) or Mm1_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave(Mm1_name); if (cmd.lightweight) Mm1_d_ = std::move(Mm1_.torow());
+    ).hdfsave(Mm1_name); if (cmd.lightweight_radial_cache) Mm1_d_ = std::move(Mm1_.torow());
     Mm1_tr_.hdfload(Mm1_tr_name) or Mm1_tr_.populate (
         bspline_.order(),    [=](int m, int n) -> Complex { return computeM(-1, m, n, bspline_.Nreknot() - 1);}
-    ).hdfsave(Mm1_tr_name); if (cmd.lightweight) Mm1_tr_d_ = std::move(Mm1_tr_.torow());
+    ).hdfsave(Mm1_tr_name); if (cmd.lightweight_radial_cache) Mm1_tr_d_ = std::move(Mm1_tr_.torow());
     Mm2_.hdfload(Mm2_name) or Mm2_.populate (
         bspline_.order(), [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave(Mm2_name); if (cmd.lightweight) Mm2_d_ = std::move(Mm2_.torow());
+    ).hdfsave(Mm2_name); if (cmd.lightweight_radial_cache) Mm2_d_ = std::move(Mm2_.torow());
     std::cout << "ok" << std::endl << std::endl;
 }
 
@@ -390,7 +390,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     R_tr_dia_.resize(lambdas.size());
     
     // abandon their computation, if not necessary
-    if (cmd.lightweight)
+    if (cmd.lightweight_radial_cache)
         return;
     
     // shorthands
@@ -511,11 +511,40 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     std::cout << std::endl;
 }
 
+void RadialIntegrals::init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, cArray & Mtr_mLm1) const
+{
+    // logarithms of partial integral moments
+    Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
+    Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+}
+
+cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1) const
+{
+    // get recursive structure
+    std::vector<std::pair<int,int>> structure = S_.nzpattern();
+    
+    // (i,k)-block data (= concatenated non-zero upper diagonals)
+    cArray block_ik (structure.size());
+    
+    // for all elements in the symmetrical block
+    for (unsigned n = 0; n < structure.size(); n++)
+    {
+        // element indices
+        int j = structure[n].first;
+        int l = structure[n].second;
+        
+        // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+        block_ik[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+    }
+    
+    return block_ik;
+}
+
 cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) const
 {
     // logarithms of partial integral moments
-    cArray Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-    cArray Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+    cArray Mtr_L, Mtr_mLm1;
+    init_R_tr_dia_block(lambda, Mtr_L, Mtr_mLm1);
     
     // number of source vectors
     int N = src.size();
@@ -532,7 +561,7 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) c
     std::vector<std::pair<int,int>> structure = S_.nzpattern();
     
     // for all blocks of the radial matrix
-    # pragma omp parallel for firstprivate (structure, lambda, Mtr_L, Mtr_mLm1) schedule (dynamic, 1)
+    # pragma omp parallel for firstprivate (lambda, Mtr_L, Mtr_mLm1) schedule (dynamic, 1)
     for (unsigned iblock = 0; iblock < structure.size(); iblock++)
     {
         // block indices
@@ -540,18 +569,7 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) c
         int k = structure[iblock].second;
         
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        cArray block_ik (structure.size());
-        
-        // for all elements in the symmetrical block
-        for (unsigned n = 0; n < structure.size(); n++)
-        {
-            // element indices
-            int j = structure[n].first;
-            int l = structure[n].second;
-            
-            // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-            block_ik[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-        }
+        cArray block_ik = calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1);
         
         // multiply all source vectors by this block
         # pragma omp critical

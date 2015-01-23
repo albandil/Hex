@@ -100,7 +100,9 @@ CXXFLAGS = $(CXXRILIS)
 
 # source files
 CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
-           matrix preconditioners radial slater special version
+           matrix radial slater special version \
+           preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
+           preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner
 
 # sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))

@@ -376,6 +376,23 @@ class RadialIntegrals
         }
         
         /**
+         * @brief Initialize calculation of the R-matrix blocks.
+         * 
+         * This routine will precompute one-electron B-spline moments that are used
+         * by the routine @ref calc_R_tr_dia_block. The arrays Mtr_L and Mtr_mLm1 will be replaced
+         * by the new content.
+         */
+        void init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, cArray & Mtr_mLm1) const;
+        
+        /**
+         * @brief Calculate particular sub-matrix of the radial integrals matrix.
+         * 
+         * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
+         * and return it in a form of a dense array (copying structure of the overlap matrix).
+         */
+        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1) const;
+        
+        /**
          * @brief Multiply vectors by matrix of two-electron integrals.
          * 
          * This routine will multiply several source vectors by the matrix of two-electron

@@ -83,8 +83,8 @@ class CommandLine
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cache_all_radint(true), cache_own_radint(true),
-              itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(true),
-              gpu_slater(false), lightweight(false), shared_scratch(false), reuse_dia_blocks(false)
+              itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
+              gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false)
         {
             // get command line options
             parse(argc, argv);
@@ -148,7 +148,7 @@ class CommandLine
         bool gpu_slater;
         
         /// Whether to avoid explicitly calculating big matrices and only apply them on the fly.
-        bool lightweight;
+        bool lightweight_full, lightweight_radial_cache;
         
         /// Whether to compute only a subset of radial integrals in shared scratch architecture.
         bool shared_scratch;
