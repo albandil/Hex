@@ -37,6 +37,11 @@
 #endif
 
 #include "arrays.h"
+#include "io.h"
+
+template <class T> struct OPSum { T operator() (T x, T y) { return x + y; } };
+template <class T> struct OPMin { T operator() (T x, T y) { return std::min(x,y); } };
+template <class T> struct OPMax { T operator() (T x, T y) { return std::max(x,y); } };
 
 /**
  * @brief MPI info.
@@ -59,8 +64,8 @@ class Parallel
          * @param active Whether to turn the MPI on or keep with the computation
          *               sequential.
          */
-        Parallel (int* argc, char*** argv, bool active)
-            : active_(active), iproc_(0), Nproc_(1)
+        Parallel (int* argc, char*** argv, CommandLine const & cmd)
+            : active_(cmd.parallel), groupsize_(cmd.groupsize), iproc_(0), Nproc_(1)
         {
 #ifndef NO_MPI
             if (active_)
@@ -113,6 +118,17 @@ class Parallel
         }
         
         /**
+         * @brief Returns true if this process is a group leader process.
+         * 
+         * This function returns true if this process is the group leader process,
+         * i.e. it has lowest ID in its group.
+         */
+        inline bool IamLeader () const
+        {
+            return iproc_ % groupsize_ == 0;
+        }
+        
+        /**
          * @brief Returns true if the work item is assigned to this process.
          * 
          * If there are several work items, i-th one is assigned to the
@@ -148,6 +164,26 @@ class Parallel
         inline int Nproc () const
         {
             return Nproc_;
+        }
+        
+        inline int igroup () const
+        {
+            return iproc_ / groupsize_;
+        }
+        
+        inline int Ngroups () const
+        {
+            return Nproc_ / groupsize_;
+        }
+        
+        inline int groupsize () const
+        {
+            return groupsize_;
+        }
+        
+        inline bool isMyGroup (int i) const
+        {
+            return i % Ngroups() == i;
         }
         
         /**
@@ -209,67 +245,64 @@ class Parallel
         }
         
         /**
-         * @brief Sum arrays to node.
-         * 
+         * @brief Get minimum.
          */
-        template <class T> void sum (T* array, std::size_t N, int owner = 0) const
+        template <class T, class BinaryOperation> T reduce (T* array, std::size_t N, BinaryOperation BinOp) const
         {
+            // are there any data to reduce?
+            int valid = (N > 0);
+            
+            // get local reduction (if any)
+            T local;
+            if (valid)
+            {
+                local = array[0];
+                for (std::size_t i = 1; i < N; i++)
+                    local = BinOp(local,array[i]);
+            }
+            
+            // final reduction (contributed from all processes)
+            T final = local;
+            
 #ifndef NO_MPI
             if (active_)
             {
-                NumberArray<T> tmp(N);
-                MPI_Status status;
+                // does any process have valid data for reduction?
+                int some_valid = false;
                 
-                // slaves will send their data to owner
-                if (iproc_ != owner)
-                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, owner, iproc_, MPI_COMM_WORLD);
-                
-                // master node will receive and sum the data
-                if (iproc_ == owner)
+                // for all active processes
+                for (int i = 0; i < iproc_; i++)
                 {
-                    // for all non-master processes
-                    for (int i = 0; i < Nproc_; i++)
-                    {
-                        // skip self
-                        if (i == iproc_)
-                            continue;
-                        
-                        // receive data from a particular node into 'tmp'
-                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
-                        
-                        // sum the arrays
-                        ArrayView<T>(N, array) += tmp;
-                    }
+                    // this process will announce all other processes if has any data at all
+                    bool iproc_valid = valid;
+                    MPI_Bcast(&iproc_valid, 1, MPI_INT, iproc_, MPI_COMM_WORLD);
+                    
+                    // skip this process if it has no data
+                    if (not iproc_valid)
+                        continue;
+                    
+                    // otherwise retrieve the local reduction of the process
+                    T iproc_local = local;
+                    MPI_Bcast(&iproc_local, typeinfo<T>::ncmpt, typeinfo<T>::mpicmpttype(), iproc_, MPI_COMM_WORLD);
+                    
+                    // update final reduction (on other processes)
+                    if (iproc_ != i)
+                        final = BinOp(final, iproc_local);
+                    
+                    // there are some valid data!
+                    some_valid = true;
                 }
-            }
-#endif
-        }
-        
-        /**
-         * @brief Synchronize across processes by summing.
-         * 
-         * Synchronize array across processes by summing. There are no assumptions on what
-         * segment is on which node. The whole arrays are broadcasted and summed on every node.
-         * 
-         * @param array Pointer to data array to synchronize.
-         * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
-         *               will be synchronized. If there are some elements more, they will be left
-         *               untouched (and un-broadcast).
-         * 
-         * It is expected that the array has length equal or greater than chunksize * Nchunk.
-         */
-        template <class T> void syncsum (T* array, std::size_t N) const
-        {
-#ifndef NO_MPI
-            if (active_)
-            {
-                // master node will receive and sum the data ...
-                sum(array, N, 0);
                 
-                // ... and broadcast the result back to all the slaves
-                MPI_Bcast(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                // dose final reduction contain valid data?
+                valid = some_valid;
             }
 #endif
+            // complain if there are no valid data
+            if (not valid)
+                Exception("There are no data to reduce on process %d!", iproc_);
+            
+            // return the reduction
+            return local;
         }
         
         /**
@@ -289,6 +322,9 @@ class Parallel
         
         // whether the MPI is on
         bool active_;
+        
+        // size of a group that works on superblock
+        int groupsize_;
         
         // communicator rank
         int iproc_;

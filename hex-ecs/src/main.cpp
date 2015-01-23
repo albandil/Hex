@@ -109,7 +109,7 @@ int main (int argc, char* argv[])
 #endif
     
     // setup MPI
-    Parallel par (&argc, &argv, cmd.parallel);
+    Parallel par (&argc, &argv, cmd);
     
     // check input file
     if (not cmd.inputfile.is_open())
@@ -254,24 +254,18 @@ if (cmd.itinerary & CommandLine::StgSolve)
         // compute node-local scalar product
         Complex prod = (x|y);
         
-        // colect products from other nodes
-        par.syncsum(&prod, 1);
-        
         // return global scalar product
-        return prod;
+        return par.reduce(&prod, 1, OPSum<Complex>());
     };
     
     // CG norm function that broadcasts master's result to all nodes
     auto compute_norm = [ & ](cArray const & r) -> double
     {
         // compute node-local norm of 'r'
-        double rnorm = r.norm();
-        
-        // collect norms from other nodes
-        par.syncsum(&rnorm, 1);
+        double rnorm2 = r.sqrnorm();
         
         // return global norm
-        return rnorm;
+        return std::sqrt(par.reduce(&rnorm2, 1, OPSum<double>()));
     };
     
     //
@@ -368,8 +362,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
-            cArray chi ((coupled_states.size() / par.Nproc() + coupled_states.size() % par.Nproc()) * Nspline * Nspline);
-            prec->rhs(chi, ie, instate, Spin);
+            cArray chi = prec->rhs(ie, instate, Spin);
             
             // compute and check norm of the right hand side vector
             double chi_norm = compute_norm(chi);
@@ -421,20 +414,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             {
                 if (par.active())
                 {
-                    // create whole solution array and copy the owned blocks
-                    cArray whole_solution (coupled_states.size() * Nspline * Nspline);
-                    for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
-                    {
-                        cArrayView(whole_solution, ill * Nspline * Nspline, Nspline * Nspline)
-                        = cArrayView(current_solution, ill / par.Nproc() * Nspline * Nspline, Nspline * Nspline);
-                    }
-                    
-                    // sum all solutions to master node (this will assemble all blocks)
-                    par.sum(whole_solution.data(), whole_solution.size(), 0);
-                    
-                    // master node will save the solution
-                    if (par.IamMaster())
-                        reader.save(whole_solution);
+                    // TODO : Assemble solution from all processes.
                 }
                 else
                 {

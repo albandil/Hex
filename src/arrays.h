@@ -859,7 +859,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
         
         /// Compute usual 2-norm.
-        double norm () const
+        double sqrnorm () const
         {
             double ret = 0.;
             for (std::size_t i = 0; i < size(); i++)
@@ -867,7 +867,11 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 Complex z = (*this)[i];
                 ret += z.real() * z.real() + z.imag() * z.imag();
             }
-            return sqrt(ret);
+            return ret;
+        }
+        double norm () const
+        {
+            return std::sqrt(sqrnorm());
         }
         
         /** 

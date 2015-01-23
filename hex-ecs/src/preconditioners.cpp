@@ -134,8 +134,11 @@ void NoPreconditioner::update (double E)
     std::cout << "ok" << std::endl;
 }
 
-void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
+cArray NoPreconditioner::rhs (int ie, int instate, int Spin) const
 {
+    // resulting right hand side
+    cArray chi;
+    
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
     int mi = std::get<2>(inp_.instates[instate]);
@@ -167,15 +170,14 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
         Exception("Unable to expand hydrogen bound orbital in B-splines!");
     
     // for all segments constituting the RHS
-    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroup(ill))
     {
+        // setup storage
+        cArray chi_block ((Nspline / par_.groupsize()) * Nspline);
+        
+        // get angular momenta
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
-        
-        // setup storage
-        cArrayView chi_block (chi, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        chi_block.fill(0);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
@@ -235,7 +237,12 @@ void NoPreconditioner::rhs (cArrayView chi, int ie, int instate, int Spin) const
             if (li == l2 and l == l1)
                 chi_block += (-prefactor * Sign) * outer_product(s_rad_.Mm1_tr().dot(Ji_expansion), s_rad_.S().dot(Pi_expansion));
         }
+        
+        // append the new segment to the solution vector
+        chi.append(chi_block.begin(), chi_block.end());
     }
+    
+    return chi;
 }
 
 void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
@@ -420,10 +427,9 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     int Nspline = s_rad_.bspline().Nspline();
     
     // iterations
-    iArray n (l1_l2_.size());
+    iArray n;
     
-    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroup(ill))
     {
         // create segment views
         cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
@@ -434,7 +440,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
         
         // solve using the CG solver
-        n[ill] = cg_callbacks < cArray, cArrayView >
+        int iter = cg_callbacks < cArray, cArrayView >
         (
             rview,                  // rhs
             zview,                  // solution
@@ -445,16 +451,22 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             inner_mmul,             // matrix multiplication
             false                   // verbose output
         );
+        
+        // update iterations
+        if (par_.IamLeader())
+            n.push_back(iter);
     }
     
-    // broadcast inner preconditioner iterations
-    par_.sync(n.data(), 1, l1_l2_.size());
+    // get preconditioner data from all processes
+    int nmin = par_.reduce(n.data(), n.size(), OPMin<int>());
+    int nmax = par_.reduce(n.data(), n.size(), OPMax<int>());
+    int ntot = par_.reduce(n.data(), n.size(), OPSum<int>());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
-    std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
+    std::cout << std::setw(5) << nmin;
+    std::cout << std::setw(5) << nmax;
+    std::cout << std::setw(5) << format("%g", float(ntot) / l1_l2_.size());
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const

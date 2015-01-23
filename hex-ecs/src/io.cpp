@@ -123,6 +123,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zipmax <number>         (-R)  Maximal radius to use for solution zipping.                                                                            \n"
 #ifndef NO_MPI
                     "\t--mpi                     (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
+                    "\t--groupsize <number>      (-g)  Share single superblock work on given number of processes.                                                             \n"
 #endif
                     "\t--stg-integ               (-a)  Only calculate needed radial integrals.                                                                                \n"
                     "\t--stg-integ-solve         (-b)  Only calculate integrals and the solution.                                                                             \n"
@@ -180,6 +181,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use MPI
                 parallel = true;
+                return true;
+            },
+        "groupsize", "g", 1, [&] (std::string optarg) -> bool
+            {
+                // share superblock on multiple nodes
+                groupsize = std::atoi(optarg.c_str());
                 return true;
             },
 #endif
