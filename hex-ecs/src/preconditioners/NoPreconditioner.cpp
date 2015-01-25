@@ -375,206 +375,65 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             q_block -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * l2 * (l2 + 1.)) * s_rad_.Mm2_d(), p_block);
         }
         
-        // multiply "p" by the off-diagonal super-blocks
+        // auxiliary buffers
+        cArray buffer (Nspline * Nspline);
+        cArrays Mtr_L(s_rad_.maxlambda() + 1), Mtr_mLm1(s_rad_.maxlambda() + 1);
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            s_rad_.init_R_tr_dia_block(lambda, Mtr_L[lambda], Mtr_mLm1[lambda]);
+        
+        // multiply by offdiagonal blocks
+        for (int illp = 0; illp < Nang; illp++)
         {
-            // coupling super-block positions and coefficients
-            iArrays dst_for_src(Nang), src_for_dst(Nang);
-            std::vector<std::tuple<int,int,double>> f_for_superblock;
+            // owner of this block will copy it to the buffer
+            if (par_.isMyWork(illp))
+                std::memcpy(&buffer[0], p.data() + (illp / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline * sizeof(Complex));
             
-            // initialize R-integrals
-            cArray Mtr_L, Mtr_mLm1;
-            s_rad_.init_R_tr_dia_block(lambda, Mtr_L, Mtr_mLm1);
+            // owner will broadcast the source segment 'p(illp)' to all non-owners
+            par_.bcast(illp % par_.Nproc(), buffer);
             
-            // determine which coupling blocks contain R[lambda]
-            for (int ill = 0;  ill < Nang;  ill++)
-            for (int illp = 0; illp < Nang; illp++)
+            // everyone will update its result segments; for all angular momentum transfers
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
-                // row multi-index
-                int l1 = l1_l2_[ill].first;
-                int l2 = l1_l2_[ill].second;
-                
-                // column multi-index
-                int l1p = l1_l2_[illp].first;
-                int l2p = l1_l2_[illp].second;
-                
-                // calculate angular integral
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                if (not std::isfinite(f))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // add this superblock to the task list
-                if (f != 0.)
+                // precalculate all angular factors 'f(lambda,ill,illp)'
+                rArray fs (Nang);
+                for (int ill = 0; ill < Nang; ill++)
                 {
-                    dst_for_src[illp].push_back(ill);
-                    src_for_dst[ill].push_back(illp);
-                    f_for_superblock.push_back(std::make_tuple(ill,illp,f));
+                    fs[ill] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+                    if (not std::isfinite(fs[ill]))
+                        Exception("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
                 }
-            }
+                
+                // for all sub-blocks of the radial matrix
+                for (std::pair<int,int> bpos : structure)
+                {
+                    // calculate the radial sub-block
+                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, bpos.first, bpos.second, Mtr_L[lambda], Mtr_mLm1[lambda], cmd_.parallel_dot);
+                    
+                    // assemble all symmetries (one or two positions)
+                    std::vector<std::pair<int,int>> syms = { bpos };
+                    if (bpos.first != bpos.second)
+                        syms.push_back(std::make_pair(bpos.second, bpos.first));
+                    
+                    // multiply the appropriate segments of the source vector (which is contained in 'buffer')
+                    for (std::pair<int,int> sym : syms)
+                    {
+                        cArray product = SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + sym.second * Nspline);
+                        
+                        // for all destination super-segments
+                        for (int ill = 0; ill < Nang; ill++)
+                        {
+                            // if eligible, update the sub-segment in the super-segment 'q(ill)'
+                            if (fs[ill] != 0 and par_.isMyWork(ill))
+                                cArrayView(q, (ill / par_.Nproc()) * Nspline * Nspline + sym.first * Nspline, Nspline) -= fs[ill] * product;
+                        }
+                        
+                    } // for sub-block positions
+                    
+                } // for sub-blocks
+                
+            } // for lambda
             
-            // skip this multipole if no blocks use it (but should not happen)
-            if (f_for_superblock.empty())
-                continue;
-            
-            // for all multiplication rounds (- evenly distribute subblocks between the processes)
-            for (int iroundblock = 0; iroundblock < (int)structure.size(); iroundblock += par_.Nproc())
-            {
-                // necessary source vector segments to be processed by this worker
-                cArrays srcdata[Nang], dstdata[Nang];
-                cArray buffer (Nspline);
-                
-                //
-                // Send source vector data from owners to the workers-
-                //
-                
-                // for all source super-segments
-                for (int illp = 0; illp < (int)l1_l2_.size(); illp++)
-                {
-                    // skip non-contributing couplings
-                    if (dst_for_src[illp].empty())
-                        continue;
-                    
-                    // for all sub-blocks of this round
-                    for (int idata = 0; idata < par_.Nproc() and iroundblock + idata < (int)structure.size(); idata++)
-                    {
-                        // get current sub-block index
-                        int isubblock = iroundblock + idata;
-                        
-                        // get matrix indices within the sub-block
-                        int i = structure[isubblock].first;
-                        int k = structure[isubblock].second;
-                        
-                        // get one (diagonal) or two (off-diagonal) sub-block positions
-                        std::vector<std::pair<int,int>> bpos;
-                        bpos.push_back(std::make_pair(i,k));
-                        if (i != k)
-                            bpos.push_back(std::make_pair(k,i));
-                        
-                        // for all positions of the sub-block
-                        for (std::pair<int,int> const & pos : bpos)
-                        {
-                            // owner of the source super-segment 'p(illp)' will send the sub-segment 'p(illp,k)' to the worker 'idata'
-                            if (par_.isMyWork(illp) and par_.iproc() != idata)
-                            {
-                                par_.send(p.data() + (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline, Nspline, illp % par_.Nproc(), idata);
-                            }
-                            
-                            // current worker should receive the data into its buffer
-                            if (not par_.isMyWork(illp) and par_.iproc() == idata)
-                            {
-                                par_.recv(&buffer[0], Nspline, illp % par_.Nproc(), idata);
-                                srcdata[illp].push_back(buffer);
-                            }
-                            
-                            // current worker is the owner of the data
-                            if (par_.isMyWork(illp) and par_.iproc() == idata)
-                            {
-                                srcdata[illp].push_back(cArrayView(p, (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline, Nspline));
-                            }
-                        }
-                    }
-                }
-                
-                //
-                // Multiply all source sub-segments by sub-block.
-                //
-                
-                // get sub-block that is to be computed on this node
-                unsigned imyblock = iroundblock + par_.iproc();
-                
-                // only compute existing sub-blocks
-                if (imyblock < structure.size())
-                {
-                    // block position (upper diagonals)
-                    int i = structure[imyblock].first;
-                    int k = structure[imyblock].second;
-                    
-                    // calculate the R-integral sub-block (i,k) = (k,i)
-                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1, true);
-                    
-                    // for all superblocks containing R[lambda]
-                    for (unsigned n = 0; n < f_for_superblock.size(); n++)
-                    {
-                        // get superblock position and angular factor
-                        int ill  = std::get<0>(f_for_superblock[n]);
-                        int illp = std::get<1>(f_for_superblock[n]);
-                        double f = std::get<2>(f_for_superblock[n]);
-                        
-                        // for all (one or two) source vector segments
-                        for (unsigned isrc = 0; isrc < srcdata[illp].size(); isrc++)
-                        {
-                            // multiply segment by the sub-block
-                            cArray product = f * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), srcdata[illp][isrc].data());
-                            
-                            // initialize destination segment storage
-                            if (dstdata[ill].empty())
-                                dstdata[ill].resize(srcdata[illp].size());
-                            
-                            // update destination segment (sum with contributions from other superblocks)
-                            if (dstdata[ill][isrc].empty())
-                                dstdata[ill][isrc] = product;
-                            else
-                                dstdata[ill][isrc] += product;
-                        }
-                    }
-                }
-                
-                par_.wait();
-                
-                //
-                // Send results (the destination data) to owners of the product segments.
-                //
-                
-                // for all destination super-segments
-                for (int ill = 0; ill < (int)l1_l2_.size(); ill++)
-                {
-                    // skip non-contributing couplings
-                    if (src_for_dst[ill].empty())
-                        continue;
-                    
-                    // for all sub-blocks of this round
-                    for (int idata = 0; idata < par_.Nproc() and iroundblock + idata < (int)structure.size(); idata++)
-                    {
-                        // get current sub-block index
-                        int isubblock = iroundblock + idata;
-                        
-                        // get sub-block indices
-                        int i = structure[isubblock].first;
-                        int k = structure[isubblock].second;
-                        
-                        // get one or two sub-block positions
-                        std::vector<std::pair<int,int>> bpos;
-                        bpos.push_back(std::make_pair(i,k));
-                        if (i != k)
-                            bpos.push_back(std::make_pair(k,i));
-                        
-                        // for all positions of the sub-block
-                        for (unsigned ipos = 0; ipos < bpos.size(); ipos++)
-                        {
-                            std::pair<int,int> pos = bpos[ipos];
-                            
-                            // current worker will send the data
-                            if (not par_.isMyWork(ill) and par_.iproc() == idata)
-                            {
-                                par_.send(dstdata[ill][ipos].data(), Nspline, idata, ill % par_.Nproc());
-                            }
-                            
-                            // owner of the destination super-segment 'q(ill)' will receive the sub-segment 'q(illp,i)' from the worker 'idata'
-                            if (par_.isMyWork(ill) and par_.iproc() != idata)
-                            {
-                                par_.recv(&buffer[0], Nspline, idata, ill % par_.Nproc());
-                                cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + pos.first * Nspline) -= buffer;
-                            }
-                            
-                            // self-sending
-                            if (par_.isMyWork(ill) and par_.iproc() == idata)
-                            {
-                                cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + pos.first * Nspline) -= dstdata[ill][ipos];
-                            }
-                        }
-                    } // for idata
-                } // for ill
-            } // for iroundblock
-        } // for lambda
+        } // for illp
+        
     } // if not cmd_.lightweight_radial_cache
 }
