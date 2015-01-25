@@ -469,7 +469,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                             // current worker is the owner of the data
                             if (par_.isMyWork(illp) and par_.iproc() == idata)
                             {
-                                srcdata[illp].push_back(cArrayView (Nspline, p.data() + (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline));
+                                srcdata[illp].push_back(cArrayView(p, (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline, Nspline));
                             }
                         }
                     }

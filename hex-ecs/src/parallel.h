@@ -176,7 +176,7 @@ class Parallel
         /**
          * @brief Send data to a process.
          */
-        template <class T> void send (T const * array, std::size_t size, int origin, int destination)
+        template <class T> void send (T const * array, std::size_t size, int origin, int destination) const
         {
             if (active_ and iproc_ == origin)
             {
@@ -195,7 +195,7 @@ class Parallel
         /**
          * @brief Receive data from a process.
          */
-        template <class T> void recv (T * array, std::size_t size, int origin, int destination)
+        template <class T> void recv (T * array, std::size_t size, int origin, int destination) const
         {
             if (active_ and iproc_ == destination)
             {
