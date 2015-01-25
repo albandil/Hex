@@ -176,18 +176,36 @@ Complex RadialIntegrals::computeR
     for (int ix = a; ix <= a + order and ix < Nreknot - 1; ix++)
     for (int iy = std::max(b,ix+1); iy <= b + order and iy < Nreknot - 1; iy++)
     {
-        Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
-        if (std::isfinite(lg.imag()))
-            Rtr_Labcd_offdiag += std::exp(lg);
+        Complex m_ac = Mtr_L_ac[ix - a], m_bd = Mtr_mLm1_bd[iy - b];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
+        {
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+            
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
+        }
     }
     
     // ix > iy (by renaming the ix,iy indices)
     for (int ix = b; ix <= b + order and ix < Nreknot - 1; ix++)
     for (int iy = std::max(a,ix+1); iy <= a + order and iy < Nreknot - 1; iy++)
     {
-        Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
-        if (std::isfinite(lg.imag()))
-            Rtr_Labcd_offdiag += std::exp(lg);
+        Complex m_bd = Mtr_L_bd[ix - b], m_ac = Mtr_mLm1_ac[iy - a];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
+        {
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+            
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
+        }
     }
     
     // sum the diagonal and offdiagonal contributions

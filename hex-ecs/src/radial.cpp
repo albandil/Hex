@@ -225,7 +225,16 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 // save to m-matrix
                 if (integral != 0.)
                 {
-                    Complex lg = std::log(integral) + logscale;
+                    Complex lg;
+                    
+                    // store real integrals as real logarithms ...
+                    if (integral.imag() == 0.)
+                        lg = std::log(integral.real()) + logscale;
+                    
+                    // ... and complex numbers as the original numbers
+                    else
+                        lg = integral * std::exp(logscale);
+                    
                     m[(x_1 * (2 * order + 1) + y_1) * (order + 1) + z_1] = lg;
                     m[(x_2 * (2 * order + 1) + y_2) * (order + 1) + z_2] = lg;
                 }
