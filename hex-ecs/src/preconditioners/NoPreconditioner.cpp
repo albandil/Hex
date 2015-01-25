@@ -133,7 +133,7 @@ void NoPreconditioner::update (double E)
                 else
                 {
                     // compute the data anew
-                    block += (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda]);
+                    block += (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda], true);
                 }
             }
             
@@ -248,7 +248,14 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
             
             // update the right-hand side
             # pragma omp critical
-            chi.append(chi_block.begin(), chi_block.end());
+            {
+                // resize if necessary
+                if (chi.size() < (ill / par_.Nproc() + 1) * Nspline * Nspline)
+                    chi.resize((ill / par_.Nproc() + 1) * Nspline * Nspline);
+                
+                // copy data
+                cArrayView(chi, ill / par_.Nproc() * Nspline * Nspline, Nspline * Nspline) = chi_block;
+            }
         }
     }
 }
@@ -292,13 +299,13 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
-            for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 // skip diagonal
                 if (ill == illp)
                     continue;
                 
-                // skip segments not owned by this process
+                // skip segments not owned by this process (will be computed by other processes)
                 if (not par_.isMyWork(illp))
                     continue;
                 
@@ -344,19 +351,14 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // Lightweight mode multiplication
         //
         
-        std::cout << "Lightweight multiplication" << std::endl;
-        
         // get one-electron matrix structure
         std::vector<std::pair<int,int>> structure = s_rad_.S().nzpattern();
-        MPI_Status status;
         
-        // multiply "p" by the diagonal blocks
+        // multiply "p" by the diagonal super-blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
         if (par_.isMyWork(ill))
         {
-            std::cout << "Diagonal block multiplication ill = " << ill << std::endl;
-            
             // copy-from segment of "p"
             cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
@@ -373,12 +375,10 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             q_block -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * l2 * (l2 + 1.)) * s_rad_.Mm2_d(), p_block);
         }
         
-        // multiply "p" by the off-diagonal blocks
-        for (int lambda = 0; lambda < s_rad_.maxlambda(); lambda++)
+        // multiply "p" by the off-diagonal super-blocks
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
-            std::cout << "lambda = " << lambda << std::endl;
-            
-            // coupling block positions and coefficients
+            // coupling super-block positions and coefficients
             iArrays dst_for_src(Nang), src_for_dst(Nang);
             std::vector<std::tuple<int,int,double>> f_for_superblock;
             
@@ -404,7 +404,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                     Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                 
                 // add this superblock to the task list
-                // TODO : Use symmetry.
                 if (f != 0.)
                 {
                     dst_for_src[illp].push_back(ill);
@@ -413,24 +412,24 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 }
             }
             
-            // skip this multipole if no blocks use it (but shouldnot happen)
+            // skip this multipole if no blocks use it (but should not happen)
             if (f_for_superblock.empty())
                 continue;
             
             // for all multiplication rounds (- evenly distribute subblocks between the processes)
             for (int iroundblock = 0; iroundblock < (int)structure.size(); iroundblock += par_.Nproc())
             {
-                std::cout << "\tiroundblock = " << iroundblock << std::endl;
-                
-                // necessary source vector data to be processed by this worker
-                cArrays srcdata(Nang), dstdata(Nang);
+                // necessary source vector segments to be processed by this worker
+                cArrays srcdata[Nang], dstdata[Nang];
                 cArray buffer (Nspline);
                 
-                // we need to send source vector data from owners to the workers
+                //
+                // Send source vector data from owners to the workers-
+                //
+                
+                // for all source super-segments
                 for (int illp = 0; illp < (int)l1_l2_.size(); illp++)
                 {
-                    std::cout << "\t\tsending illp = " << illp << std::endl;
-                    
                     // skip non-contributing couplings
                     if (dst_for_src[illp].empty())
                         continue;
@@ -441,86 +440,94 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                         // get current sub-block index
                         int isubblock = iroundblock + idata;
                         
-                        // get sub-block indices
+                        // get matrix indices within the sub-block
+                        int i = structure[isubblock].first;
                         int k = structure[isubblock].second;
                         
-                        // owner of the source super-segment 'p(illp)' will send the sub-segment 'p(illp,k)' to the worker 'idata'
-                        if (par_.isMyWork(illp))
-                        {
-                            // prepare data to send
-                            std::memcpy
-                            (
-                                &buffer[0], // destination
-                                p.data() + (illp / par_.Nproc()) * Nspline * Nspline + k * Nspline, // source
-                                Nspline * sizeof(Complex) // byte size
-                            );
-                            
-                            // send the data
-                            MPI_Send
-                            (
-                                &buffer[0],     // data to send
-                                2 * Nspline,    // how many components
-                                MPI_DOUBLE,     // data type
-                                idata,          // destination process
-                                illp,           // tag (source segment angular numbers)
-                                MPI_COMM_WORLD  // communication context
-                            );
-                        }
+                        // get one (diagonal) or two (off-diagonal) sub-block positions
+                        std::vector<std::pair<int,int>> bpos;
+                        bpos.push_back(std::make_pair(i,k));
+                        if (i != k)
+                            bpos.push_back(std::make_pair(k,i));
                         
-                        // current worker should receive the data into its buffer
-                        if (par_.iproc() == idata)
+                        // for all positions of the sub-block
+                        for (std::pair<int,int> const & pos : bpos)
                         {
-                            // receive the data
-                            MPI_Recv
-                            (
-                                &buffer[0],             // receive data into this array
-                                2 * Nspline,            // how many components
-                                MPI_DOUBLE,             // data type
-                                illp % par_.Nproc(),    // sender process ID
-                                illp,                   // tag
-                                MPI_COMM_WORLD,         // communication context
-                                &status                 // status info
-                            );
+                            // owner of the source super-segment 'p(illp)' will send the sub-segment 'p(illp,k)' to the worker 'idata'
+                            if (par_.isMyWork(illp) and par_.iproc() != idata)
+                            {
+                                par_.send(p.data() + (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline, Nspline, illp % par_.Nproc(), idata);
+                            }
                             
-                            // copy data to own storage
-                            srcdata[illp] = buffer;
+                            // current worker should receive the data into its buffer
+                            if (not par_.isMyWork(illp) and par_.iproc() == idata)
+                            {
+                                par_.recv(&buffer[0], Nspline, illp % par_.Nproc(), idata);
+                                srcdata[illp].push_back(buffer);
+                            }
+                            
+                            // current worker is the owner of the data
+                            if (par_.isMyWork(illp) and par_.iproc() == idata)
+                            {
+                                srcdata[illp].push_back(cArrayView (Nspline, p.data() + (illp / par_.Nproc()) * Nspline * Nspline + pos.second * Nspline));
+                            }
                         }
-                        
-                        par_.wait();
                     }
                 }
                 
-                // calculate the R-integral sub-block (i,k)
-                cArray R_block_ik = s_rad_.calc_R_tr_dia_block
-                (
-                    lambda,
-                    structure[iroundblock + par_.iproc()].first,
-                    structure[iroundblock + par_.iproc()].second,
-                    Mtr_L, Mtr_mLm1
-                );
+                //
+                // Multiply all source sub-segments by sub-block.
+                //
                 
-                // multiply all source vectors
-                // TODO : Use symmetry.
-                for (unsigned n = 0; n < f_for_superblock.size(); n++)
+                // get sub-block that is to be computed on this node
+                unsigned imyblock = iroundblock + par_.iproc();
+                
+                // only compute existing sub-blocks
+                if (imyblock < structure.size())
                 {
-                    // get superblock position and factor
-                    int ill  = std::get<0>(f_for_superblock[n]);
-                    int illp = std::get<1>(f_for_superblock[n]);
-                    double f = std::get<2>(f_for_superblock[n]);
+                    // block position (upper diagonals)
+                    int i = structure[imyblock].first;
+                    int k = structure[imyblock].second;
                     
-                    cArray product = SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), srcdata[illp].data());
+                    // calculate the R-integral sub-block (i,k) = (k,i)
+                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1, true);
                     
-                    if (dstdata[ill].empty())
-                        dstdata[ill] = f * product;
-                    else
-                        dstdata[ill] += f * product;
+                    // for all superblocks containing R[lambda]
+                    for (unsigned n = 0; n < f_for_superblock.size(); n++)
+                    {
+                        // get superblock position and angular factor
+                        int ill  = std::get<0>(f_for_superblock[n]);
+                        int illp = std::get<1>(f_for_superblock[n]);
+                        double f = std::get<2>(f_for_superblock[n]);
+                        
+                        // for all (one or two) source vector segments
+                        for (unsigned isrc = 0; isrc < srcdata[illp].size(); isrc++)
+                        {
+                            // multiply segment by the sub-block
+                            cArray product = f * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), srcdata[illp][isrc].data());
+                            
+                            // initialize destination segment storage
+                            if (dstdata[ill].empty())
+                                dstdata[ill].resize(srcdata[illp].size());
+                            
+                            // update destination segment (sum with contributions from other superblocks)
+                            if (dstdata[ill][isrc].empty())
+                                dstdata[ill][isrc] = product;
+                            else
+                                dstdata[ill][isrc] += product;
+                        }
+                    }
                 }
                 
-                // now we need to send results to owners
+                par_.wait();
+                
+                //
+                // Send results (the destination data) to owners of the product segments.
+                //
+                
+                // for all destination super-segments
                 for (int ill = 0; ill < (int)l1_l2_.size(); ill++)
                 {
-                    std::cout << "\t\treceiving ill = " << ill << std::endl;
-                    
                     // skip non-contributing couplings
                     if (src_for_dst[ill].empty())
                         continue;
@@ -533,53 +540,41 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                         
                         // get sub-block indices
                         int i = structure[isubblock].first;
+                        int k = structure[isubblock].second;
                         
-                        // current worker will send the data
-                        if (par_.iproc() == idata)
+                        // get one or two sub-block positions
+                        std::vector<std::pair<int,int>> bpos;
+                        bpos.push_back(std::make_pair(i,k));
+                        if (i != k)
+                            bpos.push_back(std::make_pair(k,i));
+                        
+                        // for all positions of the sub-block
+                        for (unsigned ipos = 0; ipos < bpos.size(); ipos++)
                         {
-                            // prepare the data to send
-                            std::memcpy
-                            (
-                                &buffer[0],                 // destination
-                                dstdata[ill].begin(),       // source
-                                Nspline * sizeof(Complex)   // byte size
-                            );
+                            std::pair<int,int> pos = bpos[ipos];
                             
-                            // receive the data
-                            MPI_Send
-                            (
-                                &buffer[0],             // data to send
-                                2 * Nspline,            // how many components
-                                MPI_DOUBLE,             // data type
-                                ill % par_.Nproc(),     // destination process
-                                ill,                    // tag (destination segment angular numbers)
-                                MPI_COMM_WORLD          // communication context
-                            );
-                        }
-                        
-                        // owner of the destination super-segment 'q(ill)' will receive the sub-segment 'q(illp,i)' from the worker 'idata'
-                        if (par_.isMyWork(ill))
-                        {
-                            // send the data
-                            MPI_Recv
-                            (
-                                &buffer[0],     // receive data to this array
-                                2 * Nspline,    // how many components
-                                MPI_DOUBLE,     // data type
-                                idata,          // source process
-                                ill,            // tag (source segment angular numbers)
-                                MPI_COMM_WORLD, // communication context
-                                &status
-                            );
+                            // current worker will send the data
+                            if (not par_.isMyWork(ill) and par_.iproc() == idata)
+                            {
+                                par_.send(dstdata[ill][ipos].data(), Nspline, idata, ill % par_.Nproc());
+                            }
                             
-                            // update the destination sub-segment
-                            cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + i * Nspline) -= buffer;
+                            // owner of the destination super-segment 'q(ill)' will receive the sub-segment 'q(illp,i)' from the worker 'idata'
+                            if (par_.isMyWork(ill) and par_.iproc() != idata)
+                            {
+                                par_.recv(&buffer[0], Nspline, idata, ill % par_.Nproc());
+                                cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + pos.first * Nspline) -= buffer;
+                            }
+                            
+                            // self-sending
+                            if (par_.isMyWork(ill) and par_.iproc() == idata)
+                            {
+                                cArrayView(Nspline, q.data() + (ill / par_.Nproc()) * Nspline * Nspline + pos.first * Nspline) -= dstdata[ill][ipos];
+                            }
                         }
-                        
-                        par_.wait();
-                    }
-                }
-            }
-        }
-    }
+                    } // for idata
+                } // for ill
+            } // for iroundblock
+        } // for lambda
+    } // if not cmd_.lightweight_radial_cache
 }

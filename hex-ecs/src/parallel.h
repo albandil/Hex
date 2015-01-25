@@ -174,6 +174,47 @@ class Parallel
         }
         
         /**
+         * @brief Send data to a process.
+         */
+        template <class T> void send (T const * array, std::size_t size, int origin, int destination)
+        {
+            if (active_ and iproc_ == origin)
+            {
+                MPI_Send
+                (
+                    const_cast<T*>(array),
+                    typeinfo<T>::ncmpt * size,
+                    typeinfo<T>::mpicmpttype(),
+                    destination,
+                    origin,
+                    MPI_COMM_WORLD
+                );
+            }
+        }
+        
+        /**
+         * @brief Receive data from a process.
+         */
+        template <class T> void recv (T * array, std::size_t size, int origin, int destination)
+        {
+            if (active_ and iproc_ == destination)
+            {
+                MPI_Status status;
+                
+                MPI_Recv
+                (
+                    array,
+                    typeinfo<T>::ncmpt * size,
+                    typeinfo<T>::mpicmpttype(),
+                    origin,
+                    origin,
+                    MPI_COMM_WORLD,
+                    &status
+                );
+            }
+        }
+        
+        /**
          * @brief Synchronize across processes by composition.
          * 
          * Synchronize array across processes. It is assumed that i-th chunk of the array is

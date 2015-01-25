@@ -269,13 +269,13 @@ if (cmd.itinerary & CommandLine::StgSolve)
     auto compute_norm = [ & ](cArray const & r) -> double
     {
         // compute node-local norm of 'r'
-        double rnorm = r.norm();
+        double rnorm2 = r.sqrnorm();
         
         // collect norms from other nodes
-        par.syncsum(&rnorm, 1);
+        par.syncsum(&rnorm2, 1);
         
         // return global norm
-        return rnorm;
+        return std::sqrt(rnorm2);
     };
     
     //
@@ -324,8 +324,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
-            if (not reader.load(current_solution))
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            if (not reader.check())
                 all_done = false;
         }
         if (all_done)
@@ -359,8 +359,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             
             // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
-            if (reader.load(current_solution))
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            if (reader.check())
                 continue;
             
             // get total energy of the system
@@ -421,29 +421,46 @@ if (cmd.itinerary & CommandLine::StgSolve)
             computations_done++;
             
             // save solution to disk (if valid)
+            // - master process will collect all data and write them sequentially to disk
             if (std::isfinite(compute_norm(current_solution)))
             {
-                if (par.active())
+                // for all super-segments
+                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
                 {
-                    // create whole solution array and copy the owned blocks
-                    cArray whole_solution (coupled_states.size() * Nspline * Nspline);
-                    for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
+                    // if calculating in parallel : owner of the data will send the data to master
+                    if (par.active() and par.isMyWork(ill) and not par.IamMaster())
                     {
-                        cArrayView(whole_solution, ill * Nspline * Nspline, Nspline * Nspline)
-                        = cArrayView(current_solution, ill / par.Nproc() * Nspline * Nspline, Nspline * Nspline);
+                        par.send
+                        (
+                            current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline,
+                            Nspline * Nspline,  // element count
+                            par.iproc(),        // origin process
+                            0                   // destination proccess
+                        );
                     }
                     
-                    // sum all solutions to master node (this will assemble all blocks)
-                    par.sum(whole_solution.data(), whole_solution.size(), 0);
+                    // if calculating in parallel : master will receive the data to a buffer and write them to disk
+                    if (par.active() and not par.isMyWork(ill) and par.IamMaster())
+                    {
+                        cArray buffer (Nspline * Nspline);
+                        
+                        par.recv
+                        (
+                            &buffer[0],         // data buffer
+                            Nspline * Nspline,  // element count
+                            ill % par.Nproc(),  // origin process
+                            0                   // destination process
+                        );
+                        
+                        reader.save(buffer, ill);
+                    }
                     
-                    // master node will save the solution
-                    if (par.IamMaster())
-                        reader.save(whole_solution);
-                }
-                else
-                {
-                    // save the local solution
-                    reader.save(current_solution);
+                    // if this segment is owned by master then master will save its own work
+                    if (par.isMyWork(ill) and par.IamMaster())
+                    {
+                        cArrayView data (Nspline * Nspline, current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline);
+                        reader.save(data, ill);
+                    }
                 }
             }
             

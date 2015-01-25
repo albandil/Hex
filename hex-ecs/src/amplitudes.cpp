@@ -82,7 +82,7 @@ void Amplitudes::extract ()
                 int mi = std::get<2>(instate);
                 
                 // load the solution
-                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Ei[ie]);
+                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Ei[ie], ang_, bspline_.Nspline());
                 cArray solution;
                 if (not reader.load(solution))
                 {

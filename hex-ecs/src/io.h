@@ -227,13 +227,19 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E)
-            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)) {}
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, unsigned Nspline)
+            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)), ang_(ang), Nspline_(Nspline) {}
         
         /// Get name of the solution file.
         std::string const & name () const
         {
             return name_;
+        }
+        
+        /// Check that the file exists.
+        bool check () const
+        {
+            return HDFFile(name_, HDFFile::readonly).valid();
         }
         
         /**
@@ -263,14 +269,27 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (cArray const & sol)
+        bool save (const cArrayView segment, unsigned ill)
         {
-            return sol.hdfsave(name_, true /* = with compression */);
+            // create and resize the output file it it does not exist
+            if (not check())
+            {
+                HDFFile hdf (name_, HDFFile::overwrite);
+                hdf.write("array", (Complex*)nullptr, ang_.size() * Nspline_ * Nspline_);
+            }
+            
+            // open the file for random access
+            HDFFile hdf (name_, HDFFile::readwrite);
+            
+            // write the data with correct offset
+            return hdf.valid() and hdf.write("array", segment.data(), Nspline_ * Nspline_, ill * Nspline_ * Nspline_);
         }
     
     private:
         
         std::string name_;
+        std::vector<std::pair<int,int>> ang_;
+        unsigned Nspline_;
 };
 
 /**

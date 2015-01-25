@@ -390,7 +390,7 @@ class RadialIntegrals
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1) const;
+        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, bool parallel = false) const;
         
         /**
          * @brief Multiply vectors by matrix of two-electron integrals.

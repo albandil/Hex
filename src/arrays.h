@@ -196,13 +196,19 @@ template <class T> class ArrayView
         /// Check whether the size is equal to zero.
         bool empty () const { return size() == 0; }
         
-        /// Two-norm (defined only for scalar data type).
-        template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
+        /// Square of the two-norm (defined only for scalar data type).
+        template <class = typename std::enable_if<is_scalar<T>::value>> double sqrnorm () const
         {
             double sqrnorm = 0.;
             for (T const & x : *this)
                 sqrnorm += sqrabs(x);
-            return std::sqrt(sqrnorm);
+            return sqrnorm;
+        }
+        
+        /// Two-norm (defined only for scalar data type).
+        template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
+        {
+            return std::sqrt(sqrnorm());
         }
 };
 
@@ -858,25 +864,28 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             return c;
         }
         
-        /// Compute usual 2-norm.
-        double norm () const
+        /// Compute (square of) the usual 2-norm.
+        double sqrnorm () const
         {
             double ret = 0.;
-            for (std::size_t i = 0; i < size(); i++)
-            {
-                Complex z = (*this)[i];
-                ret += z.real() * z.real() + z.imag() * z.imag();
-            }
-            return sqrt(ret);
+            for (T z : *this)
+                ret += sqrabs(z);
+            return ret;
+        }
+        
+        /// Compute the usual 2-norm.
+        double norm () const
+        {
+            return std::sqrt(sqrnorm());
         }
         
         /** 
-        * @brief Apply a user transformation.
-        * 
-        * The functor "f" will be applied on every item and the resulting
-        * array is returned. It is expected that the return value of the functor
-        * is a number type, so that NumberArray can be used.
-        */
+         * @brief Apply a user transformation.
+         * 
+         * The functor "f" will be applied on every item and the resulting
+         * array is returned. It is expected that the return value of the functor
+         * is a number type, so that NumberArray can be used.
+         */
         template <class Functor> auto transform (Functor f) const -> NumberArray<decltype(f(T(0)))>
         {
             std::size_t n = size();

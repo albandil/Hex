@@ -518,7 +518,7 @@ void RadialIntegrals::init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, 
     Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
 }
 
-cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1) const
+cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, bool parallel) const
 {
     // get recursive structure
     std::vector<std::pair<int,int>> structure = S_.nzpattern();
@@ -527,6 +527,7 @@ cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, 
     cArray block_ik (structure.size());
     
     // for all elements in the symmetrical block
+    # pragma omp parallel for schedule (dynamic,1) if (parallel)
     for (unsigned n = 0; n < structure.size(); n++)
     {
         // element indices
