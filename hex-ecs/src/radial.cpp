@@ -420,11 +420,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         );
     }
     
-    if (!cmd.gpu_slater)
-    {
-        // print information
-        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
-    }
+    // print information
+    std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
     
     // for all multipoles : compute / load
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)

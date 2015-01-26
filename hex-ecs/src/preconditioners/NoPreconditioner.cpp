@@ -376,11 +376,63 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         }
         
         // auxiliary buffers
-        cArray buffer (Nspline * Nspline);
+        cArray buffer (Nang * Nspline);
         cArrays Mtr_L(s_rad_.maxlambda() + 1), Mtr_mLm1(s_rad_.maxlambda() + 1);
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             s_rad_.init_R_tr_dia_block(lambda, Mtr_L[lambda], Mtr_mLm1[lambda]);
         
+        // precalculate angular integrals
+        double fs[Nang][Nang][s_rad_.maxlambda() + 1];
+        for (int ill  = 0; ill  < Nang; ill ++)
+        for (int illp = 0; illp < Nang; illp++)
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+            if (not std::isfinite(fs[ill][illp][lambda]))
+                Exception("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+        }
+        
+        // for all source vector sub-segments
+        for (int k = 0; k < Nspline; k++)
+        {
+            // copy owned sub-segments to the buffer
+            for (int illp = 0; illp < Nang; illp++) if (par_.isMyWork(illp))
+                std::memcpy(&buffer[0] + illp * Nspline, p.data() + (illp / par_.Nproc()) * Nspline * Nspline + k * Nspline, Nspline * sizeof(Complex));
+            
+            // synchronize source sub-segments buffer across processes
+            par_.sync(&buffer[0], Nspline, Nang);
+            
+            // for all potential multipoles
+            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            {
+                // for all destination sub-blocks
+                for (int i = 0; i < Nspline; i++)
+                {
+                    // calculate the radial sub-block
+                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], cmd_.parallel_dot);
+                    
+                    // update all owned superblocks
+                    for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))
+                    for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
+                    {
+                        cArrayView
+                        (
+                            q,
+                            (ill / par_.Nproc()) * Nspline * Nspline + i * Nspline,
+                            Nspline
+                        ) -= fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot
+                        (
+                            Nspline,
+                            s_rad_.S().diag(),
+                            R_block_ik.data(),
+                            buffer.data() + illp * Nspline
+                        );
+                    }
+                }
+            }
+        }
+        
+/*
         // multiply by offdiagonal blocks
         for (int illp = 0; illp < Nang; illp++)
         {
@@ -434,6 +486,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             } // for lambda
             
         } // for illp
-        
+*/
     } // if not cmd_.lightweight_radial_cache
 }
