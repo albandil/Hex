@@ -97,6 +97,7 @@ void NoPreconditioner::update (double E)
             continue;
         
         // for all blocks
+        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_dot)
         for (unsigned iblock = 0; iblock < dia_blocks_[ill].structure().size(); iblock++)
         {
             // get block position
@@ -124,20 +125,33 @@ void NoPreconditioner::update (double E)
                 if (f == 0.)
                     continue;
             
-                // add two-electron term
+                // calculate two-electron term
+                cArray contrib;
                 if (not cmd_.lightweight_radial_cache)
                 {
-                    // use precomputed block (from memory or from scratch file)
-                    block += (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                    // use precomputed block ... 
+                    if (not cmd_.cache_all_radint) // ... from scratch file
+                    {
+                        # pragma omp critical
+                        contrib = (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                    }
+                    else // ... from memory
+                    {
+                        contrib = (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                    }
                 }
                 else
                 {
                     // compute the data anew
-                    block += (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda], true);
+                    contrib = (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda], dia_blocks_[ill].structure());
                 }
+                
+                // update the sub-block
+                block += contrib;
             }
             
             // save block
+            # pragma omp critical
             dia_blocks_[ill].setBlock(iblock,block);
         }
     }
@@ -264,6 +278,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
+    int order = s_rad_.bspline().order();
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
@@ -406,10 +421,11 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 // for all destination sub-blocks
-                for (int i = 0; i < Nspline; i++)
+                # pragma omp parallel for if (cmd_.parallel_dot)
+                for (int i = std::max(0, k - order); i <= std::min(k + order, Nspline - 1); i++)
                 {
                     // calculate the radial sub-block
-                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], cmd_.parallel_dot);
+                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], structure);
                     
                     // update all owned superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))

@@ -462,23 +462,16 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             # pragma omp for schedule (dynamic,1)
             for (unsigned iblock = 0; iblock < structure.size(); iblock++)
             {
-                // block indices
-                int i = structure[iblock].first;
-                int k = structure[iblock].second;
-                
-                // create a new block of the radial integral matrix
-                cArray block (structure.size());
-                
-                // for all elements in the symmetrical block
-                for (unsigned n = 0; n < structure.size(); n++)
-                {
-                    // element indices
-                    int j = structure[n].first;
-                    int l = structure[n].second;
-                    
-                    // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-                    block[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
-                }
+                // calculate the block
+                cArray block = calc_R_tr_dia_block
+                (
+                    lambda,
+                    structure[iblock].first,
+                    structure[iblock].second,
+                    Mtr_L,
+                    Mtr_mLm1,
+                    structure
+                );
                 
                 // write the finished block to disk
                 # pragma omp critical
@@ -524,23 +517,22 @@ void RadialIntegrals::init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, 
     Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
 }
 
-cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, bool parallel) const
+cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
 {
-    // get recursive structure
-    std::vector<std::pair<int,int>> structure = S_.nzpattern();
+    // shorthands
+    int Nspline = bspline_.Nspline();
+    int order = bspline_.order();
+    int N = Nspline * (order + 1) - order * (order + 1) / 2;
     
-    // (i,k)-block data (= concatenated non-zero upper diagonals)
-    cArray block_ik (structure.size());
+    // (i,k)-block data
+    cArray block_ik (N);
     
     // for all elements in the symmetrical block
-    # pragma omp parallel for schedule (dynamic,1) if (parallel)
     for (unsigned n = 0; n < structure.size(); n++)
     {
-        // element indices
+        // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
         int j = structure[n].first;
         int l = structure[n].second;
-        
-        // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
         block_ik[n] = computeR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
     }
     
@@ -576,7 +568,7 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) c
         int k = structure[iblock].second;
         
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        cArray block_ik = calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1);
+        cArray block_ik = calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1, structure);
         
         // multiply all source vectors by this block
         # pragma omp critical
