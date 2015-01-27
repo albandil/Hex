@@ -161,4 +161,4 @@ obj/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # include generated source dependencied
--include $(wildcard obj/*.dep)
+-include $(DEPENDENCIES)
