@@ -418,90 +418,29 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             par_.sync(&buffer[0], Nspline, Nang);
             
             // for all potential multipoles
+            # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_dot)
             for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
             {
                 // for all destination sub-blocks
-                # pragma omp parallel for if (cmd_.parallel_dot)
                 for (int i = std::max(0, k - order); i <= std::min(k + order, Nspline - 1); i++)
                 {
                     // calculate the radial sub-block
                     cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], structure);
                     
-                    // update all owned superblocks
+                    // apply all superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))
                     for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
                     {
-                        cArrayView
-                        (
-                            q,
-                            (ill / par_.Nproc()) * Nspline * Nspline + i * Nspline,
-                            Nspline
-                        ) -= fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot
-                        (
-                            Nspline,
-                            s_rad_.S().diag(),
-                            R_block_ik.data(),
-                            buffer.data() + illp * Nspline
-                        );
+                        // multiply sub-segment by the R block
+                        cArray product = fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + illp * Nspline);
+                        
+                        // update the owned sub-segment
+                        # pragma omp critical
+                        cArrayView(q,(ill / par_.Nproc()) * Nspline * Nspline + i * Nspline,Nspline) -= product;
                     }
                 }
             }
         }
         
-/*
-        // multiply by offdiagonal blocks
-        for (int illp = 0; illp < Nang; illp++)
-        {
-            // owner of this block will copy it to the buffer
-            if (par_.isMyWork(illp))
-                std::memcpy(&buffer[0], p.data() + (illp / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline * sizeof(Complex));
-            
-            // owner will broadcast the source segment 'p(illp)' to all non-owners
-            par_.bcast(illp % par_.Nproc(), buffer);
-            
-            // everyone will update its result segments; for all angular momentum transfers
-            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-            {
-                // precalculate all angular factors 'f(lambda,ill,illp)'
-                rArray fs (Nang);
-                for (int ill = 0; ill < Nang; ill++)
-                {
-                    fs[ill] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-                    if (not std::isfinite(fs[ill]))
-                        Exception("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-                }
-                
-                // for all sub-blocks of the radial matrix
-                for (std::pair<int,int> bpos : structure)
-                {
-                    // calculate the radial sub-block
-                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, bpos.first, bpos.second, Mtr_L[lambda], Mtr_mLm1[lambda], cmd_.parallel_dot);
-                    
-                    // assemble all symmetries (one or two positions)
-                    std::vector<std::pair<int,int>> syms = { bpos };
-                    if (bpos.first != bpos.second)
-                        syms.push_back(std::make_pair(bpos.second, bpos.first));
-                    
-                    // multiply the appropriate segments of the source vector (which is contained in 'buffer')
-                    for (std::pair<int,int> sym : syms)
-                    {
-                        cArray product = SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + sym.second * Nspline);
-                        
-                        // for all destination super-segments
-                        for (int ill = 0; ill < Nang; ill++)
-                        {
-                            // if eligible, update the sub-segment in the super-segment 'q(ill)'
-                            if (fs[ill] != 0 and par_.isMyWork(ill))
-                                cArrayView(q, (ill / par_.Nproc()) * Nspline * Nspline + sym.first * Nspline, Nspline) -= fs[ill] * product;
-                        }
-                        
-                    } // for sub-block positions
-                    
-                } // for sub-blocks
-                
-            } // for lambda
-            
-        } // for illp
-*/
     } // if not cmd_.lightweight_radial_cache
 }
