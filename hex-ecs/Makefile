@@ -19,8 +19,8 @@ LFLAGS = -fopenmp
 SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
 
 # - for repository release
-# SUITESPARSEFLAGS = -I/usr/include/suitesparse
-# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) -lopenblas
+SUITESPARSEFLAGS = -I/usr/include/suitesparse
+SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) -lopenblas
 
 # - for custom build
 # SUITESPARSEFLAGS =
