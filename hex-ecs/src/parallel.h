@@ -155,6 +155,7 @@ class Parallel
          */
         template <class T> void bcast (int owner, NumberArray<T> & data) const
         {
+#ifndef NO_MPI
             // owner : broadcast size
             int size = data.size();
             MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
@@ -171,6 +172,7 @@ class Parallel
                 owner,
                 MPI_COMM_WORLD
             );
+#endif
         }
         
         /**
@@ -178,6 +180,7 @@ class Parallel
          */
         template <class T> void send (T const * array, std::size_t size, int origin, int destination) const
         {
+#ifndef NO_MPI
             if (active_ and iproc_ == origin)
             {
                 MPI_Send
@@ -190,6 +193,7 @@ class Parallel
                     MPI_COMM_WORLD
                 );
             }
+#endif
         }
         
         /**
@@ -197,6 +201,7 @@ class Parallel
          */
         template <class T> void recv (T * array, std::size_t size, int origin, int destination) const
         {
+#ifndef NO_MPI
             if (active_ and iproc_ == destination)
             {
                 MPI_Status status;
@@ -212,6 +217,7 @@ class Parallel
                     &status
                 );
             }
+#endif
         }
         
         /**
