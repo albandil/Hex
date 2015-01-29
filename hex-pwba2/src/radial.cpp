@@ -33,7 +33,6 @@
 #include <gsl/gsl_spline.h>
 
 #include "arrays.h"
-#include "complex.h"
 #include "gausskronrod.h"
 #include "hydrogen.h"
 #include "misc.h"

@@ -37,7 +37,8 @@
 #include <string>
 #include <H5Cpp.h>
 
-#include "complex.h"
+#include "numbers.h"
+#include "misc.h"
 
 /**
  * @brief HDF I/O management.
@@ -89,10 +90,16 @@ public:
     std::size_t size (std::string dataset) const;
     
     /// load data from a valid file.
-    template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const;
+    template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
+    {
+        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset, typeinfo<T>::hdfcmpttype());
+    }
     
     /// Write data to a valid file.
-    template <typename T> bool write (std::string dataset, T const * data, std::size_t length, std::size_t offset = 0);
+    template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
+    {
+        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset, typeinfo<T>::hdfcmpttype());
+    }
     
     /// Check that the file is valid.
     bool valid () const { return valid_; }

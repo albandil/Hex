@@ -36,7 +36,7 @@
 
 #include <ginac/ginac.h>
 
-#include "complex.h"
+#include "numbers.h"
 #include "vec3d.h"
 
 GiNaC::ex rl_Y

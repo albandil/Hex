@@ -384,12 +384,12 @@ CooMatrix kron (const CooMatrix& A, const CooMatrix& B)
     cArray C_x (Csize);
     
     // get pointers
-    long const * restrict pA_i = A.i().data();
-    long const * restrict pB_i = B.i().data();
-    long       * restrict pC_i = C_i.data();
-    long const * restrict pA_j = A.j().data();
-    long const * restrict pB_j = B.j().data();
-    long       * restrict pC_j = C_j.data();
+    std::int64_t const * restrict pA_i = A.i().data();
+    std::int64_t const * restrict pB_i = B.i().data();
+    std::int64_t       * restrict pC_i = C_i.data();
+    std::int64_t const * restrict pA_j = A.j().data();
+    std::int64_t const * restrict pB_j = B.j().data();
+    std::int64_t       * restrict pC_j = C_j.data();
     Complex const * restrict pA_x = A.v().data();
     Complex const * restrict pB_x = B.v().data();
     Complex       * restrict pC_x = C_x.data();
@@ -516,7 +516,7 @@ CooMatrix CscMatrix::tocoo () const
 {
     // reserve space for the auxiliary (J) and the output (Ti,Tj,Tx,Tz) arrays
     std::size_t N = x_.size();
-    std::vector<long> Ti(N), Tj(N), J(N);
+    std::vector<std::int64_t> Ti(N), Tj(N), J(N);
     std::vector<Complex> Tx(N);
     
     // do we have any elements at all?
@@ -524,7 +524,7 @@ CooMatrix CscMatrix::tocoo () const
     {
     
         // do the conversion
-        long status = umfpack_zl_col_to_triplet(n_, p_.data(), J.data());
+        std::int64_t status = umfpack_zl_col_to_triplet(n_, p_.data(), J.data());
         
         // check success
         if (status != 0)
@@ -751,7 +751,7 @@ CsrMatrix::LUft CsrMatrix::factorize (double droptol) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
-    long status;
+    std::int64_t status;
     
     // get default setting
     double Control[UMFPACK_CONTROL];
@@ -1050,7 +1050,7 @@ CooMatrix CsrMatrix::tocoo () const
     {
     
         // do the conversion
-        long status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
+        std::int64_t status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
         
         // check success
         if (status != 0)
@@ -1148,8 +1148,8 @@ Complex CsrMatrix::operator () (unsigned i, unsigned j) const
 
 Complex sparse_row_scalar_product
 (
-  int n1, Complex const * const restrict x1, long const * const restrict i1,
-  int n2, Complex const * const restrict x2, long const * const restrict i2
+  int n1, Complex const * const restrict x1, std::int64_t const * const restrict i1,
+  int n2, Complex const * const restrict x2, std::int64_t const * const restrict i2
 )
 {
     Complex ssp = 0.;
@@ -1238,7 +1238,7 @@ CscMatrix CooMatrix::tocsc () const
     if (nz != 0)
     {
     
-        long status = umfpack_zl_triplet_to_col
+        std::int64_t status = umfpack_zl_triplet_to_col
         (
             m_,            // rows
             n_,            // cols
@@ -1282,7 +1282,7 @@ CsrMatrix CooMatrix::tocsr () const
     if (nz != 0)
     {
     
-        long status = umfpack_zl_triplet_to_col
+        std::int64_t status = umfpack_zl_triplet_to_col
         (
             n_,            // cols (rows of transposed matrix)
             m_,            // rows (cols of transposed matrix)
@@ -2548,7 +2548,7 @@ CooMatrix BlockSymDiaMatrix::tocoo () const
     std::size_t nelem = nblocks * nblocks;
     
     // allocate the ijv arrays
-    lArray I(nelem), J(nelem);  long *pI = I.data(), *pJ = J.data();
+    lArray I(nelem), J(nelem);  std::int64_t *pI = I.data(), *pJ = J.data();
     cArray V(nelem);            Complex *pV = V.data();
     
 #ifndef NO_HDF

@@ -51,7 +51,6 @@
 #endif
 
 #include "arrays.h"
-#include "complex.h"
 #include "hdffile.h"
 
 // forward declaration of classes in order to enable them as return types
@@ -690,8 +689,8 @@ public:
 private:
     
     // dimensions
-    long m_;
-    long n_;
+    std::int64_t m_;
+    std::int64_t n_;
     
     // representation
     lArray p_;
@@ -878,8 +877,8 @@ public:
             if (numeric_ == nullptr)
                 return 0;
             
-            long lnz, unz, m, n, nz_udiag;
-            long status = umfpack_zl_get_lunz
+            std::int64_t lnz, unz, m, n, nz_udiag;
+            std::int64_t status = umfpack_zl_get_lunz
             (
                 &lnz, &unz, &m, &n, &nz_udiag, numeric_
             );
@@ -916,7 +915,7 @@ public:
             for (int eq = 0; eq < eqs; eq++)
             {
                 // solve for current RHS
-                long status = umfpack_zl_solve
+                std::int64_t status = umfpack_zl_solve
                 (
                     UMFPACK_Aat,
                     matrix_->p_.data(), matrix_->i_.data(),
@@ -966,7 +965,7 @@ public:
          */
         void save (std::string name) const
         {
-            long err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
+            std::int64_t err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_invalid_Numeric_object)
                 Exception("[LUft::save] Invalid numeric object.");
@@ -987,7 +986,7 @@ public:
         //@{
         void load (std::string name, bool throw_on_io_failure = true)
         {
-            long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
+            std::int64_t err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_out_of_memory)
                 Exception ("[LUft::load] Out of memory.");
@@ -1195,8 +1194,8 @@ public:
 private:
     
     // dimensions
-    long m_;
-    long n_;
+    std::int64_t m_;
+    std::int64_t n_;
     
     // representation
     lArray p_;
@@ -1229,13 +1228,13 @@ public:
     
     CooMatrix ()
         : m_(0), n_(0), sorted_(true) {}
-    CooMatrix (std::size_t m, std::size_t n)
+    CooMatrix (size_t m, size_t n)
         : m_(m), n_(n), sorted_(true) {}
     CooMatrix (CooMatrix const & A)
         : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
-    CooMatrix (std::size_t m, std::size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
+    CooMatrix (std::size_t m, std::size_t n, lArrayView i, lArrayView j, cArrayView x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
-    CooMatrix (std::size_t m, std::size_t n, NumberArray<long> && i, NumberArray<long> && j, NumberArray<Complex> && x)
+    CooMatrix (std::size_t m, std::size_t n, lArray && i, lArray && j, cArray && x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**
@@ -1248,10 +1247,10 @@ public:
     template <class T> CooMatrix (std::size_t m, std::size_t n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
-        size_t i = 0;
-        for (size_t col = 0; col < n; col++)
+        std::size_t i = 0;
+        for (std::size_t col = 0; col < n; col++)
         {
-            for (size_t row = 0; row < m; row++)
+            for (std::size_t row = 0; row < m; row++)
             {
                 // get element from array
                 Complex val = *(a + i);
@@ -1279,7 +1278,7 @@ public:
         if (m_ == 1 and n_ == 1)
         {
             // get number of nonzero matrix elements
-            size_t elems = this->shake().x_.size();
+            std::size_t elems = this->shake().x_.size();
             if (elems > 1)
                 throw "[CooMatrix::operator Complex] more elements than nominal volume!\n";
             else if (elems == 1)
@@ -1325,7 +1324,7 @@ public:
     {
         Complex val;
         
-        for (size_t row = 0; row < m_; row++)
+        for (std::size_t row = 0; row < m_; row++)
         {
             for (std::size_t col = row; col < n_ and col - row <= d; col++)
             {
@@ -1405,7 +1404,7 @@ public:
      * Adds a new element to the matrix. If an existing coordinates are used,
      * the numbers will be summed.
      */
-    void add (long i, long j, Complex v)
+    void add (std::int64_t i, std::int64_t j, Complex v)
     {
         i_.push_back(i);
         j_.push_back(j);
@@ -1469,8 +1468,8 @@ public:
     /// Element-wise multiplication by complex number.
     CooMatrix& operator *= (Complex c)
     {
-        long nz = i_.size();
-        for (long i = 0; i < nz; i++)
+        std::size_t nz = i_.size();
+        for (std::size_t i = 0; i < nz; i++)
             x_[i] *= c;
         
         return *this;
@@ -1543,7 +1542,7 @@ public:
     template <typename DenseMatrixType> DenseMatrixType todense () const
     {
         DenseMatrixType M (rows(), cols());
-        for (unsigned idx = 0; idx < x_.size(); idx++)
+        for (std::size_t idx = 0; idx < x_.size(); idx++)
             M (i_[idx], j_[idx]) = x_[idx];
         return M;
     }
@@ -1763,10 +1762,10 @@ public:
         int d = std::abs(i-j);
         
         // get diagonal index
-        int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
         
         // check that this diagonal exists
-        assert(id < (int)idiag_.size());
+        assert(id < idiag_.size());
         
         // get corresponding element
         return dptrs_[id][std::min(i,j)];
@@ -1778,10 +1777,10 @@ public:
         int d = std::abs(i-j);
         
         // get diagonal index
-        int id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
         
         // check that this diagonal exists
-        assert(id < (int)idiag_.size());
+        assert(id < idiag_.size());
         
         // get corresponding element
         return dptrs_[id][std::min(i,j)];

@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "arrays.h"
-#include "complex.h"
 
 rArray abs (const cArrayView u)
 {

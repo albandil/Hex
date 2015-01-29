@@ -33,7 +33,6 @@
 #define HEX_BSPLINE
 
 #include "arrays.h"
-#include "complex.h"
 #include "misc.h"
 
 /**

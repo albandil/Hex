@@ -37,7 +37,6 @@
 
 #include "arrays.h"
 #include "clenshawcurtis.h"
-#include "complex.h"
 #include "gausskronrod.h"
 #include "misc.h"
 #include "pwba2.h"

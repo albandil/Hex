@@ -34,7 +34,6 @@
 
 #include <gsl/gsl_interp.h>
 
-#include "complex.h"
 #include "potential.h"
 #include "special.h"
 

@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "arrays.h"
-#include "complex.h"
 #include "interfaces.h"
 
 /// Energy units

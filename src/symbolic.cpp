@@ -40,7 +40,6 @@
 #include <cln/cln.h>
 #include <gsl/gsl_sf.h>
 
-#include "complex.h"
 #include "misc.h"
 #include "special.h"
 #include "symbolic.h"

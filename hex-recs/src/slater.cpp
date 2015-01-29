@@ -206,9 +206,9 @@ Complex RadialIntegrals::computeR (
 void RadialIntegrals::allSymmetries (
     int i, int j, int k, int l,
     Complex Rijkl_tr,
-    NumberArray<long> & R_tr_i,
-    NumberArray<long> & R_tr_j,
-    NumberArray<Complex> & R_tr_v
+    lArray & R_tr_i,
+    lArray & R_tr_j,
+    cArray & R_tr_v
 ) const {
     // shorthand
     int Nspline = bspline_.Nspline();

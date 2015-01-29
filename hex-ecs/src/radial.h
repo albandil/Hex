@@ -37,7 +37,6 @@
 
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"

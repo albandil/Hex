@@ -45,7 +45,7 @@
 #define sqr(x) (gsl_sf_pow_int((x),2))
 
 #include "arrays.h"
-#include "complex.h"
+#include "numbers.h"
 #include "misc.h"
 
 /// Shifting coefficients for Sturmian T-operators
@@ -231,9 +231,9 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
  * 
  * The power is computed as a corresponding bit shift of 1.
  */
-inline constexpr unsigned long long pow2 (unsigned long long i)
+inline constexpr std::uint64_t pow2 (std::uint64_t i)
 {
-    return 1 << i;
+    return std::uint64_t(1) << i;
 }
 
 /**
@@ -243,9 +243,9 @@ inline constexpr unsigned long long pow2 (unsigned long long i)
  * The rest is computed plainly by std::pow (so it is not fast
  * anymore).
  */
-inline unsigned long long pow3 (unsigned long long i)
+inline std::uint64_t pow3 (std::uint64_t i)
 {
-    static const unsigned long long pow3_table[10] = {
+    static const std::uint64_t pow3_table[10] = {
         /* 3^0 */ 1,
         /* 3^1 */ 3,
         /* 3^2 */ 3*3,
@@ -258,7 +258,7 @@ inline unsigned long long pow3 (unsigned long long i)
         /* 3^9 */ 3*3*3*3*3*3*3*3*3
     };
     
-    return (i < 10 ? pow3_table[i] : (unsigned long long)std::pow(3,i));
+    return (i < 10 ? pow3_table[i] : (std::uint64_t)std::pow(3,i));
 }
 
 /**

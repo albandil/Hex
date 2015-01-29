@@ -55,10 +55,6 @@
     #include <unistd.h>
 #endif
 
-#ifndef NO_MPI
-    #include <mpi.h>
-#endif
-
 //
 // Restricted pointers.
 // - allow some compiler optimizations on arrays
@@ -190,7 +186,7 @@ template <class T> struct is_scalar { static const bool value = is_complex<T>::v
     template <> struct is_scalar<T> { static const bool value = true; }
 
 declareTypeAsScalar(int);
-declareTypeAsScalar(long);
+declareTypeAsScalar(std::int64_t);
 declareTypeAsScalar(float);
 declareTypeAsScalar(double);
 
@@ -346,7 +342,7 @@ template <class T> T string_to (std::string str)
 template <> inline int string_to (std::string str)
 {
     // convert to int
-    char* tail; long val = std::strtol(str.c_str(), &tail, 10);
+    char* tail; int val = std::strtol(str.c_str(), &tail, 10);
     
     // throw or return
     if (*tail != 0x0)
@@ -705,79 +701,5 @@ inline std::string underline (std::string text)
         text.push_back('-');
     return text;
 }
-
-//
-// Data type abstract traits.
-//
-
-/**
- * @brief Data-type information.
- * 
- * The information about components of a specific data type can be used in
- * type-generic template functions. This class (or rather its specializations
- * for individual types) offer the necessary information.
- * 
- * An example of use would be a formatted output of column data of an array
- * of the abstract data type 'T'. If we wanted to print every component as a
- * separate column, we would need to (a) know the total number of components
- * of the data type 'T' and (b) have the tool to access individual elements.
- * This class (or rather its specializations for different types) offers
- * both through the members 'ncmpt' and 'cmpt'.
- */
-template <class T> class typeinfo {};
-
-/// Data-type info class specialization for 'int'.
-template<> class typeinfo<int>
-{
-    public:
-        /// Component data type.
-        typedef int cmpttype;
-        
-        /// Component count.
-        static const std::size_t ncmpt = 1;
-        
-        /// Component getter.
-        static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
-        /// MPI data type of a component.
-        static MPI_Datatype mpicmpttype () { return MPI_INT; }
-#endif
-};
-
-/// Data-type info class specialization for 'double'.
-template<> class typeinfo<double>
-{
-    public:
-        /// Component data type.
-        typedef double cmpttype;
-        
-        /// Component count.
-        static const std::size_t ncmpt = 1;
-        
-        /// Component getter.
-        static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
-        /// MPI data type of a component.
-        static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
-#endif
-};
-
-/// Data-type info class specialization for 'std::complex'.
-template<> template<class T> class typeinfo<std::complex<T>>
-{
-    public:
-        /// Component data type.
-        typedef T cmpttype;
-        
-        /// Component count.
-        static const std::size_t ncmpt = 2;
-        
-        /// Component getter.
-        static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
-#ifndef NO_MPI
-        /// MPI data type of a component.
-        static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
-#endif
-};
 
 #endif

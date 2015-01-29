@@ -36,7 +36,6 @@
 
 #include "arrays.h"
 #include "special.h"
-#include "complex.h"
 
 #ifndef NO_LAPACK
 /**

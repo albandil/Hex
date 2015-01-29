@@ -35,7 +35,7 @@
 #include <ginac/ginac.h>
 #include <gsl/gsl_sf.h>
 
-#include "complex.h"
+#include "numbers.h"
 #include "special.h"
 #include "vec3d.h"
 

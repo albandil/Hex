@@ -30,7 +30,6 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "arrays.h"
-#include "complex.h"
 #include "potential.h"
 #include "dwba.h"
 #include "hydrogen.h"

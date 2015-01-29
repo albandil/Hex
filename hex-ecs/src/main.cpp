@@ -45,7 +45,6 @@
 #include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "io.h"
 #include "itersolve.h"
 #include "misc.h"

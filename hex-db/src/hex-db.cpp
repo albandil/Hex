@@ -41,7 +41,6 @@
 #include <sqlitepp/sqlitepp.hpp>
 
 #include "arrays.h"
-#include "complex.h"
 #include "hex-db.h"
 #include "special.h"
 #include "interpolate.h"

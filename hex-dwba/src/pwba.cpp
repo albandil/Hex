@@ -30,7 +30,6 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "arrays.h"
-#include "complex.h"
 #include "gausskronrod.h"
 #include "hydrogen.h"
 #include "pwba.h"

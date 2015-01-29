@@ -47,12 +47,12 @@
 #include <vector>
 
 #ifndef NO_HDF
-#include "hdffile.h"
+    #include "hdffile.h"
 #endif
 
-#include "complex.h"
 #include "memory.h"
 #include "misc.h"
+#include "numbers.h"
 
 // Forward declaration of Array (unaligned array of items).
 template < class T, class Alloc_ = PlainAllocator<T> > class Array;
@@ -1544,12 +1544,12 @@ void writeVTK_cells
 //
 
 typedef NumberArray<int>          iArray;
-typedef NumberArray<long>         lArray;
+typedef NumberArray<int64_t>      lArray;
 typedef NumberArray<double>       rArray;
 typedef NumberArray<Complex>      cArray;
 
 typedef ArrayView<int>         iArrayView;
-typedef ArrayView<long>        lArrayView;
+typedef ArrayView<int64_t>     lArrayView;
 typedef ArrayView<double>      rArrayView;
 typedef ArrayView<Complex>     cArrayView;
 

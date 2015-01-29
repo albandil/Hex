@@ -36,7 +36,6 @@
 #include <gsl/gsl_sf.h>
 
 #include "arrays.h"
-#include "complex.h"
 #include "ode.h"
 #include "potential.h"
 #include "wave_distort.h"

@@ -105,66 +105,6 @@ std::size_t HDFFile::size (std::string dataset) const
     }
 }
 
-template<> bool HDFFile::read<int> (std::string dataset, int* buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_INT));
-}
-
-template<> bool HDFFile::read<unsigned int> (std::string dataset, unsigned int * buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_UINT));
-}
-
-template<> bool HDFFile::read<long> (std::string dataset, long* buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_LONG));
-}
-
-template<> bool HDFFile::read<unsigned long> (std::string dataset, unsigned long * buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_ULONG));
-}
-
-template<> bool HDFFile::read<double> (std::string dataset, double* buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, length, offset, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::read<Complex> (std::string dataset, Complex* buffer, std::size_t length, std::size_t offset) const
-{
-    return read_(dataset, buffer, 2*length, 2*offset, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::write<int> (std::string dataset, int const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_INT));
-}
-
-template<> bool HDFFile::write<unsigned int> (std::string dataset, unsigned int const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_UINT));
-}
-
-template<> bool HDFFile::write<long> (std::string dataset, long const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_LONG));
-}
-
-template<> bool HDFFile::write<unsigned long> (std::string dataset, unsigned long const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, length, offset, H5::IntType(H5::PredType::NATIVE_ULONG));
-}
-
-template<> bool HDFFile::write<double> (std::string dataset, double const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, length, offset, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::write<Complex> (std::string dataset, Complex const * buffer, std::size_t length, std::size_t offset)
-{
-    return write_(dataset, buffer, 2*length, 2*offset, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
 bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype) const
 {
     if (not valid_)

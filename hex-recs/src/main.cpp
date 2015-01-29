@@ -42,7 +42,6 @@
 #include "angular.h"
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "hydrogen.h"
 #include "io.h"
 #include "itersolve.h"

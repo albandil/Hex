@@ -33,10 +33,10 @@
 #include <cstdlib>
 #include <string>
 
-#include "../../src/complex.h"
 #include "../../src/arrays.h"
 #include "../../src/arrays.cpp"
 #include "../../src/misc.h"
+#include "../../src/numbers.h"
 #include "../../src/compact.h"
 #include "../../src/chebyshev.h"
 #include "../../src/hdffile.cpp"

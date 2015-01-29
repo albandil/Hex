@@ -37,7 +37,6 @@
 
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"
@@ -201,9 +200,9 @@ class RadialIntegrals
         (
             int i, int j, int k, int l,
             Complex Rijkl_tr,
-            NumberArray<long> & R_tr_i,
-            NumberArray<long> & R_tr_j,
-            NumberArray<Complex> & R_tr_v
+            lArray & R_tr_i,
+            lArray & R_tr_j,
+            cArray & R_tr_v
         ) const;
         
         /** Compute P-overlaps
