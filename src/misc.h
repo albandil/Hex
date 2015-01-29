@@ -53,6 +53,7 @@
 #if (defined(__linux__) && defined(__GNUC__))
     #include <execinfo.h>
     #include <unistd.h>
+    #include <cxxabi.h>
 #endif
 
 //
@@ -113,10 +114,62 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     std::cerr << " *** " << format(p...) << std::endl;
     
 #if (defined(__linux__) && defined(__GNUC__))
-    // print stack trace
-    void * array[10];
-    std::size_t size = backtrace(array, 10);
-    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    // This stack printing function has been borrowed from Timo Bingmann's
+    //    "C++ Code Snippet - Print Stack Backtrace Programmatically with Demangled Function Names"
+    // from the page
+    //    http://panthema.net/2008/0901-stacktrace-demangled/
+    {
+        std::cerr << "Stack trace:" << std::endl;
+        void* addrlist[65];
+        int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
+        if (addrlen == 0)
+        {
+            std::cerr << "  <empty, possibly corrupt>" << std::endl;
+            std::terminate();
+        }
+        char** symbollist = backtrace_symbols(addrlist, addrlen);
+        std::size_t funcnamesize = 256;
+        char* funcname = (char*)std::malloc(funcnamesize);
+        for (int i = 1; i < addrlen; i++)
+        {
+            char *begin_name = 0, *begin_offset = 0, *end_offset = 0;
+            for (char *p = symbollist[i]; *p; ++p)
+            {
+                if (*p == '(')
+                    begin_name = p;
+                else if (*p == '+')
+                    begin_offset = p;
+                else if (*p == ')' && begin_offset)
+                {
+                    end_offset = p;
+                    break;
+                }
+            }
+            if (begin_name && begin_offset && end_offset && begin_name < begin_offset)
+            {
+                *begin_name++ = '\0';
+                *begin_offset++ = '\0';
+                *end_offset = '\0';
+                int status;
+                char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
+                if (status == 0)
+                {
+                    funcname = ret;
+                    std::cerr << format("  %s : %s+%s", symbollist[i], funcname, begin_offset) << std::endl;
+                }
+                else
+                {
+                    std::cerr << format("  %s : %s()+%s", symbollist[i], begin_name, begin_offset) << std::endl;
+                }
+            }
+            else
+            {
+                std::cerr << "  " << symbollist[i] << std::endl;
+            }
+        }
+        std::free(funcname);
+        std::free(symbollist);
+    }
 #endif
     
     // exit the program
