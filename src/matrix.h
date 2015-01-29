@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_MATRIX
 #define HEX_MATRIX
@@ -20,13 +39,19 @@
 #include <vector>
 
 #ifndef NO_PNG
-#include <png++/png.hpp>
+    #include <png++/png.hpp>
 #endif
 
-#include <umfpack.h>
+#ifndef NO_UMFPACK
+    #include <umfpack.h>
+#endif
+
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
 
 #include "arrays.h"
-#include "complex.h"
+#include "hdffile.h"
 
 // forward declaration of classes in order to enable them as return types
 // of other classes before proper definition
@@ -505,7 +530,7 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
 /**
  * @brief Dense matrix multiplication.
  */
-template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
+/*template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
     assert(A.cols() == B.rows());
     
@@ -545,7 +570,14 @@ template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, Col
     
     // return result
     return C;
+}*/
+
+template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
+{
+    Exception("Don't know how to multipy matrices of type %s.", typeid(Type).name);
 }
+template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B);
+template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B);
 
 /**
  * @brief Matrix parts.
@@ -588,13 +620,13 @@ public:
     
     // Constructors
     
-    CscMatrix()
+    CscMatrix ()
         : m_(0), n_(0) {}
-    CscMatrix(size_t m, size_t n)
+    CscMatrix (std::size_t m, std::size_t n)
         : m_(m), n_(n) {}
-    CscMatrix(CscMatrix const & A)
+    CscMatrix (CscMatrix const & A)
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_) {}
-    CscMatrix(size_t m, size_t n, const lArrayView p, const lArrayView i, const cArrayView x)
+    CscMatrix (std::size_t m, std::size_t n, const lArrayView p, const lArrayView i, const cArrayView x)
         : m_(m), n_(n), p_(p), i_(i), x_(x) {}
     
     // Destructor
@@ -657,14 +689,13 @@ public:
 private:
     
     // dimensions
-    long m_;
-    long n_;
+    std::int64_t m_;
+    std::int64_t n_;
     
     // representation
     lArray p_;
     lArray i_;
     cArray x_;
-    
 };
 
 /**
@@ -682,24 +713,25 @@ private:
  * holds column indices of elements, which are stored in \c Ax and \c Az, real
  * ang imaginary part being separated.
  */
-class CsrMatrix {
+class CsrMatrix
+{
     
 public:
     
     // Constructors
     
-    CsrMatrix()
+    CsrMatrix ()
         : m_(0), n_(0), name_() {}
-    CsrMatrix(size_t m, size_t n)
+    CsrMatrix (std::size_t m, std::size_t n)
         : m_(m), n_(n), name_() {}
-    CsrMatrix(CsrMatrix const & A)
+    CsrMatrix (CsrMatrix const & A)
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
-    CsrMatrix(size_t m, size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
+    CsrMatrix (std::size_t m, std::size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
         : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     
     // Destructor
     
-    ~CsrMatrix() {}
+    ~CsrMatrix () {}
     
     /**
      * @brief Clear data.
@@ -728,7 +760,7 @@ public:
     cArray const & x () const { return x_; }
     
     // return absolute value of the (in absolute value) largest element
-    double norm() const;
+    double norm () const;
     
     /**
      * Write the matrix data to a file.
@@ -740,7 +772,7 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write(const char* filename) const;
+    void write (const char* filename) const;
     
 #ifndef NO_PNG
     /**
@@ -760,7 +792,7 @@ public:
             PngGenerator (CsrMatrix const * mat, double threshold);
             ~PngGenerator ();
             
-            png::byte* get_next_row (size_t pos);
+            png::byte* get_next_row (std::size_t pos);
             
         private:
             
@@ -845,8 +877,8 @@ public:
             if (numeric_ == nullptr)
                 return 0;
             
-            long lnz, unz, m, n, nz_udiag;
-            long status = umfpack_zl_get_lunz
+            std::int64_t lnz, unz, m, n, nz_udiag;
+            std::int64_t status = umfpack_zl_get_lunz
             (
                 &lnz, &unz, &m, &n, &nz_udiag, numeric_
             );
@@ -883,7 +915,7 @@ public:
             for (int eq = 0; eq < eqs; eq++)
             {
                 // solve for current RHS
-                long status = umfpack_zl_solve
+                std::int64_t status = umfpack_zl_solve
                 (
                     UMFPACK_Aat,
                     matrix_->p_.data(), matrix_->i_.data(),
@@ -933,13 +965,13 @@ public:
          */
         void save (std::string name) const
         {
-            long err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
+            std::int64_t err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_invalid_Numeric_object)
-                throw exception ("[LUft::save] Invalid numeric object.");
+                Exception("[LUft::save] Invalid numeric object.");
             
             if (err == UMFPACK_ERROR_file_IO)
-                throw exception ("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
+                Exception("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
         }
         void save () const
         {
@@ -954,13 +986,13 @@ public:
         //@{
         void load (std::string name, bool throw_on_io_failure = true)
         {
-            long err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
+            std::int64_t err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_out_of_memory)
-                throw exception ("[LUft::load] Out of memory.");
+                Exception ("[LUft::load] Out of memory.");
             
             if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
-                throw exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
+                Exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
         }
         void load ()
         {
@@ -1162,8 +1194,8 @@ public:
 private:
     
     // dimensions
-    long m_;
-    long n_;
+    std::int64_t m_;
+    std::int64_t n_;
     
     // representation
     lArray p_;
@@ -1187,19 +1219,22 @@ private:
  * contain its real and imaginary part. Same coordinates amy be used several
  * times; resulting element is then sum of these entries.
  */
-class CooMatrix {
+class CooMatrix
+{
     
 public:
     
     // Empty constructors
     
-    CooMatrix()
+    CooMatrix ()
         : m_(0), n_(0), sorted_(true) {}
-    CooMatrix(size_t m, size_t n)
+    CooMatrix (size_t m, size_t n)
         : m_(m), n_(n), sorted_(true) {}
-    CooMatrix(CooMatrix const & A)
+    CooMatrix (CooMatrix const & A)
         : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
-    CooMatrix(size_t m, size_t n, NumberArray<long> const & i, NumberArray<long> const & j, NumberArray<Complex> const & x)
+    CooMatrix (std::size_t m, std::size_t n, lArrayView i, lArrayView j, cArrayView x)
+        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
+    CooMatrix (std::size_t m, std::size_t n, lArray && i, lArray && j, cArray && x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**
@@ -1209,13 +1244,13 @@ public:
      * @param a Column-major ordered dense array with matrix elements.
      *          Only nonzero elements are copied into internal storage.
      */
-    template <class T> CooMatrix (size_t m, size_t n, T a) : m_(m), n_(n), sorted_(false)
+    template <class T> CooMatrix (std::size_t m, std::size_t n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
-        size_t i = 0;
-        for (size_t col = 0; col < n; col++)
+        std::size_t i = 0;
+        for (std::size_t col = 0; col < n; col++)
         {
-            for (size_t row = 0; row < m; row++)
+            for (std::size_t row = 0; row < m; row++)
             {
                 // get element from array
                 Complex val = *(a + i);
@@ -1235,7 +1270,7 @@ public:
     }
     
     // Destructor
-    ~CooMatrix() {}
+    ~CooMatrix () {}
     
     /// Convert 1×1 matrix to a complex number.
     operator Complex () const
@@ -1243,7 +1278,7 @@ public:
         if (m_ == 1 and n_ == 1)
         {
             // get number of nonzero matrix elements
-            size_t elems = this->shake().x_.size();
+            std::size_t elems = this->shake().x_.size();
             if (elems > 1)
                 throw "[CooMatrix::operator Complex] more elements than nominal volume!\n";
             else if (elems == 1)
@@ -1257,18 +1292,18 @@ public:
     
     // Getters
     
-    size_t rows() const { return m_; }
-    size_t cols() const { return n_; }
-    size_t size() const { return i_.size(); }
-    lArray const & i() const { return i_; }
-    lArray const & j() const { return j_; }
-    cArray const & v() const { return x_; }
+    std::size_t rows () const { return m_; }
+    std::size_t cols () const { return n_; }
+    std::size_t size () const { return i_.size(); }
+    lArray const & i () const { return i_; }
+    lArray const & j () const { return j_; }
+    cArray const & v () const { return x_; }
     
     /// Index operator. Returns the existing value or zero.
-    Complex operator() (size_t ix, size_t iy) const
+    Complex operator() (std::size_t ix, std::size_t iy) const
     {
-        for (size_t n = 0; n < i_.size(); n++)
-             if ((size_t)i_[n] == ix and (size_t)j_[n] == iy)
+        for (std::size_t n = 0; n < i_.size(); n++)
+             if ((std::size_t)i_[n] == ix and (std::size_t)j_[n] == iy)
                 return x_[n];
         return 0.;
     }
@@ -1285,13 +1320,13 @@ public:
      *  Complex (*) (long, long)
      * @endcode
      */
-    template <class Functor> CooMatrix& symm_populate_band (size_t d, Functor f)
+    template <class Functor> CooMatrix& symm_populate_band (std::size_t d, Functor f)
     {
         Complex val;
         
-        for (size_t row = 0; row < m_; row++)
+        for (std::size_t row = 0; row < m_; row++)
         {
-            for (size_t col = row; col < n_ and col - row <= d; col++)
+            for (std::size_t col = row; col < n_ and col - row <= d; col++)
             {
                 val = f(row,col);
                 
@@ -1329,9 +1364,9 @@ public:
     {
         Complex val;
         
-        for (size_t row = 0; row < m_; row++)
+        for (std::size_t row = 0; row < m_; row++)
         {
-            for (size_t col = 0; col < n_; col++)
+            for (std::size_t col = 0; col < n_; col++)
             {
                 val = f(row,col);
                 
@@ -1369,7 +1404,7 @@ public:
      * Adds a new element to the matrix. If an existing coordinates are used,
      * the numbers will be summed.
      */
-    void add (long i, long j, Complex v)
+    void add (std::int64_t i, std::int64_t j, Complex v)
     {
         i_.push_back(i);
         j_.push_back(j);
@@ -1379,7 +1414,7 @@ public:
     }
     
     /// Transposition, implemented as an interchange of "i" and "j" data.
-    CooMatrix transpose() const
+    CooMatrix transpose () const
     {
         CooMatrix tr;
         
@@ -1422,7 +1457,7 @@ public:
         x_.append(A.x_.begin(), A.x_.end());
         
         // negate the newly added elements
-        for (size_t i = prev_size; i < x_.size(); i++)
+        for (std::size_t i = prev_size; i < x_.size(); i++)
             x_[i] = -x_[i];
         
         sorted_ = false;
@@ -1433,8 +1468,8 @@ public:
     /// Element-wise multiplication by complex number.
     CooMatrix& operator *= (Complex c)
     {
-        long nz = i_.size();
-        for (long i = 0; i < nz; i++)
+        std::size_t nz = i_.size();
+        for (std::size_t i = 0; i < nz; i++)
             x_[i] *= c;
         
         return *this;
@@ -1472,7 +1507,7 @@ public:
      * @brief Change dimension of the matrix.
      * @warning No row/column index range checking.
      */
-    void resize (size_t m, size_t n)
+    void resize (std::size_t m, std::size_t n)
     {
         m_ = m;
         n_ = n;
@@ -1488,38 +1523,38 @@ public:
      * @param m New row count.
      * @param n New column coount.
      */
-    CooMatrix reshape (size_t m, size_t n) const;
+    CooMatrix reshape (std::size_t m, std::size_t n) const;
     
     /// Convert matrix to dense column-major ordered 1D-array.
     cArray todense () const;
     
     /// Sort indices (by i_, then by j_)
-    void sort();
-    bool sorted() const { return sorted_; }
+    void sort ();
+    bool sorted () const { return sorted_; }
     
     /// Convert to CSC matrix.
-    CscMatrix tocsc() const;
+    CscMatrix tocsc () const;
     
     /// Convert to CSR matrix.
-    CsrMatrix tocsr() const;
+    CsrMatrix tocsr () const;
     
     /// Convert to dense matrix of a given underlying type.
-    template <typename DenseMatrixType> DenseMatrixType todense() const
+    template <typename DenseMatrixType> DenseMatrixType todense () const
     {
         DenseMatrixType M (rows(), cols());
-        for (unsigned idx = 0; idx < x_.size(); idx++)
+        for (std::size_t idx = 0; idx < x_.size(); idx++)
             M (i_[idx], j_[idx]) = x_[idx];
         return M;
     }
     
     /// Convert to dense matrix (row-ordered).
-    RowMatrix<Complex> torow() const
+    RowMatrix<Complex> torow () const
     {
         return todense<RowMatrix<Complex>>();
     }
     
     /// Convert to dense matrix (column-ordered).
-    ColMatrix<Complex> tocol() const
+    ColMatrix<Complex> tocol () const
     {
         return todense<ColMatrix<Complex>>();
     }
@@ -1531,7 +1566,7 @@ public:
      * "upper" for conversion of upper triangle and "both" for
      * conversion of the main diagonal only.
      */
-    SymDiaMatrix todia(MatrixTriangle triangle = lower) const;
+    SymDiaMatrix todia (MatrixTriangle triangle = lower) const;
     
     /**
      * @brief Solve matrix equation.
@@ -1542,7 +1577,7 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve (const cArrayView b, size_t eqs = 1) const
+    cArray solve (const cArrayView b, std::size_t eqs = 1) const
     {
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
@@ -1651,6 +1686,9 @@ public:
     /// Move constructor.
     SymDiaMatrix (SymDiaMatrix && A);
     
+    /// Constructor - HDF loader.
+    SymDiaMatrix (std::string filename);
+    
     /**
      * @brief Plain symmetrical populator.
      *
@@ -1687,7 +1725,16 @@ public:
             }
         }
         
+        // update diagonal pointers
+        setup_dptrs_();
+        
         return *this;
+    }
+    
+    void update ()
+    {
+        // update diagonal pointers
+        setup_dptrs_();
     }
 
     //
@@ -1708,6 +1755,36 @@ public:
     //
     // Getters
     //
+    
+    Complex operator() (int i, int j) const
+    {
+        // get diagonal label
+        int d = std::abs(i-j);
+        
+        // get diagonal index
+        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        
+        // check that this diagonal exists
+        assert(id < idiag_.size());
+        
+        // get corresponding element
+        return dptrs_[id][std::min(i,j)];
+    }
+    
+    Complex & operator() (int i, int j)
+    {
+        // get diagonal label
+        int d = std::abs(i-j);
+        
+        // get diagonal index
+        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        
+        // check that this diagonal exists
+        assert(id < idiag_.size());
+        
+        // get corresponding element
+        return dptrs_[id][std::min(i,j)];
+    }
     
     /**
      * @brief Diagonal indices.
@@ -1769,7 +1846,8 @@ public:
      * Return row/column count. The matrix is symmetric and so both
      * counts are equal.
      */
-    std::size_t size () const { return n_; }
+    int size () const { return n_; }
+    int & size () { return n_; }
     
     /**
      * @brief Bandwidth.
@@ -1788,6 +1866,15 @@ public:
      */
     bool is_compatible (SymDiaMatrix const & B) const;
     
+    /**
+     * @brief Non-zero pattern.
+     * 
+     * Return array of pairs of integers that indicate structurally non-zero positions
+     * within the matrix. Note that only the upper triangle positions are returned,
+     * because the matrix is otherwise structurally symmetrical.
+     */
+    std::vector<std::pair<int,int>> nzpattern () const;
+    
     //
     // Arithmetic and other operators
     //
@@ -1803,6 +1890,13 @@ public:
      *
      * This is a key member of the structure, defining e.g. the speed of conjugate
      * gradients and evaluation of the scattering amplitudes.
+     *
+     * @todo The performance of this routine (which accesses the data in a predictible,
+     * consecutive fashion) is mostly limited by the memory bandwidth.
+     * The routine could be slightly optimized if a "packed" version of the data
+     * structure was chosen, so that the right hand side would be loaded into processor cache
+     * only once for every dense band in the matrix (and not for every diagonal as in
+     * the present version).
      * 
      * @param B Dense matrix. It is supposed to be stored by columns and to have
      *          dimensions n times k, where n is the column count of (*this) matrix.
@@ -1813,7 +1907,8 @@ public:
      *                 of the othwerwise symmetric matrix.
      * @param parallelize Whether to use OpenMP to parallelize the SpMV operation.
      */
-    cArray dot (const cArrayView B, MatrixTriangle triangle = both, bool parallelize = false) const;
+    cArray dot (const cArrayView B) const;
+    static cArray sym_dia_dot (int n_, const iArrayView idiag_, Complex const * rp_elems_, Complex const * rp_B);
     
     /**
      * @brief Back-substitution (lower).
@@ -1852,6 +1947,9 @@ public:
     /// Return the name of the linked disk file.
     std::string hdfname () const { return name_; }
     
+    /// Return content of the 'name' file as a new SymDiaMatrix object.
+    SymDiaMatrix hdfget () const { return SymDiaMatrix(name_); }
+    
     /**
      * @brief Load from file.
      * 
@@ -1862,6 +1960,9 @@ public:
     //@{
     bool hdfload () { return hdfload (name_); }
     bool hdfload (std::string name);
+#ifndef NO_HDF
+    bool hdfload (HDFFile & hdf, std::string prefix = "");
+#endif
     //@}
     
     /**
@@ -1876,10 +1977,24 @@ public:
      * @return True on successful write, false otherwise.
      */
     //@{
-    bool hdfsave () const { return hdfsave (name_); }
-    bool hdfsave (std::string name, bool docompress = false, int consec = 10) const;
+    bool hdfsave
+    (
+        std::string name,
+        HDFFile::FileAccess flags = HDFFile::overwrite,
+        bool docompress = false,
+        std::size_t consec = 10
+    ) const;
+    bool hdfsave
+    (
+        HDFFile::FileAccess flags = HDFFile::overwrite,
+        bool docompress = false,
+        std::size_t consec = 10
+    ) const
+    {
+        return hdfsave(name_, flags, docompress, consec);
+    }
     //@}
-
+    
     //
     // Conversions to other formats
     //
@@ -1994,6 +2109,122 @@ private:
      * @endverbatim
      */
     void setup_dptrs_();
+};
+
+class BlockSymDiaMatrix
+{
+    private:
+        
+        /// Name of HDF5 scratch disk file.
+        std::string diskfile_;
+        
+        /// Whether to keep in memory.
+        bool inmemory_;
+        
+        /// Size of a matrix block and also of the block structure.
+        std::size_t size_;
+        
+        /// List of block positions (only upper part).
+        std::vector<std::pair<int,int>> structure_;
+        
+        /// Diagonal labels.
+        iArray idiag_;
+        
+        /// Data array.
+        cArray data_;
+        
+    public:
+        
+        //
+        // Constructors.
+        //
+        
+        BlockSymDiaMatrix (int size = 0)
+            : diskfile_(), inmemory_(true), size_(size), data_() {}
+        
+        /**
+         * @brief Main constructor.
+         * 
+         * @param Nblock Number of blocks in a row (column) of the block matrix.
+         * @param blocksize Number of element in a row (column) of every single block.
+         * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
+         * @param name Name of the optional scratch disk file.
+         */
+        BlockSymDiaMatrix (int size, std::vector<std::pair<int,int>> const & blockstructure, const iArrayView idiag, bool inmemory = true, std::string name = "")
+            : diskfile_(name), inmemory_(inmemory), size_(size), structure_(blockstructure), idiag_(idiag), data_()
+        {
+            if (inmemory_)
+            {
+                data_.resize(structure_.size() * structure_.size());
+            }
+#ifdef NO_HDF
+            else
+            {
+                Exception("The program is not compiled with support for scratch-disk HDF files.");
+            }
+#endif
+        }
+        
+        /// Is this object cached in memory?
+        bool inmemory () const
+        {
+            return inmemory_;
+        }
+        
+        /// Get block structure (only upper part!).
+        std::vector<std::pair<int,int>> const & structure () const
+        {
+            return structure_;
+        }
+        
+        /// Access individual blocks.
+        cArray getBlock (int i) const;
+        void setBlock (int i, const cArrayView data);
+        
+        //
+        // Arithmetic operators.
+        //
+        
+        /**
+         * @brief Multiply (block) vector by the matrix.
+         * 
+         * @param v Vector to multiply. It should be of equal size to the size of the matrix.
+         *          The result will be again of the same size.
+         * @param parallelize Multiply by several blocks at once (OpenMP used).
+         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
+         */
+        cArray dot (cArrayView v, bool parallelize = false) const;
+        
+        //
+        // Coversions to other matrix types.
+        //
+        
+        /**
+         * @brief Convert to COO format.
+         * 
+         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
+         */
+        CooMatrix tocoo () const;
+        
+        //
+        // Scratch file I/O.
+        //
+        
+        /// Get name of the scratch disk file.
+        std::string hdfname () const { return diskfile_; }
+        std::string & hdfname () { return diskfile_; }
+        
+        /// Check that the scratch disk file exists.
+        bool hdfcheck () const;
+        
+        /// Reset (= create empty) HDF scratch file needed when writing individual blocks.
+        bool hdfinit () const;
+        
+        /// Write all blocks from memory to the disk file.
+        bool hdfsave () const;
+        
+        /// Load data from disk to memory.
+        bool hdfload ();
 };
 
 // --------------------------------------------------------------------------//
@@ -2151,7 +2382,8 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
  * @param B Second matrix.
  */
 CooMatrix kron (CooMatrix const & A, CooMatrix const & B);
-SymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
+BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
+cArray kron_dot (SymDiaMatrix const & A, SymDiaMatrix const & B, const cArrayView v);
 
 /**
  * Identity matrix.

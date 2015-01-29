@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <algorithm>
 #include <cstring>
@@ -110,9 +129,13 @@ int main (int argc, char* argv[])
         "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
         "vars", "v",     0, [ & ](std::string opt) -> bool
         {
-            std::cout << "(name)\t\t(description)" << std::endl;
+            OutputTable table;
+            table.setAlignment(OutputTable::left, OutputTable::left);
+            table.setWidth(20,40);
+            table.write("(name)", "(description)");
             for (Variable const * var : vlist)
-                std::cout << var->id() << "\t\t" << var->description() << std::endl;
+                table.write(var->id(), var->description());
+            
             std::exit(EXIT_SUCCESS);
         },
         "params", "p",   1, [ & ](std::string opt) -> bool
@@ -126,16 +149,28 @@ int main (int argc, char* argv[])
             
             if (it == vlist.end())
             {
-                std::cout << "No such variable \"" << opt << "\"\n";
+                std::cout << "No such variable \"" << opt << "\"" << std::endl;
             }
             else
             {
-                std::cout << "\nVariable \"" << opt << "\" uses the following parameters:\n\n\t";
-                for (std::string v : (*it)->deps())
-                    std::cout << v << " ";
-                std::cout << "\n\nof which one of the following can be read from the standard input:\n\n\t";
+                std::cout << std::endl;
+                std::cout << "Variable \"" << opt << "\" uses the following parameters:" << std::endl;
+                std::cout << std::endl;
+                
+                OutputTable table;
+                table.setAlignment(OutputTable::left, OutputTable::left);
+                table.setWidth(20,40);
+                for (auto v : (*it)->deps())
+                    table.write(v.first, v.second);
+                
+                std::cout << std::endl;
+                
+                std::cout << "of which one of the following can be read from the standard input:" << std::endl;;
+                std::cout << std::endl;
+                
                 for (std::string v : (*it)->vdeps())
                     std::cout << v << " ";
+                
                 std::cout << std::endl << std::endl;
             }
             std::exit(EXIT_SUCCESS);
@@ -197,8 +232,16 @@ int main (int argc, char* argv[])
             // try to find it in the variable dependencies
             for (const Variable* var : vlist)
             {
-                std::vector<std::string> const & deps = var->deps();
-                if (std::find(deps.begin(), deps.end(), arg) != deps.end())
+                // scan the dependencies for 'arg'
+                bool this_arg_is_needed = false;
+                for (auto iter = var->deps().begin(); iter != var->deps().end(); iter++)
+                {
+                    if (iter->first == arg)
+                        this_arg_is_needed = true;
+                }
+                
+                // if this parameter has been found, process it furher
+                if (this_arg_is_needed)
                 {
                     // check parameter
                     if (par.empty())
@@ -212,7 +255,7 @@ int main (int argc, char* argv[])
                     return true;
                 }
             }
-
+            
             return false;
         }
     );

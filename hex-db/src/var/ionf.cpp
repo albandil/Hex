@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -25,11 +44,16 @@
 
 const std::string IonizationF::Id = "ionf";
 const std::string IonizationF::Description = "Ionization amplitude radial part.";
-const std::vector<std::string> IonizationF::Dependencies = {
-    "ni", "li", "mi", 
-    "L", "S",
-    "Ei", "l1", "l2",
-    "Eshare"
+const std::vector<std::pair<std::string,std::string>> IonizationF::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"l1", "Atomic electron orbital momentum in the final state."},
+    {"l2", "Projectile orbital momentum in the final state."},
+    {"Eshare", "Energy fraction (atomic vs projectile electron) in the final state."}
 };
 const std::vector<std::string> IonizationF::VecDependencies = { "Eshare" };
 
@@ -71,19 +95,19 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int  L = As<int>(sdata,  "L", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    int l1 = As<int>(sdata, "l1", Id);
-    int l2 = As<int>(sdata, "l2", Id);
-    double Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int  L = Conv<int>(sdata,  "L", Id);
+    int  S = Conv<int>(sdata,  "S", Id);
+    int l1 = Conv<int>(sdata, "l1", Id);
+    int l2 = Conv<int>(sdata, "l2", Id);
+    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // read energy sharing (in user units)
     rArray Eshare;
     try {
-        Eshare.push_back(As<double>(sdata, "Eshare", Id));
+        Eshare.push_back(Conv<double>(sdata, "Eshare", Id));
     } catch (std::exception e) {
         Eshare = readStandardInput<double>();
     }
@@ -164,14 +188,21 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
         "# and impact energy\n" <<
         "#     Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by energy share " << 
-        "# \n" <<
-        "# Eshare\t Re f\t Im f\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# Eshare   ", "Re f     ", "Im f     ");
+    table.write("# ---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < Eshare.size(); i++)
     {
-        std::cout << 
-            Eshare[i] << "\t" << 
-            f_out[i].real()*lfactor << "\t" <<
-            f_out[i].imag()*lfactor << "\n";
+        table.write
+        (
+            Eshare[i],
+            f_out[i].real()*lfactor,
+            f_out[i].imag()*lfactor
+        );
     }
     
     return true;

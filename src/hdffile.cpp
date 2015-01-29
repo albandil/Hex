@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef NO_HDF
 
@@ -19,24 +38,33 @@
 #include "hdffile.h"
 #include "misc.h"
 
-HDFFile::HDFFile(std::string filename, FileAccess flag)
-    : file_(nullptr), valid_(true)
+HDFFile::HDFFile (std::string filename, FileAccess flag)
+    : prefix(), file_(nullptr), name_(filename), valid_(true)
 {
+    // separate filesystem path and dataset path (by semicolon)
+    std::size_t pos = name_.find(':');
+    if (pos != std::string::npos)
+    {
+        prefix = name_.substr(pos + 1);
+        name_.resize(pos);
+    }
+    
+    // try to open the file
     try
     {
         switch (flag)
         {
             case readonly:
-                file_ = new H5::H5File(filename.c_str(), H5F_ACC_RDONLY);
+                file_ = new H5::H5File(name_.c_str(), H5F_ACC_RDONLY);
                 break;
             case overwrite:
-                file_ = new H5::H5File(filename.c_str(), H5F_ACC_TRUNC);
+                file_ = new H5::H5File(name_.c_str(), H5F_ACC_TRUNC);
                 break;
             case failifexists:
-                file_ = new H5::H5File(filename.c_str(), H5F_ACC_EXCL);
+                file_ = new H5::H5File(name_.c_str(), H5F_ACC_EXCL);
                 break;
             case readwrite:
-                file_ = new H5::H5File(filename.c_str(), H5F_ACC_RDWR);
+                file_ = new H5::H5File(name_.c_str(), H5F_ACC_RDWR);
                 break;
         }
     }
@@ -47,7 +75,7 @@ HDFFile::HDFFile(std::string filename, FileAccess flag)
     }
 }
 
-HDFFile::~HDFFile()
+HDFFile::~HDFFile ()
 {
     if (file_ != nullptr)
     {
@@ -57,85 +85,27 @@ HDFFile::~HDFFile()
     }
 }
 
-size_t HDFFile::size(std::string dataset) const
+std::size_t HDFFile::size (std::string dataset) const
 {
     if (not valid_)
         return 0;
     
     try
     {
+        dataset = prefix + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
-        size_t length = dspc.getSimpleExtentNpoints();
+        std::size_t length = dspc.getSimpleExtentNpoints();
         return length;
     }
     catch (...)
     {
-        return 0;
+        // the dataset doesn't exist
+        return 0; // Exception("Failed to retrieve size of HDF dataset \"%s\".", dataset.c_str());
     }
 }
 
-template<> bool HDFFile::read<int>(std::string dataset, int* buffer, size_t length) const
-{
-    return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
-}
-
-template<> bool HDFFile::read<unsigned int>(std::string dataset, unsigned int * buffer, size_t length) const
-{
-    return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
-}
-
-template<> bool HDFFile::read<long>(std::string dataset, long* buffer, size_t length) const
-{
-    return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_LONG));
-}
-
-template<> bool HDFFile::read<unsigned long>(std::string dataset, unsigned long * buffer, size_t length) const
-{
-    return read_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_ULONG));
-}
-
-template<> bool HDFFile::read<double>(std::string dataset, double* buffer, size_t length) const
-{
-    return read_(dataset, buffer, length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::read<Complex>(std::string dataset, Complex* buffer, size_t length) const
-{
-    return read_(dataset, buffer, 2*length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::write<int>(std::string dataset, int const * buffer, size_t length)
-{
-    return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_INT));
-}
-
-template<> bool HDFFile::write<unsigned int>(std::string dataset, unsigned int const * buffer, size_t length)
-{
-    return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_UINT));
-}
-
-template<> bool HDFFile::write<long>(std::string dataset, long const * buffer, size_t length)
-{
-    return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_LONG));
-}
-
-template<> bool HDFFile::write<unsigned long>(std::string dataset, unsigned long const * buffer, size_t length)
-{
-    return write_(dataset, buffer, length, H5::IntType(H5::PredType::NATIVE_ULONG));
-}
-
-template<> bool HDFFile::write<double>(std::string dataset, double const * buffer, size_t length)
-{
-    return write_(dataset, buffer, length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-template<> bool HDFFile::write<Complex>(std::string dataset, Complex const * buffer, size_t length)
-{
-    return write_(dataset, buffer, 2*length, H5::FloatType(H5::PredType::NATIVE_DOUBLE));
-}
-
-bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::AtomType dtype) const
+bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype) const
 {
     if (not valid_)
         return false;
@@ -144,23 +114,28 @@ bool HDFFile::read_(std::string dataset, void * buffer, hsize_t length, H5::Atom
         return true;
     try
     {
+        
+        dataset = prefix + dataset;
         H5::DataSet dset = file_->openDataSet(dataset.c_str());
         H5::DataSpace dspc = dset.getSpace();
         
-        if (length != (hsize_t)dspc.getSimpleExtentNpoints())
-            throw exception ("Dimensions do not match, %ld != %ld.", length, dspc.getSimpleExtentNpoints());
+        dspc.selectHyperslab(H5S_SELECT_SET, &length, &offset);
         
-        dset.read(buffer, dtype, dspc, dspc);
+        H5::DataSpace mspc(1, &length);
+        
+        if (buffer != nullptr)
+            dset.read(buffer, dtype, mspc, dspc);
         
         return true;
     }
-    catch (H5::FileIException e)
+    catch (H5::Exception & e)
     {
-        return false;
+        e.printErrorStack();
+        Exception("Failed to read HDF dataset \"%s\" from file \"%s\".", dataset.c_str(), name_.c_str());
     }
 }
 
-bool HDFFile::write_(std::string dataset, void const * buffer, hsize_t length, H5::AtomType dtype)
+bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype)
 {
     if (not valid_)
         return false;
@@ -170,16 +145,32 @@ bool HDFFile::write_(std::string dataset, void const * buffer, hsize_t length, H
     
     try
     {
-        H5::DataSpace dspc(1, &length);
-        H5::DataSet dset = file_->createDataSet(dataset.c_str(), dtype, dspc);
+        dataset = prefix + dataset;
         
-        dset.write(buffer, dtype);
+        H5::DataSet dset;
+        H5::DataSpace mspc(1, &length);
+        H5::DataSpace dspc(1, &length);
+        
+        try
+        {
+            dset = file_->openDataSet(dataset.c_str());
+            dspc = dset.getSpace();
+            dspc.selectHyperslab(H5S_SELECT_SET, &length, &offset); 
+        }
+        catch (H5::Exception)
+        {
+            dset = file_->createDataSet(dataset.c_str(), dtype, dspc);
+        }
+        
+        if (buffer != nullptr)
+            dset.write(buffer, dtype, mspc, dspc);
         
         return true;
     }
-    catch (H5::FileIException e)
+    catch (H5::Exception & e)
     {
-        return false;
+        e.printErrorStack();
+        Exception("Failed to write HDF dataset \"%s\" to file \"%s\".", dataset.c_str(), name_.c_str());
     }
 }
 

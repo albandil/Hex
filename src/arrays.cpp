@@ -1,20 +1,38 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <vector>
 
 #include "arrays.h"
-#include "complex.h"
 
 rArray abs (const cArrayView u)
 {
@@ -51,19 +69,6 @@ NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> co
 
     for (std::size_t i = 0; i < N; i++)
         C[i] = hypot(A[i], B[i]);
-
-    return C;
-}
-
-NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B)
-{
-    assert(A.size() == B.size());
-    
-    std::size_t N = A.size();
-    NumberArray<double> C (N);
-
-    for (std::size_t i = 0; i < N; i++)
-        C[i] = atan2(A[i], B[i]);
 
     return C;
 }
@@ -252,4 +257,20 @@ rArray threshold (const rArrayView a, double eps)
     }
     
     return b;
+}
+
+cArray interleave (const rArrayView re, const rArrayView im)
+{
+    if (re.size() != im.size())
+        Exception("Cannot interleave arrays of different sizes (%ld != %ld).", re.size(), im.size());
+    
+    cArray output (re.size());
+    
+    for (std::size_t i = 0; i < re.size(); i++)
+    {
+        output[i].real(re[i]);
+        output[i].imag(im[i]);
+    }
+    
+    return output;
 }

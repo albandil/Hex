@@ -1,18 +1,38 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_DIOPHANTINE
 #define HEX_DIOPHANTINE
 
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -21,30 +41,62 @@
 #include "misc.h"
 #include "special.h"
 
-template <class Functor, class Integrator>
+/**
+ * @brief Abstract base for node integrators.
+ * 
+ * This class is the base class for so called "node integrators", which compute
+ * integral as a sum of sub-integrals from specific sub-intervals. For example the
+ * sub-intervals can be given by zeros of some special function occuring in the
+ * integrand. This particular class defines the integration algorithm; however,
+ * it is general and not intended for direct use -- the member function that returns
+ * the n-th node is pure virtual and expected to be defined in some derived class.
+ * See e.g. @ref FixedNodeIntegrator for example of such class.
+ */
+template <class Functor, class Integrator, class T>
 class NodeIntegrator
 {
     private:
         
+        /// Integration rule to use on sub-intervals.
         Integrator Q_;
+        
+        /// Function to integrate (T -> T).
         Functor f_;
         
-        double result_;
+        /// Result of integration.
+        T result_;
+        
+        /// Whether the integration went all right.
         bool ok_;
+        
+        /// Error text if the integration failed.
         std::string status_;
         
+        /// Absolute tolerance.
         double epsabs_;
+        
+        /// Relative tolerance.
         double epsrel_;
+        
+        /// Maximum number of nodes to use.
         int limit_;
         
     
     public:
         
+        //
+        // constructor
+        //
+        
         NodeIntegrator (Functor f)
             : Q_(f),  f_(f), result_(0), ok_(true), status_(),
-              epsabs_(1e-8), epsrel_(1e-6), limit_(1000) {}
+              epsabs_(1e-8), epsrel_(1e-6), limit_(1024) {}
         
-        double result () const { return result_; }
+        //
+        // getters and setters
+        //
+        
+        T result () const { return result_; }
         bool ok () const { return ok_; }
         std::string const & status () const { return status_; }
         
@@ -57,9 +109,34 @@ class NodeIntegrator
         int limit () const { return limit_; }
         void setLimit (double n) { limit_ = n; }
         
+        //
+        // redefinable node getters
+        //
+        
+        /// Get n-th node.
         virtual double nthNode (int n) const = 0;
+        
+        /// Get end of classically forbidden region (= exponential rise, no nodes).
         virtual double turningPoint () const { return 0; }
         
+        //
+        // integration routine
+        //
+        
+        /**
+         * @brief Integration routine.
+         * 
+         * The function will compute integral of function over the specified finite (!) interval.
+         * The integration in the potential classically forbidden region is done by simple
+         * trapezoidal rule which is refined up to the convergence. The rest is integrated
+         * node-to-node by the supplied integrator class (see e.g. @ref GaussKronrod or
+         * @ref ClenshawCurtis).
+         * 
+         * @todo Use Romberg integration (or some other extrapolation procedure) in the classically
+         * forbidden region instead of the plain trapezoidal integration.
+         * 
+         * @todo Make the logarithmic grid adaptive in some sense. (?)
+         */
         bool integrate (double a, double b)
         {
             // initialize
@@ -74,23 +151,32 @@ class NodeIntegrator
             double rt = this->turningPoint();
             if (rt != 0 and a < rt)
             {
+                // get bounds of the classically forbidden region
                 double r0 = a;
                 double r1 = std::min(rt,b);
                 
-                double quotient = 0.75; // FIXME variable ?
-                for (int samples = 8; ; samples *= 2)
+                // logarithmic grid ratio parameter
+                // TODO : Make it variable.
+                double quotient = 0.75;
+                
+                // for different subdivision
+                for (int samples = 2; ; samples *= 2)
                 {
+                    // spread logarithmically
                     rArray grid = geomspace(r0,r1,samples,quotient);
-                    rArray eval = grid.transform(f_);
-                    double estimate = special::integral::trapz(grid, eval);
+                    
+                    // evaluate function
+                    NumberArray<T> eval = grid.transform(f_);
+                    
+                    // trapezoidally integrate
+                    // TODO : Some kind of extrapolation.
+                    T estimate = special::integral::trapz(grid, eval);
                     
                     // check iteration limit
-                    if ((int)log2(samples) == limit_)
+                    if (samples >= limit_)
                     {
-                        throw exception
-                        (
-                            "Cannot integrate classically forbidden region - reached maximal number of iterations."
-                        );
+                        result_ = estimate;
+                        break;
                     }
                     
                     // check convergence
@@ -100,10 +186,10 @@ class NodeIntegrator
                         break;
                     }
                     
-                    // check hopelessness
-                    if (estimate == 0 and result_ == 0)
+                    // check if the integral is probably clean zero
+                    if (estimate == 0)
                     {
-                        // this is probably hopeless...
+                        result_ = estimate;
                         break;
                     }
                     
@@ -118,7 +204,7 @@ class NodeIntegrator
             if (prevR == b)
                 return ok_;
             
-            // for all integration parcels (nodes of the Bessel function)
+            // for all integration parcels (nodes)
             for (int inode = 1; inode < limit_; inode++)
             {
                 // get integration bounds
@@ -134,8 +220,8 @@ class NodeIntegrator
                     break;
                 
                 // shrink integration interval, if necessary
-                rmin = std::max (a, rmin);
-                rmax = std::min (rmax, b);
+                rmin = std::max(a, rmin);
+                rmax = std::min(rmax, b);
                 
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
@@ -150,7 +236,8 @@ class NodeIntegrator
                 prevR = rmax;
                 
                 // check convergence
-                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or std::abs(Q_.result()) < epsrel_ * std::abs(result_))
+                if (std::abs(Q_.result()) < epsabs_ * std::abs(rmax - rmin) or
+                    std::abs(Q_.result()) < epsrel_ * std::abs(result_))
                     break;
             }
             
@@ -158,13 +245,19 @@ class NodeIntegrator
         }
 };
 
-template <class Functor, class Integrator>
-class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+/**
+ * @brief Bessel node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the Bessel function
+ * zeros as the integration nodes.
+ */
+template <class Functor, class Integrator, class T>
+class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         BesselNodeIntegrator (Functor f, double k, int l)
-            : NodeIntegrator<Functor,Integrator>(f), k_(k), l_(l) {}
+            : NodeIntegrator<Functor,Integrator,T>(f), k_(k), l_(l) {}
         
         virtual double nthNode (int n) const
         {
@@ -192,13 +285,19 @@ class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         int l_;
 };
 
-template <class Functor, class Integrator>
-class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+/**
+ * @brief Coulomb node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the Coulomb function
+ * zeros as the integration nodes.
+ */
+template <class Functor, class Integrator, class T>
+class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         CoulombNodeIntegrator (Functor f, double k, int l)
-            : NodeIntegrator<Functor,Integrator>(f), k_(k), l_(l), nzeros_(0), zeros_(nullptr) {}
+            : NodeIntegrator<Functor,Integrator,T>(f), k_(k), l_(l), nzeros_(0), zeros_(nullptr) {}
         
         ~CoulombNodeIntegrator()
         {
@@ -244,13 +343,22 @@ class CoulombNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         mutable double * zeros_;
 };
 
-template <class Functor, class Integrator>
-class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
+/**
+ * @brief Fixed node integrator.
+ * 
+ * This class derives from @ref NodeIntegrator and uses the node array supplied
+ * by the user.
+ */
+template <class Functor, class Integrator, class T>
+class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
 {
     public:
         
         FixedNodeIntegrator (Functor f, const rArrayView zeros, double rt = 0)
-            : NodeIntegrator<Functor,Integrator>(f), zeros_(zeros), rt_(rt) {}
+            : NodeIntegrator<Functor,Integrator,T>(f), zeros_(zeros), rt_(rt)
+        {
+            NodeIntegrator<Functor,Integrator,T>::setLimit(zeros_.size());
+        }
         
         virtual double nthNode (int n) const
         {
@@ -269,9 +377,6 @@ class FixedNodeIntegrator : public NodeIntegrator<Functor,Integrator>
         };
         
     private:
-        
-        double k_;
-        int l_;
         
         const rArray zeros_;
         double rt_;

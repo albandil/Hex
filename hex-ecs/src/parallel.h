@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_PARALLEL
 #define HEX_PARALLEL
@@ -44,9 +63,27 @@ class Parallel
             : active_(active), iproc_(0), Nproc_(1)
         {
 #ifndef NO_MPI
-            MPI_Init (argc, argv);
-            MPI_Comm_size (MPI_COMM_WORLD, &Nproc_);
-            MPI_Comm_rank (MPI_COMM_WORLD, &iproc_);
+            if (active_)
+            {
+    #ifndef _OPENMP
+                // initialize MPI
+                MPI_Init(argc, argv);
+    #else
+                // initialize MPI compatible with OpenMP
+                int req_flag = MPI_THREAD_FUNNELED, prov_flag;
+                MPI_Init_thread(argc, argv, req_flag, &prov_flag);
+                
+                // check thread support
+                if (prov_flag == MPI_THREAD_SINGLE)
+                {
+                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_FUNNELED. ";
+                    std::cout << "Every MPI process may thus run only on a single core." << std::endl;
+                }
+    #endif
+                // get number of processes and ID of this process
+                MPI_Comm_size(MPI_COMM_WORLD, &Nproc_);
+                MPI_Comm_rank(MPI_COMM_WORLD, &iproc_);
+            }
 #else
             active_ = false;
 #endif
@@ -114,35 +151,164 @@ class Parallel
         }
         
         /**
-         * @brief Synchronize across processes.
+         * @brief Broadcast array from owner to everyone.
+         */
+        template <class T> void bcast (int owner, NumberArray<T> & data) const
+        {
+            // owner : broadcast size
+            int size = data.size();
+            MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
+            
+            // all : resize data array
+            data.resize(size);
+            
+            // owner : broadcast data
+            MPI_Bcast
+            (
+                data.data(),
+                size * typeinfo<T>::ncmpt,
+                typeinfo<T>::mpicmpttype(),
+                owner,
+                MPI_COMM_WORLD
+            );
+        }
+        
+        /**
+         * @brief Send data to a process.
+         */
+        template <class T> void send (T const * array, std::size_t size, int origin, int destination) const
+        {
+            if (active_ and iproc_ == origin)
+            {
+                MPI_Send
+                (
+                    const_cast<T*>(array),
+                    typeinfo<T>::ncmpt * size,
+                    typeinfo<T>::mpicmpttype(),
+                    destination,
+                    origin,
+                    MPI_COMM_WORLD
+                );
+            }
+        }
+        
+        /**
+         * @brief Receive data from a process.
+         */
+        template <class T> void recv (T * array, std::size_t size, int origin, int destination) const
+        {
+            if (active_ and iproc_ == destination)
+            {
+                MPI_Status status;
+                
+                MPI_Recv
+                (
+                    array,
+                    typeinfo<T>::ncmpt * size,
+                    typeinfo<T>::mpicmpttype(),
+                    origin,
+                    origin,
+                    MPI_COMM_WORLD,
+                    &status
+                );
+            }
+        }
+        
+        /**
+         * @brief Synchronize across processes by composition.
          * 
          * Synchronize array across processes. It is assumed that i-th chunk of the array is
          * present on the (i % Nproc_)-th process. That process will be used as the broadcast root.
          * This behaviour is compatible with the member function @ref isMyWork.
          * 
-         * @param array Array to synchronize,
+         * @param array Pointer to data array to synchronize.
          * @param chunksize Size of the per-process segment.
          * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
          *               will be synchronized. If there are some elements more, they will be left
          *               untouched (and un-broadcast).
+         * 
+         * It is expected that the array has length equal or greater than chunksize * Nchunk.
          */
-        template <class T> void sync (ArrayView<T> array, std::size_t chunksize, std::size_t Nchunk) const
+        template <class T> void sync (T * array, std::size_t chunksize, std::size_t Nchunk) const
         {
 #ifndef NO_MPI
             if (active_)
             {
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
                 {
-                    // relevant process will broadcast this chunk's data
                     MPI_Bcast
                     (
-                        array.data() + ichunk * chunksize,
-                        chunksize,
-                        MPI_DOUBLE_COMPLEX,
+                        array + ichunk * chunksize,
+                        chunksize * typeinfo<T>::ncmpt,
+                        typeinfo<T>::mpicmpttype(),
                         ichunk % Nproc_,
                         MPI_COMM_WORLD
                     );
                 }
+            }
+#endif
+        }
+        
+        /**
+         * @brief Sum arrays to node.
+         * 
+         */
+        template <class T> void sum (T* array, std::size_t N, int owner = 0) const
+        {
+#ifndef NO_MPI
+            if (active_)
+            {
+                NumberArray<T> tmp(N);
+                MPI_Status status;
+                
+                // slaves will send their data to owner
+                if (iproc_ != owner)
+                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, owner, iproc_, MPI_COMM_WORLD);
+                
+                // master node will receive and sum the data
+                if (iproc_ == owner)
+                {
+                    // for all non-master processes
+                    for (int i = 0; i < Nproc_; i++)
+                    {
+                        // skip self
+                        if (i == iproc_)
+                            continue;
+                        
+                        // receive data from a particular node into 'tmp'
+                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
+                        
+                        // sum the arrays
+                        ArrayView<T>(N, array) += tmp;
+                    }
+                }
+            }
+#endif
+        }
+        
+        /**
+         * @brief Synchronize across processes by summing.
+         * 
+         * Synchronize array across processes by summing. There are no assumptions on what
+         * segment is on which node. The whole arrays are broadcasted and summed on every node.
+         * 
+         * @param array Pointer to data array to synchronize.
+         * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
+         *               will be synchronized. If there are some elements more, they will be left
+         *               untouched (and un-broadcast).
+         * 
+         * It is expected that the array has length equal or greater than chunksize * Nchunk.
+         */
+        template <class T> void syncsum (T* array, std::size_t N) const
+        {
+#ifndef NO_MPI
+            if (active_)
+            {
+                // master node will receive and sum the data ...
+                sum(array, N, 0);
+                
+                // ... and broadcast the result back to all the slaves
+                MPI_Bcast(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
             }
 #endif
         }

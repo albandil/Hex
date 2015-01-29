@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_CLENSHAWCURTIS
 #define HEX_CLENSHAWCURTIS
@@ -45,8 +64,8 @@ public:
      * @param  f Function to integrate of the signature FType(*)(double x).
      */ 
     ClenshawCurtis (Functor const & f) : F(f), EpsRel(1e-8), EpsAbs(1e-12), 
-        Limit(true), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
-        vName("[ClenshawCurtis_ff]"), Throw(true) {}
+        Limit(false), Recurrence(true), NNest(5), NStack(5), L(1.0), Verbose(false),
+        vName("[ClenshawCurtis_ff]"), Log(std::cout.rdbuf()), Throw(true) {}
     
     /// Get relative tolerance.
     inline double eps() const { return EpsRel; }
@@ -94,7 +113,17 @@ public:
     inline bool verbose() const { return Verbose; }
     
     /// Set verbose flag.
-    inline void setVerbose(bool verbose, std::string name = "ClenshawCurtis_ff") { Verbose = verbose; vName = name; }
+    inline void setVerbose
+    (
+        bool verbose,
+        std::string name = "ClenshawCurtis_ff",
+        std::ostream & stream = std::cout
+    )
+    {
+        Verbose = verbose;
+        vName = name;
+        Log.rdbuf(stream.rdbuf());
+    }
     
     /// Set warn flag.
     inline void setThrowAll(bool t) { Throw = t; }
@@ -137,6 +166,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
+            cc_G.setVerbose(Verbose, vName);
             
             // integrate
             return -cc_G.integrate_ff(-1., 1., n);    // (-∞,x2)->(1,-1)
@@ -157,6 +187,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
+            cc_G.setVerbose(Verbose, vName);
             
             // integrate
             return cc_G.integrate_ff(-1., 1., n);    // (x1,+∞)->(-1,1)
@@ -217,8 +248,12 @@ public:
             fvals.resize(2*N + 1);
             ftraf.resize(2*N);
             
-            // create plan
-            fftw_plan plan = fftw_plan_dft_1d
+            // create plan (thread-safe)
+            fftw_plan plan;
+#ifdef _OPENMP
+            # pragma omp critical
+#endif
+            plan = fftw_plan_dft_1d
             (
                 2*N,
                 reinterpret_cast<fftw_complex*>(&fvals[0]),
@@ -237,12 +272,12 @@ public:
                     fvals[k] = fvals[2*N-k] = f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("%s \"%g\" when evaluating function at %g", vName.c_str(), std::abs(fvals[k]), std::cos(k * pi_over_N));
+                        Exception("%s \"%g\" when evaluating function at %g", vName.c_str(), std::abs(fvals[k]), std::cos(k * pi_over_N));
                 }
                 fvals[N] = f(-1);
                 
                 if (not std::isfinite(std::abs(fvals[N])))
-                    throw exception("%s \"%g\" when evaluating function at -1.", vName.c_str(), std::abs(fvals[N]));
+                    Exception("%s \"%g\" when evaluating function at -1.", vName.c_str(), std::abs(fvals[N]));
             }
             else
             {
@@ -253,15 +288,21 @@ public:
                     fvals[k] = fvals[2*N-k] = (k % 2 == 0) ? fvals_prev[k/2] : f(std::cos(k * pi_over_N));
                     
                     if (not std::isfinite(std::abs(fvals[k])))
-                        throw exception("%s \"%g\" when evaluating function.", vName.c_str(), std::abs(fvals[k]));
+                        Exception("%s \"%g\" when evaluating function.", vName.c_str(), std::abs(fvals[k]));
                 }
                 fvals[N] = fvals_prev[N/2];
             }
             
+            // append element
             coefs.resize(N + 1);
 
             // compute coefficients using FFT/DCT-I
             fftw_execute(plan);
+            
+            // delete plan (thread-safe)
+#ifdef _OPENMP
+            # pragma omp critical
+#endif
             fftw_destroy_plan(plan);
             
             // create type-correct pointer
@@ -282,7 +323,7 @@ public:
             }
             else
             {
-                throw exception("%s Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
+                Exception("%s Can't handle datatype \"%s\".", vName.c_str(), typeid(FType).name());
             }
             
             // sum the quadrature rule
@@ -292,13 +333,13 @@ public:
             
             // echo debug information
             if (Verbose)
-                std::cout << vName << " N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
+                Log << vName << " N = " << N << ", Sum = " << FType(2.*(x2-x1)/N)*sum << "\n";
             
             // check for convergence
             if (std::abs(sum - FType(2.) * sum_prev) <= std::max(EpsRel*std::abs(sum), EpsAbs))
             {
                 if (Verbose)
-                    std::cout << vName << " Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
+                    Log << vName << " Convergence for N = " << N << ", sum = " << FType(2. * (x2 - x1) / N) * sum << "\n";
                 
                 return FType(2. * (x2 - x1) / N) * sum;
             }
@@ -307,7 +348,7 @@ public:
                   and std::max(std::abs(sum), std::abs(sum_prev)) <= EpsAbs * std::abs(x2-x1) )
             {
                 if (Verbose)
-                    std::cout << vName << " EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
+                    Log << vName << " EpsAbs limit matched, " << EpsAbs << " on (" << x1 << "," << x2 << ").\n";
                 
                 return FType(0.);
             }
@@ -328,11 +369,11 @@ public:
         {
             if (Throw)
             {
-                throw exception("%s Insufficient evaluation limit %d", vName.c_str(), maxN);
+                Exception("%s Insufficient evaluation limit %d", vName.c_str(), maxN);
             }
             else
             {
-                std::cout << vName << " WARNING: Insufficient evaluation limit " << maxN << ".\n";
+                Log << vName << " WARNING: Insufficient evaluation limit " << maxN << ".\n";
                 return FType(2. * (x2 - x1) / maxN) * sum;
             }
         }
@@ -345,7 +386,7 @@ public:
         if (std::abs(x2-x1) < EpsAbs)
         {
             if (Verbose)
-                std::cout << vName << " Interval smaller than " << EpsAbs << "\n";
+                Log << vName << " Interval smaller than " << EpsAbs << "\n";
             return 0;
         }
         
@@ -353,15 +394,15 @@ public:
         if (NStack == 0)
         {
             if (Verbose)
-                std::cout << vName << " Bisection inhibited due to internal stack limit.\n";
+                Log << vName << " Bisection inhibited due to internal stack limit.\n";
             return FType(2. * (x2 - x1) / maxN) * sum;
         }
         
         if (Verbose)
         {
-            std::cout << vName << " Bisecting to ("
-                      << x1 << "," << (x2+x1)/2 << ") and ("
-                      << (x2+x1)/2 << "," << x2 << ")\n";
+            Log << vName << " Bisecting to ("
+                << x1 << "," << (x2+x1)/2 << ") and ("
+                << (x2+x1)/2 << "," << x2 << ")\n";
         }
         
         // the actual bisection - also the attributes of the class need to be modified
@@ -512,6 +553,9 @@ private:
     
     /// Debuggin information identification.
     std::string vName;
+    
+    /// Debugging stream (defaults to 'std::cout').
+    mutable std::ostream Log;
     
     /// Throw on non-critical errors.
     bool Throw;

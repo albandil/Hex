@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <algorithm>
 #include <map>
@@ -66,10 +85,14 @@ void db_bornICS (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 const std::string CompleteCrossSection::Id = "ccs";
 const std::string CompleteCrossSection::Description = "Complete cross section (L- and S-summed integral cross section).";
-const std::vector<std::string> CompleteCrossSection::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> CompleteCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 
@@ -140,7 +163,7 @@ void hex_complete_cross_section_
         st.exec();
         
         // if a reallocation is needed, return
-        if (*N != *n)
+        if (*N != *n or ccs == nullptr)
             return;
     }
     
@@ -246,12 +269,12 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
     
     // energies and cross sections
     rArray energies;
@@ -260,7 +283,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         
@@ -274,7 +297,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     // complete cross section array
     rArray ccs(energies.size());
     
-    // resize arrays if all energies are requester
+    // resize arrays if all energies are requested
     if (energies[0] < 0)
     {
         int N;
@@ -283,12 +306,15 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N);
         
         // resize
-        scaled_energies.resize(N); scaled_energies[0] = -1;
+        scaled_energies.resize(N);
         ccs.resize(N);
+        if (N > 0)
+            scaled_energies[0] = -1;
     }
     
     // retrieve requested energies
-    hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
+    if (scaled_energies.size() > 0)
+        hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
     
     // write header
     std::cout << logo("#") <<
@@ -296,12 +322,19 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\t σ\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "sigma    ");
+    table.write("# ---------", "---------");
+    
+    if (scaled_energies.size() == 0)
+        std::cout << "#\n# The database contains no relevant data." << std::endl;
     
     // write data
     for (std::size_t i = 0; i < scaled_energies.size(); i++)
-        std::cout << scaled_energies[i]/efactor << "\t" << (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.) << std::endl;
+        table.write(scaled_energies[i]/efactor, (std::isfinite(ccs[i]) ? ccs[i] * lfactor * lfactor : 0.));
     
     return true;
 }

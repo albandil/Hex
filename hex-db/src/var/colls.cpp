@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <algorithm>
 #include <map>
@@ -21,11 +40,16 @@
 
 const std::string CollisionStrength::Id = "colls";
 const std::string CollisionStrength::Description = "Collision strength (energy scaled integral cross section).";
-const std::vector<std::string> CollisionStrength::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "L", "S",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> CollisionStrength::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> CollisionStrength::VecDependencies = { "Ei" };
 
@@ -53,14 +77,14 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
 //     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    int  L = As<int>(sdata, "L", Id);
-    int  S = As<int>(sdata, "S", Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    int  L = Conv<int>(sdata, "L", Id);
+    int  S = Conv<int>(sdata, "S", Id);
     
     // energies and cross sections
     double E, sigma, sigmab;
@@ -70,7 +94,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         
@@ -110,8 +134,12 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\tΩ\tΩBorn\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "omega    ", "omegaB   ");
+    table.write("# ---------", "---------", "---------");
     
     // terminate if no data
     if (E_arr.size() == 0)
@@ -132,7 +160,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
             double OmegaB = E_arr[i] * (2*li+1) * sigmab_arr[i] / cs_prefactor;
             
             // print collisions strengths
-            std::cout << E_arr[i] / efactor << "\t" << Omega << "\t" << OmegaB << "\n";
+            table.write(E_arr[i] / efactor, Omega, OmegaB);
         }
     }
     else
@@ -159,7 +187,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << omegas[i] << "\t" << omegasB[i] << "\n";
+            table.write(energies[i], omegas[i], omegasB[i]);
     }
     
     return true;

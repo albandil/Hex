@@ -1,21 +1,39 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <algorithm>
 #include <vector>
 
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 
 
 // ----------------------------------------------------------------------- //
@@ -25,16 +43,30 @@
 
 Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
 {
-    if (k == 0)
-        return  (i == iknot) ? 1. : 0.;
+    // NOTE: The following bounds check is the caller's responsibility:
+    // if (r <= t_[i] or t_[i + k] <= r)
+    //    return 0.;
     
-    Complex A = bspline(i,   iknot, k-1, r);
-    Complex B = bspline(i+1, iknot, k-1, r);
+    // value of the parent B-splines of the requested B-spline
+    Complex b[k + 1];
     
-    Complex S1 = (t_[i+k]   != t_[i])   ? (r - t_[i]) / (t_[i+k] - t_[i]) : 0.;
-    Complex S2 = (t_[i+k+1] != t_[i+1]) ? (t_[i+k+1] - r) / (t_[i+k+1] - t_[i+1]) : 0.;
+    // initialize zero-order B-splines
+    for (int n = 0; n <= k; n++)
+        b[n] = (i + n == iknot ? 1. : 0.);
     
-    return A * S1 + B * S2;
+    // calculate higher orders
+    for (int ord = 1; ord <= k; ord++)
+    {
+        // update splines
+        for (int n = 0; n <= k-ord; n++)
+        {
+            b[n] = (t_[i+ord+n]   == t_[i+n]   ? 0. : b[n]   * (r    -    t_[i+n]) / (t_[i+ord+n]   -   t_[i+n]))
+                 + (t_[i+ord+n+1] == t_[i+n+1] ? 0. : b[n+1] * (t_[i+ord+n+1] - r) / (t_[i+ord+n+1] - t_[i+n+1]));
+        }
+    }
+    
+    // return the collected value of the requested B-spline
+    return b[0];
 }
 
 Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
@@ -57,10 +89,76 @@ Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
 // ----------------------------------------------------------------------- //
 
 
-void Bspline::B (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
+void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Complex * const restrict y) const
 {
-    for (int j = 0; j < n; j++)
-        y[j] = bspline(i, iknot, order_, x[j]);
+    // NOTE: The caller's responsibility is to check that all 'x' lie within the definition domain of the i-th B-spline.
+    
+    if (i + order_ + 1 < Nreknot_)
+    {
+        //
+        // All knots are real here => use real arithmetic.
+        //
+        
+        // value of the parent B-splines of the requested B-spline
+        double b[M][order_ + 1];
+        
+        // initialize zero-order B-splines
+        for (int m = 0; m < M; m++)
+        for (int n = 0; n <= order_; n++)
+            b[m][n] = (i + n == iknot ? 1. : 0.);
+        
+        // calculate higher orders
+        for (int ord = 1; ord <= order_; ord++)
+        {
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                double invden1 = (rknots_[i+ord+n]   == rknots_[i+n]   ? 0. : 1. / (rknots_[i+ord+n]   - rknots_[i+n]));
+                double invden2 = (rknots_[i+ord+n+1] == rknots_[i+n+1] ? 0. : 1. / (rknots_[i+ord+n+1] - rknots_[i+n+1]));
+                
+                // for all evaluation points
+                for (int m = 0; m < M; m++)
+                    b[m][n] = b[m][n] * (x[m].real() - rknots_[i+n]) * invden1 + b[m][n+1] * (rknots_[i+ord+n+1] - x[m].real()) * invden2;
+            }
+        }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m][0];
+    }
+    else
+    {
+        //
+        // Some knots are complex here => use complex arithmetic.
+        //
+        
+        // value of the parent B-splines of the requested B-spline
+        Complex b[M][order_ + 1];
+        
+        // initialize zero-order B-splines
+        for (int m = 0; m < M; m++)
+        for (int n = 0; n <= order_; n++)
+            b[m][n] = (i + n == iknot ? 1. : 0.);
+        
+        // calculate higher orders
+        for (int ord = 1; ord <= order_; ord++)
+        {
+            // update splines
+            for (int n = 0; n <= order_ - ord; n++)
+            {
+                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0. : 1. / (t_[i+ord+n]   - t_[i+n]));
+                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0. : 1. / (t_[i+ord+n+1] - t_[i+n+1]));
+                
+                // for all evaluation points
+                for (int m = 0; m < M; m++)
+                    b[m][n] = b[m][n] * (x[m] - t_[i+n]) * invden1 + b[m][n+1] * (t_[i+ord+n+1] - x[m]) * invden2;
+            }
+        }
+        
+        // return the collected value of the requested B-spline
+        for (int m = 0; m < M; m++)
+            y[m] = b[m][0];
+    }
 }
 
 void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const
@@ -170,7 +268,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
             // increment knot
             while ( ix->real() > t_[iknot+1].real() )
                 if (++iknot >= Nknot_)
-                    throw exception("Some evaluation points are outside of grid.");
+                    Exception("Some evaluation points are outside of grid.");
             
             // evaluate this spline at *ix
             evBx[ispline][ix-xleft] = bspline(ispline, iknot, order_, *ix);
@@ -208,7 +306,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
             // increment knot
             while ( iy->real() > t_[iknot+1].real() )
                 if (++iknot >= Nknot_)
-                    throw exception("Some evaluation points are outside of grid.");
+                    Exception("Some evaluation points are outside of grid.");
             
             // evaluate this spline at *ix
             evBy[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);

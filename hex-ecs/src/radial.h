@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_MOMENTS
 #define HEX_MOMENTS
@@ -18,16 +37,11 @@
 
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"
 #include "special.h"
 #include "matrix.h"
-
-#ifndef NO_OPENCL
-#include "opencl.h"
-#endif
 
 class weightEdgeDamp
 {
@@ -58,7 +72,7 @@ class weightEndDamp
     public:
         
         // constructor
-        weightEndDamp(Bspline const & bspline)
+        weightEndDamp (Bspline const & bspline)
             : bspline_(bspline) {}
         
         // weight function
@@ -87,8 +101,8 @@ class RadialIntegrals
               Mm1_(bspline.Nspline()), Mm1_tr_(bspline.Nspline()), Mm2_(bspline.Nspline()) {}
         
         // public callable members
-        void setupOneElectronIntegrals();
-        void setupTwoElectronIntegrals(Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
+        void setupOneElectronIntegrals (CommandLine const & cmd);
+        void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
         
         /**
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$
@@ -97,7 +111,7 @@ class RadialIntegrals
          * @param j      B-spline index.
          * @param iknot  Interval index.
          */
-        Complex computeD_iknot(int i, int j, int iknot) const;
+        Complex computeD_iknot (int i, int j, int iknot) const;
         
         /**
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
@@ -105,7 +119,7 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeD(int i, int j, int maxknot = -1) const;
+        Complex computeD (int i, int j, int maxknot = -1) const;
         
         /**
          * Compute integral moment of coordinate power between the B-splines
@@ -117,7 +131,7 @@ class RadialIntegrals
          * @param iknot  Interval index.
          * @param R      Potential truncation point.
          */
-        Complex computeM_iknot(int a, int i, int j, int iknot, Complex R) const;
+        Complex computeM_iknot (int a, int i, int j, int iknot, Complex R) const;
         
         /**
          * Compute integral moment of coordinate power between the B-splines
@@ -127,7 +141,7 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeM(int a, int i, int j, int maxknot = 0) const;
+        Complex computeM (int a, int i, int j, int maxknot = 0) const;
         
         /**
          * Compute logarithms of integral moment of degree "a" for every B-spline pair and every
@@ -139,7 +153,7 @@ class RadialIntegrals
          * @param a Moment degree.
          * @param iknotmax Index of knot that terminates the integration range.
          */
-        cArray computeMi(int a, int iknotmax = 0) const;
+        cArray computeMi (int a, int iknotmax = 0) const;
         
         rArray computeScale (int a, int iknotmax = 0) const;
         
@@ -181,17 +195,11 @@ class RadialIntegrals
         void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
         void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
         
-        void allSymmetries
-        (
-            int i, int j, int k, int l,
-            Complex Rijkl_tr,
-            NumberArray<long> & R_tr_i,
-            NumberArray<long> & R_tr_j,
-            NumberArray<Complex> & R_tr_v
-        ) const;
-        
-        /** Compute P-overlaps
+        /** 
+         * @brief Compute P-overlaps
+         * 
          * Compute overlap vector of B-splines vs. hydrogen Pnl function.
+         * 
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
          * @param weightf Weight function to multiply every value of the hydrogenic function.
@@ -346,7 +354,7 @@ class RadialIntegrals
             return res;
         }
         
-        Bspline const & bspline() const { return bspline_; }
+        Bspline const & bspline () const { return bspline_; }
         
         SymDiaMatrix const & D() const { return D_; }
         SymDiaMatrix const & S() const { return S_; }
@@ -354,13 +362,48 @@ class RadialIntegrals
         SymDiaMatrix const & Mm1_tr() const { return Mm1_tr_; }
         SymDiaMatrix const & Mm2() const { return Mm2_; }
         
-        SymDiaMatrix const & R_tr_dia(unsigned i) const
+        RowMatrix<Complex> const & D_d() const { return D_d_; }
+        RowMatrix<Complex> const & S_d() const { return S_d_; }
+        RowMatrix<Complex> const & Mm1_d() const { return Mm1_d_; }
+        RowMatrix<Complex> const & Mm1_tr_d() const { return Mm1_tr_d_; }
+        RowMatrix<Complex> const & Mm2_d() const { return Mm2_d_; }
+        
+        BlockSymDiaMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
-        std::size_t maxlambda() const { return R_tr_dia_.size() - 1; }
+        /**
+         * @brief Initialize calculation of the R-matrix blocks.
+         * 
+         * This routine will precompute one-electron B-spline moments that are used
+         * by the routine @ref calc_R_tr_dia_block. The arrays Mtr_L and Mtr_mLm1 will be replaced
+         * by the new content.
+         */
+        void init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, cArray & Mtr_mLm1) const;
+        
+        /**
+         * @brief Calculate particular sub-matrix of the radial integrals matrix.
+         * 
+         * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
+         * and return it in a form of a dense array (copying structure of the overlap matrix).
+         */
+        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
+        
+        /**
+         * @brief Multiply vectors by matrix of two-electron integrals.
+         * 
+         * This routine will multiply several source vectors by the matrix of two-electron
+         * integrals for given multipole 'lambda'. The matrix elements are
+         * computed anew and applied directly to the vectors to minimize memory
+         * requirements. This method - instead of caching the whole integral
+         * matrix in memory or on disk - is used in the 'lightweight' mode,
+         * which can be requested by the command line option --lightweight.
+         */
+        cArrays apply_R_matrix (unsigned lambda, cArrays const & src) const;
+        
+        int maxlambda () const { return R_tr_dia_.size() - 1; }
         
     private:
         
@@ -370,35 +413,13 @@ class RadialIntegrals
         // Gauss-Legendre integrator
         GaussLegendre g_;
         
-#ifndef NO_OPENCL
-        
-        // OpenCL setup
-        void setup_gpu_ ();
-        
-        // OpenCL data
-        mutable CLArray<Complex> R_gpu_;
-        CLArray<double> xIn0_, wIn0_, xOut0_, wOut0_;
-        CLArray<Complex> t_;
-        
-        // OpenCL environment
-        cl_platform_id platform_;
-        cl_device_id device_;
-        cl_context context_;
-        cl_command_queue queue_;
-        cl_program program_;
-        
-        cl_kernel Rint_;
-        
-        std::size_t max_local_;
-        
-#endif // NO_OPENCL
-        
         //
         // matrices
         //
         
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
-        Array<SymDiaMatrix> R_tr_dia_;
+        RowMatrix<Complex> D_d_, S_d_, Mm1_d_, Mm1_tr_d_, Mm2_d_;
+        Array<BlockSymDiaMatrix> R_tr_dia_;
 };
 
 #endif

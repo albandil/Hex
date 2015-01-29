@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_MISC
 #define HEX_MISC
@@ -31,6 +50,79 @@
 #include <type_traits>
 #include <string>
 
+#if (defined(__linux__) && defined(__GNUC__))
+    #include <execinfo.h>
+    #include <unistd.h>
+#endif
+
+//
+// Restricted pointers.
+// - allow some compiler optimizations on arrays
+//
+
+#ifndef restrict
+#ifdef __GNUC__
+    #define restrict __restrict
+#else
+    #define restrict
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
+#endif
+#endif
+
+/**
+ * @brief printf-like formatting.
+ * 
+ * This function takes an arbitrary number of parameters. It is expected that
+ * the first one is the formatting string (printf-like syntax). All the
+ * arguments are sent to snprintf without change.
+ */
+template <class ...Params> std::string format (Params ...p)
+{
+    // calculate the necessary space
+    unsigned n = std::snprintf(nullptr, 0, p...);
+    
+    // allocate the string
+    std::string text;
+    text.resize(n);
+    
+    // compose the text
+    std::snprintf(&text[0], n + 1, p...);
+    
+    // return the text
+    return text;
+}
+
+/// Debug output.
+#define Debug std::cout << __func__ << " (" << __FILE__ << ":" << __LINE__ << "): "
+
+/// Fatal error routine.
+#define Exception(...) TerminateWithException(__FILE__, __LINE__, __func__, __VA_ARGS__)
+
+/**
+ * @brief Fatal error routine.
+ * 
+ * Fatal error termination routine with easy printf-like interface.
+ * Use the macro @ref Exception to call this function with proper line number
+ * and function name.
+ */
+template <class ...Params> [[noreturn]] void TerminateWithException (const char* file, int line, const char* func, Params ...p)
+{
+    // print error text
+    std::cerr << std::endl << std::endl;
+    std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
+    std::cerr << " *** " << format(p...) << std::endl;
+    
+#if (defined(__linux__) && defined(__GNUC__))
+    // print stack trace
+    void * array[10];
+    std::size_t size = backtrace(array, 10);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+#endif
+    
+    // exit the program
+    std::terminate();
+}
+
 /**
  * @brief Exception class.
  * 
@@ -51,58 +143,19 @@ public:
     
     /// Constructor.
     template <class ...Params> exception (Params ...p)
-    {
-        // get requested size
-        int size = snprintf(nullptr, 0, p...);
-        
-        // allocate buffer
-        message = new char [size + 1];
-        
-        // printf to the allocated storage
-        snprintf(message, size + 1, p...);
-    }
-    
-    /// Destructor.
-    virtual ~exception() noexcept
-    {
-        delete [] message;
-    }
+        : message_(format(p...)) { }
     
     /// Return pointer to the exception text.
-    const char* what() const noexcept (true)
+    const char* what () const noexcept (true)
     {
-        return message;
+        return message_.c_str();
     }
     
 private:
     
     /// Text of the exception.
-    char * message;
+    std::string message_;
 };
-
-//
-// Restricted pointers.
-// - allow some compiler optimizations on arrays
-//
-
-#ifndef restrict
-#ifdef __GNUC__
-    #define restrict __restrict
-#else
-    #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
-#endif
-#endif
-
-//
-// Memory alignment.
-// - supports intrinsic compiler optimization, mainly the usage of SIMD instructions (AVX etc.)
-// - enabled only for Linux systems (those ought to posess "posix_memalign", which is used)
-//
-
-#ifndef __linux__
-    #define NO_ALIGN
-#endif
 
 //
 // List all complex types.
@@ -133,7 +186,7 @@ template <class T> struct is_scalar { static const bool value = is_complex<T>::v
     template <> struct is_scalar<T> { static const bool value = true; }
 
 declareTypeAsScalar(int);
-declareTypeAsScalar(long);
+declareTypeAsScalar(std::int64_t);
 declareTypeAsScalar(float);
 declareTypeAsScalar(double);
 
@@ -267,23 +320,6 @@ template <class T> constexpr T const & larger_of (T const & a, T const & b)
 }
 
 /**
- * @brief printf-like formatting.
- * 
- * This function takes an arbitrary number of parameters. It is expected that
- * the first one is the formatting string (printf-like syntax). All the
- * arguments are sent to snprintf without change. This functions returns
- * a pointer to a static character string.
- * 
- * @note The maximal size of the string is hard-coded to 1024 characters.
- */
-template <class ...Params> char const * format (Params ...p)
-{
-    static char text[1024];
-    snprintf(text, sizeof(text), p...);
-    return text;
-}
-
-/**
  * @brief Conversion of string to a type.
  * 
  * This is a generic template function that is used to convert a text entry to
@@ -293,10 +329,7 @@ template <class ...Params> char const * format (Params ...p)
  */
 template <class T> T string_to (std::string str)
 {
-    throw exception
-    (
-        "Conversion of string to \"%s\" not implemented.", typeid(T).name()
-    );
+    Exception("Conversion of string to \"%s\" not implemented.", typeid(T).name());
 }
 
 /**
@@ -309,11 +342,11 @@ template <class T> T string_to (std::string str)
 template <> inline int string_to (std::string str)
 {
     // convert to int
-    char* tail; long val = std::strtol(str.c_str(), &tail, 10);
+    char* tail; int val = std::strtol(str.c_str(), &tail, 10);
     
     // throw or return
     if (*tail != 0x0)
-        throw exception ("The string \"%s\" cannot be converted to integer number.", str.c_str());
+        Exception("The string \"%s\" cannot be converted to integer number.", str.c_str());
     else
         return val;
 }
@@ -332,7 +365,7 @@ template <> inline double string_to (std::string str)
     
     // throw or return
     if (*tail != 0x0)
-        throw exception ("The string \"%s\" cannot be converted to real number.", str.c_str());
+        Exception("The string \"%s\" cannot be converted to real number.", str.c_str());
     else
         return val;
 }
@@ -404,7 +437,7 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
         if (allowed_special & ReadItem<T>::asterisk)
             return ReadItem<T>({ T(0), ReadItem<T>::asterisk });
         else
-            throw exception ("Asterisk '*' not allowed here.");
+            Exception("Asterisk '*' not allowed here.");
     }
     
     // convert entry to type T
@@ -479,24 +512,24 @@ class Timer
 };
 
 /**
- * @brief Output table.
- * 
- * This class enables table-formatted output. An example code is
- * @code
- * std::ofstream file ("output.txt");
- * OutputTable table (file);
- * table.setWidth (5, 5);
- * table.setAlign (OutputTable::left, OutputTable::right);
- * table.write ("abc", "xyz");
- * table.write (10, 17.5);
- * table.write (" x", "xx");
- * @endcode
- * The resulting output will be
- * @code
- * abc    xyz
- * 10    17.5
- *  x      xx
- * @endcode
+   @brief Output table.
+   
+   This class enables table-formatted output. An example code is
+   @code
+   std::ofstream file ("output.txt");
+   OutputTable table (file);
+   table.setWidth (5, 5);
+   table.setAlign (OutputTable::left, OutputTable::right);
+   table.write ("abc", "xyz");
+   table.write (10, 17.5);
+   table.write (" x", "xx");
+   @endcode
+   The resulting output will be
+   @code
+   abc    xyz
+   10    17.5
+    x      xx
+   @endcode
  */
 class OutputTable
 {
@@ -557,7 +590,7 @@ class OutputTable
                     out_ << std::left;
                     break;
                 case center:
-                    throw exception ("[OutputTable] Item centering not implemented yet!");
+                    Exception("[OutputTable] Item centering not implemented yet!");
                     break;
                 case right:
                     out_ << std::right;
@@ -621,14 +654,14 @@ template <class T> class Range
                 
                 // convert portions to the correct type
                 std::istringstream infirst(strfirst), inlast(strlast);
-                if (!(infirst >> first)) throw exception ("\"%s\" is not a number.", strfirst.c_str());
-                if (!(inlast >> last)) throw exception ("\"%s\" is not a number.", strlast.c_str());
+                if (!(infirst >> first)) Exception("\"%s\" is not a number.", strfirst.c_str());
+                if (!(inlast >> last)) Exception("\"%s\" is not a number.", strlast.c_str());
             }
             else
             {
                 // convert whole string to the correct type
                 std::istringstream in(Lin);
-                if (!(in >> first)) throw exception ("\"%s\" is not a number.", Lin.c_str());
+                if (!(in >> first)) Exception("\"%s\" is not a number.", Lin.c_str());
                 
                 // the first and last element is the same
                 last = first;
@@ -637,21 +670,21 @@ template <class T> class Range
 };
 
 /**
- * @brief Underline text.
- * 
- * This simple function will count characters in the supplied text string,
- * append a new-line character and a group of '-' characters whose number
- * will be equal to the length of the supplied text. It supports UTF-8, so
- * the following code
+   @brief Underline text.
+   
+   This simple function will count characters in the supplied text string,
+   append a new-line character and a group of '-' characters whose number
+   will be equal to the length of the supplied text. It supports UTF-8, so
+   the following code
    @code
        std::cout << underline("Title containing UTF-8 characters αβγδ") << std::endl;
    @endcode
- * will produce the output
+   will produce the output
    @verbatim
        Title containing UTF-8 characters αβγδ
        --------------------------------------
    @endverbatim
- * It may be necessary to set the user locale, first, using the function call
+   It may be necessary to set the user locale, first, using the function call
    @code
        std::setlocale(LC_ALL, "en_GB.utf8");
    @endcode
@@ -668,55 +701,5 @@ inline std::string underline (std::string text)
         text.push_back('-');
     return text;
 }
-
-//
-// Data type abstract traits.
-//
-
-/**
- * @brief Data-type information.
- * 
- * The information about components of a specific data type can be used in
- * type-generic template functions. This class (or rather its specializations
- * for individual types) offer the necessary information.
- * 
- * An example of use would be a formatted output of column data of an array
- * of the abstract data type 'T'. If we wanted to print every component as a
- * separate column, we would need to (a) know the total number of components
- * of the data type 'T' and (b) have the tool to access individual elements.
- * This class (or rather its specializations for different types) offers
- * both through the members 'ncmpt' and 'cmpt'.
- */
-template <class T> class typeinfo {};
-
-/// Data-type info class specialization for 'double'.
-template<> class typeinfo<double>
-{
-    public:
-        /// Component data type.
-        typedef double cmpttype;
-        
-        /// Component count.
-        static const std::size_t ncmpt = 1;
-        
-        /// Component getter.
-        static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-};
-
-/// Data-type info class specialization for 'std::complex'.
-template<> template<class T> class typeinfo<std::complex<T>>
-{
-    public:
-        /// Component data type.
-        typedef T cmpttype;
-        
-        /// Component count.
-        static const std::size_t ncmpt = 2;
-        
-        /// Component getter.
-        static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
-};
-
-#define Debug std::cout << __func__ << " (" << __LINE__ << "): "
 
 #endif

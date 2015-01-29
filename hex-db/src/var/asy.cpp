@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -25,10 +44,15 @@
 
 const std::string SpinAsymmetry::Id = "asy";
 const std::string SpinAsymmetry::Description = "Spin asymetry.";
-const std::vector<std::string> SpinAsymmetry::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> SpinAsymmetry::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the spin asymetry."}
 };
 const std::vector<std::string> SpinAsymmetry::VecDependencies = { "theta" };
 
@@ -56,13 +80,13 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    double E = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    double E = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // angles
     rArray angles;
@@ -71,7 +95,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
         
     } catch (std::exception e) {
         
@@ -100,10 +124,15 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     E = " << E/efactor << " " << unit_name(Eunits)
-                     << " ordered by angle in " << unit_name(Aunits) << "\n" <<
-        "# θ\t dσ\n";
+                     << " ordered by angle in " << unit_name(Aunits) << "\n";
+    OutputTable table;
+    table.setWidth(15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "asymetry ");
+    table.write("# ---------", "---------");
+    
     for (std::size_t i = 0; i < angles.size(); i++)
-        std::cout << angles[i] << "\t" << asy[i] << "\t" << dcs0[i] << "\t" << dcs1[i] << "\n";
+        table.write(angles[i], asy[i]);
     
     return true;
 }

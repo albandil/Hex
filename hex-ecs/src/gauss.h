@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_GAUSS
 #define HEX_GAUSS
@@ -108,16 +127,18 @@ class GaussLegendre : public GaussLegendreData
          *    t[iknot] <= x2 <= t[iknot+1]
          * @endcode
          */
-        template <class Functor, class... Data> Complex quad (
+        template <class Functor, class... Data> Complex quad
+        (
             Functor f,
             int points, int iknot, Complex x1, Complex x2,
             Data... data
-        ) const {
+        ) const
+        {
             // check boundaries
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
             {
-                throw exception ("[quad] Error: boundaries not for this iknot!");
+                Exception ("[quad] Error: boundaries not for this iknot!");
             }
             
             // get evaluation points and weights
@@ -151,14 +172,18 @@ class GaussLegendre : public GaussLegendreData
          * result = quad (&a, &a::integrand, ...);
          * @endcode
          */
-        template <class ClassPtr, class Functor, class... Data> Complex quadMFP (
-            ClassPtr ptr, Functor f, int points, int iknot, Complex x1, Complex x2, Data... data
-        ) const {
+        template <class ClassPtr, class Functor, class... Data> Complex quadMFP
+        (
+            ClassPtr ptr, Functor f,
+            int points, int iknot, Complex x1, Complex x2,
+            Data... data
+        ) const
+        {
             // check boundaries
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
             {
-                throw exception ("[quad] Error: boundaries not for this iknot!");
+                Exception ("[quad] Error: boundaries not for this iknot!");
             }
             
             // get evaluation points and weights

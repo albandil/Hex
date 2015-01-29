@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_GAUSSKRONROD
 #define HEX_GAUSSKRONROD
@@ -55,7 +74,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
         double EpsRel;
         
         /// Limit on subdivision.
-        size_t Limit;
+        std::size_t Limit;
         
         /// Integration workspace pointer.
         gsl_integration_workspace * Workspace;
@@ -66,7 +85,7 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
     public:
         
         // constructor
-        GaussKronrod (Functor f, size_t limit = 1000)
+        GaussKronrod (Functor f, std::size_t limit = 1000)
             : Integrand(f), Result(special::constant::Nan), AbsErr(special::constant::Nan),
               Ok(false), EpsAbs(0.), EpsRel(1e-5), Limit(limit),
               Workspace(gsl_integration_workspace_alloc(Limit)) {}
@@ -101,19 +120,8 @@ template <typename Functor> class GaussKronrod : public special::RadialFunction<
          * from GSL (that is, in this case, nothing than C-port of QuadPack).
          * 
          * You can compute improper integrals. For specifying "infinity" as
-         * one or both bounds use either
-         * 
-          @code
-              std::numeric_limits<double>::infinity()
-          @endcode
-         * 
-         * for positive infinity or
-         * 
-          @code
-              -std::numeric_limits<double>::infinity()
-          @endcode
-         * 
-         * for negative infinity.
+         * one or both bounds use either special::constant::Inf for positive infinity or
+         * -special::constant::Inf for negative infinity.
          * 
          * @return The value of "Ok" (i.e. whether the last integration has
          * been successful according to the library).

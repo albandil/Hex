@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <cstdio>
 #include <cmath>
@@ -19,10 +38,13 @@
 
 #include <gsl/gsl_errno.h>
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 #include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
-#include "complex.h"
 #include "io.h"
 #include "itersolve.h"
 #include "misc.h"
@@ -59,10 +81,35 @@ int main (int argc, char* argv[])
     H5::Exception::dontPrint();
     
     // disable buffering of the standard output (-> immediate logging)
-    setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     
     // get input from command line
     CommandLine cmd (argc, argv);
+    
+    // check some exclusive options
+    if (cmd.parallel_block)
+    {
+        if (cmd.outofcore)
+            Exception("The options --out-of-core and --parallel-block can't be used together because the HDF library is not thread-safe.");
+        if (cmd.lightweight_radial_cache)
+            Exception("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
+        if (cmd.parallel_dot)
+            Exception("Please use either --parallel-block or --parallel-dot, but not both.");
+    }
+    
+#ifdef _OPENMP
+    // set OpenMP parallel nesting (avoid oversubscription)
+    // - disable for concurrent diagonal block preconditioning
+    // - enable for sequential diagonal block preconditioning
+    omp_set_nested(!cmd.parallel_block);
+    # pragma omp parallel
+    # pragma omp master
+    {
+        std::cout << "OpenMP environment:" << std::endl;
+        std::cout << "\tthreads: " << omp_get_num_threads() << std::endl;
+        std::cout << "\tnesting: " << (omp_get_nested() ? "on" : "off") << std::endl;
+    }
+#endif
     
     // setup MPI
     Parallel par (&argc, &argv, cmd.parallel);
@@ -72,7 +119,14 @@ int main (int argc, char* argv[])
     {
         cmd.inputfile.open("ecs.inp");
         if (not cmd.inputfile.good())
-            throw exception("Input error: Cannot open the file \"ecs.inp\".");
+        {
+            std::cout << "Cannot open the file \"ecs.inp\"." << std::endl;
+            std::cout << std::endl;
+            std::cout << "Either (1) provide input settings in the file \"ecs.inp\", " << std::endl;
+            std::cout << "    or (2) give another name using the '--input' command line option." << std::endl;
+            std::cout << std::endl;
+            std::exit(EXIT_FAILURE);
+        };
     }
     
     // get input from input file
@@ -94,7 +148,7 @@ int main (int argc, char* argv[])
     
     // check ordering
     if (R0 >= Rmax)
-        throw exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
+        Exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
     
     // create B-splines
     Bspline bspline (inp.order, inp.rknots, inp.ecstheta, inp.cknots);
@@ -103,7 +157,7 @@ int main (int argc, char* argv[])
     int Nspline = bspline.Nspline();
     
     // info
-    std::cout << "B-spline solver count: " << Nspline << "\n\n";
+    std::cout << "B-spline solver count: " << Nspline << std::endl << std::endl;
     
     //
     // Setup angular data -------------------------------------------------- //
@@ -157,7 +211,7 @@ int main (int argc, char* argv[])
     
     PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
     if (prec == nullptr)
-        throw exception ("Preconditioner %d not implemented.", cmd.preconditioner);
+        Exception("Preconditioner %d not implemented.", cmd.preconditioner);
     
 // ------------------------------------------------------------------------- //
 //                                                                           //
@@ -184,10 +238,44 @@ else
 if (cmd.itinerary & CommandLine::StgSolve)
 {
     // CG preconditioner callback
-    auto apply_preconditioner = [ & ](cArray const & r, cArray & z) -> void { prec->precondition(r, z); };
+    auto apply_preconditioner = [ & ](cArray & r, cArray & z) -> void
+    {
+        // MPI-distributed preconditioning
+        prec->precondition(r, z);
+    };
     
     // CG matrix multiplication callback
-    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void { prec->multiply(p, q); };
+    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+    {
+        // MPI-distributed multiplication
+        prec->multiply(p, q);
+    };
+    
+    // CG scalar product function callback
+    auto scalar_product = [ & ](cArray const & x, cArray const & y) -> Complex
+    {
+        // compute node-local scalar product
+        Complex prod = (x|y);
+        
+        // colect products from other nodes
+        par.syncsum(&prod, 1);
+        
+        // return global scalar product
+        return prod;
+    };
+    
+    // CG norm function that broadcasts master's result to all nodes
+    auto compute_norm = [ & ](cArray const & r) -> double
+    {
+        // compute node-local norm of 'r'
+        double rnorm2 = r.sqrnorm();
+        
+        // collect norms from other nodes
+        par.syncsum(&rnorm2, 1);
+        
+        // return global norm
+        return std::sqrt(rnorm2);
+    };
     
     //
     // Solve the equations
@@ -235,8 +323,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
-            if (not reader.load(current_solution))
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            if (not reader.check())
                 all_done = false;
         }
         if (all_done)
@@ -270,8 +358,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             
             // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie]);
-            if (reader.load(current_solution))
+            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            if (reader.check())
                 continue;
             
             // get total energy of the system
@@ -283,11 +371,11 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
-            cArray chi (coupled_states.size() * Nspline * Nspline);
+            cArray chi;
             prec->rhs(chi, ie, instate, Spin);
             
             // compute and check norm of the right hand side vector
-            double chi_norm = chi.norm();
+            double chi_norm = compute_norm(chi);
             if (chi_norm == 0.)
             {
                 // this should not happen, hopefully we already checked
@@ -307,8 +395,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
             current_solution = cArray(chi.size());
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
-            std::cout << "\t   i | time        | residual        | min max avg block precond. iter." << std::endl;
-            unsigned iterations = cg_callbacks<cArray,cArrayView>
+            std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
+            unsigned iterations = cg_callbacks < cArray, cArrayView >
             (
                 chi,                    // right-hand side
                 current_solution,       // on input, the initial guess, on return, the solution
@@ -317,7 +405,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 max_iter,               // maximal iteration count
                 apply_preconditioner,   // preconditioner callback
                 matrix_multiply,        // matrix multiplication callback
-                true                    // verbose output
+                true,                   // verbose output
+                compute_norm,           // how to evaluate norm of an array
+                scalar_product          // how to calculate scalar product of two arrays
             );
             
             if (iterations >= max_iter)
@@ -330,8 +420,48 @@ if (cmd.itinerary & CommandLine::StgSolve)
             computations_done++;
             
             // save solution to disk (if valid)
-            if (std::isfinite(current_solution.norm()))
-                reader.save(current_solution);
+            // - master process will collect all data and write them sequentially to disk
+            if (std::isfinite(compute_norm(current_solution)))
+            {
+                // for all super-segments
+                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+                {
+                    // if calculating in parallel : owner of the data will send the data to master
+                    if (par.active() and par.isMyWork(ill) and not par.IamMaster())
+                    {
+                        par.send
+                        (
+                            current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline,
+                            Nspline * Nspline,  // element count
+                            par.iproc(),        // origin process
+                            0                   // destination proccess
+                        );
+                    }
+                    
+                    // if calculating in parallel : master will receive the data to a buffer and write them to disk
+                    if (par.active() and not par.isMyWork(ill) and par.IamMaster())
+                    {
+                        cArray buffer (Nspline * Nspline);
+                        
+                        par.recv
+                        (
+                            &buffer[0],         // data buffer
+                            Nspline * Nspline,  // element count
+                            ill % par.Nproc(),  // origin process
+                            0                   // destination process
+                        );
+                        
+                        reader.save(buffer, ill);
+                    }
+                    
+                    // if this segment is owned by master then master will save its own work
+                    if (par.isMyWork(ill) and par.IamMaster())
+                    {
+                        cArrayView data (Nspline * Nspline, current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline);
+                        reader.save(data, ill);
+                    }
+                }
+            }
             
         } // end of For Spin, instate
         

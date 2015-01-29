@@ -9,8 +9,8 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -fopenmp -fPIC -mtune=native -march=native
-LFLAGS = -fopenmp -fPIC
+CFLAGS = -fopenmp -Wall -mtune=native -march=native
+LFLAGS = -fopenmp
 
 # ---------------------------------------------------------------------------- #
 # Suite Sparse environment                                                     #
@@ -20,15 +20,12 @@ SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
 
 # - for repository release
 # SUITESPARSEFLAGS = -I/usr/include/suitesparse
-# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
+# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) -lopenblas
 
 # - for custom build
-SUITESPARSEFLAGS =
-SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
+# SUITESPARSEFLAGS =
+# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
                   -lmetis -lsuitesparseconfig -lopenblas
-                  
-# - do not use openblas-specific functions
-# SUITESPARSEFLAGS = -DNO_OPENBLAS
 
 # ---------------------------------------------------------------------------- #
 # OpenMPI environment (optional, use -DNO_MPI to omit)                         #
@@ -40,24 +37,6 @@ SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
 # - for repository release
 OPENMPIFLAGS = $(shell mpic++ --showme:compile)
 OPENMPILIBS  = $(shell mpic++ --showme:link)
-
-# ---------------------------------------------------------------------------- #
-# OpenCL environment (optional, use -DNO_OPENCL to omit)                       #
-# ---------------------------------------------------------------------------- #
-
-OPENCLFLAGS = -DNO_OPENCL
-
-# - for AMD OpenCL
-# OPENCLFLAGS = -I/opt/AMDAPPSDK-2.9-1/include
-# OPENCLLIBS = -L/opt/AMDAPPSDK-2.9-1/lib/x86_64 -lOpenCL
-
-# - for Intel OpenCL
-# OPENCLFLAGS = -I/opt/intel/opencl-1.2-4.4.0.117/include
-# OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
-
-# - for NVidia OpenCL
-# OPENCLFLAGS = -I/usr/include/nvidia-current/
-# OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
 # HDF                                                                          #
@@ -91,22 +70,22 @@ FFTWLIBS = -lfftw3
 # PNG++ (optional, use -DNO_PNG to omit)                                       #
 # ---------------------------------------------------------------------------- #
 
-# PNGPPFLAGS = -DNO_PNG
-# PNGPPFLIBS =
+PNGPPFLAGS = -DNO_PNG
+PNGPPFLIBS =
 
-PNGPPFLAGS = -I./libs
-PNGPPLIBS = -lpng
+# PNGPPFLAGS = -I./libs
+# PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 
 
 # compiler flags
-CFLAGS += $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
+CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
           $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
 
 # linker flags
-LFLAGS += $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
-          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
+          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS) -rdynamic
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
@@ -117,19 +96,18 @@ CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT
 
 # choose between DEBUG and RELEASE compiler flags
 # CXXFLAGS = $(CXXDEBUG)
-CXXFLAGS = -g $(CXXRILIS)
+CXXFLAGS = $(CXXRILIS)
 
 # source files
 CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
-           matrix preconditioners radial slater special version
-OCLFILES = preconditioners slater
+           matrix radial slater special version \
+           preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
+           preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner
 
 # sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
 OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
-OCLSOURCES   = $(patsubst %,src/%.cl, $(CXXFILES))
-OCLKERNELS   = $(patsubst %,src/%.inc,$(OCLFILES))
 
 # build all targets
 all: pollversion bin/hex-ecs
@@ -159,7 +137,7 @@ dist:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES) $(OCLKERNELS)
+	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean distclean
@@ -169,7 +147,7 @@ distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
 # main program target
-bin/hex-ecs: $(OCLKERNELS) $(OBJECTS)
+bin/hex-ecs: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
 
@@ -183,4 +161,4 @@ obj/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # include generated source dependencied
--include $(wildcard obj/*.dep)
+-include $(DEPENDENCIES)

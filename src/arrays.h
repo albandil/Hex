@@ -1,19 +1,39 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_ARRAYS
 #define HEX_ARRAYS
 
 #include <cassert>
+#include <cmath>
 #include <complex>
 #include <cstdlib>
 #include <cstring>
@@ -27,18 +47,18 @@
 #include <vector>
 
 #ifndef NO_HDF
-#include "hdffile.h"
+    #include "hdffile.h"
 #endif
 
-#include "complex.h"
 #include "memory.h"
 #include "misc.h"
+#include "numbers.h"
 
 // Forward declaration of Array (unaligned array of items).
-template < class T, class Alloc = PlainAllocator<T> > class Array;
+template < class T, class Alloc_ = PlainAllocator<T> > class Array;
 
-// Forward declaration of NumberArray (256bit-aligned array of numbers ~AVX).
-template < class T, class Alloc = AlignedAllocator<T,32u> > class NumberArray;
+// Forward declaration of NumberArray (512bit-aligned array of numbers -> AVX2).
+template < class T, class Alloc_ = AlignedAllocator<T,NUMBER_ARRAY_ALIGNMENT/8u> > class NumberArray;
 
 /**
  * @brief Array view.
@@ -101,12 +121,19 @@ template <class T> class ArrayView
         
         // destructor
         ~ArrayView () {}
-    
+        
+        /// Change view.
+        void reset (std::size_t n, T * ptr)
+        {
+            N_ = n;
+            array_ = const_cast<T*>(ptr);
+        }
+        
         /// Assignment operator.
         ArrayView<T> & operator = (const ArrayView<T> v)
         {
             if (v.size() != size())
-                throw exception ("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N_);
+                Exception ("[ArrayView::operator=] Cannot copy %ld elements to %ld fields!", v.size(), N_);
             
             for (std::size_t i = 0; i < size(); i++)
                 array_[i] = v[i];
@@ -124,7 +151,7 @@ template <class T> class ArrayView
             if (i < size())
                 return array_[i];
             else
-                throw exception ("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
+                Exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
 #endif
         }
     
@@ -137,7 +164,7 @@ template <class T> class ArrayView
             if (i < size())
                 return array_[i];
             else
-                throw exception ("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
+                Exception("[ArrayView::operator[]] Index %ld out of bounds (size = %ld) !", i, N_);
 #endif
         }
         
@@ -169,13 +196,19 @@ template <class T> class ArrayView
         /// Check whether the size is equal to zero.
         bool empty () const { return size() == 0; }
         
-        /// Two-norm (defined only for scalar data type).
-        template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
+        /// Square of the two-norm (defined only for scalar data type).
+        template <class = typename std::enable_if<is_scalar<T>::value>> double sqrnorm () const
         {
             double sqrnorm = 0.;
             for (T const & x : *this)
                 sqrnorm += sqrabs(x);
-            return sqrt(sqrnorm);
+            return sqrnorm;
+        }
+        
+        /// Two-norm (defined only for scalar data type).
+        template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
+        {
+            return std::sqrt(sqrnorm());
         }
 };
 
@@ -192,7 +225,7 @@ template <class T> class ArrayView
  * - Basic iterator interface simillar to STL containers -- methods begin(),
  *   end(), and thus also the ability to appear in the range-based for loops.
  */
-template <class T, class Alloc> class Array : public ArrayView<T>
+template <class T, class Alloc_> class Array : public ArrayView<T>
 {
     public:
         
@@ -200,7 +233,8 @@ template <class T, class Alloc> class Array : public ArrayView<T>
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
-    
+        typedef Alloc_ Alloc;
+        
     public:
     
         // constructors, creates an empty array
@@ -351,7 +385,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             if (size() > 0)
                 return *(data() + (--ArrayView<T>::N_));
             else
-                throw exception ("Array has no element to pop!");
+                Exception("Array has no element to pop!");
         }
         
         /**
@@ -451,8 +485,8 @@ template <class T, class Alloc> class Array : public ArrayView<T>
             }
             
             // swap content
-            std::swap (ArrayView<T>::N_, b.ArrayView<T>::N_);
-            std::swap (ArrayView<T>::array_, b.ArrayView<T>::array_);
+            std::swap(ArrayView<T>::N_, b.ArrayView<T>::N_);
+            std::swap(ArrayView<T>::array_, b.ArrayView<T>::array_);
             
             return *this;
         }
@@ -472,7 +506,7 @@ template <class T, class Alloc> class Array : public ArrayView<T>
  * - a collection of overloaded arithmetic operators (sum of two arrays,
  *   difference, multiplication by a number etc.)
  */
-template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
+template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
 {
     public:
         
@@ -480,6 +514,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         typedef T DataType;
         typedef T * iterator;
         typedef T const * const_iterator;
+        typedef Alloc_ Alloc;
         
     protected:
         
@@ -592,7 +627,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 
                 if (size() > 0)
                 {
-                    memcpy (new_array, data(), size() * sizeof(T));
+                    std::memcpy(new_array, data(), size() * sizeof(T));
                     Alloc::free (ArrayView<T>::array_);
                 }
                 
@@ -733,10 +768,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
          * to the end of the array. If the reserved storage is large enough,
          * no reallocation will take place.
          */
-        template <class InputIterator> void append
-        (
-            InputIterator first, InputIterator last
-        )
+        template <class InputIterator> void append (InputIterator first, InputIterator last)
         {
             if (size() + last - first > (int)Nres_)
             {
@@ -747,7 +779,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 T* new_array = Alloc::alloc(Nres_);
                 
                 // copy original data
-                memcpy(new_array, data(), size() * sizeof(T));
+                std::memcpy(new_array, data(), size() * sizeof(T));
                 
                 // destroy original array
                 if (data() != nullptr)
@@ -761,6 +793,10 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             for (InputIterator it = first; it != last; it++)
                 (*this)[ArrayView<T>::N_++] = *it;
         }
+        void append (const ArrayView<T> a)
+        {
+            append(a.begin(), a.end());
+        }
         
         /// Check that size equals to zero.
         bool empty () const
@@ -771,7 +807,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
         /// Fill array with zeros.
         void clear ()
         {
-            memset(ArrayView<T>::array_, 0, size() * sizeof(T));
+            std::memset(ArrayView<T>::array_, 0, size() * sizeof(T));
         }
         
         /// Reset array: deallocate everything, resize to zero.
@@ -828,25 +864,28 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             return c;
         }
         
-        /// Compute usual 2-norm.
-        double norm () const
+        /// Compute (square of) the usual 2-norm.
+        double sqrnorm () const
         {
             double ret = 0.;
-            for (std::size_t i = 0; i < size(); i++)
-            {
-                Complex z = (*this)[i];
-                ret += z.real() * z.real() + z.imag() * z.imag();
-            }
-            return sqrt(ret);
+            for (T z : *this)
+                ret += sqrabs(z);
+            return ret;
+        }
+        
+        /// Compute the usual 2-norm.
+        double norm () const
+        {
+            return std::sqrt(sqrnorm());
         }
         
         /** 
-        * @brief Apply a user transformation.
-        * 
-        * The functor "f" will be applied on every item and the resulting
-        * array is returned. It is expected that the return value of the functor
-        * is a number type, so that NumberArray can be used.
-        */
+         * @brief Apply a user transformation.
+         * 
+         * The functor "f" will be applied on every item and the resulting
+         * array is returned. It is expected that the return value of the functor
+         * is a number type, so that NumberArray can be used.
+         */
         template <class Functor> auto transform (Functor f) const -> NumberArray<decltype(f(T(0)))>
         {
             std::size_t n = size();
@@ -909,7 +948,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             // the second character outght to be "'"
             // the last character ought to be "'" as well
             if ((s[0] != 'x' and s[0] != 'X') or s[1] != '\'' or s.back() != '\'')
-                throw exception ("[NumberArray::fromBlob] Blob has wrong format, %s.", s.c_str());
+                Exception("[NumberArray::fromBlob] Blob has wrong format, %s.", s.c_str());
             
             // create substring
             std::string ss (s.begin() + 2, s.end() - 1);
@@ -1035,11 +1074,11 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             // read zero blocks
             if (zero_blocks.resize(hdf.size("zero_blocks")))
-                if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
-                    return false;
+            if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+                return false;
                 
-                // get data size
-                std::size_t size = hdf.size("array");
+            // get data size
+            std::size_t size = hdf.size("array");
             
             // scale size if this is a complex array
             if (typeid(T) == typeid(Complex))
@@ -1134,10 +1173,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             {
                 int start = nonzero_blocks[2*iblock];
                 int end = nonzero_blocks[2*iblock+1];
-                carray.append (
-                    begin() + start,
-                    begin() + end
-                );
+                carray.append(begin() + start, begin() + end);
             }
             
             return std::make_tuple(zero_blocks,carray);
@@ -1165,7 +1201,7 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             
             // resize and clean internal storage
             NumberArray<DataType> unpack(final_size);
-            memset(&(unpack[0]), 0, final_size * sizeof(T));
+            std::memset(&(unpack[0]), 0, final_size * sizeof(T));
             
             // copy nonzero chunks
             int this_end = 0;   // index of last updated element in "this"
@@ -1176,7 +1212,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
                 int zero_end = zero_blocks[2*i+1];
                 
                 // append nonzero data before this zero block
-                memcpy (
+                std::memcpy
+                (
                     &(unpack[0]) + this_end,
                     begin() + load_end,
                     (zero_start - this_end) * sizeof(T)
@@ -1188,7 +1225,8 @@ template <class T, class Alloc> class NumberArray : public Array<T, Alloc>
             }
             
             // append remaining data
-            memcpy (
+            std::memcpy
+            (
                 &(unpack[0]) + this_end,
                 begin() + load_end,
                 (final_size - this_end) * sizeof(T)
@@ -1323,7 +1361,7 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
 template <typename T> NumberArray<T> logspace (T x0, T x1, std::size_t samples)
 {
     if (x0 <= 0 or x1 <= 0 or x1 < x0)
-        throw exception ("[logspace] It must be 0 < x1 <= x2 !");
+        Exception("[logspace] It must be 0 < x1 <= x2 !");
     
     NumberArray<T> grid(samples);
     
@@ -1506,12 +1544,12 @@ void writeVTK_cells
 //
 
 typedef NumberArray<int>          iArray;
-typedef NumberArray<long>         lArray;
+typedef NumberArray<int64_t>      lArray;
 typedef NumberArray<double>       rArray;
 typedef NumberArray<Complex>      cArray;
 
 typedef ArrayView<int>         iArrayView;
-typedef ArrayView<long>        lArrayView;
+typedef ArrayView<int64_t>     lArrayView;
 typedef ArrayView<double>      rArrayView;
 typedef ArrayView<Complex>     cArrayView;
 
@@ -1567,7 +1605,7 @@ template <typename T> T min (const ArrayView<T> a)
     for (T const * it = a.begin(); it != a.end(); it++)
         if (*it < z)
             z = *it;
-        return z;
+    return z;
 }
 
 /// Maximal element of array.
@@ -1577,89 +1615,61 @@ template <typename T> T max (const ArrayView<T> a)
     for (T const * it = a.begin(); it != a.end(); it++)
         if (*it > z)
             z = *it;
-        return z;
+    return z;
 }
 
-/// Return per-element power.
-template <typename T> NumberArray<T> pow (NumberArray<T> const & u, double e)
-{
-    NumberArray<T> v(u.size());
-    
-    auto iu = u.begin();
-    auto iv = v.begin();
-    
-    while (iu != u.end())
-        *(iv++) = std::pow(*(iu++), e);
-    
-    return v;
+#define DEFINE_FUN_1ARR(fun,kern)           \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> in                   \
+)                                           \
+{                                           \
+    std::size_t N = in.size();              \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(in[i]);               \
+    return out;                             \
 }
 
-/// Return per-element power.
-template <typename T> Array<T> pow (Array<T> const & u, double e)
-{
-    Array<T> v(u.size());
-    
-    auto iu = u.begin();
-    auto iv = v.begin();
-    
-    while (iu != u.end())
-        *(iv++) = std::pow(*(iu++), e);
-    
-    return v;
+#define DEFINE_FUN_1ARR_1DBL(fun,kern)      \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> in,                  \
+    double y                                \
+)                                           \
+{                                           \
+    std::size_t N = in.size();              \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(in[i],y);             \
+    return out;                             \
 }
 
-/// Return per-element square root.
-template <class T> NumberArray<T> sqrt (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::sqrt(A[i]);
-    
-    return B;
+#define DEFINE_FUN_2ARR(fun,kern)           \
+template <class T> NumberArray<T> fun       \
+(                                           \
+    const ArrayView<T> a,                   \
+    const ArrayView<T> b                    \
+)                                           \
+{                                           \
+    assert(a.size() == b.size());           \
+    std::size_t N = a.size();               \
+    NumberArray<T> out(N);                  \
+    for (std::size_t i = 0; i < N; i++)     \
+        out[i] = kern(a[i],b[i]);           \
+    return out;                             \
 }
 
-/// Return per-element sine.
-template <class T> NumberArray<T> sin (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::sin(A[i]);
-    
-    return B;
-}
-
-/// Return per-element arcsine.
-template <class T> NumberArray<T> asin (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::asin(A[i]);
-    
-    return B;
-}
-
-/// Return per-element cosine.
-template <class T> NumberArray<T> cos (NumberArray<T> const & A)
-{
-    std::size_t N = A.size();
-    NumberArray<T> B (N);
-    
-    for (std::size_t i = 0; i < N; i++)
-        B[i] = std::cos(A[i]);
-    
-    return B;
-}
+DEFINE_FUN_1ARR(exp,std::exp);
+DEFINE_FUN_1ARR(sin,std::sin);
+DEFINE_FUN_1ARR(cos,std::cos);
+DEFINE_FUN_1ARR(asin,std::asin);
+DEFINE_FUN_1ARR(sqrt,std::sqrt);
+DEFINE_FUN_2ARR(atan2,std::atan2);
+DEFINE_FUN_1ARR_1DBL(pow,std::pow);
 
 /// Return per-element hypot.
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
-/// Return per-element atan2.
-NumberArray<double> atan2 (NumberArray<double> const & A, NumberArray<double> const & B);
 /// Return per-element square of absolute value.
 NumberArray<double> sqrabs (NumberArray<Complex> const & A);
 /// Return per-element real part.
@@ -1720,6 +1730,15 @@ Array<bool> operator == (const ArrayView<T> u, const ArrayView<T> v)
 
 /// Check that all values are "true".
 inline bool all (const ArrayView<bool> B)
+{
+    bool ok = true;
+    for (bool b : B)
+        ok = ok and b;
+    return ok;
+}
+
+/// Check that all values are "true".
+inline bool all (const ArrayView<int> B)
 {
     bool ok = true;
     for (bool b : B)
@@ -1906,5 +1925,8 @@ template <class T> std::string to_string (const ArrayView<T> v, char sep = ' ')
 
 /// Drop small elements of array (replace by zero).
 rArray threshold (const rArrayView a, double eps);
+
+/// Combine real and imaginary parts.
+cArray interleave (const rArrayView re, const rArrayView im);
 
 #endif

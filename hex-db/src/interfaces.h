@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_DB_INTERFACES
 #define HEX_DB_INTERFACES
@@ -176,6 +195,99 @@ inline void hex_scattering_amplitude
         &ni, &li, &mi,
         &nf, &lf, &mf,
         &S, &E, &N,
+        angles, result
+    );
+}
+
+/**
+   @brief Scattering anplitude for non-aligned impact direction (Fortran).
+   
+   This function will evaluate the scattering amplitude when the projectile is coming in a
+   direction different from the quantization axis, i.e. when
+   @f[
+       \mathbf{k}_i \neq (0, 0, k_i) \,.
+   @f]
+   In that case the of the scattering amplitude can be computed using Wigner d-function
+   and all possible amplitudes from scattering between various magnetic levels. The reason
+   for this is that such situation is equivalent to a change of the quantization axis by the
+   same amount. To be precise, it is
+   @f[
+       T_{n_f l_f m_f \leftarrow n_i l_i m_i} = \sum_{m_i' m_f'}
+       D_{m_i' m_i}^{l_i} D_{m_f' m_f}^{l_f \ast} T_{n_f l_f m_f' \leftarrow n_i l_i m_i'} \,.
+   @f]
+   
+   Fortran prototype equivalent to
+   @code{.f90}
+   subroutine scattering_amplitude (ni,li,mi,nf,lf,mf,S,E,N,angles,result)
+     integer, intent(in) :: ni,li,mi
+     integer, intent(in) :: nf,lf,mf
+     integer, intent(int) :: S,N
+     double precision, intent(in)     :: E
+     double precision, dimension(N)   :: angles
+     double precision, dimension(2*N) :: result
+   @endcode
+   
+   @param ni Initial atomic principal quantum number.
+   @param li Initial atomic orbital quantum number.
+   @param mi Initial atomic magnetic quantum number.
+   @param nf Final atomic principal quantum number.
+   @param lf Final atomic orbital quantum number.
+   @param mf Final atomic magnetic quantum number.
+   @param S Total spin (0 = singlet, 1 = triplet).
+   @param E Impact energy in Rydbergs.
+   @param N Sample count.
+   @param alpha Impact angle (first of Euler angles).
+   @param beta Impact angle (second of Euler angles).
+   @param gamma Impact angle (third of Euler angles).
+   @param angles Real array of length N containing scattering angles.
+   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+*/
+void hex_scattering_amplitude_dir_
+(
+    int * ni, int * li, int * mi,
+    int * nf, int * lf, int * mf,
+    int * S, double * E, int * N,
+    double * alpha, double * beta, double * gamma,
+    double * angles, double * result
+);
+
+/**
+   @brief Scattering anplitude for non-aligned impact direction (C).
+   
+   C prototype.
+   
+   See @ref hex_scattering_amplitude_dir_ for theory.
+   
+   @param ni Initial atomic principal quantum number.
+   @param li Initial atomic orbital quantum number.
+   @param mi Initial atomic magnetic quantum number.
+   @param nf Final atomic principal quantum number.
+   @param lf Final atomic orbital quantum number.
+   @param mf Final atomic magnetic quantum number.
+   @param S Total spin (0 = singlet, 1 = triplet).
+   @param E Impact energy in Rydbergs.
+   @param N Sample count.
+   @param alpha Impact angle (first of Euler angles).
+   @param beta Impact angle (second of Euler angles).
+   @param gamma Impact angle (third of Euler angles).
+   @param angles Real array of length N containing scattering angles.
+   @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
+*/
+inline void hex_scattering_amplitude_dir
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E, int N,
+    double alpha, double beta, double gamma,
+    double * angles, double * result
+)
+{
+    hex_scattering_amplitude_dir_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &S, &E, &N,
+        &alpha, &beta, &gamma,
         angles, result
     );
 }

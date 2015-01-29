@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -26,10 +45,15 @@
 
 const std::string BornFullTMatrix::Id = "bornf";
 const std::string BornFullTMatrix::Description = "Full second Born T-matrix (angle dependent).";
-const std::vector<std::string> BornFullTMatrix::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf", 
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> BornFullTMatrix::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"theta", "Scattering angles for which to compute the amplitude."}
 };
 const std::vector<std::string> BornFullTMatrix::VecDependencies = { "theta" };
 
@@ -70,18 +94,18 @@ bool BornFullTMatrix::run (std::map<std::string,std::string> const & sdata) cons
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    double Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // read scattering angle (in user units)
     rArray angles;
     try {
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
     } catch (std::exception e) {
         angles = readStandardInput<double>();
     }
@@ -154,14 +178,20 @@ bool BornFullTMatrix::run (std::map<std::string,std::string> const & sdata) cons
         "# and impact energy\n" <<
         "#     Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by angle in " << unit_name(Aunits) <<
-        "# \n" <<
-        "# angle\t Re TB\t Im TB\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "Re TBorn ", "Im TBorn ");
+    table.write("# ---------", "---------", "---------");
     for (std::size_t i = 0; i < angles.size(); i++)
     {
-        std::cout << 
-            angles[i] << "\t" << 
-            T_out[i].real()*lfactor << "\t" <<
-            T_out[i].imag()*lfactor << "\n";
+        table.write
+        (
+            angles[i],
+            T_out[i].real()*lfactor,
+            T_out[i].imag()*lfactor
+        );
     }
     
     return true;

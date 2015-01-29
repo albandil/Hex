@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <cmath>
 #include <cstdlib>
@@ -16,10 +35,6 @@
 #include <iostream>
 #include <vector>
 #include <tuple>
-
-#ifndef NO_OPENCL
-#include "opencl.h"
-#endif
 
 #include "arrays.h"
 #include "bspline.h"
@@ -56,7 +71,7 @@ void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i
     
     // fill output array
     for (int k = 0; k < n; k++)
-        out[k] = values_i[k] * values_j[k] * pow(in[k]/x,L) * damp(in[k], 0, R);
+        out[k] = values_i[k] * values_j[k] * std::pow(in[k]/x,L) * damp(in[k], 0, R);
 }
 
 void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const
@@ -86,9 +101,10 @@ void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i
 
 Complex RadialIntegrals::computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const
 {
-    // raise point count - this is not a poly!
-    // TODO Estimate the order.
-    int points = bspline_.order() + L + 10; 
+    // compute integral of Bk(1) Bl(1) V(1,2) Bm(2) Bn(2)
+    
+    // integration points (the integrand is a poly of order equal to the four times the order of B-splines)
+    int points = 2 * bspline_.order() + 1; 
     
     // integrate
     return g_.quadMFP
@@ -114,6 +130,7 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
     if (bspline_.t(iknot) == bspline_.t(iknot + 1))
         return 0.;
     
+    // sum the two triangle integrals
     return computeRtri(L,b,d,a,c,iknot,iknotmax) + computeRtri(L,a,c,b,d,iknot,iknotmax);
 }
 
@@ -138,7 +155,7 @@ Complex RadialIntegrals::computeR
     Complex Rtr_Labcd_offdiag = 0;
     
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
-    for (int iknot = 0; iknot < Nreknot - 1; iknot++)
+    for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
         Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
     
     // Further parts are a bit cryptical, because we are using precomputed
@@ -154,94 +171,43 @@ Complex RadialIntegrals::computeR
     Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
-    for (int ix = 0; ix < Nreknot - 1; ix++)
+    
+    // ix < iy
+    for (int ix = a; ix <= a + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(b,ix+1); iy <= b + order and iy < Nreknot - 1; iy++)
     {
-        for (int iy = ix + 1; iy < (int)Nreknot - 1; iy++)
+        Complex m_ac = Mtr_L_ac[ix - a], m_bd = Mtr_mLm1_bd[iy - b];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
         {
-            // ix < iy
-            if (a <= ix and ix <= a + order and
-                b <= iy and iy <= b + order)
-            {
-                Complex lg = Mtr_L_ac[ix - a] + Mtr_mLm1_bd[iy - b];
-                if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp(lg);
-            }
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
             
-            // ix > iy (by renaming the ix,iy indices)
-            if (b <= ix and ix <= b + order and
-                a <= iy and iy <= a + order)
-            {
-                Complex lg = Mtr_L_bd[ix - b] + Mtr_mLm1_ac[iy - a];
-                if (std::isfinite(lg.imag()))
-                    Rtr_Labcd_offdiag += std::exp(lg);
-            }
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
+        }
+    }
+    
+    // ix > iy (by renaming the ix,iy indices)
+    for (int ix = b; ix <= b + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(a,ix+1); iy <= a + order and iy < Nreknot - 1; iy++)
+    {
+        Complex m_bd = Mtr_L_bd[ix - b], m_ac = Mtr_mLm1_ac[iy - a];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
+        {
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+            
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
         }
     }
     
     // sum the diagonal and offdiagonal contributions
     return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
-}
-
-void RadialIntegrals::allSymmetries
-(
-    int i, int j, int k, int l,
-    Complex Rijkl_tr,
-    NumberArray<long> & R_tr_i,
-    NumberArray<long> & R_tr_j,
-    NumberArray<Complex> & R_tr_v
-) const
-{
-    // shorthand
-    int Nspline = bspline_.Nspline();
-    
-    {
-        // store the integral
-        R_tr_i.push_back(i * Nspline + j);
-        R_tr_j.push_back(k * Nspline + l);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    if (i != k) // i.e. i < k
-    {
-        // swap i <-> k (symmetry 1)
-        R_tr_i.push_back(k * Nspline + j);
-        R_tr_j.push_back(i * Nspline + l);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    if (j != l) // i.e. j < l
-    {
-        // swap j <-> l (symmetry 2)
-        R_tr_i.push_back(i * Nspline + l);
-        R_tr_j.push_back(k * Nspline + j);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    if (i != j or k != l) // i.e. i < j or k < l
-    {
-        // swap i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(j * Nspline + i);
-        R_tr_j.push_back(l * Nspline + k);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    if (i != k and (i != j or k != l)) // i.e. i < k and (i < j or k < l)
-    {
-        // swap i <-> k (symmetry 1) and i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(l * Nspline + i);
-        R_tr_j.push_back(j * Nspline + k);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    if (j != l and (i != j or k != l)) // i.e. j < l and (i < j or k < l)
-    {
-        // swap j <-> l (symmetry 2) and i <-> j and k <-> l (symmetry 3)
-        R_tr_i.push_back(j * Nspline + k);
-        R_tr_j.push_back(l * Nspline + i);
-        R_tr_v.push_back(Rijkl_tr);
-    }
-    
-    // NOTE there are two more symmetries, (1)+(2) and (1)+(2)+(3),
-    // but we don't need those for the construction of a symmetrical
-    // matrix, so we will not store them at all
 }

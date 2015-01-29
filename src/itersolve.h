@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_ITERSOLVE
 #define HEX_ITERSOLVE
@@ -17,9 +36,9 @@
 #include <iostream>
 
 #include "arrays.h"
-#include "complex.h"
 #include "matrix.h"
 #include "misc.h"
+#include "special.h"
 
 /**
  * @brief Return new complex array.
@@ -143,10 +162,10 @@ template
     class TArrayView,
     class Preconditioner,
     class MatrixMultiplication,
-    class NewArray      = decltype(default_new_complex_array),
-    class AxbyOperation = decltype(default_complex_axby),
+    class ComputeNorm   = decltype(default_compute_norm),
     class ScalarProduct = decltype(operator|<Complex>),
-    class ComputeNorm   = decltype(default_compute_norm)
+    class AxbyOperation = decltype(default_complex_axby),
+    class NewArray      = decltype(default_new_complex_array)
 >
 unsigned cg_callbacks
 (
@@ -158,10 +177,10 @@ unsigned cg_callbacks
           Preconditioner apply_preconditioner,
     MatrixMultiplication matrix_multiply,
                     bool verbose        = true,
-                NewArray new_array      = default_new_complex_array,
-           AxbyOperation axby           = default_complex_axby,
+             ComputeNorm compute_norm   = default_compute_norm,
            ScalarProduct scalar_product = operator|<Complex>,
-             ComputeNorm compute_norm   = default_compute_norm
+           AxbyOperation axby           = default_complex_axby,
+                NewArray new_array      = default_new_complex_array
 )
 {
     Timer timer;
@@ -287,15 +306,23 @@ unsigned cg_callbacks
  * @param verbose Whether to comment the progress to stdout.
  * @return Iteration count.
  */
-template <typename TFunctor1, typename TFunctor2>
-int bicgstab_callbacks
+template
+<
+    class TArray,
+    class TArrayView,
+    class Preconditioner,
+    class MatrixMultiplication
+>
+unsigned bicgstab_callbacks
 (
-    const cArrayView b, cArrayView x,
-    double eps,
-    int min_iterations, int max_iterations,
-    TFunctor1 apply_preconditioner,
-    TFunctor2 matrix_multiply,
-    bool verbose = false
+        const TArrayView b,
+              TArrayView x,
+                  double eps,
+                unsigned min_iterations,
+                unsigned max_iterations,
+          Preconditioner apply_preconditioner,
+    MatrixMultiplication matrix_multiply,
+                    bool verbose
 )
 {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -304,12 +331,15 @@ int bicgstab_callbacks
     int N = b.size();
     double bnorm = b.norm();
     
-    cArray x_im1(N), r_im1(N), rt(N), p_i(N), p_im1(N), v_im1(N), phat(N), v_i(N), s(N), shat(N), t(N), x_i(N), r_i(N);
-    Complex rho_im1, rho_im2, beta, alpha_i, alpha_im1, omega_i, omega_im1;
+    cArray p(N), r(N), rt(N), s(N), t(N), v(N), y(N), z(N);
+    Complex alpha = 1, beta = 1, rho = 1, rho_prev = 1, omega = 1;
     
-    x_im1 = x;
-    matrix_multiply(x_im1,r_im1);
-    rt = r_im1 = b - r_im1;
+    matrix_multiply(x,r);
+    rt = r = b - r;
+    
+    double rnorm = r.norm();
+    
+    Timer timer;
     
     int i;
     for (i = 1; i < max_iterations; i++)
@@ -318,62 +348,65 @@ int bicgstab_callbacks
         
         if (verbose)
         {
-            std::cout << "\t[Bi-CGSTAB] Residual relative magnitude after "
-                    << i << " iterations: " << r_im1.norm() / bnorm
-                    << " (" << sec.count()/60 << " min)\n";
+            std::cout << '\t';
+            std::cout << std::setw(4) << std::right << i;
+            std::cout << " | ";
+            std::cout << std::setw(11) << std::left << timer.nice_time();
+            std::cout << " | ";
+            std::cout << std::setw(15) << std::left << rnorm / bnorm;
         }
         
-        rho_im1 = (rt | r_im1);
-        if (std::abs(rho_im1) == 0.)
-            throw exception ("[Bi-CGSTAB] Failed, rho = 0.");
+        // 1.
+        rho = (rt | r);
         
-        if (i == 1)
-        {
-            p_i = r_im1;
-        }
-        else
-        {
-            beta = (rho_im1 / rho_im2) * (alpha_im1 / omega_im1);
-            p_i = r_im1 + beta * (p_im1 - omega_im1 * v_im1);
-        }
+        // 2.
+        beta = (rho / rho_prev) * (alpha / omega);
         
-        apply_preconditioner(p_i, phat);
-        matrix_multiply(phat, v_i);
-        alpha_i = rho_im1 / (rt | v_i);
-        s = r_im1 - alpha_i * v_i;
+        // 3.
+        p = r + beta * (p - omega * v);
         
-        if (s.norm() < eps * bnorm)
+        // 4.
+        apply_preconditioner(p, y);
+        
+        // 5.
+        matrix_multiply(y, v);
+        
+        // 6.
+        alpha = rho / (rt | v);
+        
+        // 7.
+        s = r - alpha * v;
+        
+        // 8.
+        apply_preconditioner(s, z);
+        
+        // 9.
+        matrix_multiply(z, t);
+        
+        // 10. (assumming K₁ = Id)
+        omega = (t | s) / (t | t);
+        
+        // 11.
+        x += alpha * y + omega * z;
+        
+        // 12. (check accuracy of x)
+        matrix_multiply(x, y);
+        rnorm = (y - b).norm();
+        if (verbose)
+            std::cout << std::endl;
+        if (not std::isfinite(rnorm))
         {
-            x = x_im1 + alpha_i * phat;
+            std::cout << "\t     The norm of the solution is not finite. Something went wrong!" << std::endl;
             break;
         }
+        if (rnorm < eps * bnorm)
+            return i;
         
-        apply_preconditioner(s, shat);
-        matrix_multiply(shat, t);
-        omega_i = (t|s) / (t|t);
+        // 13.
+        r = s - omega * t;
         
-        x_i = x_im1 + alpha_i * phat + omega_i * s;
-        r_i = s - omega_i * t;
-        
-        if (r_i.norm() < eps * bnorm)
-        {
-            x = x_i;
-            break;
-        }
-        
-        if (omega_i == 0.)
-            throw exception ("[Bi-CGSTAB] Solver failed, ω = 0.");
-        
-        // shift vectors
-        x_im1 = std::move(x_i);
-        r_im1 = std::move(r_i);
-        p_im1 = std::move(p_i);
-        v_im1 = std::move(v_i);
-        
-        // shift 
-        rho_im2 = rho_im1;
-        alpha_im1 = alpha_i;
-        omega_im1 = omega_i;
+        // Update indices.
+        rho_prev = rho;
     }
     
     return i;
@@ -441,7 +474,7 @@ int cgs_callbacks
         
         if (rho_1 == 0.)
         {
-            throw exception ("[cgs] Solver failes, ρ = 0.");
+            Exception("[cgs] Solver failes, ρ = 0.");
         }
         if (i == 1)
         {
@@ -473,6 +506,300 @@ int cgs_callbacks
     }
     
     return i;
+}
+
+template
+<
+    class TArray,
+    class TArrayView,
+    class Preconditioner,
+    class MatrixMultiplication,
+    class ComputeNorm   = decltype(default_compute_norm),
+    class AxbyOperation = decltype(default_complex_axby),
+    class ScalarProduct = decltype(operator|<Complex>),
+    class NewArray      = decltype(default_new_complex_array)
+>
+int minres_callbacks
+(
+        const TArrayView b,
+              TArrayView x,
+                  double tol,
+                unsigned min_iterations,
+                unsigned max_iterations,
+          Preconditioner apply_preconditioner,
+    MatrixMultiplication matrix_multiply,
+                    bool verbose        = true,
+             ComputeNorm compute_norm   = default_compute_norm,
+           AxbyOperation axby           = default_complex_axby,
+           ScalarProduct scalar_product = operator|<Complex>,
+                NewArray new_array      = default_new_complex_array
+)
+{
+    Timer timer;
+    
+    // compute norm of the right hand side
+    double bnorm = compute_norm(b);
+    
+    // trivial solution for zero right hand side
+    if (bnorm == 0)
+    {
+        x.fill(0.);
+        return 0;
+    }
+    
+    // get size of the problem
+    std::size_t N = b.size();
+    
+    std::vector<std::string> msg(11);
+    msg[0]  = " beta1 = 0.  The exact solution is  x = 0 ";
+    msg[1]  = " A solution to Ax = b was found, given tol ";
+    msg[2]  = " A least-squares solution was found, given tol ";
+    msg[3]  = " Reasonable accuracy achieved, given eps ";
+    msg[4]  = " x has converged to an eigenvector ";
+    msg[5]  = " acond has exceeded 0.1/eps ";
+    msg[6]  = " The iteration limit was reached ";
+    msg[7]  = " A  does not define a symmetric matrix ";
+    msg[8]  = " M  does not define a symmetric matrix ";
+    msg[9]  = " M  does not define a pos-def preconditioner ";
+    msg[10] = " beta2 = 0.  If M = I, b and x are eigenvectors ";
+
+    int istop(0), itn(0);
+    double Anorm(0.0), Acond(0.0), Arnorm(0.0);
+    double rnorm(0.0), ynorm(0.0);
+    bool done(false);
+
+    // Step 1
+    /*
+     * Set up y and v for the first Lanczos vector v1.
+     * y = beta1 P' v1, where P = C^(-1).
+     * v is really P'v1
+     */
+    
+    // residual; initialized to starting residual using the initial guess
+    TArray r1 (std::move(new_array(N)));
+    matrix_multiply(x, r1); // r = A x
+    axby (-1., r1, 1., b); // r = b - r
+    rnorm = compute_norm(r1);
+    
+    if (verbose)
+    {
+        std::cout << '\t';
+        std::cout << std::setw(4) << std::right << 0;
+        std::cout << " | ";
+        std::cout << std::setw(11) << std::left << timer.nice_time();
+        std::cout << " | ";
+        std::cout << std::setw(15) << std::left << rnorm / bnorm;
+    }
+    
+    // apply preconditioner
+    TArray y (std::move(new_array(N)));
+    apply_preconditioner(r1, y);
+    
+    if (verbose)
+            std::cout << std::endl;
+
+    double beta1 = std::abs(scalar_product(r1, y));
+    
+    // Test for an indefined preconditioner
+    // If b = 0 exactly stop with x = x0.
+
+    if(beta1 < 0.0)
+    {
+        istop = 9;
+        done = true;
+    }
+    else
+    {
+        if(beta1 == 0.0)
+        {
+            done = true;
+        }
+        else
+            beta1 = std::sqrt(beta1); // Normalize y to get v1 later
+    }
+    
+    // STEP 2
+    /* Initialize other quantities */
+    double oldb = 0., beta = beta1, dbar = 0., epsln = 0., oldeps = 0.;
+    double qrnorm = beta1, phi = 0., phibar = beta1, rhs1 = beta1;
+    double rhs2 = 0., tnorm2 = 0., ynorm2 = 0.;
+    double cs = -1., sn = 0.;
+    double gmax = 0., gmin = std::numeric_limits<double>::max();
+    double alpha = 0., gamma = 0.;
+    double delta = 0., gbar = 0.;
+    double z = 0.;
+    
+    TArray v(std::move(new_array(N)));
+    TArray w(std::move(new_array(N)));
+    TArray w1(std::move(new_array(N)));
+    TArray w2(std::move(new_array(N)));
+    TArray r2(std::move(new_array(N)));
+    
+    // r2 = r1
+    axby(0., r2, 1., r1);
+    
+    /* Main Iteration */
+    if (!done)
+    {
+        for (itn = 0; itn < max_iterations; ++itn)
+        {
+            // STEP 3
+            /*
+            -----------------------------------------------------------------
+            Obtain quantities for the next Lanczos vector vk+1, k = 1, 2,...
+            The general iteration is similar to the case k = 1 with v0 = 0:
+            
+            p1      = Operator * v1  -  beta1 * v0,
+            alpha1  = v1'p1,
+            q2      = p2  -  alpha1 * v1,
+            beta2^2 = q2'q2,
+            v2      = (1/beta2) q2.
+            
+            Again, y = betak P vk,  where  P = C**(-1).
+            .... more description needed.
+            -----------------------------------------------------------------
+             */
+            double s = 1./beta; //Normalize previous vector (in y)
+            axby(0., v, s, y);
+            
+            matrix_multiply(v,y);
+            
+            if (itn > 0)
+                axby(1., y, -beta/oldb, r1);
+            
+            alpha = std::abs(scalar_product(v,y));   // alphak
+            axby(1., y, -alpha/beta, r2);
+            axby(0., r1, 1., r2);
+            axby(0., r2, 1., y);
+            
+            if (verbose)
+            {
+                std::cout << '\t';
+                std::cout << std::setw(4) << std::right << itn + 2;
+                std::cout << " | ";
+                std::cout << std::setw(11) << std::left << timer.nice_time();
+                std::cout << " | ";
+                std::cout << std::setw(15) << std::left << rnorm / bnorm;
+            }
+            
+            apply_preconditioner(r2,y);
+            
+            if (verbose)
+                std::cout << std::endl;
+            
+            oldb = beta; //oldb = betak
+            beta = std::abs(scalar_product(r2,y));
+            
+            if(beta < 0)
+            {
+                istop = 9;
+                break;
+            }
+            
+            beta = std::sqrt(beta);
+            tnorm2 += alpha*alpha + oldb*oldb + beta*beta;
+            
+            if (itn == 0)    //Initialize a few things
+            {
+                if  (beta/beta1 < 10.0 * special::constant::eps)
+                    istop = 10;
+            }
+            
+            // Apply previous rotation Q_{k-1} to get
+            // [delta_k epsln_{k+1}] = [cs sn]  [dbar_k 0]
+            // [gbar_k   dbar_{k+1}]   [sn -cs] [alpha_k beta_{k+1}].
+            oldeps = epsln;
+            delta  = cs*dbar + sn*alpha;
+            gbar   = sn*dbar - cs*alpha;
+            epsln  =           sn*beta;
+            dbar   =         - cs*beta;
+            double root = std::sqrt(gbar * gbar + dbar * dbar);
+            Arnorm = phibar * root; // ||Ar_{k-1}||
+            
+            // Compute next plane rotation Q_k
+            gamma = std::sqrt(gbar * gbar + beta * beta); // gamma_k
+            gamma = std::max(gamma, special::constant::eps);
+            cs = gbar / gamma;                     // c_k
+            sn = beta / gamma;                     // s_k
+            phi = cs * phibar;                     // phi_k
+            phibar = sn * phibar;                  // phibar_{k+1}
+            
+            // Update x
+            double denom = 1. / gamma;
+            axby(0., w1, 1., w2);
+            axby(0., w2, 1, w);
+            axby(0., w, -oldeps, w1);
+            axby(1., w, -delta, w2);
+            axby(1., w, denom, v);
+            axby(1., x, phi, w);
+
+            // go round again
+            gmax    = std::max(gmax, gamma);
+            gmin    = std::min(gmin, gamma);
+            z       = rhs1/gamma;
+            rhs1    = rhs2 - delta*z;
+            rhs2    =      - epsln*z;
+            
+            // Estimate various norms
+            
+            Anorm = std::sqrt(tnorm2);
+            ynorm2 = std::abs(scalar_product(x,x));
+            ynorm = std::sqrt(ynorm2);
+            double epsa = Anorm * special::constant::eps;
+            double epsx = epsa * ynorm;
+            double epsr = Anorm * ynorm * tol;
+            double diag = gbar;
+            if (0 == diag)
+                diag = epsa;
+            
+            qrnorm = phibar;
+            rnorm  = qrnorm;
+            double test1 = 0., test2 = 0.;
+            test1  = rnorm / (Anorm * ynorm); // ||r||/(||A|| ||x||)
+            test2  = root / Anorm;         // ||A r_{k-1}|| / (||A|| ||r_{k-1}||)
+            
+            // Estimate cond(A)
+            /*
+             In this version we look at the diagonals of  R  in the
+             factorization of the lower Hessenberg matrix,  Q * H = R,
+             where H is the tridiagonal matrix from Lanczos with one
+             extra row, beta(k+1) e_k^T.
+             */
+            Acond = gmax / gmin;
+            
+            //See if any of the stopping criteria is satisfied
+            if (0 == istop)
+            {
+                double t1 = 1. + test1, t2 = 1. + test2; //This test work if tol < eps
+                if (t2 <= 1.) istop = 2;
+                if (t1 <= 1.) istop = 1;
+                
+                if (itn >= max_iterations - 1) istop = 6;
+                if (Acond >= 0.1 / special::constant::eps) istop = 4;
+                if (epsx >= beta1)   istop = 3;
+                if (test2 <= tol)    istop = 2;
+                if (test1 <= tol)    istop = 1;
+            }
+            
+            if (0 != istop)
+                break;
+            
+        }
+    }
+    
+    // Display final status
+    {
+        std::cout << std::setfill('-') << std::setw(80) << "-" << "\n";
+        std::cout << msg[istop] << "\n";
+        std::cout << " Number of iterations: " << itn << "\n";
+        std::cout << " Anorm = " << Anorm << "\t Acond = " << Acond << "\n";
+        std::cout << " rnorm = " << rnorm << "\t ynorm = " << ynorm << "\n";
+        std::cout << " Arnorm = " << Arnorm << "\n";
+        std::cout << std::setfill('-') << std::setw(80) << "-" << std::endl;
+        std::cout << std::setfill(' ');
+    }
+
+    return itn;
 }
 
 #endif

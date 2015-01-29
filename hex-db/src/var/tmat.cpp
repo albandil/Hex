@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -21,11 +40,16 @@
 
 const std::string TMatrix::Id = "tmat";
 const std::string TMatrix::Description = "T-matrix.";
-const std::vector<std::string> TMatrix::Dependencies = {
-    "ni", "li", "mi", 
-    "nf", "lf", "mf",
-    "L", "S",
-    "Ei", "ell"
+const std::vector<std::pair<std::string,std::string>> TMatrix::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"ell", "Outgoing projectile partial wave angular momentum."}
 };
 const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
 
@@ -71,15 +95,14 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    int  L = As<int>(sdata,  "L", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    int ell= As<int>(sdata, "ell",Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    int  S = Conv<int>(sdata,  "S", Id);
+    int ell= Conv<int>(sdata, "ell",Id);
     
     // energies
     rArray energies;
@@ -88,7 +111,7 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         
@@ -101,23 +124,23 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     
     // create query statement
     sqlitepp::statement st(db);
-    st << "SELECT Ei, Re_T_ell, Im_T_ell, Re_TBorn_ell, Im_TBorn_ell, FROM " + TMatrix::Id + " "
+    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell), SUM(Re_TBorn_ell), SUM(Im_TBorn_ell) FROM " + TMatrix::Id + " "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
           "  AND nf = :nf "
           "  AND lf = :lf "
           "  AND mf = :mf "
-          "  AND  L = :L  "
           "  AND  S = :S  "
           "  AND ell=:ell "
+          "GROUP BY L, Ei "
           "ORDER BY Ei ASC",
        sqlitepp::into(E),
        sqlitepp::into(Re_T_ell), sqlitepp::into(Im_T_ell),
        sqlitepp::into(Re_TBorn_ell), sqlitepp::into(Im_TBorn_ell),
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
        sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-       sqlitepp::use(L), sqlitepp::use(S), sqlitepp::use(ell);
+       sqlitepp::use(S), sqlitepp::use(ell);
     
     // get T-matrices
     rArray E_arr;
@@ -131,28 +154,48 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data fot this selection." << std::endl;
         return true;
+    }
     
-    // interpolate
-    cArray T_out = interpolate(E_arr, T_arr, energies * efactor);
-    cArray Tb_out = interpolate(E_arr, Tb_arr, energies * efactor);
+    // get T-matrices
+    cArray T_out, Tb_out;
+    if (energies.size() > 0 and energies[0] < 0)
+    {
+        // use all
+        energies = E_arr;
+        T_out = T_arr;
+        Tb_out = Tb_arr;
+    }
+    else
+    {
+        // interpolate
+        T_out = interpolate(E_arr, T_arr, energies * efactor);
+        Tb_out = interpolate(E_arr, Tb_arr, energies * efactor);
+    }
     
     // write out
     std::cout << logo("#") <<
         "# T-matrices in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-        "#     L = " << L << ", S = " << S << ", ℓ = " << ell << "\n" <<
+        "#     S = " << S << ", ℓ = " << ell << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "# \n" <<
-        "# E\tRe T\tIm T\tRe TBorn\tIm TBorn\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15, 15, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "Re T     ", "Im T     ", "Re TBorn ", "Im TBorn ");
+    table.write("# ---------", "---------", "---------", "---------", "---------");
     for (std::size_t i = 0; i < energies.size(); i++)
     {
-        std::cout << energies[i] << "\t" << 
-            T_out[i].real()*lfactor << "\t" <<
-            T_out[i].imag()*lfactor << "\t" <<
-            Tb_out[i].real()*lfactor << "\t" <<
-            Tb_out[i].imag()*lfactor << std::endl;
+        table.write
+        (
+            energies[i],
+            T_out[i].real()*lfactor,  T_out[i].imag()*lfactor,
+            Tb_out[i].real()*lfactor, Tb_out[i].imag()*lfactor
+        );
     }
     
     return true;

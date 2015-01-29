@@ -20,13 +20,16 @@
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
-					<Add directory="../win-include" />
+					<Add option="-DNO_MPI" />
+					<Add directory="../Win64/include" />
 					<Add directory="libs" />
 				</Compiler>
 				<Linker>
-					<Add library="..\win-libraries\libsqlite3.a" />
-					<Add library="..\win-libraries\libgsl.a" />
-					<Add library="..\win-libraries\libfftw3.a" />
+					<Add library="..\Win64\lib\libgsl-1.16.dll.a" />
+					<Add library="..\Win64\lib\libsqlite3-3.8.3.dll.a" />
+					<Add library="..\Win64\lib\libginac-1.6.3.dll.a" />
+					<Add library="..\Win64\lib\libcln-1.3.4.dll.a" />
+					<Add library="..\Win64\lib\libfftw3-3.3.4.dll.a" />
 				</Linker>
 			</Target>
 			<Target title="exe">
@@ -42,14 +45,11 @@
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
-					<Add directory="../win-include" />
+					<Add option="-DNO_MPI" />
 					<Add directory="libs" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add library="..\win-libraries\libfftw3.a" />
-					<Add library="..\win-libraries\libgsl.a" />
-					<Add library="..\win-libraries\libsqlite3.a" />
 					<Add library="lib\libhex-db.a" />
 				</Linker>
 			</Target>
@@ -149,8 +149,8 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/arrays.cpp">
-			<Option target="lib" />
 			<Option target="exe" />
+			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/arrays.h">
 			<Option target="lib" />
@@ -159,6 +159,12 @@
 		<Unit filename="src/arrithm.h">
 			<Option target="lib" />
 			<Option target="exe" />
+		</Unit>
+		<Unit filename="src/born.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/born.h">
+			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/chebyshev.h">
 			<Option target="lib" />
@@ -173,10 +179,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/compact.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/complex.h">
 			<Option target="lib" />
 			<Option target="exe" />
 		</Unit>
@@ -201,6 +203,10 @@
 		<Unit filename="src/misc.h">
 			<Option target="exe" />
 			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/numbers.h">
+			<Option target="lib" />
+			<Option target="exe" />
 		</Unit>
 		<Unit filename="src/special.cpp">
 			<Option target="lib" />
@@ -236,6 +242,9 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/momtf.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/var/scatamp-dir.cpp">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/scatamp.cpp">

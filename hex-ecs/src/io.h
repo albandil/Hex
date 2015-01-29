@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_IO_H
 #define HEX_IO_H
@@ -63,9 +82,9 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
-              droptol(1e-8), itinerary(StgNone), outofcore(false), itertol(1e-8),
-              prec_itertol(1e-8), parallel_dot(false), parallel_block(true),
-              gpu_slater(false)
+              droptol(1e-8), itinerary(StgNone), outofcore(false), cache_all_radint(true), cache_own_radint(true),
+              itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
+              gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false)
         {
             // get command line options
             parse(argc, argv);
@@ -109,6 +128,10 @@ class CommandLine
         /// Whether to keep precomputed data only on disk and spare RAM.
         bool outofcore;
         
+        /// Whether to keep radial integrals in memory.
+        bool cache_all_radint;
+        bool cache_own_radint;
+        
         /// Tolerance for terminating iterative solution.
         double itertol;
         
@@ -123,6 +146,15 @@ class CommandLine
         
         /// Whether to compute diagonal two-electron integrals using OpenCL.
         bool gpu_slater;
+        
+        /// Whether to avoid explicitly calculating big matrices and only apply them on the fly.
+        bool lightweight_full, lightweight_radial_cache;
+        
+        /// Whether to compute only a subset of radial integrals in shared scratch architecture.
+        bool shared_scratch;
+        
+        /// Whether to use diagonal blocks as present in the scratch directory. (For debugging purposes only.)
+        bool reuse_dia_blocks;
 };
 
 /**
@@ -195,13 +227,19 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E)
-            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)) {}
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, unsigned Nspline)
+            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)), ang_(ang), Nspline_(Nspline) {}
         
         /// Get name of the solution file.
         std::string const & name () const
         {
             return name_;
+        }
+        
+        /// Check that the file exists.
+        bool check () const
+        {
+            return HDFFile(name_, HDFFile::readonly).valid();
         }
         
         /**
@@ -231,14 +269,27 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (cArray const & sol)
+        bool save (const cArrayView segment, unsigned ill)
         {
-            return sol.hdfsave(name_, true /* = with compression */);
+            // create and resize the output file it it does not exist
+            if (not check())
+            {
+                HDFFile hdf (name_, HDFFile::overwrite);
+                hdf.write("array", (Complex*)nullptr, ang_.size() * Nspline_ * Nspline_);
+            }
+            
+            // open the file for random access
+            HDFFile hdf (name_, HDFFile::readwrite);
+            
+            // write the data with correct offset
+            return hdf.valid() and hdf.write("array", segment.data(), Nspline_ * Nspline_, ill * Nspline_ * Nspline_);
         }
     
     private:
         
         std::string name_;
+        std::vector<std::pair<int,int>> ang_;
+        unsigned Nspline_;
 };
 
 /**

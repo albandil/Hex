@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -26,10 +45,12 @@
 
 const std::string StokesParameters::Id = "stokes";
 const std::string StokesParameters::Description = "Reduced Stokes parameters for the ns->n'p transition.";
-const std::vector<std::string> StokesParameters::Dependencies = {
-    "ni", /* li = 0, mi = 0 */
-    "nf", /* lf = 1, |mf| ≤ 1 */
-    "Ei", "theta"
+const std::vector<std::pair<std::string,std::string>> StokesParameters::Dependencies = {
+    {"ni", "Initial atomic principal quantum number; the state (ni,0,0) is used."},
+    {"nf", "Final atomic principal quantum number; the states (nf,1,*) are used."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"beta", "Angle between impact direction and the quantization axis."},
+    {"theta", "Scattering angles for which to compute the Stokes parameters."}
 };
 const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
 
@@ -57,9 +78,9 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(ni*ni) + 1./(nf*nf));
     
@@ -70,7 +91,7 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(As<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", Id));
         
     } catch (std::exception e) {
         
@@ -138,21 +159,22 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
         "#     nf = " << nf << ", lf = " << 1 << ",\n"
         "#     E = " << Ei/efactor << " " << unit_name(Eunits) << "\n"
         "# ordered by angle in " << unit_name(Aunits) << "\n"
-        "# \n"
-        "# θ\t λ\t R\t I\t P₁\t P₂\t P₃\t Pl\t γ\t P⁺\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# angle    ", "lambda   ", "R        ", "I        ", "P1       ", "P2       ", "P3       ", "Pl       ", "gamma    ", "P+       ");
+    table.write("# ---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------", "---------");
+    
     for (std::size_t i = 0; i < angles.size(); i++)
     {
-        std::cout << 
-            angles[i] << "\t" << 
-            lambda[i] << "\t" <<
-            R[i] << "\t" <<
-            I[i] << "\t" <<
-            P1[i] << "\t" <<
-            P2[i] << "\t" <<
-            P3[i] << "\t" <<
-            Pl[i] << "\t" <<
-            gamma[i] / afactor << "\t" <<
-            Pplus[i] << "\n";
+        table.write
+        (
+            angles[i],
+            lambda[i], R[i], I[i],
+            P1[i], P2[i], P3[i],
+            Pl[i], gamma[i] / afactor, Pplus[i]
+        );
     }
     
     return true;

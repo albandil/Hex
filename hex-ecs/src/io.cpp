@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <cstdio>
 #include <cstring>
@@ -16,8 +35,6 @@
 #include <fstream>
 #include <string>
 #include <tuple>
-
-#include <omp.h>
 
 #include "arrays.h"
 #include "cmdline.h"
@@ -77,7 +94,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (out.bad())
-                    throw exception ("Error: Cannot write to \"example.inp\"\n");
+                    Exception("Error: Cannot write to \"example.inp\"\n");
                 
                 out << sample_input;
                     
@@ -89,37 +106,55 @@ void CommandLine::parse (int argc, char* argv[])
                 // set custom input file
                 inputfile.open(optarg);
                 if (not inputfile.good())
-                    throw exception ("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                    Exception("Error: Input file \"%s\" not found.\n", optarg.c_str());
                 return true;
             },
         "help", "h", 0, [&](std::string optarg) -> bool
             {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                                  \n"
-                    "                                                                                                                  \n"
-                    "\t--example                 (-e)  create sample input file                                                        \n"
-                    "\t--help                    (-h)  display this help                                                               \n"
-                    "\t--input <filename>        (-i)  use custom input file                                                           \n"
-                    "\t--zipfile <filename>      (-z)  solution file to zip                                                            \n"
-                    "\t--zipcount <number>       (-n)  zip samples                                                                     \n"
-                    "\t--zipmax <number>         (-R)  maximal radius to use for solution zipping                                      \n"
+                    "Available switches (short forms in parentheses):                                                                                                          \n"
+                    "                                                                                                                                                          \n"
+                    "\t--example                  (-e)  Create sample input file.                                                                                              \n"
+                    "\t--help                     (-h)  Display this help.                                                                                                     \n"
+                    "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
+                    "\t--zipfile <filename>       (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
+                    "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
+                    "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
 #ifndef NO_MPI
-                    "\t--mpi                     (-m)  use MPI                                                                         \n"
+                    "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
-                    "\t--stg-integ               (-a)  only do radial integrals                                                        \n"
-                    "\t--stg-integ-solve         (-b)  only do integrals & solve                                                       \n"
-                    "\t--stg-extract             (-c)  only extract amplitudes                                                         \n"
-                    "\t--preconditioner <name>   (-p)  preconditioner to use (default: ILU)                                            \n"
-                    "\t--list-preconditioners    (-P)  list of available preconditioners with short description of each                \n"
-                    "\t--tolerance <number>      (-T)  tolerance for the conjugate gradients solver                                    \n"
-                    "\t--prec-tolerance <number> (-t)  tolerance for the conjugate gradients preconditioner                            \n"
-                    "\t--drop-tolerance <number> (-d)  drop tolerance for the ILU preconditioner (default: 1e-15)                      \n"
-                    "\t--out-of-core             (-O)  use hard disk drive to store intermediate results and thus to save RAM (slower) \n"
-                    "\t--parallel-dot                  OpenMP-parallelize SpMV operations                                              \n"
-                    "\t--no-parallel-block             disable simultaneous preconditioning of multiple blocks by OpenMP               \n"
-                    "\t--gpu-slater                    compute diagonal two-electron interals using OpenCL                             \n"
-                    "                                                                                                                  \n"
+                    "\t--stg-integ                (-a)  Only calculate needed radial integrals.                                                                                \n"
+                    "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
+                    "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
+                    "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
+                    "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
+                    "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
+                    "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
+                    "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
+                    "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
+                    "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
+                    "\t--out-of-core              (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
+                    "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
+                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
+#ifndef NO_LAPACK
+                    "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
+#endif
+                    "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
+                    "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
+                    "                                                                                                                                                          \n"
+                    "There are also some environment variables that control the execution.                                                                                     \n"
+                    "                                                                                                                                                          \n"
+                    "\tOMP_NUM_THREADS     Number of OpenMP threads to use.                                                                                                    \n"
+                    "\t                    If empty, the physical number of hardware threads set by system is used.                                                            \n"
+                    "                                                                                                                                                          \n"
+                    "\tHEX_RHO             Scattering amplitude extraction distance (must be on the real part of the grid).                                                    \n"
+                    "\t                    If empty, the end of the real grid is used.                                                                                         \n"
+                    "                                                                                                                                                          \n"
+                    "\tHEX_SAMPLES         How many times to evaluate the amplitude in the vicinity of the evaluation point. The evaluations will be uniformly                 \n"
+                    "\t                    spread over one wave-length of the scattered electron and averaged to suppress numerical errors.                                    \n"
+                    "\t                    If empty, 10 evaluations are used.                                                                                                  \n"
+                    "                                                                                                                                                          \n"
                 ;
                 std::exit(EXIT_SUCCESS);
             },
@@ -167,9 +202,25 @@ void CommandLine::parse (int argc, char* argv[])
                 itinerary = StgExtract;
                 return true;
             },
+        "own-radial-cache", "w", 0, [&](std::string optarg) -> bool
+            {
+                // do not cache un-'owned' two-electron radial integrals in memory
+                cache_own_radint = true;
+                cache_all_radint = false;
+                return true;
+            },
+        "no-radial-cache", "r", 0, [&](std::string optarg) -> bool
+            {
+                // do not cache any two-electron radial integrals in memory at all
+                cache_own_radint = false;
+                cache_all_radint = false;
+                return true;
+            },
         "out-of-core", "O", 0, [&](std::string optarg) -> bool
             {
-                // use out-of-core functionality: store diagonal blocks on disk
+                // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
+                cache_all_radint = false;
+                cache_own_radint = false;
                 outofcore = true;
                 return true;
             },
@@ -195,7 +246,7 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // preconditioner
                 if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
-                    throw exception("Unknown preconditioner \"%s\".", optarg.c_str());
+                    Exception("Unknown preconditioner \"%s\".", optarg.c_str());
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
@@ -216,10 +267,10 @@ void CommandLine::parse (int argc, char* argv[])
                 parallel_dot = true;
                 return true;
             },
-        "no-parallel-block", "", 0, [&](std::string optarg) -> bool
+        "parallel-block", "", 0, [&](std::string optarg) -> bool
             {
-                // un-parallelize preconditioning
-                parallel_block = false;
+                // parallelize preconditioning
+                parallel_block = true;
                 return true;
             },
         "gpu-slater", "", 0, [&](std::string optarg) -> bool
@@ -228,10 +279,36 @@ void CommandLine::parse (int argc, char* argv[])
                 gpu_slater = true;
                 return true;
             },
+        "lightweight-radial-cache", "l", 0, [&](std::string optarg) -> bool
+            {
+                // do not precompute two-electron radial integral matrices but only apply them on the fly
+                lightweight_radial_cache = true;
+                return true;
+            },
+#ifndef NO_LAPACK
+        "lightweight-full", "L", 0, [&](std::string optarg) -> bool
+            {
+                // do not precompute large matrices but only apply them on the fly
+                lightweight_full = lightweight_radial_cache = true;
+                return true;
+            },
+#endif
+        "shared-scratch", "s", 0, [&](std::string optarg) -> bool
+            {
+                // precompute only the owned subset of radial integrals
+                shared_scratch = true;
+                return true;
+            },
+        "reuse-dia-blocks", "", 0, [&](std::string optarg) -> bool
+            {
+                // load dia blocks from scratch files
+                reuse_dia_blocks = true;
+                return true;
+            },
         
         [&] (std::string optname, std::string optarg) -> bool
         {
-            throw exception ("Unknown switch \"%s\".", optname.c_str());
+            Exception("Unknown switch \"%s\".", optname.c_str());
         }
     );
 }
@@ -267,7 +344,7 @@ void InputFile::read (std::ifstream & inf)
         if (rknots_begin[i] > rknots_end[i])
         {
             std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
-            throw exception ("Inconsistent knot specification!");
+            Exception("Inconsistent knot specification!");
         }
         
         rArray new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
@@ -430,16 +507,18 @@ void InputFile::read (std::ifstream & inf)
     // construct energy sequence
     for (unsigned i = 0; i < Ei_begin.size(); i++)
     {
-        Ei = concatenate
-        (
-            Ei,
-            linspace
+        if (Ei_samples[i] > 0)
+        {
+            Ei.append
             (
-                Ei_begin[i],
-                Ei_end[i],
-                Ei_samples[i]
-            )
-        );
+                linspace
+                (
+                    Ei_begin[i],
+                    Ei_end[i],
+                    Ei_samples[i]
+                )
+            );
+        }
     }
     
     // print info
@@ -477,7 +556,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     
     // load the requested file
     if (not sol.hdfload(cmd.zipfile.c_str()))
-        throw exception("Cannot load file %s.", cmd.zipfile.c_str());
+        Exception("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
     grid = linspace (0., cmd.zipmax, cmd.zipcount);

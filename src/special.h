@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_SPECF
 #define HEX_SPECF
@@ -26,7 +45,7 @@
 #define sqr(x) (gsl_sf_pow_int((x),2))
 
 #include "arrays.h"
-#include "complex.h"
+#include "numbers.h"
 #include "misc.h"
 
 /// Shifting coefficients for Sturmian T-operators
@@ -68,9 +87,9 @@ const double euler           = M_EULER;    // γ
 const double alpha           = GSL_CONST_NUM_FINE_STRUCTURE; // α
 const double alpha_sqr       = alpha*alpha; // α²
 
-// other special numbers
-const double Inf = std::numeric_limits<double>::infinity();
-const double Nan = std::numeric_limits<double>::quiet_NaN();
+const double Inf = std::numeric_limits<double>::infinity();     // +∞
+const double Nan = std::numeric_limits<double>::quiet_NaN();    // NaN
+const double eps = std::numeric_limits<double>::epsilon();      // machine precision
 
 }; // end of namespace "special::constant"
 
@@ -105,7 +124,7 @@ template <class T> T trapz (NumberArray<T> const & x, NumberArray<T> const & y)
 template <class T> T simpson (double h, NumberArray<T> const & y)
 {
     if (y.size() % 2 != 0)
-        throw exception ("You need to use even number of grid points for Simpson integration.");
+        Exception("You need to use even number of grid points for Simpson integration.");
     
     T sum1 = 0, sum2 = 0;
     
@@ -177,13 +196,7 @@ template <class T> T pow_exp_hyperg1F1 (T a, T b, T c, T u, T v, T x, double eps
         
         // check if we run out of allowed iterations
         if (n == maxiter)
-        {
-            throw exception
-            (
-                "Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",
-                maxiter
-            );
-        }
+            Exception("Maximal number of iterations (%d) reached in pow_exp_hyperg1F1.",maxiter);
     }
     
     // return the result
@@ -218,9 +231,9 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
  * 
  * The power is computed as a corresponding bit shift of 1.
  */
-inline constexpr unsigned pow2 (unsigned i)
+inline constexpr std::uint64_t pow2 (std::uint64_t i)
 {
-    return 1 << i;
+    return std::uint64_t(1) << i;
 }
 
 /**
@@ -230,9 +243,9 @@ inline constexpr unsigned pow2 (unsigned i)
  * The rest is computed plainly by std::pow (so it is not fast
  * anymore).
  */
-inline int pow3 (unsigned i)
+inline std::uint64_t pow3 (std::uint64_t i)
 {
-    static const int pow3_table[10] = {
+    static const std::uint64_t pow3_table[10] = {
         /* 3^0 */ 1,
         /* 3^1 */ 3,
         /* 3^2 */ 3*3,
@@ -245,7 +258,7 @@ inline int pow3 (unsigned i)
         /* 3^9 */ 3*3*3*3*3*3*3*3*3
     };
     
-    return (i < 10 ? pow3_table[i] : (int)std::pow(3,i));
+    return (i < 10 ? pow3_table[i] : (std::uint64_t)std::pow(3,i));
 }
 
 /**
@@ -257,7 +270,11 @@ inline int pow3 (unsigned i)
  * The method used comes from Ikebe Y.: <i>The zeros of regular Coulomb wave
  * functions and of their derivatives</i>, Math. Comp. <b>29</b>, 131 (1975)
  * 878-887. It uses eigenvalues of a special tridiagonal matrix. The eigenvalues
- * are computed using the standard Lapack function DSTEV .
+ * are computed using the standard Lapack function DSTEV.
+ * 
+ * The calculation proceeds in iterations. In every iteration the size of the
+ * matrix to be diagonalized is doubled, until the first 'nzeros' eigenvalues
+ * converge. For large number of zeros this can be very time consuming.
  */
 int coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel = 1e-8);
 
@@ -563,6 +580,12 @@ inline Complex ric_h_plus (int n, double x)
 
 /**
  * @brief Spherical harmonic function.
+ * 
+ * The definition of the spherical harmonics implemented by GSL is used. This means
+ * the standard definition without the Condon-Shortley phase. This means for example
+ * that @f$ Y_{1,-1}(\vartheta,0) = Y_{1,-1}(\vartheta,0) @f$, whereas with the Condon-Shortley
+ * phase the two values would differ by sign. Generaly, this convention cen be retrieved from the
+ * Condon-Shortley convention by multiplying by the factor @f$ (-1)^{\max (0,m)} @f$.
  */
 Complex sphY (int l, int m, double theta, double phi);
 
@@ -773,6 +796,11 @@ double Wigner3j_2 (int two_j1, int two_j2, int two_j3, int two_m1, int two_m2, i
 double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, int two_j6);
 #define Wigner6j(a,b,c,d,e,f) Wigner6j_2(2*(a),2*(b),2*(c),2*(d),2*(e),2*(f))
 //@}
+
+/**
+ * @brief Small Wigner d-matrix.
+ */
+double Wigner_d (int two_j, int two_ma, int two_mb, double beta);
 
 /**
  * @return Value of @f$ f(\lambda,l_1,l_2,l_1',l_2',L) @f$.

@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_MEMORY
 #define HEX_MEMORY
@@ -17,6 +36,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
+
+#include "misc.h"
 
 /**
  * @brief Basic memory allocator.
@@ -30,13 +51,23 @@ template <class T> class PlainAllocator
     public:
         
         /**
+         * @brief Get alignment of a type.
+         * 
+         * Return alignment of the allocated array in bytes.
+         */
+        static std::size_t align ()
+        {
+            return std::alignment_of<T>::value;
+        }
+        
+        /**
          * @brief Allocate array.
          * 
          * This method will allocate fields of the data type T.
          * The elements will be constructed by the implicit constructor.
          * @param n Number of items to allocate.
          */
-        static T * alloc (size_t n)
+        static T * alloc (std::size_t n)
         {
             return new T[n]();
         }
@@ -70,9 +101,11 @@ template <class T> class PlainAllocator
  * autovectorization, which can utilize SIMD instruction of the CPU and
  * speed up the operation on the arrays.
  */
-template <class T, size_t alignment = std::alignment_of<T>::value> class AlignedAllocator
+template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class AlignedAllocator
 {
     public:
+        
+        static const std::size_t alignment = alignment_;
         
         /**
          * @brief Allocate aligned memory.
@@ -104,7 +137,7 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
                 return nullptr;
             
             // get the alignment and raise it to nearest multiple of sizeof(void*)
-            std::size_t align = std::max(alignment, alignof(max_align_t));
+            std::size_t align = std::max(alignment_, alignof(max_align_t));
             if (align % sizeof(void*) != 0)
                 align += sizeof(void*) - align % sizeof(void*);
             
@@ -113,7 +146,21 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             std::size_t bytes = elems * sizeof(T) + sizeof(std::uintptr_t) + align;
             
             // allocate memory pool
-            void * root = std::malloc(bytes);
+            void * root;
+            try
+            {
+                root = new char [bytes];
+            }
+            catch (std::bad_alloc const & err)
+            {
+                std::string strsize = (
+                    bytes < 1204           ? format("%d B", bytes) : (
+                    bytes < 1024*1204      ? format("%.2f kiB", bytes / 1024.) : (
+                    bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
+                      /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
+                
+                Exception("Insufficent memory (unable to allocate next %s).", strsize.c_str());
+            }
             std::uintptr_t root_address = (std::uintptr_t)root;
             
             // compute padding
@@ -152,7 +199,7 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
                 std::uintptr_t root_address = *(reinterpret_cast<std::uintptr_t*>(origin) - 1);
                 
                 // free the whole memory pool
-                std::free(reinterpret_cast<T*>(root_address));
+                delete [] reinterpret_cast<char*>(root_address);
             }
         }
         
@@ -194,5 +241,8 @@ template <class T, size_t alignment = std::alignment_of<T>::value> class Aligned
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
 };
+
+// number array alignment (512 bits ~ AVX2)
+#define NUMBER_ARRAY_ALIGNMENT 512u
 
 #endif /* HEX_MEMORY */

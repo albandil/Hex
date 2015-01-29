@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_AMPLITUDES
 #define HEX_AMPLITUDES
@@ -131,16 +150,16 @@ class Amplitudes
         Transition;
         
         // Λ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::map<int,std::pair<cArray,cArray>>> Lambda_Slp;
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Lambda_Slp;
         
         // T[ie] for both spins indexed by (ni,li,mi,nf,lf,mf) and l'
-        std::map<Transition,std::map<int,std::pair<cArray,cArray>>> Tmat_Slp;
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Tmat_Slp;
         
         // σ[ie] for both spins indexed by (ni,li,mi,nf,lf,mf)
         std::map<Transition,std::pair<rArray,rArray>> sigma_S;
         
-        // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and l1,l2
-        std::map<Transition,std::pair<cArrays,cArrays>> Xi_Sl1l2;
+        // Ξ[ie] (lists of Chebyshev coefficients) indexed by (ni,li,mi) and (l1,l2)
+        std::map<Transition,std::vector<std::pair<cArray,cArray>>> Xi_Sl1l2;
         
         /**
          * @brief Extract radial part of scattering amplitude.
@@ -157,7 +176,7 @@ class Amplitudes
          *        \mathrm{d}r_1 \ .
          * @f]
          */
-        std::map<int,std::pair<cArray,cArray>> computeLambda_ (Transition T);
+        void computeLambda_ (Transition T, const cArrayView solution, int ie, int Spin);
         
         /**
          * @brief Evaluate T-matrices.
@@ -172,7 +191,7 @@ class Amplitudes
          * (an item per impact energy) indexed by @f$ j' @f$ and @f$ l' @f$
          * (the angular momenta of the projectile).
          */
-        std::map<int,std::pair<cArray,cArray>> computeTmat_ (Transition T);
+        void computeTmat_ (Transition T);
         
         /**
          * @brief Extract radial part of ionization amplitude.
@@ -207,7 +226,7 @@ class Amplitudes
          * @param coupled_states List of all coupled-state angular momenta pairs.
          * @return Vector of radial integrals.
          */
-        std::pair<cArrays,cArrays> computeXi_ (Transition T);
+        void computeXi_ (Transition T, const cArrayView solution, int ie, int Spin);
         
         /**
          * @brief Evaluate cross sections.
@@ -215,9 +234,9 @@ class Amplitudes
          * This routine will reuse the T-matrices calculated by @ref computeTmat_
          * and compute the cross sections.
          */
-        std::pair<rArray,rArray> computeSigma_ (Transition T);
+        void computeSigma_ (Transition T);
         
-        std::pair<rArray,rArray> computeSigmaIon_ (Transition T);
+        void computeSigmaIon_ (Transition T);
         
         // B-spline environment
         Bspline const & bspline_;

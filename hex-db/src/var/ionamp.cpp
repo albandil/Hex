@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -24,9 +43,13 @@
 
 const std::string IonizationAmplitude::Id = "ionamp";
 const std::string IonizationAmplitude::Description = "Ionization amplitude.";
-const std::vector<std::string> IonizationAmplitude::Dependencies = {
-    "ni", "li", "mi", 
-    "S", "Ei", "dirs"
+const std::vector<std::pair<std::string,std::string>> IonizationAmplitude::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(ε₁,θ₁,φ₁) (ε₂,θ₂,φ₂)'."}
 };
 const std::vector<std::string> IonizationAmplitude::VecDependencies = { "dirs" };
 
@@ -55,11 +78,11 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int  S = As<int>(sdata,  "S", Id);
-    double Ei = As<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int  S = Conv<int>(sdata,  "S", Id);
+    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
     
     // read directions
     //  dirs.first  = ( theta1, phi1, E1frac )
@@ -67,7 +90,7 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
     // NOTE: energy fractions will be normalized to become on-shell
     std::vector<std::pair<geom::vec3d,geom::vec3d>> dirs;
     try {
-        dirs.push_back(As<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
+        dirs.push_back(Conv<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
     } catch (exception e) {
         dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }
@@ -132,7 +155,10 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
     
     // terminate if no data
     if (E_arr.empty())
+    {
+        std::cout << "No data for this transition." << std::endl;
         return true;
+    }
     
     // for all directions and energy shares evaluate the amplitude
     cArray ampls(dirs.size());
@@ -196,15 +222,22 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata) 
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     S = " << S << ", Ei = " << Ei << " in " << unit_name(Eunits) << "\n" <<
         "# ordered by direcion triplets (angles in " << unit_name(Aunits) << ")\n" <<
-        "# \n" <<
-        "# (θ₁ φ₁ Δ₁)\t(θ₁ φ₁ Δ₂)\tRe F\tIm F\n";
+        "# \n";
+    OutputTable table;
+    table.setWidth(45, 45, 15, 15);
+    table.setAlignment(OutputTable::left);
+    table.write("# first electron directions", "second electron directions", "Re F     ", "Im F     ");
+    table.write("# -------------------------", "--------------------------", "---------", "---------");
+    
     for (std::size_t i = 0; i < dirs.size(); i++)
     {
-        std::cout << 
-            dirs[i].first << "\t" << 
-            dirs[i].second<< "\t" << 
-            ampls[i].real()*lfactor << "\t" <<
-            ampls[i].imag()*lfactor << "\n";
+        table.write
+        (
+            dirs[i].first,
+            dirs[i].second,
+            ampls[i].real()*lfactor,
+            ampls[i].imag()*lfactor
+        );
     }
     
     return true;

@@ -14,6 +14,13 @@ CFLAGS = -Wall -std=c++11 -fPIC
 LFLAGS = 
 
 # ---------------------------------------------------------------------------- #
+# GiNaC                                                                        #
+# ---------------------------------------------------------------------------- #
+
+GINACFLAGS =
+GINACLIBS = -lcln -lginac
+
+# ---------------------------------------------------------------------------- #
 # SQLite3                                                                      #
 # ---------------------------------------------------------------------------- #
 
@@ -44,28 +51,28 @@ FFTWLIBS = -lfftw3
 ################################################################################
 
 
-CFLAGS += $(SQLITEFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
-LFLAGS += $(SQLITELIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS)
+CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
+LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -DNO_MPI -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -DNO_MPI -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
-# CXXFLAGS = $(CXXDEBUG)
-CXXFLAGS = $(CXXRILIS)
+CXXFLAGS = $(CXXDEBUG)
+# CXXFLAGS = $(CXXRILIS)
 
 SQLITEPP = libs/libsqlitepp.a
 SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,libs/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
-FILES = arrays hex-db special variables vec3d version
+FILES = arrays hex-db born special variables vec3d version
 FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
 
-VARS = asy ccs colls dcs xcs ics momtf scatamp tcs tmat ionf ionamp tdcs stokes bornf tmatb
+VARS = asy ccs colls dcs xcs ics momtf scatamp scatamp-dir tcs tmat ionf ionamp tdcs stokes bornf tmatb
 VARS_SOURCES = $(patsubst %,src/var/%.cpp,$(VARS))
 VARS_OBJECTS = $(patsubst %,obj/%.o,$(VARS))
 VARS_DEPENDENCIES = $(patsubst %,obj/%.dep,$(VARS))
@@ -114,6 +121,8 @@ test: lib/$(HEXDBLIB)
 bin/$(HEXDBEXE): obj/ui.o lib/$(HEXDBLIB).0
 	@mkdir -p $(@D)
 	$(CXX) $^ -L$(shell pwd)/lib/ -lhex-db $(LFLAGS) -o $@
+
+lib/$(HEXDBLIB).0: lib/$(HEXDBLIB)
 
 lib/$(HEXDBLIB): $(FILES_OBJECTS) $(VARS_OBJECTS) $(SQLITEPP)
 	@mkdir -p $(@D)

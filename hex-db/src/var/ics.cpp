@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <map>
 #include <string>
@@ -74,11 +93,16 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 const std::string IntegralCrossSection::Id = "ics";
 const std::string IntegralCrossSection::Description = "Integral cross section.";
-const std::vector<std::string> IntegralCrossSection::Dependencies = {
-    "ni", "li", "mi",
-    "nf", "lf", "mf",
-    "L", "S",
-    "Ei"
+const std::vector<std::pair<std::string,std::string>> IntegralCrossSection::Dependencies = {
+    {"ni", "Initial atomic principal quantum number."},
+    {"li", "Initial atomic orbital quantum number."},
+    {"mi", "Initial atomic magnetic quantum number."},
+    {"nf", "Final atomic principal quantum number."},
+    {"lf", "Final atomic orbital quantum number."},
+    {"mf", "Final atomic magnetic quantum number."},
+    {"L", "Total orbital momentum of atomic + projectile electron."},
+    {"S", "Total spin of atomic + projectile electron."},
+    {"Ei", "Projectile impact energy (Rydberg)."}
 };
 const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 
@@ -187,14 +211,14 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = As<int>(sdata, "ni", Id);
-    int li = As<int>(sdata, "li", Id);
-    int mi = As<int>(sdata, "mi", Id);
-    int nf = As<int>(sdata, "nf", Id);
-    int lf = As<int>(sdata, "lf", Id);
-    int mf = As<int>(sdata, "mf", Id);
-    int  L = As<int>(sdata, "L", Id);
-    int  S = As<int>(sdata, "S", Id);
+    int ni = Conv<int>(sdata, "ni", Id);
+    int li = Conv<int>(sdata, "li", Id);
+    int mi = Conv<int>(sdata, "mi", Id);
+    int nf = Conv<int>(sdata, "nf", Id);
+    int lf = Conv<int>(sdata, "lf", Id);
+    int mf = Conv<int>(sdata, "mf", Id);
+    int  L = Conv<int>(sdata, "L", Id);
+    int  S = Conv<int>(sdata, "S", Id);
     
     // energies and cross sections
     double E, sigma, sigmaB;
@@ -204,7 +228,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(As<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", Id));
         
     } catch (std::exception e) {
         
@@ -244,8 +268,12 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
         "#     L = " << L << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
-        "#\n" <<
-        "# E\tσ\tσBorn\n";
+        "#\n";
+    OutputTable table;
+    table.setWidth(15);
+    table.setAlignment(OutputTable::left);
+    table.write("# E        ", "sigma    ", "sigmaBorn");
+    table.write("# ---------", "---------", "---------");
     
     // terminate if no data
     if (E_arr.empty())
@@ -255,7 +283,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     {
         // negative energy indicates full output
         for (std::size_t i = 0; i < E_arr.size(); i++)
-            std::cout << E_arr[i] / efactor << "\t" << sigma_arr[i] * lfactor * lfactor << "\n";
+            table.write(E_arr[i] / efactor, sigma_arr[i] * lfactor * lfactor);
     }
     else
     {
@@ -272,7 +300,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            std::cout << energies[i] << "\t" << ics[i] * lfactor * lfactor << "\t" << icsB[i] * lfactor * lfactor << std::endl;
+            table.write(energies[i], ics[i] * lfactor * lfactor, icsB[i] * lfactor * lfactor);
     }
     
     return true;

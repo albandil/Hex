@@ -1,14 +1,33 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #ifndef HEX_SPARSE_GRID
 #define HEX_SPARSE_GRID
@@ -16,9 +35,16 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <iostream>
 #include <map>
 #include <numeric>
 #include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "ndcube.h"
 
@@ -39,61 +65,6 @@ namespace spgrid
  * 3         | 12     | hexahedron
  */
 extern const std::vector<unsigned> vtk_cell;
-
-/**
- * @brief Ordering for 'std::bitset' type.
- * 
- * This template defines a "less than" relation for the 'std::bitset' type.
- * The relation is necessary for use of 'std::bitset' as the indexing key 
- * of tree storage ('std::map').
- * 
- * The comparison is done by transforming the bitset to an unsigned integral
- * number (if its size is sufficient) or to text string of zeros and ones
- * (if more space is necessary). It is not really astonishingly fast method,
- * but it is used only in debug output of the VTK file, which makes it
- * acceptable.
- */
-template <int d> class order_bitsets
-{
-    public:
-        
-        bool operator() (std::bitset<d> const & u, std::bitset<d> const & v)
-        {
-            // define ordering for 'std::bitset<d>' variables
-            return d < 8 * sizeof(unsigned long) ?
-                    u.to_ulong() < v.to_ulong() : u.to_string() < v.to_string() ;
-        }
-};
-
-/**
- * @brief Ordering for vectors of bitsets.
- * 
- * This template defined a "less than" relation for vectors of bitsets, or to
- * be exact for the type std::vector&lt;std::bitset&lt;T,dim&gt;&gt;. The
- * normal lexicographical comparison library call is used.
- * 
- * This function relies on the existence of @ref order_bitsets, which defines
- * the ordering of the 'std::bitset' type.
- */
-template <int d> class order_vector_of_bitsets
-{
-    public:
-        
-        bool operator()
-        (
-            std::vector<std::bitset<d>> const & a,
-            std::vector<std::bitset<d>> const & b
-        )
-        {
-            // compare two vectors of bitsets
-            return std::lexicographical_compare
-            (
-                a.begin(), a.end(),
-                b.begin(), b.end(),
-                order_bitsets<d>()
-            );
-        }
-};
 
 /**
  * @brief Get further point of a cube along given axis.
@@ -142,19 +113,22 @@ template <int d> class order_vector_of_bitsets
  * Note that the number of digits matters; x=0.1 and x=0.100 are the same point but the subdivision
  * history is different.
  */
-template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::vector<std::bitset<dim>> pt)
+template <int dim> std::vector<char> shift_fwd (char axis, std::vector<char> pt)
 {
+    // get bit mask corresponding to the chosen axis
+    char mask = special::pow2(axis);
+    
     // find the latest history point where the point can be shifted forward
     for (auto bit = pt.rbegin(); bit != pt.rend(); bit++)
     {
-        if ((*bit)[axis])
+        if ((*bit & mask) != 0)
         {
-            (*bit)[axis] = 0;  // set bit to 0 (and "carry" to the next binary "digit")
+            *bit &= ~mask;  // set bit to 0 (and "carry" to the next binary "digit")
             continue;
         }
         else
         {
-            (*bit)[axis] = 1;  // set bit to 1 (no "carry", done)
+            *bit |= mask;  // set bit to 1 (no "carry", done)
             return pt;
         }
     }
@@ -169,19 +143,22 @@ template <int dim> std::vector<std::bitset<dim>> shift_fwd (unsigned axis, std::
  * The back-shifted point from the example in @ref shift_fwd would be x = 0.010 (if the x-axis
  * were chosen) or y = 0.000 (if the y-axis were chosen).
  */
-template <int dim> std::vector<std::bitset<dim>> shift_bck (unsigned axis, std::vector<std::bitset<dim>> pt)
+template <int dim> std::vector<char> shift_bck (char axis, std::vector<char> pt)
 {
+    // get bit mask corresponding to the chosen axis
+    char mask = special::pow2(axis);
+    
     // find the latest history point where the point can be shifted back
     for (auto bit = pt.rbegin(); bit != pt.rend(); bit++)
     {
-        if ((*bit)[axis])
+        if ((*bit & mask) != 0)
         {
-            (*bit)[axis] = 0;  // set bit to 0 (no "carry", done)
+            *bit &= ~mask;  // set bit to 0 (no "carry", done)
             return pt;
         }
         else
         {
-            (*bit)[axis] = 1;  // set bit to 1 (and "carry" to the next binary "digit")
+            *bit |= mask;  // set bit to 1 (and "carry" to the next binary "digit")
             continue;
         }
     }
@@ -195,7 +172,7 @@ template <int dim> std::vector<std::bitset<dim>> shift_bck (unsigned axis, std::
  * This template should never be called (it will throw an exception otherwise).
  * Its explicit specializations for 1-D, 2-D and 3-D are expected to be called instead.
  */
-template <int dim> std::vector<std::vector<std::bitset<dim>>> extrude_point_to_regular_VTK_cell (std::vector<std::bitset<dim>> const & pt)
+template <int dim> std::vector<std::vector<char>> extrude_point_to_regular_VTK_cell (std::vector<char> const & pt)
 {
     throw exception ("Regular extrusion of point into more than 3 dimensions is not implemented. Please do not use VTK grid export here.");
 }
@@ -206,10 +183,10 @@ template <int dim> std::vector<std::vector<std::bitset<dim>>> extrude_point_to_r
  * The function will return set of points (in the form of subdivision history, see @ref shift_fwd for details)
  * making a line, starting from given origin.
  */
-template<> inline std::vector<std::vector<std::bitset<1>>> extrude_point_to_regular_VTK_cell<1> (std::vector<std::bitset<1>> const & pt)
+template<> inline std::vector<std::vector<char>> extrude_point_to_regular_VTK_cell<1> (std::vector<char> const & pt)
 {
     // order required by VTK: (xmin) (xmax)
-    std::vector<std::vector<std::bitset<1>>> cell_points = { pt };
+    std::vector<std::vector<char>> cell_points = { pt };
     cell_points.push_back(shift_fwd<1>(0,pt));
     return cell_points;
 }
@@ -221,10 +198,10 @@ template<> inline std::vector<std::vector<std::bitset<1>>> extrude_point_to_regu
  * making a square, starting from given origin. The ordering of the vertices is chosen such that it will
  * make a valid VTK_QUAD specification.
  */
-template<> inline std::vector<std::vector<std::bitset<2>>> extrude_point_to_regular_VTK_cell<2> (std::vector<std::bitset<2>> const & pt)
+template<> inline std::vector<std::vector<char>> extrude_point_to_regular_VTK_cell<2> (std::vector<char> const & pt)
 {
     // order required by VTK: (xmin,ymin) (xmax,ymin) (xmax,ymax) (xmin,ymax)
-    std::vector<std::vector<std::bitset<2>>> cell_points = { pt };
+    std::vector<std::vector<char>> cell_points = { pt };
     cell_points.push_back(shift_fwd<2>(0,pt));
     cell_points.push_back(shift_fwd<2>(1,cell_points.back()));
     cell_points.push_back(shift_bck<2>(0,cell_points.back()));
@@ -238,11 +215,11 @@ template<> inline std::vector<std::vector<std::bitset<2>>> extrude_point_to_regu
  * making a cube, starting from given origin. The ordering of the vertices is chosen such that it will
  * make a valid VTK_HEXAHEDRON specification.
  */
-template<> inline std::vector<std::vector<std::bitset<3>>> extrude_point_to_regular_VTK_cell<3> (std::vector<std::bitset<3>> const & pt)
+template<> inline std::vector<std::vector<char>> extrude_point_to_regular_VTK_cell<3> (std::vector<char> const & pt)
 {
     // order required by VTK: (xmin,ymin,zmin) (xmax,ymin,zmin) (xmax,ymax,zmin) (xmin,ymax,zmin)
     //                        (xmin,ymin,zmax) (xmax,ymin,zmax) (xmax,ymax,zmax) (xmin,ymax,zmax)
-    std::vector<std::vector<std::bitset<3>>> cell_points = { pt };
+    std::vector<std::vector<char>> cell_points = { pt };
     cell_points.push_back(shift_fwd<3>(0,pt));
     cell_points.push_back(shift_fwd<3>(1,cell_points.back()));
     cell_points.push_back(shift_bck<3>(0,cell_points.back()));
@@ -256,89 +233,41 @@ template<> inline std::vector<std::vector<std::bitset<3>>> extrude_point_to_regu
 /**
  * @brief Available sparse grid types.
  * 
- * Not all of these sparse grids are implemented in Hex. But they can be
- * downloaded from the page http://sparse-grids.de/#Nodes.
+ * The sparse grids can be downloaded from the page http://sparse-grids.de/#Nodes.
  */
 typedef enum
 {
     /* dim = 1 */
-    d1l1n1, d1l2n3, d1l3n3, d1l4n7, d1l5n7, d1l6n7, d1l7n15, d1l8n15,
+    d1l1n1, d1l2n3, d1l3n3, d1l4n7, d1l5n7, /*d1l6n7, d1l7n15, d1l8n15,
     d1l9n15, d1l10n15, d1l11n15, d1l12n15, d1l13n31, d1l14n31, d1l15n31,
     d1l16n31, d1l17n31, d1l18n31, d1l19n31, d1l20n31, d1l21n31, d1l22n31,
-    d1l23n31, d1l24n31, d1l25n63,
+    d1l23n31, d1l24n31, d1l25n63,*/
     
     /* dim = 2 */
-    d2l1n1, d2l2n5, d2l3n9, d2l4n17, d2l5n33, d2l6n33, d2l7n65, d2l8n97,
+    d2l1n1, d2l2n5, d2l3n9, d2l4n17, d2l5n33, d2l6n33, d2l7n65, /*d2l8n97,
     d2l9n97, d2l10n161, d2l11n161, d2l12n161, d2l13n257, d2l14n321,
     d2l15n321, d2l16n449, d2l17n449, d2l18n449, d2l19n705, d2l20n705,
-    d2l21n705, d2l22n705, d2l23n705, d2l24n705, d2l25n1025,
+    d2l21n705, d2l22n705, d2l23n705, d2l24n705, d2l25n1025,*/
     
     /* dim = 3 */
-    d3l1n1, d3l2n7, d3l3n19, d3l4n39, d3l5n87, d3l6n135, d3l7n207, d3l8n399,
+    d3l1n1, d3l2n7, d3l3n19, d3l4n39, d3l5n87, d3l6n135, /*d3l7n207, d3l8n399,
     d3l9n495, d3l10n751, d3l11n1135, d3l12n1135, d3l13n1759, d3l14n2335,
     d3l15n2527, d3l16n3679, d3l17n4447, d3l18n4447, d3l19n6495, d3l20n8031,
-    d3l21n8031, d3l22n11103, d3l23n11103, d3l24n11103, d3l25n15039,
+    d3l21n8031, d3l22n11103, d3l23n11103, d3l24n11103, d3l25n15039,*/
     
     /* dim = 4 */
-    d4l1n1, d4l2n9, d4l3n33, d4l4n81, d4l5n193, d4l6n385, d4l7n641, d4l8n1217,
+    d4l1n1, d4l2n9, d4l3n33, d4l4n81, d4l5n193, /*d4l6n385, d4l7n641, d4l8n1217,
     d4l9n1985, d4l10n2881, d4l11n4929, d4l12n6465, d4l13n8705, d4l14n13697,
     d4l15n16001, d4l16n22401, d4l17n31617, d4l18n34689, d4l19n47489,
-    d4l20n63873,
+    d4l20n63873,*/
     
     /* dim = 5 */
-    d5l1n1, d5l2n11, d5l3n51, d5l4n151, d5l5n391, d5l6n903, d5l7n1743,
+    d5l1n1, d5l2n11, d5l3n51, d5l4n151, d5l5n391, /*d5l6n903, d5l7n1743,
     d5l8n3343, d5l9n6223, d5l10n10063, d5l11n17103, d5l12n27343, d5l13n38303,
-    d5l14n60703,
+    d5l14n60703,*/
     
     /* dim = 6 */
-    d6l1n1, d6l2n13, d6l3n73, d6l4n257, d6l5n737, d6l6n1889, d6l7n4161,
-    d6l8n8481, d6l9n16929, d6l10n30689, d6l11n53729, d6l12n93665,
-
-    /* dim = 7 */
-    d7l1n1, d7l2n15, d7l3n99, d7l4n407, d7l5n1303, d7l6n3655, d7l7n8975,
-    d7l8n19855, d7l9n42031, d7l10n83247,
-    
-    /* dim = 8 */
-    d8l1n1, d8l2n17, d8l3n129, d8l4n609, d8l5n2177, d8l6n6657, d8l7n17921,
-    d8l8n43137, d8l9n97153,
-    
-    /* dim = 9 */
-    d9l1n1, d9l2n19, d9l3n163, d9l4n871, d9l5n3463, d9l6n11527, d9l7n33679,
-    d9l8n87823,
-    
-    /* dim = 10 */
-    d10l1n1, d10l2n21, d10l3n201, d10l4n1201, d10l5n5281, d10l6n19105,
-    d10l7n60225,
-    
-    /* dim = 11 */
-    d11l1n1, d11l2n23, d11l3n243, d11l4n1607, d11l5n7767, d11l6n30471,
-    
-    /* dim = 12 */
-    d12l1n1, d12l2n25, d12l3n289, d12l4n2097, d12l5n11073, d12l6n46977,
-    
-    /* dim = 13 */
-    d13l1n1, d13l2n27, d13l3n339, d13l4n2679, d13l5n15367, d13l6n70279,
-    
-    /* dim = 14 */
-    d14l1n1, d14l2n29, d14l3n393, d14l4n3361, d14l5n20833, d14l6n102369,
-    
-    /* dim = 15 */
-    d15l1n1, d15l2n31, d15l3n451, d15l4n4151, d15l5n27671,
-    
-    /* dim = 16 */
-    d16l1n1, d16l2n33, d16l3n513, d16l4n5057, d16l5n36097,
-    
-    /* dim = 17 */
-    d17l1n1, d17l2n35, d17l3n579, d17l4n6087, d17l5n46343,
-    
-    /* dim = 18 */
-    d18l1n1, d18l2n37, d18l3n649, d18l4n7249, d18l5n58657,
-    
-    /* dim = 19 */
-    d19l1n1, d19l2n39, d19l3n723, d19l4n8551, d19l5n73303,
-    
-    /* dim = 20 */
-    d20l1n1, d20l2n41, d20l3n801, d20l4n10001, d20l5n90561
+    d6l1n1, d6l2n13, d6l3n73, d6l4n257, d6l5n737,
 }
 SparseGridId;
 
@@ -359,6 +288,266 @@ SparseGridNodes;
 
 /// Sparse grid nodes.
 extern const std::map<SparseGridId,SparseGridNodes> nodes;
+
+/**
+ * @brief Globally adaptive sparse-grid-based integrator.
+ * 
+ * This class implements a multidimensional integator. The main routine
+ * is @ref integrate_adapt, which accepts a functor to integrate
+ * (of signature T (*)(int, double const*)) and a pair of sparse grids
+ * (two different-order rules) which will be used to estimate the
+ * integration error.
+ * 
+ * The integrator has to be used for unit cube integration domain.
+ * 
+ * The method works in the following way: The integral estimate
+ * is computed using two different-order rules to estimate also the
+ * error. If the error satisfies convergence criteria, integration
+ * terminates. Otherwise all non-converged domains will be exploded
+ * into 2^dim sub-cubes. The converged cells' estimates are summed
+ * and only the non-converged cells are kept for further processing.
+ * 
+ * See also description of the function @ref integrate_adapt.
+ */
+template <class T, int dim> class Domains
+{
+    public:
+        
+        // default constructor
+        Domains (int lvl = 0) : lvl_(lvl), N_(0), file_(nullptr)
+        {
+#ifdef _OPENMP
+            omp_init_lock(&lock_);
+#endif
+        }
+        
+        // move constructor
+        Domains (Domains && D) : Domains()
+        {
+            std::swap(lvl_,      D.lvl_);
+            std::swap(N_,        D.N_);
+            std::swap(nbytes_,   D.nbytes_);
+            std::swap(data_,     D.data_);
+            std::swap(file_,     D.file_);
+            std::swap(filename_, D.filename_);
+        }
+        
+        // destructor
+        ~Domains ()
+        {
+#ifdef _OPENMP
+            omp_destroy_lock(&lock_);
+#endif
+            if (file_ != nullptr)
+            {
+                std::fclose(file_);
+                std::remove(filename_);
+            }
+        }
+        
+        // interchange data structure
+        typedef struct
+        {
+            bool set;
+            T val;
+            geom::ndCube<dim> cube;
+        } Domain;
+        
+        // subdivision level
+        int level () const { return lvl_; }
+        
+        // number of domains
+        std::size_t size () const { return N_; }
+        
+        // add new subdomain (OpenMP thread safe)
+        void add (Domain const & dom)
+        {
+            // reset cube parameters
+            if (N_ == 0)
+            {
+                lvl_ = dom.cube.level();
+                nbytes_ = sizeof(bool) + sizeof(T) + lvl_ * sizeof(char);
+            }
+            
+            assert (dom.cube.level() == lvl_);
+            
+            // serialize the item to add
+            char data [nbytes_];
+            pack_(dom, data);
+            
+#ifdef _OPENMP
+            // enable only a single thread at once to access the data
+            omp_set_lock(&lock_);
+#endif
+            
+            // check if there is already an open scratch file
+            if (file_ != nullptr)
+            {
+                // write data to the end of scratch file
+                std::fseek(file_, 0, SEEK_END);
+                std::fwrite(data, nbytes_, 1, file_);
+            }
+            else
+            {
+                try
+                {
+                    // try to add new element to memory
+                    data_.insert(data_.end(), data, data + nbytes_);
+                }
+                catch (std::bad_alloc const & ex)
+                {
+                    // -> not enough memory, we need to create a disk file!
+                    
+                    // create a unique scratch file name
+                    do
+                    {
+                        static const char templt[] = "pwba2-XXXXXXXXX.tmp";
+                        static const char alphnm[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+                        
+                        std::srand(std::time(nullptr));
+                        std::strncpy(filename_, templt, sizeof(filename_));
+                        for (unsigned i = 0; i < std::strlen(filename_); i++)
+                            if (filename_[i] == 'X')
+                                filename_[i] = alphnm[std::rand() % std::strlen(alphnm)];
+                    }
+                    while (std::ifstream(filename_).good());
+                    
+                    // open the file
+                    file_ = std::fopen(filename_, "wb+");
+                    
+                    // check that the file has been created successfully
+                    if (file_ == nullptr)
+                    {
+                        std::perror(format("Error while opening \"%s\": ", filename_).c_str());
+                        std::exit(EXIT_FAILURE);
+                    }
+                    
+                    // write existing data to the file
+                    std::fwrite(data_.data(), nbytes_, N_, file_);
+                    
+                    // destroy memory data
+                    data_.clear();
+                    
+                    // finally add the new element
+                    std::fwrite(data, nbytes_, 1, file_);
+                }
+            }
+            
+            // update subdomain count
+            N_++;
+            
+#ifdef _OPENMP
+            // allow other threads to access the data
+            omp_unset_lock(&lock_);
+#endif
+        }
+        
+        // change values of the domain attributes (OpenMP thread safe)
+        void update (std::size_t i, Domain const & dom)
+        {
+            // serialize the item to write
+            char data [nbytes_];
+            pack_(dom, data);
+            
+#ifdef _OPENMP
+            // enable only a single thread at once to access the data
+            omp_set_lock(&lock_);
+#endif
+            
+            // check if there is already an open scratch file
+            if (file_ != nullptr)
+            {
+                std::fseek(file_, i * nbytes_, SEEK_SET);
+                std::fwrite(data, nbytes_, 1, file_);
+            }
+            else
+            {
+                std::memcpy(data_.data() + i * nbytes_, data, nbytes_);
+            }
+            
+#ifdef _OPENMP
+            // allow other threads to access the data
+            omp_unset_lock(&lock_);
+#endif
+        }
+        
+        // access subdomain attributes
+        Domain operator[] (std::size_t i)
+        {
+            Domain ret;
+            
+#ifdef _OPENMP
+            // enable only a single thread at once to access the data
+            omp_set_lock(&lock_);
+#endif
+            // packed data
+            char data [nbytes_];
+            
+            // check if there is already an open scratch file
+            if (file_ != nullptr)
+            {
+                std::fseek(file_, i * nbytes_, SEEK_SET);
+                std::fread(data, nbytes_, 1, file_);
+            }
+            else
+            {
+                std::memcpy(data, data_.data() + i * nbytes_, nbytes_);
+            }
+            
+#ifdef _OPENMP
+            // allow other threads to access the data
+            omp_unset_lock(&lock_);
+#endif
+            
+            // deserialize
+            unpack_(ret, data);
+            
+            // return
+            return ret;
+        }
+        
+    private:
+        
+        // current subdivision level
+        int lvl_;
+        
+        // number of integration sub-domains currently stored
+        std::size_t N_;
+        
+        // size of serialized interchange structure
+        std::size_t nbytes_;
+        
+        // data storage in memory
+        std::vector<char> data_;
+        
+        // data storage on disk
+        FILE* file_;
+        
+        // name of the disk file
+        char filename_[20];
+        
+#ifdef _OPENMP
+        // concurrency lock
+        omp_lock_t lock_;
+#endif
+        
+        void pack_ (Domain const & dom, char * data)
+        {
+            *reinterpret_cast<bool*>(data) = dom.set;
+            *reinterpret_cast<T*>(data + sizeof(bool)) = dom.val;
+            if (lvl_ > 0)
+                std::memcpy(data + sizeof(bool) + sizeof(T), dom.cube.history(), lvl_);
+        }
+        
+        void unpack_ (Domain & dom, char const * data)
+        {
+            dom.set = *reinterpret_cast<bool const *>(data);
+            dom.val = *reinterpret_cast<T const*>(data + sizeof(bool));
+            
+            geom::ndCube<dim> c(lvl_, data + sizeof(bool) + sizeof(T));
+            dom.cube = c;
+        }
+};
 
 template <class T> class SparseGrid
 {
@@ -546,9 +735,14 @@ template <class T> class SparseGrid
          * @param F Function to integrate.
          * @param i Sparse grid type.
          * @param domain N-dimensional cube (integration volume) which is a subdivision of the unit cube.
-         *               This argument is optional; default is unit hyper-cube.
+         *               This argument is optional; default is a unit hyper-cube.
          */
-        template <class Functor, int dim> T integrate_fixed (Functor F, SparseGridId i, geom::ndCube<dim> const & domain = geom::ndCube<dim>()) const
+        template <int dim, class Functor> T integrate_fixed
+        (
+            Functor F,
+            SparseGridId i,
+            geom::ndCube<dim> const & domain = geom::ndCube<dim>()
+        ) const
         {
             // check that the chosen sparse grid is available
             assert(nodes.find(i) != nodes.end());
@@ -599,7 +793,7 @@ template <class T> class SparseGrid
         };
         
         /**
-         * @brief Adaptive sparse-grid quadrature.
+         * @brief Globally adaptive sparse-grid-based quadrature.
          * 
          * This function will integrate the function 'F' a 'dim'-dimensional unit cube.
          * Two sparse grids have to be specified. For every integration sub-cell
@@ -631,22 +825,24 @@ template <class T> class SparseGrid
             // synonym for 'dim'-dimensional cube
             typedef geom::ndCube<dim> dCube;
             
-            // integration domain info
-            typedef struct sDomain
-            {
-                dCube cube;
-                bool set;
-                T val;
-            } tDomain;
-            
-            // integral over processed cells
+            // high-order integral estimateover processed cells
             T finalEstimate = 0;
             
+            // low-order integral estimate over to-be-yet-processed cells
+            T globalEstimate = integrate_fixed(F, ruleLow, dCube());
+            
+            // declare root domain
+            typename Domains<T,dim>::Domain root;
+            root.set = false;
+            root.val = globalEstimate;
+            root.cube = dCube();
+            
             // unprocessed subdomains of the integration domain
-            std::vector<tDomain> domains = {{ geom::ndCube<dim>(), false, integrate_fixed(F, ruleLow, geom::ndCube<dim>()) }};
+            Domains<T,dim> domains;
+            domains.add(root);
             
             // VTK debug data (only used when write_vtk_ == true)
-            std::map<std::vector<std::bitset<dim>>,T,order_vector_of_bitsets<dim>> vtk;
+            std::map<std::vector<char>,T> vtk;
             
             // initialize evaluations count and number of cells
             neval_ = nodes.at(ruleLow).n;
@@ -655,11 +851,6 @@ template <class T> class SparseGrid
             // for all subdivision levels
             for (int level = 0; level <= maxlevel_; level++)
             {
-                // first of all, sum the current estimates for use in the global convergence check
-                T globalEstimate = finalEstimate;
-                for (tDomain const & dom : domains)
-                    globalEstimate += dom.val;
-                
                 // also compute the volume (as a fraction of root volume) for use in convergence checking
                 double levelVolume = domains.size() * std::pow(0.5,level*dim);
                 
@@ -682,94 +873,110 @@ template <class T> class SparseGrid
                     std::cout << "% of orig. volume)" << std::endl;
                 }
                 
-                // debug variables
-                std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0;
+                // auxiliary variables
+                std::size_t abslocal = 0, rellocal = 0, absglobal = 0, relglobal = 0, pos = 0, i_pos = 0;
                 std::vector<std::size_t> bisectIDs;
                 Timer timer;
                 
                 // check convergence for all not yet converged sub-domains
-                # pragma omp parallel if (parallel_) reduction (+:abslocal,absglobal,rellocal,relglobal)
+                # pragma omp parallel if (parallel_) \
+                    default (shared) \
+                    firstprivate(i_pos) \
+                    shared (pos) \
+                    reduction (+:abslocal,absglobal,rellocal,relglobal)
                 {
                     // per-thread data
-                    std::size_t thread_neval = 0;
                     T thread_finalEstimate = 0;
                     std::vector<std::size_t> thread_bisectIDs;
                     
-                    // for all domains
+                    // for all domains (consecutive access)
                     # pragma omp for schedule (static)
-                    for (auto dom = domains.begin(); dom < domains.end(); dom++)
+                    for (std::size_t i = 0; i < domains.size(); i++)
                     {
+                        // get next comain ID
+                        # pragma omp critical
+                        i_pos = pos++;
+                        
+                        // get current domain data
+                        typename Domains<Complex,dim>::Domain dom = domains[i_pos];
+                        
                         // compute the fine estimate for this domain
-                        T fineEstimate = integrate_fixed(F, ruleHigh, dom->cube);
-                        thread_neval += nodes.at(ruleHigh).n;
+                        T fineEstimate = integrate_fixed(F, ruleHigh, dom.cube);
                         
                         // check absolute local convergence
-                        if (std::abs(dom->val - fineEstimate) < epsabs_)
+                        if (std::abs(dom.val - fineEstimate) < epsabs_)
                         {
-                            dom->set = true;
+                            dom.set = true;
                             abslocal++;
                         }
                         
                         // check relative local convergence
-                        if (std::abs(dom->val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
+                        if (std::abs(dom.val - fineEstimate) / std::abs(fineEstimate) < epsrel_)
                         {
-                            dom->set = true;
+                            dom.set = true;
                             rellocal++;
                         }
                         
                         // check absolute global (extrapolated) convergence
-                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsabs_)
+                        if (std::abs(dom.val - fineEstimate) * (levelVolume / dom.cube.volume()) < global_epsabs_)
                         {
-                            dom->set = true;
+                            dom.set = true;
                             absglobal++;
                         }
                         
                         // check relative global (extrapolated) convergence
-                        if (std::abs(dom->val - fineEstimate) * (levelVolume / dom->cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
+                        if (std::abs(dom.val - fineEstimate) * (levelVolume / dom.cube.volume()) < global_epsrel_ * std::abs(globalEstimate))
                         {
-                            dom->set = true;
+                            dom.set = true;
                             relglobal++;
                         }
                         
                         // store the better estimate
-                        dom->val = fineEstimate;
+                        dom.val = fineEstimate;
                         
                         // is the cell converged or was max level reached?
-                        if (level >= minlevel_ and (dom->set or level == maxlevel_))
+                        if (level >= minlevel_ and (dom.set or level == maxlevel_))
                         {
                             // YES : use the current value as final
-                            thread_finalEstimate += dom->val;
+                            thread_finalEstimate += dom.val;
                             
                             // YES : save data for optional VTK debug output
                             if (write_vtk_ and dim <= 3)
                             {
+                                // compose map key (the history)
+                                std::vector<char> key (dom.cube.history(), dom.cube.history() + dom.cube.level());
+                                
+                                // store the pair "(key,average)" to the map
                                 # pragma omp critical
-                                vtk[dom->cube.history()] = dom->val / dom->cube.volume();
+                                vtk[key] = dom.val / dom.cube.volume();
                             }
                         }
                         else
                         {
                             // NO : add domain ID to the list of domains needing bisection
-                            thread_bisectIDs.push_back(dom - domains.begin());
+                            thread_bisectIDs.push_back(i_pos);
                         }
-                    }
                         
+                        // update domain in the storage
+                        domains.update(i_pos,dom);
+                    }
+                    
                     # pragma omp critical
                     {
                         // update shared variables by contributions from this thread
-                        neval_ += thread_neval;
                         finalEstimate += thread_finalEstimate;
                         bisectIDs.insert(bisectIDs.end(), thread_bisectIDs.begin(), thread_bisectIDs.end());
-                    }
-                
+                    }                
                 }
                 
-                if (verbose_)
-                    std::cout << prefix_ << "  processing time : " << timer.nice_time() << std::endl;
+                // update evaluation count
+                neval_ += domains.size() * nodes.at(ruleHigh).n;
                 
                 // debug info
                 if (verbose_)
                 {
+                    std::cout << prefix_ << "  processing time : " << timer.nice_time() << std::endl;
+                    
                     // print how many cells are converged (in every convergence category)
                         std::cout << prefix_ << "  converged cells due to" << std::endl;
                     if (epsabs_ > 0)
@@ -796,63 +1003,66 @@ template <class T> class SparseGrid
                 }
                 
                 // move current domains to temporary array
-                std::vector<tDomain> oldDomains = std::move(domains);
+                Domains<T,dim> oldDomains = std::move(domains);
                 
-                // further subdivide all not yet converged sub-domains
-                timer.reset();
-                # pragma omp parallel if (parallel_)
+                // further subdivide all not yet converged sub-domains (consecutive access)
+                timer.reset(); globalEstimate = finalEstimate; pos = 0; i_pos = 0;
+                # pragma omp parallel for schedule (static) if (parallel_) \
+                    default (shared) \
+                    shared (pos,globalEstimate) \
+                    firstprivate (i_pos)
+                for (unsigned i = 0; i < bisectIDs.size(); i++)
                 {
-                    // per-thread data
-                    std::size_t Nlow = nodes.at(ruleLow).n;
-                    std::size_t thread_neval = 0, thread_ncells = 0;
-                    std::vector<tDomain> thread_domains;
-                    
-                    // for all domains that need subdivision
-                    # pragma omp for schedule (static)
-                    for (auto itID = bisectIDs.begin(); itID < bisectIDs.end(); itID++)
-                    {
-                        // subdivide this domain into 2^dim subcubes
-                        for (dCube const & c : oldDomains[*itID].cube.subdivide())
-                        {
-                            // compute also the rough estimate of integral in this new cell 'c'
-                            thread_domains.push_back({ c, false, integrate_fixed(F, ruleLow, c) });
-                            
-                            // update (per-thread) evaluation count and cell count
-                            thread_neval += Nlow;
-                            thread_ncells++;
-                        }
-                    }
-                    
-                    // add new domains
+                    // get next domain ID
                     # pragma omp critical
+                    i_pos = pos++;
+                    
+                    // get old domain
+                    typename Domains<T,dim>::Domain olddom = oldDomains[bisectIDs[i_pos]];
+                    
+                    // subdivide this domain into 2^dim subcubes
+                    for (dCube const & c : olddom.cube.subdivide())
                     {
-                        // update shared variables by contributions from this thread
-                        ncells_ += thread_ncells;
-                        neval_ += thread_neval;
-                        domains.insert(domains.end(), thread_domains.begin(), thread_domains.end());
+                        // compute the rough estimate of integral in this new cell 'c'
+                        T val = integrate_fixed(F, ruleLow, c);
+                        
+                        // update global estimate over to-be-yet-processed cells
+                        # pragma omp critical
+                        globalEstimate += val;
+                        
+                        // create new sub-domain
+                        typename Domains<T,dim>::Domain dom;
+                        dom.set = false;
+                        dom.val = val;
+                        dom.cube = c;
+                        
+                        // add cube and data
+                        domains.add(dom);
                     }
                 }
                 
+                // update cell const and evaluation count
+                ncells_ += domains.size();
+                neval_ += domains.size() * nodes.at(ruleLow).n;
+                
+                // print some more statistics
                 if (verbose_)
                 {
-                    // print some more statistics
                     std::cout << prefix_ << "  bisection time : " << timer.nice_time() << std::endl;
                     std::cout << prefix_ << "  function evaluations up to now : " << neval_ << std::endl;
                 }
                 
                 // stop if no domain needs subdivision
-                if (domains.empty())
+                if (domains.size() == 0)
                     break;
             }
             
             // sum contributions to the integral
-            result_ = finalEstimate;
-            for (tDomain const & dom : domains)
-                result_ += dom.val;
+            result_ = globalEstimate;
             
             if (verbose_)
             {
-                if (domains.empty())
+                if (domains.size() == 0)
                     std::cout << prefix_ << "  cell list successfully emptied" << std::endl;
                 else
                     std::cout << prefix_ << "  integral did not converge in " << domains.size() << " cells" << std::endl;
@@ -868,14 +1078,14 @@ template <class T> class SparseGrid
                 }
                 
                 // auxiliary data structures needed for points and cells
-                std::map<std::vector<std::bitset<dim>>,std::size_t,order_vector_of_bitsets<dim>> point_histories_map;
+                std::map<std::vector<char>,std::size_t> point_histories_map;
                 std::vector<std::pair<std::array<std::size_t,special::pow2(dim)>,T>> cell_data;
                 
                 // for every cell in grid: extrude its origin to the whole cell
                 for (auto data : vtk)
                 {
                     // start with the root corner of the cube (use its subdivision history)
-                    std::vector<std::vector<std::bitset<dim>>> pthistory = extrude_point_to_regular_VTK_cell<dim>(data.first);
+                    std::vector<std::vector<char>> pthistory = extrude_point_to_regular_VTK_cell<dim>(data.first);
                     
                     // point indices for this cell
                     std::array<std::size_t,special::pow2(dim)> pts;
@@ -903,7 +1113,7 @@ template <class T> class SparseGrid
                 }
                 
                 // sort points so that their order matches their indices
-                std::vector<std::vector<std::bitset<dim>>> point_histories(point_histories_map.size());
+                std::vector<std::vector<char>> point_histories(point_histories_map.size());
                 for (auto data : point_histories_map)
                     point_histories[data.second] = data.first;
                 
@@ -922,7 +1132,7 @@ template <class T> class SparseGrid
                     std::vector<double> coords(dim);
                     for (unsigned sub = 0; sub < ptsubs.size(); sub++)
                     for (int axis = 0; axis < dim; axis++)
-                    if (ptsubs[sub][axis])
+                    if ((ptsubs[sub] & special::pow2(axis)) != 0)
                         coords[axis] += std::pow(0.5,sub);
                     
                     // write exactly three coordinates, even in the lower-dimensional case (VTK wants it this way)
