@@ -51,7 +51,7 @@ std::string logo (std::string esc)
         "%s                                         \n"
         "%s             UK MFF (c) 2015             \n"
         "%s                                         \n"
-        "%s          version: 1.05 %s               \n"
+        "%s          version: 1.05.1 %s             \n"
         "%s                                         \n",
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
         esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
