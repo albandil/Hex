@@ -359,37 +359,64 @@ Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot) const
     return res;
 }
 
-void RadialIntegrals::setupOneElectronIntegrals (CommandLine const & cmd)
+void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
+    // shorthands
+    int order   = bspline_.order();
+    int Nknot   = bspline_.Nknot();
+    int Nreknot = bspline_.Nreknot();
+    
     // create file names for this radial integrals
-    char D_name[20], S_name[20], Mm1_name[20], Mm1_tr_name[20], Mm2_name[20];
-    std::snprintf(D_name,      sizeof(D_name),      "%d-D.hdf",      bspline_.order());
-    std::snprintf(S_name,      sizeof(S_name),      "%d-S.hdf",      bspline_.order());
-    std::snprintf(Mm1_name,    sizeof(Mm1_name),    "%d-Mm1.hdf",    bspline_.order());
-    std::snprintf(Mm1_tr_name, sizeof(Mm1_tr_name), "%d-Mm1_tr.hdf", bspline_.order());
-    std::snprintf(Mm2_name,    sizeof(Mm2_name),    "%d-Mm2.hdf",    bspline_.order());
+    D_.hdflink(format("%d-D.hdf", order));
+    S_.hdflink(format("%d-S.hdf", order));
+    Mm1_.hdflink(format("%d-Mm1.hdf", order));
+    Mm1_tr_.hdflink(format("%d-Mm1_tr.hdf", order));
+    Mm2_.hdflink(format("%d-Mm2.hdf", order));
     
-    // load/compute derivative overlaps
-    std::cout << "Loading/precomputing derivative overlaps... " << std::flush;
-    D_.hdfload(D_name) or D_.populate (
-        bspline_.order(), [=](int i, int j) -> Complex { return computeD(i, j, bspline_.Nknot() - 1); }
-    ).hdfsave(D_name); if (cmd.lightweight_radial_cache) D_d_ = std::move(D_.torow());
-    std::cout << "ok" << std::endl << std::endl;
+    std::cout << "Loading/precomputing one-electron matrices... " << std::flush;
     
-    // load/compute integral moments
-    std::cout << "Loading/precomputing integral moments... " << std::flush;
-    S_.hdfload(S_name) or S_.populate (
-        bspline_.order(), [=](int m, int n) -> Complex { return computeM(0, m, n); }
-    ).hdfsave(S_name); if (cmd.lightweight_radial_cache) S_d_ = std::move(S_.torow());
-    Mm1_.hdfload(Mm1_name) or Mm1_.populate (
-        bspline_.order(), [=](int m, int n) -> Complex { return computeM(-1, m, n); }
-    ).hdfsave(Mm1_name); if (cmd.lightweight_radial_cache) Mm1_d_ = std::move(Mm1_.torow());
-    Mm1_tr_.hdfload(Mm1_tr_name) or Mm1_tr_.populate (
-        bspline_.order(),    [=](int m, int n) -> Complex { return computeM(-1, m, n, bspline_.Nreknot() - 1);}
-    ).hdfsave(Mm1_tr_name); if (cmd.lightweight_radial_cache) Mm1_tr_d_ = std::move(Mm1_tr_.torow());
-    Mm2_.hdfload(Mm2_name) or Mm2_.populate (
-        bspline_.order(), [=](int m, int n) -> Complex { return computeM(-2, m, n); }
-    ).hdfsave(Mm2_name); if (cmd.lightweight_radial_cache) Mm2_d_ = std::move(Mm2_.torow());
+    // load/compute one-electron matrices
+    if (not D_.hdfload())
+    {
+        D_.populate(order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); });
+        if (not cmd.shared_scratch or par.IamMaster())
+            D_.hdfsave();
+    }
+    if (not S_.hdfload())
+    {
+        S_.populate(order, [=](int m, int n) -> Complex { return computeM(0, m, n); });
+        if (not cmd.shared_scratch or par.IamMaster())
+            S_.hdfsave();
+    }
+    if (not Mm1_.hdfload())
+    {
+        Mm1_.populate(order, [=](int m, int n) -> Complex { return computeM(-1, m, n); });
+        if (not cmd.shared_scratch or par.IamMaster())
+            Mm1_.hdfsave();
+    }
+    if (not Mm1_tr_.hdfload())
+    {
+        Mm1_tr_.populate(order,    [=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);});
+        if (not cmd.shared_scratch or par.IamMaster())
+            Mm1_tr_.hdfsave();
+    }
+    if (not Mm2_.hdfload())
+    {
+        Mm2_.populate(order, [=](int m, int n) -> Complex { return computeM(-2, m, n); });
+        if (not cmd.shared_scratch or par.IamMaster())
+            Mm2_.hdfsave();
+    }
+    
+    // convert them to dense format, if it will be needed later
+    if (cmd.lightweight_radial_cache)
+    {
+        D_d_      = std::move(D_.torow());
+        S_d_      = std::move(S_.torow());
+        Mm1_d_    = std::move(Mm1_.torow());
+        Mm1_tr_d_ = std::move(Mm1_tr_.torow());
+        Mm2_d_    = std::move(Mm2_.torow());
+    }
+    
     std::cout << "ok" << std::endl << std::endl;
 }
 

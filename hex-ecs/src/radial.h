@@ -101,7 +101,7 @@ class RadialIntegrals
               Mm1_(bspline.Nspline()), Mm1_tr_(bspline.Nspline()), Mm2_(bspline.Nspline()) {}
         
         // public callable members
-        void setupOneElectronIntegrals (CommandLine const & cmd);
+        void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
         
         /**

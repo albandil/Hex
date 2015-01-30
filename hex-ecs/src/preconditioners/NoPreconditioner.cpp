@@ -49,7 +49,7 @@ void NoPreconditioner::setup ()
     Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
     
     // compute one-electron radial integrals
-    s_rad_.setupOneElectronIntegrals(cmd_);
+    s_rad_.setupOneElectronIntegrals(par_, cmd_);
     
     // compute two-eletron radial integrals
     s_rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
