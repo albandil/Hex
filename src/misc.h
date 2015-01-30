@@ -167,6 +167,7 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
                 std::cerr << "  " << symbollist[i] << std::endl;
             }
         }
+        std::cerr << std::endl;
         std::free(funcname);
         std::free(symbollist);
     }
