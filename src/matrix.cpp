@@ -2607,6 +2607,11 @@ CooMatrix BlockSymDiaMatrix::tocoo () const
         }
     }
     
+#ifndef NO_HDF
+    if (not inmemory_)
+        delete hdf;
+#endif
+    
     // compose the final matrix
     return CooMatrix
     (
@@ -2697,21 +2702,14 @@ void BlockSymDiaMatrix::setBlock (int i, const cArrayView data)
             // create a new file
             phdf = new HDFFile (diskfile_, HDFFile::overwrite);
             if (not phdf->valid())
-                Exception("Cannot open file \"%s\" or writing.", diskfile_.c_str());
+                Exception("Cannot open file \"%s\" for writing.", diskfile_.c_str());
             
             // initialize the dataset to its full length
             phdf->write("data", (Complex*)nullptr, structure_.size() * structure_.size());
         }
         
-        // open disk file
-        HDFFile hdf (diskfile_, HDFFile::readwrite);
-        
-        // check success
-        if (not hdf.valid())
-            Exception("Cannot open file \"%s\".", diskfile_.c_str());
-        
-        // read data
-        if (not hdf.write("data", &data[0], structure_.size(), i * structure_.size()))
+        // write data
+        if (not phdf->write("data", &data[0], structure_.size(), i * structure_.size()))
             Exception("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
         
         delete phdf;
