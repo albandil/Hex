@@ -89,16 +89,16 @@ public:
     /// Get size of the dataset of valid file.
     std::size_t size (std::string dataset) const;
     
-    /// load data from a valid file.
+    /// Load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
-        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset, typeinfo<T>::hdfcmpttype());
+        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
     
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
-        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset, typeinfo<T>::hdfcmpttype());
+        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
     
     /// Check that the file is valid.
