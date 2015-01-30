@@ -2441,7 +2441,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         }
         
         // for all groups of blocks to process in parallel
-        for (std::size_t igroup = 0; igroup < (endblockd - beginblockd + 1) / Nparblock; igroup++)
+        for (std::size_t igroup = 0; igroup < (endblockd - beginblockd + Nparblock - 1) / Nparblock; igroup++)
         {
             // blocks in this group
             std::size_t beginblock = beginblockd + igroup * Nparblock;
