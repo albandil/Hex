@@ -373,38 +373,23 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     Mm1_tr_.hdflink(format("%d-Mm1_tr.hdf", order));
     Mm2_.hdflink(format("%d-Mm2.hdf", order));
     
-    std::cout << "Loading/precomputing one-electron matrices... " << std::flush;
+    std::cout << "Precomputing one-electron matrices... " << std::flush;
     
-    // load/compute one-electron matrices
-    if (not D_.hdfload())
+    // compute one-electron matrices
+    D_.populate(order, [=](int m, int n) -> Complex { return computeD(m, n, Nknot - 1); });
+    S_.populate(order, [=](int m, int n) -> Complex { return computeM(0, m, n); });
+    Mm1_.populate(order, [=](int m, int n) -> Complex { return computeM(-1, m, n); });
+    Mm1_tr_.populate(order, [=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);});
+    Mm2_.populate(order, [=](int m, int n) -> Complex { return computeM(-2, m, n); });
+    
+    // save the matrices to disk
+    if (not cmd.shared_scratch or par.IamMaster())
     {
-        D_.populate(order, [=](int i, int j) -> Complex { return computeD(i, j, Nknot - 1); });
-        if (not cmd.shared_scratch or par.IamMaster())
-            D_.hdfsave();
-    }
-    if (not S_.hdfload())
-    {
-        S_.populate(order, [=](int m, int n) -> Complex { return computeM(0, m, n); });
-        if (not cmd.shared_scratch or par.IamMaster())
-            S_.hdfsave();
-    }
-    if (not Mm1_.hdfload())
-    {
-        Mm1_.populate(order, [=](int m, int n) -> Complex { return computeM(-1, m, n); });
-        if (not cmd.shared_scratch or par.IamMaster())
-            Mm1_.hdfsave();
-    }
-    if (not Mm1_tr_.hdfload())
-    {
-        Mm1_tr_.populate(order,    [=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);});
-        if (not cmd.shared_scratch or par.IamMaster())
-            Mm1_tr_.hdfsave();
-    }
-    if (not Mm2_.hdfload())
-    {
-        Mm2_.populate(order, [=](int m, int n) -> Complex { return computeM(-2, m, n); });
-        if (not cmd.shared_scratch or par.IamMaster())
-            Mm2_.hdfsave();
+        D_.hdfsave();
+        S_.hdfsave();
+        Mm1_.hdfsave();
+        Mm1_tr_.hdfsave();
+        Mm2_.hdfsave();
     }
     
     // convert them to dense format, if it will be needed later
