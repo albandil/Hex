@@ -1009,7 +1009,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
 #ifndef NO_HDF
             // save to HDF file
             HDFFile hdf(name, HDFFile::overwrite);
-            
             if (not hdf.valid())
                 return false;
             
@@ -1019,22 +1018,11 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 NumberArray<T> elements;
                 std::tie(zero_blocks,elements) = compress(consec);
                 
-                if (not zero_blocks.empty())
-                {
-                    if (not hdf.write (
-                        "zero_blocks",
-                        &(zero_blocks[0]),
-                        zero_blocks.size()
-                    )) return false;
-                }
-                if (not elements.empty())
-                {
-                    if (not hdf.write (
-                        "array",
-                        &(elements[0]),
-                        elements.size()
-                    )) return false;
-                }
+                if (not zero_blocks.empty() and not hdf.write("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
+                    return false;
+                
+                if (not elements.empty() and not hdf.write("array", &(elements[0]), elements.size()))
+                    return false;
             }
             else
             {
@@ -1076,7 +1064,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             if (zero_blocks.resize(hdf.size("zero_blocks")))
             if (not hdf.read("zero_blocks", &(zero_blocks[0]), zero_blocks.size()))
                 return false;
-                
+            
             // get data size
             std::size_t size = hdf.size("array");
             
@@ -1085,11 +1073,8 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 size /= 2;
             
             // read packed elements
-            if (elements.resize(size))
-            {
-                if (not hdf.read("array", &(elements[0]), elements.size()))
-                    return false;
-            }
+            if (elements.resize(size) > 0 and not hdf.read("array", &(elements[0]), elements.size()))
+                return false;
             
             // remove previous data
             if (data() != nullptr)
@@ -1099,8 +1084,11 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 ArrayView<T>::N_ = Nres_ = 0;
             }
             
-            // unpack
-            *this = elements.decompress(zero_blocks);
+            // unpack (if necessary)
+            if (zero_blocks.size() > 0)
+                *this = std::move(elements.decompress(zero_blocks));
+            else
+                *this = std::move(elements);
             
             return true;
 #else

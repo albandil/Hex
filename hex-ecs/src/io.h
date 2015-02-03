@@ -255,7 +255,7 @@ class SolutionIO
             cArray tmp;
             if (tmp.hdfload(name_))
             {
-                sol = tmp;
+                std::swap(sol,tmp);
                 return true;
             }
             return false;

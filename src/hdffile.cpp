@@ -68,7 +68,7 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
                 break;
         }
     }
-    catch (H5::FileIException e)
+    catch (H5::FileIException & e)
     {
         file_ = nullptr;
         valid_ = false;
@@ -79,9 +79,17 @@ HDFFile::~HDFFile ()
 {
     if (file_ != nullptr)
     {
-        file_->flush(H5F_SCOPE_GLOBAL);
-        file_->close();
-        delete file_;
+        try
+        {
+            file_->flush(H5F_SCOPE_GLOBAL);
+            file_->close();
+            delete file_;
+        }
+        catch (H5::Exception & e)
+        {
+            e.printErrorStack();
+            Exception("Failed to close the HDF file \"%s\".", name_.c_str());
+        }
     }
 }
 
