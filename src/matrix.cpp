@@ -2412,7 +2412,12 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
     // the first and (one past) the last block of a diagonal
     std::size_t beginblockd = 0, endblockd = 0;
     
+    // data
+    cArray diskdata;
+    cArrayView view;
+    
     // for all diagonals
+    # pragma omp parallel if (parallelize)
     while (beginblockd != structure_.size())
     {
         // find the last block of the current diagonal
@@ -2432,7 +2437,6 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         {
 #ifdef _OPENMP
             // in parallel calculation use NUM_THREADS blocks at a time
-            # pragma omp parallel
             Nparblock = std::min<unsigned>(Nparblock, omp_get_num_threads());
 #else
             // in serial calculation use just one block at a time
@@ -2452,18 +2456,21 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             std::size_t size = (endblock - beginblock) * structure_.size();
             
             // data view of this block diagonal
-            cArrayView view (size, const_cast<Complex*>(data_.data() + offset));
+            view.reset(size, const_cast<Complex*>(data_.data() + offset));
             
 #ifndef NO_HDF
-            cArray diskdata;
             if (not inmemory_)
             {
-                // read data from the disk
-                diskdata.resize(size);
-                if (not hdf->read("data", &diskdata[0], size, offset))
-                    Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                # pragma omp master
+                {
+                    // read data from the disk
+                    diskdata.resize(size);
+                    if (not hdf->read("data", &diskdata[0], size, offset))
+                        Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                }
                 
                 // reset view to the new data
+                # pragma omp barrier
                 view.reset(size, diskdata.data());
             }
 #endif
@@ -2472,7 +2479,8 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             if (d == 0)
             {
                 // for all blocks on the main diagonal
-                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                # pragma omp barrier
+                # pragma omp for // schedule (dynamic, 1)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block index
@@ -2492,7 +2500,8 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             if (d != 0)
             {
                 // for all blocks on the side diagonal (upper blocks, i < j)
-                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                # pragma omp barrier
+                # pragma omp for // schedule (dynamic, 1)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block indices
@@ -2509,7 +2518,8 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
                 }
                 
                 // for all blocks on the side diagonal (lower blocks, i > j)
-                # pragma omp parallel for if (parallelize) schedule (dynamic, 1)
+                # pragma omp barrier
+                # pragma omp for // schedule (dynamic, 1)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block indices
