@@ -423,39 +423,16 @@ if (cmd.itinerary & CommandLine::StgSolve)
             // - master process will collect all data and write them sequentially to disk
             if (std::isfinite(compute_norm(current_solution)))
             {
-                // for all super-segments
-                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+                // save solution to a single file if MPI is not active
+                if (par.Nproc() == 1)
                 {
-                    // if calculating in parallel : owner of the data will send the data to master
-                    if (par.active() and par.isMyWork(ill) and not par.IamMaster())
-                    {
-                        par.send
-                        (
-                            current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline,
-                            Nspline * Nspline,  // element count
-                            par.iproc(),        // origin process
-                            0                   // destination proccess
-                        );
-                    }
-                    
-                    // if calculating in parallel : master will receive the data to a buffer and write them to disk
-                    if (par.active() and not par.isMyWork(ill) and par.IamMaster())
-                    {
-                        cArray buffer (Nspline * Nspline);
-                        
-                        par.recv
-                        (
-                            &buffer[0],         // data buffer
-                            Nspline * Nspline,  // element count
-                            ill % par.Nproc(),  // origin process
-                            0                   // destination process
-                        );
-                        
-                        reader.save(buffer, ill);
-                    }
-                    
-                    // if this segment is owned by master then master will save its own work
-                    if (par.isMyWork(ill) and par.IamMaster())
+                    reader.save(current_solution);
+                }
+                
+                // save all owned segments to separate files
+                else
+                {
+                    for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
                     {
                         cArrayView data (Nspline * Nspline, current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline);
                         reader.save(data, ill);

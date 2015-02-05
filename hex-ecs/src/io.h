@@ -228,18 +228,35 @@ class SolutionIO
     public:
         
         SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, unsigned Nspline)
-            : name_(format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L, S, Pi, ni, li, mi, E)), ang_(ang), Nspline_(Nspline) {}
+            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), Nspline_(Nspline) {}
         
         /// Get name of the solution file.
-        std::string const & name () const
+        std::string name (int ill = -1) const
         {
-            return name_;
+            if (ill == -1)
+                return format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L_, S_, Pi_, ni_, li_, mi_, E_);
+            else
+                return format("psi-%d-%d-%d-%d-%d-%d-%g-(%d,%d).hdf", L_, S_, Pi_, ni_, li_, mi_, E_, ang_[ill].first, ang_[ill].second);
         }
         
         /// Check that the file exists.
-        bool check () const
+        bool check (int ill = -1) const
         {
-            return HDFFile(name_, HDFFile::readonly).valid();
+            // look for monolithic solution file
+            if (HDFFile(name(), HDFFile::readonly).valid())
+                return true;
+            
+            // look for specific solution segment file
+            if (ill >= 0)
+                return HDFFile(name(ill), HDFFile::readonly).valid();
+            
+            // look for all solution segment files
+            for (unsigned illp = 0; illp < ang_.size(); illp++)
+            {
+                if (not HDFFile(name(illp), HDFFile::readonly).valid())
+                    return false;
+            }
+            return true;
         }
         
         /**
@@ -250,14 +267,67 @@ class SolutionIO
          * is not written and 'false' is returned. Otherwise the function returns 'true'
          * and fills the contents of the array with the read data.
          */
-        bool load (cArray & sol)
+        bool load (cArray & sol, int ill = -1)
         {
-            cArray tmp;
-            if (tmp.hdfload(name_))
+            // check that the requested files are present
+            if (not check(ill))
+                return false;
+            
+            // load the whole solution
+            if (ill == -1)
             {
-                std::swap(sol,tmp);
-                return true;
+                //
+                // a) load the whole monolithic solution file
+                //
+                
+                    // simply check presence of the file and load the data, if available
+                    if (HDFFile(name(), HDFFile::readonly).valid())
+                        return sol.hdfload(name());
+                
+                //
+                // b) load all solution segments
+                //
+                
+                    // allocate memory for all segments
+                    sol.resize(Nspline_ * Nspline_ * ang_.size());
+                    
+                    // load all segments
+                    for (unsigned illp = 0; illp < ang_.size(); illp++)
+                    {
+                        if (not HDFFile(name(illp), HDFFile::readonly).read("array", sol.data() + illp * Nspline_ * Nspline_, Nspline_ * Nspline_))
+                            return false;
+                    }
+                    
+                    // successfully loaded all segments
+                    return true;
             }
+            
+            // load only a segment of the solution
+            else
+            {
+                //
+                // c) read from the whole monolithic solution file
+                //
+                
+                    HDFFile hdf (name(), HDFFile::readonly);
+                    if (hdf.valid())
+                    {
+                        // allocate memory
+                        sol.resize(Nspline_ * Nspline_);
+                        
+                        // read data from the file
+                        return hdf.read("array", sol.data() + ill * Nspline_ * Nspline_, Nspline_ * Nspline_, ill * Nspline_ * Nspline_);
+                    }
+                
+                //
+                // d) read from a solution segment
+                //
+                
+                    // simply load the requested solution segment file
+                    if (HDFFile(name(ill), HDFFile::readonly).valid())
+                        return sol.hdfload(name(ill));
+            }
+            
             return false;
         }
         
@@ -269,25 +339,19 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (const cArrayView segment, unsigned ill)
+        bool save (const cArrayView segment, int ill = -1)
         {
-            // create and resize the output file it it does not exist
-            if (not check())
-            {
-                HDFFile hdf (name_, HDFFile::overwrite);
-                hdf.write("array", (Complex*)nullptr, ang_.size() * Nspline_ * Nspline_);
-            }
+            // open file
+            HDFFile hdf (name(ill), HDFFile::overwrite);
             
-            // open the file for random access
-            HDFFile hdf (name_, HDFFile::readwrite);
-            
-            // write the data with correct offset
-            return hdf.valid() and hdf.write("array", segment.data(), Nspline_ * Nspline_, ill * Nspline_ * Nspline_);
+            // write data if the file was created successfully
+            return hdf.valid() and hdf.write("array", segment.data(), segment.size());
         }
     
     private:
         
-        std::string name_;
+        int L_, S_, Pi_, ni_, li_, mi_;
+        double E_;
         std::vector<std::pair<int,int>> ang_;
         unsigned Nspline_;
 };
