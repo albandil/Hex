@@ -2412,12 +2412,18 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
     // the first and (one past) the last block of a diagonal
     std::size_t beginblockd = 0, endblockd = 0;
     
+    // number of available OpenMP threads
+    unsigned Nthreads = 1;
+#ifdef _OPENMP
+    # pragma omp parallel
+    Nthreads = omp_get_num_threads();
+#endif
+    
     // data
     cArray diskdata;
     cArrayView view;
     
     // for all diagonals
-    # pragma omp parallel if (parallelize)
     while (beginblockd != structure_.size())
     {
         // find the last block of the current diagonal
@@ -2431,18 +2437,8 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         // which diagonal is this?
         std::size_t d = structure_[beginblockd].second - structure_[beginblockd].first;
         
-        // how many blocks from the current diagonal to process simultaneously (all if in memory)
-        std::size_t Nparblock = endblockd - beginblockd;
-        if (not inmemory_)
-        {
-#ifdef _OPENMP
-            // in parallel calculation use NUM_THREADS blocks at a time
-            Nparblock = std::min<unsigned>(Nparblock, omp_get_num_threads());
-#else
-            // in serial calculation use just one block at a time
-            Nparblock = 1;
-#endif
-        }
+        // how many blocks from the current diagonal to process simultaneously (all if in memory, one per thread if on disk)
+        std::size_t Nparblock = (inmemory_ ? endblockd - beginblockd : std::min<unsigned>(endblockd - beginblockd, Nthreads));
         
         // for all groups of blocks to process in parallel
         for (std::size_t igroup = 0; igroup < (endblockd - beginblockd + Nparblock - 1) / Nparblock; igroup++)
@@ -2461,16 +2457,12 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
 #ifndef NO_HDF
             if (not inmemory_)
             {
-                # pragma omp master
-                {
-                    // read data from the disk
-                    diskdata.resize(size);
-                    if (not hdf->read("data", &diskdata[0], size, offset))
-                        Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
-                }
+                // read data from the disk
+                diskdata.resize(size);
+                if (not hdf->read("data", &diskdata[0], size, offset))
+                    Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
                 
                 // reset view to the new data
-                # pragma omp barrier
                 view.reset(size, diskdata.data());
             }
 #endif
@@ -2479,8 +2471,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             if (d == 0)
             {
                 // for all blocks on the main diagonal
-                # pragma omp barrier
-                # pragma omp for // schedule (dynamic, 1)
+                # pragma omp parallel for schedule (static) if (parallelize)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block index
@@ -2500,8 +2491,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
             if (d != 0)
             {
                 // for all blocks on the side diagonal (upper blocks, i < j)
-                # pragma omp barrier
-                # pragma omp for // schedule (dynamic, 1)
+                # pragma omp parallel for schedule (static) if (parallelize)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block indices
@@ -2518,8 +2508,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
                 }
                 
                 // for all blocks on the side diagonal (lower blocks, i > j)
-                # pragma omp barrier
-                # pragma omp for // schedule (dynamic, 1)
+                # pragma omp parallel for schedule (static) if (parallelize)
                 for (std::size_t iblock = beginblock; iblock < endblock; iblock++)
                 {
                     // block indices
