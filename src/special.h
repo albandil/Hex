@@ -832,22 +832,6 @@ double Gaunt (int l1, int m1, int l2, int m2, int l, int m);
  */
 int triangle_count (int L, int maxell);
 
-/**
- * @brief The hypergeometric function @f$ {}_2F_1 @f$.
- * 
- * Evaluates the Gauss hypergeometric function
- * @f[
- *     {}_2F_1(a,b;c;x)
- * @f]
- * for arbitrary real argument @f$ x @f$. It uses the routine gsl_sf_hyperg_2F1 from
- * GSL library, which is defined for |x| < 1. Using the transformations Abramowitz & Stegun
- * 15.3.3-9 the hypergeometric function is transformed so that is can be evaluated by
- * the library function.
- * 
- * @todo Document transformations.
- */
-double Hyper2F1 (double a, double b, double c, double x);
-
 }; // end of namespace "special"
 
 #endif

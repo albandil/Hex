@@ -860,49 +860,6 @@ int triangle_count (int L, int maxl)
     return n;
 }
 
-double special::Hyper2F1 (double a, double b, double c, double x)
-{
-    if (x < -1.0)
-    {
-        // x in (-inf,-1)
-        double w = 1 / (1 - x);
-        return std::pow(1-x,-a) * std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(b-a) - gsl_sf_lngamma(b) - gsl_sf_lngamma(c-a)) * gsl_sf_hyperg_2F1(a,c-b,a-b+1,w)
-             + std::pow(1-x,-b) * std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(a-b) - gsl_sf_lngamma(a) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(b,c-a,b-a+1,w);
-    }
-    else if (x < 0.0)
-    {
-        // x in [-1,0)
-        double w = x / (1 - x);
-        return std::pow(1-x,-a) * gsl_sf_hyperg_2F1(a,c-b,c,w);
-    }
-    else if (x <= 0.5)
-    {
-        // x in [0,0.5]
-        return gsl_sf_hyperg_2F1(a,b,c,x);
-    }
-    else if (x <= 1.0)
-    {
-        // x in (0.5,1)
-        double w = 1 - x;
-        return std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(c-a-b) - gsl_sf_lngamma(c-a) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(a,b,a+b+1-c,w)
-             + std::pow(1-x,c-a-b) * std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(a+b-c) - gsl_sf_lngamma(a) - gsl_sf_lngamma(b)) * gsl_sf_hyperg_2F1(c-a,c-b,c-a-b+1,w);
-    }
-    else if (x <= 2.0)
-    {
-        // x in [1,2]
-        double w = 1 - 1/x;
-        return std::pow(x,-a) * std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(c-a-b) - gsl_sf_lngamma(c-a) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(a,a-c+1,a+b-c+1,w)
-             + std::pow(x,a-c) * std::pow(1-x,c-a-b) * std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(a+b-c) - gsl_sf_lngamma(a) - gsl_sf_lngamma(b)) * gsl_sf_hyperg_2F1(c-a,1-a,c-a-b+1,w);
-    }
-    else /* x > 2 */
-    {
-        // x in (2,+inf)
-        double w = 1/x;
-        return std::pow(-x,-a)*std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(b-a) - gsl_sf_lngamma(b) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(a,a-c+1,a-b+1,w)
-             + std::pow(-x,-b)*std::exp(gsl_sf_lngamma(c) + gsl_sf_lngamma(a-b) - gsl_sf_lngamma(a) - gsl_sf_lngamma(c-b)) * gsl_sf_hyperg_2F1(b-c+1,b,b-a+1,w);
-    }
-}
-
 std::vector<std::vector<int>> special::FdB_partition (int n)
 {
     // all conformant partitionings

@@ -45,7 +45,7 @@ LAPACKLIBS = -lopenblas
 
 
 CFLAGS += $(GSLFLAGS) $(GINACFLAGS) $(LAPACKFLAGS) $(FFTWFLAGS)
-LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) $(FFTWLIBS)
+LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) $(FFTWLIBS) -rdynamic
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
@@ -56,7 +56,7 @@ CXXDEBUG = $(CFLAGS) -g -fcx-limited-range -DNO_HDF -DNO_MPI -DGIT_COMMIT=\"$(GI
 CXXFLAGS = -g $(CXXRILIS)
 
 FILES = arrays born hydrogen pwba2-pwx pwba2-spg radial special spgrid \
-        ui vec3d version
+        ui vec3d version hyp_2F1
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

@@ -40,6 +40,9 @@
 #include "radial.h"
 #include "special.h"
 
+// include Michel's hypergeometric function implementation
+#include "hyp_2F1.H"
+
 rArray interpolate_bound_bound_potential
 (
     rArray const & x,
@@ -119,6 +122,151 @@ rArray interpolate_bound_bound_potential
             V[i] = Norm * potential(x[i]);
     }
     
+    return V;
+}
+
+rArray interpolate_bound_free_potential_0
+(
+    rArray const & x,
+    int lambda,
+    int Na, int La, double Kb, int Lb
+)
+{
+    // array of bound-free potential evaluations
+    unsigned N = x.size();
+    double rmax = x.back();
+    rArray V(N);
+    
+    // number of Coulomb zeros within the range of grid "x" (initial guess)
+    unsigned nzeros = Kb * x.back() / (2 * special::constant::pi);
+    
+    // calculate the Coulomb zeros
+    rArray zeros;
+    do
+    {
+        // double the necessary zero count
+        nzeros = 2 * (1 + nzeros);
+        zeros.resize(nzeros);
+        
+        // for large frequencies 'Kb' the integral will be almost zero, so lets check already here
+        if (nzeros > N / 2)
+            return rArray(N,0.);
+        
+        // compute zeros of the Coulomb function
+        special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
+        zeros /= Kb;
+    }
+    while (zeros.back() < x.back());
+    
+    // the classical turning point for non-S-waves
+    double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
+    
+    // Coulomb function scaled by hydrogen orbital
+    rArray PF(N);
+    for (unsigned i = 0; i < N; i++)
+    {
+        PF[i] = Hydrogen::P(Na,La,x[i]) * Hydrogen::F(Kb,Lb,x[i]);
+    }
+    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+    gsl_spline_init (spline, x.data(), PF.data(), N);
+    
+    // compute the integrals
+    if (lambda == 0)
+    {
+        // bound state normalization constant
+        double Nnl = std::sqrt(std::pow(2./Na,3) * gsl_sf_fact(Na-La-1) / (2 * Na * std::pow(gsl_sf_fact(Na+La),3)));
+        
+        // free state normalization constant
+        gsl_sf_result Cl;
+        gsl_sf_coulomb_CL_e(Lb, -1/Kb, &Cl);
+        
+        // sum all terms
+        double a, hyperg0, hyperg1, sign, laguerre;
+        for (int j = 2*La+1; j <= Na+La; j++)
+        {
+            sign = (j % 2 == 0 ? 1. : -1.);
+            
+            laguerre = (gsl_sf_pow_int(gsl_sf_fact(Na+La),2) * sign * gsl_sf_pow_int(2./Na,j-La-1)) / (gsl_sf_fact(Na+La-j) * gsl_sf_fact(j) * gsl_sf_fact(j-2*La-1));
+            
+            a = (j - La - 1) + 1 + (Lb + 1);
+            hyperg0 = gsl_sf_fact(a+1) * (hyp_2F1(Complex(Lb+1.,1./Kb), a+1, 2.*Lb+2., Complex(0.,2.*Kb)/Complex(1./Na,Kb)) / std::pow(Complex(1./Na,Kb),a+1)).real();
+            
+            a = (j - La - 1) + 1 + (Lb + 1) - 1;
+            hyperg1 = gsl_sf_fact(a+1) * (hyp_2F1(Complex(Lb+1.,1./Kb), a+1, 2.*Lb+2., Complex(0.,2.*Kb)/Complex(1./Na,Kb)) / std::pow(Complex(1./Na,Kb),a+1)).real();
+            
+            V += laguerre * gsl_sf_pow_int(Kb,Lb+1) * (hyperg1 - hyperg0/x);
+        }
+        
+        V *= Nnl * Cl.val;
+        V[0] = 0;
+    }
+    else
+    {
+        // setup accelerator for value search (for every thread)
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        
+        // evaluate potential at grid point 'y'
+        auto potential = [Na,La,Kb,Lb,lambda,zeros,rt,rmax,x,spline,&acc](double y) -> double
+        {
+            // use zero potential in the origin (should be Inf, but that would spread NaNs in PC arithmeric)
+            if (y == 0.)
+                return 0;
+            
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ < r₂
+            auto integrand1 = [Na,La,Kb,Lb,lambda,y,spline,&acc](double x) -> double
+            {
+                return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(x/y,lambda);
+            };
+            
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt);
+            Q1.setEpsAbs(0);
+            Q1.integrate(0., y);
+            if (not Q1.ok())
+            {
+                std::cerr << format
+                (
+                    "Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").",
+                    lambda, Na, La, Kb, Lb, y, Q1.status().c_str()
+                ) << std::endl;
+                std::terminate();
+            }
+            
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for λ ≠ 0 and r₁ > r₂
+            auto integrand2 = [&](double x) -> double
+            {
+                return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(y/x,lambda + 1);
+            };
+            
+            // integrate per node of the Coulomb function (precomputed before)
+            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt);
+            Q2.setEpsAbs(0);
+            Q2.integrate(y, rmax);
+            if (not Q2.ok())
+            {
+                std::cerr << format
+                (
+                    "Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").",
+                    lambda, Na, La, Kb, Lb, y, Q2.status().c_str()
+                ) << std::endl;
+                std::terminate();
+            }
+            
+            return (Q1.result() + Q2.result()) / y;
+        };
+        
+        // evaluate potential in all grid points
+        for (unsigned i = 0; i < N; i++)
+            V[i] = potential(x[i]);
+        
+        // release memory
+        gsl_interp_accel_free(acc);
+    }
+    
+    // free allocated memory
+    gsl_spline_free(spline);
+    
+    // return the array of evaluations
     return V;
 }
 
