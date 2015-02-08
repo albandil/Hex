@@ -13,8 +13,8 @@ Dependencies
 The program is written in C++11 and can be successfully compiled by the
 following compilers:
 
- * GCC 4.8.1
- * Intel C++ Composer XE 15.0 (tested with GCC 4.8.1 headers)
+ * GCC 4.8.3
+ * Intel C++ Composer XE 15.0 (tested with GCC 4.8.3 headers)
  
 There are several external libraries that are being used for some partial tasks.
 Here is the list of the libraries with versions that were used:
@@ -34,6 +34,12 @@ Here is the list of the libraries with versions that were used:
                 http://www.sqlite.org/download.html
             Used for access to the database files.
 
+ * GiNaC 1.6.2 (+ CLN 1.3.4)
+            Needed, obtainable from
+                http://www.ginac.de/
+            Used for symbolical computation of integrands.
+            Note: I needed to configure GiNaC with '--disable-rpath' option.
+            
 Some or all of the libraries may be present in precompiled form in the repositories
 of the Linux distribution used.
 

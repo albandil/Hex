@@ -1,12 +1,12 @@
 The following configuration successfully builds the package:
 
 Compiler:
-    GCC 4.8.1 or
+    GCC 4.8.3 or
     Intel C++ Composer XE 15.0
 
 Third-party libraries:
     GSL 1.16
-    OpenBLAS 0.2.12
+    OpenBLAS 0.2.13
     SuiteSparse 4.3.1
     sqlitepp 0.2            (included in libs/, works e.g. with sqlite3 3.7.17)
     CLN 1.3.4
