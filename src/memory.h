@@ -159,7 +159,7 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
                     bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
                       /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
                 
-                Exception("Insufficent memory (unable to allocate next %s).", strsize.c_str());
+                HexException("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
             std::uintptr_t root_address = (std::uintptr_t)root;
             

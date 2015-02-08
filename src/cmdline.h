@@ -156,14 +156,14 @@ template <class Callback, class ...Params> bool HandleSwitch
             
             // are there any more words in input?
             if (i == argc)
-                Exception("Missing an argument for the option \"%s\".", optname.c_str());
+                HexException("Missing an argument for the option \"%s\".", optname.c_str());
             
             // use the next word as the option
             return callback (argv[i++]);
         }
         else
         {
-            Exception("An option cannot have more than one arguments, but \"%s\" has %d.", optname.c_str(), noptarg);
+            HexException("An option cannot have more than one arguments, but \"%s\" has %d.", optname.c_str(), noptarg);
         }
     }
     

@@ -133,7 +133,7 @@ template <int dim> std::vector<char> shift_fwd (char axis, std::vector<char> pt)
         }
     }
     
-    throw exception ("Cannot shift forward.");
+    HexException("Cannot shift forward.");
 }
 
 /**
@@ -163,7 +163,7 @@ template <int dim> std::vector<char> shift_bck (char axis, std::vector<char> pt)
         }
     }
     
-    throw exception ("Cannot shift backward.");
+    HexException("Cannot shift backward.");
 }
 
 /**
@@ -174,7 +174,8 @@ template <int dim> std::vector<char> shift_bck (char axis, std::vector<char> pt)
  */
 template <int dim> std::vector<std::vector<char>> extrude_point_to_regular_VTK_cell (std::vector<char> const & pt)
 {
-    throw exception ("Regular extrusion of point into more than 3 dimensions is not implemented. Please do not use VTK grid export here.");
+    HexException("Regular extrusion of point into more than 3 dimensions is not implemented. Please do not use VTK grid export here.");
+    return std::vector<std::vector<char>>(); // this is only for the compiler not to complain
 }
 
 /**

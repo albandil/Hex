@@ -31,6 +31,19 @@
 
 #include <iostream>
 
+#ifdef _OPENMP
+    #include <omp.h>
+    #define OMP_prepare omp_lock_t writelock; omp_init_lock(&writelock)
+    #define OMP_exclusive_in omp_set_lock(&writelock)
+    #define OMP_exclusive_out omp_unset_lock(&writelock)
+    #define OMP_clean omp_destroy_lock(&writelock)
+#else
+    #define OMP_prepare
+    #define OMP_exclusive_in
+    #define OMP_exclusive_out
+    #define OMP_clean
+#endif
+
 #include "../arrays.h"
 #include "../gauss.h"
 #include "../misc.h"
@@ -57,6 +70,8 @@ void NoPreconditioner::setup ()
 
 void NoPreconditioner::update (double E)
 {
+    OMP_prepare;
+    
     // update energy
     E_ = E;
     
@@ -119,7 +134,7 @@ void NoPreconditioner::update (double E)
                 
                 // check that the "f" coefficient is valid (no factorial overflow etc.)
                 if (not Complex_finite(f))
-                    Exception("Overflow in computation of f[%d](%d,%d,%d,%d).", inp_.L, l1, l2, l1, l2);
+                    HexException("Overflow in computation of f[%d](%d,%d,%d,%d).", inp_.L, l1, l2, l1, l2);
                 
                 // check that the "f" coefficient is nonzero
                 if (f == 0.)
@@ -132,8 +147,9 @@ void NoPreconditioner::update (double E)
                     // use precomputed block ... 
                     if (not cmd_.cache_all_radint) // ... from scratch file
                     {
-                        # pragma omp critical
+                        OMP_exclusive_in;
                         contrib = (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                        OMP_exclusive_out;
                     }
                     else // ... from memory
                     {
@@ -151,17 +167,22 @@ void NoPreconditioner::update (double E)
             }
             
             // save block
-            # pragma omp critical
+            OMP_exclusive_in;
             dia_blocks_[ill].setBlock(iblock,block);
+            OMP_exclusive_out;
         }
     }
     
     par_.wait();
     std::cout << "ok" << std::endl;
+    
+    OMP_clean;
 }
 
 void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
 {
+    OMP_prepare;
+    
     // shorthands
     int li = std::get<1>(inp_.instates[instate]);
     int mi = std::get<2>(inp_.instates[instate]);
@@ -178,19 +199,19 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
     );
     ji_overlaps.hdfsave("ji_overlaps.hdf");
     if (not std::isfinite(ji_overlaps.norm()))
-        Exception("Unable to compute Riccati-Bessel function B-spline overlaps!");
+        HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
     cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
     if (not std::isfinite(ji_expansion.norm()))
-        Exception("Unable to expand Riccati-Bessel function in B-splines!");
+        HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
     Pi_overlaps = s_rad_.overlapP(inp_.ni, li, weightEndDamp(s_rad_.bspline()));
     Pi_expansion = s_rad_.S().tocoo().tocsr().solve(Pi_overlaps);
     if (not std::isfinite(Pi_expansion.norm()))
-        Exception("Unable to expand hydrogen bound orbital in B-splines!");
+        HexException("Unable to expand hydrogen bound orbital in B-splines!");
     
     // for all segments constituting the RHS
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
@@ -237,9 +258,9 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
                 
                 // abort if any of the coefficients is non-number (factorial overflow etc.)
                 if (not std::isfinite(f1))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
                 if (not std::isfinite(f2))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
                 
                 // add multipole terms (direct/exchange)
                 if (not cmd_.lightweight_radial_cache)
@@ -261,7 +282,7 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
                 chi_block += (-prefactor * Sign) * outer_product(s_rad_.Mm1_tr().dot(Ji_expansion), s_rad_.S().dot(Pi_expansion));
             
             // update the right-hand side
-            # pragma omp critical
+            OMP_exclusive_in;
             {
                 // resize if necessary
                 if (chi.size() < (ill / par_.Nproc() + 1) * Nspline * Nspline)
@@ -270,12 +291,17 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
                 // copy data
                 cArrayView(chi, ill / par_.Nproc() * Nspline * Nspline, Nspline * Nspline) = chi_block;
             }
+            OMP_exclusive_out;
         }
     }
+    
+    OMP_clean;
 }
 
 void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
 {
+    OMP_prepare;
+    
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     int order = s_rad_.bspline().order();
@@ -284,7 +310,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     
     // clear output array
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
-
+    
     if (not cmd_.lightweight_radial_cache)
     {
         //
@@ -312,16 +338,16 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // product of line of blocks with the source vector (-> one segment of destination vector)
             cArray product (Nchunk);
             
+            // maximal multipole
+            int maxlambda = s_rad_.maxlambda();
+            
             # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
-            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= maxlambda; lambda++)
+            if (par_.isMyWork(illp))
             {
                 // skip diagonal
                 if (ill == illp)
-                    continue;
-                
-                // skip segments not owned by this process (will be computed by other processes)
-                if (not par_.isMyWork(illp))
                     continue;
                 
                 // row multi-index
@@ -335,7 +361,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 // calculate angular integral
                 double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
                 if (not std::isfinite(f))
-                    Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                 
                 // check non-zero
                 if (f == 0.)
@@ -404,7 +430,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         {
             fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
             if (not std::isfinite(fs[ill][illp][lambda]))
-                Exception("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+                HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
         }
         
         // for all source vector sub-segments
@@ -417,30 +443,44 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // synchronize source sub-segments buffer across processes
             par_.sync(&buffer[0], Nspline, Nang);
             
+            // auxiliary variables
+            int maxlambda = s_rad_.maxlambda();
+            int i_min = std::max(0, k - order);
+            int i_max = std::min(k + order, Nspline - 1);
+            
             // for all potential multipoles
             # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_dot)
-            for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+            for (int lambda = 0; lambda <= maxlambda; lambda++)
             {
                 // for all destination sub-blocks
-                for (int i = std::max(0, k - order); i <= std::min(k + order, Nspline - 1); i++)
+                for (int i = i_min; i <= i_max; i++)
                 {
                     // calculate the radial sub-block
                     cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], structure);
                     
                     // apply all superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))
-                    for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
                     {
-                        // multiply sub-segment by the R block
-                        cArray product = fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + illp * Nspline);
+                        // collected products of superblocks in this row
+                        cArray product (Nspline);
+                        
+                        // for all superblocks in this row
+                        for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
+                        {
+                            // multiply sub-segment by the R block
+                            product += fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + illp * Nspline);
+                        }
                         
                         // update the owned sub-segment
-                        # pragma omp critical
+                        OMP_exclusive_in;
                         cArrayView(q,(ill / par_.Nproc()) * Nspline * Nspline + i * Nspline,Nspline) -= product;
+                        OMP_exclusive_out;
                     }
                 }
             }
         }
         
     } // if not cmd_.lightweight_radial_cache
+    
+    OMP_clean;
 }

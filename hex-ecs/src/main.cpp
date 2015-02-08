@@ -90,11 +90,11 @@ int main (int argc, char* argv[])
     if (cmd.parallel_block)
     {
         if (cmd.outofcore)
-            Exception("The options --out-of-core and --parallel-block can't be used together because the HDF library is not thread-safe.");
+            HexException("The options --out-of-core and --parallel-block can't be used together because the HDF library is not thread-safe.");
         if (cmd.lightweight_radial_cache)
-            Exception("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
+            HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
         if (cmd.parallel_dot)
-            Exception("Please use either --parallel-block or --parallel-dot, but not both.");
+            HexException("Please use either --parallel-block or --parallel-dot, but not both.");
     }
     
 #ifdef _OPENMP
@@ -148,7 +148,7 @@ int main (int argc, char* argv[])
     
     // check ordering
     if (R0 >= Rmax)
-        Exception ("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
+        HexException("ERROR: Rmax = %g (end of grid) must be greater than R0 = %g (end of real grid)!", Rmax, R0);
     
     // create B-splines
     Bspline bspline (inp.order, inp.rknots, inp.ecstheta, inp.cknots);
@@ -211,7 +211,7 @@ int main (int argc, char* argv[])
     
     PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
     if (prec == nullptr)
-        Exception("Preconditioner %d not implemented.", cmd.preconditioner);
+        HexException("Preconditioner %d not implemented.", cmd.preconditioner);
     
 // ------------------------------------------------------------------------- //
 //                                                                           //

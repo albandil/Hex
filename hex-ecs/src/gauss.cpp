@@ -49,7 +49,7 @@ int GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, 
 {
     // enforce at least second order rule
     if (points < 2)
-        Exception ("[gauss_nodes_and_weights] Nor implemented for orders less than 2. Your input: %d.", points);
+        HexException("[gauss_nodes_and_weights] Nor implemented for orders less than 2. Your input: %d.", points);
     
     // first of all generate any missing data
     # pragma omp critical

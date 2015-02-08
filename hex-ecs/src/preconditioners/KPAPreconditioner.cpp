@@ -158,7 +158,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             // calculate angular integral
             double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
             if (not std::isfinite(f))
-                Exception("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
+                HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
             
             // multiply
             if (f != 0.)
@@ -169,24 +169,35 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
 
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
-    // get angular momenta of this block
-    int l1 = l1_l2_[iblock].first;
-    int l2 = l1_l2_[iblock].second;
-    
-    // dimension of the matrices
-    int Nspline = s_bspline_.Nspline();
-    
-    // multiply by the first Kronecker product
-    z = kron_dot(invCl_invsqrtS_[l1], invCl_invsqrtS_[l2], r);
-    
-    // divide by the diagonal
-    # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
-    for (int i = 0; i < Nspline; i++) 
-    for (int j = 0; j < Nspline; j++)
-        z[i * Nspline + j] /= E_ - Dl_[l1][i] - Dl_[l2][j];
-    
-    // multiply by the second Kronecker product
-    z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
+    try
+    {
+        // get angular momenta of this block
+        int l1 = l1_l2_[iblock].first;
+        int l2 = l1_l2_[iblock].second;
+        
+        // dimension of the matrices
+        int Nspline = s_bspline_.Nspline();
+        
+        // multiply by the first Kronecker product
+        z = kron_dot(invCl_invsqrtS_[l1], invCl_invsqrtS_[l2], r);
+        
+        // divide by the diagonal
+        # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
+        for (int i = 0; i < Nspline; i++) 
+        for (int j = 0; j < Nspline; j++)
+            z[i * Nspline + j] /= E_ - Dl_[l1][i] - Dl_[l2][j];
+        
+        // multiply by the second Kronecker product
+        z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
+    }
+    catch (std::exception & e)
+    {
+        HexException("Standard exception in KPA preconditioner: %s.", e.what());
+    }
+    catch (...)
+    {
+        HexException("Unknown exception in KPA preconditioner.");
+    }
 }
 
 #endif

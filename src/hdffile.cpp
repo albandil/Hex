@@ -88,7 +88,7 @@ HDFFile::~HDFFile ()
         catch (H5::Exception & e)
         {
             e.printErrorStack();
-            Exception("Failed to close the HDF file \"%s\".", name_.c_str());
+            HexException("Failed to close the HDF file \"%s\".", name_.c_str());
         }
     }
 }
@@ -139,7 +139,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
     catch (H5::Exception & e)
     {
         e.printErrorStack();
-        Exception("Failed to read HDF dataset \"%s\" from file \"%s\".", dataset.c_str(), name_.c_str());
+        HexException("Failed to read HDF dataset \"%s\" from file \"%s\".", dataset.c_str(), name_.c_str());
     }
 }
 
@@ -178,7 +178,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
     catch (H5::Exception & e)
     {
         e.printErrorStack();
-        Exception("Failed to write HDF dataset \"%s\" to file \"%s\".", dataset.c_str(), name_.c_str());
+        HexException("Failed to write HDF dataset \"%s\" to file \"%s\".", dataset.c_str(), name_.c_str());
     }
 }
 

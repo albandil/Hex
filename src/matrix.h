@@ -574,7 +574,7 @@ cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cAr
 
 template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
-    Exception("Don't know how to multipy matrices of type %s.", typeid(Type).name);
+    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name);
 }
 template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B);
 template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B);
@@ -968,10 +968,10 @@ public:
             std::int64_t err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_invalid_Numeric_object)
-                Exception("[LUft::save] Invalid numeric object.");
+                HexException("[LUft::save] Invalid numeric object.");
             
             if (err == UMFPACK_ERROR_file_IO)
-                Exception("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
+                HexException("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
         }
         void save () const
         {
@@ -989,10 +989,10 @@ public:
             std::int64_t err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
             
             if (err == UMFPACK_ERROR_out_of_memory)
-                Exception ("[LUft::load] Out of memory.");
+                HexException("[LUft::load] Out of memory.");
             
             if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
-                Exception ("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
+                HexException("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
         }
         void load ()
         {
@@ -1280,14 +1280,14 @@ public:
             // get number of nonzero matrix elements
             std::size_t elems = this->shake().x_.size();
             if (elems > 1)
-                throw "[CooMatrix::operator Complex] more elements than nominal volume!\n";
+                HexException("[CooMatrix::operator Complex] more elements than nominal volume!");
             else if (elems == 1)
                 return this->shake().x_[0];
             else
                 return 0.;
         }
         else
-            throw "[CooMatrix::operator Complex] matrix is not 1×1!\n";
+            HexException("[CooMatrix::operator Complex] matrix is not 1×1!");
     }
     
     // Getters

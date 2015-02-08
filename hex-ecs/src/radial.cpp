@@ -515,7 +515,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (R_tr_dia_[lambda].hdfload())
                 std::cout << "\t- integrals for lambda = " << lambda << " loaded from shared file \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
             else
-                Exception("Can't read shared radial integral file \"%s\".", R_tr_dia_[lambda].hdfname().c_str());
+                HexException("Can't read shared radial integral file \"%s\".", R_tr_dia_[lambda].hdfname().c_str());
         }
     }
     

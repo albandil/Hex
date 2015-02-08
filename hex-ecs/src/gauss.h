@@ -138,7 +138,7 @@ class GaussLegendre : public GaussLegendreData
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
             {
-                Exception ("[quad] Error: boundaries not for this iknot!");
+                HexException("[quad] Error: boundaries not for this iknot!");
             }
             
             // get evaluation points and weights
@@ -183,7 +183,7 @@ class GaussLegendre : public GaussLegendreData
             if (x1.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x1.real() or
                 x2.real() < bspline_.t(iknot).real() or bspline_.t(iknot+1).real() < x2.real())
             {
-                Exception ("[quad] Error: boundaries not for this iknot!");
+                HexException("[quad] Error: boundaries not for this iknot!");
             }
             
             // get evaluation points and weights

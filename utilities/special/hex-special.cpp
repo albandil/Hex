@@ -254,7 +254,7 @@ int main (int argc, char* argv[])
     }
     else
     {
-        throw exception ("The function \"%s\" is not available.", argv[1]);
+        HexException("The function \"%s\" is not available.", argv[1]);
     }
     
     return EXIT_SUCCESS;

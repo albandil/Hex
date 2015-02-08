@@ -94,7 +94,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // produce sample input file
                 std::ofstream out("example.inp");
                 if (out.bad())
-                    Exception("Error: Cannot write to \"example.inp\"\n");
+                    HexException("Error: Cannot write to \"example.inp\"\n");
                 
                 out << sample_input;
                     
@@ -106,7 +106,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // set custom input file
                 inputfile.open(optarg);
                 if (not inputfile.good())
-                    Exception("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                    HexException("Error: Input file \"%s\" not found.\n", optarg.c_str());
                 return true;
             },
         "help", "h", 0, [&](std::string optarg) -> bool
@@ -246,7 +246,7 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // preconditioner
                 if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
-                    Exception("Unknown preconditioner \"%s\".", optarg.c_str());
+                    HexException("Unknown preconditioner \"%s\".", optarg.c_str());
                 return true;
             },
         "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
@@ -308,7 +308,7 @@ void CommandLine::parse (int argc, char* argv[])
         
         [&] (std::string optname, std::string optarg) -> bool
         {
-            Exception("Unknown switch \"%s\".", optname.c_str());
+            HexException("Unknown switch \"%s\".", optname.c_str());
         }
     );
 }
@@ -344,7 +344,7 @@ void InputFile::read (std::ifstream & inf)
         if (rknots_begin[i] > rknots_end[i])
         {
             std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
-            Exception("Inconsistent knot specification!");
+            HexException("Inconsistent knot specification!");
         }
         
         rArray new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
@@ -556,7 +556,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     
     // load the requested file
     if (not sol.hdfload(cmd.zipfile.c_str()))
-        Exception("Cannot load file %s.", cmd.zipfile.c_str());
+        HexException("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
     grid = linspace (0., cmd.zipmax, cmd.zipcount);

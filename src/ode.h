@@ -115,7 +115,7 @@ int solve2 (
             
             // check finiteness
             if (not std::isfinite(y_row[0]))
-                throw exception("[solve2] Infinite result (%g) for i = %d", y_row[0], i);
+                HexException("[solve2] Infinite result (%g) for i = %d", y_row[0], i);
             
             // advance number of steps
             nsteps++;
@@ -142,7 +142,7 @@ int solve2 (
                 }
                 if (flag == ABORT_ON_OVERFLOW)
                 {
-                    throw exception ("[solve2] Overflow error.");
+                    HexException("[solve2] Overflow error.");
                 }
             }
             

@@ -412,7 +412,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, const cArrayView solu
         CooMatrix Wj[inp_.maxell + 1];
         for (int l = 0; l <= inp_.maxell; l++)
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
-            
+        
         // we need "P_overlaps" to have a 'dot' method
         CooMatrix Sp (Nspline, 1, Pf_overlaps.begin());
         
@@ -623,7 +623,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         
         // limit subdivision
         if (N > 32768)
-            Exception("ERROR: Non-convergent Chebyshev expansion.");
+            HexException("ERROR: Non-convergent Chebyshev expansion.");
     }
     
     return CB;

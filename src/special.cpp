@@ -115,9 +115,9 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
         
         // check status information
         if (info < 0)
-            Exception("Illegal value to DSTEV in coulomb_zeros (argument %d).", -info);
+            HexException("Illegal value to DSTEV in coulomb_zeros (argument %d).", -info);
         if (info > 0)
-            Exception("DSTEV failed to converge (%d offdiagonal elements).", info);
+            HexException("DSTEV failed to converge (%d offdiagonal elements).", info);
         
         // compute new zeros
         for (int i = 0; i < nzeros; i++)
@@ -168,7 +168,7 @@ cArray special::ric_jv (int lmax, Complex z)
             }
             else
             {
-                Exception("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
+                HexException("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
             }
         }
         
@@ -548,7 +548,7 @@ double special::coul_F_sigma (int l, double k)
     int err = gsl_sf_lngamma_complex_e(l+1, -1/k, &lnr, &arg);
     
     if (err != GSL_SUCCESS)
-        Exception("Error while evaluating Coulomb phaseshift.");
+        HexException("Error while evaluating Coulomb phaseshift.");
     
     return arg.val;
 }
@@ -752,11 +752,11 @@ double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     double C = Wigner3j(l2, lambda, l2p, 0, 0, 0);
     
     if (not std::isfinite(A))
-        Exception("Wigner6j(%d,%d,%d,%d,%d,%d) not finite.", l1, l2, L, l2p, l1p, lambda);
+        HexException("Wigner6j(%d,%d,%d,%d,%d,%d) not finite.", l1, l2, L, l2p, l1p, lambda);
     if (not std::isfinite(B))
-        Exception("Wigner3j(%d,%d,%d,0,0,0) not finite.", l1, lambda, l1p);
+        HexException("Wigner3j(%d,%d,%d,0,0,0) not finite.", l1, lambda, l1p);
     if (not std::isfinite(C))
-        Exception("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
+        HexException("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
     
     return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
 }

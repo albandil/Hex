@@ -265,7 +265,7 @@ class BesselNodeIntegrator : public NodeIntegrator<Functor,Integrator,T>
             int err = gsl_sf_bessel_zero_Jnu_e(l_+0.5,n,&res);
             if (err != GSL_SUCCESS)
             {
-                throw exception
+                HexException
                 (
                     "Cannot find %d-th root of the Bessel function j[%d](%g r) -- %s.",
                     n, l_, k_, gsl_strerror(err)

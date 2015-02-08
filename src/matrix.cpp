@@ -144,7 +144,7 @@ template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<
     // C(col) = (A'(col) B(col))' = B'(col) A(col)
     
     if (A.cols() != B.rows())
-        Exception("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
     
     // dimensions
     int m = B.cols(), n = A.cols(), k = A.rows();
@@ -174,7 +174,7 @@ template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatri
     // C(col) = (A'(col) B(col))' = B'(col) A(col)
     
     if (A.cols() != B.rows())
-        Exception("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
+        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
     
     // dimensions
     int m = B.cols(), n = A.cols(), k = B.rows();
@@ -201,7 +201,7 @@ template<> ColMatrix<Complex> ColMatrix<Complex>::invert () const
 {
 #ifndef NO_LAPACK
     if (rows() != cols())
-        Exception("Only square matrices can be diagonalized.");
+        HexException("Only square matrices can be diagonalized.");
     int N = rows();
     
     ColMatrix<Complex> inv (*this);
@@ -260,7 +260,7 @@ template<> std::tuple<cArray,ColMatrix<Complex>,ColMatrix<Complex>> ColMatrix<Co
 {
 #ifndef NO_LAPACK
     if (rows() != cols())
-        Exception("Only square matrices can be diagonalized.");
+        HexException("Only square matrices can be diagonalized.");
     int N = rows();
     
     ColMatrix<Complex> VL(N,N), VR(N,N);
@@ -1181,7 +1181,7 @@ CsrMatrix operator * (CsrMatrix const & A, CscMatrix const & B)
 {
     // check compatibility
     if (A.cols() != B.rows())
-        Exception("Wrong sizes for matrix multiplication: %d %d, %d %d.", A.rows(), A.cols(), B.rows(), B.cols());
+        HexException("Wrong sizes for matrix multiplication: %d %d, %d %d.", A.rows(), A.cols(), B.rows(), B.cols());
     
     // result arrays
     lArray Cp = { 0 }, Ci;
@@ -1487,7 +1487,7 @@ Complex CooMatrix::ddot (CooMatrix const & B) const
     
     // sort by i_ and j_
     if (not sorted() or not B.sorted())
-        Exception("[CooMatrix] Sort matrices before ddot!");
+        HexException("[CooMatrix] Sort matrices before ddot!");
         
     Complex result = 0;
     
@@ -1657,7 +1657,7 @@ SymDiaMatrix::SymDiaMatrix (std::string filename)
 {
     # pragma omp critical
     if (not hdfload())
-        Exception("Unable to load from %s.", filename.c_str());
+        HexException("Unable to load from %s.", filename.c_str());
 }
 
 void SymDiaMatrix::setup_dptrs_()
@@ -1677,7 +1677,7 @@ SymDiaMatrix const & SymDiaMatrix::operator += (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        Exception("[SymDiaMatrix::operator+=] Unequal sizes (%ld != %ld)!", size(), B.size());
+        HexException("[SymDiaMatrix::operator+=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))
@@ -1730,7 +1730,7 @@ SymDiaMatrix const & SymDiaMatrix::operator -= (SymDiaMatrix const & B)
 {
     // check sizes
     if (size() != B.size())
-        Exception("[SymDiaMatrix::operator-=] Unequal sizes (%ld != %ld)!", size(), B.size());
+        HexException("[SymDiaMatrix::operator-=] Unequal sizes (%ld != %ld)!", size(), B.size());
     
     // check diagonals
     if (diag().size() == B.diag().size() and all(diag() == B.diag()))
@@ -1825,7 +1825,7 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 {
     // check dimensions
     if (A.size() != B.size())
-        Exception("Cannot multiply matrices: A's column count != B's row count.");
+        HexException("Cannot multiply matrices: A's column count != B's row count.");
     
     // compute bandwidth, half-bandwidth and other parameters of the matrices
     int C_size = A.size();
@@ -1890,12 +1890,12 @@ SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B)
 bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
 {
     if (n_ != B.n_)
-        Exception("[SymDiaMatrix] Unequal ranks (%d != %d).", n_, B.n_);
+        HexException("[SymDiaMatrix] Unequal ranks (%d != %d).", n_, B.n_);
     if (idiag_.size() != B.idiag_.size())
-        Exception("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
+        HexException("[SymDiaMatrix] Unequal number of diagonals (%d != %d).", idiag_.size(), B.idiag_.size());
     for (std::size_t i = 0; i < idiag_.size(); i++)
         if (idiag_[i] != B.idiag_[i])
-            Exception("[SymDiaMatrix] Unequal distribution of diagonals.");
+            HexException("[SymDiaMatrix] Unequal distribution of diagonals.");
     return true;
 }
 
@@ -2124,7 +2124,7 @@ cArray SymDiaMatrix::dot (const cArrayView B) const
 {
     // check dimensions
     if ((int)B.size() != n_)
-        Exception("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n_, B.size());
+        HexException("[SymDiaMatrix::dot] Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n_, B.size());
     
     return sym_dia_dot(n_, idiag_, &elems_[0], &B[0]);
 }
@@ -2393,7 +2393,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
 {
     // check vector size
     if (v.size() != size_ * size_)
-        Exception("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
+        HexException("[BlockSymDiaMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
     
     // check if matrix is empty
     if (structure_.size() == 0)
@@ -2460,7 +2460,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
                 // read data from the disk
                 diskdata.resize(size);
                 if (not hdf->read("data", &diskdata[0], size, offset))
-                    Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                    HexException("Failed to read HDF file \"%s\".", diskfile_.c_str());
                 
                 // reset view to the new data
                 view.reset(size, diskdata.data());
@@ -2571,7 +2571,7 @@ CooMatrix BlockSymDiaMatrix::tocoo () const
             // read data from the disk
             diskdata.resize(structure_.size());
             if (not hdf->read("data", &diskdata[0], structure_.size(), iblock * structure_.size()))
-                Exception("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                HexException("Failed to read HDF file \"%s\".", diskfile_.c_str());
             
             // reset view to the new data
             view.reset(structure_.size(), diskdata.data());
@@ -2670,14 +2670,14 @@ cArray BlockSymDiaMatrix::getBlock (int i) const
         
         // check success
         if (not hdf.valid())
-            Exception("Cannot open file \"%s\".", diskfile_.c_str());
+            HexException("Cannot open file \"%s\".", diskfile_.c_str());
         
         // create output array
         cArray data (structure_.size());
         
         // read data
         if (not hdf.read("data", &data[0], structure_.size(), i * structure_.size()))
-            Exception("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+            HexException("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
         
         return data;
     }
@@ -2686,7 +2686,7 @@ cArray BlockSymDiaMatrix::getBlock (int i) const
 void BlockSymDiaMatrix::setBlock (int i, const cArrayView data)
 {
     if (data.size() != structure_.size())
-        Exception("Wrong dimensions: %ld != %ld.", data.size(), structure_.size());
+        HexException("Wrong dimensions: %ld != %ld.", data.size(), structure_.size());
     
     if (inmemory_)
     {
@@ -2701,7 +2701,7 @@ void BlockSymDiaMatrix::setBlock (int i, const cArrayView data)
             // create a new file
             phdf = new HDFFile (diskfile_, HDFFile::overwrite);
             if (not phdf->valid())
-                Exception("Cannot open file \"%s\" for writing.", diskfile_.c_str());
+                HexException("Cannot open file \"%s\" for writing.", diskfile_.c_str());
             
             // initialize the dataset to its full length
             phdf->write("data", (Complex*)nullptr, structure_.size() * structure_.size());
@@ -2709,7 +2709,7 @@ void BlockSymDiaMatrix::setBlock (int i, const cArrayView data)
         
         // write data
         if (not phdf->write("data", &data[0], structure_.size(), i * structure_.size()))
-            Exception("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+            HexException("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
         
         delete phdf;
     }

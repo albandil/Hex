@@ -277,7 +277,7 @@ double P (unsigned n, unsigned l, double r)
     // abort on other errors
     if (err != GSL_SUCCESS)
     {
-        Exception
+        HexException
         (
             "Unable to evaluate the hydrogen radial function for n = %d, l = %d, r = %g (\"%s\").",
             n, l, r, gsl_strerror(err)
@@ -318,7 +318,7 @@ double F (double k, int l, double r, double sigma)
         return norm * F;
     
     // some other problem
-    Exception
+    HexException
     (
         "Evaluation of hydrogen free state failed for l = %d, k = %g, r = %g\nError: %d %s\n",
         l, k, r, err, gsl_strerror(err)

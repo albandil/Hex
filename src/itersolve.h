@@ -474,7 +474,7 @@ int cgs_callbacks
         
         if (rho_1 == 0.)
         {
-            Exception("[cgs] Solver failes, ρ = 0.");
+            HexException("[cgs] Solver failes, ρ = 0.");
         }
         if (i == 1)
         {
