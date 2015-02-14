@@ -397,7 +397,7 @@ inline double ric_j (int n, double x)
 /**
  * @brief Ricatti-Bessel function of the second kind, @f$ \hat{y}_n(x) @f$.
  * 
- * @f$ \hat{n}_0(x) = \cos x @f$
+ * @f$ \hat{n}_0(x) = -\cos x @f$
  */
 inline double ric_n (int n, double x)
 {
