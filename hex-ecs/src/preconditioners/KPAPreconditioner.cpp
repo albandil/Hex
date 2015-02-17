@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
+#include <set>
 
 #include "../arrays.h"
 #include "../gauss.h"
@@ -42,19 +43,107 @@
 const std::string KPACGPreconditioner::name = "KPA";
 const std::string KPACGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
 
+void KPACGPreconditioner::sData::hdflink (const char* file)
+{
+    filename = file;
+}
+
+bool KPACGPreconditioner::sData::hdfload (const char* file)
+{
+    // open HDF file for reading
+    HDFFile hdf ((file == nullptr ? filename.c_str() : file), HDFFile::readonly);
+    if (not hdf.valid())
+        return false;
+    
+    // read size
+    unsigned size;
+    if (not hdf.read("n", &size, 1))
+        return false;
+    
+    // read matrices
+    invCl_invsqrtS = RowMatrix<Complex>(size,size);
+    if (not hdf.read("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
+        return false;
+    invsqrtS_Cl = RowMatrix<Complex>(size,size);
+    if (not hdf.read("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
+        return false;
+    
+    // read eigenvalues
+    Dl.resize(size);
+    if (not hdf.read("Dl", Dl.data(), size))
+        return false;
+    
+    return true;
+}
+
+bool KPACGPreconditioner::sData::hdfsave (const char* file) const
+{
+    // open HDF file for writing
+    HDFFile hdf ((file == nullptr ? filename.c_str() : file), HDFFile::overwrite);
+    if (not hdf.valid())
+        return false;
+    
+    // write size
+    unsigned size = Dl.size();
+    if (not hdf.write("n", &size, 1))
+        return false;
+    
+    // write matrices
+    if (not hdf.write("invCl_invsqrtS", invCl_invsqrtS.data().data(), size * size))
+        return false;
+    if (not hdf.write("invsqrtS_Cl", invsqrtS_Cl.data().data(), size * size))
+        return false;
+    
+    // write eigenvalues
+    if (not hdf.write("Dl", Dl.data(), size))
+        return false;
+    
+    return true;
+}
+
 void KPACGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
     std::cout << "Set up KPA preconditioner" << std::endl;
+    
+    // compose list of angular momenta needed by this processor
+    std::set<int> needed_l;
+    for (int l = 0; l <= inp_.maxell; l++)
+    {
+        // check if this angular momentum is needed by some of the blocks owned by this process
+        bool need_this_l = false;
+        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        {
+            if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
+                need_this_l = true;
+        }
+        
+        // append the 'l' if needed
+        if (need_this_l)
+            needed_l.insert(l);
+    }
+    
+    // link preconditioner matrices to disk files and try to load precomputed
+    Array<bool> done (inp_.maxell + 1, true);
+    for (int l : needed_l)
+    {
+        prec_[l].hdflink(format("kpa-%d-%d.hdf",l,par_.iproc()).c_str());
+        done[l] = prec_[l].hdfload();
+        if (done[l])
+            std::cout << "\t- preconditioner data for l = " << l << " loaded from \"" << prec_[l].filename << "\"" << std::endl;
+    }
+    
+    // if all preconditioners have been loaded, exit this routine
+    if (all(done))
+    {
+        std::cout << std::endl;
+        return;
+    }
+    
     std::cout << "\t- Overlap matrix factorization" << std::endl;
     
     Timer timer;
-    
-    // resize arrays
-    invsqrtS_Cl_.resize(inp_.maxell + 1);
-    invCl_invsqrtS_.resize(inp_.maxell + 1);
-    Dl_.resize(inp_.maxell + 1);
     
     // diagonalize overlap matrix
     ColMatrix<Complex> S = s_rad_.S().torow().T();
@@ -85,18 +174,10 @@ void KPACGPreconditioner::setup ()
     SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
     
     // diagonalize one-electron hamiltonians for all angular momenta
-    for (int l = 0; l <= inp_.maxell; l++)
+    for (int l : needed_l)
     {
-        // check if this angular momentum is needed by some of the blocks owned by this process
-        bool need_l = false;
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-        {
-            if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
-                need_l = true;
-        }
-        
-        // skip the angular momentum if no owned diagonal block needs it
-        if (not need_l)
+        // skip loaded
+        if (done[l])
             continue;
         
         // reset timer
@@ -111,24 +192,27 @@ void KPACGPreconditioner::setup ()
         
         // diagonalize the transformed matrix
         ColMatrix<Complex> ClL, ClR;
-        std::tie(Dl_[l],ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
+        std::tie(prec_[l].Dl,ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
         ColMatrix<Complex> invClR = ClR.invert();
         
         // store the data
-        invsqrtS_Cl_[l] = invsqrtS * ClR;
-        invCl_invsqrtS_[l] = RowMatrix<Complex>(invClR) * ColMatrix<Complex>(invsqrtS);
+        prec_[l].invsqrtS_Cl = invsqrtS * ClR;
+        prec_[l].invCl_invsqrtS = RowMatrix<Complex>(invClR) * ColMatrix<Complex>(invsqrtS);
         
         // covert Dl to matrix form and print verification
-        ColMatrix<Complex> Dlmat(Dl_[l].size()), invDlmat(Dl_[l].size());
-        for (unsigned i = 0; i < Dl_[l].size(); i++)
+        ColMatrix<Complex> Dlmat(prec_[l].Dl.size()), invDlmat(prec_[l].Dl.size());
+        for (unsigned i = 0; i < prec_[l].Dl.size(); i++)
         {
-            Dlmat(i,i) = Dl_[l][i];
-            invDlmat(i,i) = 1.0 / Dl_[l][i];
+            Dlmat(i,i) = prec_[l].Dl[i];
+            invDlmat(i,i) = 1.0 / prec_[l].Dl[i];
         }
         
         // Now Hl = ClR * Dlmat * ClR⁻¹
         std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
         std::cout << "\t\t- residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
+        
+        // Save to disk for possible future reuse.
+        prec_[l].hdfsave();
     }
     
     std::cout << std::endl;
@@ -179,16 +263,16 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         int Nspline = s_bspline_.Nspline();
         
         // multiply by the first Kronecker product
-        z = kron_dot(invCl_invsqrtS_[l1], invCl_invsqrtS_[l2], r);
+        z = kron_dot(prec_[l1].invCl_invsqrtS, prec_[l2].invCl_invsqrtS, r);
         
         // divide by the diagonal
         # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
         for (int i = 0; i < Nspline; i++) 
         for (int j = 0; j < Nspline; j++)
-            z[i * Nspline + j] /= E_ - Dl_[l1][i] - Dl_[l2][j];
+            z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];
         
         // multiply by the second Kronecker product
-        z = kron_dot(invsqrtS_Cl_[l1], invsqrtS_Cl_[l2], z);
+        z = kron_dot(prec_[l1].invsqrtS_Cl, prec_[l2].invsqrtS_Cl, z);
     }
     catch (std::exception & e)
     {

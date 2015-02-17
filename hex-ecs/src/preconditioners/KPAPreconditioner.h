@@ -32,6 +32,10 @@
 #ifndef HEX_KPAPRECONDITIONER_H
 #define HEX_KPAPRECONDITIONER_H
 
+#include <string>
+
+#include "../arrays.h"
+#include "../matrix.h"
 #include "../preconditioners.h"
 
 #ifndef NO_LAPACK
@@ -56,6 +60,27 @@ class KPACGPreconditioner : public CGPreconditioner
         static const std::string name;
         static const std::string description;
         
+        typedef struct sData
+        {
+            /// Link the structure to a disk file.
+            void hdflink (const char * file);
+            
+            /// Try to load data from a disk file.
+            bool hdfload (const char * file = nullptr);
+            
+            /// Save data to disk.
+            bool hdfsave (const char * file = nullptr) const;
+            
+            /// One-electron hamiltonian diagonalization.
+            RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
+            
+            /// Diagonal parts of one-electron hamiltonians.
+            cArray Dl;
+            
+            /// Filename.
+            std::string filename;
+        } Data;
+        
         KPACGPreconditioner
         (
             Parallel const & par,
@@ -64,7 +89,7 @@ class KPACGPreconditioner : public CGPreconditioner
             Bspline const & bspline,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline, cmd),
-            invCl_invsqrtS_(inp.maxell+1), invsqrtS_Cl_(inp.maxell+1), Dl_(inp.maxell+1)
+            prec_(inp.maxell+1)
         {
             // nothing more to do
         }
@@ -85,11 +110,7 @@ class KPACGPreconditioner : public CGPreconditioner
         
     protected:
         
-        // one-electron hamiltonian eigen-diagonalization
-        std::vector<RowMatrix<Complex>> invCl_invsqrtS_, invsqrtS_Cl_;
-        
-        // diagonal parts of one-electron hamiltonians
-        std::vector<cArray> Dl_;
+        std::vector<Data> prec_;
 };
 
 #endif
