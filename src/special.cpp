@@ -133,6 +133,50 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
 }
 #endif /* NO_LAPACK */
 
+Complex special::cfgamma (Complex s, Complex z)
+{
+    unsigned n = 0, k = 0;
+    double epsrel = 1e-15;
+    unsigned maxiter = 10000;
+    
+    // n = 0
+    Complex App = 0, Bpp = 1;
+    n++;
+    
+    // n = 1
+    Complex Ap = 1, Bp = z;
+    Complex cfp = Ap / Bp;
+    n++; k++;
+    
+    // n = 2, 3, 4, ...
+    Complex a, b, A, B, cf;
+    do
+    {
+        // n = 2k
+        a = Complex(k) - s;
+        b = Complex(1);
+        A = b * Ap + a * App;
+        B = b * Bp + a * Bpp;
+        App = Ap; Ap = A;
+        Bpp = Bp; Bp = B;
+        n++;
+        
+        // n = 2k + 1
+        a = Complex(k);
+        b = z;
+        A = b * Ap + a * App;
+        B = b * Bp + a * Bpp;
+        cfp = cf; cf = A / B;
+        App = Ap; Ap = A;
+        Bpp = Bp; Bp = B;
+        n++; k++;
+    }
+    while (n < maxiter and std::abs(cf - cfp) > epsrel * std::abs(cf));
+    
+    // scale by z^s e^(-z)
+    return cf * std::pow(z,s) * std::exp(-z);
+}
+
 cArray special::ric_jv (int lmax, Complex z)
 {
     // results

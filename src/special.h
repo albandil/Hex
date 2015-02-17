@@ -195,6 +195,22 @@ inline std::uint64_t pow3 (std::uint64_t i)
 }
 
 /**
+ * @brief Incomplete gamma function.
+ * 
+ * This function calculates the value of the upper incomplete Gamma function
+ * for complex arguments by evaluating the continued fraction
+ * @f[
+ *     \Gamma(s,z) = z^s\mathrm{e}^{-z} \frac{1}{z+{}} \frac{1-s}{1+{}} \frac{1}{z+{}}
+ *     \frac{2-s}{1+{}} \frac{2}{z+{}} \frac{3-s}{1+{}} \frac{3}{z+{}} \dots
+ * @f]
+ * The program hex-pwba2 uses this routine in the domain
+ * @f$ (-\mathrm{i}z) \in \mathbb{R}^+, s \in \mathbb{Z}^- @f$,
+ * where the continued fraction converges rapidly. Elsewhere it may not be the
+ * best method.
+ */
+Complex cfgamma (Complex s, Complex z);
+
+/**
  * @brief Get zeros of the Coulomb wave function @f$ F_L(-1/k,kr) @f$.
  * 
  * Calculates given number of leading zeros of the Coulomb wave function
@@ -516,7 +532,7 @@ inline Complex ric_h_plus (int n, double x)
  * 
  * The definition of the spherical harmonics implemented by GSL is used. This means
  * the standard definition without the Condon-Shortley phase. This means for example
- * that @f$ Y_{1,-1}(\vartheta,0) = Y_{1,-1}(\vartheta,0) @f$, whereas with the Condon-Shortley
+ * that @f$ Y_{1,+1}(\vartheta,0) = Y_{1,-1}(\vartheta,0) @f$, whereas with the Condon-Shortley
  * phase the two values would differ by sign. Generaly, this convention cen be retrieved from the
  * Condon-Shortley convention by multiplying by the factor @f$ (-1)^{\max (0,m)} @f$.
  */
@@ -686,7 +702,7 @@ double logdelta (int two_j1, int two_j2, int two_j3);
  * The formula is taken from Edmonds, A. R.: Angular momentum in quantum mechanics, Princeton
  * 1968.
  * @f[
- *     \left( \matrix{j_1 7 j_2 & j_3 \cr m_1 & m_2 & m_3} \right)
+ *     \left( \matrix{j_1 & j_2 & j_3 \cr m_1 & m_2 & m_3} \right)
  *     = \epsilon(j_1,j_2,j_3)\Delta(j_1,j_2,j_3) \delta_{m_1+m_2+m_3}^0 (-1)^{j_1-j_2-m_3}
  *     \sqrt{(j_1+m_1)! (j_1-m_1)! (j_2+m_2)! (j_2-m_2)! (j_3+m_3)! (j_3-m_3)!}
  *     \sum_k \frac{(-1)^2}{k! (j_1+j_2-j_3-k)! (j_1-m_1-k)! (j_2+m_2-k)! (j_3-j_2+m_1+k)!
@@ -732,11 +748,13 @@ double Wigner6j_2 (int two_j1, int two_j2, int two_j3, int two_j4, int two_j5, i
 
 /**
  * @brief Small Wigner d-matrix.
+ * Small Wigner d-matrix.
  */
 double Wigner_d (int two_j, int two_ma, int two_mb, double beta);
 
 /**
  * @return Value of @f$ f(\lambda,l_1,l_2,l_1',l_2',L) @f$.
+ * Angular integral @f$ f(\lambda,l_1,l_2,l_1',l_2',L) @f$.
  */
 double computef (int lambda, int l1, int l2, int l1p, int l2p, int L);
 
