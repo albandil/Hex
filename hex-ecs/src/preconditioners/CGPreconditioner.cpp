@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
+#include <cstdio>
 
 #include "../arrays.h"
 #include "../itersolve.h"
@@ -50,26 +51,43 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
     {
-        // create segment views
-        cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        cArrayView zview (z, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-        
-        // wrappers around the callbacks
-        auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
-        auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
-        
-        // solve using the CG solver
-        n[ill] = cg_callbacks < cArray, cArrayView >
-        (
-            rview,                  // rhs
-            zview,                  // solution
-            cmd_.prec_itertol,      // preconditioner tolerance
-            0,                      // min. iterations
-            Nspline * Nspline,      // max. iteration
-            inner_prec,             // preconditioner
-            inner_mmul,             // matrix multiplication
-            false                   // verbose output
-        );
+        try
+        {
+            // create segment views
+            cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
+            cArrayView zview (z, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
+            
+            // wrappers around the callbacks
+            auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
+            auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
+            
+            // solve using the CG solver
+            n[ill] = cg_callbacks < cArray, cArrayView >
+            (
+                rview,                  // rhs
+                zview,                  // solution
+                cmd_.prec_itertol,      // preconditioner tolerance
+                0,                      // min. iterations
+                Nspline * Nspline,      // max. iteration
+                inner_prec,             // preconditioner
+                inner_mmul,             // matrix multiplication
+                false                   // verbose output
+            );
+        }
+        catch (std::exception const & e)
+        {
+            HexException("Standard exception: %s.", e.what());
+        }
+        catch (H5::Exception const & e)
+        {
+            e.printErrorStack();
+            e.printError(stderr);
+            HexException("HDF exception.");
+        }
+        catch (...)
+        {
+            HexException("Unknown exception.");
+        }
     }
     
     // broadcast inner preconditioner iterations
