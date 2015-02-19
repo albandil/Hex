@@ -2389,6 +2389,8 @@ bool BlockSymDiaMatrix::hdfcheck () const
     return HDFFile(diskfile_, HDFFile::readonly).valid();
 }
 
+
+
 cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool wholematrix) const
 {
     // check vector size
@@ -2654,7 +2656,19 @@ bool BlockSymDiaMatrix::hdfload ()
     if (not hdf.read("data", &data_[0], data_.size()))
         return false;
     
+    // turn on the "in memory" flag
+    inmemory_ = true;
+    
     return true;
+}
+
+void BlockSymDiaMatrix::drop ()
+{
+    // release memory
+    data_.drop();
+    
+    // turn off the "in memory" flag
+    inmemory_ = false;
 }
 
 cArray BlockSymDiaMatrix::getBlock (int i) const
