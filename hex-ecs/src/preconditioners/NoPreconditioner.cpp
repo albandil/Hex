@@ -371,11 +371,12 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
                 
                 // calculate product
-                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
+                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, cmd_.wholematrix) );
                 
                 // update collected product
-                # pragma omp critical
+                OMP_exclusive_in;
                 product += p0;
+                OMP_exclusive_out;
             }
             
             // sum all contributions to this destination segment on its owner node

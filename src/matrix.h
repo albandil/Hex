@@ -2191,9 +2191,10 @@ class BlockSymDiaMatrix
          * @param v Vector to multiply. It should be of equal size to the size of the matrix.
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
-         * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
+         * @param wholematrix Start by loading the whole matrix from disk if not in memory as opposed to
+         *                    loading and applying one block after another.
          */
-        cArray dot (cArrayView v, bool parallelize = false) const;
+        cArray dot (cArrayView v, bool parallelize = false, bool wholematrix = false) const;
         
         //
         // Coversions to other matrix types.

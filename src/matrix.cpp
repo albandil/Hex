@@ -2389,7 +2389,7 @@ bool BlockSymDiaMatrix::hdfcheck () const
     return HDFFile(diskfile_, HDFFile::readonly).valid();
 }
 
-cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
+cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize, bool wholematrix) const
 {
     // check vector size
     if (v.size() != size_ * size_)
@@ -2438,7 +2438,7 @@ cArray BlockSymDiaMatrix::dot (cArrayView v, bool parallelize) const
         std::size_t d = structure_[beginblockd].second - structure_[beginblockd].first;
         
         // how many blocks from the current diagonal to process simultaneously (all if in memory, one per thread if on disk)
-        std::size_t Nparblock = (inmemory_ ? endblockd - beginblockd : std::min<unsigned>(endblockd - beginblockd, Nthreads));
+        std::size_t Nparblock = ((inmemory_ or wholematrix) ? endblockd - beginblockd : std::min<unsigned>(endblockd - beginblockd, Nthreads));
         
         // for all groups of blocks to process in parallel
         for (std::size_t igroup = 0; igroup < (endblockd - beginblockd + Nparblock - 1) / Nparblock; igroup++)
