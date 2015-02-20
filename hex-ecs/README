@@ -29,8 +29,8 @@ Here is the list of the libraries with versions that were used:
             Needed, obtainable from 
                 http://www.hdfgroup.org/HDF5/release/obtain5.html
             Used for intermediate output of results.
-            The C++ version of the library is used. If custom-compiling, use
-                ./configure --enable-cxx
+            The thread-safe version of the library is used. If custom-compiling, use
+                ./configure --enable-threadsafe
 
  * UMFPACK 5.7.1
             Needed, obtainable as a part of SuiteSparse 4.4.3 from 
@@ -38,11 +38,9 @@ Here is the list of the libraries with versions that were used:
             Used for solution of sparse linear systems.
 
  * OpenBLAS 0.2.13
-            Optional, but some BLAS implementation is necessary for SuiteSparse
-            for dense matrix kernels. OpenBLAS is one of the best open-source
-            implementations. Obtainable from
+            Optional, but some BLAS implementation is necessary for dense matrix routines.
+            OpenBLAS is one of the best open-source implementations. Obtainable from
                 http://www.openblas.net/
-            Not directly used by hex-ecs.
 
  * GSL 1.16
             Needed, obtainable from

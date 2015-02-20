@@ -25,8 +25,8 @@ Here is the list of the libraries with versions that were used:
             Optional, obtainable from 
                 http://www.hdfgroup.org/HDF5/release/obtain5.html
             Used for intermediate output of results.
-            The C++ version of the library is used. If custom-compiling, use
-                ./configure --enable-cxx
+            The thread-safe version of the library is used. If custom-compiling, use
+                ./configure --enable-threadsafe
 
  * GSL 1.16
             Needed, obtainable from
