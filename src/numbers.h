@@ -41,7 +41,7 @@
 #endif
 
 #ifndef NO_HDF
-    #include <H5Cpp.h>
+    #include <hdf5.h>
 #endif
 
 #undef I
@@ -115,7 +115,7 @@ template<> class typeinfo<int>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::IntType(H5::PredType::NATIVE_INT); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_INT; }
 #endif
 };
 
@@ -137,7 +137,7 @@ template<> class typeinfo<std::int64_t>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::IntType(H5::PredType::NATIVE_INT64); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_INT64; }
 #endif
 };
 
@@ -159,7 +159,7 @@ template<> class typeinfo<unsigned>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::IntType(H5::PredType::NATIVE_UINT); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_UINT; }
 #endif
 };
 
@@ -181,7 +181,7 @@ template<> class typeinfo<std::uint64_t>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::IntType(H5::PredType::NATIVE_UINT64); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_UINT64; }
 #endif
 };
 
@@ -203,7 +203,7 @@ template<> class typeinfo<float>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::FloatType(H5::PredType::NATIVE_FLOAT); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_FLOAT; }
 #endif
 };
 
@@ -225,7 +225,29 @@ template<> class typeinfo<double>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return H5::FloatType(H5::PredType::NATIVE_DOUBLE); }
+        static hid_t hdfcmpttype () { return H5T_NATIVE_DOUBLE; }
+#endif
+};
+
+/// Data-type info class specialization for 'long double'.
+template<> class typeinfo<long double>
+{
+    public:
+        /// Component data type.
+        typedef long double cmpttype;
+        
+        /// Component count.
+        static const std::size_t ncmpt = 1;
+        
+        /// Component getter.
+        static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
+#ifndef NO_MPI
+        /// MPI data type of a component.
+        static MPI_Datatype mpicmpttype () { return MPI_LONG_DOUBLE; }
+#endif
+#ifndef NO_HDF
+        /// HDF data type of a component.
+        static hid_t hdfcmpttype () { return H5T_NATIVE_LDOUBLE; }
 #endif
 };
 
@@ -247,7 +269,7 @@ template<> template<class T> class typeinfo<std::complex<T>>
 #endif
 #ifndef NO_HDF
         /// HDF data type of a component.
-        static H5::AtomType hdfcmpttype () { return typeinfo<T>::hdfcmpttype(); }
+        static hid_t hdfcmpttype () { return typeinfo<T>::hdfcmpttype(); }
 #endif
 };
 

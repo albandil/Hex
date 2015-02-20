@@ -1902,74 +1902,60 @@ bool SymDiaMatrix::is_compatible (SymDiaMatrix const & B) const
 #ifndef NO_HDF
 bool SymDiaMatrix::hdfload (HDFFile & hdf, std::string prefix)
 {
-    try
-    {
-        // check the HDF file
-        if (not hdf.valid())
-            return false;
-        
-        // set prefix
-        if (not prefix.empty())
-            hdf.prefix = prefix;
-        
-        // read dimension
-        if (not hdf.read("n", &n_, 1))
-            return false;
-        
-        // read non-zero diagonal identificators
-        if (idiag_.resize(hdf.size("idiag")))
-            if (not hdf.read("idiag", &(idiag_[0]), idiag_.size()))
-                return false;
-        
-        // compressed array info
-        iArray zero_blocks_re, zero_blocks_im;
-        rArray elements_re, elements_im;
-        
-        // read data from file
-        if ((zero_blocks_re.resize(hdf.size("zero_blocks_re")) and not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
-            (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
-            (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
-            (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
-            return false;
-        
-        // decompress
-        elems_ = std::move
-        (
-            interleave
-            (
-                elements_re.decompress(zero_blocks_re),
-                elements_im.decompress(zero_blocks_im)
-            )
-        );
-        
-        // update matrix internals
-        setup_dptrs_();
-        
-        return true;
-    }
-    catch (H5::FileIException exc)
-    {
+    // check the HDF file
+    if (not hdf.valid())
         return false;
-    }
+    
+    // set prefix
+    if (not prefix.empty())
+        hdf.prefix = prefix;
+    
+    // read dimension
+    if (not hdf.read("n", &n_, 1))
+        return false;
+    
+    // read non-zero diagonal identificators
+    if (idiag_.resize(hdf.size("idiag")))
+        if (not hdf.read("idiag", &(idiag_[0]), idiag_.size()))
+            return false;
+    
+    // compressed array info
+    iArray zero_blocks_re, zero_blocks_im;
+    rArray elements_re, elements_im;
+    
+    // read data from file
+    if ((zero_blocks_re.resize(hdf.size("zero_blocks_re")) and not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
+        (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
+        (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
+        (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
+        return false;
+    
+    // decompress
+    elems_ = std::move
+    (
+        interleave
+        (
+            elements_re.decompress(zero_blocks_re),
+            elements_im.decompress(zero_blocks_im)
+        )
+    );
+    
+    // update matrix internals
+    setup_dptrs_();
+    
+    return true;
 }
 #endif
 
 bool SymDiaMatrix::hdfload (std::string name)
 {
 #ifndef NO_HDF
-    try
-    {
-        // open the HDF file
-        HDFFile hdf(name, HDFFile::readonly);
-        if (not hdf.valid())
-            return false;
-        
-        return hdfload(hdf);
-    }
-    catch (H5::FileIException exc)
-    {
+    // open the HDF file
+    HDFFile hdf(name, HDFFile::readonly);
+    if (not hdf.valid())
         return false;
-    }
+    
+    return hdfload(hdf);
 #else /* NO_HDF */
     return false;
 #endif

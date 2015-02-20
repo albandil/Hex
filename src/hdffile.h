@@ -35,7 +35,8 @@
 #ifndef NO_HDF
 
 #include <string>
-#include <H5Cpp.h>
+
+#include <hdf5.h>
 
 #include "numbers.h"
 #include "misc.h"
@@ -81,10 +82,10 @@ public:
     FileAccess;
     
     /// Constructor from filename and access mode.
-    HDFFile(std::string filename, FileAccess flag);
+    HDFFile (std::string filename, FileAccess flag);
     
     /// Destructor.
-    ~HDFFile();
+    ~HDFFile ();
     
     /// Get size of the dataset of valid file.
     std::size_t size (std::string dataset) const;
@@ -108,12 +109,12 @@ public:
     std::string prefix;
     
     /// Internal HDF object.
-    H5::H5File * file () { return file_; }
+    hid_t file () const { return file_; }
     
 private:
     
     /// Pointer to the HDF structure.
-    H5::H5File * file_;
+    hid_t file_;
     
     /// Filename.
     std::string name_;
@@ -122,10 +123,10 @@ private:
     bool valid_;
     
     /// Auxiliary read function.
-    bool read_(std::string dataset, void * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype) const;
+    bool read_(std::string dataset, void * buffer, hsize_t length, hsize_t offset, hid_t dtype) const;
     
     /// Auxiliary write function.
-    bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype);
+    bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype);
 };
 
 #endif

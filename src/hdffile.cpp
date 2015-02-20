@@ -33,13 +33,15 @@
 
 #include <iostream>
 #include <string>
+
+#include <hdf5.h>
 #include <H5Cpp.h>
 
 #include "hdffile.h"
 #include "misc.h"
 
 HDFFile::HDFFile (std::string filename, FileAccess flag)
-    : prefix(), file_(nullptr), name_(filename), valid_(true)
+    : prefix(), file_(-1), name_(filename), valid_(false)
 {
     // separate filesystem path and dataset path (by semicolon)
     std::size_t pos = name_.find(':');
@@ -50,136 +52,219 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
     }
     
     // try to open the file
-    try
+    switch (flag)
     {
-        switch (flag)
-        {
-            case readonly:
-                file_ = new H5::H5File(name_.c_str(), H5F_ACC_RDONLY);
-                break;
-            case overwrite:
-                file_ = new H5::H5File(name_.c_str(), H5F_ACC_TRUNC);
-                break;
-            case failifexists:
-                file_ = new H5::H5File(name_.c_str(), H5F_ACC_EXCL);
-                break;
-            case readwrite:
-                file_ = new H5::H5File(name_.c_str(), H5F_ACC_RDWR);
-                break;
-        }
+        case overwrite:
+            file_ = H5Fcreate(name_.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+            break;
+        case failifexists:
+            file_ = H5Fcreate(name_.c_str(), H5F_ACC_EXCL, H5P_DEFAULT, H5P_DEFAULT);
+            break;
+        case readonly:
+            file_ = H5Fopen(name_.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+            break;
+        case readwrite:
+            file_ = H5Fopen(name_.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+            break;
     }
-    catch (H5::FileIException & e)
-    {
-        file_ = nullptr;
-        valid_ = false;
-    }
+    
+    valid_ = (file_ >= 0);
 }
 
 HDFFile::~HDFFile ()
 {
-    if (file_ != nullptr)
+    if (file_ >= 0)
     {
-        try
-        {
-            file_->flush(H5F_SCOPE_GLOBAL);
-            file_->close();
-            delete file_;
-        }
-        catch (H5::Exception & e)
-        {
-            e.printErrorStack();
-            HexException("Failed to close the HDF file \"%s\".", name_.c_str());
-        }
+        // write everything to disk
+        H5Fflush(file_, H5F_SCOPE_GLOBAL);
+        
+        // close the file
+        H5Fclose(file_);
+        
+        // invalidate IDs
+        file_ = -1;
+        valid_ = false;
     }
 }
 
 std::size_t HDFFile::size (std::string dataset) const
 {
+    // invalid file has zero size
     if (not valid_)
         return 0;
     
-    try
-    {
-        dataset = prefix + dataset;
-        H5::DataSet dset = file_->openDataSet(dataset.c_str());
-        H5::DataSpace dspc = dset.getSpace();
-        std::size_t length = dspc.getSimpleExtentNpoints();
-        return length;
-    }
-    catch (...)
-    {
-        // the dataset doesn't exist
-        return 0; // Exception("Failed to retrieve size of HDF dataset \"%s\".", dataset.c_str());
-    }
+    // compose full dataset path
+    dataset = prefix + dataset;
+    
+    // open requested dataset
+    hid_t dset = H5Dopen2(file_, dataset.c_str(), 0);
+    if (dset < 0)
+        return 0; // non-existing dataset has zero size
+    
+    // open associated dataspace
+    hid_t dspc = H5Dget_space(dset);
+    if (dspc < 0)
+        return 0; // some unknown error, assumed invalid dataset
+    
+    // retrieve size of the dataset
+    hssize_t length = H5Sget_simple_extent_npoints(dspc);
+    
+    // release memory
+    H5Sclose(dspc);
+    H5Dclose(dset);
+    
+    // return the size
+    return length;
 }
 
-bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype) const
+bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t offset, hid_t dtype) const
 {
+    // skip reading invalid files
     if (not valid_)
         return false;
     
+    // skip reading empty datasets
     if (length == 0)
         return true;
-    try
+    
+    // skip reading into null buffer
+    if (buffer == nullptr)
+        return false;
+    
+    // compose full dataset path
+    dataset = prefix + dataset;
+    
+    // open requested dataset
+    hid_t dset = H5Dopen2(file_, dataset.c_str(), 0);
+    if (dset < 0)
+        return false;
+    
+    // open associated dataspace
+    hid_t dspc = H5Dget_space(dset);
+    if (dspc < 0)
     {
-        
-        dataset = prefix + dataset;
-        H5::DataSet dset = file_->openDataSet(dataset.c_str());
-        H5::DataSpace dspc = dset.getSpace();
-        
-        dspc.selectHyperslab(H5S_SELECT_SET, &length, &offset);
-        
-        H5::DataSpace mspc(1, &length);
-        
-        if (buffer != nullptr)
-            dset.read(buffer, dtype, mspc, dspc);
-        
-        return true;
+        H5Dclose(dset);
+        return false;
     }
-    catch (H5::Exception & e)
+    
+    // select data in the file
+    herr_t res = H5Sselect_hyperslab(dspc, H5S_SELECT_SET, &offset, nullptr, &length, nullptr);
+    if (res < 0)
     {
-        e.printErrorStack();
-        HexException("Failed to read HDF dataset \"%s\" from file \"%s\".", dataset.c_str(), name_.c_str());
+        H5Dclose(dset);
+        H5Sclose(dspc);
+        return false;
     }
+    
+    // create simple memory space
+    hid_t mspc = H5Screate_simple(1, &length, nullptr);
+    if (mspc < 0)
+    {
+        H5Dclose(dset);
+        H5Sclose(dspc);
+        return false;
+    }
+    
+    // read data
+    herr_t err = H5Dread(dset, dtype, mspc, dspc, H5P_DEFAULT, buffer);
+    if (err < 0)
+    {
+        H5Dclose(dset);
+        H5Sclose(dspc);
+        H5Sclose(mspc);
+        return false;
+    }
+    
+    // release memory
+    H5Sclose(mspc);
+    H5Sclose(dspc);
+    H5Dclose(dset);
+    
+    return true;
 }
 
-bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, hsize_t offset, H5::AtomType dtype)
+bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype)
 {
+    // skip writing into invalid files
     if (not valid_)
         return false;
     
+    // skip writing empty datasets
     if (length == 0)
         return true;
     
-    try
+    // compose full dataset path
+    dataset = prefix + dataset;
+    
+    // file data space
+    hid_t dspc;
+    
+    // try to open an existing dataset
+    hid_t dset = H5Dopen2(file_, dataset.c_str(), 0);
+    if (dset < 0)
     {
-        dataset = prefix + dataset;
-        
-        H5::DataSet dset;
-        H5::DataSpace mspc(1, &length);
-        H5::DataSpace dspc(1, &length);
-        
-        try
+        // create a new data space
+        dspc = H5Screate_simple(1, &length, nullptr);
+        if (dspc < 0)
         {
-            dset = file_->openDataSet(dataset.c_str());
-            dspc = dset.getSpace();
-            dspc.selectHyperslab(H5S_SELECT_SET, &length, &offset); 
-        }
-        catch (H5::Exception)
-        {
-            dset = file_->createDataSet(dataset.c_str(), dtype, dspc);
+            H5Dclose(dset);
+            return false;
         }
         
-        if (buffer != nullptr)
-            dset.write(buffer, dtype, mspc, dspc);
-        
-        return true;
+        // create a new dataset
+        dset = H5Dcreate2(file_, dataset.c_str(), dtype, dspc, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        if (dset < 0)
+        {
+            H5Sclose(dspc);
+            H5Dclose(dset);
+            return false;
+        }
     }
-    catch (H5::Exception & e)
+    else
     {
-        e.printErrorStack();
-        HexException("Failed to write HDF dataset \"%s\" to file \"%s\".", dataset.c_str(), name_.c_str());
+        // get assigned data space
+        dspc = H5Dget_space(dset);
+        if (dspc < 0)
+        {
+            H5Dclose(dset);
+            return false;
+        }
+        
+        // select data in the file
+        herr_t res = H5Sselect_hyperslab(dspc, H5S_SELECT_SET, &offset, nullptr, &length, nullptr);
+        if (res < 0)
+        {
+            H5Dclose(dset);
+            H5Sclose(dspc);
+            return false;
+        }
     }
+    
+    // memory data space
+    hid_t mspc = H5Screate_simple(1, &length, nullptr);
+    if (mspc < 0)
+    {
+        H5Dclose(dset);
+        H5Sclose(dspc);
+        return false;
+    }
+    
+    // write data from buffer
+    herr_t err = H5Dwrite(dset, dtype, mspc, dspc, H5P_DEFAULT, buffer);
+    if (err < 0)
+    {
+        H5Dclose(dset);
+        H5Sclose(dspc);
+        H5Sclose(mspc);
+        return false;
+    }
+    
+    // release memory
+    H5Dclose(dset);
+    H5Sclose(dspc);
+    H5Sclose(mspc);
+    
+    return true;
 }
 
 #endif

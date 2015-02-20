@@ -78,7 +78,7 @@ int main (int argc, char* argv[])
     
     // turn off GSL and HDF exceptions
     gsl_set_error_handler_off();
-    H5::Exception::dontPrint();
+    H5Eset_auto2(H5E_DEFAULT, nullptr, nullptr);
     
     // disable buffering of the standard output (-> immediate logging)
     std::setvbuf(stdout, nullptr, _IONBF, 0);

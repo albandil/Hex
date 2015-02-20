@@ -76,17 +76,7 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         }
         catch (std::exception const & e)
         {
-            HexException("Standard exception: %s.", e.what());
-        }
-        catch (H5::Exception const & e)
-        {
-            e.printErrorStack();
-            e.printError(stderr);
-            HexException("HDF exception.");
-        }
-        catch (...)
-        {
-            HexException("Unknown exception.");
+            HexException("%s", e.what());
         }
     }
     
