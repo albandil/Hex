@@ -35,7 +35,6 @@
 #include <string>
 
 #include <hdf5.h>
-#include <H5Cpp.h>
 
 #include "hdffile.h"
 #include "misc.h"

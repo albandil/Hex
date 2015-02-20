@@ -35,9 +35,9 @@
 #include "../../src/arrays.cpp"
 #include "../../src/hdffile.cpp"
 
-int main(int argc, char *argv[])
+int main (int argc, char *argv[])
 {
-    H5::Exception::dontPrint();
+    H5Eset_auto2(H5E_DEFAULT, nullptr, nullptr);
     
     bool cpx = false;    // whether to write complex expansion
     std::string hdf;
