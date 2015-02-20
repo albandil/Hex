@@ -306,8 +306,8 @@ void Amplitudes::writeICS_files ()
         fS0 << std::setw(15) << header;
         fS1 << std::setw(15) << header;
     }
-    fS0 << std::endl << std::setw(15) << "----------";
-    fS1 << std::endl << std::setw(15) << "----------";
+    fS0 << std::endl << std::setw(15) << "# ----------";
+    fS1 << std::endl << std::setw(15) << "# ----------";
     for (auto data : sigma_S)
     {
         fS0 << std::setw(15) << "----------";
