@@ -329,10 +329,59 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
             // multiply
-            q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot);
+            q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot, cmd_.wholematrix);
         }
         
-        // multiply "p" by the off-diagonal blocks
+        // multiply "p" by the off-diagonal blocks - single proces
+        if (par_.Nproc() == 1)
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            // load data from scratch disk
+            if (not cmd_.cache_own_radint and cmd_.wholematrix)
+                const_cast<BlockSymDiaMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
+            
+            // update all blocks with this multipole potential matrix
+            for (int ill = 0;  ill < Nang;  ill++)
+            for (int illp = 0; illp < Nang; illp++)
+            {
+                // skip diagonal
+                if (ill == illp)
+                    continue;
+                
+                // row multi-index
+                int l1 = l1_l2_[ill].first;
+                int l2 = l1_l2_[ill].second;
+                
+                // column multi-index
+                int l1p = l1_l2_[illp].first;
+                int l2p = l1_l2_[illp].second;
+                
+                // calculate angular integral
+                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                if (not std::isfinite(f))
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                
+                // check non-zero
+                if (f == 0.)
+                    continue;
+                
+                // source segment of "p"
+                cArrayView p_block (p, illp * Nchunk, Nchunk);
+                
+                // destination segment of "q"
+                cArrayView q_block (q, ill * Nchunk, Nchunk);
+                
+                // calculate product
+                q_block += (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot);
+            }
+            
+            // load data from scratch disk
+            if (not cmd_.cache_own_radint)
+                const_cast<BlockSymDiaMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
+        }
+        
+        // multiply "p" by the off-diagonal blocks multiprocess
+        if (par_.Nproc() > 1)
         for (int ill = 0;  ill < Nang;  ill++)
         {
             // product of line of blocks with the source vector (-> one segment of destination vector)

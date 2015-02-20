@@ -2215,6 +2215,9 @@ class BlockSymDiaMatrix
         std::string hdfname () const { return diskfile_; }
         std::string & hdfname () { return diskfile_; }
         
+        /// Release data from memory, but keep HDF link.
+        void drop ();
+        
         /// Check that the scratch disk file exists.
         bool hdfcheck () const;
         
