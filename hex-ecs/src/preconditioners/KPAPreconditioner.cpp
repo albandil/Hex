@@ -221,11 +221,34 @@ void KPACGPreconditioner::setup ()
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
     // let the parent do it if lightweight mode is off
-    if (not cmd_.lightweight_full)
+    if (cmd_.kpa_simple_rad)
     {
-        CGPreconditioner::CG_mmul(iblock, p, q);
+        // get block angular momemnta
+        int l1 = l1_l2_[iblock].first;
+        int l2 = l1_l2_[iblock].second;
+        
+        // multiply 'p' by the diagonal block (except for the two-electron term)
+        q  = kron_dot(Complex(E_) * s_rad_.S_d(), s_rad_.S_d(), p);
+        q -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l1 + 1.) * l1) * s_rad_.Mm2_d(), s_rad_.S_d(), p);
+        q -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l2 + 1.) * l2) * s_rad_.Mm2_d(), p);
+        
+        // structure
+        std::vector<std::pair<int,int>> structure = s_rad_.S().nzpattern();
+        
+        // multiply 'p' by the two-electron integrals (with simplified diagonal term)
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            // calculate angular integral
+            double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
+            if (not std::isfinite(f))
+                HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
+            
+            // multiply
+            if (f != 0.)
+                q -= s_rad_.apply_simple_R_matrix(lambda, cArrays(1, f * p))[0];
+        }
     }
-    else
+    else if (cmd_.lightweight_full)
     {
         // get block angular momemnta
         int l1 = l1_l2_[iblock].first;
@@ -248,6 +271,10 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             if (f != 0.)
                 q -= s_rad_.apply_R_matrix(lambda, cArrays(1, f * p))[0];
         }
+    }
+    else
+    {
+        CGPreconditioner::CG_mmul(iblock, p, q);
     }
 }
 

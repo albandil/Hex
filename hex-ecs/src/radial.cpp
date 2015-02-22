@@ -393,7 +393,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     }
     
     // convert them to dense format, if it will be needed later
-    if (cmd.lightweight_radial_cache)
+//     if (cmd.lightweight_radial_cache)
     {
         D_d_      = std::move(D_.torow());
         S_d_      = std::move(S_.torow());
@@ -435,6 +435,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // print information
     std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
     
+    // compute partial moments
+    for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
+    {
+        Mitr_L_.push_back(computeMi( lambda, bspline_.Nreknot() - 1));
+        Mitr_mLm1_.push_back(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+    }
+    
     // for all multipoles : compute / load
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
@@ -458,14 +465,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             }
         }
         
-        // logarithms of partial integral moments
-        cArray Mtr_L, Mtr_mLm1;
-        
-        // compute partial moments
-        Mtr_L    = std::move(computeMi( lambda,   bspline_.Nreknot() - 1));
-        Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
-        
-        # pragma omp parallel firstprivate (lambda, Mtr_L, Mtr_mLm1)
+        # pragma omp parallel firstprivate (lambda)
         {
             // get recursive structure
             std::vector<std::pair<int,int>> const & structure = R_tr_dia_[lambda].structure();
@@ -480,8 +480,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     lambda,
                     structure[iblock].first,
                     structure[iblock].second,
-                    Mtr_L,
-                    Mtr_mLm1,
+                    Mitr_L_[lambda],
+                    Mitr_mLm1_[lambda],
                     structure
                 );
                 
@@ -551,6 +551,28 @@ cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, 
     return block_ik;
 }
 
+cArray RadialIntegrals::calc_simple_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
+{
+    // shorthands
+    int Nspline = bspline_.Nspline();
+    int order = bspline_.order();
+    int N = Nspline * (order + 1) - order * (order + 1) / 2;
+    
+    // (i,k)-block data
+    cArray block_ik (N);
+    
+    // for all elements in the symmetrical block
+    for (unsigned n = 0; n < structure.size(); n++)
+    {
+        // evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
+        int j = structure[n].first;
+        int l = structure[n].second;
+        block_ik[n] = computeSimpleR(lambda, i, j, k, l, Mtr_L, Mtr_mLm1);
+    }
+    
+    return block_ik;
+}
+
 cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) const
 {
     // logarithms of partial integral moments
@@ -581,6 +603,64 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src) c
         
         // (i,k)-block data (= concatenated non-zero upper diagonals)
         cArray block_ik = calc_R_tr_dia_block(lambda, i, k, Mtr_L, Mtr_mLm1, structure);
+        
+        // multiply all source vectors by this block
+        # pragma omp critical
+        for (int isrc = 0; isrc < N; isrc++)
+        {
+            // source and destination segment
+            dst[isrc].slice(i * chunk, (i + 1) * chunk) += SymDiaMatrix::sym_dia_dot
+            (
+                chunk,
+                S_.diag(),
+                block_ik.data(),
+                src[isrc].data() + k * chunk
+            );
+            
+            // take care of symmetric position of the off-diagonal block
+            if (i != k)
+            {
+                dst[isrc].slice(k * chunk, (k + 1) * chunk) += SymDiaMatrix::sym_dia_dot
+                (
+                    chunk,
+                    S_.diag(),
+                    block_ik.data(),
+                    src[isrc].data() + i * chunk
+                );
+            }
+        }
+    }
+    
+    // return result
+    return dst;
+}
+
+cArrays RadialIntegrals::apply_simple_R_matrix (unsigned lambda, cArrays const & src) const
+{
+    // number of source vectors
+    int N = src.size();
+    
+    // size of a block
+    std::size_t chunk = bspline_.Nspline();
+    
+    // output array (the product)
+    cArrays dst(N);
+    for (int n = 0; n < N; n++)
+        dst[n] = cArray(src[n].size());
+    
+    // get recursive structure
+    std::vector<std::pair<int,int>> structure = S_.nzpattern();
+    
+    // for all blocks of the radial matrix
+    # pragma omp parallel for firstprivate (lambda) schedule (dynamic, 1)
+    for (unsigned iblock = 0; iblock < structure.size(); iblock++)
+    {
+        // block indices
+        int i = structure[iblock].first;
+        int k = structure[iblock].second;
+        
+        // (i,k)-block data (= concatenated non-zero upper diagonals)
+        cArray block_ik = calc_simple_R_tr_dia_block(lambda, i, k, Mitr_L_[lambda], Mitr_mLm1_[lambda], structure);
         
         // multiply all source vectors by this block
         # pragma omp critical

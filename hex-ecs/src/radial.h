@@ -189,6 +189,13 @@ class RadialIntegrals
             cArray const & Mtr_L,
             cArray const & Mtr_mLm1
         ) const;
+        Complex computeSimpleR
+        (
+            int lambda,
+            int i, int j, int k, int l,
+            cArray const & Mtr_L,
+            cArray const & Mtr_mLm1
+        ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
         Complex computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
@@ -374,6 +381,9 @@ class RadialIntegrals
             return R_tr_dia_[i];
         }
         
+        cArray const & Mitr_L (int L) const { return Mitr_L_[L]; }
+        cArray const & Mitr_mLm1 (int L) const { return Mitr_mLm1_[L]; }
+        
         /**
          * @brief Initialize calculation of the R-matrix blocks.
          * 
@@ -390,6 +400,7 @@ class RadialIntegrals
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
         cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
+        cArray calc_simple_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
         
         /**
          * @brief Multiply vectors by matrix of two-electron integrals.
@@ -402,6 +413,7 @@ class RadialIntegrals
          * which can be requested by the command line option --lightweight.
          */
         cArrays apply_R_matrix (unsigned lambda, cArrays const & src) const;
+        cArrays apply_simple_R_matrix (unsigned lambda, cArrays const & src) const;
         
         int maxlambda () const { return R_tr_dia_.size() - 1; }
         
@@ -420,6 +432,8 @@ class RadialIntegrals
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
         RowMatrix<Complex> D_d_, S_d_, Mm1_d_, Mm1_tr_d_, Mm2_d_;
         Array<BlockSymDiaMatrix> R_tr_dia_;
+        
+        cArrays Mitr_L_, Mitr_mLm1_;
 };
 
 #endif

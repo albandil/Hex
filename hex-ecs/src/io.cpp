@@ -140,6 +140,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
 #ifndef NO_LAPACK
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
+                    "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
                     "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
@@ -297,6 +298,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // do not precompute large matrices but only apply them on the fly
                 lightweight_full = lightweight_radial_cache = true;
+                return true;
+            },
+        "kpa-simple-rad", "R", 0, [&](std::string optarg) -> bool
+            {
+                // use simplified radial matrix for KPA nested iterations
+                kpa_simple_rad = true;
                 return true;
             },
 #endif

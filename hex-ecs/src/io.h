@@ -84,7 +84,8 @@ class CommandLine
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
-              gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false)
+              gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
+              kpa_simple_rad(false)
         {
             // get command line options
             parse(argc, argv);
@@ -158,6 +159,9 @@ class CommandLine
         
         /// Whether to use diagonal blocks as present in the scratch directory. (For debugging purposes only.)
         bool reuse_dia_blocks;
+        
+        /// Use simplified radial integral matrix for nested KPA iterations (experimental).
+        bool kpa_simple_rad;
 };
 
 /**

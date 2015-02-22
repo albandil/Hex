@@ -211,3 +211,77 @@ Complex RadialIntegrals::computeR
     // sum the diagonal and offdiagonal contributions
     return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
 }
+
+Complex RadialIntegrals::computeSimpleR
+(
+    int lambda,
+    int a, int b, int c, int d,
+    cArray const & Mtr_L, cArray const & Mtr_mLm1
+) const
+{
+    int order = bspline_.order();
+    int Nreknot = bspline_.Nreknot();
+    
+    // check overlaps
+    if (std::abs(a - c) > order or std::abs(b - d) > order)
+        return 0.;
+    
+    // diagonal part
+    Complex Rtr_Labcd_diag = 0;
+    
+    // off-diagonal part
+    Complex Rtr_Labcd_offdiag = 0;
+    
+    // Further parts are a bit cryptical, because we are using precomputed
+    // (partial, per knot) integral moments, which are quite compactly stored
+    // in arrays M_L and M_mLm1 of shape [Nspline × (2*order+1) × (order+1)],
+    // but the aim is straightforward: Just to sum the offdiagonal elements,
+    // i.e. the products of two two-spline integrals, when ix ≠ iy.
+    
+    // shorthands
+    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    
+    // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
+    
+    // ix < iy
+    for (int ix = a; ix <= a + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(b,ix+1); iy <= b + order and iy < Nreknot - 1; iy++)
+    {
+        Complex m_ac = Mtr_L_ac[ix - a], m_bd = Mtr_mLm1_bd[iy - b];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
+        {
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+            
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
+        }
+    }
+    
+    // ix > iy (by renaming the ix,iy indices)
+    for (int ix = b; ix <= b + order and ix < Nreknot - 1; ix++)
+    for (int iy = std::max(a,ix+1); iy <= a + order and iy < Nreknot - 1; iy++)
+    {
+        Complex m_bd = Mtr_L_bd[ix - b], m_ac = Mtr_mLm1_ac[iy - a];
+        
+        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
+        {
+            // multiply real x real
+            if (m_ac.imag() == 0 and m_bd.imag() == 0)
+                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+            
+            // multiply other cases
+            else
+                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
+        }
+    }
+    
+    // sum the diagonal and offdiagonal contributions
+    return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
+}
