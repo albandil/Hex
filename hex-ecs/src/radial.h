@@ -186,15 +186,15 @@ class RadialIntegrals
         (
             int lambda,
             int i, int j, int k, int l,
-            cArray const & Mtr_L,
-            cArray const & Mtr_mLm1
+            const cArrayView Mtr_L,
+            const cArrayView Mtr_mLm1
         ) const;
         Complex computeSimpleR
         (
             int lambda,
             int i, int j, int k, int l,
-            cArray const & Mtr_L,
-            cArray const & Mtr_mLm1
+            const cArrayView Mtr_L,
+            const cArrayView Mtr_mLm1
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
@@ -375,14 +375,47 @@ class RadialIntegrals
         RowMatrix<Complex> const & Mm1_tr_d() const { return Mm1_tr_d_; }
         RowMatrix<Complex> const & Mm2_d() const { return Mm2_d_; }
         
+        cArray const & D_p() const { return D_p_; }
+        cArray const & S_p() const { return S_p_; }
+        cArray const & Mm1_p() const { return Mm1_p_; }
+        cArray const & Mm1_tr_p() const { return Mm1_tr_p_; }
+        cArray const & Mm2_p() const { return Mm2_p_; }
+        
         BlockSymDiaMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
-        cArray const & Mitr_L (int L) const { return Mitr_L_[L]; }
-        cArray const & Mitr_mLm1 (int L) const { return Mitr_mLm1_[L]; }
+        cArrayView Mitr_L (int L) const
+        {
+            if (L < 0)
+                return Mitr_L_;
+            
+            std::size_t mi_size = bspline_.Nspline() * (2 * bspline_.order() + 1) * (bspline_.order() + 1);
+            
+            return cArrayView
+            (
+                Mitr_L_,
+                L * mi_size,
+                mi_size
+            );
+        }
+        
+        cArrayView Mitr_mLm1 (int L) const
+        {
+            if (L < 0)
+                return Mitr_mLm1_;
+            
+            std::size_t mi_size = bspline_.Nspline() * (2 * bspline_.order() + 1) * (bspline_.order() + 1);
+            
+            return cArrayView
+            (
+                Mitr_mLm1_,
+                L * mi_size,
+                mi_size
+            );
+        }
         
         /**
          * @brief Initialize calculation of the R-matrix blocks.
@@ -399,8 +432,8 @@ class RadialIntegrals
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
-        cArray calc_simple_R_tr_dia_block (unsigned lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
+        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
+        cArray calc_simple_R_tr_dia_block (unsigned lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
         
         /**
          * @brief Multiply vectors by matrix of two-electron integrals.
@@ -431,9 +464,10 @@ class RadialIntegrals
         
         SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
         RowMatrix<Complex> D_d_, S_d_, Mm1_d_, Mm1_tr_d_, Mm2_d_;
+        cArray D_p_, S_p_, Mm1_p_, Mm1_tr_p_, Mm2_p_;
         Array<BlockSymDiaMatrix> R_tr_dia_;
         
-        cArrays Mitr_L_, Mitr_mLm1_;
+        cArray Mitr_L_, Mitr_mLm1_;
 };
 
 #endif

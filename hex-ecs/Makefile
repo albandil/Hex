@@ -46,6 +46,15 @@ HDFFLAGS =
 HDFLIBS = -lhdf5
 
 # ---------------------------------------------------------------------------- #
+# OpenCL                                                                       #
+# ---------------------------------------------------------------------------- #
+
+OPENCLFLAGS = -DNO_OPENCL
+
+# OPENCLFLAGS = 
+# OPENCLLIBS = -lOpenCL
+
+# ---------------------------------------------------------------------------- #
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 
@@ -108,6 +117,8 @@ CXXFILES = amplitudes arrays gauss bspline hdffile hydrogen main io \
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
 OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
 DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
+OCLSOURCES   = src/preconditioners/GPUPreconditioner.cl
+OCLKERNELS   = src/preconditioners/GPUPreconditioner.inc
 
 # build all targets
 all: pollversion bin/hex-ecs
@@ -147,7 +158,7 @@ distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
 # main program target
-bin/hex-ecs: $(OBJECTS)
+bin/hex-ecs: $(OCLKERNELS) $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
 

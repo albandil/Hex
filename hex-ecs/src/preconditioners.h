@@ -102,13 +102,15 @@ class PreconditionerBase
 
 class NoPreconditioner;
 class CGPreconditioner;
-class KPAPreconditioner;
-class ILUPreconditioner;
+class KPACGPreconditioner;
+class ILUCGPreconditioner;
+class GPUCGPreconditioner;
 
 #include "preconditioners/NoPreconditioner.h"
 #include "preconditioners/CGPreconditioner.h"
 #include "preconditioners/KPAPreconditioner.h"
 #include "preconditioners/ILUPreconditioner.h"
+#include "preconditioners/GPUPreconditioner.h"
 
 /**
  * @brief Preconditioner traits.
@@ -149,6 +151,9 @@ class Preconditioners
             , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
 #ifndef NO_LAPACK
             , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
+#endif
+#ifndef NO_OPENCL
+            , GPUCGPreconditioner         // KPA implemented on GPU.
 #endif
         > AvailableTypes;
         

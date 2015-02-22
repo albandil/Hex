@@ -138,7 +138,7 @@ Complex RadialIntegrals::computeR
 (
     int lambda,
     int a, int b, int c, int d,
-    cArray const & Mtr_L, cArray const & Mtr_mLm1
+    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
 ) const
 {
     int order = bspline_.order();
@@ -216,7 +216,7 @@ Complex RadialIntegrals::computeSimpleR
 (
     int lambda,
     int a, int b, int c, int d,
-    cArray const & Mtr_L, cArray const & Mtr_mLm1
+    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
 ) const
 {
     int order = bspline_.order();

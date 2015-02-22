@@ -393,13 +393,22 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     }
     
     // convert them to dense format, if it will be needed later
-//     if (cmd.lightweight_radial_cache)
+    if (cmd.lightweight_radial_cache or cmd.kpa_simple_rad)
     {
         D_d_      = std::move(D_.torow());
         S_d_      = std::move(S_.torow());
         Mm1_d_    = std::move(Mm1_.torow());
         Mm1_tr_d_ = std::move(Mm1_tr_.torow());
         Mm2_d_    = std::move(Mm2_.torow());
+    }
+    
+    // this is used by the GPU preconditioner
+    {
+        D_p_      = std::move(D_.toPaddedRows());
+        S_p_      = std::move(S_.toPaddedRows());
+        Mm1_p_    = std::move(Mm1_.toPaddedRows());
+        Mm1_tr_p_ = std::move(Mm1_tr_.toPaddedRows());
+        Mm2_p_    = std::move(Mm2_.toPaddedRows());
     }
     
     std::cout << "ok" << std::endl << std::endl;
@@ -416,6 +425,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     
     // shorthands
     int Nspline = bspline_.Nspline();
+    int order = bspline_.order();
     
     // allocate storage and associate names
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
@@ -436,10 +446,13 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
     
     // compute partial moments
+    std::size_t mi_size = Nspline * (2 * order + 1) * (order + 1);
+    Mitr_L_.resize((lambdas.size() + 1) * mi_size);
+    Mitr_mLm1_.resize((lambdas.size() + 1) * mi_size);
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
-        Mitr_L_.push_back(computeMi( lambda, bspline_.Nreknot() - 1));
-        Mitr_mLm1_.push_back(computeMi(-lambda-1, bspline_.Nreknot() - 1));
+        cArrayView(Mitr_L_, lambda * mi_size, mi_size) = computeMi(lambda, bspline_.Nreknot() - 1);
+        cArrayView(Mitr_mLm1_, lambda * mi_size, mi_size) = computeMi(-lambda-1, bspline_.Nreknot() - 1);
     }
     
     // for all multipoles : compute / load
@@ -480,8 +493,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                     lambda,
                     structure[iblock].first,
                     structure[iblock].second,
-                    Mitr_L_[lambda],
-                    Mitr_mLm1_[lambda],
+                    Mitr_L(lambda),
+                    Mitr_mLm1(lambda),
                     structure
                 );
                 
@@ -529,7 +542,7 @@ void RadialIntegrals::init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, 
     Mtr_mLm1 = std::move(computeMi(-lambda-1, bspline_.Nreknot() - 1));
 }
 
-cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
+cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
 {
     // shorthands
     int Nspline = bspline_.Nspline();
@@ -551,7 +564,7 @@ cArray RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, 
     return block_ik;
 }
 
-cArray RadialIntegrals::calc_simple_R_tr_dia_block (unsigned int lambda, int i, int k, cArray const & Mtr_L, cArray const & Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
+cArray RadialIntegrals::calc_simple_R_tr_dia_block (unsigned int lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const
 {
     // shorthands
     int Nspline = bspline_.Nspline();
@@ -660,7 +673,7 @@ cArrays RadialIntegrals::apply_simple_R_matrix (unsigned lambda, cArrays const &
         int k = structure[iblock].second;
         
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        cArray block_ik = calc_simple_R_tr_dia_block(lambda, i, k, Mitr_L_[lambda], Mitr_mLm1_[lambda], structure);
+        cArray block_ik = calc_simple_R_tr_dia_block(lambda, i, k, Mitr_L(lambda), Mitr_mLm1(lambda), structure);
         
         // multiply all source vectors by this block
         # pragma omp critical
