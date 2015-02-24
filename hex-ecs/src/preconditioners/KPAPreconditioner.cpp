@@ -232,9 +232,6 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         q -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l1 + 1.) * l1) * s_rad_.Mm2_d(), s_rad_.S_d(), p);
         q -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l2 + 1.) * l2) * s_rad_.Mm2_d(), p);
         
-        // structure
-        std::vector<std::pair<int,int>> structure = s_rad_.S().nzpattern();
-        
         // multiply 'p' by the two-electron integrals (with simplified diagonal term)
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
         {
@@ -247,6 +244,9 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             if (f != 0.)
                 q -= s_rad_.apply_simple_R_matrix(lambda, cArrays(1, f * p))[0];
         }
+        
+//         std::cout << "inner_mmul: " << cArrayView(15, q.data()) << std::endl; 
+//         std::cout << "inner_mmul norm: " << std::sqrt(sum(sqrabs(q))) << std::endl;
     }
     else if (cmd_.lightweight_full)
     {

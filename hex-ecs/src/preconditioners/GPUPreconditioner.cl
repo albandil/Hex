@@ -82,7 +82,9 @@ inline double2 cdiv (double2 a, double2 b)
 kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
 {
     uint i = get_global_id(0);
-    x[i] = cmul(a,x[i]) + cmul(b,y[i]);
+    
+    if (i < NROW)
+        x[i] = cmul(a,x[i]) + cmul(b,y[i]);
 }
 
 /**
@@ -94,7 +96,9 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
 kernel void vec_mul_vec (global double2 *a, global double2 *b, global double2 *c)
 {
     uint i = get_global_id(0);
-    c[i] = cmul(a[i],b[i]);
+    
+    if (i < NROW)
+        c[i] = cmul(a[i],b[i]);
 }
 
 /**
@@ -117,13 +121,14 @@ kernel void vec_norm (global double2 *v, global double *n)
 kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
 {
     uint iglobal = get_global_id(0);
-    double2 ui = u[iglobal];
-    double2 vi = v[iglobal];
-    
     uint ilocal = get_local_id(0);
+    
     local double2 uv[NLOCAL];
-    uv[ilocal].x = ui.x * vi.x - ui.y * vi.y;
-    uv[ilocal].y = ui.x * vi.y + ui.y * vi.x;
+    
+    if (iglobal < NROW)
+        uv[ilocal] = cmul(u[iglobal],v[iglobal]);
+    else
+        uv[ilocal] = 0;
     
     // wait on completition of local write instructions
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -152,13 +157,19 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
 kernel void norm (global double2 *v, global double *z)
 {
     uint iglobal = get_global_id(0);
-    double2 vi = v[iglobal];
-    
     uint ilocal = get_local_id(0);
-    local double vv[NLOCAL];
-    vv[ilocal] = vi.x * vi.x + vi.y * vi.y;
     
-    // wait on completition of local write instructions
+    local double vv[NLOCAL];
+    
+    if (iglobal < NROW)
+    {
+        double2 vi = v[iglobal];
+        vv[ilocal] = vi.x * vi.x + vi.y * vi.y;
+    }
+    else
+        vv[ilocal] = 0;
+    
+    // wait for completition of local write instructions
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // reduce the per-element products
@@ -170,7 +181,7 @@ kernel void norm (global double2 *v, global double *z)
         
         stride *= 2;
         
-        // wait on completition of local write instructions
+        // wait for completition of local write instructions
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
@@ -187,6 +198,8 @@ kernel void norm (global double2 *v, global double *z)
  */
 kernel void mmul
 (
+    // energy
+    double E,
     // row-padded one-electron matrices
     global double2 const * const restrict Sp,
     global double2 const * const restrict Dp,
@@ -196,7 +209,7 @@ kernel void mmul
     int l1, int l2, int Nlambdas,
     global int     const * const restrict lambdas,
     // precomputed angular integrals
-    global double  const * const restrict f,
+    global double  const * const restrict fs,
     // one-electron partial moments
     global double2 const * const restrict MiL,
     global double2 const * const restrict MimLm1,
@@ -207,6 +220,17 @@ kernel void mmul
 {
     // block row index
     int i = get_group_id(0);
+    
+    // clear output vector
+    for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL)
+    {
+        // get line index of the current worker
+        int j = first_j + get_local_id(0);
+        
+        // erase the element
+        if (j < NSPLINE)
+            y[i * NSPLINE + j] = 0;
+    }
     
     // for all block column indices
     for (int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
@@ -224,23 +248,24 @@ kernel void mmul
             for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
             {
                 // compute multi-indices
-                int ik = i * ORDER + abs_diff(i,k);
-                int jl = j * ORDER + abs_diff(j,l);
+                int ik = min(i,k) * (ORDER + 1) + abs(i - k);
+                int jl = min(j,l) * (ORDER + 1) + abs(l - j);
                 
                 // calculate the one-electron part of the hamiltonian matrix element Hijkl
-                double2 elem = E * cmul(Sp[ik],Sp[jl]);
+                double2 elem = 0;
+                elem += E * cmul(Sp[ik],Sp[jl]);
                 elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
-                elem -= l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
+                elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
                 elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
                 
                 // calculate the simplified two-electron part of the hamiltonian matrix element Hijkl
                 for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
                 {
                     // get pointers to the needed partial integral moments
-                    global double2 const * const restrict MiL_ik    = MiL    + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k-i+ORDER) * (ORDER+1);
-                    global double2 const * const restrict MimLm1_ik = MimLm1 + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k-i+ORDER) * (ORDER+1);
-                    global double2 const * const restrict MiL_jl    = MiL    + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l-j+ORDER) * (ORDER+1);
-                    global double2 const * const restrict MimLm1_jl = MimLm1 + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l-j+ORDER) * (ORDER+1);
+                    global double2 const * const MiL_ik    = MiL    + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                    global double2 const * const MimLm1_ik = MimLm1 + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                    global double2 const * const MiL_jl    = MiL    + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                    global double2 const * const MimLm1_jl = MimLm1 + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
                     
                     // ix < iy
                     for (int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
@@ -249,13 +274,18 @@ kernel void mmul
                         double2 m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
                         
                         // multiply real x real (merge exponents)
-                        if (m_ik.y == 0 and m_jl.y == 0)
-                            elem -= f[lambda] * exp(m_ik.x + m_jl.x);
+                        if (m_ik.y == 0 && m_jl.y == 0)
+                        {
+                            elem.x -= fs[ilambda] * exp(m_ik.x + m_jl.x);
+                        }
                         
                         // multiply other cases
                         else
-                            elem -= f[lambda] * (m_ik.y == 0 ? double2(exp(m_ik.x),0.) : m_ik)
-                                              * (m_jl.y == 0 ? double2(exp(m_jl.x),0.) : m_jl);
+                        {
+                            double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                            double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                            elem -= fs[ilambda] * cmul(M_ik,M_jl);
+                        }
                     }
                     
                     // ix > iy (by renaming the ix,iy indices)
@@ -264,24 +294,29 @@ kernel void mmul
                     {
                         double2 m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
                         
-                        // multiply real x real
-                        if (m_ik.y == 0 and m_jl.y == 0)
-                            elem -= f[lambda] * exp(m_ik.x + m_jl.x);
+                        // multiply real x real (merge exponents)
+                        if (m_ik.y == 0 && m_jl.y == 0)
+                        {
+                            elem.x -= fs[ilambda] * exp(m_ik.x + m_jl.x);
+                        }
                         
                         // multiply other cases
                         else
-                            elem -= f[lambda] * (m_ik.y == 0 ? double2(exp(m_ik.x),0.) : m_ik)
-                                              * (m_jl.y == 0 ? double2(exp(m_jl.x),0.) : m_jl);
+                        {
+                            double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                            double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                            elem -= fs[ilambda] * cmul(M_ik,M_jl);
+                        }
                     }
-                }
+                } // end for (ilambda)
                 
                 // multiply right-hand side by that matrix element
-                prod += cmul(elem, y[k * NSPLINE + l]);
-            
+                prod += cmul(elem, x[k * NSPLINE + l]);
+                
             } // end for (l)
             
             // update result vector
-            x[i * NSPLINE + j] += prod;
+            y[i * NSPLINE + j] += prod;
             
         } // end for (turn) ... group of lines to process by the work-group
         

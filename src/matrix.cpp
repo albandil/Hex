@@ -2289,6 +2289,31 @@ RowMatrix<Complex> SymDiaMatrix::torow (MatrixTriangle triangle) const
 
 cArray SymDiaMatrix::toPaddedRows () const
 {
+    // max diagonal label
+    int maxdiag = diag().back();
+    
+    // create array of zeros of the right length
+    cArray padr (n_ * (maxdiag + 1), 0.);
+    
+    // add diagonals
+    for (unsigned idiag = 0; idiag < diag().size(); idiag++)
+    {
+        // get data pointer for this diagonal
+        Complex const * const pa = dptr(idiag);
+        
+        // get this diagonal label
+        int ldiag = diag(idiag);
+        
+        // store the upper diagonal elements
+        for (int irow = 0; irow + ldiag < n_; irow++)
+            padr[irow * (maxdiag + 1) + ldiag] = pa[irow];
+    }
+    
+    return padr;
+}
+
+/*cArray SymDiaMatrix::toPaddedRows () const
+{
     // stored diagonals count
     int ndiag = diag().size();
     
@@ -2324,7 +2349,7 @@ cArray SymDiaMatrix::toPaddedRows () const
     }
     
     return padr;
-}
+}*/
 
 cArray SymDiaMatrix::toPaddedCols () const
 {

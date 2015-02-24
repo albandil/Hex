@@ -51,8 +51,8 @@ HDFLIBS = -lhdf5
 
 OPENCLFLAGS = -DNO_OPENCL
 
-# OPENCLFLAGS = 
-# OPENCLLIBS = -lOpenCL
+# OPENCLFLAGS = -I/opt/AMDAPPSDK-3.0-0-Beta/include
+# OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #

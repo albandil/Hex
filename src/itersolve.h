@@ -191,7 +191,7 @@ unsigned cg_callbacks
     // trivial solution for zero right hand side
     if (bnorm == 0)
     {
-        x.fill(0.);
+        axby(0., x, 0., b); // x = 0 b
         return 0;
     }
     
@@ -201,7 +201,7 @@ unsigned cg_callbacks
     // residual; initialized to starting residual using the initial guess
     TArray r (std::move(new_array(N)));
     matrix_multiply(x, r); // r = A x
-    axby (-1., r, 1., b); // r = b - r
+    axby(-1., r, 1., b); // r = b - r
     double rnorm = compute_norm(r);
     
     // terminate if the initial guess is already fine enough
@@ -212,8 +212,8 @@ unsigned cg_callbacks
     //    use rather the right hand side as the initial guess
     if (rnorm / bnorm > 1000)
     {
-        x.fill(0.);
-        axby (0., r, 1., b); // r = b
+        axby(0., x, 0., b); // x = 0 b
+        axby(0., r, 1., b); // r = b
     }
     
     // some auxiliary arrays (search directions etc.)
@@ -245,16 +245,17 @@ unsigned cg_callbacks
         
         // compute projection ρ = r·z
         rho_new = scalar_product(r, z);
+//         std::cout << "rho_new = " << rho_new << std::endl;
         
         // setup search direction p
         if (k == 1)
         {
-            axby (0., p, 1., z); // p = z
+            axby(0., p, 1., z); // p = z
         }
         else
         {
             beta = rho_new / rho_old;
-            axby (beta, p, 1, z); // p = beta p + z
+            axby(beta, p, 1, z); // p = beta p + z
         }
         
         // move to next Krylov subspace by multiplying A·p
@@ -262,10 +263,11 @@ unsigned cg_callbacks
         
         // compute projection ratio α
         alpha = rho_new / scalar_product(p, z);
+//         std::cout << "alpha = " << alpha << std::endl;
         
         // update the solution and the residual
-        axby (1., x, alpha, p); // x = x + α p
-        axby (1., r, -alpha, z); // r = r - α z
+        axby(1., x, alpha, p); // x = x + α p
+        axby(1., r, -alpha, z); // r = r - α z
         
         // compute and check norm
         rnorm = compute_norm(r);

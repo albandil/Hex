@@ -207,9 +207,6 @@ Complex RadialIntegrals::computeSimpleR
     if (std::abs(a - c) > order or std::abs(b - d) > order)
         return 0.;
     
-    // diagonal part
-    Complex Rtr_Labcd_diag = 0;
-    
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
     
@@ -258,5 +255,5 @@ Complex RadialIntegrals::computeSimpleR
     }
     
     // sum the diagonal and offdiagonal contributions
-    return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
+    return Rtr_Labcd_offdiag;
 }
