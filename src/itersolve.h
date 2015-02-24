@@ -218,7 +218,6 @@ unsigned cg_callbacks
     
     // some auxiliary arrays (search directions etc.)
     TArray p (std::move(new_array(N)));
-    TArray q (std::move(new_array(N)));
     TArray z (std::move(new_array(N)));
     
     // some other scalar variables
@@ -259,14 +258,14 @@ unsigned cg_callbacks
         }
         
         // move to next Krylov subspace by multiplying A·p
-        matrix_multiply(p, q);
+        matrix_multiply(p, z);
         
         // compute projection ratio α
-        alpha = rho_new / scalar_product(p, q);
+        alpha = rho_new / scalar_product(p, z);
         
         // update the solution and the residual
         axby (1., x, alpha, p); // x = x + α p
-        axby (1., r, -alpha, q); // r = r - α q
+        axby (1., r, -alpha, z); // r = r - α z
         
         // compute and check norm
         rnorm = compute_norm(r);

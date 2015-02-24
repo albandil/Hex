@@ -1,39 +1,42 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
- *                                                                           *
- *                       / /   / /    __    \ \  / /                         *
- *                      / /__ / /   / _ \    \ \/ /                          *
- *                     /  ___  /   | |/_/    / /\ \                          *
- *                    / /   / /    \_\      / /  \ \                         *
- *                                                                           *
- *                         Jakub Benda (c) 2014                              *
- *                     Charles University in Prague                          *
- *                                                                           *
-\* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
+//                                                                                   //
+//                       / /   / /    __    \ \  / /                                 //
+//                      / /__ / /   / _ \    \ \/ /                                  //
+//                     /  ___  /   | |/_/    / /\ \                                  //
+//                    / /   / /    \_\      / /  \ \                                 //
+//                                                                                   //
+//                                                                                   //
+//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//                                                                                   //
+// MIT License:                                                                      //
+//                                                                                   //
+//  Permission is hereby granted, free of charge, to any person obtaining a          //
+// copy of this software and associated documentation files (the "Software"),        //
+// to deal in the Software without restriction, including without limitation         //
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,          //
+// and/or sell copies of the Software, and to permit persons to whom the             //
+// Software is furnished to do so, subject to the following conditions:              //
+//                                                                                   //
+//  The above copyright notice and this permission notice shall be included          //
+// in all copies or substantial portions of the Software.                            //
+//                                                                                   //
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS          //
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       //
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE       //
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, //
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF         //
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  //
+//                                                                                   //
+//  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#pragma OPENCL EXTENSION cl_khr_fp64: enable
-
+// Necessary compile-time definitions:
 // -D ORDER=...
-// #define ORDER 5
-
 // -D NSPLINE=...
-// #define NSPLINE 117
-
-// -D DIAGONALS=...
-// #define DIAGONALS \
-//     -590, -589, -588, -587, -586, -585, -584, -583, -582, -581, -580, \
-//     -473, -472, -471, -470, -469, -468, -467, -466, -465, -464, -463, \
-//     -356, -355, -354, -353, -352, -351, -350, -349, -348, -347, -346, \
-//     -239, -238, -237, -236, -235, -234, -233, -232, -231, -230, -229, \
-//     -122, -121, -120, -119, -118, -117, -116, -115, -114, -113, -112, \
-//       -5,   -4,   -3,   -2,   -1,    0,    1,    2,    3,    4,    5, \
-//      112,  113,  114,  115,  116,  117,  118,  119,  120,  121,  122, \
-//      229,  230,  231,  232,  233,  234,  235,  236,  237,  238,  239, \
-//      346,  347,  348,  349,  350,  351,  352,  353,  354,  355,  356, \
-//      463,  464,  465,  466,  467,  468,  469,  470,  471,  472,  473, \
-//      580,  581,  582,  583,  584,  585,  586,  587,  588,  589,  590
-//
+// -D NREKNOT=...
 // -D NLOCAL=...
-// #define NLOCAL 64
+
+// Enable double precision.
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
 #define NDIAG   ((2*ORDER+1)*(2*ORDER+1))
@@ -177,92 +180,11 @@ kernel void norm (global double2 *v, global double *z)
 }
 
 /**
- * @brief DIA-matrix-vector multiplication.
+ * @brief Multiplication by a superblock.
  * 
- * The input matrix is supplied in the form of zero-padded concatenated diagonals.
- * For example, the matrix
- * @f[
- *     A = \pmatrix {
- *         a_{11} & a_{12} &        &        &        \cr
- *         a_{21} & a_{22} & a_{23} &        &        \cr
- *                & a_{32} & a_{33} & a_{34} &        \cr
- *                &        & a_{43} & a_{44} & a_{45} \cr
- *                &        &        & a_{54} & a_{55} \cr
- *     }
- * @f]
- * would be column-padded to
- * @f[
- *     A' = \pmatrix {
- *              0 & a_{11} & a_{12} \cr
- *         a_{21} & a_{22} & a_{23} \cr
- *         a_{32} & a_{33} & a_{34} \cr
- *         a_{43} & a_{44} & a_{45} \cr
- *         a_{54} & a_{55} &      0 \cr
- *     }
- * @f]
- * and sent in as a 1D array
- * @f[
- *     A'' = [0, a_{21} , a_{32}, a_{43}, a_{54}; a_{11}, a_{22}, a_{33}, a_{44}, a_{55}; a_{12}, a_{23}, a_{34}, a_{45}, 0] \ .
- * @f]
+ * This routine will multiply super-segment of the right-hand side by a super-block
+ * of the matrix that corresponds to given angular momenta.
  */
-kernel void DIA_dot_vec (global double2 *A, global double2 *x, global double2 *y)
-{
-    // diagonal labels
-    const int diagonals [] = { DIAGONALS };
-    
-    // matrix row for this local thread
-    int irow = get_global_id(0);
-    
-    // only do something if this matrix row exists
-    if (irow < NROW)
-    {
-        // scalar product
-        double2 yloc = 0;
-        
-        // for all diagonals
-        for (int idiag = 0; idiag < NDIAG; idiag++)
-        {
-            // get column index for all threads
-            int icol = irow + diagonals[idiag];
-            
-            // multiply the elements
-            if (0 <= icol && icol < NCOL)
-            {
-                yloc += cmul(A[idiag * NROW + irow], x[icol]);
-            }
-        }
-        
-        // copy results to global memory
-        y[irow] = yloc;
-    }
-}
-
-kernel void sym_krondot_1
-(
-    // one-electron SymDiaMatrix elements
-    global double2 const * const restrict A,
-    global double2 const * const restrict B,
-    // real factor
-    double a,
-    // source and destination vector
-    global double2 const * const restrict v,
-    global double2       * const restrict C
-)
-{
-    // get worker's segment index (0 <= i < NSPLINE)
-    int seg = get_global_id(0);
-    
-    // for all rows of B
-    for (int irow = 0; irow < NSPLINE; irow++)
-    {
-        // scalar product of the current row of B and the worker's segment
-        double2 prod = 0;
-        for (int icol = 0; icol < NSPLINE; icol++)
-            prod = prod + cmul(B[irow * NSPLINE + icol],v[seg * NSPLINE + icol]);
-        C[irow * NSPLINE + seg] = prod;
-    }
-}
-
 kernel void mmul
 (
     // row-padded one-electron matrices
@@ -270,43 +192,103 @@ kernel void mmul
     global double2 const * const restrict Dp,
     global double2 const * const restrict M1p,
     global double2 const * const restrict M2p,
-    // maximal multipole
-    int max_lambda,
+    // angular momenta and nonzero multipoles
+    int l1, int l2, int Nlambdas,
+    global int     const * const restrict lambdas,
+    // precomputed angular integrals
+    global double  const * const restrict f,
     // one-electron partial moments
     global double2 const * const restrict MiL,
     global double2 const * const restrict MimLm1,
-    // angular momenta of this block
-    int l1, int l2,
     // source and target vector
     global double2 const * const restrict x,
-    global double2 const * const restrict y
+    global double2       * const restrict y
 )
 {
-    // for all non-zero block-diagonals
-    for (int d = 0; d <= ORDER; d++)
+    // block row index
+    int i = get_group_id(0);
+    
+    // for all block column indices
+    for (int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
     {
-        // block indices
-        int i = get_group_id();
-        int k = i + d;
-        
-        // whether the block will be calculated once or twice
-        int ncycle = (d == 0 ? 1 : 2);
-        
-        // for both block positions
-        for (int cycle = 0; cycle < ncycle; cycle++)
+        // loop over line groups
+        for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
         {
-            // update x[i] using y[k] - one-electron contributions
-            // TODO
+            // get line index of the current worker
+            int j = first_j + get_local_id(0);
             
-            // update x[i] using y[k] - simplified two-electron contributions
-            // TODO
+            // scalar product of this block's line and the source vector segment
+            double2 prod = 0;
             
-            // swap i and k
-            int tmp = i;
-            i = k;
-            k = tmp;
-        }
-    }
+            // for all elements of this block's line
+            for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+            {
+                // compute multi-indices
+                int ik = i * ORDER + abs_diff(i,k);
+                int jl = j * ORDER + abs_diff(j,l);
+                
+                // calculate the one-electron part of the hamiltonian matrix element Hijkl
+                double2 elem = E * cmul(Sp[ik],Sp[jl]);
+                elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
+                elem -= l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
+                elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
+                
+                // calculate the simplified two-electron part of the hamiltonian matrix element Hijkl
+                for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+                {
+                    // get pointers to the needed partial integral moments
+                    global double2 const * const restrict MiL_ik    = MiL    + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k-i+ORDER) * (ORDER+1);
+                    global double2 const * const restrict MimLm1_ik = MimLm1 + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k-i+ORDER) * (ORDER+1);
+                    global double2 const * const restrict MiL_jl    = MiL    + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l-j+ORDER) * (ORDER+1);
+                    global double2 const * const restrict MimLm1_jl = MimLm1 + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l-j+ORDER) * (ORDER+1);
+                    
+                    // ix < iy
+                    for (int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
+                    for (int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
+                    {
+                        double2 m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
+                        
+                        // multiply real x real (merge exponents)
+                        if (m_ik.y == 0 and m_jl.y == 0)
+                            elem -= f[lambda] * exp(m_ik.x + m_jl.x);
+                        
+                        // multiply other cases
+                        else
+                            elem -= f[lambda] * (m_ik.y == 0 ? double2(exp(m_ik.x),0.) : m_ik)
+                                              * (m_jl.y == 0 ? double2(exp(m_jl.x),0.) : m_jl);
+                    }
+                    
+                    // ix > iy (by renaming the ix,iy indices)
+                    for (int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
+                    for (int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
+                    {
+                        double2 m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
+                        
+                        // multiply real x real
+                        if (m_ik.y == 0 and m_jl.y == 0)
+                            elem -= f[lambda] * exp(m_ik.x + m_jl.x);
+                        
+                        // multiply other cases
+                        else
+                            elem -= f[lambda] * (m_ik.y == 0 ? double2(exp(m_ik.x),0.) : m_ik)
+                                              * (m_jl.y == 0 ? double2(exp(m_jl.x),0.) : m_jl);
+                    }
+                }
+                
+                // multiply right-hand side by that matrix element
+                prod += cmul(elem, y[k * NSPLINE + l]);
+            
+            } // end for (l)
+            
+            // update result vector
+            x[i * NSPLINE + j] += prod;
+            
+        } // end for (turn) ... group of lines to process by the work-group
+        
+        // wait for completition of this block
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+    } // end for (k) ... block index in row
 }
 
 /**

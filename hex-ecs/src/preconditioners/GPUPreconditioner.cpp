@@ -41,6 +41,7 @@
 #include "../misc.h"
 #include "../preconditioners.h"
 #include "../radial.h"
+#include "../special.h"
 
 #include <CL/cl.h>
 
@@ -195,6 +196,18 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         clArrayView<Complex> prec1b (Nspline * Nspline, prec_[l1].invsqrtS_Cl.data().data()); prec1b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         clArrayView<Complex> prec2b (Nspline * Nspline, prec_[l2].invsqrtS_Cl.data().data()); prec1b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         
+        // angular integrals
+        clArray<int> lambdas (s_rad_.maxlambda() + 1);
+        int Nlambdas = 0;
+        for (unsigned lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            double f = special::computef(l1,l2,l1,l2,inp_.L);
+            if (not std::isfinite(f))
+                HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1, l2, inp_.L);
+            lambdas[Nlambdas++] = f;
+        }
+        lambdas.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n) -> clArray<Complex>
         {
@@ -217,13 +230,14 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clSetKernelArg(mmul_,  1, sizeof(cl_mem), &D_p.handle());
             clSetKernelArg(mmul_,  2, sizeof(cl_mem), &Mm1_tr_p.handle());
             clSetKernelArg(mmul_,  3, sizeof(cl_mem), &Mm2_p.handle());
-            clSetKernelArg(mmul_,  4, sizeof(int),    &max_lambda);
-            clSetKernelArg(mmul_,  5, sizeof(cl_mem), &Mi_L);
-            clSetKernelArg(mmul_,  6, sizeof(cl_mem), &Mi_mLm1);
-            clSetKernelArg(mmul_,  7, sizeof(int),    &l1);
-            clSetKernelArg(mmul_,  8, sizeof(int),    &l2);
-            clSetKernelArg(mmul_,  9, sizeof(cl_mem), &a.handle());
-            clSetKernelArg(mmul_, 10, sizeof(cl_mem), &b.handle());
+            clSetKernelArg(mmul_,  4, sizeof(int),    &l1);
+            clSetKernelArg(mmul_,  5, sizeof(int),    &l2);
+            clSetKernelArg(mmul_,  6, sizeof(int),    &Nlambdas);
+            clSetKernelArg(mmul_,  7, sizeof(double), &lambdas);
+            clSetKernelArg(mmul_,  8, sizeof(cl_mem), &Mi_L);
+            clSetKernelArg(mmul_,  9, sizeof(cl_mem), &Mi_mLm1);
+            clSetKernelArg(mmul_, 10, sizeof(cl_mem), &a.handle());
+            clSetKernelArg(mmul_, 11, sizeof(cl_mem), &b.handle());
             clEnqueueNDRangeKernel(queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
             clFinish(queue_);
         };
@@ -343,6 +357,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         prec2b.disconnect();
         Dl1.disconnect();
         Dl2.disconnect();
+        lambdas.disconnect();
     }
     
     // free GPU memory
