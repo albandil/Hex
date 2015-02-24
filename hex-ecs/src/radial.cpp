@@ -41,16 +41,6 @@
 #include "parallel.h"
 #include "radial.h"
 
-inline double damp (Complex r, Complex R)
-{
-    // if sufficiently far, return clean zero
-    if (r.real() > R.real())
-        return 0.;
-    
-    // else damp using tanh(x) distribution
-    return std::tanh(0.125 * (R.real() - r.real()));
-}
-
 rArray RadialIntegrals::computeScale (int lambda, int iknotmax) const
 {
     // get last knot (end of last interval)
@@ -107,7 +97,7 @@ void RadialIntegrals::M_integrand
     {
         for (int k = 0; k < n; k++)
         {
-            out[k] = values_i[k] * values_j[k] * pow(in[k],a) * damp(in[k],R);
+            out[k] = values_i[k] * values_j[k] * pow(in[k],a) * damp(in[k],0.,R);
             
             if (not (all_finite = Complex_finite(out[k])))
                 break;
@@ -135,7 +125,7 @@ void RadialIntegrals::M_integrand
         {
             for (int k = 0; k < n; k++)
             {
-                out[k] = std::log(values_i[k]) + std::log(values_j[k]) + double(a) * std::log(in[k]) + std::log(damp(in[k],R));
+                out[k] = std::log(values_i[k]) + std::log(values_j[k]) + double(a) * std::log(in[k]) + std::log(damp(in[k],0.,R));
                 
                 // use newly computed value as scale, if larger than the current value
                 if (out[k].real() > logscale)
@@ -169,7 +159,7 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
     cArray m
     (
         Nspline * (2 * order + 1) * (order + 1),
-        Complex(0.,special::constant::Inf)
+        Complex(-special::constant::Inf, 0.)
     );
     
     // for all B-splines
@@ -328,7 +318,7 @@ Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex
     if (R != 0.)
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * pow(xs[k],a) * ws[k] * damp(xs[k],R);
+            res += values_i[k] * values_j[k] * pow(xs[k],a) * ws[k] * damp(xs[k],0.,R);
     }
     else
     {

@@ -43,6 +43,25 @@
 #include "special.h"
 #include "matrix.h"
 
+/**
+ * Potential suppressing factor. 
+ * @param y Radial coordinate of some electron.
+ * @param x Radial coordinate of the other electron.
+ * @param R Truncation radius.
+ */
+inline double damp (Complex y, Complex x, Complex R)
+{
+    // compute hyperradius
+    double r = std::hypot(x.real(), y.real());
+    
+    // if sufficiently far, return clean zero
+    if (r > R.real())
+        return 0.;
+    
+    // else damp using tanh(x) distribution
+    return std::tanh(0.125 * (R.real() - r));
+}
+
 class weightEdgeDamp
 {
     public:
