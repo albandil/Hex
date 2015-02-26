@@ -190,13 +190,7 @@ kernel void norm (global double2 *v, global double *z)
         z[get_group_id(0)] = vv[0];
 }
 
-/**
- * @brief Multiplication by a superblock.
- * 
- * This routine will multiply super-segment of the right-hand side by a super-block
- * of the matrix that corresponds to given angular momenta.
- */
-kernel void mmul
+kernel void mmul_1el
 (
     // energy
     double E,
@@ -206,13 +200,7 @@ kernel void mmul
     global double2 const * const restrict M1p,
     global double2 const * const restrict M2p,
     // angular momenta and nonzero multipoles
-    int l1, int l2, int Nlambdas,
-    global int     const * const restrict lambdas,
-    // precomputed angular integrals
-    global double  const * const restrict fs,
-    // one-electron partial moments
-    global double2 const * const restrict MiL,
-    global double2 const * const restrict MimLm1,
+    int l1, int l2,
     // source and target vector
     global double2 const * const restrict x,
     global double2       * const restrict y
@@ -241,9 +229,6 @@ kernel void mmul
             // get line index of the current worker
             int j = first_j + get_local_id(0);
             
-            // scalar product of this block's line and the source vector segment
-            double2 prod = 0;
-            
             // for all elements of this block's line
             for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
             {
@@ -252,20 +237,61 @@ kernel void mmul
                 int jl = min(j,l) * (ORDER + 1) + abs(l - j);
                 
                 // calculate the one-electron part of the hamiltonian matrix element Hijkl
-                double2 elem = 0;
-                elem += E * cmul(Sp[ik],Sp[jl]);
+                double2 elem = E * cmul(Sp[ik],Sp[jl]);
                 elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
                 elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
                 elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
                 
+                // multiply right-hand side by that matrix element
+                y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
+                
+            } // end for (l)
+            
+        } // end for (turn) ... group of lines to process by the work-group
+        
+        // wait for completition of this block
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+    } // end for (k) ... block index in row
+}
+
+kernel void mmul_2el
+(
+    // multipole and angular integral
+    int lambda, double f,
+    // one-electron partial moments
+    global double2 const * const restrict MiL,
+    global double2 const * const restrict MimLm1,
+    // source and target vector
+    global double2 const * const restrict x,
+    global double2       * const restrict y
+)
+{
+    // block row index
+    int i = get_group_id(0);
+    
+    // for all block column indices
+    for (int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
+    {
+        // loop over line groups
+        for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
+        {
+            // get line index of the current worker
+            int j = first_j + get_local_id(0);
+            
+            // for all elements of this block's line
+            for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+            {
+                double2 elem = 0;
+                
                 // calculate the simplified two-electron part of the hamiltonian matrix element Hijkl
-                for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+//                 for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
                 {
                     // get pointers to the needed partial integral moments
-                    global double2 const * const MiL_ik    = MiL    + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                    global double2 const * const MimLm1_ik = MimLm1 + ((lambdas[ilambda] * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                    global double2 const * const MiL_jl    = MiL    + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-                    global double2 const * const MimLm1_jl = MimLm1 + ((lambdas[ilambda] * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                    global double2 const * const MiL_ik    = MiL    + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                    global double2 const * const MimLm1_ik = MimLm1 + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                    global double2 const * const MiL_jl    = MiL    + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                    global double2 const * const MimLm1_jl = MimLm1 + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
                     
                     // ix < iy
                     for (int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
@@ -276,7 +302,7 @@ kernel void mmul
                         // multiply real x real (merge exponents)
                         if (m_ik.y == 0 && m_jl.y == 0)
                         {
-                            elem.x -= fs[ilambda] * exp(m_ik.x + m_jl.x);
+                            elem.x -= f * exp(m_ik.x + m_jl.x);
                         }
                         
                         // multiply other cases
@@ -284,7 +310,7 @@ kernel void mmul
                         {
                             double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
                             double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                            elem -= fs[ilambda] * cmul(M_ik,M_jl);
+                            elem -= f * cmul(M_ik,M_jl);
                         }
                     }
                     
@@ -297,7 +323,7 @@ kernel void mmul
                         // multiply real x real (merge exponents)
                         if (m_ik.y == 0 && m_jl.y == 0)
                         {
-                            elem.x -= fs[ilambda] * exp(m_ik.x + m_jl.x);
+                            elem.x -= f * exp(m_ik.x + m_jl.x);
                         }
                         
                         // multiply other cases
@@ -305,18 +331,15 @@ kernel void mmul
                         {
                             double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
                             double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                            elem -= fs[ilambda] * cmul(M_ik,M_jl);
+                            elem -= f * cmul(M_ik,M_jl);
                         }
                     }
                 } // end for (ilambda)
                 
                 // multiply right-hand side by that matrix element
-                prod += cmul(elem, x[k * NSPLINE + l]);
+                y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
                 
             } // end for (l)
-            
-            // update result vector
-            y[i * NSPLINE + j] += prod;
             
         } // end for (turn) ... group of lines to process by the work-group
         
@@ -326,57 +349,55 @@ kernel void mmul
     } // end for (k) ... block index in row
 }
 
-/**
- * KPA preconditioner
- * 
- * 1) kron_dot1(CS1,CS2,r,C)
- * 2) kron_dot2(CS1,CS2,t,C)
- * 3) kron_div (E,D1,D2,t)
- * 4) kron_dot1(SC1,SC2,t,C)
- * 5) kron_dot2(SC1,SC2,z,C)
- */
-kernel void kron_dot1
+kernel void mul_ABt
 (
-    global double2 const * const restrict A,
-    global double2 const * const restrict B,
-    global double2 const * const restrict v,
-    global double2       * const restrict C
+    global double2 /*const*/ * const restrict A, // input matrix A (row-major)
+    global double2 /*const*/ * const restrict B, // input matrix B (col-major)
+    global double2       * const restrict C  // output matrix C (row-major)
 )
 {
-    // get worker's segment index (0 <= i < NSPLINE)
-    int seg = get_global_id(0);
+    #define BLOCK_SIZE      16 // = local size
+    #define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
+    #define NUM_BLOCKS      ((NSPLINE + BLOCK_SIZE - 1) / BLOCK_SIZE)
     
-    // for all rows of B
-    for (int irow = 0; irow < NSPLINE; irow++)
-    {
-        // scalar product of the current row of B and the worker's segment
-        double2 prod = 0;
-        for (int icol = 0; icol < NSPLINE; icol++)
-            prod = prod + cmul(B[irow * NSPLINE + icol],v[seg * NSPLINE + icol]);
-        C[irow * NSPLINE + seg] = prod;
-    }
-}
-kernel void kron_dot2
-(
-    global double2 const * const restrict A,
-    global double2 const * const restrict B,
-    global double2       * const restrict w,
-    global double2 const * const restrict C
-)
-{
-    // get worker's segment index (0 <= i < NSPLINE)
-    int seg = get_global_id(0);
+    // work arrays
+    local double2 Aloc[BLOCK_SIZE][BLOCK_SIZE];
+    local double2 Bloc[BLOCK_SIZE][BLOCK_SIZE];
     
-    // for all rows of C
-    for (int irow = 0; irow < NSPLINE; irow++)
+    // destination blocks
+    private int idyblock = get_group_id(0); // row
+    private int idxblock = get_group_id(1); // col
+    
+    // group worker threads
+    private int iylocal = get_local_id(0); // row
+    private int ixlocal = get_local_id(1); // col
+    
+    // aggregated scalar product of the destination element C[get_global_id(0),get_global_id(1)]
+    private double2 res = 0;
+    
+    // for all source blocks
+    for (private int iblock = 0; iblock < NUM_BLOCKS; iblock++)
     {
-        // scalar product of the current row of A and C
-        double2 prod = 0;
-        for (int icol = 0; icol < NSPLINE; icol++)
-            prod = prod + cmul(A[seg * NSPLINE + icol],C[irow * NSPLINE + icol]);
-        w[seg * NSPLINE + irow] = prod;
+        // load source blocks into the local memory (pad by zeros)
+        barrier(CLK_LOCAL_MEM_FENCE);
+        Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE + (iblock * BLOCK_SIZE + ixlocal)];
+        Bloc[iylocal][ixlocal] = B[(idxblock * BLOCK_SIZE + ixlocal) * NSPLINE + (iblock * BLOCK_SIZE + iylocal)];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        // each group's thread will calculate one of BLOCK_VOLUME scalar products
+        for (private int k = 0; k < BLOCK_SIZE; k++) if (iblock * BLOCK_SIZE + k < NSPLINE)
+        {
+            private double2 a = Aloc[k][iylocal];
+            private double2 b = Bloc[k][ixlocal];
+            res += cmul(a,b);
+        }
     }
+    
+    // store result to device memory
+    if (get_global_id(0) < NSPLINE && get_global_id(1) < NSPLINE)
+        C[get_global_id(0) * NSPLINE + get_global_id(1)] = res;
 }
+
 kernel void kron_div
 (
     double2 E,
