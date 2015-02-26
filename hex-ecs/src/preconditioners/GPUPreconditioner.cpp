@@ -59,12 +59,25 @@ char * source = &kernels_cl[0];
 
 void GPUCGPreconditioner::setup ()
 {
-    // compute memory requirements of the preconditioner
+    KPACGPreconditioner::setup();
+    
+    // shorthands
     int order = s_bspline_.order();
     int Nspline = s_bspline_.Nspline();
     int Nreknot = s_bspline_.Nreknot();
-    int maxell = inp_.maxell;
-    unsigned long req = ((maxell+1) * (Nspline + 2*Nspline*Nspline) + (2*order+1)*(2*order+1)*Nspline*Nspline + 3*Nspline*Nspline) * 16;
+    
+    // compute memory requirements of the preconditioner
+    std::size_t req = 0;
+    // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
+    req += 10 * (std::size_t)Nspline * (std::size_t)Nspline;
+    // - padded one-electron matrices (Sp, Dp, M1p, M2p)
+    req += 4 * s_rad_.S_p().size();
+    // - preconditioner eigenvalues
+    req += 2 * Nspline;
+    // - partial integral moments
+    req += 2 * s_rad_.Mitr_L(-1).size();
+    // - all these were complex numbers
+    req *= 16;
     
     std::cout << "Setting up OpenCL environment" << std::endl;
     char text [1000];
@@ -72,29 +85,29 @@ void GPUCGPreconditioner::setup ()
     // use platform 0
     clGetPlatformIDs(1, &platform_, nullptr);
     clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tplatform: " << text << " ";
+    std::cout << "\t- platform: " << text << " ";
     clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
     clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
-    std::cout << "\tavailable version: " << text << std::endl;
+    std::cout << "\t- available version: " << text << std::endl;
     
     // use device 0
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
 //     clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
     clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tdevice: " << text << " ";
+    std::cout << "\t- device: " << text << " ";
     clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
     std::cout << "(" << text << ")" << std::endl;
     cl_ulong size;
     clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
+    std::cout << "\t- local memory size: " << size/1024 << " kiB" << std::endl;
     clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
+    std::cout << "\t- global memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
     std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)" << std::endl;
     clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax compute units: " << size << std::endl;
+    std::cout << "\t- max compute units: " << size << std::endl;
     clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax work group size: " << size << std::endl << std::endl;
+    std::cout << "\t- max work group size: " << size << std::endl << std::endl;
     
     // choose workgroup size
     Nlocal_ = 64;
@@ -143,10 +156,6 @@ void GPUCGPreconditioner::setup ()
     krd1_ = clCreateKernel(program_, "kron_dot1",   nullptr);
     krd2_ = clCreateKernel(program_, "kron_dot2",   nullptr);
     krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
-    
-    std::cout << "Set up GPU preconditioner" << std::endl;
-    
-    KPACGPreconditioner::setup();
 }
 
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -198,7 +207,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         clArrayView<Complex> prec2b (Nspline * Nspline, prec_[l2].invsqrtS_Cl.data().data()); prec2b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         
         // angular integrals
-        /*iArray lambdas (s_rad_.maxlambda() + 1);
+        iArray lambdas (s_rad_.maxlambda() + 1);
         rArray fs (s_rad_.maxlambda() + 1);
         int Nlambdas = 0;
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -215,8 +224,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             fs[Nlambdas] = f;
             
             Nlambdas++;
-        }*/
-        clArray<int> lambdas (s_rad_.maxlambda() + 1);
+        }
+        /*clArray<int> lambdas (s_rad_.maxlambda() + 1);
         clArray<double> fs (s_rad_.maxlambda() + 1);
         int Nlambdas = 0;
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -235,7 +244,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nlambdas++;
         }
         lambdas.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        fs.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        fs.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);*/
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n) -> clArray<Complex>
@@ -425,8 +434,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         prec2b.disconnect();
         Dl1.disconnect();
         Dl2.disconnect();
-        lambdas.disconnect();
-        fs.disconnect();
+//         lambdas.disconnect();
+//         fs.disconnect();
     }
     
     // free GPU memory

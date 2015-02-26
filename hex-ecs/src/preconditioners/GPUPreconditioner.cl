@@ -258,7 +258,7 @@ kernel void mmul_1el
 kernel void mmul_2el
 (
     // multipole and angular integral
-    int lambda, double f,
+    private int lambda, private double f,
     // one-electron partial moments
     global double2 const * const restrict MiL,
     global double2 const * const restrict MimLm1,
@@ -268,73 +268,69 @@ kernel void mmul_2el
 )
 {
     // block row index
-    int i = get_group_id(0);
+    private int i = get_group_id(0);
     
     // for all block column indices
-    for (int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
     {
         // loop over line groups
-        for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
+        for (private int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
         {
             // get line index of the current worker
-            int j = first_j + get_local_id(0);
+            private int j = first_j + get_local_id(0);
             
             // for all elements of this block's line
-            for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+            for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
             {
-                double2 elem = 0;
+                private double2 elem = 0, M_ik = 0, M_jl = 0, m_ik = 0, m_jl = 0;
                 
-                // calculate the simplified two-electron part of the hamiltonian matrix element Hijkl
-//                 for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+                // get pointers to the needed partial integral moments
+                global double2 const * const MiL_ik    = MiL    + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                global double2 const * const MimLm1_ik = MimLm1 + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                global double2 const * const MiL_jl    = MiL    + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                global double2 const * const MimLm1_jl = MimLm1 + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                
+                // ix < iy
+                for (private int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
+                for (private int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
                 {
-                    // get pointers to the needed partial integral moments
-                    global double2 const * const MiL_ik    = MiL    + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                    global double2 const * const MimLm1_ik = MimLm1 + ((lambda * NSPLINE + i) * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                    global double2 const * const MiL_jl    = MiL    + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-                    global double2 const * const MimLm1_jl = MimLm1 + ((lambda * NSPLINE + j) * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                    m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
                     
-                    // ix < iy
-                    for (int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
-                    for (int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
+                    // multiply real x real (merge exponents)
+                    if (m_ik.y == 0 && m_jl.y == 0)
                     {
-                        double2 m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
-                        
-                        // multiply real x real (merge exponents)
-                        if (m_ik.y == 0 && m_jl.y == 0)
-                        {
-                            elem.x -= f * exp(m_ik.x + m_jl.x);
-                        }
-                        
-                        // multiply other cases
-                        else
-                        {
-                            double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                            double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                            elem -= f * cmul(M_ik,M_jl);
-                        }
+                        elem.x -= f * exp(m_ik.x + m_jl.x);
                     }
                     
-                    // ix > iy (by renaming the ix,iy indices)
-                    for (int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
-                    for (int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
+                    // multiply other cases
+                    else
                     {
-                        double2 m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
-                        
-                        // multiply real x real (merge exponents)
-                        if (m_ik.y == 0 && m_jl.y == 0)
-                        {
-                            elem.x -= f * exp(m_ik.x + m_jl.x);
-                        }
-                        
-                        // multiply other cases
-                        else
-                        {
-                            double2 M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                            double2 M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                            elem -= f * cmul(M_ik,M_jl);
-                        }
+                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                        elem -= f * cmul(M_ik,M_jl);
                     }
-                } // end for (ilambda)
+                }
+                
+                // ix > iy (by renaming the ix,iy indices)
+                for (private int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
+                for (private int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
+                {
+                    m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
+                    
+                    // multiply real x real (merge exponents)
+                    if (m_ik.y == 0 && m_jl.y == 0)
+                    {
+                        elem.x -= f * exp(m_ik.x + m_jl.x);
+                    }
+                    
+                    // multiply other cases
+                    else
+                    {
+                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                        elem -= f * cmul(M_ik,M_jl);
+                    }
+                }
                 
                 // multiply right-hand side by that matrix element
                 y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
