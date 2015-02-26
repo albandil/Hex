@@ -66,51 +66,75 @@ void GPUCGPreconditioner::setup ()
     int Nspline = s_bspline_.Nspline();
     int Nreknot = s_bspline_.Nreknot();
     
-    // compute memory requirements of the preconditioner
-    std::size_t req = 0;
-    // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
-    req += 10 * (std::size_t)Nspline * (std::size_t)Nspline;
-    // - padded one-electron matrices (Sp, Dp, M1p, M2p)
-    req += 4 * s_rad_.S_p().size();
-    // - preconditioner eigenvalues
-    req += 2 * Nspline;
-    // - partial integral moments
-    req += 2 * s_rad_.Mitr_L(-1).size();
-    // - all these were complex numbers
-    req *= 16;
-    
     std::cout << "Setting up OpenCL environment" << std::endl;
-    char text [1000];
     
     // use platform 0
+    char platform_name[1024], platform_vendor[1024], platform_version[1024];
     clGetPlatformIDs(1, &platform_, nullptr);
-    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
-    std::cout << "\t- platform: " << text << " ";
-    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
-    std::cout << "\t- available version: " << text << std::endl;
+    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
     
     // use device 0
+    char device_name[1024], device_vendor[1024];
     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
 //     clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
-    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
-    std::cout << "\t- device: " << text << " ";
-    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    cl_ulong size;
-    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\t- local memory size: " << size/1024 << " kiB" << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\t- global memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
-    std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)" << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "\t- max compute units: " << size << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\t- max work group size: " << size << std::endl << std::endl;
+    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
     
-    // choose workgroup size
-    Nlocal_ = 64;
+    cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size;
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &max_compute_units, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &max_work_group_size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_memory_size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_memory_size, 0);
+    
+    std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
+    std::cout << "\t- available version: " << platform_version << std::endl;
+    std::cout << "\t- device: " << device_name << " (" << device_vendor << ")" << std::endl;
+    std::cout << "\t- max compute units: " << max_compute_units << std::endl;
+    std::cout << "\t- max work group size: " << max_work_group_size << std::endl;
+    
+    // we need at least (2*order+1)^2 for "mmul_2el" kernel
+    if (max_work_group_size < (2u*order+1)*(2u*order+1))
+        HexException("Work group size of at least %d is needed for given B-spline order.", (2*order+1)*(2*order+1));
+    
+    // choose default workgroup size
+    Nlocal_ = std::min<std::size_t>(64, max_work_group_size);
+    
+    // choose block size for "mul_ABt" kernel, aim for 4 concurrent threads
+    blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 16/*double*/ * 2/*arrays*/));
+    std::cout << "\t- matrix multiplication sub-block size: " << blocksize_ << std::endl;
+    
+    // compute global memory requirements of the preconditioner
+    std::size_t greq = 0;
+    // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
+    greq += 10 * (std::size_t)Nspline * (std::size_t)Nspline;
+    // - padded one-electron matrices (Sp, Dp, M1p, M2p)
+    greq += 4 * s_rad_.S_p().size();
+    // - preconditioner eigenvalues
+    greq += 2 * Nspline;
+    // - partial integral moments
+    greq += 2 * s_rad_.Mitr_L(-1).size();
+    // - all these were complex numbers
+    greq *= 16;
+    
+    std::cout << "\t- global memory size: " << format("%.2f", global_memory_size/pow(1024,3)) << " GiB ";
+    std::cout << "(apx. " << format("%.2f", greq * 100. / global_memory_size) << " % will be used)" << std::endl;
+    
+    // compute local memory requirements of the preconditioner
+    std::size_t lreq = 0;
+    // - either Complex per default Nlocal_
+    lreq = Nlocal_;
+    // - or the requirements of mul_ABt
+    lreq = std::max<std::size_t>(lreq, 2/*array*/ * 16/*double*/ * blocksize_);
+    // - or the requirements of mmul_2el
+    lreq = std::max<std::size_t>(lreq, (2*order+1)*(2*order+1));
+    // - all these were complex numbers
+    lreq *= 16;
+    
+    std::cout << "\t- local memory size: " << local_memory_size/1024 << " kiB ";
+    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used, ~ ";
+    std::cout << format("%0d", local_memory_size/lreq) << " wavefronts)" << std::endl << std::endl;
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
@@ -119,10 +143,11 @@ void GPUCGPreconditioner::setup ()
     // setup compile flags
     std::ostringstream flags;
     flags << " -cl-fast-relaxed-math ";
-    flags << " -D ORDER="     << order     << " ";
-    flags << " -D NSPLINE="   << Nspline   << " ";
-    flags << " -D NREKNOT="   << Nreknot   << " ";
-    flags << " -D NLOCAL="    << Nlocal_   << " ";
+    flags << " -D ORDER="      << order      << " ";
+    flags << " -D NSPLINE="    << Nspline    << " ";
+    flags << " -D NREKNOT="    << Nreknot    << " ";
+    flags << " -D NLOCAL="     << Nlocal_    << " ";
+    flags << " -D BLOCK_SIZE=" << blocksize_ << " ";
     
     // build program
     program_ = clCreateProgramWithSource(context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -143,18 +168,12 @@ void GPUCGPreconditioner::setup ()
     }
     
     // set program entry points
-    mmul_ = clCreateKernel(program_, "mmul",        nullptr);
     mml1_ = clCreateKernel(program_, "mmul_1el",    nullptr);
     mml2_ = clCreateKernel(program_, "mmul_2el",    nullptr);
-    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
     axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
-    vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
     norm_ = clCreateKernel(program_, "norm",        nullptr);
     spro_ = clCreateKernel(program_, "scalar_product", nullptr);
     mabt_ = clCreateKernel(program_, "mul_ABt",     nullptr);
-    mabt2_ = clCreateKernel(program_, "mul_ABt_2",  nullptr);
-    krd1_ = clCreateKernel(program_, "kron_dot1",   nullptr);
-    krd2_ = clCreateKernel(program_, "kron_dot2",   nullptr);
     krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
 }
 
@@ -297,9 +316,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             // multiply by approximate inverse block
             Timer timer;
             
-            std::size_t block_size = 16;
-            std::size_t gsize[2] = { block_size * ((Nspline + block_size - 1) / block_size), block_size * ((Nspline + block_size - 1) / block_size) };
-            std::size_t lsize[2] = { block_size, block_size };
+//             std::size_t block_size = 16; // must match macro defined in kernel !
+            std::size_t gsize[2] = { blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_), blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_) };
+            std::size_t lsize[2] = { blocksize_, blocksize_ };
             
             clSetKernelArg(mabt_, 0, sizeof(cl_mem), &prec2a.handle());
             clSetKernelArg(mabt_, 1, sizeof(cl_mem), &x.handle());

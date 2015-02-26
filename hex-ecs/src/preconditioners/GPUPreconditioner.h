@@ -116,18 +116,16 @@ class GPUCGPreconditioner : public KPACGPreconditioner
         
         // size of a workgroup
         std::size_t Nlocal_;
+        std::size_t blocksize_;
         
         // computational kernels
-        cl_kernel mabt_, mabt2_;
-        cl_kernel mmul_;
+        cl_kernel mabt_;
         cl_kernel mml1_;
         cl_kernel mml2_;
-        cl_kernel amul_;
         cl_kernel axby_;
-        cl_kernel vnrm_;
         cl_kernel norm_;
         cl_kernel spro_;
-        cl_kernel krd1_, krd2_, krdv_;
+        cl_kernel krdv_;
 };
 
 #endif

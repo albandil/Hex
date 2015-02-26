@@ -30,18 +30,19 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 // Necessary compile-time definitions:
-// -D ORDER=...
-// -D NSPLINE=...
-// -D NREKNOT=...
-// -D NLOCAL=...
+// -D ORDER=... (implies local size in "mmul_2el")
+// -D NSPLINE=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
+// -D NREKNOT=... (needed by "mmul_2el")
+// -D NLOCAL=... (local size in "scalar_product", "norm" and "mmul_1el")
+// -D NBLOCK_SIZE=... (block size and local size in "mul_ABt")
 
-// Enable double precision.
+// Enable double precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
-#define NDIAG   ((2*ORDER+1)*(2*ORDER+1))
-#define NROW    (NSPLINE * NSPLINE)
-#define NCOL    (NSPLINE * NSPLINE)
+#define NROW            (NSPLINE * NSPLINE)
+#define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
+#define NUM_BLOCKS      ((NSPLINE + BLOCK_SIZE - 1) / BLOCK_SIZE)
 
 /**
  * @brief Complex multiplication.
@@ -78,6 +79,10 @@ inline double2 cdiv (double2 a, double2 b)
  * 
  * Computes the linear combination @f$ ax + by @f$ of vectors @f$ x @f$ and 
  * @f$ y @f$ and stores the result in @f$ x @f$.
+ * @param a Complex factor.
+ * @param x Source and destination vector.
+ * @param b Complex factor.
+ * @param y Source vector.
  */
 kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
 {
@@ -88,35 +93,13 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
 }
 
 /**
- * @brief Vector-vector multiplication.
- * 
- * Computes per-element vector-vector multiplication @f$ a * b @f$ and stores
- * the resulting vector in @f$ c @f$,
- */
-kernel void vec_mul_vec (global double2 *a, global double2 *b, global double2 *c)
-{
-    uint i = get_global_id(0);
-    
-    if (i < NROW)
-        c[i] = cmul(a[i],b[i]);
-}
-
-/**
- * @brief Per-element square of a vector.
- * 
- * Similarly to @ref vec_mul_vec, computes a per-element square of
- * a given vector @f$ v @f$ and stores the result in the vector 
- * given as the second argument.
- */
-kernel void vec_norm (global double2 *v, global double *n)
-{
-    uint i = get_global_id(0);
-    double2 vi = v[i];
-    n[i] = vi.x * vi.x + vi.y * vi.y;
-}
-
-/**
  * @brief Full scalar product.
+ * 
+ * Calculates element-wise product of the arrays and reduces them using local memory
+ * to one number per work group. These intermediate numbers are the summed by CPU.
+ * @param u Source vector.
+ * @param v Source vector.
+ * @param z Output vector for intermediate segment scalar products.
  */
 kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
 {
@@ -153,6 +136,11 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
 
 /**
  * @brief Full vector norm.
+ * 
+ * Calculates scalar product of the segments of the arrays belonging to different groups
+ * as one number per work group. These intermediate numbers are the summed by CPU.
+ * @param v Source vector.
+ * @param z Output vector for intermediate segment norms.
  */
 kernel void norm (global double2 *v, global double *z)
 {
@@ -190,6 +178,21 @@ kernel void norm (global double2 *v, global double *z)
         z[get_group_id(0)] = vv[0];
 }
 
+/**
+ * @brief Multiplication by one-electron Hamiltonian matrix.
+ * 
+ * Multiplies given vector by one-electron part of the Hamiltonian matrix,
+ * that can expressed as a Kronecker product of simple one-electron matrices.
+ * @param E Total energy of the system.
+ * @param Sp Row-padded upper overlap matrix.
+ * @param Dp Row-padded upper derivative overlap matrix.
+ * @param M1p Row-padded upper integral moment matrix (for r^1).
+ * @param M2p Row-padded upper integral moment matrix (for r^2).
+ * @param l1 Angular momentum of first electron.
+ * @param l2 Angular momentum of second electron.
+ * @param x Source vector.
+ * @param y Destination vector.
+ */
 kernel void mmul_1el
 (
     // energy
@@ -255,6 +258,22 @@ kernel void mmul_1el
     } // end for (k) ... block index in row
 }
 
+/**
+ * @brief Multiplication by two-electron Hamiltonian matrix.
+ * 
+ * Multiplies vector by a two-electron Hamiltonian matrix @f$ R_{ijkl}^\lambda @f$.
+ * Each multi-index @f$ (i,j) @f$ is assigned to a different group. Every @f$ (k,l) @f$
+ * multi-index is assigned to a unique local thread within the group. The scalar product
+ * is then represented as a reduction within the work-group.
+ * 
+ * This kernel is called for every multipole independently.
+ * 
+ * @param f Real prefactor (angular integral).
+ * @param MiL Partial integral moments (r^lambda).
+ * @param MiL Partial integral moments (r^(-lambda-1)).
+ * @param x Source vector.
+ * @param y Destination vector.
+ */
 kernel void mmul_2el
 (
     // angular integral
@@ -354,6 +373,14 @@ kernel void mmul_2el
     }
 }
 
+/**
+ * @brief Matrix-matrix multiplication.
+ * 
+ * General matrix-matrix multiplication.
+ * @param A Input matrix (row-major storage).
+ * @param B Input matrix (column-major storage).
+ * @param C Outpu matrix (row-major storage).
+ */
 kernel void mul_ABt
 (
     global double2 const * const restrict A, // input matrix A (row-major)
@@ -361,10 +388,6 @@ kernel void mul_ABt
     global double2       * const restrict C  // output matrix C (row-major)
 )
 {
-    #define BLOCK_SIZE      16 // = local size
-    #define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
-    #define NUM_BLOCKS      ((NSPLINE + BLOCK_SIZE - 1) / BLOCK_SIZE)
-    
     // work arrays
     local double2 Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local double2 Bloc[BLOCK_SIZE][BLOCK_SIZE];
@@ -400,6 +423,15 @@ kernel void mul_ABt
         C[get_global_id(0) * NSPLINE + get_global_id(1)] = res;
 }
 
+/**
+ * @brief KPA preconditioner.
+ * 
+ * Divides the source vector by the KPA preconditioner term.
+ * @param E Total energy.
+ * @param D1 Eigenvalues for first angular momentum.
+ * @param D2 Eigenvalues for second angular momentum.
+ * @param y Source/destination vector.
+ */
 kernel void kron_div
 (
     double2 E,
