@@ -101,6 +101,13 @@ bool KPACGPreconditioner::sData::hdfsave (const char* file) const
     return true;
 }
 
+void KPACGPreconditioner::sData::drop ()
+{
+    invCl_invsqrtS = RowMatrix<Complex>();
+    invsqrtS_Cl = RowMatrix<Complex>();
+    Dl = cArray();
+}
+
 void KPACGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
@@ -213,9 +220,29 @@ void KPACGPreconditioner::setup ()
         
         // Save to disk for possible future reuse.
         prec_[l].hdfsave();
+        
+        // Release memory in the case of out-of-core calculation.
+        if (cmd_.outofcore)
+            prec_[l].drop();
     }
     
     std::cout << std::endl;
+}
+
+void KPACGPreconditioner::CG_init (int iblock) const
+{
+    CGPreconditioner::CG_init(iblock);
+    
+    if (cmd_.outofcore)
+    {
+        // get block angular momenta
+        int l1 = l1_l2_[iblock].first;
+        int l2 = l1_l2_[iblock].second;
+        
+        // load preconditionjer from disk
+        prec_[l1].hdfload();
+        prec_[l2].hdfload();
+    }
 }
 
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -223,7 +250,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
     // let the parent do it if lightweight mode is off
     if (cmd_.kpa_simple_rad)
     {
-        // get block angular momemnta
+        // get block angular momenta
         int l1 = l1_l2_[iblock].first;
         int l2 = l1_l2_[iblock].second;
         
@@ -244,9 +271,6 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             if (f != 0.)
                 q -= s_rad_.apply_simple_R_matrix(lambda, cArrays(1, f * p))[0];
         }
-        
-//         std::cout << "inner_mmul: " << cArrayView(15, q.data()) << std::endl; 
-//         std::cout << "inner_mmul norm: " << std::sqrt(sum(sqrabs(q))) << std::endl;
     }
     else if (cmd_.lightweight_full)
     {
@@ -308,6 +332,22 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     catch (...)
     {
         HexException("Unknown exception in KPA preconditioner.");
+    }
+}
+
+void KPACGPreconditioner::CG_exit (int iblock) const
+{
+    CGPreconditioner::CG_exit(iblock);
+    
+    if (cmd_.outofcore)
+    {
+        // get block angular momenta
+        int l1 = l1_l2_[iblock].first;
+        int l2 = l1_l2_[iblock].second;
+        
+        // load preconditioner from disk
+        prec_[l1].drop();
+        prec_[l2].drop();
     }
 }
 

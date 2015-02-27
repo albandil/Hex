@@ -225,6 +225,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         clArrayView<Complex> rview (r, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz); rview.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         clArrayView<Complex> zview (z, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz); zview.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
+        // initialize block preconditioner
+        this->CG_init(ill);
+        
         // preconditioner matrices
         clArrayView<Complex> prec1a (Nspline * Nspline, prec_[l1].invCl_invsqrtS.data().data()); prec1a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         clArrayView<Complex> prec2a (Nspline * Nspline, prec_[l2].invCl_invsqrtS.data().data()); prec2a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
@@ -455,6 +458,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         prec2b.disconnect();
         Dl1.disconnect();
         Dl2.disconnect();
+        
+        // release bock preconditioner
+        this->CG_exit(ill);
     }
     
     // free GPU memory
