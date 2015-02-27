@@ -48,6 +48,13 @@ void KPACGPreconditioner::sData::hdflink (const char* file)
     filename = file;
 }
 
+bool KPACGPreconditioner::sData::hdfcheck (const char* file) const
+{
+    // open HDF file for reading
+    HDFFile hdf ((file == nullptr ? filename.c_str() : file), HDFFile::readonly);
+    return hdf.valid();
+}
+
 bool KPACGPreconditioner::sData::hdfload (const char* file)
 {
     // open HDF file for reading
@@ -136,8 +143,10 @@ void KPACGPreconditioner::setup ()
     for (int l : needed_l)
     {
         prec_[l].hdflink(format("kpa-%d-%d.hdf",l,par_.iproc()).c_str());
-        done[l] = prec_[l].hdfload();
-        if (done[l])
+        done[l] = prec_[l].hdfcheck();
+        if (cmd_.outofcore and done[l])
+            std::cout << "\t- preconditioner data for l = " << l << " present in \"" << prec_[l].filename << "\"" << std::endl;
+        if (not cmd_.outofcore and (done[l] = prec_[l].hdfload()))
             std::cout << "\t- preconditioner data for l = " << l << " loaded from \"" << prec_[l].filename << "\"" << std::endl;
     }
     

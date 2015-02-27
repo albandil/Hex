@@ -65,6 +65,9 @@ class KPACGPreconditioner : public CGPreconditioner
             /// Link the structure to a disk file.
             void hdflink (const char * file);
             
+            /// Check that the file exists and can be opened for reading.
+            bool hdfcheck (const char * file = nullptr) const;
+            
             /// Try to load data from a disk file.
             bool hdfload (const char * file = nullptr);
             
