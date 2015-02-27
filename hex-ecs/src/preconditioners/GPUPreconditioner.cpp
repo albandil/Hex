@@ -29,7 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef NO_OPENCL
+#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
 
 #include <iostream>
 #include <set>
@@ -75,12 +75,25 @@ void GPUCGPreconditioner::setup ()
     clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
     clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
     
-    // use device 0
+    std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
+    std::cout << "\t- available version: " << platform_version << std::endl;
+    
+    // use first device of the chosed type
     char device_name[1024], device_vendor[1024];
-    clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
-//     clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
+    if (cmd_.gpucpu)
+    {
+        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
+            HexException("No OpenCL capable CPU found for this platform.");
+    }
+    else
+    {
+        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
+            HexException("No OpenCL capable GPU found for this platform.");
+    }
     clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
     clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
+    
+    std::cout << "\t- device: " << device_name << " (" << device_vendor << ")" << std::endl;
     
     cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size;
     clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &max_compute_units, 0);
@@ -88,9 +101,6 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_memory_size, 0);
     clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_memory_size, 0);
     
-    std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
-    std::cout << "\t- available version: " << platform_version << std::endl;
-    std::cout << "\t- device: " << device_name << " (" << device_vendor << ")" << std::endl;
     std::cout << "\t- max compute units: " << max_compute_units << std::endl;
     std::cout << "\t- max work group size: " << max_work_group_size << std::endl;
     
@@ -138,7 +148,11 @@ void GPUCGPreconditioner::setup ()
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
+#ifdef CL_VERSION_2_0
     queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
+#else
+    queue_ = clCreateCommandQueue(context_, device_, 0, nullptr);
+#endif
     
     // setup compile flags
     std::ostringstream flags;

@@ -144,6 +144,9 @@ void CommandLine::parse (int argc, char* argv[])
 #endif
                     "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
+#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
+                    "\t--cpu                      (-C)  Use OpenCL on CPU (not GPU) in the case of GPU preconditioner.                                                         \n"
+#endif
                     "                                                                                                                                                          \n"
                     "There are also some environment variables that control the execution.                                                                                     \n"
                     "                                                                                                                                                          \n"
@@ -319,6 +322,14 @@ void CommandLine::parse (int argc, char* argv[])
                 reuse_dia_blocks = true;
                 return true;
             },
+#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
+        "cpu", "", 0,  [&](std::string optarg) -> bool
+            {
+                // use CPU for GPUPreconditioner
+                gpucpu = true;
+                return true;
+            },
+#endif
         
         [&] (std::string optname, std::string optarg) -> bool
         {
