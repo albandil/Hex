@@ -274,7 +274,8 @@ kernel void mmul_1el
  * @param x Source vector.
  * @param y Destination vector.
  */
-kernel void mmul_2el
+# if 0
+kernel void mmul_2el // this implementation should be faster, but IS only for small NSPLINE...
 (
     // angular integral
     private double f,
@@ -372,6 +373,93 @@ kernel void mmul_2el
         y[i * NSPLINE + j] += collect;
     }
 }
+# else
+kernel void mmul_2el
+(
+    // angular integral
+    private double f,
+    // one-electron partial moments
+    global double2 const * const restrict MiL,
+    global double2 const * const restrict MimLm1,
+    // source and target vector
+    global double2 const * const restrict x,
+    global double2       * const restrict y
+)
+{
+    // block row index
+    private int i = get_group_id(0);
+    
+    // for all block column indices
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
+    {
+        // loop over line groups
+        for (private int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
+        {
+            // get line index of the current worker
+            private int j = first_j + get_local_id(0);
+            
+            // for all elements of this block's line
+            for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+            {
+                private double2 elem = 0, M_ik = 0, M_jl = 0, m_ik = 0, m_jl = 0;
+                
+                // get pointers to the needed partial integral moments
+                global double2 const * const MiL_ik    = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                global double2 const * const MimLm1_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+                global double2 const * const MiL_jl    = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                global double2 const * const MimLm1_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                
+                // ix < iy
+                for (private int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
+                for (private int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
+                {
+                    m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
+                    
+                    // multiply real x real (merge exponents)
+                    if (m_ik.y == 0 && m_jl.y == 0)
+                    {
+                        elem.x -= f * exp(m_ik.x + m_jl.x);
+                    }
+                    
+                    // multiply other cases
+                    else
+                    {
+                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                        elem -= f * cmul(M_ik,M_jl);
+                    }
+                }
+                // ix > iy (by renaming the ix,iy indices)
+                for (private int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
+                for (private int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
+                {
+                    m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
+                    
+                    // multiply real x real (merge exponents)
+                    if (m_ik.y == 0 && m_jl.y == 0)
+                    {
+                        elem.x -= f * exp(m_ik.x + m_jl.x);
+                    }
+                    
+                    // multiply other cases
+                    else
+                    {
+                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
+                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
+                        elem -= f * cmul(M_ik,M_jl);
+                    }
+                }
+                // multiply right-hand side by that matrix element
+                y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
+            } // end for (l)
+        } // end for (turn) ... group of lines to process by the work-group
+        
+        // wait for completition of this block
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+    } // end for (k) ... block index in row
+}
+# endif
 
 /**
  * @brief Matrix-matrix multiplication.

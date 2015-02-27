@@ -182,7 +182,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     // shorthands
     std::size_t Nspline = s_rad_.bspline().Nspline();
     std::size_t Nsegsiz = Nspline * Nspline;
-    std::size_t order = s_bspline_.order();
     
     // performance timers
     std::size_t us_prec = 0, us_mmul = 0, us_spro = 0, us_axby = 0, us_norm = 0;
@@ -211,6 +210,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         Mi_L[lambda].reset(s_rad_.Mitr_L(lambda).size(), s_rad_.Mitr_L(lambda).data()); Mi_L[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         Mi_mLm1[lambda].reset(s_rad_.Mitr_mLm1(lambda).size(), s_rad_.Mitr_mLm1(lambda).data()); Mi_mLm1[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     }
+    
+    clArrayView<Complex> Mi_L_all(s_rad_.Mitr_L(-1).size(), s_rad_.Mitr_L(-1).data()); Mi_L_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    clArrayView<Complex> Mi_mLm1_all(s_rad_.Mitr_mLm1(-1).size(), s_rad_.Mitr_mLm1(-1).data()); Mi_mLm1_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     
     // for all diagonal blocks
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
@@ -290,7 +292,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             
             us_mmul_1 += timer.microseconds();
             
-            std::size_t nlocal = (2*order+1)*(2*order+1);
+            /*std::size_t nlocal = (2*order+1)*(2*order+1);
             std::size_t ngroups = Nsegsiz;
             std::size_t nglobal = nlocal * ngroups;
             
@@ -303,6 +305,17 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
                 clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
                 clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &nglobal, &nlocal, 0, nullptr, nullptr);
+            }*/
+            
+            // two-electron contribution
+            for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+            {
+                clSetKernelArg(mml2_, 0, sizeof(double), &(fs[ilambda]));
+                clSetKernelArg(mml2_, 1, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
+                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
             }
             
             clFinish(queue_);
@@ -316,7 +329,6 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             // multiply by approximate inverse block
             Timer timer;
             
-//             std::size_t block_size = 16; // must match macro defined in kernel !
             std::size_t gsize[2] = { blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_), blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_) };
             std::size_t lsize[2] = { blocksize_, blocksize_ };
             
@@ -458,6 +470,8 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         Mi_L[lambda].disconnect();
         Mi_mLm1[lambda].disconnect();
     }
+    Mi_L_all.disconnect();
+    Mi_mLm1_all.disconnect();
     
     // broadcast inner preconditioner iterations
     par_.sync(n.data(), 1, l1_l2_.size());
