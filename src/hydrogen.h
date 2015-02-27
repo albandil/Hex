@@ -255,8 +255,8 @@ double getFreeFar
     int max_steps = DEFAULT_MAXSTEPS
 );
 
-} // end of namespace Hydrogen
-    
+} // end of namespace hydrogen
+
 /**
  * Hydrogen radial function.
  */
