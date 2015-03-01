@@ -121,6 +121,8 @@ void KPACGPreconditioner::setup ()
     
     std::cout << "Set up KPA preconditioner" << std::endl;
     
+    std::size_t Nspline = s_bspline_.Nspline();
+    
     // compose list of angular momenta needed by this processor
     std::set<int> needed_l;
     for (int l = 0; l <= inp_.maxell; l++)
@@ -162,32 +164,22 @@ void KPACGPreconditioner::setup ()
     Timer timer;
     
     // diagonalize overlap matrix
-    ColMatrix<Complex> S = s_rad_.S().torow().T();
-    ColMatrix<Complex> CL, CR; cArray DS;
-    std::tie(DS,CL,CR) = S.diagonalize();
-    ColMatrix<Complex> invCR = CR.invert();
+    cArray D;
+    ColMatrix<Complex> S = s_rad_.S().torow().T(), CR, invCR;
+    S.diagonalize(D, nullptr, &CR);
+    CR.invert(invCR);
     
-    // convert eigenvalues to diagonal matrix
-    ColMatrix<Complex> DSmat(DS.size()), invDSmat(DS.size());
-    ColMatrix<Complex> DSsqrtmat(DS.size()), invDSsqrtmat(DS.size());
-    for (unsigned i = 0; i < DS.size(); i++)
-    {
-        DSmat(i,i) = DS[i];
-        DSsqrtmat(i,i) = std::sqrt(DS[i]);
-        invDSmat(i,i) = 1.0 / DS[i];
-        invDSsqrtmat(i,i) = 1.0 / std::sqrt(DS[i]);
-    }
-    
-    // Now S = CR * DSmat * CR⁻¹
+    // Now S = CR * (D * CR⁻¹)
     std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
-    std::cout << "\t\tresidual: " << cArray((RowMatrix<Complex>(S) - RowMatrix<Complex>(CR) * DSmat * invCR).data()).norm() << std::endl;
+    for (std::size_t i = 0; i < Nspline * Nspline; i++)
+        invCR.data()[i] *= D[i % Nspline];
+    std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
+    S = ColMatrix<Complex>();
     
-    // compute √S and √S⁻¹
-    RowMatrix<Complex> sqrtS = RowMatrix<Complex>(CR) * DSsqrtmat * invCR;
-    RowMatrix<Complex> invsqrtS = RowMatrix<Complex>(CR) * invDSsqrtmat * invCR;
-    
-    // necessary Kronecker product
-    SymDiaMatrix half_D_minus_Mm1_tr = 0.5 * s_rad_.D() - s_rad_.Mm1_tr();
+    // compute √S⁻¹
+    for (std::size_t i = 0; i < Nspline * Nspline; i++)
+        invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
+    ColMatrix<Complex> invsqrtS = std::move(CR * invCR);
     
     // diagonalize one-electron hamiltonians for all angular momenta
     for (int l : needed_l)
@@ -200,39 +192,29 @@ void KPACGPreconditioner::setup ()
         std::cout << "\t- One-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
         timer.reset();
         
-        // compose the one-electron hamiltonian
-        ColMatrix<Complex> Hl ( (half_D_minus_Mm1_tr + (0.5*l*(l+1)) * rad().Mm2()).torow() );
+        // compose the symmetrical one-electron hamiltonian
+        ColMatrix<Complex> tHl = (0.5 * s_rad_.D() - s_rad_.Mm1_tr() + (0.5*l*(l+1)) * s_rad_.Mm2()).torow().T();
         
         // symmetrically transform by inverse square root of the overlap matrix
-        RowMatrix<Complex> tHl = invsqrtS * Hl * ColMatrix<Complex>(invsqrtS);
+        tHl = std::move(invsqrtS * tHl * invsqrtS);
         
         // diagonalize the transformed matrix
-        ColMatrix<Complex> ClL, ClR;
-        std::tie(prec_[l].Dl,ClL,ClR) = ColMatrix<Complex>(tHl).diagonalize();
-        ColMatrix<Complex> invClR = ClR.invert();
+        tHl.diagonalize(D, nullptr, &CR);
+        CR.invert(invCR);
         
-        // store the data
-        prec_[l].invsqrtS_Cl = invsqrtS * ClR;
-        prec_[l].invCl_invsqrtS = RowMatrix<Complex>(invClR) * ColMatrix<Complex>(invsqrtS);
-        
-        // covert Dl to matrix form and print verification
-        ColMatrix<Complex> Dlmat(prec_[l].Dl.size()), invDlmat(prec_[l].Dl.size());
-        for (unsigned i = 0; i < prec_[l].Dl.size(); i++)
-        {
-            Dlmat(i,i) = prec_[l].Dl[i];
-            invDlmat(i,i) = 1.0 / prec_[l].Dl[i];
-        }
-        
-        // Now Hl = ClR * Dlmat * ClR⁻¹
-        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-        std::cout << "\t\t- residual: " << cArray((tHl - RowMatrix<Complex>(ClR) * Dlmat * invClR).data()).norm() << std::endl;
-        
-        // Save to disk for possible future reuse.
+        // store the preconditioner data
+        prec_[l].Dl = D;
+        prec_[l].invsqrtS_Cl = std::move(RowMatrix<Complex>(invsqrtS * CR));
+        prec_[l].invCl_invsqrtS = std::move(RowMatrix<Complex>(invCR * invsqrtS));
         prec_[l].hdfsave();
-        
-        // Release memory in the case of out-of-core calculation.
         if (cmd_.outofcore)
             prec_[l].drop();
+        
+        // Now Hl = ClR * D * ClR⁻¹
+        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
+            invCR.data()[i] *= D[i % Nspline];
+        std::cout << "\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
     }
     
     std::cout << std::endl;
@@ -264,9 +246,9 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = l1_l2_[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        q  = kron_dot(Complex(E_) * s_rad_.S_d(), s_rad_.S_d(), p);
-        q -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l1 + 1.) * l1) * s_rad_.Mm2_d(), s_rad_.S_d(), p);
-        q -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l2 + 1.) * l2) * s_rad_.Mm2_d(), p);
+        q  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p);
+        q -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l1+1)*l1) * s_rad_.Mm2(), s_rad_.S(), p);
+        q -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l2+1)*l2) * s_rad_.Mm2(), p);
         
         // multiply 'p' by the two-electron integrals (with simplified diagonal term)
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -288,9 +270,9 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = l1_l2_[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        q  = kron_dot(Complex(E_) * s_rad_.S_d(), s_rad_.S_d(), p);
-        q -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l1 + 1.) * l1) * s_rad_.Mm2_d(), s_rad_.S_d(), p);
-        q -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * (l2 + 1.) * l2) * s_rad_.Mm2_d(), p);
+        q  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p);
+        q -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l1+1)*l1) * s_rad_.Mm2(), s_rad_.S(), p);
+        q -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l2+1)*l2) * s_rad_.Mm2(), p);
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)

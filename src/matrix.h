@@ -60,7 +60,7 @@ template <class T> class ColMatrix;
 class CooMatrix;
 class CscMatrix;
 class CsrMatrix;
-class SymDiaMatrix;
+class SymBandMatrix;
 
 /**
  * @brief DenseMatrix.
@@ -95,7 +95,7 @@ template <class T> class DenseMatrix
         T * begin () { return data_.begin(); }
         T const * begin () const { return data_.begin(); }
         
-    private:
+    protected:
         
         /// Row count.
         int rows_;
@@ -127,8 +127,32 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
             : DenseMatrix<Type>(rows, cols) {}
         ColMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
+        ColMatrix (ColMatrix<Type> const & m)
+            : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { }
         ColMatrix (RowMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
+        
+        /**
+         * @brief Assignment operator.
+         */
+        ColMatrix<Type> & operator = (ColMatrix<Type> const & A)
+        {
+            this->rows_ = A.rows_;
+            this->cols_ = A.cols_;
+            this->data_ = A.data_;
+            return *this;
+        }
+        
+        /**
+         * @brief Move assignment.
+         */
+        ColMatrix<Type> & operator = (ColMatrix<Type> const && A)
+        {
+            this->rows_ = std::move(A.rows_);
+            this->cols_ = std::move(A.cols_);
+            this->data_ = std::move(A.data_);
+            return *this;
+        }
         
         /**
          * @brief Populator.
@@ -212,10 +236,15 @@ template <class Type> class ColMatrix : public DenseMatrix<Type>
         //@}
         
         /// Inversion.
-        ColMatrix<Type> invert () const;
+        void invert (ColMatrix<Type> & inv) const;
         
         /// Diagonalization.
-        std::tuple<NumberArray<Type>,ColMatrix<Type>,ColMatrix<Type>> diagonalize () const;
+        void diagonalize
+        (
+            NumberArray<Type> & eigval,
+            ColMatrix<Type> * eigvecL = nullptr,
+            ColMatrix<Type> * eigvecR = nullptr
+        ) const;
     
     private:
         
@@ -251,8 +280,32 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
             : DenseMatrix<Type>(rows, cols) {}
         RowMatrix (int rows, int cols, const ArrayView<Type> data)
             : DenseMatrix<Type>(rows, cols, data) {}
+        RowMatrix (RowMatrix<Type> const & m)
+            : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { }
         RowMatrix (ColMatrix<Type> const & m)
             : DenseMatrix<Type>(m.rows(), m.cols(), m.data()) { reorder_(); }
+        
+        /**
+         * @brief Assignment operator.
+         */
+        RowMatrix<Type> & operator = (RowMatrix<Type> const & A)
+        {
+            this->rows_ = A.rows_;
+            this->cols_ = A.cols_;
+            this->data_ = A.data_;
+            return *this;
+        }
+        
+        /**
+         * @brief Move assignment.
+         */
+        RowMatrix<Type> & operator = (RowMatrix<Type> const && A)
+        {
+            this->rows_ = std::move(A.rows_);
+            this->cols_ = std::move(A.cols_);
+            this->data_ = std::move(A.data_);
+            return *this;
+        }
         
         /**
          * @brief Populator.
@@ -512,6 +565,7 @@ template <class Type> class RowMatrix : public DenseMatrix<Type>
 
 template <class T> RowMatrix<T> operator + (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() += B.data(); return C; }
 template <class T> RowMatrix<T> operator - (RowMatrix<T> const & A, RowMatrix<T> const & B) { RowMatrix<T> C(A); C.data() -= B.data(); return C; }
+template <class T> ColMatrix<T> operator - (ColMatrix<T> const & A, ColMatrix<T> const & B) { ColMatrix<T> C(A); C.data() -= B.data(); return C; }
 template <class T> RowMatrix<T> operator * (T x, RowMatrix<T> const & A) { RowMatrix<T> B(A); B.data() *= x; return B; }
 template <class T> RowMatrix<T> operator * (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() *= x; return B; }
 template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMatrix<T> B(A); B.data() /= x; return B; }
@@ -527,50 +581,6 @@ template <class T> RowMatrix<T> operator / (RowMatrix<T> const & A, T x) { RowMa
  */
 cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cArrayView const v);
 
-/**
- * @brief Dense matrix multiplication.
- */
-/*template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
-{
-    assert(A.cols() == B.rows());
-    
-    // sizes
-    int rows = A.rows();
-    int cols = B.cols();
-    int comm = A.cols();
-    
-    // output matrix, initialized to zero
-    RowMatrix<Type> C(A.rows(), B.cols());
-    
-    // data pointers
-    Type const * restrict pA = A.begin();
-    Type const * restrict pB = B.begin();
-    Type       * restrict pC = C.begin();
-    
-    // for all rows of A
-    for (int irow = 0; irow < rows; irow++)
-    {
-        // for all columns of B
-        for (int icol = 0; icol < cols; icol++)
-        {
-            // compute the scalar product "row * column"
-            for (int k = 0; k < comm; k++)
-                (*pC) += (*(pA + k)) * (*pB++);
-            
-            // move to next element of C
-            pC++;
-        }
-        
-        // move to the next row of A
-        pA += A.cols();
-        
-        // reset B's data pointer
-        pB = B.begin();
-    }
-    
-    // return result
-    return C;
-}*/
 
 template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
@@ -578,6 +588,12 @@ template <class Type> RowMatrix<Type> operator * (RowMatrix<Type> const & A, Col
 }
 template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B);
 template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B);
+
+template <class Type> ColMatrix<Type> operator * (ColMatrix<Type> const & A, ColMatrix<Type> const & B)
+{
+    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name);
+}
+template<> ColMatrix<Complex> operator * (ColMatrix<Complex> const & A, ColMatrix<Complex> const & B);
 
 /**
  * @brief Matrix parts.
@@ -1566,7 +1582,7 @@ public:
      * "upper" for conversion of upper triangle and "both" for
      * conversion of the main diagonal only.
      */
-    SymDiaMatrix todia (MatrixTriangle triangle = lower) const;
+//     SymBandMatrix todia (MatrixTriangle triangle = lower) const;
     
     /**
      * @brief Solve matrix equation.
@@ -1649,7 +1665,7 @@ private:
  *   matrix C = AB is equal to the sum of the bandwidths of the factors
  *   decreased by one.
  */
-class SymDiaMatrix
+class SymBandMatrix
 {
 
 public:
@@ -1658,36 +1674,42 @@ public:
     //
 
     /// Empty constructor.
-    SymDiaMatrix ();
+    SymBandMatrix ();
     
     /// Size constructor.
-    SymDiaMatrix (int n);
+    SymBandMatrix (std::size_t n);
     
     /**
      * @brief Data constructor.
      * 
      * @param n Size of the matrix.
-     * @param id Identifyiers of the diagonals (positive integers expected).
+     * @param d Number of main and upper diagonals.
      */
-    SymDiaMatrix (int n, const iArrayView id);
+    SymBandMatrix (std::size_t n, std::size_t d);
     
     /**
      * @brief Data constructor.
      * 
+     * This constructor allows population of the matrix by precomputed data. The
+     * data needs to be stored in the internal format, which is concatenation of
+     * nonzero elements from the matrix lines (but only main and upper diagonals).
+     * The several trailing rows are zero padded to make a rectangular block of
+     * numbers.
+     * 
      * @param n Size of the matrix.
-     * @param id Identifyiers of the diagonals (positive integers expected).
-     * @param v Stacked (and padded if necessary) diagonals.
+     * @param d Number of main and upper diagonals.
+     * @param v Row-padded (main- and upper-) diagonal elements.
      */
-    SymDiaMatrix (int n, const iArrayView id, const cArrayView v);
+    SymBandMatrix (std::size_t n, std::size_t d, const cArrayView v);
     
     /// Copy constructor.
-    SymDiaMatrix (SymDiaMatrix const & A);
+    SymBandMatrix (SymBandMatrix const & A);
 
     /// Move constructor.
-    SymDiaMatrix (SymDiaMatrix && A);
+    SymBandMatrix (SymBandMatrix && A);
     
     /// Constructor - HDF loader.
-    SymDiaMatrix (std::string filename);
+    SymBandMatrix (std::string filename);
     
     /**
      * @brief Plain symmetrical populator.
@@ -1699,57 +1721,35 @@ public:
      * the function will call the functor with row and column number of every
      * element that is to be set.
      * 
-     * @param d How many upper diagonals to populate. The main diagonal will
-     *          be populated always.
+     * @param d How many (main and) upper diagonals to populate.
      * @param f The functor that will compute the matrix elements.
      */
-    template <class Functor> SymDiaMatrix & populate (unsigned d, Functor f)
+    template <class Functor> SymBandMatrix & populate (Functor f)
     {
         // throw away old data
-        elems_.resize(0);
+        elems_.resize(n_ * d_);
         
-        // for all diagonals
-        for (size_t id = 0; id <= d; id++)
-        {
-            // add this diagonal
-            idiag_.push_back(id);
-            
-            // for all elements of the diagonal
-            for (int icol = id; icol < n_; icol++)
-            {
-                // get the row index, too
-                int irow = icol - id;
-                
-                // evaluate the element
-                elems_.push_back(f(irow,icol));
-            }
-        }
-        
-        // update diagonal pointers
-        setup_dptrs_();
+        // evaluate the elements
+        for (std::size_t irow = 0; irow < n_; irow++)
+        for (std::size_t id = 0; id < d_; id++)
+        if (irow + id < n_)
+            elems_[irow * d_ + id] = f(irow, irow + id);
         
         return *this;
     }
     
-    void update ()
-    {
-        // update diagonal pointers
-        setup_dptrs_();
-    }
-
     //
     // Destructor
     //
 
-    ~SymDiaMatrix () {}
+    ~SymBandMatrix () {}
     
     /// Free all fields, set dimensions to zero.
     void drop ()
     {
         n_ = 0;
+        d_ = 0;
         elems_.drop();
-        idiag_.drop();
-        dptrs_.clear();
     }
     
     //
@@ -1758,87 +1758,27 @@ public:
     
     Complex operator() (int i, int j) const
     {
-        // get diagonal label
-        int d = std::abs(i-j);
+        std::size_t irow = std::min(i,j);
+        std::size_t icol = std::max(i,j);
+        std::size_t idia = icol - irow;
         
-        // get diagonal index
-        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        assert(irow < n_ and icol < n_);
         
-        // check that this diagonal exists
-        assert(id < idiag_.size());
-        
-        // get corresponding element
-        return dptrs_[id][std::min(i,j)];
+        return idia < d_ ? elems_[irow * d_ + idia] : 0.;
     }
-    
     Complex & operator() (int i, int j)
     {
-        // get diagonal label
-        int d = std::abs(i-j);
+        std::size_t irow = std::min(i,j);
+        std::size_t icol = std::max(i,j);
+        std::size_t idia = icol - irow;
         
-        // get diagonal index
-        std::size_t id = std::find(idiag_.begin(), idiag_.end(), d) - idiag_.begin();
+        assert(irow < n_ and icol < n_ and idia < d_);
         
-        // check that this diagonal exists
-        assert(id < idiag_.size());
-        
-        // get corresponding element
-        return dptrs_[id][std::min(i,j)];
+        return elems_[irow * d_ + idia];
     }
     
-    /**
-     * @brief Diagonal indices.
-     * 
-     * Return array of indices of the stored diagonals. These are always
-     * only main and upper diagonals, so all numbers are non-negative.
-     * The array is sorted and begins with zero. Its length is always
-     * larger than zero.
-     */
-    //@{
-    iArray const & diag () const { return idiag_; }
-    iArray & diag () { return idiag_; }
-    //@}
-    
-    /**
-     * @brief Diagonal index.
-     * 
-     * Return diagonal index for of i-th stored diagonal. The zero-th stored
-     * diagonal is always the main diagonal (= 0), but it doesn't have to hold
-     * for next diagonals.
-     */
-    int diag (int i) const { return idiag_[i]; }
-    
-    /**
-     * @brief Main diagonal.
-     * 
-     * Return direct-access view of the main diagonal.
-     */
-    //@{
-    cArrayView main_diagonal () const { return cArrayView(elems_, 0, n_); }
-    cArrayView main_diagonal () { return cArrayView(elems_, 0, n_); }
-    //@}
-    
-    /**
-     * @brief Data pointer.
-     * 
-     * Return direct-access data pointer.
-     */
-    //@{
     cArray const & data () const { return elems_; }
-    cArray & data () { return elems_; }
-    //@}
-    
-    /**
-     * @brief Pointer to diagonal data.
-     * 
-     * @param i Index of the diagonal in the "idiag_" array.
-     *          The maximal value is thus less then the number stored
-     *          diagonals.
-     */
-    //@{
-    Complex const * dptr (int i) const { return dptrs_[i]; }
-    Complex * dptr (int i) { return dptrs_[i]; }
-    //@}
+    cArray       & data ()       { return elems_; }
     
     /**
      * @brief Matrix dimension.
@@ -1846,8 +1786,8 @@ public:
      * Return row/column count. The matrix is symmetric and so both
      * counts are equal.
      */
-    int size () const { return n_; }
-    int & size () { return n_; }
+    std::size_t   size () const { return n_; }
+    std::size_t & size ()       { return n_; }
     
     /**
      * @brief Bandwidth.
@@ -1855,7 +1795,8 @@ public:
      * Return the bandwidth of the matrix, i.e. number of all (upper, main an lower)
      * diagonals that would have to be stored in a full banded-matrix format.
      */
-    int bandwidth () const { return 1 + 2 * idiag_.back(); }
+    std::size_t bandwidth () const { return 2 * d_ - 1; }
+    std::size_t halfbw () const { return d_; }
     
     /**
      * @brief Check compatibility of matrices.
@@ -1864,51 +1805,25 @@ public:
      * also that they keep the same diagonals. Such matrices can be very effectively
      * summed and subtracted -- just by doing the operation on the stored element arrays.
      */
-    bool is_compatible (SymDiaMatrix const & B) const;
-    
-    /**
-     * @brief Non-zero pattern.
-     * 
-     * Return array of pairs of integers that indicate structurally non-zero positions
-     * within the matrix. Note that only the upper triangle positions are returned,
-     * because the matrix is otherwise structurally symmetrical.
-     */
-    std::vector<std::pair<int,int>> nzpattern () const;
+    bool is_compatible (SymBandMatrix const & B) const;
     
     //
     // Arithmetic and other operators
     //
     
-    SymDiaMatrix const & operator = (SymDiaMatrix && A);
-    SymDiaMatrix const & operator = (SymDiaMatrix const & A);
+    SymBandMatrix const & operator = (SymBandMatrix && A);
+    SymBandMatrix const & operator = (SymBandMatrix const & A);
     
-    SymDiaMatrix const & operator += (SymDiaMatrix const & B);
-    SymDiaMatrix const & operator -= (SymDiaMatrix const & B);
+    SymBandMatrix const & operator += (SymBandMatrix const & B);
+    SymBandMatrix const & operator -= (SymBandMatrix const & B);
     
     /**
-     * @brief Dot product.
+     * @brief Dot product with one or more vectors.
      *
-     * This is a key member of the structure, defining e.g. the speed of conjugate
-     * gradients and evaluation of the scattering amplitudes.
-     *
-     * @todo The performance of this routine (which accesses the data in a predictible,
-     * consecutive fashion) is mostly limited by the memory bandwidth.
-     * The routine could be slightly optimized if a "packed" version of the data
-     * structure was chosen, so that the right hand side would be loaded into processor cache
-     * only once for every dense band in the matrix (and not for every diagonal as in
-     * the present version).
-     * 
-     * @param B Dense matrix. It is supposed to be stored by columns and to have
-     *          dimensions n times k, where n is the column count of (*this) matrix.
-     *          Also, though only a view of the array is required, it is assumed
-     *          that B is actually NumberArray, i.e. that it is aligned with the alignment
-     *          2*sizeof(T).
-     * @param triangle Whether to use only the upper or only the lower or both triangles
-     *                 of the othwerwise symmetric matrix.
-     * @param parallelize Whether to use OpenMP to parallelize the SpMV operation.
+     * @param B Set of vectors to multiply as a column-major dense matrix.
      */
     cArray dot (const cArrayView B) const;
-    static cArray sym_dia_dot (int n_, const iArrayView idiag_, Complex const * rp_elems_, Complex const * rp_B);
+    static cArray sym_band_dot (int n, int d, const cArrayView M, const cArrayView X);
     
     /**
      * @brief Back-substitution (lower).
@@ -1935,7 +1850,7 @@ public:
      * 
      * Compute Kronecker product with other matrix.
      */
-    SymDiaMatrix kron (SymDiaMatrix const & B) const;
+    SymBandMatrix kron (SymBandMatrix const & B) const;
 
     //
     // HDF interface
@@ -1947,8 +1862,8 @@ public:
     /// Return the name of the linked disk file.
     std::string hdfname () const { return name_; }
     
-    /// Return content of the 'name' file as a new SymDiaMatrix object.
-    SymDiaMatrix hdfget () const { return SymDiaMatrix(name_); }
+    /// Return content of the 'name' file as a new SymBandMatrix object.
+    SymBandMatrix hdfget () const { return SymBandMatrix(name_); }
     
     /**
      * @brief Load from file.
@@ -2075,43 +1990,24 @@ public:
     RowMatrix<Complex> torow (MatrixTriangle triangle = both) const;
     
     /// Output to a text stream.
-    friend std::ostream & operator << (std::ostream & out, SymDiaMatrix const & A);
+    friend std::ostream & operator << (std::ostream & out, SymBandMatrix const & A);
     
 private:
 
     // dimension (only square matrices allowed)
-    int n_;
-
-    // diagonals: concatenated diagonals starting from the longest
-    // to the shortest (i.e. with rising right index)
-    cArray elems_;
+    std::size_t n_;
     
-    // upper diagonal indices starting from zero
-    iArray idiag_;
+    // main and upper diagonal count
+    std::size_t d_;
+    
+    // diagonals concatenated in row-oriented way (and padded, if necessary) of size n_*d_
+    cArray elems_;
     
     // name of linked HDF file
     std::string name_;
-    
-    // diagonal data pointers
-    std::vector<Complex*> dptrs_;
-    
-    /** 
-     * @brief Setup diagonal data pointers
-     * 
-     * Make the pointer list dptrs_ point to the beginnings of the diagonal
-     * data. If there are 2d+1 diagonals in the martix, the pointers are
-     * assigned in the following way:
-     * @verbatim
-     * dptrs_[0] ... main diagonal
-     * dptrs_[1] ... first upper diagonal (identical to 1st lower diagonal)
-     * ...
-     * dptrs_[d] ... d-th upper diagonal (identical to d-th lower diagonal)
-     * @endverbatim
-     */
-    void setup_dptrs_();
 };
 
-class BlockSymDiaMatrix
+class BlockSymBandMatrix
 {
     private:
         
@@ -2124,11 +2020,8 @@ class BlockSymDiaMatrix
         /// Size of a matrix block and also of the block structure.
         std::size_t size_;
         
-        /// List of block positions (only upper part).
-        std::vector<std::pair<int,int>> structure_;
-        
-        /// Diagonal labels.
-        iArray idiag_;
+        /// Half bandwidth.
+        std::size_t halfbw_;
         
         /// Data array.
         cArray data_;
@@ -2139,8 +2032,8 @@ class BlockSymDiaMatrix
         // Constructors.
         //
         
-        BlockSymDiaMatrix (int size = 0)
-            : diskfile_(), inmemory_(true), size_(size), data_() {}
+        BlockSymBandMatrix (int size = 0, int halfbw = 0)
+            : diskfile_(), inmemory_(true), size_(size), halfbw_(halfbw), data_() {}
         
         /**
          * @brief Main constructor.
@@ -2150,12 +2043,12 @@ class BlockSymDiaMatrix
          * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymDiaMatrix (int size, std::vector<std::pair<int,int>> const & blockstructure, const iArrayView idiag, bool inmemory = true, std::string name = "")
-            : diskfile_(name), inmemory_(inmemory), size_(size), structure_(blockstructure), idiag_(idiag), data_()
+        BlockSymBandMatrix (int size, int halfbw, bool inmemory = true, std::string name = "")
+            : diskfile_(name), inmemory_(inmemory), size_(size), halfbw_(halfbw), data_()
         {
             if (inmemory_)
             {
-                data_.resize(structure_.size() * structure_.size());
+                data_.resize(size_ * size_ * halfbw_ * halfbw_);
             }
 #ifdef NO_HDF
             else
@@ -2169,12 +2062,6 @@ class BlockSymDiaMatrix
         bool inmemory () const
         {
             return inmemory_;
-        }
-        
-        /// Get block structure (only upper part!).
-        std::vector<std::pair<int,int>> const & structure () const
-        {
-            return structure_;
         }
         
         /// Access individual blocks.
@@ -2191,10 +2078,8 @@ class BlockSymDiaMatrix
          * @param v Vector to multiply. It should be of equal size to the size of the matrix.
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
-         * @param wholematrix Start by loading the whole matrix from disk if not in memory as opposed to
-         *                    loading and applying one block after another.
          */
-        cArray dot (cArrayView v, bool parallelize = false, bool wholematrix = false) const;
+        cArray dot (cArrayView v, bool parallelize = false) const;
         
         //
         // Coversions to other matrix types.
@@ -2212,8 +2097,8 @@ class BlockSymDiaMatrix
         //
         
         /// Get name of the scratch disk file.
-        std::string hdfname () const { return diskfile_; }
-        std::string & hdfname () { return diskfile_; }
+        std::string   hdfname () const { return diskfile_; }
+        std::string & hdfname ()       { return diskfile_; }
         
         /// Release data from memory, but keep HDF link.
         void drop ();
@@ -2362,11 +2247,11 @@ inline CooMatrix operator * (const CooMatrix& A, const Complex& z)
     return C *= z;
 }
 
-SymDiaMatrix operator + (SymDiaMatrix const & A, SymDiaMatrix const & B);
-SymDiaMatrix operator - (SymDiaMatrix const & A, SymDiaMatrix const & B);
-SymDiaMatrix operator * (SymDiaMatrix const & A, SymDiaMatrix const & B);
-SymDiaMatrix operator * (double z, SymDiaMatrix const & A);
-SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
+SymBandMatrix operator + (SymBandMatrix const & A, SymBandMatrix const & B);
+SymBandMatrix operator - (SymBandMatrix const & A, SymBandMatrix const & B);
+SymBandMatrix operator * (SymBandMatrix const & A, SymBandMatrix const & B);
+SymBandMatrix operator * (double z, SymBandMatrix const & A);
+SymBandMatrix operator * (Complex z, SymBandMatrix const & A);
 
 /**
  * @brief Kronecker product.
@@ -2386,8 +2271,8 @@ SymDiaMatrix operator * (Complex z, SymDiaMatrix const & A);
  * @param B Second matrix.
  */
 CooMatrix kron (CooMatrix const & A, CooMatrix const & B);
-BlockSymDiaMatrix kron (SymDiaMatrix const & A, SymDiaMatrix const & B);
-cArray kron_dot (SymDiaMatrix const & A, SymDiaMatrix const & B, const cArrayView v);
+BlockSymBandMatrix kron (SymBandMatrix const & A, SymBandMatrix const & B);
+cArray kron_dot (SymBandMatrix const & A, SymBandMatrix const & B, const cArrayView v);
 
 /**
  * Identity matrix.

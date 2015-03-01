@@ -118,8 +118,7 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
 Complex RadialIntegrals::computeR
 (
     int lambda,
-    int a, int b, int c, int d,
-    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
+    int a, int b, int c, int d
 ) const
 {
     int order = bspline_.order();
@@ -146,10 +145,10 @@ Complex RadialIntegrals::computeR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
@@ -196,8 +195,7 @@ Complex RadialIntegrals::computeR
 Complex RadialIntegrals::computeSimpleR
 (
     int lambda,
-    int a, int b, int c, int d,
-    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
+    int a, int b, int c, int d
 ) const
 {
     int order = bspline_.order();
@@ -217,10 +215,10 @@ Complex RadialIntegrals::computeSimpleR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     

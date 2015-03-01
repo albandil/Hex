@@ -77,7 +77,7 @@ class weightEdgeDamp
             
             // this will suppress function value from R0+1 onwards
             // which is useful for expanding (divergent) Ricatti-Bessel function
-            return (z.imag() == 0.) ? (1+tanh(R0 - 5 - z.real()))/2 : 0.;
+            return (z.imag() == 0.) ? (1+std::tanh(R0 - 5 - z.real()))/2 : 0.;
         }
     
     private:
@@ -116,8 +116,13 @@ class RadialIntegrals
         
         // constructor
         RadialIntegrals(Bspline const & bspline)
-            : bspline_(bspline), g_(bspline), D_(bspline.Nspline()), S_(bspline.Nspline()),
-              Mm1_(bspline.Nspline()), Mm1_tr_(bspline.Nspline()), Mm2_(bspline.Nspline()) {}
+            : bspline_(bspline),
+              g_(bspline),
+              D_(bspline.Nspline(),bspline.order()+1),
+              S_(bspline.Nspline(),bspline.order()+1),
+              Mm1_(bspline.Nspline(),bspline.order()+1),
+              Mm1_tr_(bspline.Nspline(),bspline.order()+1),
+              Mm2_(bspline.Nspline(),bspline.order()+1) {}
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
@@ -204,16 +209,12 @@ class RadialIntegrals
         Complex computeR
         (
             int lambda,
-            int i, int j, int k, int l,
-            const cArrayView Mtr_L,
-            const cArrayView Mtr_mLm1
+            int i, int j, int k, int l
         ) const;
         Complex computeSimpleR
         (
             int lambda,
-            int i, int j, int k, int l,
-            const cArrayView Mtr_L,
-            const cArrayView Mtr_mLm1
+            int i, int j, int k, int l
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
@@ -382,25 +383,13 @@ class RadialIntegrals
         
         Bspline const & bspline () const { return bspline_; }
         
-        SymDiaMatrix const & D() const { return D_; }
-        SymDiaMatrix const & S() const { return S_; }
-        SymDiaMatrix const & Mm1() const { return Mm1_; }
-        SymDiaMatrix const & Mm1_tr() const { return Mm1_tr_; }
-        SymDiaMatrix const & Mm2() const { return Mm2_; }
+        SymBandMatrix const & D() const { return D_; }
+        SymBandMatrix const & S() const { return S_; }
+        SymBandMatrix const & Mm1() const { return Mm1_; }
+        SymBandMatrix const & Mm1_tr() const { return Mm1_tr_; }
+        SymBandMatrix const & Mm2() const { return Mm2_; }
         
-        RowMatrix<Complex> const & D_d() const { return D_d_; }
-        RowMatrix<Complex> const & S_d() const { return S_d_; }
-        RowMatrix<Complex> const & Mm1_d() const { return Mm1_d_; }
-        RowMatrix<Complex> const & Mm1_tr_d() const { return Mm1_tr_d_; }
-        RowMatrix<Complex> const & Mm2_d() const { return Mm2_d_; }
-        
-        cArray const & D_p() const { return D_p_; }
-        cArray const & S_p() const { return S_p_; }
-        cArray const & Mm1_p() const { return Mm1_p_; }
-        cArray const & Mm1_tr_p() const { return Mm1_tr_p_; }
-        cArray const & Mm2_p() const { return Mm2_p_; }
-        
-        BlockSymDiaMatrix const & R_tr_dia (unsigned i) const
+        BlockSymBandMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
@@ -437,22 +426,13 @@ class RadialIntegrals
         }
         
         /**
-         * @brief Initialize calculation of the R-matrix blocks.
-         * 
-         * This routine will precompute one-electron B-spline moments that are used
-         * by the routine @ref calc_R_tr_dia_block. The arrays Mtr_L and Mtr_mLm1 will be replaced
-         * by the new content.
-         */
-        void init_R_tr_dia_block (unsigned int lambda, cArray & Mtr_L, cArray & Mtr_mLm1) const;
-        
-        /**
          * @brief Calculate particular sub-matrix of the radial integrals matrix.
          * 
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        cArray calc_R_tr_dia_block (unsigned lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
-        cArray calc_simple_R_tr_dia_block (unsigned lambda, int i, int k, const cArrayView Mtr_L, const cArrayView Mtr_mLm1, std::vector<std::pair<int,int>> const & structure) const;
+        SymBandMatrix calc_R_tr_dia_block (unsigned lambda, int i, int k) const;
+        SymBandMatrix calc_simple_R_tr_dia_block (unsigned lambda, int i, int k) const;
         
         /**
          * @brief Multiply vectors by matrix of two-electron integrals.
@@ -481,10 +461,8 @@ class RadialIntegrals
         // matrices
         //
         
-        SymDiaMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
-        RowMatrix<Complex> D_d_, S_d_, Mm1_d_, Mm1_tr_d_, Mm2_d_;
-        cArray D_p_, S_p_, Mm1_p_, Mm1_tr_p_, Mm2_p_;
-        Array<BlockSymDiaMatrix> R_tr_dia_;
+        SymBandMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
+        Array<BlockSymBandMatrix> R_tr_dia_;
         
         cArray Mitr_L_, Mitr_mLm1_;
 };
