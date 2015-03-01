@@ -103,7 +103,7 @@ template <class ...Params> std::string format (Params ...p)
  * @brief Fatal error routine.
  * 
  * Fatal error termination routine with easy printf-like interface.
- * Use the macro @ref Exception to call this function with proper line number
+ * Use the macro @ref HexException to call this function with proper line number
  * and function name.
  */
 template <class ...Params> [[noreturn]] void TerminateWithException (const char* file, int line, const char* func, Params ...p)
@@ -111,7 +111,12 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     // print error text
     std::cerr << std::endl << std::endl;
     std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
-    std::cerr << " *** " << format(p...) << std::endl;
+#if (_POSIX_C_SOURCE >= 200112L)
+    if (isatty(fileno(stderr)))
+        std::cerr << "\033[1;31m *** " << format(p...) << "\033[0m" << std::endl;
+    else
+#endif
+        std::cerr << " *** " << format(p...) << std::endl;
     
 #if (defined(__linux__) && defined(__GNUC__))
     // This stack printing function has been borrowed from Timo Bingmann's
