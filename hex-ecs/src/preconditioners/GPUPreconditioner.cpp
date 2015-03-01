@@ -29,7 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef NO_OPENCL
+#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
 
 #include <iostream>
 #include <set>
@@ -41,6 +41,7 @@
 #include "../misc.h"
 #include "../preconditioners.h"
 #include "../radial.h"
+#include "../special.h"
 
 #include <CL/cl.h>
 
@@ -58,64 +59,109 @@ char * source = &kernels_cl[0];
 
 void GPUCGPreconditioner::setup ()
 {
-    // compute memory requirements of the preconditioner
+    KPACGPreconditioner::setup();
+    
+    // shorthands
     int order = s_bspline_.order();
     int Nspline = s_bspline_.Nspline();
-    int maxell = inp_.maxell;
-    unsigned long req = ((maxell+1) * (Nspline + 2*Nspline*Nspline) + (2*order+1)*(2*order+1)*Nspline*Nspline + 3*Nspline*Nspline) * 16;
+    int Nreknot = s_bspline_.Nreknot();
     
     std::cout << "Setting up OpenCL environment" << std::endl;
-    char text [1000];
     
     // use platform 0
+    char platform_name[1024], platform_vendor[1024], platform_version[1024];
     clGetPlatformIDs(1, &platform_, nullptr);
-    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tplatform: " << text << " ";
-    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(text), text, nullptr);
-    std::cout << "\tavailable version: " << text << std::endl;
+    clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
+    clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
     
-    // use device 0
-//     clGetDeviceIDs (platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr);
-    clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr);
-    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(text), text, nullptr);
-    std::cout << "\tdevice: " << text << " ";
-    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(text), text, nullptr);
-    std::cout << "(" << text << ")" << std::endl;
-    cl_ulong size;
-    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tlocal memory size: " << size/1024 << " kiB" << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tglobal memory size: " << format("%.2f", size/pow(1024,3)) << " GiB ";
-    std::cout << "(appx. " << format("%.2f", req * 100. / size) << " % will be used)" << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax compute units: " << size << std::endl;
-    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &size, 0);
-    std::cout << "\tmax work group size: " << size << std::endl << std::endl;
+    std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
+    std::cout << "\t- available version: " << platform_version << std::endl;
     
-    // choose (e.g.) the largest workgroup
-    // NOTE : This may not be the most efficient choice.
-    Nlocal_ = size;
+    // use first device of the chosed type
+    char device_name[1024], device_vendor[1024];
+    if (cmd_.gpucpu)
+    {
+        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
+            HexException("No OpenCL capable CPU found for this platform.");
+    }
+    else
+    {
+        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
+            HexException("No OpenCL capable GPU found for this platform.");
+    }
+    clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
+    clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
+    
+    std::cout << "\t- device: " << device_name << " (" << device_vendor << ")" << std::endl;
+    
+    cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size;
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &max_compute_units, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_ulong), &max_work_group_size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_memory_size, 0);
+    clGetDeviceInfo(device_, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_memory_size, 0);
+    
+    std::cout << "\t- max compute units: " << max_compute_units << std::endl;
+    std::cout << "\t- max work group size: " << max_work_group_size << std::endl;
+    
+    // we need at least (2*order+1)^2 for "mmul_2el" kernel
+    if (max_work_group_size < (2u*order+1)*(2u*order+1))
+        HexException("Work group size of at least %d is needed for given B-spline order.", (2*order+1)*(2*order+1));
+    
+    // choose default workgroup size
+    Nlocal_ = std::min<std::size_t>(64, max_work_group_size);
+    
+    // choose block size for "mul_ABt" kernel, aim for 4 concurrent threads
+    blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 16/*double*/ * 2/*arrays*/));
+    std::cout << "\t- matrix multiplication sub-block size: " << blocksize_ << std::endl;
+    
+    // compute global memory requirements of the preconditioner
+    std::size_t greq = 0;
+    // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
+    greq += 10 * (std::size_t)Nspline * (std::size_t)Nspline;
+    // - padded one-electron matrices (S, D, M1, M2)
+    greq += 4 * s_rad_.S().size();
+    // - preconditioner eigenvalues
+    greq += 2 * Nspline;
+    // - partial integral moments
+    greq += 2 * s_rad_.Mitr_L(-1).size();
+    // - all these were complex numbers
+    greq *= 16;
+    
+    std::cout << "\t- global memory size: " << format("%.2f", global_memory_size/pow(1024,3)) << " GiB ";
+    std::cout << "(apx. " << format("%.2f", greq * 100. / global_memory_size) << " % will be used)" << std::endl;
+    
+    // compute local memory requirements of the preconditioner
+    std::size_t lreq = 0;
+    // - either Complex per default Nlocal_
+    lreq = Nlocal_;
+    // - or the requirements of mul_ABt
+    lreq = std::max<std::size_t>(lreq, 2/*array*/ * 16/*double*/ * blocksize_);
+    // - or the requirements of mmul_2el
+    lreq = std::max<std::size_t>(lreq, (2*order+1)*(2*order+1));
+    // - all these were complex numbers
+    lreq *= 16;
+    
+    std::cout << "\t- local memory size: " << local_memory_size/1024 << " kiB ";
+    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used, ~ ";
+    std::cout << format("%0d", local_memory_size/lreq) << " wavefronts)" << std::endl << std::endl;
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
+#ifdef CL_VERSION_2_0
     queue_ = clCreateCommandQueueWithProperties(context_, device_, nullptr, nullptr);
-    
-    // setup the structure of the matrices
-    iArray diags;
-    for (int i = -order; i <= order; i++)
-        for (int j = -order; j <= order; j++)
-            diags.push_back(i * Nspline + j);
-    std::string diagonals = to_string(diags, ',');
+#else
+    queue_ = clCreateCommandQueue(context_, device_, 0, nullptr);
+#endif
     
     // setup compile flags
     std::ostringstream flags;
     flags << " -cl-fast-relaxed-math ";
-    flags << " -D ORDER="     << order     << " ";
-    flags << " -D NSPLINE="   << Nspline   << " ";
-    flags << " -D DIAGONALS=" << diagonals << " ";
-    flags << " -D NLOCAL="    << Nlocal_   << " ";
+    flags << " -D ORDER="      << order      << " ";
+    flags << " -D NSPLINE="    << Nspline    << " ";
+    flags << " -D NREKNOT="    << Nreknot    << " ";
+    flags << " -D NLOCAL="     << Nlocal_    << " ";
+    flags << " -D BLOCK_SIZE=" << blocksize_ << " ";
     
     // build program
     program_ = clCreateProgramWithSource(context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -136,19 +182,13 @@ void GPUCGPreconditioner::setup ()
     }
     
     // set program entry points
-    mmul_ = clCreateKernel(program_, "mmul",        nullptr);
-    amul_ = clCreateKernel(program_, "vec_mul_vec", nullptr);
+    mml1_ = clCreateKernel(program_, "mmul_1el",    nullptr);
+    mml2_ = clCreateKernel(program_, "mmul_2el",    nullptr);
     axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
-    vnrm_ = clCreateKernel(program_, "vec_norm",    nullptr);
     norm_ = clCreateKernel(program_, "norm",        nullptr);
     spro_ = clCreateKernel(program_, "scalar_product", nullptr);
-    krd1_ = clCreateKernel(program_, "kron_dot1",   nullptr);
-    krd2_ = clCreateKernel(program_, "kron_dot2",   nullptr);
+    mabt_ = clCreateKernel(program_, "mul_ABt",     nullptr);
     krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
-    
-    std::cout << "Set up GPU preconditioner" << std::endl;
-    
-    KPACGPreconditioner::setup();
 }
 
 void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
@@ -157,24 +197,47 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::size_t Nspline = s_rad_.bspline().Nspline();
     std::size_t Nsegsiz = Nspline * Nspline;
     
+    // performance timers
+    std::size_t us_prec = 0, us_mmul = 0, us_spro = 0, us_axby = 0, us_norm = 0;
+    std::size_t us_mmul_1 = 0;
+    
+    // round 'Nsegsiz' to nearest larger multiple of Nlocal_
+    std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
+    
     // iterations
     iArray n (l1_l2_.size());
     
     // some OpenCL auxiliary storage arrays (used by kernels for temporary data)
-    clArray<Complex> tmp ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  tmp.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-    clArray<double>  nrm ((Nsegsiz + Nlocal_ - 1) / Nlocal_);  nrm.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
-    clArray<Complex> tmA (Nspline * Nspline);                  tmA.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+    clArray<Complex> tmp (Nglobal / Nlocal_);
+    clArray<double>  nrm (Nglobal / Nlocal_);
+    clArray<Complex> tmA (Nspline * Nspline);
+    tmp.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+    nrm.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+    tmA.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
     
     // create OpenCL representation of the one-electron matrices + transfer data to GPU memory
-    clArrayView<Complex> S_p (s_rad_.S_p().size(), s_rad_.S_p().data()); S_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    clArrayView<Complex> D_p (s_rad_.D_p().size(), s_rad_.D_p().data()); D_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    clArrayView<Complex> Mm1_tr_p (s_rad_.Mm1_tr_p().size(), s_rad_.Mm1_tr_p().data()); Mm1_tr_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    clArrayView<Complex> Mm2_p (s_rad_.Mm2_p().size(), s_rad_.Mm2_p().data()); Mm2_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    clArrayView<Complex> Mi_L (s_rad_.Mitr_L(-1).size(), s_rad_.Mitr_L(-1).data()); Mi_L.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    clArrayView<Complex> Mi_mLm1 (s_rad_.Mitr_mLm1(-1).size(), s_rad_.Mitr_mLm1(-1).data()); Mi_mLm1.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    clArrayView<Complex> S_p (s_rad_.S().data().size(), s_rad_.S().data().data());
+    clArrayView<Complex> D_p (s_rad_.D().data().size(), s_rad_.D().data().data());
+    clArrayView<Complex> Mm1_tr_p (s_rad_.Mm1_tr().data().size(), s_rad_.Mm1_tr().data().data());
+    clArrayView<Complex> Mm2_p (s_rad_.Mm2().data().size(), s_rad_.Mm2().data().data());
+    S_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    D_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    Mm1_tr_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    Mm2_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     
-    // maximal angular momentum transfer
-    int max_lambda = s_rad_.maxlambda();
+    clArrayView<Complex> Mi_L[s_rad_.maxlambda() + 1], Mi_mLm1[s_rad_.maxlambda() + 1];
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    {
+        Mi_L[lambda].reset(s_rad_.Mitr_L(lambda).size(), s_rad_.Mitr_L(lambda).data());
+        Mi_mLm1[lambda].reset(s_rad_.Mitr_mLm1(lambda).size(), s_rad_.Mitr_mLm1(lambda).data());
+        Mi_L[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+        Mi_mLm1[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    }
+    
+    clArrayView<Complex> Mi_L_all(s_rad_.Mitr_L(-1).size(), s_rad_.Mitr_L(-1).data());
+    clArrayView<Complex> Mi_mLm1_all(s_rad_.Mitr_mLm1(-1).size(), s_rad_.Mitr_mLm1(-1).data());
+    Mi_L_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    Mi_mLm1_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     
     // for all diagonal blocks
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
@@ -184,16 +247,47 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         int l2 = l1_l2_[ill].second;
         
         // create segment views
-        clArrayView<Complex> rview (r, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz); rview.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> zview (z, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz); zview.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        clArrayView<Complex> rview (r, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz);
+        clArrayView<Complex> zview (z, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz);
+        rview.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        zview.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
+        
+        // initialize block preconditioner
+        this->CG_init(ill);
         
         // preconditioner matrices
-        clArrayView<Complex> prec1a (Nspline * Nspline, prec_[l1].invCl_invsqrtS.data().data()); prec1a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> prec2a (Nspline * Nspline, prec_[l2].invCl_invsqrtS.data().data()); prec2a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> Dl1 (Nspline, prec_[l1].Dl.data()); Dl1.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> Dl2 (Nspline, prec_[l2].Dl.data()); Dl2.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> prec1b (Nspline * Nspline, prec_[l1].invsqrtS_Cl.data().data()); prec1b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
-        clArrayView<Complex> prec2b (Nspline * Nspline, prec_[l2].invsqrtS_Cl.data().data()); prec1b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        clArrayView<Complex> prec1a (Nspline * Nspline, prec_[l1].invCl_invsqrtS.data().data());
+        clArrayView<Complex> prec2a (Nspline * Nspline, prec_[l2].invCl_invsqrtS.data().data());
+        clArrayView<Complex> Dl1 (Nspline, prec_[l1].Dl.data());
+        clArrayView<Complex> Dl2 (Nspline, prec_[l2].Dl.data());
+        clArrayView<Complex> prec1b (Nspline * Nspline, prec_[l1].invsqrtS_Cl.data().data());
+        clArrayView<Complex> prec2b (Nspline * Nspline, prec_[l2].invsqrtS_Cl.data().data());
+        prec1a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        prec2a.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        Dl1.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        Dl2.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        prec1b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        prec2b.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
+        
+        // angular integrals
+        iArray lambdas (s_rad_.maxlambda() + 1);
+        rArray fs (s_rad_.maxlambda() + 1);
+        int Nlambdas = 0;
+        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        {
+            double f = special::computef(lambda,l1,l2,l1,l2,inp_.L);
+            
+            if (not std::isfinite(f))
+                HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1, l2, inp_.L);
+            
+            if (f == 0)
+                continue;
+            
+            lambdas[Nlambdas] = lambda;
+            fs[Nlambdas] = f;
+            
+            Nlambdas++;
+        }
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n) -> clArray<Complex>
@@ -208,43 +302,85 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             return a;
         };
         
-        // multiplies vector by the ill-th diagonal block (approximate)
-        auto inner_mmul = [&](const clArrayView<Complex> a, const clArrayView<Complex> b) -> void
+        // multiplies vector by the (approximate) ill-th diagonal block
+        auto inner_mmul = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
         {
             // multiply
             //      b = A · a
-            clSetKernelArg(mmul_,  0, sizeof(cl_mem), &S_p.handle());
-            clSetKernelArg(mmul_,  1, sizeof(cl_mem), &D_p.handle());
-            clSetKernelArg(mmul_,  2, sizeof(cl_mem), &Mm1_tr_p.handle());
-            clSetKernelArg(mmul_,  3, sizeof(cl_mem), &Mm2_p.handle());
-            clSetKernelArg(mmul_,  4, sizeof(int),    &max_lambda);
-            clSetKernelArg(mmul_,  5, sizeof(cl_mem), &Mi_L);
-            clSetKernelArg(mmul_,  6, sizeof(cl_mem), &Mi_mLm1);
-            clSetKernelArg(mmul_,  7, sizeof(int),    &l1);
-            clSetKernelArg(mmul_,  8, sizeof(int),    &l2);
-            clSetKernelArg(mmul_,  9, sizeof(cl_mem), &a.handle());
-            clSetKernelArg(mmul_, 10, sizeof(cl_mem), &b.handle());
-            clEnqueueNDRangeKernel(queue_, mmul_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
+            
+            Timer timer;
+            
+            std::size_t Ngroups = Nspline;
+            std::size_t Nglobal = Ngroups * Nlocal_;
+            
+            // one-electron contribution
+            clSetKernelArg(mml1_, 0, sizeof(double), &E_);
+            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_p.handle());
+            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_p.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_p.handle());
+            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_p.handle());
+            clSetKernelArg(mml1_, 5, sizeof(int),    &l1);
+            clSetKernelArg(mml1_, 6, sizeof(int),    &l2);
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &a.handle());
+            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &b.handle());
+            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
             clFinish(queue_);
+            
+            us_mmul_1 += timer.microseconds();
+            
+            // two-electron contribution
+            for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+            {
+                clSetKernelArg(mml2_, 0, sizeof(double), &(fs[ilambda]));
+                clSetKernelArg(mml2_, 1, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
+                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
+            }
+            
+            /* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - *
+            // Alternative routine (but slower).
+            std::size_t nlocal = (2*order+1)*(2*order+1);
+            std::size_t ngroups = Nsegsiz;
+            std::size_t nglobal = nlocal * ngroups;
+            
+            // two-electron contribution
+            for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
+            {
+                clSetKernelArg(mml2_, 0, sizeof(double), &(fs[ilambda]));
+                clSetKernelArg(mml2_, 1, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
+                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &nglobal, &nlocal, 0, nullptr, nullptr);
+            }
+            * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - */
+            
+            clFinish(queue_);
+            
+            us_mmul += timer.microseconds();
         };
         
         // applies KPA preconditioner (two "kron-dots")
         auto inner_prec = [&](const clArrayView<Complex> x, clArrayView<Complex> y) -> void
         {
             // multiply by approximate inverse block
+            Timer timer;
             
-            clSetKernelArg(krd1_, 0, sizeof(cl_mem), &prec1a.handle());
-            clSetKernelArg(krd1_, 1, sizeof(cl_mem), &prec2a.handle());
-            clSetKernelArg(krd1_, 2, sizeof(cl_mem), &x.handle());
-            clSetKernelArg(krd1_, 3, sizeof(cl_mem), &tmA.handle());
-            clEnqueueNDRangeKernel(queue_, krd1_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            std::size_t gsize[2] = { blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_), blocksize_ * ((Nspline + blocksize_ - 1) / blocksize_) };
+            std::size_t lsize[2] = { blocksize_, blocksize_ };
+            
+            clSetKernelArg(mabt_, 0, sizeof(cl_mem), &prec2a.handle());
+            clSetKernelArg(mabt_, 1, sizeof(cl_mem), &x.handle());
+            clSetKernelArg(mabt_, 2, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            clSetKernelArg(krd2_, 0, sizeof(cl_mem), &prec1a.handle());
-            clSetKernelArg(krd2_, 1, sizeof(cl_mem), &prec2a.handle());
-            clSetKernelArg(krd2_, 2, sizeof(cl_mem), &y.handle());
-            clSetKernelArg(krd2_, 3, sizeof(cl_mem), &tmA.handle());
-            clEnqueueNDRangeKernel(queue_, krd2_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(mabt_, 0, sizeof(cl_mem), &prec1a.handle());
+            clSetKernelArg(mabt_, 1, sizeof(cl_mem), &tmA.handle());
+            clSetKernelArg(mabt_, 2, sizeof(cl_mem), &y.handle());
+            clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
             
             clSetKernelArg(krdv_, 0, sizeof(Complex), &E_);
@@ -254,47 +390,57 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             clEnqueueNDRangeKernel(queue_, krdv_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            clSetKernelArg(krd1_, 0, sizeof(cl_mem), &prec1b.handle());
-            clSetKernelArg(krd1_, 1, sizeof(cl_mem), &prec2b.handle());
-            clSetKernelArg(krd1_, 2, sizeof(cl_mem), &y.handle());
-            clSetKernelArg(krd1_, 3, sizeof(cl_mem), &tmA.handle());
-            clEnqueueNDRangeKernel(queue_, krd1_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(mabt_, 0, sizeof(cl_mem), &prec2b.handle());
+            clSetKernelArg(mabt_, 1, sizeof(cl_mem), &y.handle());
+            clSetKernelArg(mabt_, 2, sizeof(cl_mem), &tmA.handle());
+            clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            clSetKernelArg(krd2_, 0, sizeof(cl_mem), &prec1b.handle());
-            clSetKernelArg(krd2_, 1, sizeof(cl_mem), &prec2b.handle());
-            clSetKernelArg(krd2_, 2, sizeof(cl_mem), &y.handle());
-            clSetKernelArg(krd2_, 3, sizeof(cl_mem), &tmA.handle());
-            clEnqueueNDRangeKernel(queue_, krd2_, 1, nullptr, &Nspline, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(mabt_, 0, sizeof(cl_mem), &prec1b.handle());
+            clSetKernelArg(mabt_, 1, sizeof(cl_mem), &tmA.handle());
+            clSetKernelArg(mabt_, 2, sizeof(cl_mem), &y.handle());
+            clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
+            
+            us_prec += timer.microseconds();
         };
         
         // computes norm of the vector
-        auto compute_norm = [&](const clArrayView<Complex> x) -> double
+        auto compute_norm = [&](/* const */ clArrayView<Complex> x) -> double
         {
             // multiply
             //     |x|² -> nrm
+            
+            Timer timer;
+            
             clSetKernelArg(norm_, 0, sizeof(cl_mem), &x.handle());
             clSetKernelArg(norm_, 1, sizeof(cl_mem), &nrm.handle());
-            clEnqueueNDRangeKernel(queue_, norm_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel(queue_, norm_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
             nrm.EnqueueDownload(queue_);
             clFinish(queue_);
+            
+            us_norm += timer.microseconds();
             
             // return square root of the sum
             return std::sqrt(sum(nrm));
         };
         
         // computes scalar product of two arrays
-        auto scalar_product = [&](const clArrayView<Complex> x, const clArrayView<Complex> y) -> Complex
+        auto scalar_product = [&](/* const */ clArrayView<Complex> x, /* const */ clArrayView<Complex> y) -> Complex
         {
             // multiply
             //     x * y -> tmp
+            
+            Timer timer;
+            
             clSetKernelArg(spro_, 0, sizeof(cl_mem), &x.handle());
             clSetKernelArg(spro_, 1, sizeof(cl_mem), &y.handle());
             clSetKernelArg(spro_, 2, sizeof(cl_mem), &tmp.handle());
-            clEnqueueNDRangeKernel(queue_, spro_, 1, nullptr, &Nsegsiz, &Nlocal_, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel(queue_, spro_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
             tmp.EnqueueDownload(queue_);
             clFinish(queue_);
+            
+            us_spro += timer.microseconds();
             
             // sum the product of the arrays
             return sum(tmp);
@@ -305,12 +451,17 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         {
             // multiply
             //     a * x + b * y -> z
+            
+            Timer timer;
+            
             clSetKernelArg(axby_, 0, sizeof(Complex), &a);
             clSetKernelArg(axby_, 1, sizeof(cl_mem),  &x.handle());
             clSetKernelArg(axby_, 2, sizeof(Complex), &b);
             clSetKernelArg(axby_, 3, sizeof(cl_mem),  &y.handle());
-            clEnqueueNDRangeKernel(queue_, axby_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel(queue_, axby_, 1, nullptr, &Nglobal, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
+            
+            us_axby += timer.microseconds();
         };
         
         // solve using the CG solver
@@ -343,6 +494,9 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         prec2b.disconnect();
         Dl1.disconnect();
         Dl2.disconnect();
+        
+        // release bock preconditioner
+        this->CG_exit(ill);
     }
     
     // free GPU memory
@@ -353,8 +507,13 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     S_p.disconnect();
     Mm1_tr_p.disconnect();
     Mm2_p.disconnect();
-    Mi_L.disconnect();
-    Mi_mLm1.disconnect();
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    {
+        Mi_L[lambda].disconnect();
+        Mi_mLm1[lambda].disconnect();
+    }
+    Mi_L_all.disconnect();
+    Mi_mLm1_all.disconnect();
     
     // broadcast inner preconditioner iterations
     par_.sync(n.data(), 1, l1_l2_.size());
@@ -364,6 +523,16 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
     std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
     std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
+    
+    // GPU kernel timing
+    std::size_t us_total = us_axby + us_mmul + us_norm + us_prec + us_spro;
+    std::cout << " [prec: " << format("%2d", int(us_prec * 100. / us_total)) << "%"
+              << ", mul1: " << format("%2d", int(us_mmul_1 * 100. / us_total)) << "%"
+              << ", mul2: " << format("%2d", int((us_mmul-us_mmul_1) * 100. / us_total)) << "%"
+              << ", axby: " << format("%2d", int(us_axby * 100. / us_total)) << "%"
+              << ", norm: " << format("%2d", int(us_norm * 100. / us_total)) << "%"
+              << ", spro: " << format("%2d", int(us_spro * 100. / us_total)) << "%"
+              << "]";
 }
 
 #endif

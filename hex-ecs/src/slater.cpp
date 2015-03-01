@@ -41,25 +41,6 @@
 #include "gauss.h"
 #include "radial.h"
 
-/**
- * Potential suppressing factor. 
- * @param y Radial coordinate of some electron.
- * @param x Radial coordinate of the other electron.
- * @param R Truncation radius.
- */
-inline double damp (Complex y, Complex x, Complex R)
-{
-    // compute hyperradius
-    double r = std::hypot(x.real(), y.real());
-    
-    // if sufficiently far, return clean zero
-    if (r > R.real())
-        return 0.;
-    
-    // else damp using tanh(x) distribution
-    return std::tanh(0.125 * (R.real() - r));
-}
-
 void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const
 {
     Complex R = bspline_.t(iknotmax);
@@ -137,8 +118,7 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
 Complex RadialIntegrals::computeR
 (
     int lambda,
-    int a, int b, int c, int d,
-    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
+    int a, int b, int c, int d
 ) const
 {
     int order = bspline_.order();
@@ -165,10 +145,10 @@ Complex RadialIntegrals::computeR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
@@ -215,8 +195,7 @@ Complex RadialIntegrals::computeR
 Complex RadialIntegrals::computeSimpleR
 (
     int lambda,
-    int a, int b, int c, int d,
-    const cArrayView Mtr_L, const cArrayView Mtr_mLm1
+    int a, int b, int c, int d
 ) const
 {
     int order = bspline_.order();
@@ -225,9 +204,6 @@ Complex RadialIntegrals::computeSimpleR
     // check overlaps
     if (std::abs(a - c) > order or std::abs(b - d) > order)
         return 0.;
-    
-    // diagonal part
-    Complex Rtr_Labcd_diag = 0;
     
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
@@ -239,10 +215,10 @@ Complex RadialIntegrals::computeSimpleR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mtr_L.data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mtr_mLm1.data() + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mtr_L.data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mtr_mLm1.data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mtr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mtr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
@@ -252,16 +228,13 @@ Complex RadialIntegrals::computeSimpleR
     {
         Complex m_ac = Mtr_L_ac[ix - a], m_bd = Mtr_mLm1_bd[iy - b];
         
-        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
-        {
-            // multiply real x real
-            if (m_ac.imag() == 0 and m_bd.imag() == 0)
-                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
-            
-            // multiply other cases
-            else
-                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
-        }
+        // multiply real x real
+        if (m_ac.imag() == 0 and m_bd.imag() == 0)
+            Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+        
+        // multiply other cases
+        else
+            Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
     }
     
     // ix > iy (by renaming the ix,iy indices)
@@ -270,18 +243,15 @@ Complex RadialIntegrals::computeSimpleR
     {
         Complex m_bd = Mtr_L_bd[ix - b], m_ac = Mtr_mLm1_ac[iy - a];
         
-        if (std::isfinite(m_ac.imag()) and std::isfinite(m_bd.imag()))
-        {
-            // multiply real x real
-            if (m_ac.imag() == 0 and m_bd.imag() == 0)
-                Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
-            
-            // multiply other cases
-            else
-                Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
-        }
+        // multiply real x real
+        if (m_ac.imag() == 0 and m_bd.imag() == 0)
+            Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
+        
+        // multiply other cases
+        else
+            Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? (Complex)std::exp(m_ac.real()) : m_ac) * (m_bd.imag() == 0 ? (Complex)std::exp(m_bd.real()) : m_bd);
     }
     
     // sum the diagonal and offdiagonal contributions
-    return Rtr_Labcd_diag + Rtr_Labcd_offdiag;
+    return Rtr_Labcd_offdiag;
 }

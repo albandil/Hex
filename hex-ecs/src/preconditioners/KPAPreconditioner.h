@@ -65,11 +65,17 @@ class KPACGPreconditioner : public CGPreconditioner
             /// Link the structure to a disk file.
             void hdflink (const char * file);
             
+            /// Check that the file exists and can be opened for reading.
+            bool hdfcheck (const char * file = nullptr) const;
+            
             /// Try to load data from a disk file.
             bool hdfload (const char * file = nullptr);
             
             /// Save data to disk.
             bool hdfsave (const char * file = nullptr) const;
+            
+            /// Release memory.
+            void drop ();
             
             /// One-electron hamiltonian diagonalization.
             RowMatrix<Complex> invCl_invsqrtS, invsqrtS_Cl;
@@ -105,12 +111,15 @@ class KPACGPreconditioner : public CGPreconditioner
         virtual void setup ();
         
         // inner CG callback (needed by parent)
+        virtual void CG_init (int iblock) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_exit (int iblock) const;
         
     protected:
         
-        std::vector<Data> prec_;
+        // preconditioner data
+        mutable std::vector<Data> prec_;
 };
 
 #endif

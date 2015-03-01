@@ -211,6 +211,16 @@ inline std::uint64_t pow3 (std::uint64_t i)
 Complex cfgamma (Complex s, Complex z);
 
 /**
+ * @brief Complex exponential.
+ * 
+ * Calculates complex exponential of imaginary number (complex phase).
+ */
+inline Complex cis (double phi)
+{
+    return Complex(std::cos(phi),std::sin(phi));
+}
+
+/**
  * @brief Get zeros of the Coulomb wave function @f$ F_L(-1/k,kr) @f$.
  * 
  * Calculates given number of leading zeros of the Coulomb wave function

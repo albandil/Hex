@@ -61,6 +61,9 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
             auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
             
+            // prepare the block-preconditioner for run
+            this->CG_init(ill);
+            
             // solve using the CG solver
             n[ill] = cg_callbacks < cArray, cArrayView >
             (
@@ -73,6 +76,9 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
                 inner_mmul,             // matrix multiplication
                 false                   // verbose output
             );
+            
+            // release block-preconditioner block-specific data
+            this->CG_exit(ill);
         }
         catch (std::exception const & e)
         {
@@ -90,6 +96,12 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
 }
 
+void CGPreconditioner::CG_init (int iblock) const
+{
+    if (cmd_.outofcore and cmd_.wholematrix)
+        dia_blocks_[iblock].hdfload();
+}
+
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
     q = dia_blocks_[iblock].dot(p, cmd_.parallel_dot);
@@ -98,4 +110,10 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
     z = r;
+}
+
+void CGPreconditioner::CG_exit (int iblock) const
+{
+    if (cmd_.outofcore and cmd_.wholematrix)
+        dia_blocks_[iblock].drop();
 }

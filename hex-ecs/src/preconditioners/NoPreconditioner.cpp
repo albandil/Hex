@@ -72,6 +72,10 @@ void NoPreconditioner::update (double E)
 {
     OMP_prepare;
     
+    // shorthands
+    unsigned Nspline = s_bspline_.Nspline();
+    unsigned order = s_bspline_.order();
+    
     // update energy
     E_ = E;
     
@@ -80,14 +84,6 @@ void NoPreconditioner::update (double E)
         return;
     
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
-    
-    // some accelerator data for the calculation of the radial integrals
-    cArrays Mtr_L(s_rad_.maxlambda() + 1), Mtr_mLm1(s_rad_.maxlambda() + 1);
-    if (cmd_.lightweight_radial_cache)
-    {
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-            s_rad_.init_R_tr_dia_block(lambda, Mtr_L[lambda], Mtr_mLm1[lambda]);
-    }
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
@@ -98,11 +94,10 @@ void NoPreconditioner::update (double E)
         int l2 = l1_l2_[ill].second;
         
         // initialize diagonal block
-        dia_blocks_[ill] = BlockSymDiaMatrix
+        dia_blocks_[ill] = BlockSymBandMatrix
         (
             s_bspline_.Nspline(),       // block count (and size)
-            s_rad_.S().nzpattern(),     // block structure
-            s_rad_.S().diag(),          // non-zero diagonals
+            s_bspline_.order() + 1,     // half-bandwidth
             not cmd_.outofcore,         // keep in memory?
             format("dblk-%d.ooc", ill)  // scratch disk file name
         );
@@ -113,18 +108,18 @@ void NoPreconditioner::update (double E)
         
         // for all blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_dot)
-        for (unsigned iblock = 0; iblock < dia_blocks_[ill].structure().size(); iblock++)
+        for (unsigned i = 0; i < Nspline; i++)
+        for (unsigned d = 0; d <= order; d++)
+        if (i + d < Nspline)
         {
-            // get block position
-            int i = dia_blocks_[ill].structure()[iblock].first;
-            int j = dia_blocks_[ill].structure()[iblock].second;
+            unsigned j = i + d;
             
             // one-electron part
-            cArray block = E * s_rad_.S()(i,j) * s_rad_.S().data();
-            block -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S().data();
-            block -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S().data();
-            block -= s_rad_.S()(i,j) * (0.5 * s_rad_.D().data() - s_rad_.Mm1_tr().data());
-            block -= 0.5 * l2 * (l2 + 1) * s_rad_.S()(i,j) * s_rad_.Mm2().data();
+            SymBandMatrix block = E * s_rad_.S()(i,j) * s_rad_.S();
+            block -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
+            block -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S();
+            block -= s_rad_.S()(i,j) * (0.5 * s_rad_.D() - s_rad_.Mm1_tr());
+            block -= 0.5 * l2 * (l2 + 1) * s_rad_.S()(i,j) * s_rad_.Mm2();
             
             // two-electron part
             for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
@@ -141,34 +136,30 @@ void NoPreconditioner::update (double E)
                     continue;
             
                 // calculate two-electron term
-                cArray contrib;
                 if (not cmd_.lightweight_radial_cache)
                 {
                     // use precomputed block ... 
                     if (not cmd_.cache_all_radint) // ... from scratch file
                     {
                         OMP_exclusive_in;
-                        contrib = (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                        block.data() += (-f) * s_rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                         OMP_exclusive_out;
                     }
                     else // ... from memory
                     {
-                        contrib = (-f) * s_rad_.R_tr_dia(lambda).getBlock(iblock);
+                        block.data() += (-f) * s_rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                     }
                 }
                 else
                 {
                     // compute the data anew
-                    contrib = (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j, Mtr_L[lambda], Mtr_mLm1[lambda], dia_blocks_[ill].structure());
+                    block += (-f) * s_rad_.calc_R_tr_dia_block(lambda, i, j);
                 }
-                
-                // update the sub-block
-                block += contrib;
             }
             
             // save block
             OMP_exclusive_in;
-            dia_blocks_[ill].setBlock(iblock,block);
+            dia_blocks_[ill].setBlock(i * (order + 1) + d, block.data());
             OMP_exclusive_out;
         }
     }
@@ -328,8 +319,16 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // copy-to segment of "q"
             cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
             
+            // load data from scratch disk
+            if (cmd_.outofcore and cmd_.wholematrix)
+                const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).hdfload();
+            
             // multiply
-            q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot, cmd_.wholematrix);
+            q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot);
+            
+            // unload data
+            if (cmd_.outofcore and cmd_.wholematrix)
+                const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).drop();
         }
         
         // multiply "p" by the off-diagonal blocks - single proces
@@ -338,7 +337,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         {
             // load data from scratch disk
             if (not cmd_.cache_own_radint and cmd_.wholematrix)
-                const_cast<BlockSymDiaMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
+                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
             
             // update all blocks with this multipole potential matrix
             for (int ill = 0;  ill < Nang;  ill++)
@@ -377,7 +376,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // load data from scratch disk
             if (not cmd_.cache_own_radint)
-                const_cast<BlockSymDiaMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
+                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
         }
         
         // multiply "p" by the off-diagonal blocks multiprocess
@@ -420,7 +419,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
                 
                 // calculate product
-                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot, cmd_.wholematrix) );
+                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
                 
                 // update collected product
                 OMP_exclusive_in;
@@ -442,9 +441,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         // Lightweight mode multiplication
         //
         
-        // get one-electron matrix structure
-        std::vector<std::pair<int,int>> structure = s_rad_.S().nzpattern();
-        
         // multiply "p" by the diagonal super-blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
@@ -461,16 +457,13 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             int l2 = l1_l2_[ill].second;
             
             // multiply 'p_block' by the diagonal block (except for the two-electron term)
-            q_block  = kron_dot(Complex(E_) * s_rad_.S_d(), s_rad_.S_d(), p_block);
-            q_block -= kron_dot(Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * l1 * (l1 + 1.)) * s_rad_.Mm2_d(), s_rad_.S_d(), p_block);
-            q_block -= kron_dot(s_rad_.S_d(), Complex(0.5) * s_rad_.D_d() - s_rad_.Mm1_tr_d() + Complex(0.5 * l2 * (l2 + 1.)) * s_rad_.Mm2_d(), p_block);
+            q_block  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p_block);
+            q_block -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l1*(l1+1)) * s_rad_.Mm2(), s_rad_.S(), p_block);
+            q_block -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l2*(l2+1)) * s_rad_.Mm2(), p_block);
         }
         
         // auxiliary buffers
         cArray buffer (Nang * Nspline);
-        cArrays Mtr_L(s_rad_.maxlambda() + 1), Mtr_mLm1(s_rad_.maxlambda() + 1);
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-            s_rad_.init_R_tr_dia_block(lambda, Mtr_L[lambda], Mtr_mLm1[lambda]);
         
         // precalculate angular integrals
         double fs[Nang][Nang][s_rad_.maxlambda() + 1];
@@ -506,7 +499,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 for (int i = i_min; i <= i_max; i++)
                 {
                     // calculate the radial sub-block
-                    cArray R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k, Mtr_L[lambda], Mtr_mLm1[lambda], structure);
+                    SymBandMatrix R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
                     
                     // apply all superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))
@@ -518,7 +511,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                         for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
                         {
                             // multiply sub-segment by the R block
-                            product += fs[ill][illp][lambda] * SymDiaMatrix::sym_dia_dot(Nspline, s_rad_.S().diag(), R_block_ik.data(), buffer.data() + illp * Nspline);
+                            product += fs[ill][illp][lambda] * R_block_ik.dot(cArrayView(buffer, illp * Nspline, Nspline));
                         }
                         
                         // update the owned sub-segment

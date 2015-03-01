@@ -104,10 +104,10 @@ template <class T> class clArrayView : public ArrayView<T>
         {
             // release previous allocation prior to creating a new buffer !
             if (cl_handle_ != nullptr)
-                throw exception ("[clArray::connect] Release the buffer before connecting!");
+                HexException("[clArray::connect] Array is already connected!");
             
             // allocate memory on GPU
-            cl_handle_ = clCreateBuffer (context, flags, size() * sizeof(T), data(), nullptr);
+            cl_handle_ = clCreateBuffer(context, flags, size() * sizeof(T), data(), nullptr);
         }
         
         void disconnect ()
@@ -122,12 +122,12 @@ template <class T> class clArrayView : public ArrayView<T>
         
         cl_int EnqueueUpload (cl_command_queue queue)
         {
-            return clEnqueueWriteBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            return clEnqueueWriteBuffer(queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
         cl_int EnqueueDownload (cl_command_queue queue)
         {
-            return clEnqueueReadBuffer (queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
+            return clEnqueueReadBuffer(queue, cl_handle_, CL_TRUE, 0, size() * sizeof(T), data(), 0, nullptr, nullptr);
         }
         
         cl_mem const & handle () const
