@@ -2068,7 +2068,7 @@ cArray BlockSymBandMatrix::dot (cArrayView v, bool parallelize) const
                 // read data from the disk
                 diskdata.resize(vol);
                 if (not hdf->read("data", &diskdata[0], vol, offset))
-                    HexException("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                    HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
                 
                 // reset view to the new data
                 view.reset(vol, diskdata.data());
@@ -2164,7 +2164,7 @@ CooMatrix BlockSymBandMatrix::tocoo () const
             // read data from the disk
             diskdata.resize(size_ * halfbw_);
             if (not hdf->read("data", &diskdata[0], size_ * halfbw_, (i * halfbw_ + d) * size_ * halfbw_))
-                HexException("Failed to read HDF file \"%s\".", diskfile_.c_str());
+                HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
             
             // reset view to the new data
             view.reset(size_ * halfbw_, diskdata.data());
@@ -2267,14 +2267,14 @@ cArray BlockSymBandMatrix::getBlock (int i) const
         
         // check success
         if (not hdf.valid())
-            HexException("Cannot open file \"%s\".", diskfile_.c_str());
+            HexException("Cannot open file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
         
         // create output array
         cArray data (size_ * halfbw_);
         
         // read data
         if (not hdf.read("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
-            HexException("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+            HexException("Cannot access block %d in file \"%s\".\nHDF error stack:\n%s", i, diskfile_.c_str(), hdf.error().c_str());
         
         return data;
     }
@@ -2298,7 +2298,7 @@ void BlockSymBandMatrix::setBlock (int i, const cArrayView data)
             // create a new file
             phdf = new HDFFile (diskfile_, HDFFile::overwrite);
             if (not phdf->valid())
-                HexException("Cannot open file \"%s\" for writing.", diskfile_.c_str());
+                HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
             
             // initialize the dataset to its full length
             phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_);
@@ -2306,7 +2306,7 @@ void BlockSymBandMatrix::setBlock (int i, const cArrayView data)
         
         // write data
         if (not phdf->write("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
-            HexException("Cannot access block %d in file \"%s\".", i, diskfile_.c_str());
+            HexException("Cannot access block %d in file \"%s\".\nHDF error stack:\n%s", i, diskfile_.c_str(), phdf->error().c_str());
         
         delete phdf;
     }

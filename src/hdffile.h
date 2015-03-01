@@ -111,6 +111,9 @@ public:
     /// Internal HDF object.
     hid_t file () const { return file_; }
     
+    /// Error stack.
+    std::string const & error () const { return error_; };
+    
 private:
     
     /// Pointer to the HDF structure.
@@ -118,6 +121,9 @@ private:
     
     /// Filename.
     std::string name_;
+    
+    /// HDF library error stack (set on unsuccessful return).
+    mutable std::string error_;
     
     /// Whether the file is valid.
     bool valid_;
@@ -127,6 +133,9 @@ private:
     
     /// Auxiliary write function.
     bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype);
+    
+    /// Set error and return false.
+    bool fail () const;
 };
 
 #endif
