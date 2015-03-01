@@ -86,6 +86,46 @@ HDFFile::~HDFFile ()
     }
 }
 
+bool HDFFile::fail () const
+{
+    // get number of messages in the error stack
+    ssize_t n = H5Eget_num(H5E_DEFAULT);
+    
+    // output stream
+    std::stringstream out;
+    
+    // for all messages
+    H5E_type_t type;
+    for (ssize_t i = 0; i < n; i++)
+    {
+        // get message size
+        ssize_t size = H5Eget_msg(i, &type, nullptr, 0);
+        
+        // skip empty messages
+        if (size <= 0)
+        {
+            out << "  #" << i << std::endl;
+            continue;
+        }
+        
+        // retrieve message text
+        char text[size];
+        size = H5Eget_msg(i, &type, text, size);
+        if (size <= 0)
+        {
+            out << "  #" << i << std::endl;
+            continue;
+        }
+        
+        out << "  #" << i << " " << text << std::endl;
+    }
+    
+    // get resulting string
+    error_ = out.str();
+    
+    return false;
+}
+
 std::size_t HDFFile::size (std::string dataset) const
 {
     // invalid file has zero size
@@ -103,7 +143,10 @@ std::size_t HDFFile::size (std::string dataset) const
     // open associated dataspace
     hid_t dspc = H5Dget_space(dset);
     if (dspc < 0)
+    {
+        H5Dclose(dset);
         return 0; // some unknown error, assumed invalid dataset
+    }
     
     // retrieve size of the dataset
     hssize_t length = H5Sget_simple_extent_npoints(dspc);
@@ -136,14 +179,14 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
     // open requested dataset
     hid_t dset = H5Dopen2(file_, dataset.c_str(), 0);
     if (dset < 0)
-        return false;
+        return fail();
     
     // open associated dataspace
     hid_t dspc = H5Dget_space(dset);
     if (dspc < 0)
     {
         H5Dclose(dset);
-        return false;
+        return fail();
     }
     
     // select data in the file
@@ -152,7 +195,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
     {
         H5Dclose(dset);
         H5Sclose(dspc);
-        return false;
+        return fail();
     }
     
     // create simple memory space
@@ -161,7 +204,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
     {
         H5Dclose(dset);
         H5Sclose(dspc);
-        return false;
+        return fail();
     }
     
     // read data
@@ -171,7 +214,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
         H5Dclose(dset);
         H5Sclose(dspc);
         H5Sclose(mspc);
-        return false;
+        return fail();
     }
     
     // release memory
@@ -207,7 +250,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
         if (dspc < 0)
         {
             H5Dclose(dset);
-            return false;
+            return fail();
         }
         
         // create a new dataset
@@ -216,7 +259,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
         {
             H5Sclose(dspc);
             H5Dclose(dset);
-            return false;
+            return fail();
         }
     }
     else
@@ -226,7 +269,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
         if (dspc < 0)
         {
             H5Dclose(dset);
-            return false;
+            return fail();
         }
         
         // select data in the file
@@ -235,7 +278,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
         {
             H5Dclose(dset);
             H5Sclose(dspc);
-            return false;
+            return fail();
         }
     }
     
@@ -245,7 +288,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
     {
         H5Dclose(dset);
         H5Sclose(dspc);
-        return false;
+        return fail();
     }
     
     // write data from buffer
@@ -255,7 +298,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
         H5Dclose(dset);
         H5Sclose(dspc);
         H5Sclose(mspc);
-        return false;
+        return fail();
     }
     
     // release memory
