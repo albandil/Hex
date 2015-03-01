@@ -58,14 +58,13 @@ class CGPreconditioner : public NoPreconditioner
         ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
         
         // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return NoPreconditioner::rad(); }
         virtual void setup () { return NoPreconditioner::setup(); }
         virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (cArray & chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { NoPreconditioner::multiply(p, q); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions
-        virtual void precondition (const cArrayView r, cArrayView z) const;
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
         // inner CG callbacks
         virtual void CG_init (int iblock) const;

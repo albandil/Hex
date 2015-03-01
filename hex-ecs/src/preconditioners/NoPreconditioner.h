@@ -65,13 +65,11 @@ class NoPreconditioner : public PreconditionerBase
             // nothing to do
         }
         
-        virtual RadialIntegrals const & rad () const { return s_rad_; }
-        
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (cArray & chi, int ienergy, int instate, int Spin) const;
-        virtual void multiply (const cArrayView p, cArrayView q) const;
-        virtual void precondition (const cArrayView r, cArrayView z) const { z = r; }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
         
     protected:
         

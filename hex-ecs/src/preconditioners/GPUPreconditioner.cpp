@@ -191,7 +191,7 @@ void GPUCGPreconditioner::setup ()
     krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
 }
 
-void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
+void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // shorthands
     std::size_t Nspline = s_rad_.bspline().Nspline();
@@ -246,9 +246,16 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
         
+        // load blocks
+        if (cmd_.outofcore)
+        {
+            const_cast<BlockArray<Complex>&>(r).hdfload(ill);
+            z.hdfload(ill);
+        }
+        
         // create segment views
-        clArrayView<Complex> rview (r, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz);
-        clArrayView<Complex> zview (z, (ill / par_.Nproc()) * Nsegsiz, Nsegsiz);
+        clArrayView<Complex> rview (r[ill], 0, Nsegsiz);
+        clArrayView<Complex> zview (z[ill], 0, Nsegsiz);
         rview.connect(context_, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR);
         zview.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
         
@@ -290,7 +297,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         }
         
         // allocation (and upload) of an OpenCL array
-        auto new_opencl_array = [&](std::size_t n) -> clArray<Complex>
+        auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
         {
             // create array
             clArray<Complex> a(n);
@@ -474,7 +481,7 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false,                  // verbose output
+            true,                  // verbose output
             compute_norm,           // norm of an array
             scalar_product,         // scalar product of two arrays
             axby,                   // weighted sum of two arrays
@@ -494,6 +501,14 @@ void GPUCGPreconditioner::precondition (const cArrayView r, cArrayView z) const
         prec2b.disconnect();
         Dl1.disconnect();
         Dl2.disconnect();
+        
+        // unload blocks
+        if (cmd_.outofcore)
+        {
+            const_cast<BlockArray<Complex>&>(r)[ill].drop();
+            z.hdfsave(ill);
+            z[ill].drop();
+        }
         
         // release bock preconditioner
         this->CG_exit(ill);

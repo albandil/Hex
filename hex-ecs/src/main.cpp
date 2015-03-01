@@ -238,24 +238,36 @@ else
 if (cmd.itinerary & CommandLine::StgSolve)
 {
     // CG preconditioner callback
-    auto apply_preconditioner = [ & ](cArray & r, cArray & z) -> void
+    auto apply_preconditioner = [ & ](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void
     {
         // MPI-distributed preconditioning
         prec->precondition(r, z);
     };
     
     // CG matrix multiplication callback
-    auto matrix_multiply = [ & ](cArray const & p, cArray & q) -> void
+    auto matrix_multiply = [ & ](BlockArray<Complex> const & p, BlockArray<Complex> & q) -> void
     {
         // MPI-distributed multiplication
         prec->multiply(p, q);
     };
     
     // CG scalar product function callback
-    auto scalar_product = [ & ](cArray const & x, cArray const & y) -> Complex
+    auto scalar_product = [ & ](BlockArray<Complex> const & x, BlockArray<Complex> const & y) -> Complex
     {
         // compute node-local scalar product
-        Complex prod = (x|y);
+        Complex prod = 0;
+        
+        // for all segments
+        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyWork(i))
+        {
+            if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
+            if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
+            
+            prod += (x[i]|y[i]);
+            
+            if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x)[i].drop();
+            if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
+        }
         
         // colect products from other nodes
         par.syncsum(&prod, 1);
@@ -265,16 +277,63 @@ if (cmd.itinerary & CommandLine::StgSolve)
     };
     
     // CG norm function that broadcasts master's result to all nodes
-    auto compute_norm = [ & ](cArray const & r) -> double
+    auto compute_norm = [ & ](BlockArray<Complex> const & r) -> double
     {
         // compute node-local norm of 'r'
-        double rnorm2 = r.sqrnorm();
+        double rnorm2 = 0;
+        for (std::size_t i = 0; i < r.size(); i++) if (par.isMyWork(i))
+        {
+            if (not r.inmemory())
+                const_cast<BlockArray<Complex>&>(r).hdfload(i);
+            
+            rnorm2 += r[i].sqrnorm();
+            
+            if (not r.inmemory())
+                const_cast<BlockArray<Complex>&>(r)[i].drop();
+        }
         
         // collect norms from other nodes
         par.syncsum(&rnorm2, 1);
         
         // return global norm
         return std::sqrt(rnorm2);
+    };
+    
+    // CG linear combination
+    auto axby_operation = [ & ](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void
+    {
+        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyWork(i))
+        {
+            if (not x.inmemory()) x.hdfload(i);
+            if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
+            
+            for (std::size_t j = 0; j < x[i].size(); j++)
+                x[i][j] = a * x[i][j] + b * y[i][j];
+            
+            if (not x.inmemory()) { x.hdfsave(i); x[i].drop(); }
+            if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
+        }
+    };
+    
+    // CG new array
+    auto new_array = [ & ](std::size_t N, std::string name) -> BlockArray<Complex>
+    {
+        // create a new block array
+        BlockArray<Complex> array (N, !cmd.outofcore, name);
+        
+        // initialize all blocks ('resize' automatically zeroes added elements)
+        for (std::size_t i = 0; i < N; i++) if (par.isMyWork(i))
+        {
+            array[i].resize(Nspline * Nspline);
+            
+            if (not array.inmemory())
+            {
+                array.hdfsave(i);
+                array[i].drop();
+            }
+        }
+        
+        return array;
     };
     
     //
@@ -291,8 +350,6 @@ if (cmd.itinerary & CommandLine::StgSolve)
                   << int(trunc(ie * 100. / inp.Ei.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
-        
-        cArray current_solution, previous_solution;
         
         // we may have already computed all solutions for this energy... is it so?
         bool all_done = true;
@@ -371,7 +428,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // create right hand side
             std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
-            cArray chi;
+            BlockArray<Complex> chi (coupled_states.size(), !cmd.outofcore, "cg-b");
             prec->rhs(chi, ie, instate, Spin);
             
             // compute and check norm of the right hand side vector
@@ -392,14 +449,14 @@ if (cmd.itinerary & CommandLine::StgSolve)
             }
             
             // custom conjugate gradients callback-based solver
-            current_solution = cArray(chi.size());
+            BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x")));
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
-            unsigned iterations = cg_callbacks < cArray, cArrayView >
+            unsigned iterations = cg_callbacks < cBlockArray, cBlockArray& >
             (
                 chi,                    // right-hand side
-                current_solution,       // on input, the initial guess, on return, the solution
+                psi,                    // on input, the initial guess, on return, the solution
                 cmd.itertol,            // requested precision, |A·x - b|² < ε·|b|²
                 0,                      // minimal iteration count
                 max_iter,               // maximal iteration count
@@ -407,7 +464,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 matrix_multiply,        // matrix multiplication callback
                 true,                   // verbose output
                 compute_norm,           // how to evaluate norm of an array
-                scalar_product          // how to calculate scalar product of two arrays
+                scalar_product,         // how to calculate scalar product of two arrays
+                axby_operation,         // ax + by
+                new_array
             );
             
             if (iterations >= max_iter)
@@ -421,12 +480,12 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // save solution to disk (if valid)
             // - master process will collect all data and write them sequentially to disk
-            if (std::isfinite(compute_norm(current_solution)))
+            if (std::isfinite(compute_norm(psi)))
             {
                 // save solution to a single file if MPI is not active
                 if (par.Nproc() == 1)
                 {
-                    reader.save(current_solution);
+                    reader.save(psi);
                 }
                 
                 // save all owned segments to separate files
@@ -434,8 +493,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 {
                     for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
                     {
-                        cArrayView data (Nspline * Nspline, current_solution.data() + (ill / par.Nproc()) * Nspline * Nspline);
-                        reader.save(data, ill);
+                        reader.save(psi, ill);
                     }
                 }
             }
@@ -462,7 +520,7 @@ else // i.e. no StgSolve
 if (cmd.itinerary & CommandLine::StgExtract)
 {
     // extract amplitudes
-    Amplitudes ampl (bspline, inp, par, coupled_states);
+    Amplitudes ampl (bspline, inp, par, cmd, coupled_states);
     ampl.extract();
     
     // write T-matrices to a text file as SQL statements 

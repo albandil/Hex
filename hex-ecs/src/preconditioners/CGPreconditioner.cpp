@@ -40,7 +40,7 @@
 const std::string CGPreconditioner::name = "cg";
 const std::string CGPreconditioner::description = "Block inversion using plain conjugate gradients. Use --tolerance option to set the termination tolerance.";
 
-void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
+void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
@@ -53,9 +53,12 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
     {
         try
         {
-            // create segment views
-            cArrayView rview (r, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
-            cArrayView zview (z, (ill / par_.Nproc()) * Nspline * Nspline, Nspline * Nspline);
+            // load blocks, if necessary
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(r).hdfload(ill);
+                z.hdfload(ill);
+            }
             
             // wrappers around the callbacks
             auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
@@ -67,8 +70,8 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             // solve using the CG solver
             n[ill] = cg_callbacks < cArray, cArrayView >
             (
-                rview,                  // rhs
-                zview,                  // solution
+                r[ill],                 // rhs
+                z[ill],                 // solution
                 cmd_.prec_itertol,      // preconditioner tolerance
                 0,                      // min. iterations
                 Nspline * Nspline,      // max. iteration
@@ -79,6 +82,15 @@ void CGPreconditioner::precondition (const cArrayView r, cArrayView z) const
             
             // release block-preconditioner block-specific data
             this->CG_exit(ill);
+            
+            // unload blocks
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(r)[ill].drop();
+                
+                z.hdfsave(ill);
+                z[ill].drop();
+            }
         }
         catch (std::exception const & e)
         {

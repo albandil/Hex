@@ -83,10 +83,10 @@ void Amplitudes::extract ()
                 
                 // load the solution
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Ei[ie], ang_, bspline_.Nspline());
-                cArray solution;
+                BlockArray<Complex> solution (ang_.size(), cmd_.outofcore, "sol");
                 if (not reader.load(solution))
                 {
-                    std::cout << "\t\t\tFile \"" << reader.name() << "\" not found." << std::endl;
+                    std::cout << "\t\t\tSolution file(s) for L = " << inp_.L << ", Pi = " << inp_.Pi << ", ni = " << ni << ", li = " << li << ", mi = " << mi << " not found." << std::endl;
                     continue;
                 }
                 
@@ -340,7 +340,7 @@ void Amplitudes::writeICS_files ()
     fS1.close();
 }
 
-void Amplitudes::computeLambda_ (Amplitudes::Transition T, const cArrayView solution, int ie, int Spin)
+void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {
     // final projectile momenta
     rArray kf = sqrt(inp_.Ei - 1./(inp_.ni*inp_.ni) + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
@@ -426,16 +426,21 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, const cArrayView solu
             // get angular momentum
             int ell = ang_[ill].second;
             
-            // get correct solution (for this ang. mom.)
-            cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
+            // load solution block
+            if (not solution.inmemory())
+                const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
             
             // update value in the storage
-            Complex lambda = Sp.transpose().dot(PsiSc).dot(Wj[ell].todense()).todense()[0] / double(samples);
+            Complex lambda = Sp.transpose().dot(solution[ill]).dot(Wj[ell].todense()).todense()[0] / double(samples);
             # pragma omp critical
             if (Spin == 0)
                 (Lambda_Slp[T][ell].first)[ie] += lambda;
             else
                 (Lambda_Slp[T][ell].second)[ie] += lambda;
+            
+            // unload solution block
+            if (not solution.inmemory())
+                const_cast<BlockArray<Complex>&>(solution)[ill].drop();
         }
     }
 }
@@ -629,11 +634,8 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
     return CB;
 }
 
-void Amplitudes::computeXi_ (Amplitudes::Transition T, const cArrayView solution, int ie, int Spin)
+void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {
-    // B-spline count
-    int Nspline = bspline_.Nspline();
-    
     // maximal available momentum
     double kmax = std::sqrt(inp_.Ei[ie] - 1./(T.ni*T.ni));
     
@@ -645,15 +647,20 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, const cArrayView solution
         
         std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
         
-        // create subset of the solution
-        cArrayView PsiSc (solution, ill * Nspline * Nspline, Nspline * Nspline);
+        // load solution block
+        if (not solution.inmemory())
+            const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
         
         // compute new ionization amplitude
-        Chebyshev<double,Complex> CB = fcheb(bspline_, PsiSc, kmax, l1, l2);
+        Chebyshev<double,Complex> CB = fcheb(bspline_, solution[ill], kmax, l1, l2);
         if (Spin == 0)
             Xi_Sl1l2[T][ill * inp_.Ei.size() + ie].first = CB.coeffs();
         else
             Xi_Sl1l2[T][ill * inp_.Ei.size() + ie].second = CB.coeffs();
+        
+        // unload solution block
+        if (not solution.inmemory())
+            const_cast<BlockArray<Complex>&>(solution)[ill].drop();
     }
     
     std::cout << std::endl;

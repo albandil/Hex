@@ -48,9 +48,17 @@
  * by a different method, if necessary; for example when the created array needs
  * to be registered at GPU first.
  */
-inline cArray default_new_complex_array (std::size_t n)
+inline cArray default_new_complex_array (std::size_t n, std::string name)
 {
     return cArray(n);
+}
+
+/**
+ * @brief Calculate scalar product of two arrays.
+ */
+inline Complex default_scalar_product (const cArrayView x, const cArrayView y)
+{
+    return (x|y);
 }
 
 /**
@@ -163,7 +171,7 @@ template
     class Preconditioner,
     class MatrixMultiplication,
     class ComputeNorm   = decltype(default_compute_norm),
-    class ScalarProduct = decltype(operator|<Complex>),
+    class ScalarProduct = decltype(default_scalar_product),
     class AxbyOperation = decltype(default_complex_axby),
     class NewArray      = decltype(default_new_complex_array)
 >
@@ -178,7 +186,7 @@ unsigned cg_callbacks
     MatrixMultiplication matrix_multiply,
                     bool verbose        = true,
              ComputeNorm compute_norm   = default_compute_norm,
-           ScalarProduct scalar_product = operator|<Complex>,
+           ScalarProduct scalar_product = default_scalar_product,
            AxbyOperation axby           = default_complex_axby,
                 NewArray new_array      = default_new_complex_array
 )
@@ -199,7 +207,7 @@ unsigned cg_callbacks
     std::size_t N = b.size();
     
     // residual; initialized to starting residual using the initial guess
-    TArray r (std::move(new_array(N)));
+    TArray r (std::move(new_array(N,"cg-r")));
     matrix_multiply(x, r); // r = A x
     axby(-1., r, 1., b); // r = b - r
     double rnorm = compute_norm(r);
@@ -217,8 +225,8 @@ unsigned cg_callbacks
     }
     
     // some auxiliary arrays (search directions etc.)
-    TArray p (std::move(new_array(N)));
-    TArray z (std::move(new_array(N)));
+    TArray p (std::move(new_array(N,"cg-p")));
+    TArray z (std::move(new_array(N,"cg-z")));
     
     // some other scalar variables
     Complex rho_new;        // contains inner product r_i^T · r_i
@@ -245,7 +253,6 @@ unsigned cg_callbacks
         
         // compute projection ρ = r·z
         rho_new = scalar_product(r, z);
-//         std::cout << "rho_new = " << rho_new << std::endl;
         
         // setup search direction p
         if (k == 1)
@@ -263,7 +270,6 @@ unsigned cg_callbacks
         
         // compute projection ratio α
         alpha = rho_new / scalar_product(p, z);
-//         std::cout << "alpha = " << alpha << std::endl;
         
         // update the solution and the residual
         axby(1., x, alpha, p); // x = x + α p
@@ -517,7 +523,7 @@ template
     class MatrixMultiplication,
     class ComputeNorm   = decltype(default_compute_norm),
     class AxbyOperation = decltype(default_complex_axby),
-    class ScalarProduct = decltype(operator|<Complex>),
+    class ScalarProduct = decltype(default_scalar_product),
     class NewArray      = decltype(default_new_complex_array)
 >
 int minres_callbacks

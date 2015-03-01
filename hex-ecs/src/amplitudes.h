@@ -61,9 +61,9 @@ class Amplitudes
         
         Amplitudes
         (
-            Bspline const & bspline, InputFile const & inp, Parallel const & par,
+            Bspline const & bspline, InputFile const & inp, Parallel const & par, CommandLine const & cmd,
             std::vector<std::pair<int,int>> const & ang
-        ) : bspline_(bspline), rad_(bspline_), inp_(inp), par_(par), ang_(ang)
+        ) : bspline_(bspline), rad_(bspline_), inp_(inp), par_(par), cmd_(cmd), ang_(ang)
         {
             // nothing to do
         }
@@ -176,7 +176,7 @@ class Amplitudes
          *        \mathrm{d}r_1 \ .
          * @f]
          */
-        void computeLambda_ (Transition T, const cArrayView solution, int ie, int Spin);
+        void computeLambda_ (Transition T, BlockArray<Complex> const & solution, int ie, int Spin);
         
         /**
          * @brief Evaluate T-matrices.
@@ -226,7 +226,7 @@ class Amplitudes
          * @param coupled_states List of all coupled-state angular momenta pairs.
          * @return Vector of radial integrals.
          */
-        void computeXi_ (Transition T, const cArrayView solution, int ie, int Spin);
+        void computeXi_ (Transition T, BlockArray<Complex> const & solution, int ie, int Spin);
         
         /**
          * @brief Evaluate cross sections.
@@ -249,6 +249,9 @@ class Amplitudes
         
         // parallel environment
         Parallel const & par_;
+        
+        // command line switches
+        CommandLine const & cmd_;
         
         // angular basis
         std::vector<std::pair<int,int>> const & ang_;

@@ -53,11 +53,6 @@ class PreconditionerBase
     public:
         
         /**
-         * @brief Get radial integrals.
-         */
-        virtual RadialIntegrals const & rad() const = 0;
-        
-        /**
          * @brief Initialize the preconditioner.
          * 
          * This function contains all computation intensive preparations
@@ -77,7 +72,7 @@ class PreconditionerBase
         /**
          * @brief Calculate the right-hand side.
          */
-        virtual void rhs (cArray & chi, int ie, int instate, int Spin) const = 0;
+        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -85,7 +80,7 @@ class PreconditionerBase
          * This function implements matrix multiplication by the matrix of
          * the set of equations that is to be solved.
          */
-        virtual void multiply (const cArrayView p, cArrayView q) const = 0;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const = 0;
         
         /**
          * @brief Precondition the equation.
@@ -97,7 +92,7 @@ class PreconditionerBase
          * @f]
          * It may use the MPI environment.
          */
-        virtual void precondition (const cArrayView r, cArrayView z) const = 0;
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const = 0;
 };
 
 class NoPreconditioner;

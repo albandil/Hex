@@ -277,65 +277,56 @@ class SolutionIO
          * is not written and 'false' is returned. Otherwise the function returns 'true'
          * and fills the contents of the array with the read data.
          */
-        bool load (cArray & sol, int ill = -1)
+        bool load (BlockArray<Complex> & solution, int ill = -1)
         {
             // check that the requested files are present
             if (not check(ill))
                 return false;
             
-            // load the whole solution
+            // select segments
+            iArray segments_to_load = { ill };
             if (ill == -1)
-            {
-                //
-                // a) load the whole monolithic solution file
-                //
-                
-                    // simply check presence of the file and load the data, if available
-                    if (HDFFile(name(), HDFFile::readonly).valid())
-                        return sol.hdfload(name());
-                
-                //
-                // b) load all solution segments
-                //
-                
-                    // allocate memory for all segments
-                    sol.resize(Nspline_ * Nspline_ * ang_.size());
-                    
-                    // load all segments
-                    for (unsigned illp = 0; illp < ang_.size(); illp++)
-                    {
-                        if (not HDFFile(name(illp), HDFFile::readonly).read("array", sol.data() + illp * Nspline_ * Nspline_, Nspline_ * Nspline_))
-                            return false;
-                    }
-                    
-                    // successfully loaded all segments
-                    return true;
-            }
+                segments_to_load = linspace<int>(0, solution.size() - 1, solution.size());
             
-            // load only a segment of the solution
-            else
+            // for all blocks to load
+            for (int i : segments_to_load)
             {
                 //
-                // c) read from the whole monolithic solution file
+                // Either read from the whole monolithic solution file ...
                 //
                 
                     HDFFile hdf (name(), HDFFile::readonly);
                     if (hdf.valid())
                     {
                         // allocate memory
-                        sol.resize(Nspline_ * Nspline_);
+                        solution[i].resize(Nspline_ * Nspline_);
                         
                         // read data from the file
-                        return hdf.read("array", sol.data() + ill * Nspline_ * Nspline_, Nspline_ * Nspline_, ill * Nspline_ * Nspline_);
+                        if (not hdf.read("array", solution[i].data(), Nspline_ * Nspline_, i * Nspline_ * Nspline_))
+                            return false;
+                        
+                        // dump to disk
+                        if (not solution.inmemory())
+                        {
+                            solution.hdfsave(i);
+                            solution[i].drop();
+                        }
                     }
                 
                 //
-                // d) read from a solution segment
+                // ... or read from a solution segment.
                 //
                 
                     // simply load the requested solution segment file
-                    if (HDFFile(name(ill), HDFFile::readonly).valid())
-                        return sol.hdfload(name(ill));
+                    if (not HDFFile(name(ill), HDFFile::readonly).valid())
+                        return false;
+                    if (not solution[ill].hdfload(name(i)))
+                        return false;
+                    if (not solution.inmemory())
+                    {
+                        solution.hdfsave(i);
+                        solution[i].drop();
+                    }
             }
             
             return false;
@@ -349,13 +340,38 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (const cArrayView segment, int ill = -1)
+        bool save (BlockArray<Complex> const & solution, int ill = -1)
         {
-            // open file
-            HDFFile hdf (name(ill), HDFFile::overwrite);
+            // select segments
+            iArray segments_to_save = { ill };
+            if (ill == -1)
+                segments_to_save = linspace<int>(0, solution.size() - 1, solution.size());
             
-            // write data if the file was created successfully
-            return hdf.valid() and hdf.write("array", segment.data(), segment.size());
+            // for all segments
+            for (int iseg : segments_to_save)
+            {
+                // open file
+                HDFFile hdf (name(iseg), HDFFile::overwrite);
+                
+                // check file status
+                if (not hdf.valid())
+                    return false;
+                
+                // load data
+                if (not solution.inmemory())
+                    const_cast<BlockArray<Complex>&>(solution).hdfload(iseg);
+                
+                // write data
+                if (not hdf.write("array", solution[iseg].data(), solution[iseg].size()))
+                    return false;
+                
+                // unload data
+                if (not solution.inmemory())
+                    const_cast<BlockArray<Complex>&>(solution)[iseg].drop();
+            }
+            
+            // success
+            return true;
         }
     
     private:

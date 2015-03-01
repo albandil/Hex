@@ -1224,6 +1224,102 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
 };
 
+template <class T> class BlockArray
+{
+    public:
+        
+        BlockArray ()
+            : arrays_(), inmemory_(true), filename_() {}
+        BlockArray (std::size_t nblocks, bool inmemory = true, std::string filename = "")
+            : arrays_(nblocks), inmemory_(inmemory), filename_(filename) {}
+        BlockArray (BlockArray const & x)
+            : arrays_(x.arrays_), inmemory_(x.inmemory_), filename_(x.filename_) {}
+        BlockArray (BlockArray && x)
+            : arrays_(std::move(x.arrays_)), inmemory_(std::move(x.inmemory_)), filename_(std::move(x.filename_)) {}
+        
+        ~BlockArray () {}
+        
+        BlockArray<T> & operator= (BlockArray<T> const & x)
+        {
+            arrays_ = x.arrays_;
+            inmemory_ = x.inmemory_;
+            filename_ = x.filename_;
+            return *this;
+        }
+        
+        BlockArray<T> & operator= (BlockArray<T> && x)
+        {
+            arrays_ = std::move(x.arrays_);
+            inmemory_ = std::move(x.inmemory_);
+            filename_ = std::move(x.filename_);
+            return *this;
+        }
+        
+        std::size_t size () const
+        {
+            return arrays_.size();
+        }
+        
+        NumberArray<T> & operator[] (std::size_t i)
+        {
+            assert(i < arrays_.size());
+            return arrays_[i];
+        }
+        
+        NumberArray<T> const & operator[] (std::size_t i) const
+        {
+            assert(i < arrays_.size());
+            return arrays_[i];
+        }
+        
+        bool hdfcheck (std::size_t iblock)
+        {
+#ifndef NO_HDF
+            return HDFFile(format("%s-%ld.ooc", filename_.c_str(), iblock), HDFFile::readonly).valid();
+#else
+            return false;
+#endif
+        }
+        
+        bool hdfload (std::size_t iblock)
+        {
+            assert(iblock < arrays_.size());
+#ifndef NO_HDF
+            return arrays_[iblock].hdfload(format("%s-%ld.ooc", filename_.c_str(), iblock));
+#else
+            return false;
+#endif
+        }
+        
+        bool hdfsave (std::size_t iblock)
+        {
+            assert(iblock < arrays_.size());
+#ifndef NO_HDF
+            return arrays_[iblock].hdfsave(format("%s-%ld.ooc", filename_.c_str(), iblock));
+#else
+            return false;
+#endif
+        }
+        
+        bool inmemory () const
+        {
+            return inmemory_;
+        }
+        
+    private:
+        
+        /// Array blocks.
+        Array<NumberArray<T>> arrays_;
+        
+        /// Whether all data are always present in memory (or offloaded to disk).
+        bool inmemory_;
+        
+        /// Scratch disk filename prefix ("-%d.hdf" will be added).
+        std::string filename_;
+};
+
+typedef BlockArray<Complex> cBlockArray;
+
 // load array arithmetic operators
 #include "arrithm.h"
 

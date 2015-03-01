@@ -96,10 +96,9 @@ class GPUCGPreconditioner : public KPACGPreconditioner
         }
         
         // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return KPACGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { KPACGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArray & chi, int ienergy, int instate, int Spin) const { KPACGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void precondition (const cArrayView r, cArrayView z) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { KPACGPreconditioner::multiply(p,q); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { KPACGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void update (double E) { KPACGPreconditioner::update(E); }
         
         // declare own definitions

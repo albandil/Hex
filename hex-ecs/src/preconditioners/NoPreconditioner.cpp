@@ -170,7 +170,7 @@ void NoPreconditioner::update (double E)
     OMP_clean;
 }
 
-void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
+void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const
 {
     OMP_prepare;
     
@@ -274,13 +274,11 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
             
             // update the right-hand side
             OMP_exclusive_in;
+            chi[ill] = chi_block;
+            if (not chi.inmemory())
             {
-                // resize if necessary
-                if (chi.size() < (ill / par_.Nproc() + 1) * Nspline * Nspline)
-                    chi.resize((ill / par_.Nproc() + 1) * Nspline * Nspline);
-                
-                // copy data
-                cArrayView(chi, ill / par_.Nproc() * Nspline * Nspline, Nspline * Nspline) = chi_block;
+                chi.hdfsave(ill);
+                chi[ill].drop();
             }
             OMP_exclusive_out;
         }
@@ -289,7 +287,7 @@ void NoPreconditioner::rhs (cArray & chi, int ie, int instate, int Spin) const
     OMP_clean;
 }
 
-void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
+void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const
 {
     OMP_prepare;
     
@@ -298,9 +296,6 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
     int order = s_rad_.bspline().order();
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
-    
-    // clear output array
-    std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
     if (not cmd_.lightweight_radial_cache)
     {
@@ -313,22 +308,31 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         for (int ill = 0;  ill < Nang;  ill++)
         if (par_.isMyWork(ill))
         {
-            // copy-from segment of "p"
-            cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
-            
-            // copy-to segment of "q"
-            cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
-            
             // load data from scratch disk
-            if (cmd_.outofcore and cmd_.wholematrix)
-                const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).hdfload();
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(p).hdfload(ill);
+                
+                q.hdfload(ill);
+                
+                if (cmd_.wholematrix)
+                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).hdfload();
+            }
             
             // multiply
-            q_block = dia_blocks_[ill].dot(p_block, cmd_.parallel_dot);
+            q[ill] = dia_blocks_[ill].dot(p[ill], cmd_.parallel_dot);
             
             // unload data
-            if (cmd_.outofcore and cmd_.wholematrix)
-                const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).drop();
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(p)[ill].drop();
+                
+                q.hdfsave(ill);
+                q[ill].drop();
+                
+                if (cmd_.wholematrix)
+                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).drop();
+            }
         }
         
         // multiply "p" by the off-diagonal blocks - single proces
@@ -341,37 +345,50 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // update all blocks with this multipole potential matrix
             for (int ill = 0;  ill < Nang;  ill++)
-            for (int illp = 0; illp < Nang; illp++)
             {
-                // skip diagonal
-                if (ill == illp)
-                    continue;
+                if (cmd_.outofcore)
+                    q.hdfload(ill);
                 
-                // row multi-index
-                int l1 = l1_l2_[ill].first;
-                int l2 = l1_l2_[ill].second;
+                for (int illp = 0; illp < Nang; illp++)
+                {
+                    // skip diagonal
+                    if (ill == illp)
+                        continue;
+                    
+                    // row multi-index
+                    int l1 = l1_l2_[ill].first;
+                    int l2 = l1_l2_[ill].second;
+                    
+                    // column multi-index
+                    int l1p = l1_l2_[illp].first;
+                    int l2p = l1_l2_[illp].second;
+                    
+                    // calculate angular integral
+                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                    if (not std::isfinite(f))
+                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                    
+                    // check non-zero
+                    if (f == 0.)
+                        continue;
+                    
+                    // load data
+                    if (cmd_.outofcore)
+                        const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                    
+                    // calculate product
+                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], cmd_.parallel_dot);
+                    
+                    // unload data
+                    if (cmd_.outofcore)
+                        const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                }
                 
-                // column multi-index
-                int l1p = l1_l2_[illp].first;
-                int l2p = l1_l2_[illp].second;
-                
-                // calculate angular integral
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                if (not std::isfinite(f))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // check non-zero
-                if (f == 0.)
-                    continue;
-                
-                // source segment of "p"
-                cArrayView p_block (p, illp * Nchunk, Nchunk);
-                
-                // destination segment of "q"
-                cArrayView q_block (q, ill * Nchunk, Nchunk);
-                
-                // calculate product
-                q_block += (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot);
+                if (cmd_.outofcore)
+                {
+                    q.hdfsave(ill);
+                    q[ill].drop();
+                }
             }
             
             // load data from scratch disk
@@ -386,45 +403,54 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             // product of line of blocks with the source vector (-> one segment of destination vector)
             cArray product (Nchunk);
             
+            // load data
+            if (cmd_.outofcore)
+                q.hdfload(ill);
+            
             // maximal multipole
             int maxlambda = s_rad_.maxlambda();
             
-            # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_block)
+            # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
-            for (int lambda = 0; lambda <= maxlambda; lambda++)
-            if (par_.isMyWork(illp))
             {
-                // skip diagonal
-                if (ill == illp)
-                    continue;
+                if (cmd_.outofcore)
+                    const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                 
-                // row multi-index
-                int l1 = l1_l2_[ill].first;
-                int l2 = l1_l2_[ill].second;
+                for (int lambda = 0; lambda <= maxlambda; lambda++)
+                if (par_.isMyWork(illp))
+                {
+                    // skip diagonal
+                    if (ill == illp)
+                        continue;
+                    
+                    // row multi-index
+                    int l1 = l1_l2_[ill].first;
+                    int l2 = l1_l2_[ill].second;
+                    
+                    // column multi-index
+                    int l1p = l1_l2_[illp].first;
+                    int l2p = l1_l2_[illp].second;
+                    
+                    // calculate angular integral
+                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                    if (not std::isfinite(f))
+                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+                    
+                    // check non-zero
+                    if (f == 0.)
+                        continue;
+                    
+                    // calculate product
+                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], cmd_.parallel_dot) );
+                    
+                    // update collected product
+                    OMP_exclusive_in;
+                    product += p0;
+                    OMP_exclusive_out;
+                }
                 
-                // column multi-index
-                int l1p = l1_l2_[illp].first;
-                int l2p = l1_l2_[illp].second;
-                
-                // calculate angular integral
-                double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                if (not std::isfinite(f))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                
-                // check non-zero
-                if (f == 0.)
-                    continue;
-                
-                // source segment of "p"
-                cArrayView p_block (p, (illp / par_.Nproc()) * Nchunk, Nchunk);
-                
-                // calculate product
-                cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p_block, cmd_.parallel_dot) );
-                
-                // update collected product
-                OMP_exclusive_in;
-                product += p0;
-                OMP_exclusive_out;
+                if (cmd_.outofcore)
+                    const_cast<BlockArray<Complex>&>(p)[illp].drop();
             }
             
             // sum all contributions to this destination segment on its owner node
@@ -432,7 +458,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
             
             // finally, owner will update its segment
             if (par_.isMyWork(ill))
-                cArrayView (q, (ill / par_.Nproc()) * Nchunk, Nchunk) += product;
+                q[ill] += product;
         }
     }
     else
@@ -446,20 +472,27 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
         for (int ill = 0;  ill < Nang;  ill++)
         if (par_.isMyWork(ill))
         {
-            // copy-from segment of "p"
-            cArrayView p_block (p, (ill / par_.Nproc()) * Nchunk, Nchunk);
-            
-            // copy-to segment of "q"
-            cArrayView q_block (q, (ill / par_.Nproc()) * Nchunk, Nchunk);
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(p).hdfload(ill);
+                q.hdfload(ill);
+            }
             
             // get block angular momemnta
             int l1 = l1_l2_[ill].first;
             int l2 = l1_l2_[ill].second;
             
             // multiply 'p_block' by the diagonal block (except for the two-electron term)
-            q_block  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p_block);
-            q_block -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l1*(l1+1)) * s_rad_.Mm2(), s_rad_.S(), p_block);
-            q_block -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l2*(l2+1)) * s_rad_.Mm2(), p_block);
+            q[ill]  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p[ill]);
+            q[ill] -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l1*(l1+1)) * s_rad_.Mm2(), s_rad_.S(), p[ill]);
+            q[ill] -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l2*(l2+1)) * s_rad_.Mm2(), p[ill]);
+            
+            if (cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex>&>(p)[ill].drop();
+                q.hdfsave(ill);
+                q[ill].drop();
+            }
         }
         
         // auxiliary buffers
@@ -476,12 +509,14 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                 HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
         }
         
+        // FIXME : The remaining code is not compatible with --out-of-core.
+        
         // for all source vector sub-segments
         for (int k = 0; k < Nspline; k++)
         {
             // copy owned sub-segments to the buffer
             for (int illp = 0; illp < Nang; illp++) if (par_.isMyWork(illp))
-                std::memcpy(&buffer[0] + illp * Nspline, p.data() + (illp / par_.Nproc()) * Nspline * Nspline + k * Nspline, Nspline * sizeof(Complex));
+                std::memcpy(&buffer[0] + illp * Nspline, p[illp].data() + k * Nspline, Nspline * sizeof(Complex));
             
             // synchronize source sub-segments buffer across processes
             par_.sync(&buffer[0], Nspline, Nang);
@@ -516,7 +551,7 @@ void NoPreconditioner::multiply (const cArrayView p, cArrayView q) const
                         
                         // update the owned sub-segment
                         OMP_exclusive_in;
-                        cArrayView(q,(ill / par_.Nproc()) * Nspline * Nspline + i * Nspline,Nspline) -= product;
+                        cArrayView(q[ill], i * Nspline, Nspline) -= product;
                         OMP_exclusive_out;
                     }
                 }

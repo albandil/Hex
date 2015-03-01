@@ -62,10 +62,9 @@ class ILUCGPreconditioner : public CGPreconditioner
         }
         
         // reuse parent definitions
-        virtual RadialIntegrals const & rad () const { return CGPreconditioner::rad(); }
-        virtual void multiply (const cArrayView p, cArrayView q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (cArray & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
-        virtual void precondition (const cArrayView r, cArrayView z) const { CGPreconditioner::precondition(r,z); }
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         virtual void setup () { CGPreconditioner::setup(); }
         
         // declare own definitions
