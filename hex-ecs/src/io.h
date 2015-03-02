@@ -318,9 +318,7 @@ class SolutionIO
                 //
                 
                     // simply load the requested solution segment file
-                    if (not HDFFile(name(ill), HDFFile::readonly).valid())
-                        return false;
-                    if (not solution[ill].hdfload(name(i)))
+                    if (not solution[i].hdfload(name(i)))
                         return false;
                     if (not solution.inmemory())
                     {
@@ -329,7 +327,7 @@ class SolutionIO
                     }
             }
             
-            return false;
+            return true;
         }
         
         /**

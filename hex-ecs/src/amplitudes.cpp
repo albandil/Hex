@@ -83,7 +83,7 @@ void Amplitudes::extract ()
                 
                 // load the solution
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Ei[ie], ang_, bspline_.Nspline());
-                BlockArray<Complex> solution (ang_.size(), cmd_.outofcore, "sol");
+                BlockArray<Complex> solution (ang_.size(), !cmd_.outofcore, "sol");
                 if (not reader.load(solution))
                 {
                     std::cout << "\t\t\tSolution file(s) for L = " << inp_.L << ", Pi = " << inp_.Pi << ", ni = " << ni << ", li = " << li << ", mi = " << mi << " not found." << std::endl;
@@ -380,7 +380,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         return;
     
     // evaluate radial part for all evaluation radii
-    # pragma omp parallel for
+    # pragma omp parallel for if (solution.inmemory())
     for (int n = 1; n <= samples; n++)
     {
         // this is the evaluation point
