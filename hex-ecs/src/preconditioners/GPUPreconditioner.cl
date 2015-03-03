@@ -49,7 +49,7 @@
  * 
  * Multiplies two complex numbers and returns the product.
  */
-inline double2 cmul (double2 a, double2 b)
+double2 cmul (double2 a, double2 b)
 {
     double2 c;
     c.x = a.x * b.x - a.y * b.y;
@@ -63,7 +63,7 @@ inline double2 cmul (double2 a, double2 b)
  * Divides two complex numbers and returns the fraction. No overflow
  * checking is done.
  */
-inline double2 cdiv (double2 a, double2 b)
+double2 cdiv (double2 a, double2 b)
 {
     double2 c;
     double b2 = b.x * b.x + b.y * b.y;
@@ -103,17 +103,13 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
  */
 kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
 {
-    uint iglobal = get_global_id(0);
-    uint ilocal = get_local_id(0);
+    // position of this thread among other threads
+    private int iglobal = get_global_id(0);
+    private int ilocal = get_local_id(0);
     
+    // calculate product of array elements
     local double2 uv[NLOCAL];
-    
-    if (iglobal < NROW)
-        uv[ilocal] = cmul(u[iglobal],v[iglobal]);
-    else
-        uv[ilocal] = 0;
-    
-    // wait on completition of local write instructions
+    uv[ilocal] = (iglobal < NROW ? cmul(u[iglobal],v[iglobal]) : (double2)(0.,0.));
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // reduce the per-element products
@@ -122,10 +118,7 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
     {
         if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
             uv[ilocal] += uv[ilocal + stride];
-        
         stride *= 2;
-        
-        // wait on completition of local write instructions
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
@@ -144,32 +137,25 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
  */
 kernel void norm (global double2 *v, global double *z)
 {
-    uint iglobal = get_global_id(0);
-    uint ilocal = get_local_id(0);
+    // position of this thread among other threads
+    private int iglobal = get_global_id(0);
+    private int ilocal = get_local_id(0);
     
+    // get element to process by this thread
+    private double2 vi = v[iglobal];
+    
+    // calculate squared modulus of an array element
     local double vv[NLOCAL];
-    
-    if (iglobal < NROW)
-    {
-        double2 vi = v[iglobal];
-        vv[ilocal] = vi.x * vi.x + vi.y * vi.y;
-    }
-    else
-        vv[ilocal] = 0;
-    
-    // wait for completition of local write instructions
+    vv[ilocal] = (iglobal < NROW ? vi.x * vi.x + vi.y * vi.y : 0.);
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // reduce the per-element products
-    int stride = 1;
+    private int stride = 1;
     while (stride < NLOCAL)
     {
         if (ilocal % (2 * stride) == 0 && iglobal + stride < NROW)
             vv[ilocal] += vv[ilocal + stride];
-        
         stride *= 2;
-        
-        // wait for completition of local write instructions
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
@@ -196,76 +182,52 @@ kernel void norm (global double2 *v, global double *z)
 kernel void mmul_1el
 (
     // energy
-    double E,
+    private double E,
     // row-padded one-electron matrices
     global double2 const * const restrict Sp,
     global double2 const * const restrict Dp,
     global double2 const * const restrict M1p,
     global double2 const * const restrict M2p,
     // angular momenta and nonzero multipoles
-    int l1, int l2,
+    private int l1,
+    private int l2,
     // source and target vector
     global double2 const * const restrict x,
     global double2       * const restrict y
 )
 {
-    // block row index
-    int i = get_group_id(0);
+    // output vector element index
+    private int i = get_global_id(0) / NSPLINE;
+    private int j = get_global_id(0) % NSPLINE;
     
-    // clear output vector
-    for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL)
+    // initialize the output element
+    y[i * NSPLINE + j] = 0;
+    
+    // for all source vector elements
+    if (i < NSPLINE)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
     {
-        // get line index of the current worker
-        int j = first_j + get_local_id(0);
+        // compute multi-indices
+        private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
+        private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
         
-        // erase the element
-        if (j < NSPLINE)
-            y[i * NSPLINE + j] = 0;
+        // calculate the one-electron part of the hamiltonian matrix element Hijkl
+        private double2 elem = E * cmul(Sp[ik],Sp[jl]);
+        elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
+        elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
+        elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
+        
+        // multiply right-hand side by that matrix element
+        y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
     }
-    
-    // for all block column indices
-    for (int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
-    {
-        // loop over line groups
-        for (int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
-        {
-            // get line index of the current worker
-            int j = first_j + get_local_id(0);
-            
-            // for all elements of this block's line
-            for (int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
-            {
-                // compute multi-indices
-                int ik = min(i,k) * (ORDER + 1) + abs(i - k);
-                int jl = min(j,l) * (ORDER + 1) + abs(l - j);
-                
-                // calculate the one-electron part of the hamiltonian matrix element Hijkl
-                double2 elem = E * cmul(Sp[ik],Sp[jl]);
-                elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
-                elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
-                elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
-                
-                // multiply right-hand side by that matrix element
-                y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
-                
-            } // end for (l)
-            
-        } // end for (turn) ... group of lines to process by the work-group
-        
-        // wait for completition of this block
-        barrier(CLK_LOCAL_MEM_FENCE);
-        
-    } // end for (k) ... block index in row
 }
 
 /**
  * @brief Multiplication by two-electron Hamiltonian matrix.
  * 
  * Multiplies vector by a two-electron Hamiltonian matrix @f$ R_{ijkl}^\lambda @f$.
- * Each multi-index @f$ (i,j) @f$ is assigned to a different group. Every @f$ (k,l) @f$
- * multi-index is assigned to a unique local thread within the group. The scalar product
- * is then represented as a reduction within the work-group.
- * 
+ * Each multi-index @f$ (i,j) @f$ is assigned to a different thread.
  * This kernel is called for every multipole independently.
  * 
  * @param f Real prefactor (angular integral).
@@ -274,106 +236,6 @@ kernel void mmul_1el
  * @param x Source vector.
  * @param y Destination vector.
  */
-# if 0
-kernel void mmul_2el // this implementation should be faster, but IS only for small NSPLINE...
-(
-    // angular integral
-    private double f,
-    // one-electron partial moments
-    global double2 const * const restrict MiL,
-    global double2 const * const restrict MimLm1,
-    // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
-)
-{
-    // output element indices
-    private int i = get_group_id(0) / NSPLINE;
-    private int j = get_group_id(0) % NSPLINE;
-    
-    // local indices
-    private int ixlocal = get_local_id(0) / (2*ORDER+1);
-    private int iylocal = get_local_id(0) % (2*ORDER+1);
-    
-    // input element indices
-    private int k = i + ixlocal - ORDER;
-    private int l = j + iylocal - ORDER;
-    
-    // intermediate storage of the precomputed matrix elements (shared by (i,j)-group)
-    local double2 R[2*ORDER+1][2*ORDER+1];
-    R[iylocal][ixlocal] = 0;
-    
-    // get pointers to the needed partial integral moments
-    global double2 const * const MiL_ik    = MiL    + (i * (2*ORDER+1) + k - i + ORDER) * (ORDER+1);
-    global double2 const * const MimLm1_ik = MimLm1 + (i * (2*ORDER+1) + k - i + ORDER) * (ORDER+1);
-    global double2 const * const MiL_jl    = MiL    + (j * (2*ORDER+1) + l - j + ORDER) * (ORDER+1);
-    global double2 const * const MimLm1_jl = MimLm1 + (j * (2*ORDER+1) + l - j + ORDER) * (ORDER+1);
-    
-    // auxiliary variables
-    private double2 elem = 0, M_ik = 0, M_jl = 0, m_ik = 0, m_jl = 0;
-    
-    // calculate the matrix element Rijkl
-    if (0 <= k && k < NSPLINE)
-    if (0 <= l && l < NSPLINE)
-    {
-        // ix < iy
-        for (private int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
-        for (private int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
-        {
-            m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
-            
-            // multiply real x real (merge exponents)
-            if (m_ik.y == 0 && m_jl.y == 0)
-            {
-                elem.x -= f * exp(m_ik.x + m_jl.x);
-            }
-            
-            // multiply other cases
-            else
-            {
-                M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                elem -= f * cmul(M_ik,M_jl);
-            }
-        }
-        
-        // ix > iy (by renaming the ix,iy indices)
-        for (private int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
-        for (private int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
-        {
-            m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
-            
-            // multiply real x real (merge exponents)
-            if (m_ik.y == 0 && m_jl.y == 0)
-            {
-                elem.x -= f * exp(m_ik.x + m_jl.x);
-            }
-            
-            // multiply other cases
-            else
-            {
-                M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                elem -= f * cmul(M_ik,M_jl);
-            }
-        }
-        
-        // multiply right-hand side by that matrix element
-        R[iylocal][ixlocal] = cmul(elem, x[k * NSPLINE + l]);
-    }
-    
-    // reduce
-    barrier(CLK_LOCAL_MEM_FENCE);
-    if (ixlocal == 0 && iylocal == 0)
-    {
-        private double2 collect = 0;
-        for (int u = 0; u < 2 * ORDER + 1; u++)
-        for (int v = 0; v < 2 * ORDER + 1; v++)
-            collect += R[u][v];
-        y[i * NSPLINE + j] += collect;
-    }
-}
-# else
 kernel void mmul_2el
 (
     // angular integral
@@ -386,80 +248,70 @@ kernel void mmul_2el
     global double2       * const restrict y
 )
 {
-    // block row index
-    private int i = get_group_id(0);
+    // output vector element index
+    private int i = get_global_id(0) / NSPLINE;
+    private int j = get_global_id(0) % NSPLINE;
     
-    // for all block column indices
+    // auxiliary variables
+    private double2 m_ik;
+    private double2 m_jl;
+    
+    // pointers to the needed partial integral moments
+    global double2 const * restrict M_ik;
+    global double2 const * restrict M_jl;
+    
+    // for all source vector elements
+    if (i < NSPLINE)
     for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
     {
-        // loop over line groups
-        for (private int first_j = 0; first_j < NSPLINE; first_j += NLOCAL) if (first_j + get_local_id(0) < NSPLINE)
+        // matrix element
+        private double2 elem = 0;
+        
+        // ix < iy
+        M_ik = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT - 1); ix++)
         {
-            // get line index of the current worker
-            private int j = first_j + get_local_id(0);
-            
-            // for all elements of this block's line
-            for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+            m_ik = M_ik[ix - i];
+            for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT - 1); iy++)
             {
-                private double2 elem = 0, M_ik = 0, M_jl = 0, m_ik = 0, m_jl = 0;
+                m_jl = M_jl[iy - j];
                 
-                // get pointers to the needed partial integral moments
-                global double2 const * const MiL_ik    = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                global double2 const * const MimLm1_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-                global double2 const * const MiL_jl    = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-                global double2 const * const MimLm1_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+                // multiply real x real (merge exponents)
+                if (m_ik.y == 0 && m_jl.y == 0)
+                    elem.x += exp(m_ik.x + m_jl.x);
                 
-                // ix < iy
-                for (private int ix = i; ix <= i + ORDER && ix < NREKNOT - 1; ix++)
-                for (private int iy = max(j,ix+1); iy <= j + ORDER && iy < NREKNOT - 1; iy++)
-                {
-                    m_ik = MiL_ik[ix - i], m_jl = MimLm1_jl[iy - j];
-                    
-                    // multiply real x real (merge exponents)
-                    if (m_ik.y == 0 && m_jl.y == 0)
-                    {
-                        elem.x -= f * exp(m_ik.x + m_jl.x);
-                    }
-                    
-                    // multiply other cases
-                    else
-                    {
-                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                        elem -= f * cmul(M_ik,M_jl);
-                    }
-                }
-                // ix > iy (by renaming the ix,iy indices)
-                for (private int ix = j; ix <= j + ORDER && ix < NREKNOT - 1; ix++)
-                for (private int iy = max(i,ix+1); iy <= i + ORDER && iy < NREKNOT - 1; iy++)
-                {
-                    m_jl = MiL_jl[ix - j], m_ik = MimLm1_ik[iy - i];
-                    
-                    // multiply real x real (merge exponents)
-                    if (m_ik.y == 0 && m_jl.y == 0)
-                    {
-                        elem.x -= f * exp(m_ik.x + m_jl.x);
-                    }
-                    
-                    // multiply other cases
-                    else
-                    {
-                        M_ik = 0; if (m_ik.y == 0) M_ik.x = exp(m_ik.x); else M_ik = m_ik;
-                        M_jl = 0; if (m_jl.y == 0) M_jl.x = exp(m_jl.x); else M_jl = m_jl;
-                        elem -= f * cmul(M_ik,M_jl);
-                    }
-                }
-                // multiply right-hand side by that matrix element
-                y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
-            } // end for (l)
-        } // end for (turn) ... group of lines to process by the work-group
+                // multiply other cases
+                else
+                    elem += cmul((m_ik.y == 0 ? (double2)(exp(m_ik.x),0.0) : m_ik), (m_jl.y == 0 ? (double2)(exp(m_jl.x),0.0) : m_jl));
+            }
+        }
         
-        // wait for completition of this block
-        barrier(CLK_LOCAL_MEM_FENCE);
+        // ix > iy (by renaming the ix,iy indices)
+        M_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT - 1); ix++)
+        {
+            m_jl = M_jl[ix - j];
+            for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT - 1); iy++)
+            {
+                m_ik = M_ik[iy - i];
+                
+                // multiply real x real (merge exponents)
+                if (m_ik.y == 0 && m_jl.y == 0)
+                    elem.x += exp(m_ik.x + m_jl.x);
+                
+                // multiply other cases
+                else
+                    elem += cmul((m_ik.y == 0 ? (double2)(exp(m_ik.x),0.0) : m_ik), (m_jl.y == 0 ? (double2)(exp(m_jl.x),0.0) : m_jl));
+            }
+        }
         
-    } // end for (k) ... block index in row
+        // multiply right-hand side by that matrix element
+        y[i * NSPLINE + j] -= f * cmul(elem, x[k * NSPLINE + l]);
+    }
 }
-# endif
 
 /**
  * @brief Matrix-matrix multiplication.
@@ -494,6 +346,7 @@ kernel void mul_ABt
     // for all source blocks
     for (private int iblock = 0; iblock < NUM_BLOCKS; iblock++)
     {
+
         // load source blocks into the local memory (pad by zeros)
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE + (iblock * BLOCK_SIZE + ixlocal)];
@@ -502,8 +355,9 @@ kernel void mul_ABt
         
         // each group's thread will calculate one of BLOCK_VOLUME scalar products
         # pragma unroll
-        for (private int k = 0; k < BLOCK_SIZE; k++) if (iblock * BLOCK_SIZE + k < NSPLINE)
-            res += cmul(Aloc[k][iylocal],Bloc[k][ixlocal]);
+        for (private int k = 0; k < BLOCK_SIZE; k++)
+            if (iblock * BLOCK_SIZE + k < NSPLINE)
+                res += cmul(Aloc[k][iylocal],Bloc[k][ixlocal]);
     }
     
     // store result to device memory
@@ -522,16 +376,16 @@ kernel void mul_ABt
  */
 kernel void kron_div
 (
-    double2 E,
+    private double2 E,
     global double2 const * const restrict D1,
     global double2 const * const restrict D2,
     global double2       * const restrict y
 )
 {
     // get worker's segment index (0 <= i < NSPLINE)
-    int i = get_global_id(0);
+    private int i = get_global_id(0);
     
     // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
-    for (int j = 0; j < NSPLINE; j++)
+    for (private int j = 0; j < NSPLINE; j++)
         y[j * NSPLINE + i] = cdiv(y[j * NSPLINE + i], E - D1[j] - D2[i]);
 }

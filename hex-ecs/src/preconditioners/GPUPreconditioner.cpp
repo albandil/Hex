@@ -104,15 +104,12 @@ void GPUCGPreconditioner::setup ()
     std::cout << "\t- max compute units: " << max_compute_units << std::endl;
     std::cout << "\t- max work group size: " << max_work_group_size << std::endl;
     
-    // we need at least (2*order+1)^2 for "mmul_2el" kernel
-    if (max_work_group_size < (2u*order+1)*(2u*order+1))
-        HexException("Work group size of at least %d is needed for given B-spline order.", (2*order+1)*(2*order+1));
-    
     // choose default workgroup size
     Nlocal_ = std::min<std::size_t>(64, max_work_group_size);
     
-    // choose block size for "mul_ABt" kernel, aim for 4 concurrent threads
+    // choose block size for "mul_ABt" kernel, aim at 4 concurrent threads
     blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 16/*double*/ * 2/*arrays*/));
+    blocksize_ = std::min<std::size_t>(blocksize_, std::sqrt(max_work_group_size));
     std::cout << "\t- matrix multiplication sub-block size: " << blocksize_ << std::endl;
     
     // compute global memory requirements of the preconditioner
@@ -137,14 +134,11 @@ void GPUCGPreconditioner::setup ()
     lreq = Nlocal_;
     // - or the requirements of mul_ABt
     lreq = std::max<std::size_t>(lreq, 2/*array*/ * 16/*double*/ * blocksize_);
-    // - or the requirements of mmul_2el
-    lreq = std::max<std::size_t>(lreq, (2*order+1)*(2*order+1));
     // - all these were complex numbers
     lreq *= 16;
     
     std::cout << "\t- local memory size: " << local_memory_size/1024 << " kiB ";
-    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used, ~ ";
-    std::cout << format("%0d", local_memory_size/lreq) << " wavefronts)" << std::endl << std::endl;
+    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used)" << std::endl;
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
@@ -182,13 +176,13 @@ void GPUCGPreconditioner::setup ()
     }
     
     // set program entry points
-    mml1_ = clCreateKernel(program_, "mmul_1el",    nullptr);
-    mml2_ = clCreateKernel(program_, "mmul_2el",    nullptr);
-    axby_ = clCreateKernel(program_, "a_vec_b_vec", nullptr);
-    norm_ = clCreateKernel(program_, "norm",        nullptr);
-    spro_ = clCreateKernel(program_, "scalar_product", nullptr);
-    mabt_ = clCreateKernel(program_, "mul_ABt",     nullptr);
-    krdv_ = clCreateKernel(program_, "kron_div",    nullptr);
+    mml1_ = clCreateKernel(program_, "mmul_1el",        nullptr);
+    mml2_ = clCreateKernel(program_, "mmul_2el",        nullptr);
+    axby_ = clCreateKernel(program_, "a_vec_b_vec",     nullptr);
+    norm_ = clCreateKernel(program_, "norm",            nullptr);
+    spro_ = clCreateKernel(program_, "scalar_product",  nullptr);
+    mabt_ = clCreateKernel(program_, "mul_ABt",         nullptr);
+    krdv_ = clCreateKernel(program_, "kron_div",        nullptr);
 }
 
 void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
@@ -317,9 +311,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             
             Timer timer;
             
-            std::size_t Ngroups = Nspline;
-            std::size_t Nglobal = Ngroups * Nlocal_;
-            
             // one-electron contribution
             clSetKernelArg(mml1_, 0, sizeof(double), &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_p.handle());
@@ -330,7 +321,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(mml1_, 6, sizeof(int),    &l2);
             clSetKernelArg(mml1_, 7, sizeof(cl_mem), &a.handle());
             clSetKernelArg(mml1_, 8, sizeof(cl_mem), &b.handle());
-            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
             
             us_mmul_1 += timer.microseconds();
@@ -343,27 +334,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
                 clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
                 clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
-                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nglobal, &Nlocal_, 0, nullptr, nullptr);
+                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             }
-            
-            /* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - *
-            // Alternative routine (but slower).
-            std::size_t nlocal = (2*order+1)*(2*order+1);
-            std::size_t ngroups = Nsegsiz;
-            std::size_t nglobal = nlocal * ngroups;
-            
-            // two-electron contribution
-            for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
-            {
-                clSetKernelArg(mml2_, 0, sizeof(double), &(fs[ilambda]));
-                clSetKernelArg(mml2_, 1, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
-                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
-                clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &nglobal, &nlocal, 0, nullptr, nullptr);
-            }
-            * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - */
-            
             clFinish(queue_);
             
             us_mmul += timer.microseconds();
