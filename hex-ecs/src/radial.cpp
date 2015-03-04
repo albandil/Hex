@@ -450,6 +450,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 continue;
             }
         }
+        else
+        {
+            R_tr_dia_[lambda].hdfinit();
+        }
         
         # pragma omp parallel firstprivate (lambda)
         {

@@ -2206,6 +2206,19 @@ CooMatrix BlockSymBandMatrix::tocoo () const
     );
 }
 
+bool BlockSymBandMatrix::hdfinit () const
+{
+    // create a new file
+    HDFFile hdf (diskfile_, HDFFile::overwrite);
+    if (not hdf.valid())
+        HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
+    
+    // initialize the dataset to its full length
+    if (not hdf.write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+        HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), hdf.error().c_str());
+    
+    return true;
+}
 
 bool BlockSymBandMatrix::hdfsave () const
 {
@@ -2222,6 +2235,7 @@ bool BlockSymBandMatrix::hdfsave () const
     
     return true;
 }
+
 
 bool BlockSymBandMatrix::hdfload ()
 {
@@ -2301,7 +2315,8 @@ void BlockSymBandMatrix::setBlock (int i, const cArrayView data)
                 HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
             
             // initialize the dataset to its full length
-            phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_);
+            if (not phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+                HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), phdf->error().c_str());
         }
         
         // write data

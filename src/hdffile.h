@@ -135,7 +135,7 @@ private:
     bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype);
     
     /// Set error and return false.
-    bool fail () const;
+    void save_error () const;
 };
 
 #endif

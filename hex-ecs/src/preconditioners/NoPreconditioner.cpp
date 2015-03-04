@@ -105,6 +105,8 @@ void NoPreconditioner::update (double E)
         // skip calculation if the disk file is already present
         if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
             continue;
+        else
+            dia_blocks_[ill].hdfinit();
         
         // for all blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_dot)
