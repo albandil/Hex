@@ -145,7 +145,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
 #if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
-                    "\t--cpu                      (-C)  Use OpenCL on CPU (not GPU) in the case of GPU preconditioner.                                                         \n"
+                    "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
+                    "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
+                    "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).                            \n"
 #endif
                     "                                                                                                                                                          \n"
                     "There are also some environment variables that control the execution.                                                                                     \n"
@@ -323,10 +325,43 @@ void CommandLine::parse (int argc, char* argv[])
                 return true;
             },
 #if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
-        "cpu", "", 0,  [&](std::string optarg) -> bool
+        "cl-list", "", 0,  [&](std::string optarg) -> bool
             {
-                // use CPU for GPUPreconditioner
-                gpucpu = true;
+                // list all available OpenCL platforms and devices
+                std::cout << "Available OpenCL devices" << std::endl;
+                char platform_name[1024], platform_vendor[1024], platform_version[1024];
+                char device_name[1024], device_vendor[1024];
+                cl_platform_id platforms[10];
+                cl_device_id devices[10];
+                cl_uint nplatforms, ndevices;
+                clGetPlatformIDs(10, platforms, &nplatforms);
+                for (cl_uint i = 0; i < nplatforms; i++)
+                {
+                    clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
+                    clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
+                    clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
+                    std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
+                    clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
+                    for (cl_uint j = 0; j < nplatforms; j++)
+                    {
+                        clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
+                        clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
+                        std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
+                    }
+                }
+                std::cout << std::endl;
+                std::exit(0);
+            },
+        "cl-platform", "", 1, [&](std::string optarg) -> bool
+            {
+                // use given OpenCL platform
+                ocl_platform = std::atol(optarg.c_str());
+                return true;
+            },
+        "cl-device", "", 1, [&](std::string optarg) -> bool
+            {
+                // use given OpenCL device
+                ocl_device = std::atol(optarg.c_str());
                 return true;
             },
 #endif

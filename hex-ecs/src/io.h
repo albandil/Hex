@@ -85,7 +85,7 @@ class CommandLine
               droptol(1e-8), itinerary(StgNone), outofcore(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
               gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), gpucpu(false)
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(0)
         {
             // get command line options
             parse(argc, argv);
@@ -163,8 +163,11 @@ class CommandLine
         /// Use simplified radial integral matrix for nested KPA iterations (experimental).
         bool kpa_simple_rad;
         
-        /// If 'true', then use CPU for GPUPreconditioner.
-        bool gpucpu;
+        /// Index of OpenCL platform to use.
+        unsigned ocl_platform;
+        
+        /// Index of OpenCL device to use.
+        unsigned ocl_device;
 };
 
 /**

@@ -68,9 +68,17 @@ void GPUCGPreconditioner::setup ()
     
     std::cout << "Setting up OpenCL environment" << std::endl;
     
-    // use platform 0
-    char platform_name[1024], platform_vendor[1024], platform_version[1024];
-    clGetPlatformIDs(1, &platform_, nullptr);
+    // auxiliary variables
+    char platform_name[1024], platform_vendor[1024], platform_version[1024], device_name[1024], device_vendor[1024];
+    cl_platform_id platforms[10]; cl_uint nplatforms;
+    cl_device_id devices[10]; cl_uint ndevices;
+    
+    // check that the chosen platform is available
+    clGetPlatformIDs(10, platforms, &nplatforms);
+    if (cmd_.ocl_platform >= nplatforms)
+        HexException("The requested platform index (%d) does not exist on this system. Run hex-ecs --cl-list to find all existing.", cmd_.ocl_platform);
+    
+    platform_ = platforms[cmd_.ocl_platform];
     clGetPlatformInfo(platform_, CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
     clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
     clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
@@ -78,18 +86,12 @@ void GPUCGPreconditioner::setup ()
     std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
     std::cout << "\t- available version: " << platform_version << std::endl;
     
-    // use first device of the chosed type
-    char device_name[1024], device_vendor[1024];
-    if (cmd_.gpucpu)
-    {
-        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_CPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
-            HexException("No OpenCL capable CPU found for this platform.");
-    }
-    else
-    {
-        if (clGetDeviceIDs(platform_, CL_DEVICE_TYPE_GPU, 1, &device_, nullptr) == CL_DEVICE_NOT_FOUND)
-            HexException("No OpenCL capable GPU found for this platform.");
-    }
+    // check that the chosen device is available
+    clGetDeviceIDs(platform_, CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
+    if (cmd_.ocl_device >= nplatforms)
+        HexException("The requested device index (%d) does not exist for platform %d. Run hex-ecs --cl-list to find all existing.",  cmd_.ocl_device, cmd_.ocl_platform);
+    
+    device_ = devices[cmd_.ocl_device];
     clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
     clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
     
@@ -138,7 +140,7 @@ void GPUCGPreconditioner::setup ()
     lreq *= 16;
     
     std::cout << "\t- local memory size: " << local_memory_size/1024 << " kiB ";
-    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used)" << std::endl;
+    std::cout << "(apx. " << format("%.2f", lreq * 100. / local_memory_size) << " % will be used)" << std::endl << std::endl;
     
     // create context and command queue
     context_ = clCreateContext(nullptr, 1, &device_, nullptr, nullptr, nullptr);
