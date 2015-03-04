@@ -45,6 +45,7 @@
 #include "amplitudes.h"
 #include "arrays.h"
 #include "bspline.h"
+#include "hydrogen.h"
 #include "io.h"
 #include "itersolve.h"
 #include "misc.h"
@@ -70,7 +71,7 @@ int main (int argc, char* argv[])
     std::cout << "=== Exterior complex scaling in B-splines ===" << std::endl << std::endl;
     
     // echo command line
-    std::cout << "Command line used:" << std::endl;
+    std::cout << "Command line used" << std::endl;
     std::cout << "\t";
     for (int iarg = 0; iarg < argc; iarg++)
         std::cout << argv[iarg] << " ";
@@ -105,7 +106,7 @@ int main (int argc, char* argv[])
     # pragma omp parallel
     # pragma omp master
     {
-        std::cout << "OpenMP environment:" << std::endl;
+        std::cout << "OpenMP environment" << std::endl;
         std::cout << "\tthreads: " << omp_get_num_threads() << std::endl;
         std::cout << "\tnesting: " << (omp_get_nested() ? "on" : "off") << std::endl;
     }
@@ -157,7 +158,7 @@ int main (int argc, char* argv[])
     int Nspline = bspline.Nspline();
     
     // info
-    std::cout << "B-spline solver count: " << Nspline << std::endl << std::endl;
+    std::cout << "B-spline count: " << Nspline << std::endl << std::endl;
     
     //
     // Setup angular data -------------------------------------------------- //
@@ -427,9 +428,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 prec->update(E);
             
             // create right hand side
-            std::cout << "\tCreate RHS for li = " << li << ", mi = " << mi << ", S = " << Spin << std::endl;
+            std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(inp.ni, li, mi) << " and total spin S = " << Spin << "... " << std::flush;
             BlockArray<Complex> chi (coupled_states.size(), !cmd.outofcore, "cg-b");
             prec->rhs(chi, ie, instate, Spin);
+            std::cout << "ok" << std::endl;
             
             // compute and check norm of the right hand side vector
             double chi_norm = compute_norm(chi);
@@ -451,7 +453,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             // custom conjugate gradients callback-based solver
             BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x")));
             unsigned max_iter = (inp.maxell + 1) * Nspline;
-            std::cout << "\tStart CG callback with tolerance " << cmd.itertol << std::endl;
+            std::cout << "\tStart linear solver with tolerance " << cmd.itertol << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks < cBlockArray, cBlockArray& >
             (
@@ -472,7 +474,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
             else
-                std::cout << "\tEnd CG callback" << std::endl;
+                std::cout << "\tSolution found." << std::endl;
             
             // update progress
             iterations_done += iterations;

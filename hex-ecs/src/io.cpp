@@ -382,9 +382,10 @@ void InputFile::read (std::ifstream & inf)
     order = ReadNext<int>(inf).val;
     ecstheta = ReadNext<double>(inf).val;
     
-    std::cout << "\n-----   B-spline environment  -------\n";
-    std::cout << "order = " << order << "\n";
-    std::cout << "ecsθ = " << ecstheta << "\n";
+    std::cout << std::endl;
+    std::cout << "B-spline environment" << std::endl;
+    std::cout << "\torder = " << order << std::endl;
+    std::cout << "\tecs angle = " << ecstheta << std::endl;
     
     //
     // load real knot data
@@ -412,8 +413,10 @@ void InputFile::read (std::ifstream & inf)
     }
     
     // print info
-    std::cout << "\n----------   Real knots  ------------\n";
-    std::cout << rknots << std::endl;
+    std::cout << std::endl;
+    std::cout << "Real knots" << std::endl;
+    for (std::string line : rknots.lines(100))
+        std::cout << '\t' << line << std::endl;
     
     //
     // load complex knot data
@@ -443,14 +446,17 @@ void InputFile::read (std::ifstream & inf)
     }
     
     // print info
-    std::cout << "\n---------  Complex knots  ------------\n";
-    std::cout << cknots << std::endl;
+    std::cout << std::endl;
+    std::cout << "Complex knots" << std::endl;
+    for (std::string line : cknots.lines(100))
+        std::cout << '\t' << line << std::endl;
     
     //
     // load initial atomic quantum numbers
     //
     
-    std::cout << "\n----------  Initial atomic states  -------------\n";
+    std::cout << std::endl;
+    std::cout << "Initial atomic states" << std::endl;
     
     std::vector<ReadItem<int>> lis, mis;
     
@@ -482,7 +488,7 @@ void InputFile::read (std::ifstream & inf)
     }
     
     // print info
-    std::cout << "[n l m]: ";
+    std::cout << "\t[n l m]: ";
     for (auto state : instates)
     {
         std::cout << "["
@@ -497,7 +503,8 @@ void InputFile::read (std::ifstream & inf)
     // load final atomic quantum numbers
     //
     
-    std::cout << "\n----------  Final atomic states  -------------\n";
+    std::cout << std::endl;
+    std::cout << "Final atomic states" << std::endl;
     std::vector<int> nfs;
     std::vector<ReadItem<int>> lfs;
     
@@ -526,7 +533,7 @@ void InputFile::read (std::ifstream & inf)
     }
     
     // print info
-    std::cout << "[n l m]: ";
+    std::cout << "\t[n l m]: ";
     for (auto state : outstates)
     {
         std::cout << "["
@@ -540,21 +547,23 @@ void InputFile::read (std::ifstream & inf)
     // load total quantum numbers etc.
     //
     
-    std::cout << "\n----------  Angular momentum limits  -------------\n";
+    std::cout << std::endl;
+    std::cout << "Angular momentum limits" << std::endl;
     
     L = ReadNext<int>(inf).val;
     Pi = ReadNext<int>(inf).val % 2;
     levels = ReadNext<int>(inf).val;
     
-    std::cout << "L = " << L << "\n";
-    std::cout << "Π = " << Pi << "\n";
-    std::cout << "ℓ = " << levels << "\n";
+    std::cout << "\tL = " << L << std::endl;
+    std::cout << "\tPi = " << Pi << std::endl;
+    std::cout << "\tnL = " << levels << std::endl;
     
     //
     // load initial energies
     //
     
-    std::cout << "\n---  Initial projectile energies  ----\n";
+    std::cout << std::endl;
+    std::cout << "Initial projectile energies" << std::endl;
     std::vector<double> Ei_begin, Ei_end, Ei_samples;
     
     while ((x = ReadNext<double>(inf).val) != -1.)
@@ -582,20 +591,19 @@ void InputFile::read (std::ifstream & inf)
     }
     
     // print info
-    std::cout << "lowest energy: "    << Ei.front() << std::endl;
-    std::cout << "highest energy: "   << Ei.back()  << std::endl;
-    std::cout << "total enegies: "    << Ei.size()  << std::endl;
-    std::cout << "full energy list: " << Ei         << std::endl;
+    std::cout << "\tcount: "    << Ei.size()  << std::endl;
+    std::cout << "\tfull list: " << Ei         << std::endl;
     
     //
     // load some other optional data
     //
     
-    std::cout << "\n---------- Other parameters -----------\n";
+    std::cout << std::endl;
+    std::cout << "Other parameters" << std::endl;
     B = ReadNext<double>(inf).val;
     
     // print info
-    std::cout << "magnetic field: " << B << " a.u." << std::endl;
+    std::cout << "\tmagnetic field: " << B << " a.u." << std::endl;
     std::cout << std::endl;
 }
 
@@ -628,7 +636,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         int l1 = ll[ill].first;
         int l2 = ll[ill].second;
         
-        std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << "\n";
+        std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << std::endl;
         
         // write to file
         std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
