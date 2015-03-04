@@ -13,6 +13,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O3" />
+					<Add option="-fcx-limited-range" />
 					<Add option="-std=c++11" />
 					<Add option="-Wall" />
 					<Add option="-fexceptions" />
@@ -31,8 +32,7 @@
 					<Add library="..\Win64\lib\libfftw3-3.3.4.dll.a" />
 					<Add library="..\Win64\lib\libhdf5-1.8.14.dll.a" />
 					<Add library="..\Win64\lib\libmsmpi.dll.a" />
-					<Add library="..\Win64\lib\libblas-3.5.0.dll.a" />
-					<Add library="..\Win64\lib\liblapack-3.5.0.dll.a" />
+					<Add library="..\Win64\lib\libopenblas-0.2.13.dll.a" />
 					<Add library="..\Win64\lib\libumfpack-5.7.1.dll.a" />
 					<Add library="gfortran" />
 				</Linker>
@@ -70,6 +70,8 @@
 		<Unit filename="src/preconditioners.h" />
 		<Unit filename="src/preconditioners/CGPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/CGPreconditioner.h" />
+		<Unit filename="src/preconditioners/GPUPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/GPUPreconditioner.h" />
 		<Unit filename="src/preconditioners/ILUPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/ILUPreconditioner.h" />
 		<Unit filename="src/preconditioners/KPAPreconditioner.cpp" />
