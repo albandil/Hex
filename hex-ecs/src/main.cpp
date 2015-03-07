@@ -342,7 +342,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     //
     
     std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << std::endl;
-    double prevE = special::constant::Nan, E = special::constant::Nan;
+    double E = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     for (unsigned ie = 0; ie < inp.Etot.size(); ie++)
     {
@@ -353,56 +353,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
                   << " CG iterations per energy)" << std::endl;
         
         // we may have already computed all solutions for this energy... is it so?
-        bool all_done = true;
-        for (auto instate : inp.instates)
-        for (unsigned Spin = 0; Spin <= 1; Spin++)
-        {
-            // decode initial state
-            int ni = std::get<0>(instate);
-            int li = std::get<1>(instate);
-            int mi = std::get<2>(instate);
-            
-            // skip energy-forbidden states
-            if (inp.Etot[ie] < -1./(ni*ni))
-            {
-                std::cout << "\tInitial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
-                          << ") will be skipped (not allowed by total energy)." << std::endl;;
-                continue;
-            }
-            
-            // check if the right hand side will be zero for this instate
-            bool allowed = false;
-            for (int l = abs(li - inp.L); l <= li + inp.L; l++)
-            {
-                // does this combination conserve parity?
-                if ((inp.L + li + l) % 2 != inp.Pi)
-                    continue;
-                
-                // does this combination have valid 'mi' for this partial wave?
-                if (special::ClebschGordan(li,mi,l,0,inp.L,mi) != 0)
-                    allowed = true;
-            }
-            
-            // skip angular forbidden states
-            if (not allowed)
-            {
-                std::cout << "\tInitial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
-                          << ") will be skipped (not allowed by total angular variables)." << std::endl;
-                continue;
-            }
-            
-            // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
-            if (not reader.check())
-                all_done = false;
-        }
-        if (all_done)
-        {
-            std::cout << "\tAll solutions for Etot[" << ie << "] = " << inp.Etot[ie] << " loaded." << std::endl;
-            continue;
-        }
-        
-        // for all initial states
+        std::vector<std::pair<int,int>> work;
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
         for (unsigned Spin = 0; Spin <= 1; Spin++)
         {
@@ -413,11 +364,15 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // skip energy-forbidden states
             if (inp.Etot[ie] < -1./(ni*ni))
+            {
+                std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
+                          << ") : not allowed by total E." << std::endl;;
                 continue;
+            }
             
             // check if the right hand side will be zero for this instate
             bool allowed = false;
-            for (int l = abs(li - inp.L); l <= li + inp.L; l++)
+            for (int l = std::abs(li - inp.L); l <= li + inp.L; l++)
             {
                 // does this combination conserve parity?
                 if ((inp.L + li + l) % 2 != inp.Pi)
@@ -430,19 +385,41 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // skip angular forbidden states
             if (not allowed)
+            {
+                std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
+                          << ") : not allowed by total L, Pi and nL." << std::endl;
                 continue;
+            }
             
-            // we may have already computed solution for this state and energy... is it so?
+            // check if there is some precomputed solution on the disk
             SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             if (reader.check())
                 continue;
             
-            // get total energy of the system
-            prevE = E; E = 0.5 * inp.Etot[ie];
-            
-            // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
-            if (not (E == prevE)) // does not use 'if (E != prevE)' to work with initial Nan values
-                prec->update(E);
+            // add work
+            work.push_back(std::make_pair(instate,Spin));
+        }
+        
+        // skip this energy if nothing to compute
+        if (work.empty())
+        {
+            std::cout << "\tAll solutions for Etot[" << ie << "] = " << inp.Etot[ie] << " loaded." << std::endl;
+            continue;
+        }
+        
+        // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
+        if (not (E == 0.5 * inp.Etot[ie]))
+            prec->update(E = 0.5 * inp.Etot[ie]);
+        
+        // for all initial states
+        for (auto workitem : work)
+        {
+            // decode initial state
+            int instate = std::get<0>(workitem);
+            int Spin = std::get<1>(workitem);
+            int ni = std::get<0>(inp.instates[instate]);
+            int li = std::get<1>(inp.instates[instate]);
+            int mi = std::get<2>(inp.instates[instate]);
             
             // create right hand side
             std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
@@ -498,6 +475,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             computations_done++;
             
             // save solution to disk (if valid)
+            SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             // - master process will collect all data and write them sequentially to disk
             if (std::isfinite(compute_norm(psi)))
             {
