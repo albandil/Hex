@@ -315,13 +315,18 @@ class SolutionIO
                 // ... or read from a solution segment.
                 //
                 
-                    // simply load the requested solution segment file
-                    if (not solution[i].hdfload(name(i)))
-                        return false;
-                    if (not solution.inmemory())
+                    else
                     {
-                        solution.hdfsave(i);
-                        solution[i].drop();
+                        // simply load the requested solution segment file
+                        if (not solution[i].hdfload(name(i)))
+                            return false;
+                        
+                        // dump to disk
+                        if (not solution.inmemory())
+                        {
+                            solution.hdfsave(i);
+                            solution[i].drop();
+                        }
                     }
             }
             
