@@ -209,12 +209,8 @@ class RadialIntegrals
         Complex computeR
         (
             int lambda,
-            int i, int j, int k, int l
-        ) const;
-        Complex computeSimpleR
-        (
-            int lambda,
-            int i, int j, int k, int l
+            int i, int j, int k, int l,
+            bool simple = false
         ) const;
         
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
@@ -431,8 +427,7 @@ class RadialIntegrals
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        SymBandMatrix calc_R_tr_dia_block (unsigned lambda, int i, int k) const;
-        SymBandMatrix calc_simple_R_tr_dia_block (unsigned lambda, int i, int k) const;
+        SymBandMatrix calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
         
         /**
          * @brief Multiply vectors by matrix of two-electron integrals.
@@ -444,8 +439,7 @@ class RadialIntegrals
          * matrix in memory or on disk - is used in the 'lightweight' mode,
          * which can be requested by the command line option --lightweight.
          */
-        cArrays apply_R_matrix (unsigned lambda, cArrays const & src) const;
-        cArrays apply_simple_R_matrix (unsigned lambda, cArrays const & src) const;
+        cArrays apply_R_matrix (unsigned lambda, cArrays const & src, bool simple = false) const;
         
         int maxlambda () const { return R_tr_dia_.size() - 1; }
         

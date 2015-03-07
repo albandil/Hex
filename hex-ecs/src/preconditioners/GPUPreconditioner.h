@@ -59,8 +59,11 @@ class GPUCGPreconditioner : public KPACGPreconditioner
 {
     public:
         
-        static const std::string name;
-        static const std::string description;
+        static const std::string prec_name;
+        static const std::string prec_description;
+        
+        virtual std::string const & name () const { return prec_name; }
+        virtual std::string const & description () const { return prec_description; }
         
         typedef struct sData
         {

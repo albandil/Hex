@@ -37,8 +37,10 @@
 #include "../misc.h"
 #include "../preconditioners.h"
 
-const std::string CGPreconditioner::name = "cg";
-const std::string CGPreconditioner::description = "Block inversion using plain conjugate gradients. Use --tolerance option to set the termination tolerance.";
+const std::string CGPreconditioner::prec_name = "CG";
+const std::string CGPreconditioner::prec_description = 
+    "Block inversion using plain conjugate gradients. "
+    "Use --tolerance option to set the termination tolerance.";
 
 void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
@@ -116,6 +118,9 @@ void CGPreconditioner::CG_init (int iblock) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
+    if (cmd_.lightweight_full)
+        HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
+        
     q = dia_blocks_[iblock].dot(p, cmd_.parallel_dot);
 }
 

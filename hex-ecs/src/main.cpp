@@ -468,7 +468,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
             else
-                std::cout << "\tSolution found." << std::endl;
+                std::cout << "\tSolution converged." << std::endl;
             
             // update progress
             iterations_done += iterations;

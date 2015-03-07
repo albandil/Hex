@@ -51,8 +51,8 @@
 #include "../preconditioners.h"
 #include "../radial.h"
 
-const std::string NoPreconditioner::name = "none";
-const std::string NoPreconditioner::description = "\"Preconditioning\" by the identity matrix.";
+const std::string NoPreconditioner::prec_name = "none";
+const std::string NoPreconditioner::prec_description = "\"Preconditioning\" by the identity matrix.";
 
 void NoPreconditioner::setup ()
 {

@@ -60,171 +60,6 @@
 // Dense matrix routines
 //
 
-// Matrix-matrix multiplication.
-extern "C" void dgemm_
-(
-    char * TRANSA, 
-    char * TRANSB, 
-    int * M, 
-    int * N, 
-    int * K, 
-    double * ALPHA, 
-    double * A, 
-    int * LDA, 
-    double * B, 
-    int * LDB, 
-    double * BETA, 
-    double * C, 
-    int * LDC 
-);
-extern "C" void zgemm_
-(
-    char * TRANSA, 
-    char * TRANSB, 
-    int * M, 
-    int * N, 
-    int * K, 
-    Complex * ALPHA, 
-    Complex * A, 
-    int * LDA, 
-    Complex * B, 
-    int * LDB, 
-    Complex * BETA, 
-    Complex * C, 
-    int * LDC 
-);
-
-#ifndef NO_LAPACK
-// Calculates LU decomposition of a complex dense matrix.
-extern "C" void zgetrf_
-(
-    int * M,
-    int * N,
-    Complex * A,
-    int * LDA,
-    int * IPIV,
-    int * INFO
-);
-// Inverts a complex dense matrix using precomputed LU decomposition.
-extern "C" void zgetri_
-(
-    int * N,
-    Complex * A,
-    int * LDA,
-    int * IPIV,
-    Complex * WORK,
-    int * LWORK,
-    int * INFO
-);
-// Eigen-diagonalization of a general complex matrix.
-extern "C" void zgeev_
-(
-    char * JOBVL,
-    char * JOBVR,
-    int * N,
-    Complex * A,
-    int * LDA,
-    Complex * W,
-    Complex * VL,
-    int * LDVL,
-    Complex * VR,
-    int * LDVR,
-    Complex * WORK,
-    int * LWORK,
-    double * RWORK,
-    int * INFO
-);
-#endif
-
-// specialization of multiplication of real dense row-major ("C-like") matrices
-template<> RowMatrix<double> operator * (RowMatrix<double> const & A, ColMatrix<double> const & B)
-{
-    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
-    // =>
-    // C(col) = (A'(col) B(col))' = B'(col) A(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = B.cols(), n = A.cols(), k = A.rows();
-    
-    // create output matrix
-    RowMatrix<double> C (A.rows(), B.cols());
-        
-    // use the BLAS-3 routine
-    char transA = 'T', transB = 'N';
-    double alpha = 1, beta = 0;
-    dgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<double*>(B.data().data()), &k,
-                const_cast<double*>(A.data().data()), &k,
-        &beta, C.data().data(), &m
-    );
-
-    // return result
-    return C;
-}
-
-template<> ColMatrix<Complex> operator * (ColMatrix<Complex> const & A, ColMatrix<Complex> const & B)
-{
-    // C(col) = A(col) B(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = A.rows(), n = B.cols(), k = A.cols();
-    
-    // output matrix
-    ColMatrix<Complex> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'N', transB = 'N';
-    Complex alpha = 1, beta = 0;
-    zgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<Complex*>(A.data().data()), &k,//?
-                const_cast<Complex*>(B.data().data()), &k,//?
-        &beta, C.data().data(), &m
-    );
-    
-    // return resulting matrix
-    return C;
-}
-
-template<> RowMatrix<Complex> operator * (RowMatrix<Complex> const & A, ColMatrix<Complex> const & B)
-{
-    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
-    // =>
-    // C(col) = (A'(col) B(col))' = B'(col) A(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = B.cols(), n = A.cols(), k = B.rows();
-    
-    // output matrix
-    RowMatrix<Complex> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'T', transB = 'N';
-    Complex alpha = 1, beta = 0;
-    zgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<Complex*>(B.data().data()), &k,
-                const_cast<Complex*>(A.data().data()), &k,
-        &beta, C.data().data(), &m
-    );
-    
-    // return resulting matrix
-    return C;
-}
-
 template<> void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
 {
 #ifndef NO_LAPACK
@@ -381,43 +216,59 @@ template<> void ColMatrix<Complex>::diagonalize
 #endif
 }
 
-cArray kron_dot (RowMatrix<Complex> const & A, RowMatrix<Complex> const & B, cArrayView const v)
+void dense_kron_dot
+(
+    int A_rows, int A_cols, Complex const * A_data,
+    int B_rows, int B_cols, Complex const * B_data,
+    Complex const * v_data,
+    Complex       * w_data
+)
 {
     assert(A.cols() * B.cols() == (int)v.size());
     
-    // return vector
-    NumberArray<Complex> w(A.rows() * B.rows());
-    
     // auxiliary matrix
-    ColMatrix<Complex> C(B.rows(),A.cols());
+    int C_rows = B_rows, C_cols = A_cols;
+    Complex * C_data = new Complex [C_rows * C_cols];
+    
+    // auxiliary variables
     Complex alpha = 1, beta = 0;
     char norm = 'N', trans = 'T';
     
     // C = V * A^T
     {
-        int m = B.rows(), k = B.cols(), n = A.rows();
+        int m = B_rows, k = B_cols, n = A_rows;
         zgemm_
         (
             &norm, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(v.data()), &n,
-            const_cast<Complex*>(A.data().data()), &k,
-            &beta, C.data().begin(), &m
+            &alpha, const_cast<Complex*>(v_data), &n,
+            const_cast<Complex*>(A_data), &k,
+            &beta, C_data, &m
         );
     }
     
     // W = B * C
     {
-        int m = A.rows(), k = A.cols(), n = C.cols();
+        int m = A_rows, k = A_cols, n = C_cols;
         zgemm_
         (
             &trans, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(B.data().begin()), &n,
-            C.data().begin(), &n,
-            &beta, w.data(), &m
+            &alpha, const_cast<Complex*>(B_data), &n,
+            C_data, &n,
+            &beta, w_data, &m
         );
     }
     
-    return w;
+    // clean memory
+    delete [] C_data;
+}
+
+void dense_mmul
+(
+    int A_rows, int A_cols, Complex const * A_data,
+    int B_cols, Complex const * B_data, Complex * C_data
+)
+{
+    
 }
 
 cArray kron_dot (SymBandMatrix const & A, SymBandMatrix const & B, const cArrayView v)
@@ -1954,20 +1805,20 @@ cArray SymBandMatrix::sym_band_dot (int n, int d, const cArrayView M, const cArr
     if (n == 0 or d == 0)
         return Y;
     
+    // auxiliary variables
+    char uplo = 'L';
+    int k = d - 1, inc = 1;
+    Complex alpha = 1, beta = 1;
+    
     // for all source vectors (columns)
     for (int j = 0; j < Nvec; j++)
     {
-        // for all elements of the output array (rows)
-        for (int i = 0; i < n; i++)
-        {
-            // multiply by lower diagonals
-            for (int k = std::max(0, i - d + 1); k < i; k++)
-                Y[j * n + i] += M[k * d + (i - k)] * X[j * n + k];
-            
-            // multiply by main and upper diagonals
-            for (int k = i; k < std::min(n, i + d); k++)
-                Y[j * n + i] += M[i * d + (k - i)] * X[j * n + k];
-        }
+        zsbmv_
+        (
+            &uplo, &n, &k, &alpha, const_cast<Complex*>(M.data()), &d,
+            const_cast<Complex*>(X.data()) + j * n, &inc, &beta,
+            Y.data() + j * n, &inc
+        );
     }
     
     return Y;

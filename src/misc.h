@@ -392,6 +392,14 @@ template <class T> T string_to (std::string str)
 }
 
 /**
+ * @brief Conversion of a string to string.
+ */
+template <> inline std::string string_to (std::string str)
+{
+    return str;
+}
+
+/**
  * @brief Conversion of a string to character.
  * 
  * This function fails if length of the string is different from one.

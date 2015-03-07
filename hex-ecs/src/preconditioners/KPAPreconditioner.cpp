@@ -40,8 +40,9 @@
 
 #ifndef NO_LAPACK
 
-const std::string KPACGPreconditioner::name = "KPA";
-const std::string KPACGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
+const std::string KPACGPreconditioner::prec_name = "KPA";
+const std::string KPACGPreconditioner::prec_description = 
+    "Block inversion using conjugate gradients preconditioned by Kronecker product approximation.";
 
 void KPACGPreconditioner::sData::hdflink (const char* file)
 {
@@ -260,7 +261,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                q -= s_rad_.apply_simple_R_matrix(lambda, cArrays(1, f * p))[0];
+                q -= s_rad_.apply_R_matrix(lambda, cArrays(1, f * p), true)[0];
         }
     }
     else if (cmd_.lightweight_full)

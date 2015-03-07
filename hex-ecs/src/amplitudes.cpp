@@ -380,7 +380,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         return;
     
     // evaluate radial part for all evaluation radii
-    # pragma omp parallel for if (solution.inmemory())
     for (int n = 1; n <= samples; n++)
     {
         // this is the evaluation point
@@ -394,27 +393,20 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
         
         // evaluate B-splines and their derivatives at evaluation radius
-        CooMatrix Bspline_R0(Nspline, 1), Dspline_R0(Nspline, 1);
+        cArray Bspline_R0(Nspline), Dspline_R0(Nspline);
         for (int ispline = 0; ispline < Nspline; ispline++)
         {
-            Complex val;
-            
             // evaluate B-spline
-            if ((val = bspline_.bspline(ispline, eval_knot, order, eval_r)) != 0.)
-                Bspline_R0.add(ispline, 0, val);
+            Bspline_R0[ispline] = bspline_.bspline(ispline, eval_knot, order, eval_r);
             
             // evaluate B-spline derivative
-            if ((val = bspline_.dspline(ispline, eval_knot, order, eval_r)) != 0.)
-                Dspline_R0.add(ispline, 0, val);
+            Dspline_R0[ispline] = bspline_.dspline(ispline, eval_knot, order, eval_r);
         }
         
         // evaluate Wronskians
-        CooMatrix Wj[inp_.maxell + 1];
+        cArrays Wj(inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
-        
-        // we need "P_overlaps" to have a 'dot' method
-        CooMatrix Sp (Nspline, 1, Pf_overlaps.begin());
         
         // compute radial factor
         for (unsigned ill = 0; ill < ang_.size(); ill++)
@@ -429,9 +421,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             // load solution block
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
+            RowMatrixView<Complex> PsiSc(Nspline, Nspline, solution[ill]);
             
-            // update value in the storage
-            Complex lambda = Sp.transpose().dot(solution[ill]).dot(Wj[ell].todense()).todense()[0] / double(samples);
+            // calculate radial integral
+            Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell])) / double(samples);
+            
+            // update the stored value
             # pragma omp critical
             if (Spin == 0)
                 (Lambda_Slp[T][ell].first)[ie] += lambda;

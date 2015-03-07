@@ -53,6 +53,20 @@ class PreconditionerBase
     public:
         
         /**
+         * @brief Name of the preconditioner.
+         * 
+         * The name is used in the command line option --preconditioner.
+         */
+        virtual std::string const & name () const = 0;
+        
+        /**
+         * @brief Description of the preconditioner.
+         * 
+         * Simple documentation of the preconditioner.
+         */
+        virtual std::string const & description () const = 0;
+        
+        /**
          * @brief Initialize the preconditioner.
          * 
          * This function contains all computation intensive preparations
@@ -214,7 +228,7 @@ class Preconditioners
             // check if i-th preconditioner is the right one
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
-            return (name == std::tuple_element<i,AvailableTypes>::type::name) ? i : findByName<i+1>(name);
+            return (name == std::tuple_element<i,AvailableTypes>::type::prec_name) ? i : findByName<i+1>(name);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),int>::type findByName (std::string name)
         {
@@ -229,7 +243,7 @@ class Preconditioners
         //@{
         template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
         {
-            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::name : name<i+1>(idx);
+            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::prec_name : name<i+1>(idx);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type name (unsigned idx)
         {
@@ -243,7 +257,7 @@ class Preconditioners
         //@{
         template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
         {
-            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::description : description<i+1>(idx);
+            return (i == idx) ? std::tuple_element<i,AvailableTypes>::type::prec_description : description<i+1>(idx);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value),std::string>::type description (unsigned idx)
         {

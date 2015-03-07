@@ -1554,7 +1554,7 @@ template <typename T> NumberArray<T> geomspace (T x0, T x1, std::size_t samples,
     
     for (unsigned i = 0; i < samples; i++)
     {
-        grid[i] = x0 + (x1 - x0) * (1. - std::pow(q,i)) / (1. - std::pow(q,samples));
+        grid[i] = x0 + (x1 - x0) * (1. - std::pow(q,i)) / (1. - std::pow(q,samples-1));
     }
     
     return grid;

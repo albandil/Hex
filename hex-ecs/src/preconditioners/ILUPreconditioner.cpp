@@ -35,8 +35,10 @@
 #include "../misc.h"
 #include "../preconditioners.h"
 
-const std::string ILUCGPreconditioner::name = "ILU";
-const std::string ILUCGPreconditioner::description = "Block inversion using conjugate gradients preconditioned by Incomplete LU. The drop tolerance can be given as the --droptol parameter.";
+const std::string ILUCGPreconditioner::prec_name = "ILU";
+const std::string ILUCGPreconditioner::prec_description = 
+    "Block inversion using conjugate gradients preconditioned by Incomplete LU. "
+    "The drop tolerance can be given as the --droptol parameter.";
 
 void ILUCGPreconditioner::update (double E)
 {

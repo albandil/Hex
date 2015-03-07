@@ -47,17 +47,17 @@ const std::string sample_input =
     "# order      θ\n"
     "      4   0.63\n"
     "\n"
-    "# real knot sequences (L = linear)\n"
-    " 0.0  0.1    3   -1\n"
-    " 0.0  2.0   60\n"
-    "   4   20   58\n"
-    "   L    L    L\n"
+    "# real knot sequences\n"
+    "# L[inear] <Start> <End> <Sample>\n"
+    "# G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
+    "  L  0.0  0.0   4\n"
+    "  L  0.1  2.0  20\n"
+    "  L    3   60  58\n"
+    " -1\n"
     "\n"
-    "# complex knot sequences (G = logarithmic)\n"
-    "  60    -1\n"
-    " 100\n"
-    "  41\n"
-    "   G\n"
+    "# complex knot sequences\n"
+    "  G   60  100   1  1.02\n"
+    " -1\n"
     "\n"
     "# initial atomic states (ni, li, mi)\n"
     "  1 -1\n"
@@ -73,9 +73,8 @@ const std::string sample_input =
     "  0  0  4\n"
     "\n"
     "# atom + projectile total energies in Rydbergs\n"
-    " -0.35   -1\n"
-    " -0.05\n"
-    "     3\n"
+    "  L  -0.35  -0.05  3\n"
+    " -1\n"
     "\n"
     "# magnetic field\n"
     " 0\n";
@@ -375,7 +374,6 @@ void CommandLine::parse (int argc, char* argv[])
 
 void InputFile::read (std::ifstream & inf)
 {
-    double x;
     ReadItem<int> idata;
     
     // load B-spline parameters
@@ -391,32 +389,28 @@ void InputFile::read (std::ifstream & inf)
     // load real knot data
     //
     
-    std::vector<double> rknots_begin, rknots_end;
-    std::vector<int> rknots_samples;
-    std::vector<char> rknots_type;
-    while ((x = ReadNext<double>(inf).val) != -1.)
-        rknots_begin.push_back(x);
-    for (std::size_t i = 0; i < rknots_begin.size(); i++)
-        rknots_end.push_back(ReadNext<double>(inf).val);
-    for (std::size_t i = 0; i < rknots_begin.size(); i++)
-        rknots_samples.push_back(ReadNext<int>(inf).val);
-    for (std::size_t i = 0; i < rknots_begin.size(); i++)
-        rknots_type.push_back(ReadNext<char>(inf).val);
-    
-    // construct real knot sequence
-    for (unsigned i = 0; i < rknots_begin.size(); i++)
+    std::string type;
+    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
     {
-        // add sub-sequence
-        switch (std::toupper(rknots_type[i]))
+        if (type[0] == 'L')
         {
-            case 'L':
-                rknots = concatenate(rknots, linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]));
-                break;
-            case 'G':
-                rknots = concatenate(rknots, logspace(rknots_begin[i], rknots_end[i], rknots_samples[i]));
-                break;
-            default:
-                HexException("Unknown sequence type '%c'.", rknots_type[i]);
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            int samples = ReadNext<int>(inf).val;
+            rknots.append(linspace(begin, end, samples));
+        }
+        else if (type[0] == 'G')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            double d = ReadNext<double>(inf).val;
+            double quotient = ReadNext<double>(inf).val;
+            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
+            rknots.append(geomspace(begin, end, samples, quotient));
+        }
+        else
+        {
+            HexException("Unknown sequence type \"%s\".", type.c_str());
         }
     }
     
@@ -435,32 +429,27 @@ void InputFile::read (std::ifstream & inf)
     // load complex knot data
     //
     
-    std::vector<double> cknots_begin, cknots_end;
-    std::vector<int> cknots_samples;
-    std::vector<char> cknots_type;
-    while ((x = ReadNext<double>(inf).val) != -1.)
-        cknots_begin.push_back(x);
-    for (std::size_t i = 0; i < cknots_begin.size(); i++)
-        cknots_end.push_back(ReadNext<double>(inf).val);
-    for (std::size_t i = 0; i < cknots_begin.size(); i++)
-        cknots_samples.push_back(ReadNext<double>(inf).val);
-    for (std::size_t i = 0; i < cknots_begin.size(); i++)
-        cknots_type.push_back(ReadNext<char>(inf).val);
-    
-    // construct complex(-to-become) knot sequence
-    for (unsigned i = 0; i < cknots_begin.size(); i++)
+    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
     {
-        // add sub-sequence
-        switch (std::toupper(cknots_type[i]))
+        if (type[0] == 'L')
         {
-            case 'L':
-                cknots = concatenate(cknots, linspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
-                break;
-            case 'G':
-                cknots = concatenate(cknots, logspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
-                break;
-            default:
-                HexException("Unknown sequence type '%c'.", cknots_type[i]);
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            int samples = ReadNext<int>(inf).val;
+            cknots.append(linspace(begin, end, samples));
+        }
+        else if (type[0] == 'G')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            double d = ReadNext<double>(inf).val;
+            double quotient = ReadNext<double>(inf).val;
+            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
+            cknots.append(geomspace(begin, end, samples, quotient));
+        }
+        else
+        {
+            HexException("Complex knot sequence: Unknown sequence type \"%s\".", type.c_str());
         }
     }
     
@@ -586,22 +575,29 @@ void InputFile::read (std::ifstream & inf)
     // load initial energies
     //
     
-    std::cout << std::endl;
-    std::cout << "Total projectile + atom energies [Ry]" << std::endl;
-    std::vector<double> Etot_begin, Etot_end, Etot_samples;
-    
-    while ((x = ReadNext<double>(inf).val) != -1.)
-        Etot_begin.push_back(x);
-    for (std::size_t i = 0; i < Etot_begin.size(); i++)
-        Etot_end.push_back(ReadNext<double>(inf).val);
-    for (std::size_t i = 0; i < Etot_begin.size(); i++)
-        Etot_samples.push_back(ReadNext<double>(inf).val);
-    
-    // construct energy sequence
-    for (unsigned i = 0; i < Etot_begin.size(); i++)
+    std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
+    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
     {
-        if (Etot_samples[i] > 0)
-            Etot.append(linspace(Etot_begin[i], Etot_end[i], Etot_samples[i]));
+        if (type[0] == 'L')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            int samples = ReadNext<int>(inf).val;
+            Etot.append(linspace(begin, end, samples));
+        }
+        else if (type[0] == 'G')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            double d = ReadNext<double>(inf).val;
+            double quotient = ReadNext<double>(inf).val;
+            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
+            Etot.append(geomspace(begin, end, samples, quotient));
+        }
+        else
+        {
+            HexException("Energy list: Unknown sequence type \"%s\".", type.c_str());
+        }
     }
     
     // print info
