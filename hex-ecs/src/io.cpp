@@ -451,7 +451,7 @@ void InputFile::read (std::ifstream & inf)
     for (unsigned i = 0; i < cknots_begin.size(); i++)
     {
         // add sub-sequence
-        switch (std::toupper(rknots_type[i]))
+        switch (std::toupper(cknots_type[i]))
         {
             case 'L':
                 cknots = concatenate(cknots, linspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
@@ -460,7 +460,7 @@ void InputFile::read (std::ifstream & inf)
                 cknots = concatenate(cknots, logspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
                 break;
             default:
-                HexException("Unknown sequence type '%c'.", rknots_type[i]);
+                HexException("Unknown sequence type '%c'.", cknots_type[i]);
         }
     }
     
