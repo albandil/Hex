@@ -47,35 +47,35 @@ const std::string sample_input =
     "# order      θ\n"
     "      4   0.63\n"
     "\n"
-    "# real knot sequences\n"
-    " 0.0  0.1   3   -1\n"
-    " 0.0  2.0  60\n"
-    "   4   20  58\n"
+    "# real knot sequences (L = linear)\n"
+    " 0.0  0.1    3   -1\n"
+    " 0.0  2.0   60\n"
+    "   4   20   58\n"
+    "   L    L    L\n"
     "\n"
-    "# complex knot sequences\n"
+    "# complex knot sequences (G = logarithmic)\n"
     "  60    -1\n"
     " 100\n"
     "  41\n"
+    "   G\n"
     "\n"
-    "# initial atomic states\n"
-    "# ni\n"
-    "  1\n"
-    "# angular states (li, mi)\n"
-    "  0  -1\n"
-    "  0\n"
+    "# initial atomic states (ni, li, mi)\n"
+    "  1 -1\n"
+    "  *\n"
+    "  *\n"
     "\n"
     "# final atomic states (nf, lf)\n"
     "  1  -1\n"
-    "  0\n"
+    "  *\n"
     "\n"
     "# angular momenta\n"
     "# L  Pi limit\n"
     "  0  0  4\n"
     "\n"
-    "# initial energies in Rydbergs\n"
-    " 0.65   -1\n"
-    " 0.95\n"
-    "    3\n"
+    "# atom + projectile total energies in Rydbergs\n"
+    " -0.35   -1\n"
+    " -0.05\n"
+    "     3\n"
     "\n"
     "# magnetic field\n"
     " 0\n";
@@ -375,7 +375,7 @@ void CommandLine::parse (int argc, char* argv[])
 
 void InputFile::read (std::ifstream & inf)
 {
-    double x; int y;
+    double x;
     ReadItem<int> idata;
     
     // load B-spline parameters
@@ -391,25 +391,33 @@ void InputFile::read (std::ifstream & inf)
     // load real knot data
     //
     
-    std::vector<double> rknots_begin, rknots_end, rknots_samples;
+    std::vector<double> rknots_begin, rknots_end;
+    std::vector<int> rknots_samples;
+    std::vector<char> rknots_type;
     while ((x = ReadNext<double>(inf).val) != -1.)
         rknots_begin.push_back(x);
     for (std::size_t i = 0; i < rknots_begin.size(); i++)
         rknots_end.push_back(ReadNext<double>(inf).val);
     for (std::size_t i = 0; i < rknots_begin.size(); i++)
-        rknots_samples.push_back(ReadNext<double>(inf).val);
+        rknots_samples.push_back(ReadNext<int>(inf).val);
+    for (std::size_t i = 0; i < rknots_begin.size(); i++)
+        rknots_type.push_back(ReadNext<char>(inf).val);
     
     // construct real knot sequence
     for (unsigned i = 0; i < rknots_begin.size(); i++)
     {
-        if (rknots_begin[i] > rknots_end[i])
+        // add sub-sequence
+        switch (std::toupper(rknots_type[i]))
         {
-            std::cout << "\t" << rknots_begin[i] << " > " << rknots_end[i] << "\n";
-            HexException("Inconsistent knot specification!");
+            case 'L':
+                rknots = concatenate(rknots, linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]));
+                break;
+            case 'G':
+                rknots = concatenate(rknots, logspace(rknots_begin[i], rknots_end[i], rknots_samples[i]));
+                break;
+            default:
+                HexException("Unknown sequence type '%c'.", rknots_type[i]);
         }
-        
-        rArray new_knots = linspace(rknots_begin[i], rknots_end[i], rknots_samples[i]);
-        rknots = concatenate(rknots, new_knots);
     }
     
     // print info
@@ -418,38 +426,54 @@ void InputFile::read (std::ifstream & inf)
     for (std::string line : rknots.lines(100))
         std::cout << '\t' << line << std::endl;
     
+    // check order of knots
+    for (unsigned i = 1; i < rknots.size(); i++)
+        if (rknots[i] < rknots[i-1])
+            HexException("The real knot sequence is not monotonous.");
+    
     //
     // load complex knot data
     //
     
-    std::vector<double> cknots_begin, cknots_end, cknots_samples;
+    std::vector<double> cknots_begin, cknots_end;
+    std::vector<int> cknots_samples;
+    std::vector<char> cknots_type;
     while ((x = ReadNext<double>(inf).val) != -1.)
         cknots_begin.push_back(x);
     for (std::size_t i = 0; i < cknots_begin.size(); i++)
         cknots_end.push_back(ReadNext<double>(inf).val);
     for (std::size_t i = 0; i < cknots_begin.size(); i++)
         cknots_samples.push_back(ReadNext<double>(inf).val);
+    for (std::size_t i = 0; i < cknots_begin.size(); i++)
+        cknots_type.push_back(ReadNext<char>(inf).val);
     
     // construct complex(-to-become) knot sequence
     for (unsigned i = 0; i < cknots_begin.size(); i++)
     {
-        cknots = concatenate
-        (
-            cknots,
-            linspace
-            (
-                cknots_begin[i],
-                cknots_end[i],
-                cknots_samples[i]
-            )
-        );
+        // add sub-sequence
+        switch (std::toupper(rknots_type[i]))
+        {
+            case 'L':
+                cknots = concatenate(cknots, linspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
+                break;
+            case 'G':
+                cknots = concatenate(cknots, logspace(cknots_begin[i], cknots_end[i], cknots_samples[i]));
+                break;
+            default:
+                HexException("Unknown sequence type '%c'.", rknots_type[i]);
+        }
     }
     
     // print info
     std::cout << std::endl;
-    std::cout << "Complex knots" << std::endl;
+    std::cout << "Complex knots (before scaling)" << std::endl;
     for (std::string line : cknots.lines(100))
         std::cout << '\t' << line << std::endl;
+    
+    // check order of knots
+    for (unsigned i = 1; i < cknots.size(); i++)
+        if (cknots[i] < cknots[i-1])
+            HexException("The complex knot sequence is not monotonous.");
     
     //
     // load initial atomic quantum numbers
@@ -458,21 +482,22 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
     std::cout << "Initial atomic states" << std::endl;
     
-    std::vector<ReadItem<int>> lis, mis;
+    std::vector<ReadItem<int>> nis, lis, mis;
     
-    // load initial principal quantum number
-    ni = ReadNext<int>(inf).val;
+    // load initial principal quantum numbers
+    while ((idata = ReadNext<int>(inf)).val != -1)
+        nis.push_back(idata);
     
     // - orbital angular momentum
-    while ((idata = ReadNext<int>(inf)).val != -1)
-        lis.push_back(idata);
+    for (std::size_t i = 0; i < nis.size(); i++)
+        lis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
     // - magnetic quantum number
-    for (std::size_t i = 0; i < lis.size(); i++)
+    for (std::size_t i = 0; i < nis.size(); i++)
         mis.push_back(ReadNext<int>(inf, ReadItem<int>::asterisk));
     
-    for (unsigned i = 0; i < lis.size(); i++)
-    for (int li = 0; li < ni; li++)
+    for (unsigned i = 0; i < nis.size(); i++)
+    for (int li = 0; li < nis[i].val; li++)
     for (int mi = -li; mi <= li; mi++)
     {
         // skip unused orbital angular momenta
@@ -484,7 +509,7 @@ void InputFile::read (std::ifstream & inf)
             continue;
         
         // add this initial state
-        instates.push_back(std::make_tuple(ni,li,mi));
+        instates.push_back(std::make_tuple(nis[i].val,li,mi));
     }
     
     // print info
@@ -505,12 +530,11 @@ void InputFile::read (std::ifstream & inf)
     
     std::cout << std::endl;
     std::cout << "Final atomic states" << std::endl;
-    std::vector<int> nfs;
-    std::vector<ReadItem<int>> lfs;
+    std::vector<ReadItem<int>> nfs, lfs;
     
     // - principal quantum number
-    while ((y = ReadNext<int>(inf).val) != -1)
-        nfs.push_back(y);
+    while ((idata = ReadNext<int>(inf)).val != -1)
+        nfs.push_back(idata);
     
     // - orbital angular momentum
     for (std::size_t i = 0; i < nfs.size(); i++)
@@ -518,10 +542,10 @@ void InputFile::read (std::ifstream & inf)
     
     // - construct final states
     for (unsigned f = 0; f < nfs.size(); f++)
-    for (int lf = 0; lf <= nfs[f]; lf++)
+    for (int lf = 0; lf <= nfs[f].val; lf++)
     {
         // l=n only in ionization specification
-        if (lf == nfs[f] and nfs[f] != 0)
+        if (lf == nfs[f].val and nfs[f].val != 0)
             continue;
         
         // skip unused orbital angular momenta
@@ -529,7 +553,7 @@ void InputFile::read (std::ifstream & inf)
             continue;
         
         // add this initial state
-        outstates.push_back(std::make_tuple(nfs[f],lf,0));
+        outstates.push_back(std::make_tuple(nfs[f].val,lf,0));
     }
     
     // print info
@@ -563,36 +587,26 @@ void InputFile::read (std::ifstream & inf)
     //
     
     std::cout << std::endl;
-    std::cout << "Initial projectile energies" << std::endl;
-    std::vector<double> Ei_begin, Ei_end, Ei_samples;
+    std::cout << "Total projectile + atom energies [Ry]" << std::endl;
+    std::vector<double> Etot_begin, Etot_end, Etot_samples;
     
     while ((x = ReadNext<double>(inf).val) != -1.)
-        Ei_begin.push_back(x);
-    for (std::size_t i = 0; i < Ei_begin.size(); i++)
-        Ei_end.push_back(ReadNext<double>(inf).val);
-    for (std::size_t i = 0; i < Ei_begin.size(); i++)
-        Ei_samples.push_back(ReadNext<double>(inf).val);
+        Etot_begin.push_back(x);
+    for (std::size_t i = 0; i < Etot_begin.size(); i++)
+        Etot_end.push_back(ReadNext<double>(inf).val);
+    for (std::size_t i = 0; i < Etot_begin.size(); i++)
+        Etot_samples.push_back(ReadNext<double>(inf).val);
     
     // construct energy sequence
-    for (unsigned i = 0; i < Ei_begin.size(); i++)
+    for (unsigned i = 0; i < Etot_begin.size(); i++)
     {
-        if (Ei_samples[i] > 0)
-        {
-            Ei.append
-            (
-                linspace
-                (
-                    Ei_begin[i],
-                    Ei_end[i],
-                    Ei_samples[i]
-                )
-            );
-        }
+        if (Etot_samples[i] > 0)
+            Etot.append(linspace(Etot_begin[i], Etot_end[i], Etot_samples[i]));
     }
     
     // print info
-    std::cout << "\tcount: "    << Ei.size()  << std::endl;
-    std::cout << "\tfull list: " << Ei         << std::endl;
+    std::cout << "\tcount: "     << Etot.size()  << std::endl;
+    std::cout << "\tfull list: " << Etot         << std::endl;
     
     //
     // load some other optional data

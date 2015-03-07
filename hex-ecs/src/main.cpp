@@ -134,7 +134,7 @@ int main (int argc, char* argv[])
     InputFile inp (cmd.inputfile);
     
     // is there something to compute?
-    if (inp.Ei.empty() or inp.instates.empty() or inp.outstates.empty())
+    if (inp.Etot.empty() or inp.instates.empty() or inp.outstates.empty())
     {
         std::cout << "Nothing to compute." << std::endl;
         std::exit(EXIT_SUCCESS);
@@ -344,11 +344,11 @@ if (cmd.itinerary & CommandLine::StgSolve)
     std::cout << "Hamiltonian size: " << Nspline * Nspline * coupled_states.size() << std::endl;
     double prevE = special::constant::Nan, E = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
-    for (unsigned ie = 0; ie < inp.Ei.size(); ie++)
+    for (unsigned ie = 0; ie < inp.Etot.size(); ie++)
     {
         // print progress information
-        std::cout << "\nSolving the system for Ei[" << ie << "] = " << inp.Ei[ie] << " ("
-                  << int(trunc(ie * 100. / inp.Ei.size() + 0.5)) << " % finished, typically "
+        std::cout << "\nSolving the system for Etot[" << ie << "] = " << inp.Etot[ie] << " ("
+                  << int(trunc(ie * 100. / inp.Etot.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
         
@@ -357,8 +357,18 @@ if (cmd.itinerary & CommandLine::StgSolve)
         for (auto instate : inp.instates)
         for (unsigned Spin = 0; Spin <= 1; Spin++)
         {
+            // decode initial state
+            int ni = std::get<0>(instate);
             int li = std::get<1>(instate);
             int mi = std::get<2>(instate);
+            
+            // skip energy-forbidden states
+            if (inp.Etot[ie] < -1./(ni*ni))
+            {
+                std::cout << "\tInitial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
+                          << ") will be skipped (not allowed by total energy)." << std::endl;;
+                continue;
+            }
             
             // check if the right hand side will be zero for this instate
             bool allowed = false;
@@ -376,18 +386,19 @@ if (cmd.itinerary & CommandLine::StgSolve)
             // skip angular forbidden states
             if (not allowed)
             {
-                std::cout << "\tInitial state li=" << li << ", mi=" << mi << " will be skipped (not allowed by total angular variables).\n";
+                std::cout << "\tInitial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
+                          << ") will be skipped (not allowed by total angular variables)." << std::endl;
                 continue;
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             if (not reader.check())
                 all_done = false;
         }
         if (all_done)
         {
-            std::cout << "\tAll solutions for Ei[" << ie << "] = " << inp.Ei[ie] << " loaded." << std::endl;
+            std::cout << "\tAll solutions for Etot[" << ie << "] = " << inp.Etot[ie] << " loaded." << std::endl;
             continue;
         }
         
@@ -395,8 +406,14 @@ if (cmd.itinerary & CommandLine::StgSolve)
         for (unsigned instate = 0; instate < inp.instates.size(); instate++)
         for (unsigned Spin = 0; Spin <= 1; Spin++)
         {
+            // decode initial state
+            int ni = std::get<0>(inp.instates[instate]);
             int li = std::get<1>(inp.instates[instate]);
             int mi = std::get<2>(inp.instates[instate]);
+            
+            // skip energy-forbidden states
+            if (inp.Etot[ie] < -1./(ni*ni))
+                continue;
             
             // check if the right hand side will be zero for this instate
             bool allowed = false;
@@ -416,19 +433,19 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             
             // we may have already computed solution for this state and energy... is it so?
-            SolutionIO reader (inp.L, Spin, inp.Pi, inp.ni, li, mi, inp.Ei[ie], coupled_states, Nspline);
+            SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             if (reader.check())
                 continue;
             
             // get total energy of the system
-            prevE = E; E = 0.5 * (inp.Ei[ie] - 1./(inp.ni * inp.ni));
+            prevE = E; E = 0.5 * inp.Etot[ie];
             
             // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
             if (not (E == prevE)) // does not use 'if (E != prevE)' to work with initial Nan values
                 prec->update(E);
             
             // create right hand side
-            std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(inp.ni, li, mi) << " and total spin S = " << Spin << "... " << std::flush;
+            std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
             BlockArray<Complex> chi (coupled_states.size(), !cmd.outofcore, "cg-b");
             prec->rhs(chi, ie, instate, Spin);
             std::cout << "ok" << std::endl;
@@ -438,7 +455,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             if (chi_norm == 0.)
             {
                 // this should not happen, hopefully we already checked
-                std::cout << "\t! Right-hand-side is zero, check L, Π and nL." << std::endl;
+                std::cout << "\t! Right-hand-side is zero, check L, Pi and nL." << std::endl;
                 computations_done++;
                 continue;
             }
@@ -504,7 +521,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
     
-    std::cout << "All solutions computed." << std::endl;
+    std::cout << std::endl << "All solutions computed." << std::endl;
     if (computations_done > 0)
         std::cout << "\t(typically " << iterations_done / computations_done << " CG iterations per solution)" << std::endl;
 }

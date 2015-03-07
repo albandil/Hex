@@ -209,11 +209,6 @@ class InputFile
             
             // compute angular momentum limit
             maxell = levels + L + Pi;
-            
-            // projectile momenta
-            ki.resize(Ei.size());
-            for (std::size_t i = 0; i < Ei.size(); i++)
-                ki[i] = sqrt(Ei[i]);
         }
         
         // read data from file
@@ -225,7 +220,7 @@ class InputFile
         
         int order, ni, L, Pi, levels, maxell;
         double ecstheta, B;
-        rArray rknots, cknots, Ei, ki;
+        rArray rknots, cknots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;
 };
 
@@ -247,9 +242,9 @@ class SolutionIO
         std::string name (int ill = -1) const
         {
             if (ill == -1)
-                return format("psi-%d-%d-%d-%d-%d-%d-%g.hdf", L_, S_, Pi_, ni_, li_, mi_, E_);
+                return format("psi-%g-%d-%d-%d-%d-%d-%d.hdf", E_ + 1, L_, S_, Pi_, ni_, li_, mi_);
             else
-                return format("psi-%d-%d-%d-%d-%d-%d-%g-(%d,%d).hdf", L_, S_, Pi_, ni_, li_, mi_, E_, ang_[ill].first, ang_[ill].second);
+                return format("psi-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
         
         /// Check that the file exists.

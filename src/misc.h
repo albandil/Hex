@@ -392,6 +392,20 @@ template <class T> T string_to (std::string str)
 }
 
 /**
+ * @brief Conversion of a string to character.
+ * 
+ * This function fails if length of the string is different from one.
+ */
+template <> inline char string_to (std::string str)
+{
+    // check length
+    if (str.size() != 1)
+        HexException("The string \"%s\" cannot be converted to character.", str.c_str());
+    else
+        return str[0];
+}
+
+/**
  * @brief Conversion of a string to integer number.
  * 
  * This function will return an integer value of the text given as argument.

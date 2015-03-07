@@ -98,14 +98,14 @@ void NoPreconditioner::update (double E)
         (
             s_bspline_.Nspline(),       // block count (and size)
             s_bspline_.order() + 1,     // half-bandwidth
-            not cmd_.outofcore,         // keep in memory?
+            !cmd_.outofcore,            // keep in memory?
             format("dblk-%d.ooc", ill)  // scratch disk file name
         );
         
         // skip calculation if the disk file is already present
         if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
             continue;
-        else
+        else if (cmd_.outofcore)
             dia_blocks_[ill].hdfinit();
         
         // for all blocks
@@ -177,19 +177,18 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     OMP_prepare;
     
     // shorthands
+    int ni = std::get<0>(inp_.instates[instate]);
     int li = std::get<1>(inp_.instates[instate]);
     int mi = std::get<2>(inp_.instates[instate]);
     
     // shorthands
     int Nspline = s_rad_.bspline().Nspline();
     
+    // impact momentum
+    rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
+    
     // j-overlaps of shape [Nangmom × Nspline]
-    cArray ji_overlaps = s_rad_.overlapj
-    (
-        inp_.maxell,
-        inp_.ki.slice(ie, ie + 1), // use only one ki
-        weightEdgeDamp(s_rad_.bspline())
-    );
+    cArray ji_overlaps = s_rad_.overlapj(inp_.maxell, ki, weightEdgeDamp(s_rad_.bspline()));
     ji_overlaps.hdfsave("ji_overlaps.hdf");
     if (not std::isfinite(ji_overlaps.norm()))
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
@@ -201,7 +200,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
-    Pi_overlaps = s_rad_.overlapP(inp_.ni, li, weightEndDamp(s_rad_.bspline()));
+    Pi_overlaps = s_rad_.overlapP(ni, li, weightEndDamp(s_rad_.bspline()));
     Pi_expansion = s_rad_.S().tocoo().tocsr().solve(Pi_overlaps);
     if (not std::isfinite(Pi_expansion.norm()))
         HexException("Unable to expand hydrogen bound orbital in B-splines!");
@@ -229,7 +228,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(Complex(0.,1.),l)
                               * std::sqrt(special::constant::two_pi * (2 * l + 1))
-                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / inp_.ki[ie];
+                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / ki[0];
             
             // skip non-contributing terms
             if (prefactor == 0.)
