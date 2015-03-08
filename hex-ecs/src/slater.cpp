@@ -160,35 +160,33 @@ Complex RadialIntegrals::computeR
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
     // ix < iy
-    for (int ix = a; ix < std::min(a + order + 1, Nreknot - 1); ix++)
+    for (int ix = a;                   ix < std::min(a + order + 1, Nreknot - 1); ix++) if (bspline_.t()[ix+1].real() > 0)
     for (int iy = std::max(b, ix + 1); iy < std::min(b + order + 1, Nreknot - 1); iy++)
     {
-        Complex m_ac = Mtr_L_ac[ix - a], m_bd = Mtr_mLm1_bd[iy - b];
+        // calculate scale factor
+        double tx = bspline_.t()[ix+1].real(), ty = bspline_.t()[iy+1].real(), scale = 1;
+        if (ty < 1) // implies also tx < 1
+            scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
+        else if (tx < 1)
+            scale = gsl_sf_pow_int(tx, lambda);
         
-        // multiply real x real (combine exponents)
-        if (m_ac.imag() == 0 and m_bd.imag() == 0)
-            Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
-        
-        // multiply other cases
-        else
-            Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? Complex(std::exp(m_ac.real()),0.) : m_ac)
-                               * (m_bd.imag() == 0 ? Complex(std::exp(m_bd.real()),0.) : m_bd);
+        // calculate contribution to the integral
+        Rtr_Labcd_offdiag += Mtr_L_ac[ix-a] * Mtr_mLm1_bd[iy-b] * scale;
     }
     
-    // ix > iy (by renaming the ix,iy indices)
-    for (int ix = b; ix < std::min(b + order + 1, Nreknot - 1); ix++)
+    // ix > iy (by swapping (a,c) and (b,d) multi-indices)
+    for (int ix = b;                   ix < std::min(b + order + 1, Nreknot - 1); ix++) if (bspline_.t()[ix+1].real() > 0)
     for (int iy = std::max(a, ix + 1); iy < std::min(a + order + 1, Nreknot - 1); iy++)
     {
-        Complex m_bd = Mtr_L_bd[ix - b], m_ac = Mtr_mLm1_ac[iy - a];
+        // calculate scale factor
+        double tx = bspline_.t()[ix+1].real(), ty = bspline_.t()[iy+1].real(), scale = 1;
+        if (ty < 1) // implies also tx < 1
+            scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
+        else if (tx < 1)
+            scale = gsl_sf_pow_int(tx, lambda);
         
-        // multiply real x real (combine exponents)
-        if (m_ac.imag() == 0 and m_bd.imag() == 0)
-            Rtr_Labcd_offdiag += std::exp(m_ac.real() + m_bd.real());
-        
-        // multiply other cases
-        else
-            Rtr_Labcd_offdiag += (m_ac.imag() == 0 ? Complex(std::exp(m_ac.real()),0) : m_ac)
-                               * (m_bd.imag() == 0 ? Complex(std::exp(m_bd.real()),0) : m_bd);
+        // calculate contribution to the integral
+        Rtr_Labcd_offdiag += Mtr_L_bd[ix-b] * Mtr_mLm1_ac[iy-a] * scale;
     }
     
     // sum the diagonal and offdiagonal contributions

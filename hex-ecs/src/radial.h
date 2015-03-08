@@ -179,9 +179,7 @@ class RadialIntegrals
          */
         cArray computeMi (int a, int iknotmax = 0) const;
         
-        rArray computeScale (int a, int iknotmax = 0) const;
-        
-        void M_integrand (int n, Complex *in, Complex *out, int i, int j, int a, int iknot, int iknotmax, double& logscale) const;
+        void Mi_integrand (int n, Complex *in, Complex *out, int i, int j, int a, int iknot, int iknotmax) const;
         
         /**
          * Compute the two-electron (Slater-type) four-B-spline integral.
@@ -240,6 +238,9 @@ class RadialIntegrals
             cArray evalB(points);
             cArray evalP(points);
             
+            // quadrature nodes and weights
+            cArray xs(points), ws(points);
+            
             // for all knots
             for (int iknot = 0; iknot < bspline_.Nknot() - 1; iknot++)
             {
@@ -248,8 +249,7 @@ class RadialIntegrals
                     continue;
                 
                 // which points are to be used here?
-                cArray xs = g_.p_points(points, bspline_.t(iknot), bspline_.t(iknot+1));
-                cArray ws = g_.p_weights(points, bspline_.t(iknot), bspline_.t(iknot+1));
+                g_.scaled_nodes_and_weights(points, bspline_.t(iknot), bspline_.t(iknot+1), &xs[0], &ws[0]);
                 
                 // evaluate the hydrogenic function
                 std::transform
@@ -310,9 +310,12 @@ class RadialIntegrals
             
             // per interval
             int points = 20;
-                
+            
+            // quadrature weights and nodes
+            cArray xs(points), ws(points);
+            
             // for all knots
-            # pragma omp parallel for
+            # pragma omp parallel for firstprivate (xs,ws)
             for (int iknot = 0; iknot < Nknot - 1; iknot++)
             {
                 // skip zero length intervals
@@ -320,8 +323,7 @@ class RadialIntegrals
                     continue;
                 
                 // which points are to be used here?
-                cArray xs = g_.p_points(points, bspline_.t(iknot), bspline_.t(iknot+1));
-                cArray ws = g_.p_weights(points, bspline_.t(iknot), bspline_.t(iknot+1));
+                g_.scaled_nodes_and_weights(points, bspline_.t(iknot), bspline_.t(iknot+1), &xs[0], &ws[0]);
                 
                 // evaluate relevant B-splines on this knot
                 cArrays evalB(Nspline);

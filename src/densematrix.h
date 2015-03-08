@@ -647,6 +647,11 @@ RowMatrix<Type> operator / (RowMatrix<Type> const & A, Type x)
  *     \mathbf{w} = (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,,
  * @f]
  * witnout the need of evaluating (and storing) the Kronecker product.
+ * 
+ * @note This routine avoid reallocating of its intermediate work matrix
+ * by making it static and only reallocating if the dimensions change. If you
+ * need to free the memory occupied by the work matrix, call this function
+ * with zero/nullptr arguments.
  */
 void dense_kron_dot
 (

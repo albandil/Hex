@@ -81,29 +81,14 @@ class GaussLegendre : public GaussLegendreData
             : bspline_(bspline) {}
             
         /**
-         * @brief Get Gauss-Legendre quadrature points in interval.
+         * @brief Get Gauss-Legendre quadrature points and weights in interval.
          * 
          * Map Gauss-Legendre points provided by @ref gauss_nodes_and_weights
          * to a complex interval @f$ (x_1,x_2) @f$.
          * 
-         * @param points Number of Gauss-Legendre points.
-         * @param x1 Left boundary of the interval.
-         * @param x2 Right boundary of the interval.
          */
-        cArray p_points (int points, Complex x1, Complex x2) const;
-
-        /**
-         * @brief Get Gauss-Legendre quadrature weights in interval.
-         * 
-         * Map Gauss-Legendre weights provided by @ref gauss_nodes_and_weights
-         * to a complex interval @f$ (x_1,x_2) @f$.
-         * 
-         * @param points Number of Gauss-Legendtre points.
-         * @param x1 Left boundary of the interval.
-         * @param x2 Right boundary of the interval.
-         */
-        cArray p_weights (int points, Complex x1, Complex x2) const;
-
+        void scaled_nodes_and_weights (int points, Complex x1, Complex x2, Complex* xs, Complex* ws) const;
+        
         /**
          * @brief Gauss-Legendre integrator
          * 
@@ -142,21 +127,16 @@ class GaussLegendre : public GaussLegendreData
             }
             
             // get evaluation points and weights
-            cArray xs = p_points(points, x1, x2);
-            cArray ws = p_weights(points, x1, x2);
-            cArray values (points);
+            Complex xs[points], ws[points], fs[points];
+            scaled_nodes_and_weights(points, x1, x2, xs, ws);
             
             // evaluate the function
-            f(points, xs.data(), values.data(), data...);
-            
-            // pointers for fast restricted access
-            Complex const * const restrict pw = ws.data();
-            Complex const * const restrict py = values.data();
+            f(points, xs, fs, data...);
             
             // sum the results
             Complex result = 0.;
             for (int ipt = 0; ipt < points; ipt++)
-                result += pw[ipt] * py[ipt];
+                result += ws[ipt] * fs[ipt];
             
             return result;
         }
@@ -187,21 +167,16 @@ class GaussLegendre : public GaussLegendreData
             }
             
             // get evaluation points and weights
-            cArray xs = p_points(points, x1, x2);
-            cArray ws = p_weights(points, x1, x2);
-            cArray values (points);
+            Complex xs[points], ws[points], fs[points];
+            scaled_nodes_and_weights(points, x1, x2, xs, ws);
             
             // evaluate the function
-            (ptr->*f)(points, xs.data(), values.data(), data...);
-            
-            // pointers for fast restricted access
-            Complex const * const restrict pw = ws.data();
-            Complex const * const restrict py = values.data();
+            (ptr->*f)(points, xs, fs, data...);
             
             // sum the results
             Complex result = 0.;
             for (int ipt = 0; ipt < points; ipt++)
-                result += pw[ipt] * py[ipt];
+                result += ws[ipt] * fs[ipt];
             
             return result;
         }

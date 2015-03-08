@@ -211,6 +211,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     nrm.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
     tmA.connect(context_, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR);
     
+    // connect B-spline knots
+    clArrayView<Complex> t (s_bspline_.t().size(), s_bspline_.t().data());
+    t.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
+    
     // create OpenCL representation of the one-electron matrices + transfer data to GPU memory
     clArrayView<Complex> S_p (s_rad_.S().data().size(), s_rad_.S().data().data());
     clArrayView<Complex> D_p (s_rad_.D().data().size(), s_rad_.D().data().data());
@@ -221,6 +225,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     Mm1_tr_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     Mm2_p.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     
+    // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
     clArrayView<Complex> Mi_L[s_rad_.maxlambda() + 1], Mi_mLm1[s_rad_.maxlambda() + 1];
     for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
     {
@@ -229,11 +234,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         Mi_L[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
         Mi_mLm1[lambda].connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     }
-    
-    clArrayView<Complex> Mi_L_all(s_rad_.Mitr_L(-1).size(), s_rad_.Mitr_L(-1).data());
-    clArrayView<Complex> Mi_mLm1_all(s_rad_.Mitr_mLm1(-1).size(), s_rad_.Mitr_mLm1(-1).data());
-    Mi_L_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
-    Mi_mLm1_all.connect(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR);
     
     // for all diagonal blocks
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
@@ -331,11 +331,13 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // two-electron contribution
             for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
             {
-                clSetKernelArg(mml2_, 0, sizeof(double), &(fs[ilambda]));
-                clSetKernelArg(mml2_, 1, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 2, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &a.handle());
-                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &b.handle());
+                clSetKernelArg(mml2_, 0, sizeof(cl_mem), &t.handle());
+                clSetKernelArg(mml2_, 1, sizeof(int),    &(lambdas[ilambda]));
+                clSetKernelArg(mml2_, 2, sizeof(double), &(fs[ilambda]));
+                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &(Mi_L[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &(Mi_mLm1[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 5, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml2_, 6, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             }
             clFinish(queue_);
@@ -501,8 +503,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         Mi_L[lambda].disconnect();
         Mi_mLm1[lambda].disconnect();
     }
-    Mi_L_all.disconnect();
-    Mi_mLm1_all.disconnect();
     
     // broadcast inner preconditioner iterations
     par_.sync(n.data(), 1, l1_l2_.size());

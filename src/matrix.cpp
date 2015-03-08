@@ -224,11 +224,25 @@ void dense_kron_dot
     Complex       * w_data
 )
 {
-    assert(A.cols() * B.cols() == (int)v.size());
+    // work matrix
+    static int C_rows = 0, C_cols = 0;
+    static Complex * C_data = nullptr;
     
-    // auxiliary matrix
-    int C_rows = B_rows, C_cols = A_cols;
-    Complex * C_data = new Complex [C_rows * C_cols];
+    // realloc the work matrix if necessary
+    if (B_rows * A_cols != C_rows * C_cols)
+    {
+        delete [] C_data;
+        C_data = new Complex [B_rows * A_cols];
+    }
+    
+    // update sizes of the intermediate matrix
+    C_rows = B_rows; C_cols = A_cols;
+    
+    // skip invalid inputs (used to dealloc the work matrix)
+    if (A_rows == 0 or A_cols == 0 or A_data == nullptr or
+        B_rows == 0 or B_cols == 0 or B_data == nullptr or
+        v_data == nullptr or w_data == nullptr)
+        return;
     
     // auxiliary variables
     Complex alpha = 1, beta = 0;
@@ -257,18 +271,6 @@ void dense_kron_dot
             &beta, w_data, &m
         );
     }
-    
-    // clean memory
-    delete [] C_data;
-}
-
-void dense_mmul
-(
-    int A_rows, int A_cols, Complex const * A_data,
-    int B_cols, Complex const * B_data, Complex * C_data
-)
-{
-    
 }
 
 cArray kron_dot (SymBandMatrix const & A, SymBandMatrix const & B, const cArrayView v)

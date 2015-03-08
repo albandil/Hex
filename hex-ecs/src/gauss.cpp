@@ -89,7 +89,25 @@ int GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, 
     return points;
 }
 
-cArray GaussLegendre::p_points (int points, Complex x1, Complex x2) const
+void GaussLegendre::scaled_nodes_and_weights (int points, Complex x1, Complex x2, Complex* xs, Complex* ws) const
+{
+    // get the Gauss-Legendre nodes and weights
+    const double *vx, *vw;
+    points = gauss_nodes_and_weights (points, vx, vw);
+    
+    // prepare centre and half-width of the interval
+    Complex hw = 0.5 * (x2 - x1);
+    Complex ct = 0.5 * (x2 + x1);
+    
+    // prepare evaluation nodes and weights
+    for (int dat = 0; dat < points; dat++)
+    {
+        xs[dat] = ct + vx[dat] * hw;
+        ws[dat] = vw[dat] * hw;
+    }
+}
+
+/*cArray GaussLegendre::p_points (int points, Complex x1, Complex x2) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
@@ -128,4 +146,4 @@ cArray GaussLegendre::p_weights (int points, Complex x1, Complex x2) const
     }
     
     return ws;
-}
+}*/

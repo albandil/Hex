@@ -459,6 +459,10 @@ void InputFile::read (std::ifstream & inf)
     for (std::string line : cknots.lines(100))
         std::cout << '\t' << line << std::endl;
     
+    // check continuity
+    if (cknots.front() < rknots.back())
+        HexException("Complex part of the grid overlaps with the real part (%g < %g).", cknots.front(), rknots.back());
+    
     // check order of knots
     for (unsigned i = 1; i < cknots.size(); i++)
         if (cknots[i] < cknots[i-1])
