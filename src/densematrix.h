@@ -66,7 +66,8 @@ template <class T> class DenseMatrixView
         const ArrayView<T> data () const { return data_; }
         
         // getters
-        size_t size () const { return rows_ * cols_; }
+        void drop () { rows_ = cols_ = 0; data_.drop(); }
+        std::size_t size () const { return rows_ * cols_; }
         int cols () const { return cols_; }
         int rows () const { return rows_; }
         T * begin () { return data_.begin(); }
@@ -111,7 +112,8 @@ template <class T> class DenseMatrix
         const ArrayView<T> data () const { return data_; }
         
         // getters
-        size_t size () const { return rows_ * cols_; }
+        void drop () { rows_ = cols_ = 0; data_.drop(); }
+        std::size_t size () const { return rows_ * cols_; }
         int cols () const { return cols_; }
         int rows () const { return rows_; }
         T * begin () { return data_.begin(); }

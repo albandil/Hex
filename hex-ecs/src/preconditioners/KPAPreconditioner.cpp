@@ -111,9 +111,9 @@ bool KPACGPreconditioner::sData::hdfsave (const char* file) const
 
 void KPACGPreconditioner::sData::drop ()
 {
-    invCl_invsqrtS = RowMatrix<Complex>();
-    invsqrtS_Cl = RowMatrix<Complex>();
-    Dl = cArray();
+    invCl_invsqrtS.drop();
+    invsqrtS_Cl.drop();
+    Dl.clear();
 }
 
 void KPACGPreconditioner::setup ()
