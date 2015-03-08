@@ -258,8 +258,7 @@ kernel void mmul_2el
     
     // auxiliary variables
     private double2 m_ik, m_jl;
-    private double scale;
-    private int tx, ty;
+    private double scale, tx, ty;
     
     // pointers to the needed partial integral moments
     global double2 const * restrict M_ik;
@@ -278,16 +277,16 @@ kernel void mmul_2el
         M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
         for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
         {
-            m_ik = M_ik[ix - i]; tx = t[ix + 1];
+            m_ik = M_ik[ix - i]; tx = t[ix + 1].x;
             
             for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT - 1); iy++)
             {
-                m_jl = M_jl[iy - j]; ty = t[iy + 1];
+                m_jl = M_jl[iy - j]; ty = t[iy + 1].x;
                 
                 if (ty < 1) // implying also tx < 1
                     scale = pow(tx/ty,lambda)/ty;
                 else if (tx < 1)
-                    scale = pos(tx,lambda);
+                    scale = pow(tx,lambda);
                 else
                     scale = 1;
                 
@@ -300,16 +299,16 @@ kernel void mmul_2el
         M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
         for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
         {
-            m_jl = M_jl[ix - j]; tx = t[ix + 1];
+            m_jl = M_jl[ix - j]; tx = t[ix + 1].x;
             
             for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT - 1); iy++)
             {
-                m_ik = M_ik[iy - i]; ty = t[iy + 1];
+                m_ik = M_ik[iy - i]; ty = t[iy + 1].x;
                 
                 if (ty < 1) // implying also tx < 1
                     scale = pow(tx/ty,lambda)/ty;
                 else if (tx < 1)
-                    scale = pos(tx,lambda);
+                    scale = pow(tx,lambda);
                 else
                     scale = 1;
                 
