@@ -264,30 +264,16 @@ class Parallel
 #ifndef NO_MPI
             if (active_)
             {
-                NumberArray<T> tmp(N);
-                MPI_Status status;
-                
-                // slaves will send their data to owner
-                if (iproc_ != owner)
-                    MPI_Send(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, owner, iproc_, MPI_COMM_WORLD);
-                
-                // master node will receive and sum the data
-                if (iproc_ == owner)
-                {
-                    // for all non-master processes
-                    for (int i = 0; i < Nproc_; i++)
-                    {
-                        // skip self
-                        if (i == iproc_)
-                            continue;
-                        
-                        // receive data from a particular node into 'tmp'
-                        MPI_Recv(&tmp[0], typeinfo<T>::ncmpt * N, MPI_DOUBLE, i, i, MPI_COMM_WORLD, &status);
-                        
-                        // sum the arrays
-                        ArrayView<T>(N, array) += tmp;
-                    }
-                }
+                MPI_Reduce
+                (
+                    (iproc_ == owner ? MPI_IN_PLACE : array),
+                    (iproc_ == owner ? array : nullptr),
+                    typeinfo<T>::ncmpt * N,
+                    typeinfo<T>::mpicmpttype(),
+                    MPI_SUM,
+                    owner,
+                    MPI_COMM_WORLD
+                );
             }
 #endif
         }
@@ -310,11 +296,15 @@ class Parallel
 #ifndef NO_MPI
             if (active_)
             {
-                // master node will receive and sum the data ...
-                sum(array, N, 0);
-                
-                // ... and broadcast the result back to all the slaves
-                MPI_Bcast(array, typeinfo<T>::ncmpt * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                MPI_Allreduce
+                (
+                    MPI_IN_PLACE,
+                    array,
+                    typeinfo<T>::ncmpt * N,
+                    typeinfo<T>::mpicmpttype(),
+                    MPI_SUM,
+                    MPI_COMM_WORLD
+                );
             }
 #endif
         }
