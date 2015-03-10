@@ -56,10 +56,10 @@ template <class T> class DenseMatrixView
         // constructors
         DenseMatrixView()
             : rows_(0), cols_(0), data_() {}
-        DenseMatrixView(int rows, int cols)
+        DenseMatrixView(std::size_t rows, std::size_t cols)
             : rows_(rows), cols_(cols), data_(rows * cols) {}
-        DenseMatrixView(int rows, int cols, const ArrayView<T> data)
-            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == (size_t)(rows * cols)); }
+        DenseMatrixView(std::size_t rows, std::size_t cols, const ArrayView<T> data)
+            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
         
         // explicit conversion to cArrayView
         ArrayView<T> data () { return data_; }
@@ -102,10 +102,10 @@ template <class T> class DenseMatrix
         // constructors
         DenseMatrix()
             : rows_(0), cols_(0), data_() {}
-        DenseMatrix(int rows, int cols)
+        DenseMatrix(std::size_t rows, std::size_t cols)
             : rows_(rows), cols_(cols), data_(rows * cols) {}
-        DenseMatrix(int rows, int cols, const ArrayView<T> data)
-            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == (size_t)(rows * cols)); }
+        DenseMatrix(std::size_t rows, std::size_t cols, const ArrayView<T> data)
+            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
         
         // explicit conversion to cArrayView
         ArrayView<T> data () { return data_; }

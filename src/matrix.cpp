@@ -277,9 +277,12 @@ cArray kron_dot (SymBandMatrix const & A, SymBandMatrix const & B, const cArrayV
 {
     cArray w (v.size());
     
+    std::size_t A_size = A.size();
+    std::size_t B_size = B.size();
+    
     # pragma omp parallel for collapse (2)
-    for (std::size_t i = 0; i < A.size(); i++)
-    for (std::size_t j = 0; j < B.size(); j++)
+    for (std::size_t i = 0; i < A_size; i++)
+    for (std::size_t j = 0; j < B_size; j++)
     {
         // iteration bounds
         std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
