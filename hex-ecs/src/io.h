@@ -321,6 +321,16 @@ class SolutionIO
                         if (not solution[i].hdfload(name(i)))
                             return false;
                         
+                        // check size
+                        if (solution[i].size() != Nspline_ * Nspline_)
+                        {
+                            HexException
+                            (
+                                "The solution file \"%s\" doesn't seem to contain data for this input: it has %ld elements, whereas expected is %ld.",
+                                name(i).c_str(), solution[i].size(), Nspline_ * Nspline_
+                            );
+                        }
+                        
                         // dump to disk
                         if (not solution.inmemory())
                         {
@@ -380,7 +390,7 @@ class SolutionIO
         int L_, S_, Pi_, ni_, li_, mi_;
         double E_;
         std::vector<std::pair<int,int>> ang_;
-        unsigned Nspline_;
+        std::size_t Nspline_;
 };
 
 /**
