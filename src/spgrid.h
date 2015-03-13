@@ -69,7 +69,7 @@ extern const std::vector<unsigned> vtk_cell;
 /**
  * @brief Get further point of a cube along given axis.
  * 
- * Given a subdivision history of a sparse grid point, return a the neares shifted point along
+ * Given a subdivision history of a sparse grid point, return a the nearest shifted point along
  * the specified axis.
  * 
  * This function template accepts a "subdivision history" of a point in a sparse grid.
