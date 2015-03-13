@@ -82,7 +82,7 @@ class CommandLine
         // constructor
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
-              droptol(1e-8), itinerary(StgNone), outofcore(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
+              droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
               gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0)
@@ -128,6 +128,9 @@ class CommandLine
         
         /// Whether to keep precomputed data only on disk and spare RAM.
         bool outofcore;
+        
+        /// Whether to continue out-of-core computation from last computed solution (needs corresponding ooc files).
+        bool cont;
         
         /// Whether to load full matrix from scratch disk at once when calculating dot product (and not by parts).
         bool wholematrix;

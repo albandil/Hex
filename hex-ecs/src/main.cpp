@@ -317,7 +317,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     };
     
     // CG new array
-    auto new_array = [ & ](std::size_t N, std::string name) -> BlockArray<Complex>
+    auto new_array = [ & ](std::size_t N, std::string name, bool reset = true) -> BlockArray<Complex>
     {
         // create a new block array
         BlockArray<Complex> array (N, !cmd.outofcore, name);
@@ -329,7 +329,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             if (not array.inmemory())
             {
-                array.hdfsave(i);
+                if (reset)
+                    array.hdfsave(i);
                 array[i].drop();
             }
         }
@@ -422,10 +423,13 @@ if (cmd.itinerary & CommandLine::StgSolve)
             int mi = std::get<2>(inp.instates[instate]);
             
             // create right hand side
-            std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
             BlockArray<Complex> chi (coupled_states.size(), !cmd.outofcore, "cg-b");
-            prec->rhs(chi, ie, instate, Spin);
-            std::cout << "ok" << std::endl;
+            if (not cmd.cont)
+            {
+                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
+                prec->rhs(chi, ie, instate, Spin);
+                std::cout << "ok" << std::endl;
+            }
             
             // compute and check norm of the right hand side vector
             double chi_norm = compute_norm(chi);
@@ -445,9 +449,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
             }
             
             // custom conjugate gradients callback-based solver
-            BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x")));
+            BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x", !cmd.cont)));
             unsigned max_iter = (inp.maxell + 1) * Nspline;
-            std::cout << "\tStart linear solver with tolerance " << cmd.itertol << "." << std::endl;
+            std::cout << "\tStart linear solver with tolerance " << cmd.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             unsigned iterations = cg_callbacks < cBlockArray, cBlockArray& >
             (
@@ -494,6 +498,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
                     }
                 }
             }
+            
+            // reset some one-solution command line flags
+            cmd.reuse_dia_blocks = false;
+            cmd.cont = false;
             
         } // end of For Spin, instate
         
