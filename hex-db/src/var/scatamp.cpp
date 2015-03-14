@@ -287,8 +287,8 @@ void hex_scattering_amplitude_
                 // choose the asymptotics
                 if (*ni == *nf and *li == *lf and *mi == *mf)
                 {
-                    // extrapolate T_ell for elastic scattering [~ L⁻³]
-                    tmatrices.push_back(tmatrices.back() * gsl_sf_pow_int((ell-1.)/ell,3));
+                    // extrapolate T_ell for elastic scattering [T ~ L^(-2.5)]
+                    tmatrices.push_back(tmatrices.back() * gsl_sf_pow_int((ell-1.)/ell,2.5));
                 }
                 else /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
                 {

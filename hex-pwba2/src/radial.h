@@ -59,12 +59,12 @@
  * @param Nb Right state principal quantum number.
  * @param Lb Right state orbital quantum number.
  */
-rArray interpolate_bound_bound_potential
-(
-    rArray const & x,
-    int lambda,
-    int Na, int La, int Nb, int Lb
-);
+// rArray interpolate_bound_bound_potential
+// (
+//     rArray const & x,
+//     int lambda,
+//     int Na, int La, int Nb, int Lb
+// );
 
 /**
  * @brief Calculate bound-bound intermediate multipole potential.
@@ -95,59 +95,59 @@ rArray interpolate_bound_bound_potential
  * @param Nb Right state principal quantum number.
  * @param Lb Right state orbital quantum number.
  */
-rArray interpolate_bound_free_potential
-(
-    rArray const & x,
-    int lambda,
-    int Na, int La, double Kb, int Lb
-);
+// rArray interpolate_bound_free_potential
+// (
+//     rArray const & x,
+//     int lambda,
+//     int Na, int La, double Kb, int Lb
+// );
+// 
+// rArray interpolate_free_bound_potential
+// (
+//     rArray const & x,
+//     int lambda,
+//     double Ka, int La, int Nb, int Lb
+// );
 
-rArray interpolate_free_bound_potential
-(
-    rArray const & x,
-    int lambda,
-    double Ka, int La, int Nb, int Lb
-);
+// rArray interpolate_riccati_bessel_j
+// (
+//     rArray const & x,
+//     int l, double k
+// );
+// 
+// rArray interpolate_riccati_bessel_y
+// (
+//     rArray const & x,
+//     int l, double k
+// );
+// 
+// rArray interpolate_riccati_bessel_iscaled
+// (
+//     rArray const & x,
+//     int l, double k
+// );
+// 
+// rArray interpolate_riccati_bessel_kscaled
+// (
+//     rArray const & x,
+//     int l, double k
+// );
 
-rArray interpolate_riccati_bessel_j
-(
-    rArray const & x,
-    int l, double k
-);
+// Complex Idir_allowed
+// (
+//     rArray const & grid,
+//     rArray const & jf, rArray const & Vfn,
+//     rArray const & jn, rArray const & yn_ji, rArray const & yn_jf,
+//     rArray const & ji, rArray const & Vni
+// );
 
-rArray interpolate_riccati_bessel_y
-(
-    rArray const & x,
-    int l, double k
-);
-
-rArray interpolate_riccati_bessel_iscaled
-(
-    rArray const & x,
-    int l, double k
-);
-
-rArray interpolate_riccati_bessel_kscaled
-(
-    rArray const & x,
-    int l, double k
-);
-
-Complex Idir_allowed
-(
-    rArray const & grid,
-    rArray const & jf, rArray const & Vfn,
-    rArray const & jn, rArray const & yn_ji, rArray const & yn_jf,
-    rArray const & ji, rArray const & Vni
-);
-
-double Idir_forbidden
-(
-    rArray const & grid,
-    rArray const & jf, rArray const & Vfn,
-    rArray const & iscaled_n, rArray const & kscaled_n,
-    rArray const & ji, rArray const & Vni
-);
+// double Idir_forbidden
+// (
+//     rArray const & grid,
+//     rArray const & jf, rArray const & Vfn,
+//     rArray const & iscaled_n, rArray const & kscaled_n,
+//     rArray const & ji, rArray const & Vni
+// );
 
 Complex Idir_nBound_allowed
 (

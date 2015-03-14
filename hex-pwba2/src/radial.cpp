@@ -83,7 +83,7 @@ struct RiccatiBesselJ : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("j-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("j-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -105,7 +105,7 @@ struct RiccatiBesselJ : public ScaledFunction
                 }
                 eval[ipt] = sum;
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (r < rt)
             {
@@ -114,7 +114,7 @@ struct RiccatiBesselJ : public ScaledFunction
                 // - Use library function and just divide the result by the scale factor.
                 eval[ipt] = special::ric_j(l,k*r) / gsl_sf_pow_int(k*r,l+1);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
             else
             {
@@ -122,7 +122,7 @@ struct RiccatiBesselJ : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_j(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -153,7 +153,7 @@ struct RiccatiBesselI : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("i-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("i-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -175,7 +175,7 @@ struct RiccatiBesselI : public ScaledFunction
                 }
                 eval[ipt] = sum;
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (r < rt)
             {
@@ -184,7 +184,7 @@ struct RiccatiBesselI : public ScaledFunction
                 // - Use library function and just divide the result by the scale factor.
                 eval[ipt] = special::ric_i_scaled(l,k*r) / gsl_sf_pow_int(k*r,l+1);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
             else
             {
@@ -192,7 +192,7 @@ struct RiccatiBesselI : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_i_scaled(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -223,7 +223,7 @@ struct RiccatiBesselY : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("y-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("y-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -238,7 +238,7 @@ struct RiccatiBesselY : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = (l == 0 ? -1. : -gsl_sf_doublefact(2*l - 1));
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (k*r < 1.)
             {
@@ -253,7 +253,7 @@ struct RiccatiBesselY : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = (sum * Complex(std::cos(k*r),std::sin(k*r))).imag();
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             /*else if (r < rt)
             {
@@ -270,7 +270,7 @@ struct RiccatiBesselY : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_n(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -301,7 +301,7 @@ struct RiccatiBesselK : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("k-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("k-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -316,7 +316,7 @@ struct RiccatiBesselK : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = (l == 0 ? 1. : gsl_sf_doublefact(2*l - 1));
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (k*r < 1.)
             {
@@ -331,7 +331,7 @@ struct RiccatiBesselK : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = sum * special::constant::pi_half;
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             /*else if (r < rt)
             {
@@ -348,7 +348,7 @@ struct RiccatiBesselK : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_k_scaled(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -459,7 +459,7 @@ struct MultipolePotentialPP : MultipolePotential
         // exponential scale
         double c = 1./Na + 1./Nb;
         
-        std::ofstream out (format("V[%d]-%d-%d-%d-%d.out", lambda, Na, La, Nb, Lb).c_str());
+//         std::ofstream out (format("V[%d]-%d-%d-%d-%d.out", lambda, Na, La, Nb, Lb).c_str());
         
         // evaluate potential in all grid points
         for (unsigned ipt = 0; ipt < N; ipt++)
@@ -500,7 +500,7 @@ struct MultipolePotentialPP : MultipolePotential
                 lScaled = ipt;
                 eval[ipt] = Norma * Normb * (low + high);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(factor*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(factor*r,power) << std::endl;
             }
             else
             {
@@ -521,7 +521,7 @@ struct MultipolePotentialPP : MultipolePotential
                 
                 eval[ipt] = Norma * Normb * (suma1 * gsl_sf_pow_int(r, -lambda-1) + suma2 * gsl_sf_pow_int(r, lambda));
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
         
@@ -549,34 +549,91 @@ struct MultipolePotentialPF : MultipolePotential
         eval.resize(grid.size());
         hasMonopole = false;
         
-        // grid size
+        // FIXME : Safely handle origin.
+        eval = interpolate_bound_free_potential(grid, lambda, Na, La, Kb, Lb);
+        
+        // FIXME : evaluate asymptotic potential
+        asy_factor = 0;
+    }
+    
+    rArray interpolate_bound_free_potential (rArray const & grid, int lambda, int Na, int La, double Kb, int Lb)
+    {
+        // array of bound-free potential evaluations
         unsigned N = grid.size();
+        double rmax = grid.back();
+        rArray V(N);
         
-        // normalization constants
-        double Norma = std::sqrt(gsl_sf_pow_int(2./Na,3) * gsl_sf_fact(Na-La-1) / (2 * Na * gsl_sf_fact(Na + La)));
-        gsl_sf_result Cl;
-        gsl_sf_coulomb_CL_e(Lb, -1./Kb, &Cl);
-        double Normb = Cl.val;
+        // number of Coulomb zeros within the range of grid "x" (initial guess)
+        unsigned nzeros = Kb * rmax / (2 * special::constant::pi);
         
-        // evaluate potential in all grid points
-        for (unsigned ipt = 0; ipt < N; ipt++)
+        // calculate the Coulomb zeros
+        rArray zeros;
+        do
         {
-            // get current grid point
-            double r = grid[ipt];
+            // double the necessary zero count
+            nzeros = 2 * (1 + nzeros);
+            zeros.resize(nzeros);
             
-            // how far is the grid point from the origin?
-            if (r < 1.)
-            {
-                
-            }
+            // for large frequencies 'Kb' the integral will be almost zero, so lets check already here
+            if (nzeros > N / 2)
+                return rArray(N,0.);
+            
+            // compute zeros of the Coulomb function
+            special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
+            zeros /= Kb;
+        }
+        while (zeros.back() < rmax);
+        
+        // the classical turning point for non-S-waves
+        double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
+        
+        // Coulomb function scaled by hydrogen orbital
+        rArray PF(N), PFt(N);
+        for (unsigned i = 0; i < N; i++)
+        {
+            PF[i]  = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]);
+            PFt[i] = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]) * std::pow(grid[i], -La-Lb-2);
         }
         
-        // evaluate asymptotic potential
-        // TODO
+        // cubic spline interpolation of the above
+        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
+        gsl_spline_init (spline, grid.data(), PF.data(), N);
+        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        
+        // evaluate potential at all grid points 'y'
+        for (unsigned i = 1; i < N; i++)
+        {
+            // grid point
+            double y = grid[i];
+            
+            // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for r₁ < r₂ and r₁ > r₂, resp.
+            auto integrand1 = [&](double x) -> double { return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(x/y,lambda); };
+            auto integrand2 = [&](double x) -> double { return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(y/x,lambda + 1); };
+            
+            // Coulomb function node integrators
+            FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt); Q1.setEpsAbs(0);
+            FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt); Q2.setEpsAbs(0);
+            
+            // integrate
+            if (not Q1.integrate(0., y))
+                HexException("Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").", lambda, Na, La, Kb, Lb, y, Q1.status().c_str());
+            if (not Q2.integrate(y, rmax))
+                HexException("Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").", lambda, Na, La, Kb, Lb, y, Q2.status().c_str());
+            
+            // return sum
+            V[i] = (Q1.result() + Q2.result()) / y;
+        }
+        
+        // free allocated memory
+        gsl_interp_accel_free(acc);
+        gsl_spline_free(spline);
+        
+        // return the array of evaluations
+        return V;
     }
 };
 
-double integ_pow_exp_coulomb
+/*double integ_pow_exp_coulomb
 (
     unsigned long a, double b, double k, unsigned long L, double r,
     int bits = 256, int max_iter = 10000, double tolerance = 1e-5, unsigned * iter = nullptr
@@ -691,64 +748,11 @@ double integ_pow_exp_coulomb
     );
     
     // return result
-    return /* Cl.val * std::pow(k,L+1) * */ gsl_sf_fact(a) * ( csum / std::pow(Complex(b,k),a+1) * std::exp(-Complex(b*r,k*r)) ).real();
-}
+    return // Cl.val * std::pow(k,L+1) *
+           gsl_sf_fact(a) * ( csum / std::pow(Complex(b,k),a+1) * std::exp(-Complex(b*r,k*r)) ).real();
+}*/
 
-rArray interpolate_bound_bound_potential (rArray const & grid, int lambda, int Na, int La, int Nb, int Lb)
-{
-    // output array
-    rArray V (grid.size());
-    
-    // combined exponential factor
-    double c = 1./Na + 1./Nb;
-    
-    // combined normalization factor
-    double Norm = std::sqrt
-    (
-        std::pow(2./Na,3) * gsl_sf_fact(Na-La-1) / (2 * Na * gsl_sf_fact(Na + La)) *
-        std::pow(2./Nb,3) * gsl_sf_fact(Nb-Lb-1) / (2 * Nb * gsl_sf_fact(Nb + Lb))
-    );
-    
-    // evaluate potential on grid
-    for (unsigned i = 1; i < grid.size(); i++)
-    {
-        double y = grid[i];
-        
-        // for all terms of product of Laguerre polynomials
-        double suma1 = 0, suma2 = 0;
-        for (int ia = 0; ia <= Na - La - 1; ia++)
-        for (int ib = 0; ib <= Nb - Lb - 1; ib++)
-        {
-            double afactor = (ia % 2 == 0 ? 1. : -1.) * gsl_sf_pow_int(2./Na,La+ia) * gsl_sf_choose(Na+La,Na-La-1-ia) / gsl_sf_fact(ia);
-            double bfactor = (ib % 2 == 0 ? 1. : -1.) * gsl_sf_pow_int(2./Nb,Lb+ib) * gsl_sf_choose(Nb+Lb,Nb-Lb-1-ib) / gsl_sf_fact(ib);
-            int rpower1 = La + 1 + Lb + 1 + ia + ib + lambda;
-            int rpower2 = La + 1 + Lb + 1 + ia + ib - lambda - 1;
-            double integral1 = gsl_sf_gamma(rpower1 + 1) * gsl_sf_gamma_inc_P(rpower1 + 1, c*y);
-            double integral2 = gsl_sf_gamma(rpower2 + 1) * gsl_sf_gamma_inc_Q(rpower2 + 1, c*y);
-            suma1 += afactor * bfactor * integral1 / gsl_sf_pow_int(c, rpower1 + 1);
-            suma2 += afactor * bfactor * integral2 / gsl_sf_pow_int(c, rpower2 + 1);
-        }
-        
-        V[i] = Norm * (suma1 * gsl_sf_pow_int(y, -lambda-1) + suma2 * gsl_sf_pow_int(y, lambda));
-    }
-    
-    // correct by monopole
-    if (Na == Nb and La == Lb and lambda == 0)
-    {
-        // add monopole term (if x != 0)
-        for (unsigned i = 1; i < grid.size(); i++)
-            V[i] -= 1. / grid[i];
-        
-        // slightly correct (linearly extrapolate) potential in the origin
-        V[0] = 2*V[1] - V[2];
-    }
-    
-    write_array(V, format("V[%d]-(%d,%d)-(%d,%d).dat", lambda, Na, La, Nb, Lb).c_str());
-    
-    return V;
-}
-
-rArray interpolate_bound_free_potential_0 (rArray const & x, int lambda, int Na, int La, double Kb, int Lb)
+/*rArray interpolate_bound_free_potential_0 (rArray const & x, int lambda, int Na, int La, double Kb, int Lb)
 {
     // array of bound-free potential evaluations
     rArray V(x.size());
@@ -850,108 +854,15 @@ rArray interpolate_bound_free_potential_0 (rArray const & x, int lambda, int Na,
     
     // return the array of evaluations
     return V;
-}
+}*/
 
-rArray interpolate_bound_free_potential (rArray const & grid, int lambda, int Na, int La, double Kb, int Lb)
-{
-    // array of bound-free potential evaluations
-    unsigned N = grid.size();
-    double rmax = grid.back();
-    rArray V(N);
-    
-    // number of Coulomb zeros within the range of grid "x" (initial guess)
-    unsigned nzeros = Kb * rmax / (2 * special::constant::pi);
-    
-    // calculate the Coulomb zeros
-    rArray zeros;
-    do
-    {
-        // double the necessary zero count
-        nzeros = 2 * (1 + nzeros);
-        zeros.resize(nzeros);
-        
-        // for large frequencies 'Kb' the integral will be almost zero, so lets check already here
-        if (nzeros > N / 2)
-            return rArray(N,0.);
-        
-        // compute zeros of the Coulomb function
-        special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
-        zeros /= Kb;
-    }
-    while (zeros.back() < rmax);
-    
-    // the classical turning point for non-S-waves
-    double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
-    
-    // Coulomb function scaled by hydrogen orbital
-    rArray PF(N);
-    for (unsigned i = 0; i < N; i++)
-        PF[i] = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]);
-    
-    // cubic spline interpolation of the above
-    gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-    gsl_spline_init (spline, grid.data(), PF.data(), N);
-    gsl_interp_accel * acc = gsl_interp_accel_alloc ();
-    
-    // evaluate potential at all grid points 'y'
-    for (unsigned i = 1; i < N; i++)
-    {
-        // grid point
-        double y = grid[i];
-        
-        // integrand Pa(r₁) V(r₁,r₂) Fb(r₁) for r₁ < r₂ and r₁ > r₂, resp.
-        auto integrand1 = [&](double x) -> double { return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(x/y,lambda); };
-        auto integrand2 = [&](double x) -> double { return gsl_spline_eval(spline, x, acc) * gsl_sf_pow_int(y/x,lambda + 1); };
-        
-        // Coulomb function node integrators
-        FixedNodeIntegrator<decltype(integrand1),GaussKronrod<decltype(integrand1)>,double> Q1(integrand1,zeros,rt); Q1.setEpsAbs(0);
-        FixedNodeIntegrator<decltype(integrand2),GaussKronrod<decltype(integrand2)>,double> Q2(integrand2,zeros,rt); Q2.setEpsAbs(0);
-        
-        // integrate
-        if (not Q1.integrate(0., y))
-            HexException("Bound-free potential V[%d]{%d,%d->%g,%d} [0,%g] integration failed (\"%s\").", lambda, Na, La, Kb, Lb, y, Q1.status().c_str());
-        if (not Q2.integrate(y, rmax))
-            HexException("Bound-free potential V[%d]{%d,%d->%g,%d} [%g,inf] integration failed (\"%s\").", lambda, Na, La, Kb, Lb, y, Q2.status().c_str());
-        
-        // return sum
-        V[i] = (Q1.result() + Q2.result()) / y;
-    }
-    
-    // free allocated memory
-    gsl_interp_accel_free(acc);
-    gsl_spline_free(spline);
-    
-    // return the array of evaluations
-    return V;
-}
-
-rArray interpolate_free_bound_potential (rArray const & x, int lambda, double Ka, int La, int Nb, int Lb)
+/*rArray interpolate_free_bound_potential (rArray const & x, int lambda, double Ka, int La, int Nb, int Lb)
 {
     // the potential is real, so just return the transpose (= complex conjugate)
     return interpolate_bound_free_potential (x, lambda, Nb, Lb, Ka, La);
-}
+}*/
 
-rArray interpolate_riccati_bessel_j (rArray const & x, int L, double K)
-{
-    // evaluate the Riccati-Bessel function
-    return x.transform([&](double r) -> double{ return special::ric_j(L,K*r); });
-}
-
-rArray interpolate_riccati_bessel_y (rArray const & x, int l, double k)
-{
-    return x.transform
-    (
-        [&](double r) -> double
-        {
-            if (k == 0. or r == 0.)
-                return l == 0 ? 1. : 0.; // NOTE: zero should be inf, actually
-            else
-                return -special::ric_n(l,k*r);
-        }
-    );
-}
-
-rArray interpolate_riccati_bessel_iscaled (rArray const & x, int l, double k)
+/*rArray interpolate_riccati_bessel_iscaled (rArray const & x, int l, double k)
 {
     return x.transform
     (
@@ -960,9 +871,9 @@ rArray interpolate_riccati_bessel_iscaled (rArray const & x, int l, double k)
             return special::ric_i_scaled(l,k*r);
         }
     );
-}
+}*/
 
-rArray interpolate_riccati_bessel_kscaled (rArray const & x, int l, double k)
+/*rArray interpolate_riccati_bessel_kscaled (rArray const & x, int l, double k)
 {
     return x.transform
     (
@@ -974,7 +885,7 @@ rArray interpolate_riccati_bessel_kscaled (rArray const & x, int l, double k)
                 return special::ric_k_scaled(l,k*r);
         }
     );
-}
+}*/
 
 Complex Idir_allowed
 (
@@ -1015,7 +926,7 @@ Complex Idir_allowed
             }
         }
     }
-    write_array(jn_Vni_ji, format("jn_Vni_ji-%d.dat", w).c_str());
+//     write_array(jn_Vni_ji, format("jn_Vni_ji-%d.dat", w).c_str());
     
     // evalute inner high integrand (the real part)
     rArray yn_Vni_ji(N);
@@ -1053,7 +964,7 @@ Complex Idir_allowed
                 yn_Vni_ji[i] -= yn_val * ji_val / grid[i];
         }
     }
-    write_array(yn_Vni_ji, format("yn_Vni_ji-%d.dat", w).c_str());
+//     write_array(yn_Vni_ji, format("yn_Vni_ji-%d.dat", w).c_str());
     
     // evaluate outer low integrand
     rArray jf_Vfn_jn(N);
@@ -1082,7 +993,7 @@ Complex Idir_allowed
             }
         }
     }
-    write_array(jf_Vfn_jn, format("jf_Vfn_jn-%d.dat", w).c_str());
+//     write_array(jf_Vfn_jn, format("jf_Vfn_jn-%d.dat", w).c_str());
     
     // evalute outer high integrand (the real part)
     rArray jf_Vfn_yn(N);
@@ -1120,7 +1031,7 @@ Complex Idir_allowed
                 jf_Vfn_yn[i] -= yn_val * jf_val / grid[i];
         }
     }
-    write_array(jf_Vfn_yn, format("jf_Vfn_yn-%d.dat", w).c_str());
+//     write_array(jf_Vfn_yn, format("jf_Vfn_yn-%d.dat", w).c_str());
     
     // working arrays and other auxiliary variables
     rArray yn_Vfn_jf_r_inf(N), yn_Vni_ji_r_inf(N);
@@ -1149,7 +1060,7 @@ Complex Idir_allowed
             Complex V_k (0., -(jf.k - yn.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
             
-            std::cout << 0.5 * Vfn.asy_factor * (U.imag() + V.imag()) << std::endl;
+//             std::cout << 0.5 * Vfn.asy_factor * (U.imag() + V.imag()) << std::endl;
             
             yn_Vfn_jf_r_inf += 0.5 * Vfn.asy_factor * (U.imag() + V.imag());
         }
@@ -1176,7 +1087,7 @@ Complex Idir_allowed
             Complex V_k (0., -(ji.k - yn.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
             
-            std::cout << 0.5 * Vni.asy_factor * (U.imag() + V.imag()) << std::endl;
+//             std::cout << 0.5 * Vni.asy_factor * (U.imag() + V.imag()) << std::endl;
             
             yn_Vni_ji_r_inf += 0.5 * Vni.asy_factor * (U.imag() + V.imag());
         }
@@ -1219,7 +1130,7 @@ Complex Idir_allowed
             Complex V_k (0., -(jn.k + jf.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
             
-            std::cout << 0.5 * Vfn.asy_factor * (U.real() - V.real()) << std::endl;
+//             std::cout << 0.5 * Vfn.asy_factor * (U.real() - V.real()) << std::endl;
             
             integ_fn += 0.5 * Vfn.asy_factor * (U.real() - V.real());
         }
@@ -1240,7 +1151,7 @@ Complex Idir_allowed
             Complex V_k (0., -(jn.k + ji.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
             
-            std::cout << 0.5 * Vni.asy_factor * (U.real() - V.real()) << std::endl;
+//             std::cout << 0.5 * Vni.asy_factor * (U.real() - V.real()) << std::endl;
             
             integ_ni += 0.5 * Vni.asy_factor * (U.real() - V.real());
         }
@@ -1340,15 +1251,15 @@ double Idir_forbidden
     RiccatiBesselJ const & ji, MultipolePotential const & Vni
 )
 {
-    unsigned N = grid.size();
+    int N = grid.size();
     double h = grid.back() / N;
     
     double suma = 0;
-    unsigned last_diagonal = N/2;
+    int last_diagonal = N/2;
     
     // index "d" runs across the contours x - y = konst
     // TODO : use spline integration along and across the diagonals
-    for (unsigned d = 0; d < last_diagonal; d++)
+    for (int d = 0; d < last_diagonal; d++)
     {
         // contribution of these contours
         double contrib = 0;
@@ -1356,7 +1267,7 @@ double Idir_forbidden
         if (d == 0)
         {
             // index "i" runs along the diagonal [x,y] = [i,i]
-            for (unsigned i = 0; i < N; i++)
+            for (int i = 0; i < N; i++)
             {
                 double scale, ji_ev, Vfn_ev, jf_ev, Vni_ev, in_ev, kn_ev;
                 if (mmin(jf.lScaled,Vfn.lScaled,ji.lScaled,Vni.lScaled,iscaled_n.lScaled,kscaled_n.lScaled) <= i)
@@ -1385,7 +1296,7 @@ double Idir_forbidden
         else
         {
             // index "i" runs along the contour [x,y] = [i,i-d]
-            for (unsigned i = d; i < N; i++)
+            for (int i = d; i < N; i++)
             {
                 double scale, ji_ev, Vfn_ev, jf_ev, Vni_ev, in_ev, kn_ev;
                 if (mmin(jf.lScaled-d,Vfn.lScaled-d,ji.lScaled,Vni.lScaled,iscaled_n.lScaled-d,kscaled_n.lScaled-d) <= i)
@@ -1695,12 +1606,7 @@ Complex Idir_nFree_allowed
     std::ostream & log
 )
 {
-    /*Complex result = 0;
-    
-    double nrm = std::sqrt(1. / kn);
-    
-    // check if kn is small enough for asymptotics
-    bool kn_is_small = (kn * grid.back() < 1e-6);
+    Complex result = 0;
     
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
@@ -1719,50 +1625,27 @@ Complex Idir_nFree_allowed
             continue;
         
         // evaluate initial / final radial part of the projectile partial wave
-        rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
-        rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        RiccatiBesselJ ji (li, ki, grid);
+        RiccatiBesselJ jf (lf, kf, grid);
         
         // evaluate initial / final multipole potential
-        rArray Vfn = std::move(interpolate_bound_free_potential(grid, lambdaf, Nf, Lf, Kn, Ln));
-        rArray Vni = std::move(interpolate_free_bound_potential(grid, lambdai, Kn, Ln, Ni, Li));
+        MultipolePotentialPF Vfn (lambdaf, Nf, Lf, Kn, Ln, grid);
+        MultipolePotentialPF Vni (lambdai, Ni, Li, Kn, Ln, grid);
         
         // evaluate the Green function terms (Bessel functions "jn" and "yn")
-        // and cancel dependence on "kn" if too small (using Bessel function asymptotics)
-        rArray jn = (
-            kn_is_small ? // can we use the "jn" Bessel function asymptotic form?
-            pow(grid,ln+1) / gsl_sf_doublefact(2*ln+1) :                // yes
-            interpolate_riccati_bessel_j(grid, ln, kn) * nrm            // no
-        );
-        rArray yn = (
-            kn_is_small ?  // can we use the "yn" Bessel function asymptotic form?
-            pow(grid,-ln) * gsl_sf_doublefact(std::max(0,2*ln-1)) :     // yes
-            interpolate_riccati_bessel_y(grid, ln, kn) * nrm            // no
-        );
+        RiccatiBesselJ jn (ln, kn, grid);
+        RiccatiBesselY yn (ln, kn, grid);
         
-        // check finiteness of product (use asymptotic form of the product if not finite)
-        rArray yn_ji = yn * ji;
-        for (unsigned i = 1; i < yn_ji.size(); i++)
-        {
-            if (not std::isfinite(yn_ji[i]))
-                yn_ji[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*li+1) * std::pow(kn,-ln) * std::pow(ki,li+1) * std::pow(grid[i],li+1-ln);
-        }
-        rArray yn_jf = yn * jf;
-        for (unsigned i = 1; i < yn_jf.size(); i++)
-        {
-            if (not std::isfinite(yn_jf[i]))
-                yn_jf[i] = gsl_sf_doublefact(2*ln-1) / gsl_sf_doublefact(2*lf+1) * std::pow(kn,-ln) * std::pow(kf,lf+1) * std::pow(grid[i],lf+1-ln);
-        }
-        
-        // finally integrate
-        Complex inte = -Idir_allowed (grid, jf, Vfn, jn, yn_ji, yn_jf, ji, Vni);
+        // integrate
+        Complex inte = -Idir_allowed (grid, jf, Vfn, jn, yn, Vni, ji) / kn;
         
         // if we cancelled small kn, we need to throw away nonsensial imaginary part, where this can't be done
-        if (kn_is_small)
-            inte.imag(0.);
+//         if (kn_is_small)
+//             inte.imag(0.);
         
         // also, the real part may have exploded
-        if (not std::isfinite(inte.real()))
-            inte.real(0.);
+//         if (not std::isfinite(inte.real()))
+//             inte.real(0.);
         
         // comment this result
         log << format
@@ -1775,7 +1658,7 @@ Complex Idir_nFree_allowed
         result += ff * fi * inte;
     }
     
-    return result;*/
+    return result;
 }
 
 double Idir_nFree_forbidden
@@ -1787,12 +1670,7 @@ double Idir_nFree_forbidden
     std::ostream & log
 )
 {
-    /*double result = 0;
-    
-    double nrm = std::sqrt(1. / kappan);
-    
-    // check if kn is small enough for asymptotics
-    bool kn_is_small = (kappan * grid.back() < 1e-6);
+    double result = 0;
     
     int lambdaf_min = std::max(std::abs(lf-ln), std::abs(Lf-Ln));
     int lambdaf_max = std::min(lf+ln, Lf+Ln);
@@ -1811,28 +1689,19 @@ double Idir_nFree_forbidden
             continue;
         
         // evaluate initial / final radial part of the projectile partial wave
-        rArray ji = std::move(interpolate_riccati_bessel_j(grid, li, ki));
-        rArray jf = std::move(interpolate_riccati_bessel_j(grid, lf, kf));
+        RiccatiBesselJ ji (li, ki, grid);
+        RiccatiBesselJ jf (lf, kf, grid);
         
         // evaluate initial / final multipole potential
-        rArray Vfn = std::move(interpolate_bound_free_potential(grid, lambdaf, Nf, Lf, Kn, Ln));
-        rArray Vni = std::move(interpolate_free_bound_potential(grid, lambdai, Kn, Ln, Ni, Li));
+        MultipolePotentialPF Vfn (lambdaf, Nf, Lf, Kn, Ln, grid);
+        MultipolePotentialPF Vni (lambdai, Ni, Li, Kn, Ln, grid);
         
         // evaluate the Green function terms (Bessel functions "in" and "kn")
-        // and cancel dependence on "kn" if too small (using Bessel function asymptotics)
-        rArray iscaled_n = (
-            kn_is_small ? // can we use the "in" Bessel function asymptotic form?
-            pow(grid,ln+1) :                                            // yes
-            interpolate_riccati_bessel_iscaled(grid, ln, kappan) * nrm  // no
-        );
-        rArray kscaled_n = (
-            kn_is_small ? // can we use the "kn" Bessel function asymptotic form?
-            pow(grid,-ln) :                                             // yes
-            interpolate_riccati_bessel_kscaled(grid, ln, kappan) * nrm  // no
-        );
+        RiccatiBesselI iscaled_n (ln, kappan, grid);
+        RiccatiBesselK kscaled_n (ln, kappan, grid);
         
         // finally integrate
-        double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, ji, Vni);
+        double inte = -Idir_forbidden(grid, jf, Vfn, iscaled_n, kscaled_n, ji, Vni) / kappan;
         
         // comment this result
         log << format
@@ -1843,9 +1712,7 @@ double Idir_nFree_forbidden
         
         // update result
         result += ff * fi * inte;
-        
     }
     
     return result;
-    */
 }
