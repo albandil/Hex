@@ -1276,6 +1276,43 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
 };
 
+/**
+ * @brief Helper class returning either reference of new object.
+ * 
+ * This class is a wrapper around an object or a reference to the object.
+ * It serves as a useful return type of functions that either return
+ * new data, or just reference existing, so that no duplicate memory
+ * needs to be allocated.
+ */
+template <class T> class TmpNumberArray
+{
+    public:
+        
+        TmpNumberArray (const ArrayView<T> view)
+            : owner_(false), view_(view)
+        {}
+        
+        TmpNumberArray (NumberArray<T> && array)
+            : owner_(true), array_(array)
+        {}
+        
+        ArrayView<T> operator() () const
+        {
+            return owner_ ? array_ : view_;
+        }
+        
+        T const * ptr () const
+        {
+            return owner_ ? array_.data() : view_.data();
+        }
+    
+    private:
+        
+        bool owner_;
+        ArrayView<T> view_;
+        NumberArray<T> array_;
+};
+
 template <class T> class BlockArray
 {
     public:
@@ -1324,10 +1361,35 @@ template <class T> class BlockArray
             return arrays_[i];
         }
         
+        TmpNumberArray<T> segment (std::size_t iblock, std::size_t seg, std::size_t nseg) const
+        {
+            // return a view to existing data ...
+            if (inmemory_)
+                return TmpNumberArray<T>(ArrayView<T>(arrays_[iblock], seg, nseg));
+            
+            // ... or load data from disk
+            else
+                return TmpNumberArray<T>(std::move(hdfread(subname(iblock),seg, nseg)));
+        }
+        
+        void setSegment (std::size_t iblock, std::size_t offset, std::size_t n, const ArrayView<T> data) const
+        {
+            if (data.size() != n)
+                HexException("Incompatible domensions %ld != %ld.", n, data.size());
+            
+            // update a view of existing data ...
+            if (inmemory_)
+                ArrayView<T>(arrays_[iblock], offset, n) = data;
+            
+            // ... or save data from disk
+            else
+                hdfwrite(subname(iblock), offset, n, data.data());
+        }
+        
         bool hdfcheck (std::size_t iblock)
         {
 #ifndef NO_HDF
-            return HDFFile(format("%s-%ld.ooc", filename_.c_str(), iblock), HDFFile::readonly).valid();
+            return HDFFile(subname(iblock), HDFFile::readonly).valid();
 #else
             return false;
 #endif
@@ -1337,7 +1399,7 @@ template <class T> class BlockArray
         {
             assert(iblock < arrays_.size());
 #ifndef NO_HDF
-            return arrays_[iblock].hdfload(format("%s-%ld.ooc", filename_.c_str(), iblock));
+            return arrays_[iblock].hdfload(subname(iblock));
 #else
             return false;
 #endif
@@ -1347,7 +1409,7 @@ template <class T> class BlockArray
         {
             assert(iblock < arrays_.size());
 #ifndef NO_HDF
-            return arrays_[iblock].hdfsave(format("%s-%ld.ooc", filename_.c_str(), iblock));
+            return arrays_[iblock].hdfsave(subname(iblock));
 #else
             return false;
 #endif
@@ -1356,6 +1418,55 @@ template <class T> class BlockArray
         bool inmemory () const
         {
             return inmemory_;
+        }
+        
+        std::string subname (std::size_t iblock) const
+        {
+            return format("%s-%ld.ooc", filename_.c_str(), iblock);
+        }
+        
+        /**
+         * @brief Read part of an array from HDF file.
+         * 
+         * This function does not support compression.
+         * The file must exist.
+         */
+        static NumberArray<T> hdfread (std::string const & name, std::size_t offset, std::size_t n)
+        {
+            NumberArray<T> elements(n);
+#ifndef NO_HDF
+            // open the file
+            HDFFile hdf(name, HDFFile::readonly);
+            
+            if (not hdf.valid())
+                HexException("File \"%s\" can't be opened for reading.", name.c_str());
+            
+            // read elements
+            if (not hdf.read("array", &(elements[0]), n, offset))
+                HexException("Can't read dataset \"array\" from file \"%s\".", name.c_str());
+#endif
+            return elements;
+        }
+        
+        /**
+         * @brief Write part of an array into HDF file.
+         * 
+         * This function does not support compression.
+         * The file must exist.
+         */
+        static void hdfwrite (std::string const & name, std::size_t offset, std::size_t n, T const * data)
+        {
+#ifndef NO_HDF
+            // open the file
+            HDFFile hdf(name, HDFFile::readwrite);
+            
+            if (not hdf.valid())
+                HexException("File \"%s\" can't be opened for writing.", name.c_str());
+            
+            // read elements
+            if (not hdf.write("array", data, n, offset))
+                HexException("Can't write to dataset \"array\" in file \"%s\".", name.c_str());
+#endif
         }
         
     private:

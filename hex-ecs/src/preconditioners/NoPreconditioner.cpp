@@ -510,29 +510,34 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
         }
         
-        // FIXME : The remaining code is not compatible with --out-of-core.
-        
         // for all source vector sub-segments
         for (int k = 0; k < Nspline; k++)
         {
             // copy owned sub-segments to the buffer
             for (int illp = 0; illp < Nang; illp++) if (par_.isMyWork(illp))
-                std::memcpy(&buffer[0] + illp * Nspline, p[illp].data() + k * Nspline, Nspline * sizeof(Complex));
+            {
+                std::memcpy
+                (
+                    &buffer[0] + illp * Nspline,
+                    p.segment(illp, k * Nspline, Nspline).ptr(),
+                    Nspline * sizeof(Complex)
+                );
+            }
             
             // synchronize source sub-segments buffer across processes
             par_.sync(&buffer[0], Nspline, Nang);
             
             // auxiliary variables
+            int min_i = std::max(0, k - order);
+            int max_i = std::min(k + order, Nspline - 1);
             int maxlambda = s_rad_.maxlambda();
-            int i_min = std::max(0, k - order);
-            int i_max = std::min(k + order, Nspline - 1);
             
-            // for all potential multipoles
-            # pragma omp parallel for schedule (dynamic,1) collapse (2) if (cmd_.parallel_dot)
-            for (int lambda = 0; lambda <= maxlambda; lambda++)
+            // for all destination sub-blocks
+            #pragma omp parallel for collapse (2)
+            for (int i = min_i; i <= max_i; i++)
             {
-                // for all destination sub-blocks
-                for (int i = i_min; i <= i_max; i++)
+                // for all potential multipoles
+                for (int lambda = 0; lambda <= maxlambda; lambda++)
                 {
                     // calculate the radial sub-block
                     SymBandMatrix R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
@@ -550,15 +555,14 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                             product += fs[ill][illp][lambda] * R_block_ik.dot(cArrayView(buffer, illp * Nspline, Nspline));
                         }
                         
-                        // update the owned sub-segment
+                        // atomic update of the owned sub-segment
                         OMP_exclusive_in;
-                        cArrayView(q[ill], i * Nspline, Nspline) -= product;
+                        q.setSegment(ill, i * Nspline, Nspline, q.segment(ill, i * Nspline, Nspline)() - product);
                         OMP_exclusive_out;
                     }
                 }
             }
         }
-        
     } // if not cmd_.lightweight_radial_cache
     
     OMP_clean;
