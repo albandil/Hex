@@ -153,7 +153,7 @@ struct RiccatiBesselI : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-//         std::ofstream out (format("i-%d-%g.out",l,k).c_str());
+        std::ofstream out (format("i-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -168,31 +168,31 @@ struct RiccatiBesselI : public ScaledFunction
                 // Evaluate the regular Riccati-Bessel function using power series.
                 // - The scaling factor (kr)^(l+1) is explicitly put out.
                 double term = 1. / gsl_sf_doublefact(2*l+1), sum = term;
-                for (unsigned j = 1; std::abs(term) > 1e-15 * std::abs(sum); j++)
+                for (unsigned j = 1; term > 1e-15 * sum; j++)
                 {
                     term *= 0.5*(k*r)*(k*r) / (j * (2*l+2*j+1));
                     sum += term;
                 }
-                eval[ipt] = sum;
+                eval[ipt] = sum * std::exp(-k*r);
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
-            else if (r < rt)
+            /*else if (r < rt)
             {
                 lScaled = ipt;
                 // Evaluate the function within the rest of the classically forbidden region.
                 // - Use library function and just divide the result by the scale factor.
                 eval[ipt] = special::ric_i_scaled(l,k*r) / gsl_sf_pow_int(k*r,l+1);
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
-            }
+                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+            }*/
             else
             {
                 // Calculate the function using a library routine.
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_i_scaled(l,k*r);
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -273,6 +273,9 @@ struct RiccatiBesselY : public ScaledFunction
 //                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
+        
+        // change sign
+        eval = -eval;
     }
     
     /// Angular momentum.
@@ -301,7 +304,7 @@ struct RiccatiBesselK : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-//         std::ofstream out (format("k-%d-%g.out",l,k).c_str());
+        std::ofstream out (format("k-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -316,7 +319,7 @@ struct RiccatiBesselK : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = (l == 0 ? 1. : gsl_sf_doublefact(2*l - 1));
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (k*r < 1.)
             {
@@ -325,13 +328,13 @@ struct RiccatiBesselK : public ScaledFunction
                 double term = gsl_sf_pow_int(k*r,l), sum = term;
                 for (int m = 1; m <= l; m++)
                 {
-                    term *= double(l + m) * double(l + 1 - m) / (2 * m * k * r);
+                    term *= (l + m) * (l + 1. - m) / (2 * m * k * r);
                     sum += term;
                 }
                 lScaled = ipt;
-                eval[ipt] = sum * special::constant::pi_half;
+                eval[ipt] = sum;
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             /*else if (r < rt)
             {
@@ -348,7 +351,7 @@ struct RiccatiBesselK : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_k_scaled(l,k*r);
                 
-//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -1247,12 +1250,143 @@ double Idir_forbidden
 (
     rArray const & grid,
     RiccatiBesselJ const & jf, MultipolePotential const & Vfn,
-    RiccatiBesselI const & iscaled_n, RiccatiBesselK const & kscaled_n,
+    RiccatiBesselI const & in, RiccatiBesselK const & kn,
     RiccatiBesselJ const & ji, MultipolePotential const & Vni
 )
 {
     int N = grid.size();
     double h = grid.back() / N;
+    
+    double suma = 0;
+    int last_diagonal = N/2;
+    double scale, ji_ev, Vfn_ev, jf_ev, Vni_ev, in_ev, kn_ev;
+    
+    // index "d" runs across the contours x - y = konst
+    // TODO : use spline integration along and across the diagonals
+    for (int d = 0; d < last_diagonal; d++)
+    {
+        // contribution of these contours
+        double contrib = 0;
+        
+        if (d == 0)
+        {
+            // index "i" runs along the diagonal [x,y] = [i,i]
+            for (int i = 1; i < N; i++)
+            {
+                if (mmin(jf.lScaled,Vfn.lScaled,ji.lScaled,Vni.lScaled,in.lScaled,kn.lScaled) >= i)
+                {
+                    // combine scale factors
+                    scale = gsl_sf_pow_int(jf.factor, jf.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
+                            gsl_sf_pow_int(ji.factor, ji.power) * gsl_sf_pow_int(Vni.factor, Vni.power) *
+                            gsl_sf_pow_int(in.factor, in.power) * gsl_sf_pow_int(kn.factor, kn.power) *
+                            gsl_sf_pow_int(grid[i], jf.power + Vfn.power + ji.power + Vni.power + in.power + kn.power);
+                    ji_ev = ji.eval[i]; jf_ev = jf.eval[i]; Vfn_ev = Vfn.eval[i]; Vni_ev = Vni.eval[i]; in_ev = in.eval[i]; kn_ev = kn.eval[i];
+                }
+                else
+                {
+                    // use scale factors
+                    scale = 1;
+                    jf_ev  = (i <= jf.lScaled  ? gsl_sf_pow_int(jf.factor  * grid[i], jf.power)  * jf.eval[i]  : jf.eval[i]);
+                    Vfn_ev = (i <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i], Vfn.power) * Vfn.eval[i] : Vfn.eval[i]);
+                    in_ev  = (i <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i], in.power)  * in.eval[i]  : in.eval[i]);
+                    kn_ev  = (i <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i], kn.power)  * kn.eval[i]  : kn.eval[i]);
+                    Vni_ev = (i <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i], Vni.power) * Vni.eval[i] : Vni.eval[i]);
+                    ji_ev  = (i <= ji.lScaled  ? gsl_sf_pow_int(ji.factor  * grid[i], ji.power)  * ji.eval[i]  : ji.eval[i]);
+                }
+                contrib += scale * jf_ev * Vfn_ev * ji_ev * Vni_ev * in_ev * kn_ev;
+            }
+        }
+        else
+        {
+            // index "i" runs along the contour [x,y] = [i,i-d]
+            for (int i = d + 1; i < N; i++)
+            {
+                if (mmin(jf.lScaled+d,Vfn.lScaled+d,ji.lScaled,Vni.lScaled,in.lScaled+d,kn.lScaled) >= i)
+                {
+                    // combine scale factors
+                    scale = gsl_sf_pow_int(jf.factor, jf.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
+                            gsl_sf_pow_int(ji.factor, ji.power) * gsl_sf_pow_int(Vni.factor, Vni.power) *
+                            gsl_sf_pow_int(in.factor, in.power) * gsl_sf_pow_int(kn.factor, kn.power) *
+                            gsl_sf_pow_int(grid[i]/grid[i-d], ji.power + Vni.power + kn.power) *
+                            gsl_sf_pow_int(grid[i-d], jf.power + Vfn.power + in.power + kn.power + Vni.power + ji.power);
+                    ji_ev = ji.eval[i]; jf_ev = jf.eval[i-d]; Vfn_ev = Vfn.eval[i-d]; Vni_ev = Vni.eval[i]; in_ev = in.eval[i-d]; kn_ev = kn.eval[i];
+                }
+                else
+                {
+                    // use scale factors
+                    scale = 1;
+                    jf_ev  = (i-d <= jf.lScaled  ? gsl_sf_pow_int(jf.factor  * grid[i-d], jf.power)  * jf.eval[i-d]  : jf.eval[i-d]);
+                    Vfn_ev = (i-d <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i-d], Vfn.power) * Vfn.eval[i-d] : Vfn.eval[i-d]);
+                    in_ev  = (i-d <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i-d], in.power)  * in.eval[i-d]  : in.eval[i-d]);
+                    kn_ev  = (i   <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i],   kn.power)  * kn.eval[i]    : kn.eval[i]);
+                    Vni_ev = (i   <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i],   Vni.power) * Vni.eval[i]   : Vni.eval[i]);
+                    ji_ev  = (i   <= ji.lScaled  ? gsl_sf_pow_int(ji.factor  * grid[i],   ji.power)  * ji.eval[i]    : ji.eval[i]);
+                }
+                contrib += scale * jf_ev * Vfn_ev * ji_ev * Vni_ev * in_ev * kn_ev;
+            }
+            // index "i" runs along the contour [x,y] = [i,i+d]
+            for (int i = 1; i < N - d - 1; i++)
+            {
+                if (mmin(jf.lScaled-d,Vfn.lScaled-d,ji.lScaled,Vni.lScaled,in.lScaled,kn.lScaled-d) >= i)
+                {
+                    // combine scale factors
+                    scale = gsl_sf_pow_int(jf.factor, jf.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
+                            gsl_sf_pow_int(ji.factor, ji.power) * gsl_sf_pow_int(Vni.factor, Vni.power) *
+                            gsl_sf_pow_int(in.factor, in.power) * gsl_sf_pow_int(kn.factor, kn.power) *
+                            gsl_sf_pow_int(grid[i+d]/grid[i], jf.power + Vfn.power + kn.power) *
+                            gsl_sf_pow_int(grid[i], jf.power + Vfn.power + ji.power + Vni.power + in.power + kn.power);
+                    ji_ev = ji.eval[i]; jf_ev = jf.eval[i+d]; Vfn_ev = Vfn.eval[i+d]; Vni_ev = Vni.eval[i]; in_ev = in.eval[i]; kn_ev = kn.eval[i+d];
+                }
+                else
+                {
+                    // discard scale factor
+                    scale = 1;
+                    jf_ev  = (i+d <= jf.lScaled  ? gsl_sf_pow_int(jf.factor  * grid[i+d], jf.power)  * jf.eval[i+d]  : jf.eval[i+d]);
+                    Vfn_ev = (i+d <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i+d], Vfn.power) * Vfn.eval[i+d] : Vfn.eval[i+d]);
+                    kn_ev  = (i+d <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i+d], kn.power)  * kn.eval[i+d]  : kn.eval[i+d]);
+                    in_ev  = (i   <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i],   in.power)  * in.eval[i]    : in.eval[i]);
+                    Vni_ev = (i   <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i],   Vni.power) * Vni.eval[i]   : Vni.eval[i]);
+                    ji_ev  = (i   <= ji.lScaled  ? gsl_sf_pow_int(ji.factor  * grid[i],   ji.power)  * ji.eval[i]    : ji.eval[i]);
+                }
+                contrib += scale * jf_ev * Vfn_ev * ji_ev * Vni_ev * in_ev * kn_ev;
+            }
+        }
+        
+        // add properly scaled contribution
+        contrib *= std::exp(-in.k*h*d);
+        suma += contrib;
+        
+        // check convergence (do not blindly integrate everything)
+        if (std::abs(contrib) < 1e-15 * std::abs(suma))
+            last_diagonal = d;
+    }
+    
+    return suma * h * h;
+}
+
+double Idir_forbidden_old
+(
+    rArray const & grid,
+    RiccatiBesselJ const & jf, MultipolePotential const & Vfn,
+    RiccatiBesselI const & in, RiccatiBesselK const & kn,
+    RiccatiBesselJ const & ji, MultipolePotential const & Vni
+)
+{
+    int N = grid.size();
+    double h = grid.back() / N;
+    
+    rArray fpart(N),  ipart(N);
+    
+    for (int i = 0; i < N; i++)
+    {
+        double jf_ev  = (i <= jf.lScaled  ? gsl_sf_pow_int(jf.factor  * grid[i], jf.power)  * jf.eval[i]  : jf.eval[i]);
+        double Vfn_ev = (i <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i], Vfn.power) * Vfn.eval[i] : Vfn.eval[i]);
+        double Vni_ev = (i <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i], Vni.power) * Vni.eval[i] : Vni.eval[i]);
+        double ji_ev  = (i <= ji.lScaled  ? gsl_sf_pow_int(ji.factor  * grid[i], ji.power)  * ji.eval[i]  : ji.eval[i]);
+        
+        fpart[i] = jf_ev * Vfn_ev;
+        ipart[i] = ji_ev * Vni_ev;
+    }
     
     double suma = 0;
     int last_diagonal = N/2;
@@ -1269,28 +1403,9 @@ double Idir_forbidden
             // index "i" runs along the diagonal [x,y] = [i,i]
             for (int i = 0; i < N; i++)
             {
-                double scale, ji_ev, Vfn_ev, jf_ev, Vni_ev, in_ev, kn_ev;
-                if (mmin(jf.lScaled,Vfn.lScaled,ji.lScaled,Vni.lScaled,iscaled_n.lScaled,kscaled_n.lScaled) <= i)
-                {
-                    // combine scale factors
-                    scale = gsl_sf_pow_int(jf.factor, jf.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
-                            gsl_sf_pow_int(ji.factor, ji.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
-                            gsl_sf_pow_int(iscaled_n.factor, iscaled_n.power) * gsl_sf_pow_int(kscaled_n.factor, kscaled_n.power) *
-                            gsl_sf_pow_int(grid[i], jf.power + Vfn.power + ji.power + Vni.power + iscaled_n.power + kscaled_n.power);
-                    ji_ev = ji.eval[i]; jf_ev = jf.eval[i]; Vfn_ev = Vfn.eval[i]; Vni_ev = Vni.eval[i]; in_ev = iscaled_n.eval[i]; kn_ev = kscaled_n.eval[i];
-                }
-                else
-                {
-                    // discard scale factor
-                    scale = 1;
-                    ji_ev = (i <= ji.lScaled ? gsl_sf_pow_int(ji.factor * grid[i], ji.power) * ji.eval[i] : ji.eval[i]);
-                    jf_ev = (i <= jf.lScaled ? gsl_sf_pow_int(jf.factor * grid[i], jf.power) * jf.eval[i] : jf.eval[i]);
-                    Vfn_ev = (i <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i], Vfn.power) * Vfn.eval[i] : Vfn.eval[i]);
-                    Vni_ev = (i <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i], Vni.power) * Vni.eval[i] : Vni.eval[i]);
-                    in_ev = (i <= iscaled_n.lScaled ? gsl_sf_pow_int(iscaled_n.factor * grid[i], iscaled_n.power) * iscaled_n.eval[i] : iscaled_n.eval[i]);
-                    kn_ev = (i <= kscaled_n.lScaled ? gsl_sf_pow_int(kscaled_n.factor * grid[i], kscaled_n.power) * kscaled_n.eval[i] : kscaled_n.eval[i]);
-                }
-                contrib += scale * jf_ev * Vfn_ev * ji_ev * Vni_ev * in_ev * kn_ev;
+                double in_ev  = (i <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i], in.power)  * in.eval[i]  : in.eval[i]);
+                double kn_ev  = (i <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i],   kn.power)  * kn.eval[i]    : kn.eval[i]);
+                contrib += fpart[i] * ipart[i] * in_ev * kn_ev;
             }
         }
         else
@@ -1298,38 +1413,21 @@ double Idir_forbidden
             // index "i" runs along the contour [x,y] = [i,i-d]
             for (int i = d; i < N; i++)
             {
-                double scale, ji_ev, Vfn_ev, jf_ev, Vni_ev, in_ev, kn_ev;
-                if (mmin(jf.lScaled-d,Vfn.lScaled-d,ji.lScaled,Vni.lScaled,iscaled_n.lScaled-d,kscaled_n.lScaled-d) <= i)
-                {
-                    // combine scale factors
-                    scale = gsl_sf_pow_int(jf.factor, jf.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
-                            gsl_sf_pow_int(ji.factor, ji.power) * gsl_sf_pow_int(Vfn.factor, Vfn.power) *
-                            gsl_sf_pow_int(iscaled_n.factor, iscaled_n.power) * gsl_sf_pow_int(kscaled_n.factor, kscaled_n.power) *
-                            gsl_sf_pow_int(grid[i], jf.power + Vfn.power + ji.power + Vni.power + iscaled_n.power + kscaled_n.power);
-                    ji_ev = ji.eval[i]; jf_ev = jf.eval[i]; Vfn_ev = Vfn.eval[i]; Vni_ev = Vni.eval[i]; in_ev = iscaled_n.eval[i]; kn_ev = kscaled_n.eval[i];
-                }
-                else
-                {
-                    // discard scale factor
-                    scale = 1;
-                    ji_ev = (i <= ji.lScaled ? gsl_sf_pow_int(ji.factor * grid[i], ji.power) * ji.eval[i] : ji.eval[i]);
-                    jf_ev = (i <= jf.lScaled ? gsl_sf_pow_int(jf.factor * grid[i], jf.power) * jf.eval[i] : jf.eval[i]);
-                    Vfn_ev = (i <= Vfn.lScaled ? gsl_sf_pow_int(Vfn.factor * grid[i], Vfn.power) * Vfn.eval[i] : Vfn.eval[i]);
-                    Vni_ev = (i <= Vni.lScaled ? gsl_sf_pow_int(Vni.factor * grid[i], Vni.power) * Vni.eval[i] : Vni.eval[i]);
-                    in_ev = (i <= iscaled_n.lScaled ? gsl_sf_pow_int(iscaled_n.factor * grid[i], iscaled_n.power) * iscaled_n.eval[i] : iscaled_n.eval[i]);
-                    kn_ev = (i <= kscaled_n.lScaled ? gsl_sf_pow_int(kscaled_n.factor * grid[i], kscaled_n.power) * kscaled_n.eval[i] : kscaled_n.eval[i]);
-                }
-                contrib += jf.eval[i-d] * Vfn.eval[i-d] * ji.eval[i] * Vni.eval[i] * iscaled_n.eval[i-d] * kscaled_n.eval[i];
+                double in_ev  = (i-d <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i-d], in.power)  * in.eval[i-d]  : in.eval[i-d]);
+                double kn_ev  = (i <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i],   kn.power)  * kn.eval[i]    : kn.eval[i]);
+                contrib += fpart[i-d] * ipart[i] * in_ev * kn_ev;
             }
             // index "i" runs along the contour [x,y] = [i,i+d]
-            for (unsigned i = 0; i < N - d; i++)
+            for (int i = 0; i < N - d; i++)
             {
-                contrib += jf.eval[i+d] * Vfn.eval[i+d] * ji.eval[i] * Vni.eval[i] * iscaled_n.eval[i] * kscaled_n.eval[i+d];
+                double in_ev  = (i <= in.lScaled  ? gsl_sf_pow_int(in.factor  * grid[i], in.power)  * in.eval[i]  : in.eval[i]);
+                double kn_ev  = (i+d <= kn.lScaled  ? gsl_sf_pow_int(kn.factor  * grid[i+d],   kn.power)  * kn.eval[i+d]    : kn.eval[i+d]);
+                contrib += fpart[i+d] * ipart[i] * in_ev * kn_ev;
             }
         }
         
         // add properly scaled contribution
-        contrib *= std::exp(-iscaled_n.k*h*d);
+        contrib *= std::exp(-kn.k*h*d);
         suma += contrib;
         
         // check convergence (do not blindly integrate everything)
