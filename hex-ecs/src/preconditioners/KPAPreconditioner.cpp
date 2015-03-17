@@ -296,35 +296,34 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
 
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
-    try
-    {
-        // get angular momenta of this block
-        int l1 = l1_l2_[iblock].first;
-        int l2 = l1_l2_[iblock].second;
-        
-        // dimension of the matrices
-        int Nspline = s_bspline_.Nspline();
-        
-        // multiply by the first Kronecker product
-        z = kron_dot(prec_[l1].invCl_invsqrtS, prec_[l2].invCl_invsqrtS, r);
-        
-        // divide by the diagonal
-        # pragma omp parallel for collapse (2) if (cmd_.parallel_dot)
-        for (int i = 0; i < Nspline; i++) 
-        for (int j = 0; j < Nspline; j++)
-            z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];
-        
-        // multiply by the second Kronecker product
-        z = kron_dot(prec_[l1].invsqrtS_Cl, prec_[l2].invsqrtS_Cl, z);
-    }
-    catch (std::exception & e)
-    {
-        HexException("Standard exception in KPA preconditioner: %s.", e.what());
-    }
-    catch (...)
-    {
-        HexException("Unknown exception in KPA preconditioner.");
-    }
+    // get angular momenta of this block
+    int l1 = l1_l2_[iblock].first;
+    int l2 = l1_l2_[iblock].second;
+    
+    // dimension of the matrices
+    int Nspline = s_bspline_.Nspline();
+    
+    // multiply by the first Kronecker product
+    dense_kron_dot
+    (
+        Nspline, Nspline, prec_[l1].invCl_invsqrtS.data().data(),
+        Nspline, Nspline, prec_[l2].invCl_invsqrtS.data().data(),
+        r.data(), z.data()
+    );
+    
+    // divide by the diagonal
+    # pragma omp parallel for if (cmd_.parallel_dot)
+    for (int i = 0; i < Nspline; i++) 
+    for (int j = 0; j < Nspline; j++)
+        z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];
+    
+    // multiply by the second Kronecker product
+    dense_kron_dot
+    (
+        Nspline, Nspline, prec_[l1].invsqrtS_Cl.data().data(),
+        Nspline, Nspline, prec_[l2].invsqrtS_Cl.data().data(),
+        z.data(), z.data()
+    );
 }
 
 void KPACGPreconditioner::CG_exit (int iblock) const

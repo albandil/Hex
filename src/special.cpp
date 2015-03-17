@@ -117,7 +117,7 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
         if (info < 0)
             HexException("Illegal value to DSTEV in coulomb_zeros (argument %d).", -info);
         if (info > 0)
-            HexException("DSTEV failed to converge (%d offdiagonal elements).", info);
+            return -1; //HexException("DSTEV failed to converge (%d offdiagonal elements).", info);
         
         // compute new zeros
         for (int i = 0; i < nzeros; i++)

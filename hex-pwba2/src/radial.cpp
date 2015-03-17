@@ -582,7 +582,8 @@ struct MultipolePotentialPF : MultipolePotential
                 return rArray(N,0.);
             
             // compute zeros of the Coulomb function
-            special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data());
+            if (special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data()) < 0)
+                return V;
             zeros /= Kb;
         }
         while (zeros.back() < rmax);

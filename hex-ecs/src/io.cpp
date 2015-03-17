@@ -236,6 +236,7 @@ void CommandLine::parse (int argc, char* argv[])
                 // continue OOC calculation
                 cache_all_radint = false;
                 cache_own_radint = false;
+                reuse_dia_blocks = true;
                 outofcore = true;
                 cont = true;
                 return true;
