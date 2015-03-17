@@ -70,10 +70,6 @@ int main (int argc, char *argv[])
     // turn off GSL error jumps
     gsl_set_error_handler_off();
     
-#ifndef NO_HDF
-    H5::Exception::dontPrint();
-#endif
-    
     // disable STDOUT/STDERR buffering
     std::setvbuf(stdout, 0, _IONBF, 0);
     std::setvbuf(stderr, 0, _IONBF, 0);

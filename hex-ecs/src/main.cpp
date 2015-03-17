@@ -77,9 +77,8 @@ int main (int argc, char* argv[])
         std::cout << argv[iarg] << " ";
     std::cout << std::endl << std::endl;
     
-    // turn off GSL and HDF exceptions
+    // turn off GSL exceptions
     gsl_set_error_handler_off();
-    H5Eset_auto2(H5E_DEFAULT, nullptr, nullptr);
     
     // disable buffering of the standard output (-> immediate logging)
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -90,8 +89,6 @@ int main (int argc, char* argv[])
     // check some exclusive options
     if (cmd.parallel_block)
     {
-        if (cmd.outofcore)
-            HexException("The options --out-of-core and --parallel-block can't be used together because the HDF library is not thread-safe.");
         if (cmd.lightweight_radial_cache)
             HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
         if (cmd.parallel_dot)

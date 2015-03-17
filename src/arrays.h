@@ -46,10 +46,7 @@
 #include <type_traits>
 #include <vector>
 
-#ifndef NO_HDF
-    #include "hdffile.h"
-#endif
-
+#include "hdffile.h"
 #include "memory.h"
 #include "misc.h"
 #include "numbers.h"
@@ -554,7 +551,7 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
  * - even number of allocated elements (zero padded) for the use in SSE accelerators
  * - reserved storage reducing necessary reallocations
  * - basic iterator interface (members Array::begin(), Array::end()).
- * - HDF5 interface (ability to save and load to/from HDF5 data files)
+ * - datafile interface (ability to save and load to/from scratch data files)
  * - a collection of overloaded arithmetic operators (sum of two arrays,
  *   difference, multiplication by a number etc.)
  */
@@ -1058,7 +1055,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         //@{
         bool hdfsave (std::string name, bool docompress = false, int consec = 10) const
         {
-#ifndef NO_HDF
             // save to HDF file
             HDFFile hdf(name, HDFFile::overwrite);
             if (not hdf.valid())
@@ -1083,9 +1079,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             }
             
             return true;
-#else
-            return false;
-#endif
         }
         bool hdfsave () const
         {
@@ -1102,7 +1095,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         //@{
         bool hdfload (std::string name)
         {
-#ifndef NO_HDF
             // open the file
             HDFFile hdf(name, HDFFile::readonly);
             
@@ -1143,9 +1135,6 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 *this = std::move(elements);
             
             return true;
-#else
-            return false;
-#endif
         }
         bool hdfload ()
         {
@@ -1388,31 +1377,19 @@ template <class T> class BlockArray
         
         bool hdfcheck (std::size_t iblock)
         {
-#ifndef NO_HDF
             return HDFFile(subname(iblock), HDFFile::readonly).valid();
-#else
-            return false;
-#endif
         }
         
         bool hdfload (std::size_t iblock)
         {
             assert(iblock < arrays_.size());
-#ifndef NO_HDF
             return arrays_[iblock].hdfload(subname(iblock));
-#else
-            return false;
-#endif
         }
         
         bool hdfsave (std::size_t iblock)
         {
             assert(iblock < arrays_.size());
-#ifndef NO_HDF
             return arrays_[iblock].hdfsave(subname(iblock));
-#else
-            return false;
-#endif
         }
         
         bool inmemory () const
@@ -1434,7 +1411,7 @@ template <class T> class BlockArray
         static NumberArray<T> hdfread (std::string const & name, std::size_t offset, std::size_t n)
         {
             NumberArray<T> elements(n);
-#ifndef NO_HDF
+            
             // open the file
             HDFFile hdf(name, HDFFile::readonly);
             
@@ -1444,7 +1421,7 @@ template <class T> class BlockArray
             // read elements
             if (not hdf.read("array", &(elements[0]), n, offset))
                 HexException("Can't read dataset \"array\" from file \"%s\".", name.c_str());
-#endif
+            
             return elements;
         }
         
@@ -1456,7 +1433,6 @@ template <class T> class BlockArray
          */
         static void hdfwrite (std::string const & name, std::size_t offset, std::size_t n, T const * data)
         {
-#ifndef NO_HDF
             // open the file
             HDFFile hdf(name, HDFFile::readwrite);
             
@@ -1466,7 +1442,6 @@ template <class T> class BlockArray
             // read elements
             if (not hdf.write("array", data, n, offset))
                 HexException("Can't write to dataset \"array\" in file \"%s\".", name.c_str());
-#endif
         }
         
     private:

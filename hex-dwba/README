@@ -21,13 +21,6 @@ Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
 Makefile and the library link is removed from LIBRARY variable in Makefile.
 Here is the list of the libraries with versions that were used:
 
- * HDF 1.8.14
-            Optional, obtainable from 
-                http://www.hdfgroup.org/HDF5/release/obtain5.html
-            Used for intermediate output of results.
-            The thread-safe version of the library is used. If custom-compiling, use
-                ./configure --enable-threadsafe
-
  * GSL 1.16
             Needed, obtainable from
                 http://www.gnu.org/software/gsl/

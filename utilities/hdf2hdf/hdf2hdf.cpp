@@ -39,8 +39,6 @@
 
 int main (int argc, char *argv[])
 {
-    H5Eset_auto2(H5E_DEFAULT, nullptr, nullptr);
-    
     std::vector<std::string> files;
     bool compress = false;
     

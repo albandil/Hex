@@ -14,13 +14,6 @@ CFLAGS = -Wall -std=c++11 -fPIC
 LFLAGS = 
 
 # ---------------------------------------------------------------------------- #
-# HDF (optional, use -DNO_HDF to omit)                                         #
-# ---------------------------------------------------------------------------- #
-
-HDFFLAGS = -DNO_HDF
-# HDFLIBS = -lhdf5 -lhdf5_cpp
-
-# ---------------------------------------------------------------------------- #
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 
@@ -37,8 +30,8 @@ CLNLIBS = -lcln
 ################################################################################
 
 
-CFLAGS += $(HDFFLAGS) $(GSLFLAGS) $(CLNFLAGS)
-LFLAGS += $(HDFLIBS) $(GSLLIBS) $(CLNLIBS)
+CFLAGS += $(GSLFLAGS) $(CLNFLAGS)
+LFLAGS += $(GSLLIBS) $(CLNLIBS)
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

@@ -306,9 +306,7 @@ public:
     //@{
     bool hdfload () { return hdfload (name_); }
     bool hdfload (std::string name);
-#ifndef NO_HDF
     bool hdfload (HDFFile & hdf, std::string prefix = "");
-#endif
     //@}
     
     /**
@@ -481,12 +479,6 @@ class BlockSymBandMatrix
             {
                 data_.resize(size_ * size_ * halfbw_ * halfbw_);
             }
-#ifdef NO_HDF
-            else
-            {
-                Exception("The program is not compiled with support for scratch-disk HDF files.");
-            }
-#endif
         }
         
         /// Is this object cached in memory?

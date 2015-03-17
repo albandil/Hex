@@ -39,13 +39,6 @@ OPENMPIFLAGS = $(shell mpic++ --showme:compile)
 OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 # ---------------------------------------------------------------------------- #
-# HDF                                                                          #
-# ---------------------------------------------------------------------------- #
-
-HDFFLAGS = 
-HDFLIBS = -lhdf5
-
-# ---------------------------------------------------------------------------- #
 # OpenCL                                                                       #
 # ---------------------------------------------------------------------------- #
 
@@ -89,11 +82,11 @@ PNGPPFLIBS =
 
 
 # compiler flags
-CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) $(HDFFLAGS) \
+CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) \
           $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
 
 # linker flags
-LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) $(HDFLIBS) \
+LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
           $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS) -rdynamic
 
 # git revision number

@@ -25,13 +25,6 @@ Here is the list of the libraries with versions that were used:
             Optional, can be eluded by -DNO_MPI.
             Used for distributed parallellization (hex-ecs --mpi).
 
- * HDF 1.8.14
-            Needed, obtainable from 
-                http://www.hdfgroup.org/HDF5/release/obtain5.html
-            Used for intermediate output of results.
-            The thread-safe version of the library is used. If custom-compiling, use
-                ./configure --enable-threadsafe
-
  * UMFPACK 5.7.1
             Needed, obtainable as a part of SuiteSparse 4.4.3 from 
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/

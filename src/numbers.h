@@ -40,10 +40,6 @@
     #include <mpi.h>
 #endif
 
-#ifndef NO_HDF
-    #include <hdf5.h>
-#endif
-
 #undef I
 
 //
@@ -113,10 +109,6 @@ template<> class typeinfo<int>
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT; }
 #endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_INT; }
-#endif
 };
 
 /// Data-type info class specialization for 'int64'.
@@ -134,10 +126,6 @@ template<> class typeinfo<std::int64_t>
 #ifndef NO_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT64_T; }
-#endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_INT64; }
 #endif
 };
 
@@ -157,10 +145,6 @@ template<> class typeinfo<unsigned>
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UNSIGNED; }
 #endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_UINT; }
-#endif
 };
 
 /// Data-type info class specialization for 'unsigned int64'.
@@ -178,10 +162,6 @@ template<> class typeinfo<std::uint64_t>
 #ifndef NO_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UINT64_T; }
-#endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_UINT64; }
 #endif
 };
 
@@ -201,10 +181,6 @@ template<> class typeinfo<float>
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_FLOAT; }
 #endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_FLOAT; }
-#endif
 };
 
 /// Data-type info class specialization for 'double'.
@@ -222,10 +198,6 @@ template<> class typeinfo<double>
 #ifndef NO_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
-#endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_DOUBLE; }
 #endif
 };
 
@@ -245,10 +217,6 @@ template<> class typeinfo<long double>
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_LONG_DOUBLE; }
 #endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return H5T_NATIVE_LDOUBLE; }
-#endif
 };
 
 /// Data-type info class specialization for 'std::complex'.
@@ -266,10 +234,6 @@ template<> template<class T> class typeinfo<std::complex<T>>
 #ifndef NO_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return typeinfo<T>::mpicmpttype(); }
-#endif
-#ifndef NO_HDF
-        /// HDF data type of a component.
-        static hid_t hdfcmpttype () { return typeinfo<T>::hdfcmpttype(); }
 #endif
 };
 

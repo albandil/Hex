@@ -59,9 +59,6 @@
     for Wigner coupling coefficients and some other special functions.
   - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
     for sparse matrix manipulation and for a direct sparse system solver.
-  - <a href="http://www.hdfgroup.org/HDF5/">HDF5</a> (1.8.11):
-    for standardized binary output of intermediate results
-    (used to speed up further simillar calculations).
   - <a href="http://www.fftw.org/">FFTW</a> (3.3.3):
     for fast evaluation of %Chebyshev expansions by Fast Fourier Transform.
   - OpenMP (2.1): for parallelization at single machine.

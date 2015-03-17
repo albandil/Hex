@@ -214,9 +214,6 @@
  * 
  * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.16):
  *   for Wigner coupling coefficients, numerical integration and some other special functions.
- * - <a href="http://www.hdfgroup.org/HDF5/">HDF5</a> (1.8.11):
- *   for standardized binary output of intermediate results
- *   (used to speed up further simillar calculations); optional.
  * - <a href="http://www.fftw.org/">FFTW</a> (3.3.3):
  *   for fast evaluation of %Chebyshev expansions by Fast Fourier Transform.
  * - CLN (<a href="http://www.ginac.de/CLN/">http://www.ginac.de/CLN/</a>): for arbitrary-precision

@@ -48,11 +48,8 @@
     #include <omp.h>
 #endif
 
-#ifndef NO_HDF
-    #include "hdffile.h"
-#endif
-
 #include "arrays.h"
+#include "hdffile.h"
 #include "matrix.h"
 #include "misc.h"
 
@@ -499,80 +496,58 @@ CooMatrix CscMatrix::tocoo () const
 
 bool CscMatrix::hdfsave (const char* name) const
 {
-#ifndef NO_HDF
-    try
+    HDFFile file(name, HDFFile::overwrite);
+    
+    // write dimensions
+    file.write("m", &m_, 1);
+    file.write("n", &n_, 1);
+    
+    // write indices
+    if (not p_.empty())
+        file.write("p", &(p_[0]), p_.size());
+    if (not i_.empty())
+        file.write("i", &(i_[0]), i_.size());
+    
+    // write complex data as a "double" array
+    if (not x_.empty())
     {
-        HDFFile file(name, HDFFile::overwrite);
-        
-        // write dimensions
-        file.write("m", &m_, 1);
-        file.write("n", &n_, 1);
-        
-        // write indices
-        if (not p_.empty())
-            file.write("p", &(p_[0]), p_.size());
-        if (not i_.empty())
-            file.write("i", &(i_[0]), i_.size());
-        
-        // write complex data as a "double" array
-        if (not x_.empty())
-        {
-            file.write
-            (
-                "x",
-                reinterpret_cast<double const*>( &(x_[0]) ),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        file.write
+        (
+            "x",
+            reinterpret_cast<double const*>( &(x_[0]) ),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NOHDF */
-    return false;
-#endif
+    
+    return true;
 }
 
 bool CscMatrix::hdfload (const char* name)
 {
-#ifndef NO_HDF
-    try
+    HDFFile hdf(name, HDFFile::readonly);
+    
+    // read dimensions
+    hdf.read("m", &m_, 1);
+    hdf.read("n", &n_, 1);
+    
+    // read indices
+    if (p_.resize(hdf.size("p")))
+        hdf.read("p", &(p_[0]), p_.size());
+    if (i_.resize(hdf.size("i")))
+        hdf.read("i", &(i_[0]), i_.size());
+    
+    // read data
+    if (x_.resize(hdf.size("x") / 2))
     {
-        HDFFile hdf(name, HDFFile::readonly);
-        
-        // read dimensions
-        hdf.read("m", &m_, 1);
-        hdf.read("n", &n_, 1);
-        
-        // read indices
-        if (p_.resize(hdf.size("p")))
-            hdf.read("p", &(p_[0]), p_.size());
-        if (i_.resize(hdf.size("i")))
-            hdf.read("i", &(i_[0]), i_.size());
-        
-        // read data
-        if (x_.resize(hdf.size("x") / 2))
-        {
-            hdf.read
-            (
-                "x",
-                reinterpret_cast<double*>(&(x_[0])),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        hdf.read
+        (
+            "x",
+            reinterpret_cast<double*>(&(x_[0])),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NO_HDF */
-    return false;
-#endif
+    
+    return true;
 }
 
 //
@@ -774,80 +749,58 @@ void CsrMatrix::hdflink (std::string name)
 
 bool CsrMatrix::hdfsave (std::string name) const
 {
-#ifndef NO_HDF
-    try
+    HDFFile hdf(name, HDFFile::overwrite);
+    
+    // write dimensions
+    hdf.write("m", &m_, 1);
+    hdf.write("n", &n_, 1);
+    
+    // write indices
+    if (not p_.empty())
+        hdf.write("p", &(p_[0]), p_.size());
+    if (not i_.empty())
+        hdf.write("i", &(i_[0]), i_.size());
+    
+    // write data
+    if (not x_.empty())
     {
-        HDFFile hdf(name, HDFFile::overwrite);
-        
-        // write dimensions
-        hdf.write("m", &m_, 1);
-        hdf.write("n", &n_, 1);
-        
-        // write indices
-        if (not p_.empty())
-            hdf.write("p", &(p_[0]), p_.size());
-        if (not i_.empty())
-            hdf.write("i", &(i_[0]), i_.size());
-        
-        // write data
-        if (not x_.empty())
-        {
-            hdf.write
-            (
-                "x",
-                reinterpret_cast<double const*>(&(x_[0])),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        hdf.write
+        (
+            "x",
+            reinterpret_cast<double const*>(&(x_[0])),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NO_HDF */
-    return false;
-#endif
+    
+    return true;
 }
 
 bool CsrMatrix::hdfload (std::string name)
 {
-#ifndef NO_HDF
-    try
+    HDFFile hdf(name, HDFFile::readonly);
+    
+    // read dimensions
+    hdf.read("m", &m_, 1);
+    hdf.read("n", &n_, 1);
+    
+    // read indices
+    if (p_.resize(hdf.size("p")))
+        hdf.read("p", &(p_[0]), p_.size());
+    if (i_.resize(hdf.size("i")))
+        hdf.read("i", &(i_[0]), i_.size());
+    
+    // read data
+    if (x_.resize(hdf.size("x") / 2))
     {
-        HDFFile hdf(name, HDFFile::readonly);
-        
-        // read dimensions
-        hdf.read("m", &m_, 1);
-        hdf.read("n", &n_, 1);
-        
-        // read indices
-        if (p_.resize(hdf.size("p")))
-            hdf.read("p", &(p_[0]), p_.size());
-        if (i_.resize(hdf.size("i")))
-            hdf.read("i", &(i_[0]), i_.size());
-        
-        // read data
-        if (x_.resize(hdf.size("x") / 2))
-        {
-            hdf.read
-            (
-                "x",
-                reinterpret_cast<double*>(&(x_[0])),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        hdf.read
+        (
+            "x",
+            reinterpret_cast<double*>(&(x_[0])),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NO_HDF */
-    return false;
-#endif
+    
+    return true;
 }
 
 double CsrMatrix::norm () const
@@ -1469,82 +1422,60 @@ CooMatrix CooMatrix::shake () const
 
 bool CooMatrix::hdfsave (const char* name) const
 {
-#ifndef NO_HDF
-    try
+    HDFFile hdf(name, HDFFile::overwrite);
+
+    // write dimensions
+    hdf.write("m", &m_, 1);
+    hdf.write("n", &n_, 1);
+
+    // write indices
+    if (not i_.empty())
+        hdf.write("i", &(i_[0]), i_.size());
+    if (not j_.empty())
+        hdf.write("j", &(j_[0]), j_.size());
+
+    // write data
+    if (not x_.empty())
     {
-        HDFFile hdf(name, HDFFile::overwrite);
-        
-        // write dimensions
-        hdf.write("m", &m_, 1);
-        hdf.write("n", &n_, 1);
-        
-        // write indices
-        if (not i_.empty())
-            hdf.write("i", &(i_[0]), i_.size());
-        if (not j_.empty())
-            hdf.write("j", &(j_[0]), j_.size());
-        
-        // write data
-        if (not x_.empty())
-        {
-            hdf.write
-            (
-                "x",
-                reinterpret_cast<double const*>(&x_),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        hdf.write
+        (
+            "x",
+            reinterpret_cast<double const*>(&x_),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NO_HDF */
-    return false;
-#endif
+
+    return true;
 }
 
 bool CooMatrix::hdfload (const char* name)
 {
     sorted_ = false;
     
-#ifndef NO_HDF
-    try
+    HDFFile hdf(name, HDFFile::readonly);
+    
+    // read dimensions
+    hdf.read("m", &m_, 1);
+    hdf.read("n", &n_, 1);
+    
+    // read indices
+    if (i_.resize(hdf.size("i")))
+        hdf.read("i", &(i_[0]), i_.size());
+    if (j_.resize(hdf.size("j")))
+        hdf.read("j", &(j_[0]), j_.size());
+    
+    // read data
+    if (x_.resize(hdf.size("x") / 2))
     {
-        HDFFile hdf(name, HDFFile::readonly);
-        
-        // read dimensions
-        hdf.read("m", &m_, 1);
-        hdf.read("n", &n_, 1);
-        
-        // read indices
-        if (i_.resize(hdf.size("i")))
-            hdf.read("i", &(i_[0]), i_.size());
-        if (j_.resize(hdf.size("j")))
-            hdf.read("j", &(j_[0]), j_.size());
-        
-        // read data
-        if (x_.resize(hdf.size("x") / 2))
-        {
-            hdf.read
-            (
-                "x",
-                reinterpret_cast<double*>(&(x_[0])),
-                x_.size() * 2
-            );
-        }
-        
-        return true;
+        hdf.read
+        (
+            "x",
+            reinterpret_cast<double*>(&(x_[0])),
+            x_.size() * 2
+        );
     }
-    catch (...)
-    {
-        return false;
-    }
-#else /* NO_HDF */
-    return false;
-#endif
+    
+    return true;
 }
 
 SymBandMatrix::SymBandMatrix ()
@@ -1571,7 +1502,6 @@ SymBandMatrix::SymBandMatrix (SymBandMatrix&& A)
 SymBandMatrix::SymBandMatrix (std::string filename)
     : name_(filename)
 {
-    # pragma omp critical
     if (not hdfload())
         HexException("Unable to load from %s.", filename.c_str());
 }
@@ -1639,7 +1569,6 @@ bool SymBandMatrix::is_compatible (SymBandMatrix const & B) const
     return true;
 }
 
-#ifndef NO_HDF
 bool SymBandMatrix::hdfload (HDFFile & hdf, std::string prefix)
 {
     // check the HDF file
@@ -1681,25 +1610,19 @@ bool SymBandMatrix::hdfload (HDFFile & hdf, std::string prefix)
     
     return true;
 }
-#endif
 
 bool SymBandMatrix::hdfload (std::string name)
 {
-#ifndef NO_HDF
     // open the HDF file
     HDFFile hdf(name, HDFFile::readonly);
     if (not hdf.valid())
         return false;
     
     return hdfload(hdf);
-#else /* NO_HDF */
-    return false;
-#endif
 }
 
 bool SymBandMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool docompress, std::size_t consec) const
 {
-#ifndef NO_HDF
     HDFFile hdf(name, flags);
     
     if (not hdf.valid())
@@ -1737,9 +1660,6 @@ bool SymBandMatrix::hdfsave (std::string name, HDFFile::FileAccess flags, bool d
         return false;
     
     return true;
-#else /* NO_HDF */
-    return false;
-#endif
 }
 
 CooMatrix SymBandMatrix::tocoo (MatrixTriangle triangle) const
@@ -1888,95 +1808,90 @@ cArray BlockSymBandMatrix::dot (cArrayView v, bool parallelize) const
     if (halfbw_ == 0)
         return w;
     
-#ifndef NO_HDF
-    // open data file for reading
-    HDFFile * hdf = nullptr;
-    if (not inmemory_)
-        hdf = new HDFFile (diskfile_, HDFFile::readonly);
-#endif
-    
-    // data
-    cArray diskdata;
-    
     // write locks
     omp_lock_t lock[size_];
     for (std::size_t i = 0; i < size_; i++)
         omp_init_lock(&lock[i]);
     
     // for all blocks
-    for (std::size_t d = 0; d < halfbw_; d++)
+    # pragma omp parallel if (parallelize)
     {
-        // paralle processing of blocks on this diagonal (only if requested, and they are present in memory)
-        # pragma omp parallel for schedule (dynamic,1) if (parallelize && inmemory_)
-        for (std::size_t i = 0; i < size_; i++)
-        if (i + d < size_)
+        // open data file for reading
+        cArray diskdata;
+        HDFFile * hdf = nullptr;
+        if (not inmemory_)
+            hdf = new HDFFile (diskfile_, HDFFile::readonly);
+            
+        for (std::size_t d = 0; d < halfbw_; d++)
         {
-            // block volume and offset
-            std::size_t vol = size_ * halfbw_;
-            std::size_t offset = (i * halfbw_ + d) * vol;
-            
-            // data view of this block
-            cArrayView view (data_, offset, vol);
-            
-#ifndef NO_HDF
-            if (not inmemory_)
+            // parallel processing of blocks on this diagonal (only if requested, and they are present in memory)
+            # pragma omp for schedule (dynamic,1)
+            for (std::size_t i = 0; i < size_; i++)
+            if (i + d < size_)
             {
-                // read data from the disk
-                diskdata.resize(vol);
-                if (not hdf->read("data", &diskdata[0], vol, offset))
-                    HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
+                // block volume and offset
+                std::size_t vol = size_ * halfbw_;
+                std::size_t offset = (i * halfbw_ + d) * vol;
                 
-                // reset view to the new data
-                view.reset(vol, diskdata.data());
-            }
-#endif
-            
-            cArray product;
-            
-            // multiply by diagonal block
-            if (d == 0)
-            {
-                product = SymBandMatrix::sym_band_dot
-                (
-                    size_, halfbw_, view,
-                    cArrayView(v, i * size_, size_)
-                );
+                // data view of this block
+                cArrayView view (data_, offset, vol);
                 
-                omp_set_lock(&lock[i]);
-                cArrayView(w, i * size_, size_) += product;
-                omp_unset_lock(&lock[i]);
-            }
-            
-            // multiply by the other diagonals (both symmetries)
-            if (d != 0)
-            {
-                product = SymBandMatrix::sym_band_dot
-                (
-                    size_, halfbw_, view,
-                    cArrayView(v, (i + d) * size_, size_)
-                );
+                if (not inmemory_)
+                {
+                    // read data from the disk
+                    diskdata.resize(vol);
+                    if (not hdf->read("data", &diskdata[0], vol, offset))
+                        HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
+                    
+                    // reset view to the new data
+                    view.reset(vol, diskdata.data());
+                }
                 
-                omp_set_lock(&lock[i]);
-                cArrayView(w, i * size_, size_) += product;
-                omp_unset_lock(&lock[i]);
+                cArray product;
                 
-                product = SymBandMatrix::sym_band_dot
-                (
-                    size_, halfbw_, view,
-                    cArrayView(v, i * size_, size_)
-                );
+                // multiply by diagonal block
+                if (d == 0)
+                {
+                    product = SymBandMatrix::sym_band_dot
+                    (
+                        size_, halfbw_, view,
+                        cArrayView(v, i * size_, size_)
+                    );
+                    
+                    omp_set_lock(&lock[i]);
+                    cArrayView(w, i * size_, size_) += product;
+                    omp_unset_lock(&lock[i]);
+                }
                 
-                omp_set_lock(&lock[i + d]);
-                cArrayView(w, (i + d) * size_, size_) += product;
-                omp_unset_lock(&lock[i + d]);
+                // multiply by the other diagonals (both symmetries)
+                if (d != 0)
+                {
+                    product = SymBandMatrix::sym_band_dot
+                    (
+                        size_, halfbw_, view,
+                        cArrayView(v, (i + d) * size_, size_)
+                    );
+                    
+                    omp_set_lock(&lock[i]);
+                    cArrayView(w, i * size_, size_) += product;
+                    omp_unset_lock(&lock[i]);
+                    
+                    product = SymBandMatrix::sym_band_dot
+                    (
+                        size_, halfbw_, view,
+                        cArrayView(v, i * size_, size_)
+                    );
+                    
+                    omp_set_lock(&lock[i + d]);
+                    cArrayView(w, (i + d) * size_, size_) += product;
+                    omp_unset_lock(&lock[i + d]);
+                }
             }
         }
+        
+        if (not inmemory_)
+            delete hdf;
     }
-    
-#ifndef NO_HDF
-    if (not inmemory_)
-        delete hdf;
-#endif
     
     for (std::size_t i = 0; i < size_; i++)
         omp_destroy_lock(&lock[i]);
@@ -1997,12 +1912,10 @@ CooMatrix BlockSymBandMatrix::tocoo () const
     lArray J; J.reserve(nelem); 
     cArray V; V.reserve(nelem);
     
-#ifndef NO_HDF
     // open data file for reading
     HDFFile * hdf = nullptr;
     if (not inmemory_)
         hdf = new HDFFile (diskfile_, HDFFile::readonly);
-#endif
     
     // for all blocks
     for (std::size_t i = 0; i < size_; i++)
@@ -2012,7 +1925,6 @@ CooMatrix BlockSymBandMatrix::tocoo () const
         // data view of this block diagonal
         cArrayView view (data_, (i * halfbw_ + d) * size_ * halfbw_, size_ * halfbw_);
         
-#ifndef NO_HDF
         // it may be necessary to load the data from disk
         cArray diskdata;
         if (not inmemory_)
@@ -2025,7 +1937,6 @@ CooMatrix BlockSymBandMatrix::tocoo () const
             // reset view to the new data
             view.reset(size_ * halfbw_, diskdata.data());
         }
-#endif
         
         // convert the block to COO format
         CooMatrix coo = SymBandMatrix(size_, halfbw_, view).tocoo();
@@ -2046,10 +1957,8 @@ CooMatrix BlockSymBandMatrix::tocoo () const
         }
     }
     
-#ifndef NO_HDF
     if (not inmemory_)
         delete hdf;
-#endif
     
     // compose the final matrix
     return CooMatrix

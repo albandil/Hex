@@ -29,18 +29,18 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef NO_HDF
-
 #include <iostream>
 #include <string>
 
-#include <hdf5.h>
+#include <cstdio>
 
 #include "hdffile.h"
 #include "misc.h"
 
+const std::size_t HDFFile::header_byte_size = 1024;
+
 HDFFile::HDFFile (std::string filename, FileAccess flag)
-    : prefix(), file_(-1), name_(filename), valid_(false)
+    : prefix(), file_(nullptr), name_(filename), changed_(false), valid_(false)
 {
     // separate filesystem path and dataset path (by semicolon)
     std::size_t pos = name_.find(':');
@@ -54,123 +54,105 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
     switch (flag)
     {
         case overwrite:
-            file_ = H5Fcreate(name_.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-            break;
-            
-        case failifexists:
-            file_ = H5Fcreate(name_.c_str(), H5F_ACC_EXCL, H5P_DEFAULT, H5P_DEFAULT);
+            file_ = std::fopen(name_.c_str(), "wb+");
             break;
             
         case readonly:
-            file_ = H5Fopen(name_.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+            file_ = std::fopen(name_.c_str(), "rb");
             break;
             
         case readwrite:
-            file_ = H5Fopen(name_.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+            file_ = std::fopen(name_.c_str(), "rb+");
             break;
     }
     
     // save success indicator
-    valid_ = (file_ >= 0);
+    valid_ = (file_ != nullptr);
+    
+    // read header
+    if (valid_ and (flag == readonly or flag == readwrite))
+    {
+        // read number of datasets
+        std::size_t ndt;
+        if (std::fread(&ndt, sizeof(std::size_t), 1, file_) < 1)
+        {
+            // no data yet...
+            return;
+        }
+        datasets_.resize(ndt);
+        
+        // read dataset information
+        for (std::size_t idt = 0; idt < ndt; idt++)
+        {
+            // read length of the dataset name
+            std::size_t len;
+            std::fread(&len, sizeof(std::size_t), 1, file_);
+            
+            // read dataset name
+            datasets_[idt].name.resize(len);
+            std::fread(&(datasets_[idt].name[0]), sizeof(char), len, file_);
+            
+            // read datatype byte size and element count
+            std::fread(&(datasets_[idt].bytes), sizeof(std::size_t), 1, file_);
+            std::fread(&(datasets_[idt].elements), sizeof(std::size_t), 1, file_);
+        }
+    }
 }
 
 HDFFile::~HDFFile ()
 {
-    if (file_ >= 0)
+    if (file_ != nullptr)
     {
-        // write everything to disk
-        H5Fflush(file_, H5F_SCOPE_GLOBAL);
+        // write the modified header
+        if (changed_)
+        {
+            // write number of datasets
+            std::size_t ndt = datasets_.size();
+            std::fseek(file_, 0, SEEK_SET);
+            std::fwrite(&ndt, sizeof(ndt), 1, file_);
+            
+            // write datasets information
+            for (std::size_t idt = 0; idt < ndt; idt++)
+            {
+                // write length of dataset name
+                std::size_t len = datasets_[idt].name.size();
+                std::fwrite(&len, sizeof(ndt), 1, file_);
+                
+                // write dataset name
+                std::fwrite(&(datasets_[idt].name[0]), sizeof(char), len, file_);
+                
+                // write datatype byte size and element count
+                std::fwrite(&(datasets_[idt].bytes), sizeof(std::size_t), 1, file_);
+                std::fwrite(&(datasets_[idt].elements), sizeof(std::size_t), 1, file_);
+            }
+        }
         
-        // close the file
-        H5Fclose(file_);
-        
-        // invalidate IDs
-        file_ = -1;
+        std::fclose(file_);
+        file_ = nullptr;
         valid_ = false;
     }
 }
 
-void HDFFile::save_error () const
-{
-    // get number of messages in the error stack
-    ssize_t n = H5Eget_num(H5E_DEFAULT);
-    
-    // output stream
-    std::stringstream out;
-    
-    // for all messages
-    H5E_type_t type;
-    for (ssize_t i = 0; i < n; i++)
-    {
-        // get message size
-        ssize_t size = H5Eget_msg(i, &type, nullptr, 0);
-        
-        // skip empty messages
-        if (size <= 0)
-        {
-            out << "  #" << i << std::endl;
-            continue;
-        }
-        
-        // retrieve message text
-        char text[size];
-        size = H5Eget_msg(i, &type, text, size);
-        if (size <= 0)
-        {
-            out << "  #" << i << std::endl;
-            continue;
-        }
-        
-        out << "  #" << i << " " << text << std::endl;
-    }
-    
-    // get resulting string
-    error_ = out.str();
-}
-
 std::size_t HDFFile::size (std::string dataset) const
 {
-    // invalid file has zero size
-    if (not valid_)
-        return 0;
+    // try to find the dataset with this name
+    for (std::size_t i = 0; i < datasets_.size(); i++)
+    {
+        if (datasets_[i].name == dataset)
+            return datasets_[i].elements;
+    }
     
-    // compose full dataset path
-    dataset = prefix + dataset;
-    
-    // HDF descriptors
-    hid_t dset = -1, dspc = -1;
-    
-    // dataset lenght
-    hssize_t length = 0;
-    
-    // success indicator
-    bool success = true;
-    
-    // open requested dataset
-    success = (success and (dset = H5Dopen2(file_, dataset.c_str(), 0)) >= 0);
-    
-    // open associated dataspace
-    success = (success and (dspc = H5Dget_space(dset)) >= 0);
-    
-    // retrieve size of the dataset
-    success = (success and (length = H5Sget_simple_extent_npoints(dspc)) >= 0);
-    
-    // save possible error message
-    save_error();
-    
-    // release memory
-    if (dset >= 0) H5Dclose(dset);
-    if (dspc >= 0) H5Sclose(dspc);
-    
-    // return the size
-    return length;
+    return 0;
 }
 
-bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t offset, hid_t dtype) const
+bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t bytes) const
 {
     // skip reading invalid files
     if (not valid_)
+    {
+        error_ = "Invalid file.";
         return false;
+    }
     
     // skip reading empty datasets
     if (length == 0)
@@ -178,48 +160,69 @@ bool HDFFile::read_ (std::string dataset, void * buffer, hsize_t length, hsize_t
     
     // skip reading into null buffer
     if (buffer == nullptr)
+    {
+        error_ = "Null buffer.";
         return false;
-    
-    // HDF descriptors
-    hid_t dset = -1, dspc = -1, mspc = -1;
+    }
     
     // compose full dataset path
     dataset = prefix + dataset;
     
-    // success indicator
-    bool success = true;
+    // try to find the dataset with this name
+    int id = -1, seek = header_byte_size;
+    for (std::size_t i = 0; i < datasets_.size(); i++)
+    {
+        if (datasets_[i].name == dataset)
+        {
+            id = i;
+            break;
+        }
+        else
+        {
+            seek += datasets_[i].elements * datasets_[i].bytes;
+        }
+    }
     
-    // open requested dataset
-    success = (success and (dset = H5Dopen2(file_, dataset.c_str(), 0)) >= 0);
+    // dataset not found
+    if (id == -1)
+    {
+        error_ = format("Can't read dataset \"%s\" in file \"%s\".", dataset.c_str(), name_.c_str());
+        return false;
+    }
     
-    // open associated dataspace
-    success = (success and (dspc = H5Dget_space(dset)) >= 0);
+    // check that the selection fits into the dataset
+    if (offset + length > datasets_[id].elements)
+    {
+        error_ = format("Selection does not fit into the dataset (%ld + %ld >= %ld).", offset, length, datasets_[id].elements);
+        return false;
+    }
     
-    // select data in the file
-    success = (success and H5Sselect_hyperslab(dspc, H5S_SELECT_SET, &offset, nullptr, &length, nullptr) >= 0);
+    // reposition stream according to the selection
+    if (std::fseek(file_, seek + offset * bytes, SEEK_SET) != 0)
+    {
+        error_ = "Error while reading dataset: seek failure.";
+        return false;
+    }
     
-    // create simple memory space
-    success = (success and (mspc = H5Screate_simple(1, &length, nullptr)) >= 0);
+    // read data
+    std::size_t read = std::fread(buffer, bytes, length, file_);
+    if (read < length)
+    {
+        error_ = format("Error while reading dataset: read failure (read %ld of %ld).", read, length);
+        return false;
+    }
     
-    // read data into the buffer
-    success = (success and H5Dread(dset, dtype, mspc, dspc, H5P_DEFAULT, buffer) >= 0);
-    
-    // save possible error mesage
-    save_error();
-    
-    // release HDF descriptors
-    if (dset >= 0) H5Dclose(dset);
-    if (dspc >= 0) H5Sclose(dspc);
-    if (mspc >= 0) H5Sclose(mspc);
-    
-    return success;
+    return true;
 }
 
-bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype)
+bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t length, std::size_t offset, std::size_t bytes)
 {
     // skip writing into invalid files
     if (not valid_)
+    {
+        error_ = "Invalid file.";
         return false;
+    }
     
     // skip writing empty datasets
     if (length == 0)
@@ -228,50 +231,60 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, hsize_t length, 
     // compose full dataset path
     dataset = prefix + dataset;
     
-    // HDF descriptors
-    hid_t dset = -1, dspc = -1, mspc = -1;
-    
-    // success indicator
-    bool success = true;
-    
-    // try to open an existing dataset
-    dset = H5Dopen2(file_, dataset.c_str(), 0);
-    
-    // a) dataset does not exist yet
-    if (dset < 0)
+    // try to find the dataset with this name
+    int id = -1, seek = header_byte_size;
+    for (std::size_t i = 0; i < datasets_.size(); i++)
     {
-        // create a new data space
-        success = (success and (dspc = H5Screate_simple(1, &length, nullptr)) >= 0);
-        
+        if (datasets_[i].name == dataset)
+        {
+            id = i;
+            break;
+        }
+        else
+        {
+            seek += datasets_[i].elements * datasets_[i].bytes;
+        }
+    }
+    
+    // create a new dataset
+    if (id < 0)
+    {
         // create a new dataset
-        success = (success and (dset = H5Dcreate2(file_, dataset.c_str(), dtype, dspc, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT)) >= 0);
+        DatasetInfo dst;
+        dst.name = dataset;
+        dst.bytes = bytes;
+        dst.elements = length + offset;
+        datasets_.push_back(dst);
+        id = datasets_.size() - 1;
+        changed_ = true;
     }
     
-    // b) dataset already exists
-    else
+    // check that the selection fits into the dataset
+    if (offset + length > datasets_[id].elements)
     {
-        // get assigned data space
-        success = (success and (dspc = H5Dget_space(dset)) >= 0);
-        
-        // select data in the file
-        success = (success and H5Sselect_hyperslab(dspc, H5S_SELECT_SET, &offset, nullptr, &length, nullptr) >= 0);
+        error_ = format("Selection does not fit into the dataset (%ld + %ld >= %ld).", offset, length, datasets_[id].elements);
+        return false;
     }
     
-    // memory data space
-    success = (success and (mspc = H5Screate_simple(1, &length, nullptr)) >= 0);
+    // exit if nothing to write
+    if (buffer == nullptr)
+        return true;
     
-    // write data from buffer if not null
-    success = (success and (buffer == nullptr or H5Dwrite(dset, dtype, mspc, dspc, H5P_DEFAULT, buffer) >= 0));
+    // reposition stream according to the selection
+    if (std::fseek(file_, seek + offset * bytes, SEEK_SET) != 0)
+    {
+        error_ = "Error while writing dataset.";
+        return false;
+    }
     
-    // save possible error message
-    save_error();
+    // write data
+    std::size_t written = std::fwrite(buffer, bytes, length, file_);
+    if (written < length)
+    {
+        error_ = format("Error while writing dataset (written %ld of %ld).", written, length);
+        perror("error");
+        return false;
+    }
     
-    // release memory
-    if (dset >= 0) H5Dclose(dset);
-    if (dspc >= 0) H5Sclose(mspc);
-    if (mspc >= 0) H5Sclose(dspc);
-    
-    return success;
+    return true;
 }
-
-#endif
