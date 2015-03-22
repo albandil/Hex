@@ -29,16 +29,15 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_HDFFILE
-#define HEX_HDFFILE
+#ifndef HEX_H5FILE
+#define HEX_H5FILE
 
 #include <string>
 
-// #include <hdf5.h>
-#include <cstdio>
+#include <hdf5.h>
 
-#include "numbers.h"
-#include "misc.h"
+#include "../../src/numbers.h"
+#include "../../src/misc.h"
 
 /**
  * @brief HDF I/O management.
@@ -51,7 +50,7 @@
  *     
  *     ...
  *     
- *     HDFFile hdffile("test.hdf", readonly);
+ *     H5File hdffile("test.hdf", readonly);
  *     
  *     if (hdffile.valid())
  *         hdffile.write("nums", nums.data(), nums.size());
@@ -60,14 +59,14 @@
  *     
  * @endcode
  */
-class HDFFile
+class H5File
 {
 public:
     
     /**
      * @brief Access mode.
      * 
-     * This flag is used in the constructor of HDFFile to specify
+     * This flag is used in the constructor of H5File to specify
      * access mode to the file (read only, overwrite etc.).
      */
     typedef enum
@@ -75,19 +74,16 @@ public:
 //         create,
         readonly,
         overwrite,
-//         failifexists,
+        failifexists,
         readwrite
     }
     FileAccess;
     
-    /// Header size.
-    static const std::size_t header_byte_size;
-    
     /// Constructor from filename and access mode.
-    HDFFile (std::string filename, FileAccess flag);
+    H5File (std::string filename, FileAccess flag);
     
     /// Destructor.
-    ~HDFFile ();
+    ~H5File ();
     
     /// Get size of the dataset of valid file.
     std::size_t size (std::string dataset) const;
@@ -95,13 +91,13 @@ public:
     /// Load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
-        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, sizeof(typename typeinfo<T>::cmpttype));
+        HexException("Unsupported data type %s.", typeid(T).name());
     }
     
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
-        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, sizeof(typename typeinfo<T>::cmpttype));
+        HexException("Unsupported data type %s.", typeid(T).name());
     }
     
     /// Check that the file is valid.
@@ -110,53 +106,74 @@ public:
     /// Prefix for dataset paths.
     std::string prefix;
     
+    /// Internal HDF object.
+    hid_t file () const { return file_; }
+    
     /// Error stack.
     std::string const & error () const { return error_; };
-    
-    typedef struct
-    {
-        /// Name of the dataset.
-        std::string name;
-        
-        /// Byte size of one element.
-        std::size_t bytes;
-        
-        /// Number of elements.
-        std::size_t elements;
-    }
-    DatasetInfo;
-    
-    /// Dataset information.
-    std::vector<DatasetInfo> const & datasets () const { return datasets_; }
     
 private:
     
     /// Pointer to the HDF structure.
-    FILE * file_;
-    
-    /// Header
-    std::vector<DatasetInfo> datasets_;
+    hid_t file_;
     
     /// Filename.
     std::string name_;
     
-    /// Error message.
+    /// HDF library error stack (set on unsuccessful return).
     mutable std::string error_;
-    
-    /// Whether the dataset layout has been changed.
-    bool changed_;
     
     /// Whether the file is valid.
     bool valid_;
     
     /// Auxiliary read function.
-    bool read_(std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t dtype) const;
+    bool read_(std::string dataset, void * buffer, hsize_t length, hsize_t offset, hid_t dtype) const;
     
     /// Auxiliary write function.
-    bool write_(std::string dataset, void const * buffer, std::size_t length, std::size_t offset, std::size_t dtype);
+    bool write_(std::string dataset, void const * buffer, hsize_t length, hsize_t offset, hid_t dtype);
     
     /// Set error and return false.
     void save_error () const;
 };
+
+template<> bool H5File::read<int> (std::string dataset, int * buffer, std::size_t length, std::size_t offset) const
+{
+    return read_(dataset, buffer, length, offset, H5T_NATIVE_INT);
+}
+
+template<> bool H5File::write<int> (std::string dataset, int const * buffer, std::size_t length, std::size_t offset)
+{
+    return write_(dataset, buffer, length, offset, H5T_NATIVE_INT);
+}
+
+template<> bool H5File::read<std::int64_t> (std::string dataset, std::int64_t * buffer, std::size_t length, std::size_t offset) const
+{
+    return read_(dataset, buffer, length, offset, H5T_NATIVE_INT64);
+}
+
+template<> bool H5File::write<std::int64_t> (std::string dataset, std::int64_t const * buffer, std::size_t length, std::size_t offset)
+{
+    return write_(dataset, buffer, length, offset, H5T_NATIVE_INT64);
+}
+
+template<> bool H5File::read<double> (std::string dataset, double * buffer, std::size_t length, std::size_t offset) const
+{
+    return read_(dataset, buffer, length, offset, H5T_NATIVE_DOUBLE);
+}
+
+template<> bool H5File::write<double> (std::string dataset, double const * buffer, std::size_t length, std::size_t offset)
+{
+    return write_(dataset, buffer, length, offset, H5T_NATIVE_DOUBLE);
+}
+
+template<> bool H5File::read<Complex> (std::string dataset, Complex * buffer, std::size_t length, std::size_t offset) const
+{
+    return read_(dataset, buffer, length * 2, offset * 2, H5T_NATIVE_DOUBLE);
+}
+
+template<> bool H5File::write<Complex> (std::string dataset, Complex const * buffer, std::size_t length, std::size_t offset)
+{
+    return write_(dataset, buffer, length * 2, offset * 2, H5T_NATIVE_DOUBLE);
+}
 
 #endif

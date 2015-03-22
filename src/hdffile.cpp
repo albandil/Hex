@@ -191,9 +191,9 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     }
     
     // check that the selection fits into the dataset
-    if (offset + length > datasets_[id].elements)
+    if ((offset + length) * bytes > datasets_[id].elements * datasets_[id].bytes)
     {
-        error_ = format("Selection does not fit into the dataset (%ld + %ld >= %ld).", offset, length, datasets_[id].elements);
+        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].bytes);
         return false;
     }
     
@@ -260,9 +260,9 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
     }
     
     // check that the selection fits into the dataset
-    if (offset + length > datasets_[id].elements)
+    if ((offset + length) * bytes > datasets_[id].elements * datasets_[id].bytes)
     {
-        error_ = format("Selection does not fit into the dataset (%ld + %ld >= %ld).", offset, length, datasets_[id].elements);
+        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].bytes);
         return false;
     }
     

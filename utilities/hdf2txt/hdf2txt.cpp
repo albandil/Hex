@@ -62,7 +62,7 @@ int main (int argc, char *argv[])
     
     if (cpx)
     {
-        // head HDF file
+        // read HDF file
         cArray a;
         a.hdfload(hdf);
     
@@ -72,7 +72,7 @@ int main (int argc, char *argv[])
     }
     else
     {
-        // head HDF file
+        // read HDF file
         rArray a;
         a.hdfload(hdf);
     
