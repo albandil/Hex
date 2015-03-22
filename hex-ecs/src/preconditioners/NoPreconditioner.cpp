@@ -405,7 +405,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             cArray product (Nchunk);
             
             // load data
-            if (cmd_.outofcore)
+            if (cmd_.outofcore and par_.isMyWork(ill))
                 q.hdfload(ill);
             
             // maximal multipole
@@ -457,9 +457,17 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // sum all contributions to this destination segment on its owner node
             par_.sum(product.data(), Nchunk, ill % par_.Nproc());
             
-            // finally, owner will update its segment
+            // finally, owner will update its segment (and move back to disk, if OOC)
             if (par_.isMyWork(ill))
+            {
                 q[ill] += product;
+                
+                if (cmd_.outofcore)
+                {
+                    q.hdfsave(ill);
+                    q[ill].drop();
+                }
+            }
         }
     }
     else
