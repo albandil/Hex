@@ -300,6 +300,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     // CG linear combination
     auto axby_operation = [ & ](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void
     {
+        // only references blocks that are local to this MPI node
         for (std::size_t i = 0; i < x.size(); i++) if (par.isMyWork(i))
         {
             if (not x.inmemory()) x.hdfload(i);
@@ -316,7 +317,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     // CG new array
     auto new_array = [ & ](std::size_t N, std::string name, bool reset = true) -> BlockArray<Complex>
     {
-        // create a new block array
+        // create a new block array and initialize blocks local to this MPI node
         BlockArray<Complex> array (N, !cmd.outofcore, name);
         
         // initialize all blocks ('resize' automatically zeroes added elements)

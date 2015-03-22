@@ -431,7 +431,7 @@ SymBandMatrix RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, 
     return block_ik;
 }
 
-cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src, bool simple) const
+cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, bool simple) const
 {
     // number of source vectors
     int N = src.size();
@@ -441,9 +441,7 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src, b
     std::size_t order = bspline_.order();
     
     // output array (the product)
-    cArrays dst(N);
-    for (int n = 0; n < N; n++)
-        dst[n] = cArray(src[n].size());
+    cArray dst(N);
     
     // for all blocks of the radial matrix
     # pragma omp parallel for firstprivate (lambda) schedule (dynamic, 1)
@@ -453,16 +451,15 @@ cArrays RadialIntegrals::apply_R_matrix (unsigned lambda, cArrays const & src, b
         // (i,k)-block data (= concatenated non-zero upper diagonals)
         SymBandMatrix block_ik = calc_R_tr_dia_block(lambda, i, k, simple);
         
-        // multiply all source vectors by this block
+        // multiply source vector by this block
         # pragma omp critical
-        for (int isrc = 0; isrc < N; isrc++)
         {
             // source and destination segment
-            cArrayView(dst[isrc], i * Nspline, Nspline) += block_ik.dot(cArrayView(src[isrc], k * Nspline, Nspline));
+            cArrayView(dst, i * Nspline, Nspline) += block_ik.dot(cArrayView(src, k * Nspline, Nspline));
             
             // take care also of symmetric position of the off-diagonal block
             if (i != k)
-            cArrayView(dst[isrc], k * Nspline, Nspline) += block_ik.dot(cArrayView(src[isrc], i * Nspline, Nspline));
+            cArrayView(dst, k * Nspline, Nspline) += block_ik.dot(cArrayView(src, i * Nspline, Nspline));
         }
     }
     

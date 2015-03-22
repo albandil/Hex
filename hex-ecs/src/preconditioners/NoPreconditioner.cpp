@@ -262,8 +262,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 }
                 else
                 {
-                    if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.apply_R_matrix(lambda, cArrays(1, Pj1))[0];
-                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.apply_R_matrix(lambda, cArrays(1, Pj2))[0];
+                    if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.apply_R_matrix(lambda, Pj1);
+                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.apply_R_matrix(lambda, Pj2);
                 }
             }
             
@@ -413,12 +413,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
+            if (par_.isMyWork(illp))
             {
                 if (cmd_.outofcore)
                     const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                 
                 for (int lambda = 0; lambda <= maxlambda; lambda++)
-                if (par_.isMyWork(illp))
                 {
                     // skip diagonal
                     if (ill == illp)

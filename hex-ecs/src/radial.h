@@ -432,7 +432,7 @@ class RadialIntegrals
         SymBandMatrix calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
         
         /**
-         * @brief Multiply vectors by matrix of two-electron integrals.
+         * @brief Multiply vector by matrix of two-electron integrals.
          * 
          * This routine will multiply several source vectors by the matrix of two-electron
          * integrals for given multipole 'lambda'. The matrix elements are
@@ -441,7 +441,7 @@ class RadialIntegrals
          * matrix in memory or on disk - is used in the 'lightweight' mode,
          * which can be requested by the command line option --lightweight.
          */
-        cArrays apply_R_matrix (unsigned lambda, cArrays const & src, bool simple = false) const;
+        cArray apply_R_matrix (unsigned lambda, cArray const & src, bool simple = false) const;
         
         int maxlambda () const { return R_tr_dia_.size() - 1; }
         
