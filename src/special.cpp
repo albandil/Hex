@@ -196,23 +196,22 @@ cArray special::ric_jv (int lmax, Complex z)
             [](double x) -> bool { return std::isfinite(x); }
         );
         
-        // stop at failure
+        // check success
         if (err != GSL_SUCCESS or not all_finite)
         {
-            if (z.real() < lmax)
+            // re-evaluate everything using robust function
+            for (int l = 0; l <= lmax; l++)
             {
-                // most probably due underflow in the classically forbidden region
-                // -- occurs only for high angular momenta and small radii
-                // => use zero-asymptotic form DLMF §10.52.1 jn(z) ~ z^n / (2n + 1)!!
-                ev[0] = 1;
-                for (int n = 1; n <= lmax; n++)
-                {
-                    ev[n] = ev[n-1] * z.real() / (2*n+1);
-                }
-            }
-            else
-            {
-                HexException("Error %d while evaluating j[l≤%d](%g+%gi).", err, lmax, z.real(), z.imag());
+                // evaluate function
+                gsl_sf_result res;
+                err = gsl_sf_bessel_jl_e(l, z.real(), &res);
+                
+                // check success
+                if (err != GSL_SUCCESS or not std::isfinite(res.val))
+                    HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, z.real());
+                
+                // save value
+                ev[l] = res.val;
             }
         }
         
