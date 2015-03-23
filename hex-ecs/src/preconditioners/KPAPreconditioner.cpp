@@ -171,7 +171,7 @@ void KPACGPreconditioner::setup ()
         // "needed matrices": link them to scratch disk files and check presence, load if present
         for (int l : needed_l)
         {
-            prec_[l].hdflink(format("kpa-%d-%d.hdf",l,par_.iproc()).c_str());
+            prec_[l].hdflink(format("kpa-%d.hdf",l).c_str());
             done[l] = prec_[l].hdfcheck();
             
             if (cmd_.outofcore and done[l])
