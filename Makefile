@@ -1,4 +1,4 @@
-SUBDIRS = hex-ccc hex-db hex-ecs hex-pwba2 hex-dwba hex-recs utilities
+SUBDIRS = hex-db hex-ecs hex-pwba2 hex-dwba hex-recs utilities
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
