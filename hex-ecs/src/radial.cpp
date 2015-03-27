@@ -383,6 +383,11 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             }
         }
         
+        // NOTE : In OOC case, where the radial integral matrix hasn't been fully pre-allocated,
+        //        we should also fill with zeros the blocks i + d >= Nspline to make the resulting
+        //        disk file compatible with non-OOC case. In the present state the matrix files
+        //        are not compatible!
+        
         std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
         
         // save to disk even if the integrals are to be cached

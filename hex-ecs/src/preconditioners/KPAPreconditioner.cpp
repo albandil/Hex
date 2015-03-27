@@ -79,7 +79,10 @@ bool KPACGPreconditioner::sData::hdfload (const char* file)
     // read eigenvalues
     Dl.resize(size);
     if (not hdf.read("Dl", Dl.data(), size))
+    {
+        std::cout << "Failed to read Dl from " << hdf.name() << ": " << hdf.error() << std::endl;
         return false;
+    }
     
     return true;
 }
@@ -164,7 +167,7 @@ void KPACGPreconditioner::setup ()
         // "to compute matrices": link them to scratch disk files and check presence
         for (int l : comp_l)
         {
-            prec_[l].hdflink(format("kpa-%d-%d.hdf",l,par_.iproc()).c_str());
+            prec_[l].hdflink(format("kpa-%d.hdf",l).c_str());
             done[l] = prec_[l].hdfcheck();
         }
         
@@ -257,7 +260,8 @@ void KPACGPreconditioner::setup ()
     
         // load all preconditioner matrices needed by this MPI node
         for (int l : needed_l)
-            prec_[l].hdfload();
+            if (not prec_[l].hdfload())
+                HexException("Failed to read preconditioner matrix for l = %d.", l);
         
         std::cout << std::endl;
 }
@@ -275,8 +279,10 @@ void KPACGPreconditioner::CG_init (int iblock) const
         int l2 = l1_l2_[iblock].second;
         
         // load preconditioner from disk
-        prec_[l1].hdfload();
-        prec_[l2].hdfload();
+        if (not prec_[l1].hdfload())
+            HexException("Failed to read preconditioner matrix for l = %d.", l1);
+        if (not prec_[l2].hdfload())
+            HexException("Failed to read preconditioner matrix for l = %d.", l2);
     }
 }
 
@@ -322,7 +328,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l2 = l1_l2_[iblock].second;
     
     // dimension of the matrices
-    int Nspline = s_bspline_.Nspline();
+    std::size_t Nspline = s_bspline_.Nspline();
     
     // multiply by the first Kronecker product
     dense_kron_dot
@@ -334,8 +340,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     
     // divide by the diagonal
     # pragma omp parallel for if (cmd_.parallel_dot)
-    for (int i = 0; i < Nspline; i++) 
-    for (int j = 0; j < Nspline; j++)
+    for (std::size_t i = 0; i < Nspline; i++) 
+    for (std::size_t j = 0; j < Nspline; j++)
         z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];
     
     // multiply by the second Kronecker product

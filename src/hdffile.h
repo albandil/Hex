@@ -33,19 +33,21 @@
 #define HEX_HDFFILE
 
 #include <string>
-
-// #include <hdf5.h>
-#include <cstdio>
+#include <fstream>
 
 #include "numbers.h"
 #include "misc.h"
 
 /**
- * @brief HDF I/O management.
+ * @brief Hex data file.
  * 
- * This class abstracts the raw functions for work with HDF files, so that
- * template functions can be used and the user doesn't need to bother with
- * type specializations. The typical usage is
+ * This class offers an interface for accessing Hex data files. Hex data files contain
+ * a fixed-size header with list of datasets, which is followed by the datasets themselves.
+ * Concurrent write access to the same file is not controlled and will generally result
+ * in broken data. Concurrent read access, on the contrary, is allowed and should not
+ * have any side effects.
+ * 
+ * The typical usage is
  * @code
  *     rArray nums = linspace (1., 10., 10);
  *     
@@ -105,7 +107,7 @@ public:
     }
     
     /// Check that the file is valid.
-    bool valid () const { return valid_; }
+    bool valid () const { return file_.is_open(); }
     
     /// Prefix for dataset paths.
     std::string prefix;
@@ -126,13 +128,16 @@ public:
     }
     DatasetInfo;
     
+    /// File name.
+    std::string const & name () const { return name_; }
+    
     /// Dataset information.
     std::vector<DatasetInfo> const & datasets () const { return datasets_; }
     
 private:
     
-    /// Pointer to the HDF structure.
-    FILE * file_;
+    /// File stream.
+    mutable std::fstream file_;
     
     /// Header
     std::vector<DatasetInfo> datasets_;
@@ -145,9 +150,6 @@ private:
     
     /// Whether the dataset layout has been changed.
     bool changed_;
-    
-    /// Whether the file is valid.
-    bool valid_;
     
     /// Auxiliary read function.
     bool read_(std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t dtype) const;

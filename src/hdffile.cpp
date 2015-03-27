@@ -31,8 +31,7 @@
 
 #include <iostream>
 #include <string>
-
-#include <cstdio>
+#include <fstream>
 
 #include "hdffile.h"
 #include "misc.h"
@@ -40,7 +39,7 @@
 const std::size_t HDFFile::header_byte_size = 1024;
 
 HDFFile::HDFFile (std::string filename, FileAccess flag)
-    : prefix(), file_(nullptr), name_(filename), changed_(false), valid_(false)
+    : prefix(), file_(nullptr), name_(filename), changed_(false)
 {
     // separate filesystem path and dataset path (by semicolon)
     std::size_t pos = name_.find(':');
@@ -54,82 +53,76 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
     switch (flag)
     {
         case overwrite:
-            file_ = std::fopen(name_.c_str(), "wb+");
+            file_.open(name_.c_str(), std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
             break;
             
         case readonly:
-            file_ = std::fopen(name_.c_str(), "rb");
+            file_.open(name_.c_str(), std::ios::in | std::ios::binary);
             break;
             
         case readwrite:
-            file_ = std::fopen(name_.c_str(), "rb+");
+            file_.open(name_.c_str(), std::ios::in | std::ios::out | std::ios::binary);
             break;
     }
     
-    // save success indicator
-    valid_ = (file_ != nullptr);
-    
     // read header
-    if (valid_ and (flag == readonly or flag == readwrite))
+    if (file_.is_open() and (flag == readonly or flag == readwrite))
     {
         // read number of datasets
         std::size_t ndt;
-        if (std::fread(&ndt, sizeof(std::size_t), 1, file_) < 1)
-        {
-            // no data yet...
+        file_.read(reinterpret_cast<char*>(&ndt), sizeof(std::size_t));
+        
+        // exit if there are no data in the header
+        if (file_.fail())
             return;
-        }
-        datasets_.resize(ndt);
         
         // read dataset information
+        datasets_.resize(ndt);
         for (std::size_t idt = 0; idt < ndt; idt++)
         {
             // read length of the dataset name
             std::size_t len;
-            std::fread(&len, sizeof(std::size_t), 1, file_);
+            file_.read(reinterpret_cast<char*>(&len), sizeof(std::size_t));
             
             // read dataset name
             datasets_[idt].name.resize(len);
-            std::fread(&(datasets_[idt].name[0]), sizeof(char), len, file_);
+            file_.read(&(datasets_[idt].name[0]), len);
             
             // read datatype byte size and element count
-            std::fread(&(datasets_[idt].bytes), sizeof(std::size_t), 1, file_);
-            std::fread(&(datasets_[idt].elements), sizeof(std::size_t), 1, file_);
+            file_.read(reinterpret_cast<char*>(&(datasets_[idt].bytes)), sizeof(std::size_t));
+            file_.read(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
         }
     }
 }
 
 HDFFile::~HDFFile ()
 {
-    if (file_ != nullptr)
+    if (file_.is_open())
     {
         // write the modified header
         if (changed_)
         {
             // write number of datasets
             std::size_t ndt = datasets_.size();
-            std::fseek(file_, 0, SEEK_SET);
-            std::fwrite(&ndt, sizeof(ndt), 1, file_);
+            file_.seekp(file_.beg);
+            file_.write(reinterpret_cast<char*>(&ndt), sizeof(ndt));
             
             // write datasets information
             for (std::size_t idt = 0; idt < ndt; idt++)
             {
                 // write length of dataset name
                 std::size_t len = datasets_[idt].name.size();
-                std::fwrite(&len, sizeof(ndt), 1, file_);
+                file_.write(reinterpret_cast<char*>(&len), sizeof(ndt));
                 
                 // write dataset name
-                std::fwrite(&(datasets_[idt].name[0]), sizeof(char), len, file_);
+                file_.write(&(datasets_[idt].name[0]), len);
                 
                 // write datatype byte size and element count
-                std::fwrite(&(datasets_[idt].bytes), sizeof(std::size_t), 1, file_);
-                std::fwrite(&(datasets_[idt].elements), sizeof(std::size_t), 1, file_);
+                file_.write(reinterpret_cast<char*>(&(datasets_[idt].bytes)), sizeof(std::size_t));
+                file_.write(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
             }
         }
-        
-        std::fclose(file_);
-        file_ = nullptr;
-        valid_ = false;
+        file_.close();
     }
 }
 
@@ -148,7 +141,7 @@ std::size_t HDFFile::size (std::string dataset) const
 bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t bytes) const
 {
     // skip reading invalid files
-    if (not valid_)
+    if (not file_.is_open())
     {
         error_ = "Invalid file.";
         return false;
@@ -169,7 +162,8 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     dataset = prefix + dataset;
     
     // try to find the dataset with this name
-    int id = -1, seek = header_byte_size;
+    int id = -1;
+    std::size_t seek = header_byte_size;
     for (std::size_t i = 0; i < datasets_.size(); i++)
     {
         if (datasets_[i].name == dataset)
@@ -187,6 +181,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     if (id == -1)
     {
         error_ = format("Can't read dataset \"%s\" in file \"%s\".", dataset.c_str(), name_.c_str());
+        std::cout << "Can't read dataset " << dataset << " in " << name_ << std::endl;
         return false;
     }
     
@@ -198,17 +193,19 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     }
     
     // reposition stream according to the selection
-    if (std::fseek(file_, seek + offset * bytes, SEEK_SET) != 0)
+//     std::cout << "About to seek " << (long int)(seek + offset * bytes) << " from beginning. " << std::endl;
+    file_.seekg(seek + offset * bytes, std::ios_base::beg);
+    if (file_.bad())
     {
-        error_ = "Error while reading dataset: seek failure.";
+        std::cerr << "Error while reading dataset (seek failure)." << std::endl;
         return false;
     }
     
     // read data
-    std::size_t read = std::fread(buffer, bytes, length, file_);
-    if (read < length)
+    file_.read(reinterpret_cast<char*>(buffer), bytes * length);
+    if (file_.fail())
     {
-        error_ = format("Error while reading dataset: read failure (read %ld of %ld).", read, length);
+        error_ = format("Error while reading dataset: read failure.");
         return false;
     }
     
@@ -218,7 +215,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
 bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t length, std::size_t offset, std::size_t bytes)
 {
     // skip writing into invalid files
-    if (not valid_)
+    if (not file_.is_open())
     {
         error_ = "Invalid file.";
         return false;
@@ -232,7 +229,8 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
     dataset = prefix + dataset;
     
     // try to find the dataset with this name
-    int id = -1, seek = header_byte_size;
+    int id = -1;
+    std::size_t seek = header_byte_size;
     for (std::size_t i = 0; i < datasets_.size(); i++)
     {
         if (datasets_[i].name == dataset)
@@ -271,18 +269,18 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         return true;
     
     // reposition stream according to the selection
-    if (std::fseek(file_, seek + offset * bytes, SEEK_SET) != 0)
+    file_.seekp(seek + offset * bytes, std::ios_base::beg);
+    if (file_.fail())
     {
-        error_ = "Error while writing dataset.";
+        error_ = format("Error while writing dataset (seek failure).");
         return false;
     }
     
     // write data
-    std::size_t written = std::fwrite(buffer, bytes, length, file_);
-    if (written < length)
+    file_.write(reinterpret_cast<const char*>(buffer), bytes * length);
+    if (file_.bad())
     {
-        error_ = format("Error while writing dataset (written %ld of %ld).", written, length);
-        perror("error");
+        error_ = format("Error while writing dataset.");
         return false;
     }
     
