@@ -14,8 +14,7 @@ all clean allclean doc docclean distclean : $(SUBDIRS)
 
 dist: $(SUBDIRS)
 	@mkdir -p release
-	cp hex-ccc/hex-ccc-$(GIT_COMMIT).tar.gz \
-	   hex-db/hex-db-$(GIT_COMMIT).tar.gz \
+	cp hex-db/hex-db-$(GIT_COMMIT).tar.gz \
 	   hex-dwba/hex-dwba-$(GIT_COMMIT).tar.gz \
 	   hex-ecs/hex-ecs-$(GIT_COMMIT).tar.gz \
 	   hex-pwba2/hex-pwba2-$(GIT_COMMIT).tar.gz     release/
