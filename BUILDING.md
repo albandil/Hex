@@ -13,9 +13,10 @@ The following packages are used:
  * OpenBLAS (or any other BLAS + LAPACK implementation that defines ZSBMV); needed by hex-ecs.
  * MPI (optional); used by hex-ecs.
  * PNG (optional); used by hex-ecs for debugging purposes.
+ * OpenCL (optional); used by hex-ecs.
 
 CMake will try to locate the packages on its own, but will very likely fail, if they
-are in non-standard locations. In that case you need to define the following paths:
+are in non-standard locations. In that case you need to define some the following paths:
 
     CLN_INCLUDE_DIRS        CLN_LIBRARIES
     GINAC_INCLUDE_DIRS      GINAC_LIBRARIES
@@ -23,8 +24,11 @@ are in non-standard locations. In that case you need to define the following pat
     UMFPACK_INCLUDE_DIRS    UMFPACK_LIBRARIES
     GSL_INCLUDE_DIRS        GSL_LIBRARIES
     FFTW3_INCLUDE_DIRS      FFTW3_LIBRARIES
-                            OPENBLAS_LIBRARIES
+    OPENBLAS_INCLUDE_DIRS   OPENBLAS_LIBRARIES
+    BLAS_INCLUDE_DIRS       BLAS_LIBRARIES
+    LAPACK_INCLUDE_DIRS     LAPACK_LIBRARIES
     PNG_INCLUDE_DIRS        PNG_LIBRARIES
+    OPENCL_INCLUDE_DIRS     OPENCL_LIBRARIES
 
 Compilation example:
 
