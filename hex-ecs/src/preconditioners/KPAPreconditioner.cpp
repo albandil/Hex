@@ -260,7 +260,7 @@ void KPACGPreconditioner::setup ()
     
         // load all preconditioner matrices needed by this MPI node
         for (int l : needed_l)
-            if (not prec_[l].hdfload())
+            if (not cmd_.outofcore and not prec_[l].hdfload())
                 HexException("Failed to read preconditioner matrix for l = %d.", l);
         
         std::cout << std::endl;
