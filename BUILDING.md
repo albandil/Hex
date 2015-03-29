@@ -1,7 +1,8 @@
 # Building Hex
 
 It is recommended to use CMake for building the Hex source tree. This will build all
-parts, so all dependencies have to be present. These are the following packages.
+parts, so all dependencies should be present; otherwise some components will not build.
+The following packages are used:
 
  * CLN (Class Library for Numbers); needed by hex-db, hex-dwba.
  * GiNaC; needed by hex-db.
