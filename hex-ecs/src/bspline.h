@@ -104,7 +104,14 @@ class Bspline
         /** 
          * @brief B-spline.
          * 
-         * Vectorized interface to the bspline function.
+         * Evaluates single B-spline at several points at one. This results in
+         * increased speed, because some data need to be computed only once.
+         * Also, some operation have been reorganized to a form that allows
+         * SIMD auto-vectorization.
+         * 
+         * Note that all evaluation points must be in the interval bounded by
+         * 'iknot'-th and 'iknot+1'-th knot.
+         * 
          * For parameters description see @ref bspline.
          */
         void B (int i, int iknot, int n, const Complex* x, Complex* y) const;
@@ -112,8 +119,9 @@ class Bspline
         /**
          * @brief Derivative of a B-spline.
          * 
-         * Vectorized interface to the dspline function.
-         * For parameters description see @ref bspline.
+         * For parameters description see @ref dspline.
+         * 
+         * This routine simply calls @ref dspline for every evaluation point.
          */
         void dB (int i, int iknot, int n, const Complex* x, Complex* y) const;
         

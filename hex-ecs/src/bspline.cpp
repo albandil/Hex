@@ -124,7 +124,7 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
         }
         
         // precomputed denominators (used later)
-        double invden[order_ + 1];
+        double invden[order_ + 1] alignas (16);
         
         // real knots restricted pointer (for fast access)
         double const * const restrict rknots = rknots_.data();
