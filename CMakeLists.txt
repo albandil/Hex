@@ -146,7 +146,7 @@ ELSE()
     
     IF (NOT GSL_FOUND)
         MESSAGE("    - missing GSL !")
-    ENDIF(NOT GSLFOUND)
+    ENDIF(NOT GSL_FOUND)
 
 ENDIF()
 MESSAGE("")

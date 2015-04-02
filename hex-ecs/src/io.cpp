@@ -133,8 +133,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
-                    "\t--out-of-core              (-O)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
-                    "\t--out-of-core-continue           Start solution from the existing OOC files.                                                                            \n"
+                    "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
+                    "\t--out-of-core-continue     (-O)  Start solution from the existing OOC files.                                                                            \n"
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).  \n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
@@ -223,7 +223,7 @@ void CommandLine::parse (int argc, char* argv[])
                 cache_all_radint = false;
                 return true;
             },
-        "out-of-core", "O", 0, [&](std::string optarg) -> bool
+        "out-of-core", "o", 0, [&](std::string optarg) -> bool
             {
                 // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
                 cache_all_radint = false;

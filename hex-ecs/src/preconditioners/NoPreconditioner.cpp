@@ -136,7 +136,7 @@ void NoPreconditioner::update (double E)
                 // check that the "f" coefficient is nonzero
                 if (f == 0.)
                     continue;
-            
+                
                 // calculate two-electron term
                 if (not cmd_.lightweight_radial_cache)
                 {
