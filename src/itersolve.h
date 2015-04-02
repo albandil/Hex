@@ -56,7 +56,7 @@ inline cArray default_new_complex_array (std::size_t n, std::string name)
 /**
  * @brief Calculate scalar product of two arrays.
  */
-inline Complex default_scalar_product (const cArrayView x, const cArrayView y)
+inline Complex default_scalar_product (cArray const & x, cArray const & y)
 {
     return (x|y);
 }

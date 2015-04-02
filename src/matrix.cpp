@@ -368,7 +368,7 @@ CooMatrix stairs (std::size_t N)
     return CooMatrix(N,N).symm_populate_band
     (
         0,
-        [](unsigned i, unsigned j) -> Complex { return (i == j) ? i : 0.; }
+        [](unsigned i, unsigned j) -> Complex { return i; }
     );
 }
 

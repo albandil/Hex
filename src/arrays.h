@@ -54,8 +54,8 @@
 // Forward declaration of Array (unaligned array of items).
 template < class T, class Alloc_ = PlainAllocator<T> > class Array;
 
-// Forward declaration of NumberArray (512bit-aligned array of numbers -> AVX2).
-template < class T, class Alloc_ = AlignedAllocator<T,NUMBER_ARRAY_ALIGNMENT/8u> > class NumberArray;
+// Forward declaration of NumberArray (aligned array of numbers -> SIMD).
+template < class T, class Alloc_ = AlignedAllocator<T,SIMD_VECTOR_BYTES> > class NumberArray;
 
 /**
  * @brief Array view.
@@ -1462,7 +1462,7 @@ typedef BlockArray<Complex> cBlockArray;
 #include "arrithm.h"
 
 /// Scalar product of two arrays.
-template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
+template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const & b)
 {
     // get size; check if sizes match
     std::size_t N = a.size();
@@ -1472,8 +1472,13 @@ template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
     T result = 0;
     
     // iterators
+#ifdef __GNUC__
+    T const * const restrict pa = (T const *)__builtin_assume_aligned(a.data(), NumberArray<T>::Alloc::alignment);
+    T const * const restrict pb = (T const *)__builtin_assume_aligned(b.data(), NumberArray<T>::Alloc::alignment);
+#else
     T const * const restrict pa = a.data();
     T const * const restrict pb = b.data();
+#endif
     
     // sum the products
     for (std::size_t i = 0; i < N; i++)
@@ -1600,7 +1605,7 @@ template <typename T> NumberArray<T> logspace (T x0, T x1, std::size_t samples)
     
     for (unsigned i = 0; i < samples; i++)
     {
-        grid[i] = x0 * pow(x1 / x0, i / T(samples - 1));
+        grid[i] = x0 * std::pow(x1 / x0, i / T(samples - 1));
     }
         
     return grid;
@@ -1686,7 +1691,7 @@ template <typename Fetcher> bool write_1D_data (std::size_t m, const char* filen
         return false;
     
     for (std::size_t i = 0; i < m; i++)
-        f << fetch(i) << "\n";
+        f << fetch(i) << std::endl;
     
     return true;
 }
@@ -1717,7 +1722,7 @@ template <class Fetcher> bool write_2D_data (std::size_t m, std::size_t n, const
     {
         for (std::size_t j = 0; j < n; j++)
             f << fetch(i,j) << " ";
-        f << "\n";
+        f << std::endl;
     }
     
     return true;
