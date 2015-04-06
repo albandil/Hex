@@ -243,13 +243,13 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
 };
 
 // number array alignment (256 bits ~ AVX)
-#define SIMD_VECTOR_BITS    256u
-#define SIMD_VECTOR_BYTES   (SIMD_VECTOR_BITS/8u)
+#define SIMD_VECTOR_BITS 256u
+#define SIMD_VECTOR_BYTES (SIMD_VECTOR_BITS / 8u)
 
 // number of components of vector of doubles that fits into SIMD vector type
-#define SIMD_DOUBLE_VECTOR_NCMPTS (SIMD_VECTOR_BYTES/sizeof(double))
+#define simd_double_vec_size (SIMD_VECTOR_BYTES / sizeof(double))
 
 // SIMD vector of doubles
-typedef double simd_double_vec_t [SIMD_DOUBLE_VECTOR_NCMPTS] alignas (SIMD_VECTOR_BYTES);
+typedef double simd_double_vec_t [simd_double_vec_size] alignas (SIMD_VECTOR_BYTES);
 
 #endif /* HEX_MEMORY */

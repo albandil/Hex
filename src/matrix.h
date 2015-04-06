@@ -32,6 +32,8 @@
 #ifndef HEX_MATRIX
 #define HEX_MATRIX
 
+#include "numbers.h"
+
 // Forward declaration of sparse matrix classes in order to enable them as return types
 // of other classes before proper definition.
 class CooMatrix;

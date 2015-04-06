@@ -94,19 +94,19 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     // NOTE: The caller's responsibility is to check that all 'x' lie in the interval (t[iknot],t[iknot+1])
     //       and that the i-th B-spline is defined there.
     
-    // use real arithmetic when the B-spline must be real
+    //
+    // a) Use real arithmetic when using only real knots. Allow SIMD auto-vectorization.
+    //
+    
     if (i + order_ + 1 < Nreknot_)
     {
-        // number of components per SIMD vector
-        static const int vecsize = SIMD_DOUBLE_VECTOR_NCMPTS;
-        
         // number of needed SIMD vectors for M doubles
-        int nvec = (M + vecsize - 1) / vecsize;
+        int nvec = (M + simd_double_vec_size - 1) / simd_double_vec_size;
         
         // copy real parts of the evaluation points, pad by zeros
         simd_double_vec_t rx[nvec];
-        for (int m = 0; m < nvec * vecsize; m++)
-            rx[m / vecsize][m % vecsize] = (m < M ? x[m].real() : 0);
+        for (int m = 0; m < nvec * simd_double_vec_size; m++)
+            rx[m / simd_double_vec_size][m % simd_double_vec_size] = (m < M ? x[m].real() : 0);
         
         // evaluations of the parent B-splines of the wanted B-spline
         simd_double_vec_t b[order_ + 1][nvec];
@@ -114,17 +114,17 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
         // initialize all ancestral zero-order B-splines
         for (int n = 0; n <= order_; n++)
         {
-            // get value of the zero-other B-spline B_n on interval (t[iknot],t[iknot+1])
+            // determine value of the zero-order B-spline B_n on interval (t[iknot],t[iknot+1])
             double val = (n + i == iknot ? 1. : 0.);
             
             // store the value at all points
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < vecsize; v++)
+            for (int v = 0; v < simd_double_vec_size; v++) // <-- likely to auto-vectorize
                 b[n][m][v] = val;
         }
         
         // precomputed denominators (used later)
-        double invden[order_ + 1] alignas (16);
+        double invden[order_ + 1];
         
         // real knots restricted pointer (for fast access)
         double const * const restrict rknots = rknots_.data();
@@ -139,16 +139,19 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             // evaluate B-splines from lower orders
             for (int n = 0; n <= order_ - ord; n++)
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < vecsize; v++) // <-- likely to auto-vectorize
+            for (int v = 0; v < simd_double_vec_size; v++) // <-- likely to auto-vectorize
                 b[n][m][v] = b[n][m][v] * (rx[m][v] - rknots[i+n]) * invden[n] + b[n+1][m][v] * (rknots[i+ord+n+1] - rx[m][v]) * invden[n+1];
         }
         
         // return the collected value of the requested B-spline
         for (int m = 0; m < M; m++)
-            y[m] = b[0][m / vecsize][m % vecsize];
+            y[m] = b[0][m / simd_double_vec_size][m % simd_double_vec_size];
     }
     
-    // use complex arithmetic otherwise
+    //
+    // b) Use complex arithmetic otherwise.
+    //
+    
     else
     {
         // value of the parent B-splines of the requested B-spline

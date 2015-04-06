@@ -83,7 +83,7 @@ inline double default_compute_norm (const cArrayView x)
 inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArrayView y)
 {
     std::size_t N = x.size();
-    assert (N == y.size());
+    assert(N == y.size());
     
     // accelerators
     Complex       * const restrict px = x.data();
