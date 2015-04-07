@@ -195,6 +195,33 @@ inline std::uint64_t pow3 (std::uint64_t i)
 }
 
 /**
+ * @brief Integer power.
+ * 
+ * Fast integer power of arbitrary numerical type. Uses only
+ * multiplications. The number of multiplications is proportional
+ * to log(n).
+ */
+template <class T> T pow_int (T x, int n)
+{
+    T value = 1.;
+    
+    if (n < 0)
+        return 1. / pow_int(x, -n);
+    
+    do
+    {
+        if(n % 2 == 1)
+            value *= x;
+        
+        n /= 2;
+        x *= x;
+    }
+    while (n);
+    
+    return value;
+}
+
+/**
  * @brief Incomplete gamma function.
  * 
  * This function calculates the value of the upper incomplete Gamma function

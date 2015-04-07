@@ -36,10 +36,13 @@
 #include <vector>
 #include <tuple>
 
+#include <gsl/gsl_sf.h>
+
 #include "arrays.h"
 #include "bspline.h"
 #include "gauss.h"
 #include "radial.h"
+#include "special.h"
 
 void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const
 {
@@ -52,7 +55,7 @@ void RadialIntegrals::R_inner_integrand (int n, Complex* in, Complex* out, int i
     
     // fill output array
     for (int k = 0; k < n; k++)
-        out[k] = values_i[k] * values_j[k] * std::pow(in[k]/x,L) * damp(in[k], 0, R);
+        out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(in[k]/x,L) * damp(in[k], 0, R);
 }
 
 void RadialIntegrals::R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const

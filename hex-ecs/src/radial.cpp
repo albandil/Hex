@@ -40,6 +40,7 @@
 #include "gauss.h"
 #include "parallel.h"
 #include "radial.h"
+#include "special.h"
 
 void RadialIntegrals::Mi_integrand
 (
@@ -69,13 +70,13 @@ void RadialIntegrals::Mi_integrand
     {
         // use damping
         for (int k = 0; k < n; k++)
-            out[k] = values_i[k] * values_j[k] * pow(scalef*in[k],a) * damp(in[k],0.,R);
+            out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(scalef*in[k],a) * damp(in[k],0.,R);
     }
     else
     {
         // do not use damping
         for (int k = 0; k < n; k++)
-            out[k] = values_i[k] * values_j[k] * pow(scalef*in[k],a);
+            out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(scalef*in[k],a);
     }
 }
 
@@ -449,22 +450,29 @@ cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, boo
     cArray dst(N);
     
     // for all blocks of the radial matrix
-    # pragma omp parallel for firstprivate (lambda) schedule (dynamic, 1)
+    # pragma omp parallel for schedule (dynamic, 1)
     for (unsigned i = 0; i < Nspline; i++)
     for (std::size_t k = i; k < Nspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix block_ik = calc_R_tr_dia_block(lambda, i, k, simple);
+        SymBandMatrix block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
         
         // multiply source vector by this block
+        cArray prod = std::move ( block_ik.dot(cArrayView(src, k * Nspline, Nspline)) );
+        
+        // update destination vector
         # pragma omp critical
+        cArrayView(dst, i * Nspline, Nspline) += prod;
+        
+        // also handle symmetric case
+        if (i != k)
         {
-            // source and destination segment
-            cArrayView(dst, i * Nspline, Nspline) += block_ik.dot(cArrayView(src, k * Nspline, Nspline));
+            // multiply source vector by this block
+            prod = std::move ( block_ik.dot(cArrayView(src, i * Nspline, Nspline)) );
             
-            // take care also of symmetric position of the off-diagonal block
-            if (i != k)
-            cArrayView(dst, k * Nspline, Nspline) += block_ik.dot(cArrayView(src, i * Nspline, Nspline));
+            // update destination vector
+            # pragma omp critical
+            cArrayView(dst, k * Nspline, Nspline) += prod;
         }
     }
     

@@ -77,7 +77,7 @@ class weightEdgeDamp
             
             // this will suppress function value from R0+1 onwards
             // which is useful for expanding (divergent) Ricatti-Bessel function
-            return (z.imag() == 0.) ? (1+std::tanh(R0 - 5 - z.real()))/2 : 0.;
+            return (z.imag() == 0.) ? (1 + std::tanh(R0 - 5 - z.real()))/2 : 0.;
         }
     
     private:
@@ -101,7 +101,7 @@ class weightEndDamp
             
             // whis will suppress function value at Rmax
             // which is useful for expanding everywhere-nonzero hydrogenic function
-            return tanh(Rmax - z.real());
+            return std::tanh(Rmax - z.real());
         }
         
     private:
