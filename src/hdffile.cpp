@@ -193,7 +193,6 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     }
     
     // reposition stream according to the selection
-//     std::cout << "About to seek " << (long int)(seek + offset * bytes) << " from beginning. " << std::endl;
     file_.seekg(seek + offset * bytes, std::ios_base::beg);
     if (file_.bad())
     {

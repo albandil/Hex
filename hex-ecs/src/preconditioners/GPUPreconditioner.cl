@@ -232,7 +232,7 @@ kernel void mmul_1el
  * 
  * @param f Real prefactor (angular integral).
  * @param MiL Partial integral moments (r^lambda).
- * @param MiL Partial integral moments (r^(-lambda-1)).
+ * @param MimLm1 Partial integral moments (r^(-lambda-1)).
  * @param x Source vector.
  * @param y Destination vector.
  */
@@ -354,7 +354,6 @@ kernel void mul_ABt
     // for all source blocks
     for (private int iblock = 0; iblock < NUM_BLOCKS; iblock++)
     {
-
         // load source blocks into the local memory (pad by zeros)
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE + (iblock * BLOCK_SIZE + ixlocal)];
@@ -362,7 +361,6 @@ kernel void mul_ABt
         barrier(CLK_LOCAL_MEM_FENCE);
         
         // each group's thread will calculate one of BLOCK_VOLUME scalar products
-        # pragma unroll
         for (private int k = 0; k < BLOCK_SIZE; k++)
             if (iblock * BLOCK_SIZE + k < NSPLINE)
                 res += cmul(Aloc[k][iylocal],Bloc[k][ixlocal]);
