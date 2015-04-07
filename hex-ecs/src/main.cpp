@@ -31,6 +31,7 @@
 
 #include <cstdio>
 #include <cmath>
+#include <csignal>
 #include <vector>
 #include <iostream>
 #include <string>
@@ -53,6 +54,17 @@
 #include "preconditioners.h"
 #include "radial.h"
 #include "version.h"
+
+ConjugateGradients < cBlockArray, cBlockArray& > CG;
+
+void signal_handler (int param)
+{
+    // save solver state
+    CG.dump();
+    
+    // terminate the program
+    std::exit(EXIT_FAILURE);
+}
 
 int main (int argc, char* argv[])
 {
@@ -79,6 +91,9 @@ int main (int argc, char* argv[])
     
     // turn off GSL exceptions
     gsl_set_error_handler_off();
+    
+    // error handler
+    std::signal(SIGINT, &signal_handler);
     
     // disable buffering of the standard output (-> immediate logging)
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -315,7 +330,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     };
     
     // CG new array
-    auto new_array = [ & ](std::size_t N, std::string name, bool reset = true) -> BlockArray<Complex>
+    auto new_array = [ & ](std::size_t N, std::string name) -> BlockArray<Complex>
     {
         // create a new block array and initialize blocks local to this MPI node
         BlockArray<Complex> array (N, !cmd.outofcore, name);
@@ -327,7 +342,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             if (not array.inmemory())
             {
-                if (reset)
+                if (not cmd.cont)
                     array.hdfsave(i);
                 array[i].drop();
             }
@@ -446,12 +461,18 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             }
             
-            // custom conjugate gradients callback-based solver
-            BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x", !cmd.cont)));
+            // load solver state
+            if (cmd.cont)
+                CG.recover();
+            
+            // prepare solution vector
+            BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x")));
+            
+            // launch the linear system solver
             unsigned max_iter = (inp.maxell + 1) * Nspline;
             std::cout << "\tStart linear solver with tolerance " << cmd.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
-            unsigned iterations = cg_callbacks < cBlockArray, cBlockArray& >
+            unsigned iterations = CG.solve
             (
                 chi,                    // right-hand side
                 psi,                    // on input, the initial guess, on return, the solution
@@ -464,7 +485,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 compute_norm,           // how to evaluate norm of an array
                 scalar_product,         // how to calculate scalar product of two arrays
                 axby_operation,         // ax + by
-                new_array
+                new_array               // recipe for creation of a new array
             );
             
             if (iterations >= max_iter)
@@ -478,23 +499,11 @@ if (cmd.itinerary & CommandLine::StgSolve)
             
             // save solution to disk (if valid)
             SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
-            // - master process will collect all data and write them sequentially to disk
             if (std::isfinite(compute_norm(psi)))
             {
-                // save solution to a single file if MPI is not active
-                if (par.Nproc() == 1)
-                {
-                    reader.save(psi);
-                }
-                
-                // save all owned segments to separate files
-                else
-                {
-                    for (unsigned ill = 0; ill < coupled_states.size(); ill++) if (par.isMyWork(ill))
-                    {
+                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+                    if (par.isMyWork(ill))
                         reader.save(psi, ill);
-                    }
-                }
             }
             
             // reset some one-solution command line flags
