@@ -148,6 +148,19 @@ Complex RadialIntegrals::computeR
         for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
             Rtr_Labcd_diag += (bspline_.t()[iknot].real() > 1. ? S_(a,c) * S_(b,d) / bspline_.t()[iknot] : 0.);
     
+    // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
+    
+    if (a > lastscaled_ and b > lastscaled_ and c > lastscaled_ and d > lastscaled_)
+    {
+        // (b,d) << (a,c)
+        if (std::max(a,c) > std::min(b,d) + order)
+            return Rtr_Labcd_diag + Mtr_mLm1_[lambda](a,c) * Mtr_L_[lambda](b,d);
+        
+        // (a,c) << (b,d)
+        if (std::max(b,d) > std::min(a,c) + order)
+            return Rtr_Labcd_diag + Mtr_L_[lambda](a,c) * Mtr_mLm1_[lambda](b,d);
+    }
+    
     // Further parts are a bit cryptical, because we are using precomputed
     // (partial, per knot) integral moments, which are quite compactly stored
     // in arrays M_L and M_mLm1 of shape [Nspline × (2*order+1) × (order+1)],
@@ -155,10 +168,10 @@ Complex RadialIntegrals::computeR
     // i.e. the products of two two-spline integrals, when ix ≠ iy.
     
     // shorthands
-    Complex const * const restrict Mtr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
-    Complex const * const restrict Mtr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
-    Complex const * const restrict Mtr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mitr_L_ac    = Mitr_L(lambda).data()    + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mitr_mLm1_ac = Mitr_mLm1(lambda).data() + (a * (2*order+1) + c - (a-order)) * (order+1);
+    Complex const * const restrict Mitr_L_bd    = Mitr_L(lambda).data()    + (b * (2*order+1) + d - (b-order)) * (order+1);
+    Complex const * const restrict Mitr_mLm1_bd = Mitr_mLm1(lambda).data() + (b * (2*order+1) + d - (b-order)) * (order+1);
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
@@ -174,7 +187,7 @@ Complex RadialIntegrals::computeR
             scale = gsl_sf_pow_int(tx, lambda);
         
         // calculate contribution to the integral
-        Rtr_Labcd_offdiag += Mtr_L_ac[ix-a] * Mtr_mLm1_bd[iy-b] * scale;
+        Rtr_Labcd_offdiag += Mitr_L_ac[ix-a] * Mitr_mLm1_bd[iy-b] * scale;
     }
     
     // ix > iy (by swapping (a,c) and (b,d) multi-indices)
@@ -189,7 +202,7 @@ Complex RadialIntegrals::computeR
             scale = gsl_sf_pow_int(tx, lambda);
         
         // calculate contribution to the integral
-        Rtr_Labcd_offdiag += Mtr_L_bd[ix-b] * Mtr_mLm1_ac[iy-a] * scale;
+        Rtr_Labcd_offdiag += Mitr_L_bd[ix-b] * Mitr_mLm1_ac[iy-a] * scale;
     }
     
     // sum the diagonal and offdiagonal contributions

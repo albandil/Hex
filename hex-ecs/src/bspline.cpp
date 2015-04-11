@@ -105,7 +105,7 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
         
         // copy real parts of the evaluation points, pad by zeros
         simd_double_vec_t rx[nvec];
-        for (int m = 0; m < nvec * simd_double_vec_size; m++)
+        for (int m = 0; m < nvec * (int)simd_double_vec_size; m++)
             rx[m / simd_double_vec_size][m % simd_double_vec_size] = (m < M ? x[m].real() : 0);
         
         // evaluations of the parent B-splines of the wanted B-spline
@@ -119,7 +119,7 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             
             // store the value at all points
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < simd_double_vec_size; v++) // <-- likely to auto-vectorize
+            for (int v = 0; v < (int)simd_double_vec_size; v++) // <-- likely to auto-vectorize
                 b[n][m][v] = val;
         }
         
@@ -139,7 +139,7 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             // evaluate B-splines from lower orders
             for (int n = 0; n <= order_ - ord; n++)
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < simd_double_vec_size; v++) // <-- likely to auto-vectorize
+            for (int v = 0; v < (int)simd_double_vec_size; v++) // <-- likely to auto-vectorize
                 b[n][m][v] = b[n][m][v] * (rx[m][v] - rknots[i+n]) * invden[n] + b[n+1][m][v] * (rknots[i+ord+n+1] - rx[m][v]) * invden[n+1];
         }
         

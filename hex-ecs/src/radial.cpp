@@ -302,6 +302,16 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // shorthands
     int Nspline = bspline_.Nspline();
     int order = bspline_.order();
+    int Nreknot = bspline_.Nreknot();
+    
+    // get knot that terminates (x^lambda)-scaled region
+    for (int i = 0; i < bspline_.Nknot(); i++)
+    {
+        if (bspline_.t(i).real() < 1)
+            lastscaled_ = i;
+        else
+            break;
+    }
     
     // set number of two-electron integrals
     R_tr_dia_.resize(lambdas.size());
@@ -311,12 +321,16 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     
     // compute partial moments
     std::size_t mi_size = Nspline * (2 * order + 1) * (order + 1);
-    Mitr_L_.resize((lambdas.size() + 1) * mi_size);
-    Mitr_mLm1_.resize((lambdas.size() + 1) * mi_size);
+    Mitr_L_.resize(lambdas.size() * mi_size);
+    Mitr_mLm1_.resize(lambdas.size() * mi_size);
+    Mtr_L_.resize(lambdas.size());
+    Mtr_mLm1_.resize(lambdas.size());
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
         cArrayView(Mitr_L_, lambda * mi_size, mi_size) = computeMi(lambda, bspline_.Nreknot() - 1);
         cArrayView(Mitr_mLm1_, lambda * mi_size, mi_size) = computeMi(-lambda-1, bspline_.Nreknot() - 1);
+        Mtr_L_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1); });
+        Mtr_mLm1_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1); });
     }
     
     // abandon their computation, if not necessary

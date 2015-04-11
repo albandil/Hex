@@ -211,9 +211,100 @@ class RadialIntegrals
             bool simple = false
         ) const;
         
+        /**
+         * @brief Diagonal contribution to R-integral.
+         * 
+         * Calculates integral
+         * @f[
+         *     R_{ijkl}^\lambda = \int\limits_{t_i}^{t_{i+1}} \int\limits_{t_i}^{t_{i+1}}
+         *     B_a(r_1) B_b(r_2) \frac{r_<^\lambda}{r_>^{\lambda+1}} B_c(r_1) B_d(r_2)
+         *     \mathrm{d}r_1 \mathrm{d}r_2 \,.
+         * @f]
+         * 
+         * The integral is computed as a sum of two triangular integrals, see @ref computeRtri.
+         * 
+         * @param L The multipole (@f$ \lambda @f$).
+         * @param a First B-spline index.
+         * @param b Second B-spline index.
+         * @param c Third B-spline index.
+         * @param d Fourth B-spline index.
+         * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
+         * @param iknotmax Truncation knot for use in damping factor.
+         */
         Complex computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const;
+        
+        /**
+         * @brief Triangular R-integral.
+         * 
+         * Calculates integral
+         * @f[
+         *     R_{klmn}^{\lambda\triangle} = \int\limits_{t_i}^{t_{i+1}}
+         *     B_k(r_1) B_l(r_1) \frac{1}{r_1} \left( \int\limits_{t_i}^{r_1}
+         *     \left(\frac{r_2}{r_1}\right)^\lambda B_m(r_2) B_n(r_2)
+         *     \mathrm{d}r_2 \right) \mathrm{d}r_1 \,,
+         * @f]
+         * 
+         * which is used to calculate a diagonal contribution to the full R-integral,
+         * see @ref computeRdiag. Inner integrand is a polynomial, so
+         * a simple Gauss-Legendre quadrature is used (with a sufficient order). The outer
+         * integral is polynomial only when the integration starts from zero (@f$ t_i = 0 @f$).
+         * In such case it has degree equal to the combined order of the B-splines.
+         * It is assumed that also elsewhere the integrand can be well approximated
+         * by a polynomial of the same degree.
+         * 
+         * Uses functions @ref R_outer_integrand and @ref R_inner_integrand.
+         * 
+         * @param L The multipole (@f$ \lambda @f$).
+         * @param a First B-spline index.
+         * @param b Second B-spline index.
+         * @param c Third B-spline index.
+         * @param d Fourth B-spline index.
+         * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
+         * @param iknotmax Truncation knot for use in damping factor.
+         */
         Complex computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
+        
+        /**
+         * @brief Evaluates inner integrand of the triangular R-integral.
+         * 
+         * Calculates for a set of coordinates @f$ r_2 @f$ (and given coordinate @f$ r_1 @f$) the expression
+         * @f[
+         *     g_{ij}^\lambda(r_1;r_2) = B_i(r_2) B_j(r_2) \left(\frac{r_2}{r_1}\right)^\lambda \xi(r_2) \,,
+         * @f]
+         * where @f$ \xi(r) @f$ is the damping function; see @ref damp.
+         * 
+         * @param n Number of evaluation points.
+         * @param in Pointer to input array of (complex) evaluation points.
+         * @param out Pointer to output array of (complex) evaluations.
+         * @param i First B-spline index.
+         * @param j Second B-spline index.
+         * @param L Multipole (@f$ \lambda @f$).
+         * @param iknot Integration interval.
+         * @param iknotmax Damping parameter.
+         * @param x Fixed value of @f$ r_1 @f$.
+         */
         void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
+        
+        /**
+         * @brief Evaluates outer integrand of the triangular R-integral.
+         * 
+         * Calculates for a set of coordinates @f$ r_1 @f$ the expression
+         * @f[
+         *     f_{ijkl}^\lambda(r_1) = B_i(r_1) B_j(r_1) \frac{1}{r_1} \xi(r_1) \int g_{kl}^\lambda(r_1;r_2) \mathrm{d}r_2 \,,
+         * @f]
+         * where @f$ \xi(r) @f$ is the damping function (see @ref damp) and @f$ g_{kl}^\lambda(x,y) @f$
+         * is the inner integrand (see @ref R_inner_integrand).
+         * 
+         * @param n Number of evaluation points.
+         * @param in Pointer to input array of (complex) evaluation points.
+         * @param out Pointer to output array of (complex) evaluations.
+         * @param i First B-spline index.
+         * @param j Second B-spline index.
+         * @param L Multipole (@f$ \lambda @f$).
+         * @param iknot Integration interval.
+         * @param iknotmax Damping parameter.
+         * @param x Fixed value of @f$ r_1 @f$.
+         */
         void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
         
         /** 
@@ -379,20 +470,32 @@ class RadialIntegrals
             return res;
         }
         
+        /// Return reference to the B-spline object.
         Bspline const & bspline () const { return bspline_; }
         
-        SymBandMatrix const & D() const { return D_; }
-        SymBandMatrix const & S() const { return S_; }
-        SymBandMatrix const & Mm1() const { return Mm1_; }
-        SymBandMatrix const & Mm1_tr() const { return Mm1_tr_; }
-        SymBandMatrix const & Mm2() const { return Mm2_; }
+        /// Return reference to the precomputed derivative overlap matrix.
+        SymBandMatrix const & D () const { return D_; }
         
+        /// Return reference to the precomputed overlap matrix.
+        SymBandMatrix const & S () const { return S_; }
+        
+        /// Return reference to the precomputed integral moment matrix of order -1.
+        SymBandMatrix const & Mm1 () const { return Mm1_; }
+        
+        /// Return reference to the precomputed integral moment matrix of order -1, truncated at the end of the real grid.
+        SymBandMatrix const & Mm1_tr () const { return Mm1_tr_; }
+        
+        /// Return reference to the precomputed integral moment matrix of order -2.
+        SymBandMatrix const & Mm2 () const { return Mm2_; }
+        
+        /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
+        /// Return view of precomputed partial integral moments of order L.
         cArrayView Mitr_L (int L) const
         {
             if (L < 0)
@@ -408,6 +511,7 @@ class RadialIntegrals
             );
         }
         
+        /// Return view of precomputed partial integral moments of order -L-1.
         cArrayView Mitr_mLm1 (int L) const
         {
             if (L < 0)
@@ -443,6 +547,7 @@ class RadialIntegrals
          */
         cArray apply_R_matrix (unsigned lambda, cArray const & src, bool simple = false) const;
         
+        /// Return maximal multipole, for which there are precomputed two-electron integrals.
         int maxlambda () const { return R_tr_dia_.size() - 1; }
         
     private:
@@ -453,12 +558,16 @@ class RadialIntegrals
         // Gauss-Legendre integrator
         GaussLegendre g_;
         
+        // knot that terminates multipole scaled region
+        int lastscaled_;
+        
         //
         // matrices
         //
         
         SymBandMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
         Array<BlockSymBandMatrix> R_tr_dia_;
+        std::vector<SymBandMatrix> Mtr_L_, Mtr_mLm1_;
         
         cArray Mitr_L_, Mitr_mLm1_;
 };

@@ -518,6 +518,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
         }
         
+#ifdef _OPENMP
+        // I/O access locks
+        std::vector<omp_lock_t> locks(Nang);
+        for (omp_lock_t & lock : locks)
+            omp_init_lock(&lock);
+#endif
+        
         // for all source vector sub-segments
         for (int k = 0; k < Nspline; k++)
         {
@@ -564,13 +571,22 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         }
                         
                         // atomic update of the owned sub-segment
-                        OMP_exclusive_in;
+#ifdef _OPENMP
+                        omp_set_lock(&locks[ill]);
+#endif
                         q.setSegment(ill, i * Nspline, Nspline, q.segment(ill, i * Nspline, Nspline)() - product);
-                        OMP_exclusive_out;
+#ifdef _OPENMP
+                        omp_unset_lock(&locks[ill]);
+#endif
                     }
                 }
             }
         }
+        
+#ifdef _OPENMP
+        for (omp_lock_t & lock : locks)
+            omp_destroy_lock(&lock);
+#endif
     } // if not cmd_.lightweight_radial_cache
     
     OMP_clean;
