@@ -102,13 +102,8 @@ int main (int argc, char* argv[])
     CommandLine cmd (argc, argv);
     
     // check some exclusive options
-    if (cmd.parallel_block)
-    {
-        if (cmd.lightweight_radial_cache)
-            HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
-        if (cmd.parallel_dot)
-            HexException("Please use either --parallel-block or --parallel-dot, but not both.");
-    }
+    if (cmd.parallel_block and cmd.lightweight_radial_cache)
+        HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
     
 #ifdef _OPENMP
     // set OpenMP parallel nesting (avoid oversubscription)

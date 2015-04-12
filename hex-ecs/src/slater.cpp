@@ -143,22 +143,35 @@ Complex RadialIntegrals::computeR
         // calculate diagonal contribution exactly
         for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
             Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot-1);
+
+    // The following "simple" alternative does not perform very well -> commented out.
+/*
     else
         // use asymptotic form (or zero if too near)
         for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
             Rtr_Labcd_diag += (bspline_.t()[iknot].real() > 1. ? S_(a,c) * S_(b,d) / bspline_.t()[iknot] : 0.);
+*/
     
     // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
+    // In such cases we can compute the off-diagonal contribution just as a product of the two
+    // integral moments of order "lambda" and "-lambda-1", respectively.
     
-    if (a > lastscaled_ and b > lastscaled_ and c > lastscaled_ and d > lastscaled_)
+    // (b,d) << (a,c)
+    if (std::min(b,d) + order < std::max(a,c))
     {
-        // (b,d) << (a,c)
-        if (std::max(a,c) > std::min(b,d) + order)
-            return Rtr_Labcd_diag + Mtr_mLm1_[lambda](a,c) * Mtr_L_[lambda](b,d);
-        
-        // (a,c) << (b,d)
-        if (std::max(b,d) > std::min(a,c) + order)
-            return Rtr_Labcd_diag + Mtr_L_[lambda](a,c) * Mtr_mLm1_[lambda](b,d);
+        double t_ac = bspline_.t(std::min(a,c) + order + 1).real();
+        double t_bd = bspline_.t(std::min(b,d) + order + 1).real();
+        double scale = gsl_sf_pow_int(t_bd / t_ac, lambda) / t_ac;
+        return Rtr_Labcd_diag + scale * Mtr_mLm1_[lambda](a,c) * Mtr_L_[lambda](b,d);
+    }
+    
+    // (a,c) << (b,d)
+    if (std::min(a,c) + order < std::max(b,d))
+    {
+        double t_ac = bspline_.t(std::min(a,c) + order + 1).real();
+        double t_bd = bspline_.t(std::min(b,d) + order + 1).real();
+        double scale = gsl_sf_pow_int(t_ac / t_bd, lambda) / t_bd;
+        return Rtr_Labcd_diag + scale * Mtr_L_[lambda](a,c) * Mtr_mLm1_[lambda](b,d);
     }
     
     // Further parts are a bit cryptical, because we are using precomputed
@@ -180,11 +193,9 @@ Complex RadialIntegrals::computeR
     for (int iy = std::max(b, ix + 1); iy < std::min(b + order + 1, Nreknot - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_.t()[ix+1].real(), ty = bspline_.t()[iy+1].real(), scale = 1;
-        if (ty < 1) // implies also tx < 1
-            scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
-        else if (tx < 1)
-            scale = gsl_sf_pow_int(tx, lambda);
+        double tx = bspline_.t(ix+1).real();
+        double ty = bspline_.t(iy+1).real();
+        double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
         Rtr_Labcd_offdiag += Mitr_L_ac[ix-a] * Mitr_mLm1_bd[iy-b] * scale;
@@ -195,11 +206,9 @@ Complex RadialIntegrals::computeR
     for (int iy = std::max(a, ix + 1); iy < std::min(a + order + 1, Nreknot - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_.t()[ix+1].real(), ty = bspline_.t()[iy+1].real(), scale = 1;
-        if (ty < 1) // implies also tx < 1
-            scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
-        else if (tx < 1)
-            scale = gsl_sf_pow_int(tx, lambda);
+        double tx = bspline_.t(ix+1).real();
+        double ty = bspline_.t(iy+1).real();
+        double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
         Rtr_Labcd_offdiag += Mitr_L_bd[ix-b] * Mitr_mLm1_ac[iy-a] * scale;

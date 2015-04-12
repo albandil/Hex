@@ -120,6 +120,10 @@ class GPUCGPreconditioner : public KPACGPreconditioner
         std::size_t Nlocal_;
         std::size_t blocksize_;
         
+        // memory allocation flags
+        cl_mem_flags smallDataFlags_;
+        cl_mem_flags largeDataFlags_;
+        
         // computational kernels
         cl_kernel mabt_;
         cl_kernel mml1_;

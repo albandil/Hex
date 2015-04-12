@@ -109,7 +109,7 @@ void NoPreconditioner::update (double E)
             dia_blocks_[ill].hdfinit();
         
         // for all blocks
-        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_dot)
+        # pragma omp parallel for schedule (dynamic,1)
         for (unsigned i = 0; i < Nspline; i++)
         for (unsigned d = 0; d <= order; d++)
         if (i + d < Nspline)
@@ -257,8 +257,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 // add multipole terms (direct/exchange)
                 if (not cmd_.lightweight_radial_cache)
                 {
-                    if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, cmd_.parallel_dot);
-                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, cmd_.parallel_dot);
+                    if (f1 != 0.) chi_block += (       prefactor * f1) * s_rad_.R_tr_dia(lambda).dot(Pj1, true);
+                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * s_rad_.R_tr_dia(lambda).dot(Pj2, true);
                 }
                 else
                 {
@@ -321,7 +321,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             }
             
             // multiply
-            q[ill] = dia_blocks_[ill].dot(p[ill], cmd_.parallel_dot);
+            q[ill] = dia_blocks_[ill].dot(p[ill], true);
             
             // unload data
             if (cmd_.outofcore)
@@ -378,7 +378,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                     
                     // calculate product
-                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], cmd_.parallel_dot);
+                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
                     
                     // unload data
                     if (cmd_.outofcore)
@@ -442,7 +442,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], cmd_.parallel_dot) );
+                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
                     
                     // update collected product
                     OMP_exclusive_in;

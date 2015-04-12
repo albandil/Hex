@@ -63,7 +63,7 @@ void RadialIntegrals::Mi_integrand
     double t = bspline_.t()[iknot + 1].real();
     
     // scale factor for the multipole
-    double scalef = (t < 1 ? 1/t : 1);
+    double scalef = 1 / t;
     
     // fill output array
     if (R != 0.)
@@ -202,7 +202,7 @@ Complex RadialIntegrals::computeD (int i, int j, int maxknot) const
     return res;
 }
 
-Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex R) const
+Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex R, double scale) const
 {
     // get interval boundaries
     Complex x1 = bspline_.t(iknot);
@@ -230,33 +230,36 @@ Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex
     if (R != 0.)
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * pow(xs[k],a) * ws[k] * damp(xs[k],0.,R);
+            res += values_i[k] * values_j[k] * pow(scale * xs[k], a) * ws[k] * damp(xs[k], 0., R);
     }
     else
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * pow(xs[k],a) * ws[k];
+            res += values_i[k] * values_j[k] * pow(scale * xs[k], a) * ws[k];
     }
     
     return res;
 }
 
-Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot) const
+Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot, bool doscale) const
 {
     // get boundary iknots
     int left = std::max(i, j);
-    int right = std::min(i, j) + bspline_.order();
+    int right = std::min(i, j) + bspline_.order() + 1;
     
     // cut at maxknot
     if (maxknot != 0 and right > maxknot)
         right = maxknot;
     
+    // calculate scaling factor
+    double scale = (doscale ? 1 / bspline_.t(right).real() : 1);
+    
     // the result
     Complex res = 0;
     
     // undergo integration on sub-intervals
-    for (int iknot = left; iknot <= right; iknot++)
-        res += computeM_iknot(a, i, j, iknot, bspline_.t(maxknot));
+    for (int iknot = left; iknot < right; iknot++)
+        res += computeM_iknot(a, i, j, iknot, bspline_.t(maxknot), scale);
     
     return res;
 }
@@ -329,8 +332,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     {
         cArrayView(Mitr_L_, lambda * mi_size, mi_size) = computeMi(lambda, bspline_.Nreknot() - 1);
         cArrayView(Mitr_mLm1_, lambda * mi_size, mi_size) = computeMi(-lambda-1, bspline_.Nreknot() - 1);
-        Mtr_L_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1); });
-        Mtr_mLm1_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1); });
+        Mtr_L_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1, true); });
+        Mtr_mLm1_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1, true); });
     }
     
     // abandon their computation, if not necessary

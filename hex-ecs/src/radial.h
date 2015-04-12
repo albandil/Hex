@@ -155,7 +155,7 @@ class RadialIntegrals
          * @param iknot  Interval index.
          * @param R      Potential truncation point.
          */
-        Complex computeM_iknot (int a, int i, int j, int iknot, Complex R) const;
+        Complex computeM_iknot (int a, int i, int j, int iknot, Complex R, double scale) const;
         
         /**
          * Compute integral moment of coordinate power between the B-splines
@@ -165,7 +165,7 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeM (int a, int i, int j, int maxknot = 0) const;
+        Complex computeM (int a, int i, int j, int maxknot = 0, bool scale = false) const;
         
         /**
          * Compute logarithms of integral moment of degree "a" for every B-spline pair and every
@@ -493,6 +493,20 @@ class RadialIntegrals
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
+        }
+        
+        /// Return reference to precomputed full (scaled) integral moments of order L.
+        SymBandMatrix const & Mtr_L (int L) const
+        {
+            assert(L < Mtr_L_.size());
+            return Mtr_L_[L];
+        }
+        
+        /// Return reference to precomputed full (scaled) integral moments of order -L-1.
+        SymBandMatrix const & Mtr_mLm1 (int L) const
+        {
+            assert(L < Mtr_mLm1_.size());
+            return Mtr_mLm1_[L];
         }
         
         /// Return view of precomputed partial integral moments of order L.

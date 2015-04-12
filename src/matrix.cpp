@@ -1813,10 +1813,6 @@ cArray BlockSymBandMatrix::dot (cArrayView v, bool parallelize) const
     omp_lock_t lock[size_];
     for (std::size_t i = 0; i < size_; i++)
         omp_init_lock(&lock[i]);
-    
-    // disable parallel nesting
-    bool nested = omp_get_nested();
-    omp_set_nested(false);
 #endif
     
     // for all blocks
@@ -1863,13 +1859,9 @@ cArray BlockSymBandMatrix::dot (cArrayView v, bool parallelize) const
                         size_, halfbw_, view,
                         cArrayView(v, i * size_, size_)
                     );
-#ifdef _OPENMP
-                    omp_set_lock(&lock[i]);
-#endif
+                    
+                    // update result (no need to lock access here)
                     cArrayView(w, i * size_, size_) += product;
-#ifdef _OPENMP
-                    omp_unset_lock(&lock[i]);
-#endif
                 }
                 
                 // multiply by the other diagonals (both symmetries)
@@ -1911,7 +1903,6 @@ cArray BlockSymBandMatrix::dot (cArrayView v, bool parallelize) const
 #ifdef _OPENMP
     for (std::size_t i = 0; i < size_; i++)
         omp_destroy_lock(&lock[i]);
-    omp_set_nested(nested);
 #endif
     
     return w;

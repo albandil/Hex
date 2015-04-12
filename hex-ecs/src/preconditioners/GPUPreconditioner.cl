@@ -75,6 +75,30 @@ double2 cdiv (double2 a, double2 b)
 }
 
 /**
+ * @brief Integer power.
+ * 
+ * Fast integer power of arbitrary numerical type. Uses only
+ * multiplications. The number of multiplications is proportional
+ * to log(n).
+ */
+double pow_int (double x, unsigned n)
+{
+    double value = 1;
+    
+    do
+    {
+        if(n % 2 == 1)
+            value *= x;
+        
+        n /= 2;
+        x *= x;
+    }
+    while (n);
+    
+    return value;
+}
+
+/**
  * @brief AXBY operation.
  * 
  * Computes the linear combination @f$ ax + by @f$ of vectors @f$ x @f$ and 
@@ -244,6 +268,9 @@ kernel void mmul_2el
     private int lambda,
     // angular integral
     private double f,
+    // one-electron dull moments
+    global double2 const * const restrict ML,
+    global double2 const * const restrict MmLm1,
     // one-electron partial moments
     global double2 const * const restrict MiL,
     global double2 const * const restrict MimLm1,
@@ -272,47 +299,64 @@ kernel void mmul_2el
         // matrix element
         private double2 elem = 0;
         
-        // ix < iy
-        M_ik = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-        M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-        for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
+        // Are the integral moments completely decoupled, i.e. there is there no overlap between Bi, Bj, Bk and Bl?
+        // In such cases we can compute the off-diagonal contribution just as a product of the two
+        // (scaled) integral moments of order "lambda" and "-lambda-1", respectively.
+        
+        tx = t[min(i,k) + ORDER + 1].x;
+        ty = t[min(j,l) + ORDER + 1].x;
+        
+        // (j,l) << (i,k)
+        if (min(j,l) + ORDER < max(i,k))
         {
-            m_ik = M_ik[ix - i]; tx = t[ix + 1].x;
-            
-            for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT - 1); iy++)
-            {
-                m_jl = M_jl[iy - j]; ty = t[iy + 1].x;
-                
-                if (ty < 1) // implying also tx < 1
-                    scale = pow(tx/ty,lambda)/ty;
-                else if (tx < 1)
-                    scale = pow(tx,lambda);
-                else
-                    scale = 1;
-                
-                elem += cmul(m_ik,m_jl) * scale;
-            }
+            scale = pow_int(ty / tx, lambda) / tx;
+            elem += scale * MmLm1[min(i,k) * (ORDER + 1) + abs(i-k)] * ML[min(j,l) * (ORDER + 1) + abs(j-l)];
         }
         
-        // ix > iy (by renaming the ix,iy indices)
-        M_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-        M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-        for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
+        // (i,k) << (j,l)
+        else if (min(i,k) + ORDER < max(j,l))
         {
-            m_jl = M_jl[ix - j]; tx = t[ix + 1].x;
-            
-            for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT - 1); iy++)
+            scale = pow_int(tx / ty, lambda) / ty;
+            elem += scale * ML[min(i,k) * (ORDER + 1) + abs(i-k)] * MmLm1[min(j,l) * (ORDER + 1) + abs(j-l)];
+        }
+        
+        // Further parts are a bit cryptical, because we are using precomputed
+        // (partial, per knot) integral moments, which are quite compactly stored
+        // in arrays M_L and M_mLm1 of shape [Nspline * (2*order+1) * (order+1)],
+        // but the aim is straightforward: Just to sum the offdiagonal elements,
+        // i.e. the products of two two-spline integrals, when ix != iy.
+        
+        // (i,k) ~ (j,l)
+        else
+        {
+            // ix < iy
+            M_ik = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+            M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+            for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
             {
-                m_ik = M_ik[iy - i]; ty = t[iy + 1].x;
+                m_ik = M_ik[ix - i]; tx = t[ix + 1].x;
                 
-                if (ty < 1) // implying also tx < 1
-                    scale = pow(tx/ty,lambda)/ty;
-                else if (tx < 1)
-                    scale = pow(tx,lambda);
-                else
-                    scale = 1;
+                for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT - 1); iy++)
+                {
+                    m_jl = M_jl[iy - j]; ty = t[iy + 1].x;
+                    scale = pow_int(tx/ty,lambda)/ty;
+                    elem += cmul(m_ik,m_jl) * scale;
+                }
+            }
+            
+            // ix > iy (by renaming the ix,iy indices)
+            M_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+            M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+            for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
+            {
+                m_jl = M_jl[ix - j]; tx = t[ix + 1].x;
                 
-                elem += cmul(m_ik,m_jl) * scale;
+                for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT - 1); iy++)
+                {
+                    m_ik = M_ik[iy - i]; ty = t[iy + 1].x;
+                    scale = pow_int(tx/ty,lambda)/ty;
+                    elem += cmul(m_ik,m_jl) * scale;
+                }
             }
         }
         
@@ -354,7 +398,7 @@ kernel void mul_ABt
     // for all source blocks
     for (private int iblock = 0; iblock < NUM_BLOCKS; iblock++)
     {
-        // load source blocks into the local memory (pad by zeros)
+        // load source blocks into the local memory (WARNING: Should be padded by zeros: will segfault on CPU.)
         barrier(CLK_LOCAL_MEM_FENCE);
         Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE + (iblock * BLOCK_SIZE + ixlocal)];
         Bloc[iylocal][ixlocal] = B[(idxblock * BLOCK_SIZE + ixlocal) * NSPLINE + (iblock * BLOCK_SIZE + iylocal)];

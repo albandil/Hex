@@ -196,6 +196,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
         )
         {
             Timer timer;
+            ok = false;
             
             // compute norm of the right hand side
             double bnorm = compute_norm(b), rnorm;
@@ -204,6 +205,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             if (bnorm == 0)
             {
                 axby(0., x, 0., b); // x = 0 b
+                ok = true;
                 return 0;
             }
             
@@ -222,7 +224,10 @@ template < class TArray, class TArrayView > class ConjugateGradients
             
             // terminate if the initial guess is already fine enough
             if (rnorm / bnorm < eps)
+            {
+                ok = true;
                 return 0;
+            }
             
             // if the (non-zero) initial guess seems horribly wrong,
             //    use rather the right hand side as the initial guess
@@ -279,17 +284,22 @@ template < class TArray, class TArrayView > class ConjugateGradients
                 
                 // compute and check norm
                 rnorm = compute_norm(r);
+                residual = rnorm / bnorm;
                 if (verbose)
                     std::cout << std::endl;
-                if (not std::isfinite(rnorm))
+                if (not std::isfinite(residual))
                 {
                     std::cout << "\t     The norm of the solution is not finite. Something went wrong!" << std::endl;
+                    ok = false;
                     break;
                 }
                 
                 // check convergence, but always do at least "min_iterations" iterations
-                if (k >= min_iterations and rnorm / bnorm < eps)
+                if (k >= min_iterations and residual < eps)
+                {
+                    ok = true;
                     break;
+                }
                 
                 // move to the next iteration: store previous projection
                 rho_old = rho_new;
@@ -318,12 +328,21 @@ template < class TArray, class TArrayView > class ConjugateGradients
             recovered = true;
         }
         
+        void reset ()
+        {
+            recovered = false;
+            k = 1;
+            rho_new = rho_old = alpha = beta = 0;
+        }
+        
         Complex rho_new;
         Complex rho_old;
         Complex alpha, beta;
         
         unsigned k;
         bool recovered;
+        double residual;
+        bool ok;
 };
 
 #endif

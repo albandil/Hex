@@ -339,7 +339,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     );
     
     // divide by the diagonal
-    # pragma omp parallel for if (cmd_.parallel_dot)
+    # pragma omp parallel for
     for (std::size_t i = 0; i < Nspline; i++) 
     for (std::size_t j = 0; j < Nspline; j++)
         z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];

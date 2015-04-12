@@ -83,8 +83,8 @@ class CommandLine
         CommandLine (int argc, char* argv[])
             : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
-              itertol(1e-8), prec_itertol(1e-8), parallel_dot(false), parallel_block(false),
-              gpu_slater(false), lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
+              itertol(1e-8), prec_itertol(1e-8), parallel_block(false), gpu_large_data(false),
+              lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0)
         {
             // get command line options
@@ -145,14 +145,11 @@ class CommandLine
         /// Tolerance for terminating block preconditioner.
         double prec_itertol;
         
-        /// Whether to use OpenMP parallelization in SymDiaMatrix::dot
-        bool parallel_dot;
-        
         /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
         bool parallel_block;
         
-        /// Whether to compute diagonal two-electron integrals using OpenCL.
-        bool gpu_slater;
+        /// Keep large data in RAM instead of copying to the OpenCL compute device.
+        bool gpu_large_data;
         
         /// Whether to avoid explicitly calculating big matrices and only apply them on the fly.
         bool lightweight_full, lightweight_radial_cache;

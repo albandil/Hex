@@ -142,12 +142,12 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
-                    "\t--parallel-dot                   OpenMP-parallelize SpMV operations.                                                                                    \n"
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
-#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
+#ifndef NO_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
                     "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).                            \n"
+                    "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.          \n"
 #endif
                     "                                                                                                                                                          \n"
                     "There are also some environment variables that control the execution.                                                                                     \n"
@@ -284,22 +284,10 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
-        "parallel-dot", "", 0, [&](std::string optarg) -> bool
-            {
-                // parallelize SpMV
-                parallel_dot = true;
-                return true;
-            },
         "parallel-block", "", 0, [&](std::string optarg) -> bool
             {
                 // parallelize preconditioning
                 parallel_block = true;
-                return true;
-            },
-        "gpu-slater", "", 0, [&](std::string optarg) -> bool
-            {
-                // compute diagonal two-electron integrals using OpenCL
-                gpu_slater = true;
                 return true;
             },
         "lightweight-radial-cache", "l", 0, [&](std::string optarg) -> bool
@@ -334,7 +322,7 @@ void CommandLine::parse (int argc, char* argv[])
                 reuse_dia_blocks = true;
                 return true;
             },
-#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
+#ifndef NO_OPENCL
         "cl-list", "", 0,  [&](std::string optarg) -> bool
             {
                 // list all available OpenCL platforms and devices
@@ -352,7 +340,7 @@ void CommandLine::parse (int argc, char* argv[])
                     clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
                     std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
                     clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
-                    for (cl_uint j = 0; j < nplatforms; j++)
+                    for (cl_uint j = 0; j < ndevices; j++)
                     {
                         clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
                         clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
@@ -372,6 +360,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use given OpenCL device
                 ocl_device = std::atol(optarg.c_str());
+                return true;
+            },
+        "cl-use-host-memory", "", 0, [&](std::string optarg) -> bool
+            {
+                // keep large data in RAM
+                gpu_large_data = true;
                 return true;
             },
 #endif

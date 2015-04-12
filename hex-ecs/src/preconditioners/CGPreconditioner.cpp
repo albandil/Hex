@@ -80,7 +80,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 Nspline * Nspline,      // max. iteration
                 inner_prec,             // preconditioner
                 inner_mmul,             // matrix multiplication
-                false                   // verbose output
+                true                   // verbose output
             );
             
             // release block-preconditioner block-specific data
@@ -122,7 +122,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     if (cmd_.lightweight_full)
         HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
         
-    q = dia_blocks_[iblock].dot(p, cmd_.parallel_dot);
+    q = dia_blocks_[iblock].dot(p, true);
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
