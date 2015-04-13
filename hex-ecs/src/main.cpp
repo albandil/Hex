@@ -31,7 +31,6 @@
 
 #include <cstdio>
 #include <cmath>
-#include <csignal>
 #include <vector>
 #include <iostream>
 #include <string>
@@ -56,15 +55,6 @@
 #include "version.h"
 
 ConjugateGradients < cBlockArray, cBlockArray& > CG;
-
-void signal_handler (int param)
-{
-    // save solver state
-    CG.dump();
-    
-    // terminate the program
-    std::exit(EXIT_FAILURE);
-}
 
 int main (int argc, char* argv[])
 {
@@ -91,9 +81,6 @@ int main (int argc, char* argv[])
     
     // turn off GSL exceptions
     gsl_set_error_handler_off();
-    
-    // error handler
-    std::signal(SIGINT, &signal_handler);
     
     // disable buffering of the standard output (-> immediate logging)
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -248,6 +235,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
     // CG preconditioner callback
     auto apply_preconditioner = [ & ](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void
     {
+        // save state of the solver for possible restart
+        if (cmd.outofcore)
+            CG.dump();
+        
         // MPI-distributed preconditioning
         prec->precondition(r, z);
     };

@@ -80,7 +80,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 Nspline * Nspline,      // max. iteration
                 inner_prec,             // preconditioner
                 inner_mmul,             // matrix multiplication
-                true                   // verbose output
+                false                   // verbose output
             );
             
             // release block-preconditioner block-specific data

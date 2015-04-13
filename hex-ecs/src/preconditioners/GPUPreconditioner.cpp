@@ -483,7 +483,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            true,                  // verbose output
+            false,                  // verbose output
             compute_norm,           // norm of an array
             scalar_product,         // scalar product of two arrays
             axby,                   // weighted sum of two arrays
