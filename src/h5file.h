@@ -36,8 +36,8 @@
 
 #include <hdf5.h>
 
-#include "../../src/numbers.h"
-#include "../../src/misc.h"
+#include "numbers.h"
+#include "misc.h"
 
 /**
  * @brief HDF I/O management.

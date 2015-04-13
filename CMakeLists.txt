@@ -13,6 +13,7 @@ SET(Hex_VERSION_MINOR 6)
 SET(HEX_DB hex-db)
 SET(HEX_ECS hex-ecs)
 SET(HEX_DWBA hex-dwba)
+SET(HEX_HDF2HDF hex-hdf2hdf)
 
 SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_LIST_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_LIST_DIR}/bin)
@@ -28,6 +29,7 @@ FIND_PACKAGE(GiNaC)
 FIND_PACKAGE(FFTW3)
 FIND_PACKAGE(GSL)
 FIND_PACKAGE(MPI)
+FIND_PACKAGE(HDF5)
 FIND_PACKAGE(OpenCL)
 FIND_PACKAGE(PNG)
 FIND_PACKAGE(SQLite3)
@@ -306,5 +308,30 @@ ELSE()
     ENDIF(NOT CLN_FOUND)
     
 ENDIF()
+MESSAGE("")
 
+# ----------------------------------------------------------------------------
+# Tool hdf2hdf
+
+IF(HDF5_FOUND)
+
+    MESSAGE("Hex-hdf2hdf will be built")
+    
+    ADD_EXECUTABLE(${HEX_HDF2HDF}
+        utilities/hdf2hdf/hdf2hdf.cpp
+    )
+    
+    SET_TARGET_PROPERTIES(${HEX_HDF2HDF} PROPERTIES COMPILE_FLAGS "-DNO_MPI -DNO_LAPACK")
+    
+    TARGET_INCLUDE_DIRECTORIES(${HEX_HDF2HDF} PUBLIC ${HDF5_INCLUDE_DIR})
+    
+    TARGET_LINK_LIBRARIES(${HEX_HDF2HDF} ${HDF5_LIBRARIES})
+
+ELSE()
+
+    MESSAGE("Hex-hdf2hdf will NOT be built")
+    
+    MESSAGE("    - missing HDF5")
+    
+ENDIF()
 MESSAGE("")

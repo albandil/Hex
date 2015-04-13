@@ -33,11 +33,9 @@
 #include <vector>
 #include <string>
 
-#include "../../src/arrays.h"
 #include "../../src/arrays.cpp"
 #include "../../src/hdffile.cpp"
-
-#include "h5file.cpp"
+#include "../../src/h5file.cpp"
 
 std::string get_extension (std::string filename)
 {
