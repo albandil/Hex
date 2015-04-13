@@ -195,7 +195,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             NewArray new_array             = default_new_complex_array
         )
         {
-            Timer timer;
+            Timer timer (time_offset);
             ok = false;
             
             // compute norm of the right hand side
@@ -254,6 +254,8 @@ template < class TArray, class TArrayView > class ConjugateGradients
                     std::cout << " | ";
                     std::cout << std::setw(15) << std::left << rnorm / bnorm;
                 }
+                
+                time_offset = timer.seconds();
                 
                 // apply desired preconditioner
                 apply_preconditioner(r, z); // z = M⁻¹r
@@ -316,6 +318,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             out << k << std::endl;
             out << rho_old.real() << std::endl;
             out << rho_old.imag() << std::endl;
+            out << time_offset << std::endl;
         }
         
         void recover ()
@@ -325,6 +328,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             double x;
             in >> x; rho_old.real(x);
             in >> x; rho_old.imag(x);
+            in >> time_offset;
             recovered = true;
         }
         
@@ -340,6 +344,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
         Complex alpha, beta;
         
         unsigned k;
+        unsigned time_offset;
         bool recovered;
         double residual;
         bool ok;

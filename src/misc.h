@@ -542,14 +542,15 @@ class Timer
 {
     public:
         
-        /// Return object reference (singleton interface).
-        Timer()
-            : start_(std::chrono::system_clock::now()) {}
+        /// Constructor (with optional offset in seconds).
+        Timer (int offset = 0)
+            : offset_(offset), start_(std::chrono::system_clock::now()) {}
         
         /// Start timer.
         void reset ()
         {
             start_ = std::chrono::system_clock::now();
+            offset_ = 0;
         }
         
         /// Return elapsed time in seconds.
@@ -557,7 +558,7 @@ class Timer
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(end - start_);
-            return secs.count();
+            return secs.count() + offset_;
         }
         
         /// Return formatted time.
@@ -575,7 +576,7 @@ class Timer
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::milliseconds misecs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_);
-            return misecs.count();
+            return misecs.count() + offset_ * 1000;
         }
         
         /// Return elapsed time in microseconds.
@@ -583,10 +584,13 @@ class Timer
         {
             std::chrono::system_clock::time_point end = std::chrono::system_clock::now(); // ? steady_clock
             std::chrono::microseconds musecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start_);
-            return musecs.count();
+            return musecs.count() + offset_ * 1000000;
         }
         
     private:
+        
+        /// Time offset (number of seconds to be added to the time).
+        unsigned offset_;
         
         /// Start time.
         mutable std::chrono::system_clock::time_point start_;
