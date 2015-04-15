@@ -57,7 +57,7 @@
     </script>
 
     <!-- Load MathJax -->
-    <script src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script src="/MathJax/MathJax.js"></script>
 </head>
  
 <body onload = "jsDataSet(); jsDataAngular();">
