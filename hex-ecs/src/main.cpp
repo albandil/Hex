@@ -447,9 +447,8 @@ if (cmd.itinerary & CommandLine::StgSolve)
                 continue;
             }
             
-            // load solver state
-            if (cmd.cont)
-                CG.recover();
+            // load / reset solver state
+            if (cmd.cont) CG.recover(); else CG.reset();
             
             // prepare solution vector
             BlockArray<Complex> psi (std::move(new_array(coupled_states.size(),"cg-x")));
