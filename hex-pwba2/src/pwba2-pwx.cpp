@@ -197,17 +197,19 @@ cArrays PWBA2::PartialWave_direct
                 if (verbose) log << std::endl << "\tForbidden intermediate states" << std::endl;
                 if (integrate_forbidden and Etot < Enmax)
                 {
+                    double far = special::constant::Inf;
+                    
                     auto forbidden_energy_contribution = [&](double Kn) -> double
                     {
                         // boundary values
-                        if (Kn == 0 or not std::isfinite(Kn))
+                        if (Kn == 0 or not std::isfinite(Kn) or Kn >= far)
                             return 0.;
                         
                         // get momentum of the projectile
                         double kappan = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return 2. * Kn * Kn * Idir_nFree_forbidden
+                        double val = 2. * Kn * Kn * Idir_nFree_forbidden
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -215,6 +217,12 @@ cArrays PWBA2::PartialWave_direct
                             Ni, Li, ki, li,
                             log
                         );
+                        
+                        // shift numerical threshold
+                        if (val == 0)
+                            far = Kn;
+                        
+                        return val;
                     };
                     
                     // use real compactified Gauss-Kronrod integrator

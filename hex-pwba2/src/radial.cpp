@@ -153,7 +153,7 @@ struct RiccatiBesselI : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("i-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("i-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -175,7 +175,7 @@ struct RiccatiBesselI : public ScaledFunction
                 }
                 eval[ipt] = sum * std::exp(-k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             /*else if (r < rt)
             {
@@ -192,7 +192,7 @@ struct RiccatiBesselI : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_i_scaled(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
@@ -304,7 +304,7 @@ struct RiccatiBesselK : public ScaledFunction
         // number of grid points
         unsigned Npt = grid.size();
         
-        std::ofstream out (format("k-%d-%g.out",l,k).c_str());
+//         std::ofstream out (format("k-%d-%g.out",l,k).c_str());
         
         // for all grid points
         for (unsigned ipt = 0; ipt < Npt; ipt++)
@@ -319,7 +319,7 @@ struct RiccatiBesselK : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = (l == 0 ? 1. : gsl_sf_doublefact(2*l - 1));
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             else if (k*r < 1.)
             {
@@ -334,7 +334,7 @@ struct RiccatiBesselK : public ScaledFunction
                 lScaled = ipt;
                 eval[ipt] = sum;
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] * gsl_sf_pow_int(k*r,power) << std::endl;
             }
             /*else if (r < rt)
             {
@@ -351,7 +351,7 @@ struct RiccatiBesselK : public ScaledFunction
                 // - No scaling is done (function is oscillatory).
                 eval[ipt] = special::ric_k_scaled(l,k*r);
                 
-                out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
+//                 out << r << " " << eval[ipt] << " " << eval[ipt] << std::endl;
             }
         }
     }
