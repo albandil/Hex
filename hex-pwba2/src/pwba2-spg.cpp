@@ -157,42 +157,50 @@ cArrays PWBA2::FullTMatrix_direct
             double Q1 = 0, Q2 = Qon;
             
             // real bound integrand
-            auto integrand_Ub_wrap_lin = [ki,kf,vki,vkf,Ni,Nn,Nf,Ln,Qon,Etot,Wbf,Wbi,&Q1,&Q2](int n, double const * coords) -> Complex
+            auto integrand_Ub_wrap_lin = [ki,kf,vki,vkf,Ni,Nn,Nf,Ln,Qon,Etot,Wbf,Wbi,&Q1,&Q2](int npt, int dim, double const * origin, double range, double const * scale, Complex * eval) -> void
             {
                 // check dimensions
-                assert(n == 3);
+                assert(dim == 3);
                 
-                // unpack polar coordinates
-                double costheta = 2 * coords[0] - 1;
-                double sintheta = std::sqrt(1 - costheta * costheta);
-                double phi = special::constant::two_pi  * coords[1];
-                double kn = Q1 + (Q2 - Q1) * coords[2];
-                
-                // compute on-shell momentum magnitude
-                double Qn = std::sqrt(2*Etot + 1./(Nn*Nn));
-                
-                // compute both off- and on-shell momentum vectors
-                geom::vec3d vn = { sintheta * std::cos(phi), sintheta * std::sin(phi), costheta };
-                geom::vec3d vkn = kn * vn;
-                geom::vec3d vQn = Qn * vn;
-                
-                // the value of the off-shell integrand
-                Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vkn);
-                Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vkn);
-                Complex integrand_Ub_off = kn * kn * Wf * std::conj(Wi);
-                
-                // the value of the on-shell integrand
-                Complex Wfon = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
-                Complex Wion = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
-                Complex integrand_Ub_on = Qn * Qn * Wfon * std::conj(Wion);
-                
-                // Jacobian
-                double Jac = 2. // for cos theta
-                           * special::constant::two_pi // for phi
-                           * (Q2 - Q1); // for Q
-                
-                // evaluate integrand
-                return special::constant::two_inv_pi * Jac * (integrand_Ub_off - integrand_Ub_on) / (0.5*Qn*Qn - 0.5*kn*kn);
+                // for all evaluation points
+                for (int ipt = 0; ipt < npt; ipt++)
+                {
+                    double coords[3];
+                    for (int icoo = 0; icoo < 3; icoo++)
+                        coords[icoo] = origin[icoo] + range * scale[ipt * dim + icoo];
+                    
+                    // unpack polar coordinates
+                    double costheta = 2 * coords[0] - 1;
+                    double sintheta = std::sqrt(1 - costheta * costheta);
+                    double phi = special::constant::two_pi  * coords[1];
+                    double kn = Q1 + (Q2 - Q1) * coords[2];
+                    
+                    // compute on-shell momentum magnitude
+                    double Qn = std::sqrt(2*Etot + 1./(Nn*Nn));
+                    
+                    // compute both off- and on-shell momentum vectors
+                    geom::vec3d vn = { sintheta * std::cos(phi), sintheta * std::sin(phi), costheta };
+                    geom::vec3d vkn = kn * vn;
+                    geom::vec3d vQn = Qn * vn;
+                    
+                    // the value of the off-shell integrand
+                    Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vkn);
+                    Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vkn);
+                    Complex integrand_Ub_off = kn * kn * Wf * std::conj(Wi);
+                    
+                    // the value of the on-shell integrand
+                    Complex Wfon = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
+                    Complex Wion = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
+                    Complex integrand_Ub_on = Qn * Qn * Wfon * std::conj(Wion);
+                    
+                    // Jacobian
+                    double Jac = 2. // for cos theta
+                               * special::constant::two_pi // for phi
+                               * (Q2 - Q1); // for Q
+                    
+                    // evaluate integrand
+                    eval[ipt] = special::constant::two_inv_pi * Jac * (integrand_Ub_off - integrand_Ub_on) / (0.5*Qn*Qn - 0.5*kn*kn);
+                }
             };
             
             std::cout << format("  Sparse grid marching integration of bound U for theta = %g, phi = %g", theta, phi) << std::endl;
@@ -231,34 +239,42 @@ cArrays PWBA2::FullTMatrix_direct
             fUb_contrib = fUb_state_contrib;
             
             // imag bound integrand
-            auto integrand_Wb_wrap = [ki,kf,vki,vkf,Ni,Nn,Nf,Ln,Qon,Etot,Wbf,Wbi](int n, double const * coords) -> Complex
+            auto integrand_Wb_wrap = [ki,kf,vki,vkf,Ni,Nn,Nf,Ln,Qon,Etot,Wbf,Wbi](int npt, int dim, double const * origin, double range, double const * scale, Complex * eval) -> void
             {
                 // check dimensions
-                assert(n == 2);
+                assert(dim == 2);
                 
-                // unpack polar coordinates
-                double costheta = 2 * coords[0] - 1;
-                double sintheta = std::sqrt(1 - costheta * costheta);
-                double phi = special::constant::two_pi  * coords[1];
-                
-                // compute on-shell momentum magnitude
-                double Qn = std::sqrt(2*Etot + 1./(Nn*Nn));
-                
-                // compute both off- and on-shell momentum vectors
-                geom::vec3d vn = { sintheta * std::cos(phi), sintheta * std::sin(phi), costheta };
-                geom::vec3d vQn = Qn * vn;
-                
-                // the value of the on-shell integrand
-                Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
-                Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
-                Complex integrand_Wb = Complex(0.,-special::constant::pi) * Qn * Wf * std::conj(Wi);
-                
-                // Jacobian
-                double Jac = 2. // for cos theta
-                           * special::constant::two_pi; // for phi
-                
-                // evaluate integrand
-                return special::constant::two_inv_pi * Jac * integrand_Wb;
+                // for all evaluation points
+                for (int ipt = 0; ipt < npt; ipt++)
+                {
+                    double coords[2];
+                    for (int icoo = 0; icoo < 2; icoo++)
+                        coords[icoo] = origin[icoo] + range * scale[ipt * dim + icoo];
+                    
+                    // unpack polar coordinates
+                    double costheta = 2 * coords[0] - 1;
+                    double sintheta = std::sqrt(1 - costheta * costheta);
+                    double phi = special::constant::two_pi  * coords[1];
+                    
+                    // compute on-shell momentum magnitude
+                    double Qn = std::sqrt(2*Etot + 1./(Nn*Nn));
+                    
+                    // compute both off- and on-shell momentum vectors
+                    geom::vec3d vn = { sintheta * std::cos(phi), sintheta * std::sin(phi), costheta };
+                    geom::vec3d vQn = Qn * vn;
+                    
+                    // the value of the on-shell integrand
+                    Complex Wf = eval_Wb(Wbf, 1./Nn + 1./Nf, vkf - vQn);
+                    Complex Wi = eval_Wb(Wbi, 1./Nn + 1./Ni, vki - vQn);
+                    Complex integrand_Wb = Complex(0.,-special::constant::pi) * Qn * Wf * std::conj(Wi);
+                    
+                    // Jacobian
+                    double Jac = 2. // for cos theta
+                               * special::constant::two_pi; // for phi
+                    
+                    // evaluate integrand
+                    eval[ipt] = special::constant::two_inv_pi * Jac * integrand_Wb;
+                }
             };
             
             // integrate W on 2-dimensional sparse grid
@@ -289,49 +305,57 @@ cArrays PWBA2::FullTMatrix_direct
             double Q1 = 0., Q2 = Qon;
             
             // U-integrand (real part of propagator)
-            auto integrand_U_wrap_lin = [Ni,Nf,ki,kf,vki,vkf,Qon,Etot,Wcf,Wci,&Q1,&Q2](int n, double const * coords) -> Complex
+            auto integrand_U_wrap_lin = [Ni,Nf,ki,kf,vki,vkf,Qon,Etot,Wcf,Wci,&Q1,&Q2](int npt, int dim, double const * origin, double range, double const * scale, Complex * eval) -> void
             {
                 // check dimensions
-                assert(n == 6);
+                assert(dim == 6);
                 
-                // unpack polar coordinates
-                double costheta1 = 2. * coords[0] - 1., sintheta1 = std::sqrt(1. - costheta1 * costheta1);
-                double costheta2 = 2. * coords[1] - 1., sintheta2 = std::sqrt(1. - costheta2 * costheta2);
-                double phi1  = special::constant::two_pi  * coords[2];
-                double phi2  = special::constant::two_pi  * coords[3];
-                double alpha = special::constant::pi_half * coords[4];
-                double Q = Q1 + (Q2 - Q1) * coords[5];
-                
-                // compute both off- and on-shell momentum magnitudes
-                double qn = Q * std::sin(alpha), qnon = Qon * std::sin(alpha);
-                double kn = Q * std::cos(alpha), knon = Qon * std::cos(alpha);
-                
-                // compute both off- and on-shell momentum vectors
-                geom::vec3d n1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
-                geom::vec3d n2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
-                geom::vec3d vqn = qn * n1, vqnon = qnon * n1;
-                geom::vec3d vkn = kn * n2, vknon = knon * n2;
-                
-                // the value of the off-shell integrand
-                double norm = 4. / (qn * (1. - std::exp(-special::constant::two_pi/qn)));
-                Complex Wf = eval_W(Wcf,1./Nf,vkf-vkn,vqn), Wi = std::conj(eval_W(Wci,1./Ni,vki-vkn,vqn));
-                Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
-                
-                // the value of the on-shell integrand
-                double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
-                Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
-                
-                // Jacobian
-                double Jac =  2. // for costheta1
-                            * 2. // for costheta2
-                            * special::constant::two_pi // for phi1
-                            * special::constant::two_pi // for phi2
-                            * special::constant::pi_half // for alpha
-                            * (Q2 - Q1); // for Q
-                
-                // evaluate integrand
-                return special::constant::two_inv_pi * Jac * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
+                // for all evaluation points
+                for (int ipt = 0; ipt < npt; ipt++)
+                {
+                    double coords[6];
+                    for (int icoo = 0; icoo < 6; icoo++)
+                        coords[icoo] = origin[icoo] + range * scale[ipt * dim + icoo];
+                    
+                    // unpack polar coordinates
+                    double costheta1 = 2. * coords[0] - 1., sintheta1 = std::sqrt(1. - costheta1 * costheta1);
+                    double costheta2 = 2. * coords[1] - 1., sintheta2 = std::sqrt(1. - costheta2 * costheta2);
+                    double phi1  = special::constant::two_pi  * coords[2];
+                    double phi2  = special::constant::two_pi  * coords[3];
+                    double alpha = special::constant::pi_half * coords[4];
+                    double Q = Q1 + (Q2 - Q1) * coords[5];
+                    
+                    // compute both off- and on-shell momentum magnitudes
+                    double qn = Q * std::sin(alpha), qnon = Qon * std::sin(alpha);
+                    double kn = Q * std::cos(alpha), knon = Qon * std::cos(alpha);
+                    
+                    // compute both off- and on-shell momentum vectors
+                    geom::vec3d n1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
+                    geom::vec3d n2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
+                    geom::vec3d vqn = qn * n1, vqnon = qnon * n1;
+                    geom::vec3d vkn = kn * n2, vknon = knon * n2;
+                    
+                    // the value of the off-shell integrand
+                    double norm = 4. / (qn * (1. - std::exp(-special::constant::two_pi/qn)));
+                    Complex Wf = eval_W(Wcf,1./Nf,vkf-vkn,vqn), Wi = std::conj(eval_W(Wci,1./Ni,vki-vkn,vqn));
+                    Complex integrand_U_off = qn * qn * kn * kn * Q * norm * Wf * Wi;
+                    
+                    // the value of the on-shell integrand
+                    double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
+                    Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
+                    Complex integrand_U_on = qnon * qnon * knon * knon * Qon * normon * Wfon * Wion;
+                    
+                    // Jacobian
+                    double Jac = 2. // for costheta1
+                               * 2. // for costheta2
+                               * special::constant::two_pi // for phi1
+                               * special::constant::two_pi // for phi2
+                               * special::constant::pi_half // for alpha
+                               * (Q2 - Q1); // for Q
+                    
+                    // evaluate integrand
+                    eval[ipt] = special::constant::two_inv_pi * Jac * (integrand_U_off - integrand_U_on) / (Etot - 0.5*Q*Q);
+                }
             };
             
             // allow at most 10 integration cell bisections
@@ -370,44 +394,51 @@ cArrays PWBA2::FullTMatrix_direct
             fU += fU_contrib;
             
             // iW-integrand (imag part of propagator)
-            auto integrand_W_wrap = [Ni,Nf,ki,kf,vki,vkf,Etot,Qon,Wcf,Wci](int n, double const * coords) -> Complex
+            auto integrand_W_wrap = [Ni,Nf,ki,kf,vki,vkf,Etot,Qon,Wcf,Wci](int npt, int dim, double const * origin, double range, double const * scale, Complex * eval) -> void
             {
                 // check dimensions
-                assert(n == 5);
+                assert(dim == 5);
                 
-                // unpack polar coordinates
-                double costheta1 = 2. * coords[0] - 1., sintheta1 = std::sqrt(1. - costheta1 * costheta1);
-                double costheta2 = 2. * coords[1] - 1., sintheta2 = std::sqrt(1. - costheta2 * costheta2);
-                double phi1  = special::constant::two_pi  * coords[2];
-                double phi2  = special::constant::two_pi  * coords[3];
-                double alpha = special::constant::pi_half * coords[4];
-                
-                // compute both off- and on-shell momentum magnitudes
-                double qnon = Qon * std::sin(alpha);
-                double knon = Qon * std::cos(alpha);
-                
-                // compute directions
-                geom::vec3d n1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
-                geom::vec3d n2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
-                geom::vec3d vqnon = qnon * n1;
-                geom::vec3d vknon = knon * n2;
-                
-                // the value of the integrand
-                double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
-                Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
-                Complex integrand_W_on = qnon * qnon * knon * knon * normon * Wfon * Wion;
-                
-                // Jacobian
-                double Jac = 2. // for costheta1
-                           * 2. // for costheta2
-                           * special::constant::two_pi // for phi1
-                           * special::constant::two_pi // for phi2
-                           * special::constant::pi_half; // for alpha
-                
-                // evaluate integrand
-                return Complex(0.,-2) * Jac * integrand_W_on;
+                // for all evaluation points
+                for (int ipt = 0; ipt < npt; ipt++)
+                {
+                    double coords[5];
+                    for (int icoo = 0; icoo < 5; icoo++)
+                        coords[icoo] = origin[icoo] + range * scale[ipt * dim + icoo];
+                    
+                    // unpack polar coordinates
+                    double costheta1 = 2. * coords[0] - 1., sintheta1 = std::sqrt(1. - costheta1 * costheta1);
+                    double costheta2 = 2. * coords[1] - 1., sintheta2 = std::sqrt(1. - costheta2 * costheta2);
+                    double phi1  = special::constant::two_pi  * coords[2];
+                    double phi2  = special::constant::two_pi  * coords[3];
+                    double alpha = special::constant::pi_half * coords[4];
+                    
+                    // compute both off- and on-shell momentum magnitudes
+                    double qnon = Qon * std::sin(alpha);
+                    double knon = Qon * std::cos(alpha);
+                    
+                    // compute directions
+                    geom::vec3d n1 = { sintheta1 * std::cos(phi1), sintheta1 * std::sin(phi1), costheta1 };
+                    geom::vec3d n2 = { sintheta2 * std::cos(phi2), sintheta2 * std::sin(phi2), costheta2 };
+                    geom::vec3d vqnon = qnon * n1;
+                    geom::vec3d vknon = knon * n2;
+                    
+                    // the value of the integrand
+                    double normon = 4. / (qnon * (1. - std::exp(-special::constant::two_pi/qnon)));
+                    Complex Wfon = eval_W(Wcf,1./Nf,vkf-vknon,vqnon), Wion = std::conj(eval_W(Wci,1./Ni,vki-vknon,vqnon));
+                    Complex integrand_W_on = qnon * qnon * knon * knon * normon * Wfon * Wion;
+                    
+                    // Jacobian
+                    double Jac = 2. // for costheta1
+                               * 2. // for costheta2
+                               * special::constant::two_pi // for phi1
+                               * special::constant::two_pi // for phi2
+                               * special::constant::pi_half; // for alpha
+                    
+                    // evaluate integrand
+                    eval[ipt] = Complex(0.,-2) * Jac * integrand_W_on;
+                }
             };
-            
             
             // integrate W on 5-dimensional sparse grid
             std::cout << format("  Sparse grid integration of continuum W for theta = %g, phi = %g", theta, phi) << std::endl;

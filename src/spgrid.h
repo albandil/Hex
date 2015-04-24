@@ -290,26 +290,6 @@ SparseGridNodes;
 /// Sparse grid nodes.
 extern const std::map<SparseGridId,SparseGridNodes> nodes;
 
-/**
- * @brief Globally adaptive sparse-grid-based integrator.
- * 
- * This class implements a multidimensional integator. The main routine
- * is @ref integrate_adapt, which accepts a functor to integrate
- * (of signature T (*)(int, double const*)) and a pair of sparse grids
- * (two different-order rules) which will be used to estimate the
- * integration error.
- * 
- * The integrator has to be used for unit cube integration domain.
- * 
- * The method works in the following way: The integral estimate
- * is computed using two different-order rules to estimate also the
- * error. If the error satisfies convergence criteria, integration
- * terminates. Otherwise all non-converged domains will be exploded
- * into 2^dim sub-cubes. The converged cells' estimates are summed
- * and only the non-converged cells are kept for further processing.
- * 
- * See also description of the function @ref integrate_adapt.
- */
 template <class T, int dim> class Domains
 {
     public:
@@ -733,7 +713,12 @@ template <class T> class SparseGrid
          * The return value can be of arbitrary arithmetic type (but consistent with
          * the template parameter of the class).
          * 
-         * @param F Function to integrate.
+         * @param F Function to integrate. Expected signature:
+         *            void (*) (int npt, int dim, const double* origin, double range, const double* scale, T* eval)
+         *          The parameter 'npt' is number of points to evaluate, 'dim' is the dimension of the integration
+         *          space (and hence number of coordinates of every point), 'origin[i] + range * scale[i]' are
+         *          the evaluation points and 'eval[i]' are the evaluated values to fill. The number of evaluation
+         *          points is always equal to the quadrature's number of points.
          * @param i Sparse grid type.
          * @param domain N-dimensional cube (integration volume) which is a subdivision of the unit cube.
          *               This argument is optional; default is a unit hyper-cube.
@@ -753,31 +738,23 @@ template <class T> class SparseGrid
             
             // shorthands
             int N = nodes.at(i).n;
-            std::vector<double>::const_iterator px = nodes.at(i).x.begin();
-            std::vector<double>::const_iterator pw = nodes.at(i).w.begin();
+            const double * px = nodes.at(i).x.data();
+            const double * pw = nodes.at(i).w.data();
             
-            // domain extent
-            std::vector<double> origin = domain.origin();
-            double edge = domain.edge();
+            // evaluate function at the nodes
+            T eval[N];
+            F(N, dim, domain.origin().data(), domain.edge(), px, eval);
             
-            // compute fixed-point quadrature
-            T res = 0, eval = 0;
+            // evaluate the quadrature rule
+            T res = 0;
             double orphaned_weights = 0;
             for (int j = 0; j < N; j++)
             {
-                // compute translated and scaled node coordinates
-                double x[dim];
-                for (int k = 0; k < dim; k++)
-                    x[k] = origin[k] + (*px++) * edge;
-                
-                // evaluate function at the node
-                eval = F(dim,x);
-                
                 // check that the result's magnitude is finite
-                if (not std::isfinite(std::abs(eval)))
+                if (not std::isfinite(std::abs(eval[j])))
                 {
                     // NO : omit this value as we may have hit an (otherwise integrable) singularity
-                    orphaned_weights += (*pw++);
+                    orphaned_weights += pw[j];
                     
                     // print warning
                     Debug << "Warning: Non-numerical evaluation in " << domain << std::endl;
@@ -785,7 +762,7 @@ template <class T> class SparseGrid
                 else
                 {
                     // YES : update the estimate
-                    res += (*pw++) * eval;
+                    res += pw[j] * eval[j];
                 }
             }
             
@@ -805,11 +782,12 @@ template <class T> class SparseGrid
          * The subdivision bisects simultaneously in every dimension making always
          * 2^dim new sub-cells from every original cell.
          * 
-         * Function 'F' is expected to accept two parameters:
-         *  - 'n': the integer number of dimensions
-         *  - 'ptr': pointer to a field of doubles of length 'n'
-         * The return value can be of arbitrary arithmetic type (but consistent with
-         * the template parameter of the class).
+         * Function 'F' is expected to accept the following parameters:
+         *  void (*) (int npt, int dim, const double* origin, double range, const double* scale, T* eval)
+         * The parameter 'npt' is number of points to evaluate, 'dim' is the dimension of the integration
+         * space (and hence number of coordinates of every point), 'origin[i] + range * scale[i]' are
+         * the evaluation points and 'eval[i]' are the evaluated values to fill. The number of evaluation
+         * points is always equal to the quadrature's number of points.
          * 
          * This function uses the function @ref integrate_fixed to evaluate the
          * integral estimates on the two specified grids.
@@ -826,7 +804,7 @@ template <class T> class SparseGrid
             // synonym for 'dim'-dimensional cube
             typedef geom::ndCube<dim> dCube;
             
-            // high-order integral estimateover processed cells
+            // high-order integral estimate over processed cells
             T finalEstimate = 0;
             
             // low-order integral estimate over to-be-yet-processed cells
