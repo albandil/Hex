@@ -37,6 +37,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <complex>
 #include <exception>
@@ -50,10 +51,8 @@
 #include <type_traits>
 #include <string>
 
-#if (defined(__linux__) && defined(__GNUC__))
-    #include <execinfo.h>
+#ifdef __linux__
     #include <unistd.h>
-    #include <cxxabi.h>
 #endif
 
 //
@@ -99,6 +98,9 @@ template <class ...Params> std::string format (Params ...p)
 /// Fatal error routine.
 #define HexException(...) TerminateWithException(__FILE__, __LINE__, __func__, __VA_ARGS__)
 
+/// Prints backtrace. Implemented only for GNU/Linux.
+void print_stack_trace ();
+
 /**
  * @brief Fatal error routine.
  * 
@@ -111,6 +113,8 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     // print error text
     std::cerr << std::endl << std::endl;
     std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
+    
+    // POSIX terminal allows colours
 #if (_POSIX_C_SOURCE >= 200112L)
     if (isatty(fileno(stderr)))
         std::cerr << "\033[1;31m *** " << format(p...) << "\033[0m" << std::endl;
@@ -118,65 +122,8 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
 #endif
         std::cerr << " *** " << format(p...) << std::endl;
     
-#if (defined(__linux__) && defined(__GNUC__))
-    // This stack printing function has been borrowed from Timo Bingmann's
-    //    "C++ Code Snippet - Print Stack Backtrace Programmatically with Demangled Function Names"
-    // from the page
-    //    http://panthema.net/2008/0901-stacktrace-demangled/
-    {
-        std::cerr << "Stack trace:" << std::endl;
-        void* addrlist[65];
-        int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
-        if (addrlen == 0)
-        {
-            std::cerr << "  <empty, possibly corrupt>" << std::endl;
-            std::terminate();
-        }
-        char** symbollist = backtrace_symbols(addrlist, addrlen);
-        std::size_t funcnamesize = 256;
-        char* funcname = (char*)std::malloc(funcnamesize);
-        for (int i = 1; i < addrlen; i++)
-        {
-            char *begin_name = 0, *begin_offset = 0, *end_offset = 0;
-            for (char *p = symbollist[i]; *p; ++p)
-            {
-                if (*p == '(')
-                    begin_name = p;
-                else if (*p == '+')
-                    begin_offset = p;
-                else if (*p == ')' && begin_offset)
-                {
-                    end_offset = p;
-                    break;
-                }
-            }
-            if (begin_name && begin_offset && end_offset && begin_name < begin_offset)
-            {
-                *begin_name++ = '\0';
-                *begin_offset++ = '\0';
-                *end_offset = '\0';
-                int status;
-                char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
-                if (status == 0)
-                {
-                    funcname = ret;
-                    std::cerr << format("  %s : %s+%s", symbollist[i], funcname, begin_offset) << std::endl;
-                }
-                else
-                {
-                    std::cerr << format("  %s : %s()+%s", symbollist[i], begin_name, begin_offset) << std::endl;
-                }
-            }
-            else
-            {
-                std::cerr << "  " << symbollist[i] << std::endl;
-            }
-        }
-        std::cerr << std::endl;
-        std::free(funcname);
-        std::free(symbollist);
-    }
-#endif
+    // print stack trace (if available)
+    print_stack_trace();
     
     // exit the program
     std::terminate();

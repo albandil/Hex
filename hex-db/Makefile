@@ -67,7 +67,7 @@ SQLITEPPNAMES = binders exception query session statement string transaction
 SQLITEPPSRC = $(patsubst %,libs/sqlitepp/%.cpp,$(SQLITEPPNAMES))
 SQLITEPPOBJ = $(patsubst %,obj/%.o,$(SQLITEPPNAMES))
 
-FILES = arrays hex-db born special variables vec3d version
+FILES = arrays hex-db born misc special variables vec3d version
 FILES_SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 FILES_OBJECTS = $(patsubst %,obj/%.o,$(FILES))
 FILES_DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))

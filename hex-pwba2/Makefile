@@ -62,7 +62,7 @@ CXXDEBUG = $(CFLAGS) -g -fcx-limited-range -DNO_HDF -DNO_MPI -DGIT_COMMIT=\"$(GI
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = -g $(CXXRILIS)
 
-FILES = arrays born hydrogen pwba2-pwx pwba2-spg radial special spgrid \
+FILES = arrays born hydrogen pwba2-pwx pwba2-spg misc radial special spgrid \
         ui vec3d version hyp_2F1
 SOURCES = $(patsubst %,src/%.cpp,$(FILES))
 OBJECTS = $(patsubst %,obj/%.o,$(FILES))
