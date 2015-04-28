@@ -237,7 +237,7 @@ int main (int argc, char* argv[])
         {
             std::cout << "Cannot open the file \"" << filename << "\"." << std::endl;
             std::cout << std::endl;
-            std::cout << "Either (1) provide input settings in the file \"ecs.inp\", " << std::endl;
+            std::cout << "Either (1) provide input settings in the file \"pwba2.inp\", " << std::endl;
             std::cout << "    or (2) give another name using the '--input' command line option." << std::endl;
             std::cout << std::endl;
             std::exit(EXIT_FAILURE);
