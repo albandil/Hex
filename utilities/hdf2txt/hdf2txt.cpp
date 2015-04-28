@@ -34,6 +34,7 @@
 #include "../../src/arrays.h"
 #include "../../src/arrays.cpp"
 #include "../../src/hdffile.cpp"
+#include "../../src/misc.cpp"
 
 int main (int argc, char *argv[])
 {

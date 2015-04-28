@@ -31,6 +31,8 @@
 
 #include "../../src/special.h"
 #include "../../src/special.cpp"
+#include "../../src/misc.h"
+#include "../../src/misc.cpp"
 
 #include <cstdlib>
 #include <iostream>

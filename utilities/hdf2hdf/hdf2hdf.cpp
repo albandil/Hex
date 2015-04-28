@@ -36,6 +36,7 @@
 #include "../../src/arrays.cpp"
 #include "../../src/hdffile.cpp"
 #include "../../src/h5file.cpp"
+#include "../../src/misc.cpp"
 
 std::string get_extension (std::string filename)
 {
