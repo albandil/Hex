@@ -208,7 +208,10 @@ cArrays PWBA2::FullTMatrix_direct
             {
                 // integrate U on 3-dimensional sparse grid
                 std::cout << std::endl<< "  Linear integrand for Q = " << Q1 << " .. " << Q2 << std::endl;
+                static int i = 0;
+                G.setWriteVTK(true, format("%02d-%g-%g.vtk", i++, Q1, Q2));
                 G.integrate_adapt<3>(integrand_Ub_wrap_lin, spgrid::d3l4n39, spgrid::d3l6n135);
+                G.setWriteVTK(false);
                 std::cout << std::endl;
                 
                 // update total variables

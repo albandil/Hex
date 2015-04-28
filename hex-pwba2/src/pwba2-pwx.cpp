@@ -186,6 +186,7 @@ cArrays PWBA2::PartialWave_direct
                     ClenshawCurtis<decltype(allowed_energy_contribution),Complex> CC(allowed_energy_contribution);
                     CC.setVerbose(verbose, "\t\tcc", log);
                     CC.setEps(1e-5); // relative tolerance
+                    CC.setStack(10);
                     allowed_contrib += CC.integrate(0., std::sqrt(std::min(Enmax, Etot)));
                 }
                 
@@ -226,16 +227,17 @@ cArrays PWBA2::PartialWave_direct
                     };
                     
                     // use real compactified Gauss-Kronrod integrator
-                    GaussKronrod<decltype(forbidden_energy_contribution)> GK(forbidden_energy_contribution);
-                    GK.integrate(std::sqrt(Etot), special::constant::Inf);
-                    GK.setEpsRel(1e-5);
-                    if (not GK.ok())
-                    {
-                        # pragma omp critical
-                        std::cerr << "Integration of forbidden contribution failed (" << GK.status() << ").";
-                        std::terminate();
-                    }
-                    forbidden_contrib += GK.result();
+                    ClenshawCurtis<decltype(forbidden_energy_contribution),double> CC(forbidden_energy_contribution);
+                    CC.setVerbose(verbose, "\t\tcc", log);
+                    CC.setEps(1e-5);
+                    CC.setStack(10);
+//                     if (not CC.ok())
+//                     {
+//                         # pragma omp critical
+//                         std::cerr << "Integration of forbidden contribution failed (" << GK.status() << ").";
+//                         std::terminate();
+//                     }
+                    forbidden_contrib += CC.integrate(std::sqrt(Etot), special::constant::Inf);
                 }
                 
                 // update T-matrix
