@@ -133,7 +133,7 @@ template <int dim> std::vector<char> shift_fwd (char axis, std::vector<char> pt)
         }
     }
     
-    HexException("Cannot shift forward.");
+    HexException("Empty point cannot be shifted.");
 }
 
 /**
@@ -290,26 +290,6 @@ SparseGridNodes;
 /// Sparse grid nodes.
 extern const std::map<SparseGridId,SparseGridNodes> nodes;
 
-/**
- * @brief Globally adaptive sparse-grid-based integrator.
- * 
- * This class implements a multidimensional integator. The main routine
- * is @ref integrate_adapt, which accepts a functor to integrate
- * (of signature T (*)(int, double const*)) and a pair of sparse grids
- * (two different-order rules) which will be used to estimate the
- * integration error.
- * 
- * The integrator has to be used for unit cube integration domain.
- * 
- * The method works in the following way: The integral estimate
- * is computed using two different-order rules to estimate also the
- * error. If the error satisfies convergence criteria, integration
- * terminates. Otherwise all non-converged domains will be exploded
- * into 2^dim sub-cubes. The converged cells' estimates are summed
- * and only the non-converged cells are kept for further processing.
- * 
- * See also description of the function @ref integrate_adapt.
- */
 template <class T, int dim> class Domains
 {
     public:
@@ -550,6 +530,26 @@ template <class T, int dim> class Domains
         }
 };
 
+/**
+ * @brief Globally adaptive sparse-grid-based integrator.
+ * 
+ * This class implements a multidimensional integator. The main routine
+ * is @ref integrate_adapt, which accepts a functor to integrate
+ * (of signature T (*)(int, double const*)) and a pair of sparse grids
+ * (two different-order rules) which will be used to estimate the
+ * integration error.
+ * 
+ * The integrator has to be used for unit cube integration domain.
+ * 
+ * The method works in the following way: The integral estimate
+ * is computed using two different-order rules to estimate also the
+ * error. If the error satisfies convergence criteria, integration
+ * terminates. Otherwise all non-converged domains will be exploded
+ * into 2^dim sub-cubes. The converged cells' estimates are summed
+ * and only the non-converged cells are kept for further processing.
+ * 
+ * See also description of the function @ref integrate_adapt.
+ */
 template <class T> class SparseGrid
 {
     private:
