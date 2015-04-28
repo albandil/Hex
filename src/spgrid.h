@@ -612,6 +612,20 @@ template <class T> class SparseGrid
               vtkfilename_("spgrid.vtk"), parallel_(false)
         {}
         
+        /**
+         * @brief Integrand interface.
+         * 
+         * @param n Number of evaluation points.
+         * @param dim Number of coordinates for every evaluation point.
+         * @param origin Coordinates of the corner of the integration area that is closest to the origin.
+         * @param range Size of integration area.
+         * @param scale Fractional positions of the evaluation points within the integration area.
+         * @param eval Output array for evaluations.
+         * 
+         * Evaluates the integrated function at points x[ι] = origin[i] + range * scale[i].
+         */
+        typedef void (*integrand_t) (int n, int dim, double const * origin, double range, const double * scale, T * eval);
+        
         /// Return the result value computed before.
         T result () const { return result_; }
         
@@ -897,7 +911,7 @@ template <class T> class SparseGrid
                         i_pos = pos++;
                         
                         // get current domain data
-                        typename Domains<Complex,dim>::Domain dom = domains[i_pos];
+                        typename Domains<T,dim>::Domain dom = domains[i_pos];
                         
                         // compute the fine estimate for this domain
                         T fineEstimate = integrate_fixed(F, ruleHigh, dom.cube);
