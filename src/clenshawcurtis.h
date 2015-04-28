@@ -166,7 +166,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
-            cc_G.setVerbose(Verbose, vName);
+            cc_G.setVerbose(Verbose, vName, Log);
             
             // integrate
             return -cc_G.integrate_ff(-1., 1., n);    // (-∞,x2)->(1,-1)
@@ -187,7 +187,7 @@ public:
             cc_G.setSubdiv(NNest);
             cc_G.setStack(NStack);
             cc_G.setRange(L);
-            cc_G.setVerbose(Verbose, vName);
+            cc_G.setVerbose(Verbose, vName, Log);
             
             // integrate
             return cc_G.integrate_ff(-1., 1., n);    // (x1,+∞)->(-1,1)
