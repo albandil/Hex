@@ -88,26 +88,26 @@ extern const std::vector<unsigned> vtk_cell;
  * Then its position is x = 0.011 and y = 0.001 (note once again that these are binary numbers!).
  * The encoded subdivision history of the near cells is then:
  <pre>
-      ┌───────────────┬───────────────┐
-      │               │               │
-      │               │               │
-      │               │               │
-      │       ?       │       ?       │
-      │               │               │
-      │               │               │
-      │               │               │
-  .1  ├───────┬───────┼───────────────┤
-      │       │       │               │
-      │   ?   │   ?   │               │
-      │       │       │               │
-  .01 ├───────┼───┬───┤       ?       │
-      │       │   │   │               │
-  .001│   ?   ├───●───┤               │
-      │       │   │   │               │
-  .0  └───────┴───┴───┴───────────────┘
-      .0      ↑   ↑   .1           
-              ↑   ↑
-              .01 .011
+   1.0 ┌───────────────┬───────────────┐
+       │               │               │
+       │               │               │
+       │               │               │
+       │       ?       │       ?       │
+       │               │               │
+       │               │               │
+       │               │               │
+   0.1 ├───────┬───────┼───────────────┤
+       │       │       │               │
+       │   ?   │   ?   │               │
+       │       │       │               │
+  0.01 ├───────┼───┬───┤       ?       │
+       │       │   │   │               │
+ 0.001 │   ?   ├───●───┤               │
+       │       │   │   │               │
+   0.0 └───────┴───┴───┴───────────────┘
+      0.0      ↑   ↑  0.1             1.0
+               ↑   ↑
+               .01 .011
  </pre>
  * The x-shifted point would have coordinate x=0.100, whereas the y-shifted coordinate would be y = 0.010.
  * Note that the number of digits matters; x=0.1 and x=0.100 are the same point but the subdivision
@@ -133,7 +133,7 @@ template <int dim> std::vector<char> shift_fwd (char axis, std::vector<char> pt)
         }
     }
     
-    HexException("Empty point cannot be shifted.");
+    HexException("Point cannot be shifted forward.");
 }
 
 /**
@@ -163,7 +163,7 @@ template <int dim> std::vector<char> shift_bck (char axis, std::vector<char> pt)
         }
     }
     
-    HexException("Cannot shift backward.");
+    HexException("Point cannot be shifted back.");
 }
 
 /**
@@ -1083,8 +1083,10 @@ template <class T> class SparseGrid
                 // for every cell in grid: extrude its origin to the whole cell
                 for (auto data : vtk)
                 {
-                    // start with the root corner of the cube (use its subdivision history)
-                    std::vector<std::vector<char>> pthistory = extrude_point_to_regular_VTK_cell<dim>(data.first);
+                    // start with the root corner of the cube (use its subdivision history, prepend zero)
+                    std::vector<char> history = { 0 };
+                    history.insert(history.end(), data.first.begin(), data.first.end());
+                    std::vector<std::vector<char>> pthistory = extrude_point_to_regular_VTK_cell<dim>(history);
                     
                     // point indices for this cell
                     std::array<std::size_t,special::pow2(dim)> pts;
@@ -1092,11 +1094,11 @@ template <class T> class SparseGrid
                     // for all points of the current cell
                     for (std::size_t i = 0; i < special::pow2(dim); i++)
                     {
-                        // check whether this points exists in the database
+                        // check whether this point exists in the database
                         if (point_histories_map.find(pthistory[i]) == point_histories_map.end())
                         {
                             // if it doesn't, add it with a new consecutive id
-                            // NOTE : The followig two lines need to be split, because the first std::map access
+                            // NOTE : The following two lines need to be split, because the first std::map access
                             //        must precede the second (and '=' is not a sequence point). Otherwise a new
                             //        element could be created in the map, which we do not want to count.
                             std::size_t npoints = point_histories_map.size();
