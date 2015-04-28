@@ -234,7 +234,7 @@ cArrays PWBA2::FullTMatrix_direct
             }
             while
             (
-                std::abs(G.result()) > marchingEpsAbs or
+                std::abs(G.result()) > marchingEpsAbs and
                 std::abs(G.result()) > marchingEpsRel * std::abs(fUb_state_contrib)
             );
             
@@ -389,7 +389,7 @@ cArrays PWBA2::FullTMatrix_direct
             }
             while
             (
-                std::abs(G.result()) > marchingEpsAbs or
+                std::abs(G.result()) > marchingEpsAbs and
                 std::abs(G.result()) > marchingEpsRel * std::abs(fU_contrib)
             );
             
