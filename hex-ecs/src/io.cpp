@@ -589,6 +589,7 @@ void InputFile::read (std::ifstream & inf)
     {
         if (type[0] == 'L')
         {
+            // linear scale samples
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
@@ -596,12 +597,20 @@ void InputFile::read (std::ifstream & inf)
         }
         else if (type[0] == 'G')
         {
+            // geometric scale samples
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
             Etot.append(geomspace(begin, end, samples, quotient));
+        }
+        else if (type[0] == 'E')
+        {
+            // explicit list samples
+            double e;
+            while ((e = ReadNext<double>(inf).val) != -1)
+                Etot.push_back(e);
         }
         else
         {
