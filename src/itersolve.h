@@ -337,6 +337,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             recovered = false;
             k = 1;
             rho_new = rho_old = alpha = beta = 0;
+            time_offset = 0;
         }
         
         Complex rho_new;
