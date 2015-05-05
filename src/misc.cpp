@@ -46,10 +46,17 @@
 std::string get_executable_path ()
 {
     // allocate output string
-    char path[1024];
+    std::string path;
+    path.resize(256);
     
 #if defined(__linux__)
-    readlink("/proc/self/exe", path, sizeof(path));
+    std::size_t n = path.size();
+    while (n == path.size())
+    {
+        path.resize(2 * n);
+        n = readlink("/proc/self/exe", &path[0], path.size());
+    }
+    path.resize(n);
 #elif defined(_WIN32)
     GetModuleFileNameA(GetModuleHandle(nullptr), path, sizeof(path));
 #endif
