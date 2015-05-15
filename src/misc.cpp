@@ -58,7 +58,7 @@ std::string get_executable_path ()
     }
     path.resize(n);
 #elif defined(_WIN32)
-    GetModuleFileNameA(GetModuleHandle(nullptr), path, sizeof(path));
+    GetModuleFileNameA(GetModuleHandle(nullptr), &path[0], sizeof(path));
 #endif
     
     return path;
