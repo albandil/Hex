@@ -200,21 +200,24 @@ void KPACGPreconditioner::setup ()
         
         // diagonalize overlap matrix
         cArray D;
-        ColMatrix<Complex> S = s_rad_.S().torow().T(), CR, invCR;
-        S.diagonalize(D, nullptr, &CR);
-        CR.invert(invCR);
-        
-        // Now S = CR * (D * CR⁻¹)
-        std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] *= D[i % Nspline];
-        std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
-        S = ColMatrix<Complex>();
-        
-        // compute √S⁻¹
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
-        ColMatrix<Complex> invsqrtS = std::move(CR * invCR);
+        ColMatrix<Complex> S = s_rad_.S().torow().T(), CR, invCR, invsqrtS;
+        if (not all(done))
+        {
+            S.diagonalize(D, nullptr, &CR);
+            CR.invert(invCR);
+            
+            // Now S = CR * (D * CR⁻¹)
+            std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
+            for (std::size_t i = 0; i < Nspline * Nspline; i++)
+                invCR.data()[i] *= D[i % Nspline];
+            std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
+            S = ColMatrix<Complex>();
+            
+            // compute √S⁻¹
+            for (std::size_t i = 0; i < Nspline * Nspline; i++)
+                invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
+            invsqrtS = std::move(CR * invCR);
+        }
         
         // diagonalize one-electron hamiltonians for all angular momenta
         for (int l : comp_l)
