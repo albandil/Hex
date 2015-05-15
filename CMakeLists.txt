@@ -87,6 +87,7 @@ IF(CLN_FOUND AND GINAC_FOUND AND SQLITE3_FOUND AND GSL_FOUND AND FFTW3_FOUND)
         src/arrays.cpp
         src/born.cpp
         src/hdffile.cpp
+        src/misc.cpp
         src/special.cpp
         src/vec3d.cpp
         src/version.cpp
@@ -170,6 +171,7 @@ IF(UMFPACK_FOUND AND GSL_FOUND AND BLAS_FOUND AND LAPACK_FOUND AND FFTW3_FOUND)
         src/hdffile.cpp
         src/hydrogen.cpp
         src/matrix.cpp
+        src/misc.cpp
         src/special.cpp
         src/version.cpp
         hex-ecs/src/amplitudes.cpp
@@ -271,6 +273,7 @@ IF(GSL_FOUND AND FFTW3_FOUND AND CLN_FOUND)
         src/arrays.cpp
         src/hdffile.cpp
         src/hydrogen.cpp
+        src/misc.cpp
         src/special.cpp
         src/symbolic.cpp
         src/version.cpp
