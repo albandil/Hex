@@ -185,10 +185,7 @@ void KPACGPreconditioner::setup ()
         
         // if all preconditioners have been loaded, exit this routine
         if (all(done))
-        {
             std::cout << std::endl;
-            return;
-        }
     
     //
     // Calculation of the preconditioner matrices.
