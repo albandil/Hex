@@ -120,6 +120,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zipfile <filename>       (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
                     "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
                     "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
+                    "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
 #ifndef NO_MPI
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
@@ -164,6 +165,12 @@ void CommandLine::parse (int argc, char* argv[])
                     "                                                                                                                                                          \n"
                 ;
                 std::exit(EXIT_SUCCESS);
+            },
+        "write-grid", "g", 0, [&](std::string optarg) -> bool
+            {
+                // write grid to VTK
+                writegrid = true;
+                return true;
             },
         "zipfile", "z", 1, [&](std::string optarg) -> bool
             {
@@ -645,9 +652,6 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     cArray ev;      // evaluated solution
     rArray grid;    // real evaluation grid
     
-    // size of solution (l,l)-segment
-    std::size_t N = bspline.Nspline() * bspline.Nspline();
-    
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
     
     // load the requested file
@@ -655,28 +659,21 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         HexException("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
-    grid = linspace (0., cmd.zipmax, cmd.zipcount);
+    grid = linspace(0., cmd.zipmax, cmd.zipcount);
     
-    // for all coupled angular momentum pairs
-    for (unsigned ill = 0; ill < ll.size(); ill++)
-    {
-        // angular momenta
-        int l1 = ll[ill].first;
-        int l2 = ll[ill].second;
-        
-        std::cout << "\t- partial wave l1 = " << l1 << ", l2 = " << l2 << std::endl;
-        
-        // write to file
-        std::ofstream out (format("%s_(%d,%d).vtk", cmd.zipfile.c_str(), l1, l2));
-        writeVTK_points
-        (
-            out,
-            bspline.zip
-            (
-                sol.slice (ill * N, (ill + 1) * N),
-                grid, grid
-            ),
-            grid, grid, rArray({0.})
-        );
-    }
+    // write to file
+    std::ofstream out ((cmd.zipfile + ".vtk").c_str());
+    writeVTK_points(out, bspline.zip(sol, grid, grid), grid, grid, rArray({0.}));
+}
+
+void write_grid (Bspline const & bspline)
+{
+    // get knots
+    rArray knots = bspline.rknots();
+    knots.pop_back();
+    knots.append(bspline.cknots());
+    
+    // write rectilinear grid
+    std::ofstream out ("grid.vtk");
+    writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
 }

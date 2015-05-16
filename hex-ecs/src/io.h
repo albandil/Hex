@@ -81,7 +81,7 @@ class CommandLine
         
         // constructor
         CommandLine (int argc, char* argv[])
-            : zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
+            : writegrid(false), zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_block(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
@@ -104,6 +104,9 @@ class CommandLine
         
         /// Alternative name for the input file. Default is "hex.inp".
         std::ifstream inputfile;
+        
+        // Write grid layout to a VTK file.
+        bool writegrid;
         
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
         std::string zipfile;
@@ -415,5 +418,10 @@ void zip_solution
     Bspline const & bspline,
     std::vector<std::pair<int,int>> const & ll
 );
+
+/**
+ * @brief Write grid to a VTK file.
+ */
+void write_grid (Bspline const & bspline);
 
 #endif /* HEX_IO_H */

@@ -120,7 +120,7 @@ int main (int argc, char* argv[])
             std::cout << "Either (1) provide input settings in the file \"ecs.inp\", " << std::endl;
             std::cout << "    or (2) give another name using the '--input' command line option." << std::endl;
             std::cout << std::endl;
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         };
     }
     
@@ -131,7 +131,7 @@ int main (int argc, char* argv[])
     if (inp.Etot.empty() or inp.instates.empty() or inp.outstates.empty())
     {
         std::cout << "Nothing to compute." << std::endl;
-        std::exit(EXIT_SUCCESS);
+        return EXIT_SUCCESS;
     }
     
     // 
@@ -185,7 +185,7 @@ int main (int argc, char* argv[])
     
     // skip if there is nothing to compute
     if (coupled_states.empty())
-        std::exit(EXIT_SUCCESS);
+        return EXIT_SUCCESS;
     
     std::cout << std::endl;
     
@@ -197,7 +197,18 @@ int main (int argc, char* argv[])
     {
         zip_solution (cmd, bspline, coupled_states);
         std::cout << std::endl << "Done." << std::endl << std::endl;
-        return 0;
+        return EXIT_SUCCESS;
+    }
+    
+    //
+    // Write grid into VTK file if told so.
+    //
+    
+    if (cmd.writegrid and par.IamMaster())
+    {
+        write_grid(bspline);
+        std::cout << std::endl << "Done." << std::endl << std::endl;
+        return EXIT_SUCCESS;
     }
     
     //
@@ -539,5 +550,5 @@ else
 
     std::cout << std::endl << "Done." << std::endl << std::endl;
     
-    return 0;
+    return EXIT_SUCCESS;
 }

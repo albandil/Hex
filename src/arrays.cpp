@@ -153,8 +153,6 @@ void writeVTK_points
     unsigned nz = zgrid.size();
     unsigned N = nx * ny * nz;
     
-    assert (ev.size() == N);
-    
     // write VTK header
     out << "# vtk DataFile Version 3.0" << std::endl;
     out << "Wave function" << std::endl;
@@ -167,27 +165,31 @@ void writeVTK_points
     out << to_string(ygrid) << std::endl;
     out << "Z_COORDINATES " << nz << " float" << std::endl;
     out << to_string(zgrid) << std::endl;
-    out << "POINT_DATA " << N << std::endl;
-    out << "FIELD wavefunction 2" << std::endl;
     
-    // save real part
-    out << "Re 1 " << N << " float" << std::endl;
-    for (unsigned i = 0; i < nx; i++)
+    if (ev.size() == N)
     {
-        for (unsigned j = 0; j < ny; j++)
-        for (unsigned k = 0; k < nz; k++)
-            out << ev[(i * ny + j) * nz + k].real() << " ";
-        out << std::endl;
-    }
-    
-    // save imaginary part
-    out << "Im 1 " << N << " float" << std::endl;
-    for (unsigned i = 0; i < nx; i++)
-    {
-        for (unsigned j = 0; j < ny; j++)
-        for (unsigned k = 0; k < nz; k++)
-            out << ev[(i * ny + j) * nz + k].imag() << " ";
-        out << std::endl;
+        out << "POINT_DATA " << N << std::endl;
+        out << "FIELD wavefunction 2" << std::endl;
+        
+        // save real part
+        out << "Re 1 " << N << " float" << std::endl;
+        for (unsigned i = 0; i < nx; i++)
+        {
+            for (unsigned j = 0; j < ny; j++)
+            for (unsigned k = 0; k < nz; k++)
+                out << ev[(i * ny + j) * nz + k].real() << " ";
+            out << std::endl;
+        }
+        
+        // save imaginary part
+        out << "Im 1 " << N << " float" << std::endl;
+        for (unsigned i = 0; i < nx; i++)
+        {
+            for (unsigned j = 0; j < ny; j++)
+            for (unsigned k = 0; k < nz; k++)
+                out << ev[(i * ny + j) * nz + k].imag() << " ";
+            out << std::endl;
+        }
     }
 }
 
