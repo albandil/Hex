@@ -263,9 +263,16 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         return false;
     }
     
-    // exit if nothing to write
+    // use artificial single-character buffer when merely initializing the dataset
+    char nul = 0;
     if (buffer == nullptr)
-        return true;
+    {
+        buffer = &nul;
+        seek += (offset + length) * bytes - 1;
+        offset = 0;
+        bytes = 1;
+        length = 1;
+    }
     
     // reposition stream according to the selection
     file_.seekp(seek + offset * bytes, std::ios_base::beg);
