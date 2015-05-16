@@ -190,8 +190,6 @@ void KPACGPreconditioner::setup ()
     //
     // Calculation of the preconditioner matrices.
     //
-    
-        std::cout << "\t- overlap matrix factorization" << std::endl;
         
         Timer timer;
         
@@ -200,6 +198,8 @@ void KPACGPreconditioner::setup ()
         ColMatrix<Complex> S = s_rad_.S().torow().T(), CR, invCR, invsqrtS;
         if (not all(done))
         {
+            std::cout << "\t- overlap matrix factorization" << std::endl;
+            
             S.diagonalize(D, nullptr, &CR);
             CR.invert(invCR);
             

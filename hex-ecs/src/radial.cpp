@@ -343,7 +343,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // allocate storage and associate names
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
     {
-        bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_all_radint) or cmd.cache_all_radint);
+        bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
         R_tr_dia_[lambda] = BlockSymBandMatrix
         (
@@ -367,7 +367,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // look for precomputed data on disk
         if (R_tr_dia_[lambda].hdfcheck())
         {
-            if (/*not par.isMyWork(lambda) or*/ not cmd.cache_own_radint)
+            if (not par.isMyWork(lambda) or not cmd.cache_own_radint)
             {
                 std::cout << "\t- integrals for lambda = " << lambda << " present in \"" << R_tr_dia_[lambda].hdfname() << "\"\n";
                 continue;
@@ -400,11 +400,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
                 R_tr_dia_[lambda].setBlock(i * (order + 1) + d, block.data());
             }
         }
-        
-        // NOTE : In OOC case, where the radial integral matrix hasn't been fully pre-allocated,
-        //        we should also fill with zeros the blocks i + d >= Nspline to make the resulting
-        //        disk file compatible with non-OOC case. In the present state the matrix files
-        //        are not compatible!
         
         std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
         
