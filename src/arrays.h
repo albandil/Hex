@@ -1560,10 +1560,9 @@ template <typename T> NumberArray<T> linspace (T start, T end, unsigned samples)
         return space;
     }
     
-    for (unsigned i = 0; i < samples; i++)
-    {
+    for (unsigned i = 0; i < samples - 1; i++)
         space[i] = start + ((end - start) * T(i)) / T(samples - 1);
-    }
+    space[samples - 1] = end;
     
     return space;
 }
