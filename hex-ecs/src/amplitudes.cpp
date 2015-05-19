@@ -137,7 +137,7 @@ void Amplitudes::extract ()
                         // Ionization
                         //
                         
-                        std::cout << format("\tion: (%d,%d,%d) -> ion ",ni, li, mi) << std::endl;
+                        std::cout << format("\t\t\tion: (%d,%d,%d) -> ion ",ni, li, mi) /*<< std::endl*/;
                         
                         // transition
                         Transition transition = { ni, li, mi, 0, 0, 0 };
@@ -606,6 +606,8 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         Q.setEps(1e-6);
         Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
         
+        std::cerr << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
+        
         return res;
     };
     
@@ -635,12 +637,20 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
     // maximal available momentum
     double kmax = std::sqrt(inp_.Etot[ie]);
     
+    // check that memory for this transition is allocated; allocate if not
+    if (Xi_Sl1l2.find(T) == Xi_Sl1l2.end())
+        Xi_Sl1l2[T] = std::vector<std::pair<cArray,cArray>>(ang_.size() * inp_.Etot.size());
+    
+    std::cout << ": ";
+    
     // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
+//     # pragma omp parallel for schedule (dynamic, 1)
     for (unsigned ill = 0; ill < ang_.size(); ill++)
     {
         int l1 = ang_[ill].first;
         int l2 = ang_[ill].second;
         
+//         # pragma omp critical
         std::cout << "(" << l1 << "," << l2 << ") " << std::flush;
         
         // load solution block
@@ -659,7 +669,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
             const_cast<BlockArray<Complex>&>(solution)[ill].drop();
     }
     
-    std::cout << std::endl;
+    std::cout << "ok" << std::endl;
 }
 
 void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
