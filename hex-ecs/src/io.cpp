@@ -428,7 +428,7 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Real knots" << std::endl;
+    std::cout << "Real knots (" << rknots.size() << ")" << std::endl;
     for (std::string line : rknots.lines(100))
         std::cout << '\t' << line << std::endl;
     
@@ -467,7 +467,7 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Complex knots (before scaling)" << std::endl;
+    std::cout << "Complex knots (before scaling; " << cknots.size() << ")" << std::endl;
     for (std::string line : cknots.lines(100))
         std::cout << '\t' << line << std::endl;
     
