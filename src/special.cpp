@@ -801,7 +801,11 @@ double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     if (not std::isfinite(C))
         HexException("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
     
-    return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
+    double f = pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
+    
+    if (not std::isfinite(f))
+        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, L);
+    return f;
 }
 
 inline long double dfact (long double x)

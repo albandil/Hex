@@ -368,7 +368,10 @@ kernel void mmul_2el
 /**
  * @brief Matrix-matrix multiplication.
  * 
- * General matrix-matrix multiplication.
+ * General matrix-matrix multiplication. This is probably not the best
+ * ZGEMM/GPU implementation ever; however, the bottleneck of the preconditioner
+ * is rather in the routine @ref mmul_2el.
+ * 
  * @param A Input matrix (row-major storage).
  * @param B Input matrix (column-major storage).
  * @param C Outpu matrix (row-major storage).

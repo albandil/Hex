@@ -248,12 +248,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
                 double f2 = special::computef(lambda, l1, l2, l, li, inp_.L);
                 
-                // abort if any of the coefficients is non-number (factorial overflow etc.)
-                if (not std::isfinite(f1))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
-                if (not std::isfinite(f2))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
-                
                 // add multipole terms (direct/exchange)
                 if (not cmd_.lightweight_radial_cache)
                 {
@@ -344,6 +338,45 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             if (not cmd_.cache_own_radint and cmd_.wholematrix)
                 const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
             
+            // for all source segments
+            for (int illp = 0; illp < Nang; illp++)
+            {
+                // do we need to multiply this segment by the matrix?
+                bool needed = false;
+                for (int ill = 0;  ill < Nang;  ill++)
+                    if (ill != illp and special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L) != 0)
+                        needed = true;
+                
+                // skip this segment if multiplication not needed
+                if (not needed)
+                    continue;
+                
+                // calculate the product
+                if (cmd_.outofcore) const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                cArray prod = std::move( s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                if (cmd_.outofcore) const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                
+                // update all relevant off-diagonal destination segments
+                for (int ill = 0;  ill < Nang;  ill++)
+                {
+                    double f = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+                    
+                    if (f != 0 and ill != illp)
+                    {
+                        if (cmd_.outofcore) q.hdfload(ill);
+                        
+                        q[ill] += (-f) * prod;
+                        
+                        if (cmd_.outofcore) q.hdfsave(ill);
+                        if (cmd_.outofcore) q[ill].drop();
+                    }
+                }
+                
+                // unload data
+                if (not cmd_.cache_own_radint)
+                    const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
+            }
+/*
             // update all blocks with this multipole potential matrix
             for (int ill = 0;  ill < Nang;  ill++)
             {
@@ -366,8 +399,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     
                     // calculate angular integral
                     double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                     
                     // check non-zero
                     if (f == 0.)
@@ -395,6 +426,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // load data from scratch disk
             if (not cmd_.cache_own_radint)
                 const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
+*/
         }
         
         // multiply "p" by the off-diagonal blocks multiprocess
@@ -434,8 +466,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     
                     // calculate angular integral
                     double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
                     
                     // check non-zero
                     if (f == 0.)
@@ -512,11 +542,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         for (int ill  = 0; ill  < Nang; ill ++)
         for (int illp = 0; illp < Nang; illp++)
         for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        {
             fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-            if (not std::isfinite(fs[ill][illp][lambda]))
-                HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-        }
         
 #ifdef _OPENMP
         // I/O access locks
