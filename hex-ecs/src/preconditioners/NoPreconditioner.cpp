@@ -292,6 +292,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
+    // precalculate angular integrals
+    double fs[Nang][Nang][s_rad_.maxlambda() + 1];
+    for (int ill  = 0; ill  < Nang; ill ++)
+    for (int illp = 0; illp < Nang; illp++)
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+    
     if (not cmd_.lightweight_radial_cache)
     {
         //
@@ -344,7 +351,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 // do we need to multiply this segment by the matrix?
                 bool needed = false;
                 for (int ill = 0;  ill < Nang;  ill++)
-                    if (ill != illp and special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L) != 0)
+                    if (ill != illp and fs[ill][illp][lambda] != 0)
                         needed = true;
                 
                 // skip this segment if multiplication not needed
@@ -359,13 +366,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 // update all relevant off-diagonal destination segments
                 for (int ill = 0;  ill < Nang;  ill++)
                 {
-                    double f = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-                    
-                    if (f != 0 and ill != illp)
+                    if (fs[ill][illp][lambda] != 0 and ill != illp)
                     {
                         if (cmd_.outofcore) q.hdfload(ill);
                         
-                        q[ill] += (-f) * prod;
+                        q[ill] += (-fs[ill][illp][lambda]) * prod;
                         
                         if (cmd_.outofcore) q.hdfsave(ill);
                         if (cmd_.outofcore) q[ill].drop();
@@ -376,57 +381,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 if (not cmd_.cache_own_radint)
                     const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
             }
-/*
-            // update all blocks with this multipole potential matrix
-            for (int ill = 0;  ill < Nang;  ill++)
-            {
-                if (cmd_.outofcore)
-                    q.hdfload(ill);
-                
-                for (int illp = 0; illp < Nang; illp++)
-                {
-                    // skip diagonal
-                    if (ill == illp)
-                        continue;
-                    
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    
-                    // check non-zero
-                    if (f == 0.)
-                        continue;
-                    
-                    // load data
-                    if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p).hdfload(illp);
-                    
-                    // calculate product
-                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
-                    
-                    // unload data
-                    if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p)[illp].drop();
-                }
-                
-                if (cmd_.outofcore)
-                {
-                    q.hdfsave(ill);
-                    q[ill].drop();
-                }
-            }
-            
-            // load data from scratch disk
-            if (not cmd_.cache_own_radint)
-                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
-*/
         }
         
         // multiply "p" by the off-diagonal blocks multiprocess
@@ -456,23 +410,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     if (ill == illp)
                         continue;
                     
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    
                     // check non-zero
-                    if (f == 0.)
+                    if (fs[ill][illp][lambda] == 0.)
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    cArray p0 = std::move( (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -536,13 +479,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         // auxiliary buffers
         cArray buffer (Nang * Nspline);
-        
-        // precalculate angular integrals
-        double fs[Nang][Nang][s_rad_.maxlambda() + 1];
-        for (int ill  = 0; ill  < Nang; ill ++)
-        for (int illp = 0; illp < Nang; illp++)
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-            fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
         
 #ifdef _OPENMP
         // I/O access locks
