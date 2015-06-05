@@ -409,6 +409,8 @@ void InputFile::read (std::ifstream & inf)
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
+            if (end < begin) HexException("Real knot sequence: end knot (%g) before start knot (%g).", end, begin);
+            if (samples < 1) HexException("Real knot sequence: invalid number of real knots (%d) between %g and %g (must be > 1).", samples, begin, end);
             rknots.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -417,6 +419,9 @@ void InputFile::read (std::ifstream & inf)
             double end = ReadNext<double>(inf).val;
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
+            if (end < begin) HexException("Real knot sequence: end knot (%g) before start knot (%g).", end, begin);
+            if (d <= 0) HexException("Real knot sequence: invalid initial step %g (must be > 0).", d);
+            if (quotient <= 1) HexException("Real knot sequence: invalid quotien %g (must be > 1).", quotient);
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
             rknots.append(geomspace(begin, end, samples, quotient));
         }
@@ -448,6 +453,8 @@ void InputFile::read (std::ifstream & inf)
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
+            if (end < begin) HexException("Complex knot sequence: end knot (%g) before start knot (%g).", end, begin);
+            if (samples < 1) HexException("Complex knot sequence: invalid number of real knots (%d) between %g and %g (must be > 1).", samples, begin, end);
             cknots.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -456,6 +463,9 @@ void InputFile::read (std::ifstream & inf)
             double end = ReadNext<double>(inf).val;
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
+            if (end < begin) HexException("Complex knot sequence: end knot (%g) before start knot (%g).", end, begin);
+            if (d <= 0) HexException("Complex knot sequence: invalid initial step %g (must be > 0).", d);
+            if (quotient <= 1) HexException("Complex knot sequence: invalid quotien %g (must be > 1).", quotient);
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
             cknots.append(geomspace(begin, end, samples, quotient));
         }
@@ -600,6 +610,8 @@ void InputFile::read (std::ifstream & inf)
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
+            if (end < begin) HexException("Total energy sequence: end energy (%g) before start energy (%g).", end, begin);
+            if (samples < 1) HexException("Total energy sequence: invalid number of energies (%d) between %g and %g (must be > 1).", samples, begin, end);
             Etot.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -609,6 +621,9 @@ void InputFile::read (std::ifstream & inf)
             double end = ReadNext<double>(inf).val;
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
+            if (end < begin) HexException("Total energy sequence: end energy (%g) before start energy (%g).", end, begin);
+            if (d <= 0) HexException("Total energy sequence: invalid initial step %g (must be > 0).", d);
+            if (quotient <= 1) HexException("Total energy sequence: invalid quotien %g (must be > 1).", quotient);
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
             Etot.append(geomspace(begin, end, samples, quotient));
         }
