@@ -208,7 +208,14 @@ cArray special::ric_jv (int lmax, Complex z)
                 
                 // check success
                 if (err != GSL_SUCCESS or not std::isfinite(res.val))
-                    HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, z.real());
+                {
+                    // probably deep in classically forbidden region?
+                    if (z.real() * z.real() < l * (l + 1.))
+                        res.val = gsl_sf_pow_int(z.real(), l) / gsl_sf_doublefact(2*l+1);
+                    // other problem...
+                    else
+                        HexException("Error \"%s\" while evaluating j[%d](%g).", gsl_strerror(err), l, z.real());
+                }
                 
                 // save value
                 ev[l] = res.val;
