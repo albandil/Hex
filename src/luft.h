@@ -111,8 +111,6 @@ class LUft
          */
         virtual NumberArray<DataT> solve (const ArrayView<DataT> b, int eqs = 1) const
         {
-            std::cout << "b = " << b << std::endl;
-            
             // reserve space for the solution
             NumberArray<DataT> x (b.size());
             

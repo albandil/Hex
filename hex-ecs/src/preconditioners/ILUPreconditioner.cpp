@@ -152,9 +152,6 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     }
     
     // precondition by LU
-    std::cerr << "r = ";
-    std::cerr << r << std::endl;
-    MPI_Barrier(MPI_COMM_WORLD);
     z = lu_[iblock]->solve(r);
     
     // release memory
