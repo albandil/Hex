@@ -121,7 +121,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
                     "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
-#ifndef NO_MPI
+#ifdef WITH_MPI
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
                     "\t--stg-integ                (-a)  Only calculate needed radial integrals.                                                                                \n"
@@ -132,6 +132,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
+                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
                     "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
@@ -144,7 +145,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
-#ifndef NO_OPENCL
+#ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
                     "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).                            \n"
@@ -190,7 +191,19 @@ void CommandLine::parse (int argc, char* argv[])
                 zipmax = std::atof(optarg.c_str());
                 return true;
             },
-#ifndef NO_MPI
+        "lu", "F", 1, [&](std::string optarg) -> bool
+            {
+                if (optarg == "umfpack")
+                    factorizer = LUFT_UMFPACK;
+                else if (optarg == "superlu")
+                    factorizer = LUFT_SUPERLU;
+                else if (optarg == "superlu_dist")
+                    factorizer = LUFT_SUPERLU_DIST;
+                else
+                    HexException("Unknown LU-factorizer '%s'.", optarg.c_str());
+                return true;
+            },
+#ifdef WITH_MPI
         "mpi", "m", 0, [&](std::string optarg) -> bool
             {
                 // use MPI

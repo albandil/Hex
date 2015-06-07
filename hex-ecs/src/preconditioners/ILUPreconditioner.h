@@ -68,9 +68,9 @@ class ILUCGPreconditioner : public CGPreconditioner
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
-        virtual void setup () { CGPreconditioner::setup(); }
         
         // declare own definitions
+        virtual void setup ();
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
@@ -82,10 +82,10 @@ class ILUCGPreconditioner : public CGPreconditioner
         double droptol_;
         
         // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix> csr_blocks_;
+        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
         
         // LU decompositions of the CSR blocks
-        mutable std::vector<CsrMatrix::LUft> lu_;
+        mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
 };
 
 #endif

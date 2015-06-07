@@ -228,7 +228,11 @@ void KPACGPreconditioner::setup ()
             timer.reset();
             
             // compose the symmetrical one-electron hamiltonian
-            ColMatrix<Complex> tHl = (0.5 * s_rad_.D() - s_rad_.Mm1_tr() + (0.5*l*(l+1)) * s_rad_.Mm2()).torow().T();
+            ColMatrix<Complex> tHl = (
+                Complex(0.5) * s_rad_.D()
+                - s_rad_.Mm1_tr()
+                + Complex(0.5*l*(l+1)) * s_rad_.Mm2()
+            ).torow().T();
             
             // symmetrically transform by inverse square root of the overlap matrix
             tHl = std::move(invsqrtS * tHl * invsqrtS);

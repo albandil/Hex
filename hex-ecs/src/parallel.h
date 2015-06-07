@@ -32,8 +32,8 @@
 #ifndef HEX_PARALLEL
 #define HEX_PARALLEL
 
-#ifndef NO_MPI
-    #include <mpi.h>
+#ifdef WITH_MPI
+#include <mpi.h>
 #endif
 
 #include "arrays.h"
@@ -62,7 +62,7 @@ class Parallel
         Parallel (int* argc, char*** argv, bool active)
             : active_(active), iproc_(0), Nproc_(1)
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
             {
     #ifndef _OPENMP
@@ -91,7 +91,7 @@ class Parallel
         
         ~Parallel ()
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
                 MPI_Finalize();
 #endif
@@ -155,7 +155,7 @@ class Parallel
          */
         template <class T> void bcast (int owner, NumberArray<T> & data) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             // owner : broadcast size
             int size = data.size();
             MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
@@ -180,7 +180,7 @@ class Parallel
          */
         template <class T> void send (T const * array, std::size_t size, int origin, int destination) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_ and iproc_ == origin)
             {
                 MPI_Send
@@ -201,7 +201,7 @@ class Parallel
          */
         template <class T> void recv (T * array, std::size_t size, int origin, int destination) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_ and iproc_ == destination)
             {
                 MPI_Status status;
@@ -237,7 +237,7 @@ class Parallel
          */
         template <class T> void sync (T * array, std::size_t chunksize, std::size_t Nchunk) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
             {
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
@@ -261,7 +261,7 @@ class Parallel
          */
         template <class T> void sum (T* array, std::size_t N, int owner = 0) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
             {
                 MPI_Reduce
@@ -293,7 +293,7 @@ class Parallel
          */
         template <class T> void syncsum (T* array, std::size_t N) const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
             {
                 MPI_Allreduce
@@ -316,7 +316,7 @@ class Parallel
          */
         void wait () const
         {
-#ifndef NO_MPI
+#ifdef WITH_MPI
             if (active_)
                 MPI_Barrier(MPI_COMM_WORLD);
 #endif

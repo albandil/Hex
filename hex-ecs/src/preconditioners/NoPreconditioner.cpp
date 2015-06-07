@@ -94,7 +94,7 @@ void NoPreconditioner::update (double E)
         int l2 = l1_l2_[ill].second;
         
         // initialize diagonal block
-        dia_blocks_[ill] = BlockSymBandMatrix
+        dia_blocks_[ill] = BlockSymBandMatrix<Complex>
         (
             s_bspline_.Nspline(),       // block count (and size)
             s_bspline_.order() + 1,     // half-bandwidth
@@ -117,10 +117,11 @@ void NoPreconditioner::update (double E)
             unsigned j = i + d;
             
             // one-electron part
-            SymBandMatrix block = E * s_rad_.S()(i,j) * s_rad_.S();
-            block -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
+            Complex half (0.5,0.0);
+            SymBandMatrix<Complex> block = E * s_rad_.S()(i,j) * s_rad_.S();
+            block -= (half * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
             block -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S();
-            block -= s_rad_.S()(i,j) * (0.5 * s_rad_.D() - s_rad_.Mm1_tr());
+            block -= s_rad_.S()(i,j) * (half * s_rad_.D() - s_rad_.Mm1_tr());
             block -= 0.5 * l2 * (l2 + 1) * s_rad_.S()(i,j) * s_rad_.Mm2();
             
             // two-electron part
@@ -194,14 +195,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
-    cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
+    cArray ji_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
     if (not std::isfinite(ji_expansion.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
     Pi_overlaps = s_rad_.overlapP(ni, li, weightEndDamp(s_rad_.bspline()));
-    Pi_expansion = s_rad_.S().tocoo().tocsr().solve(Pi_overlaps);
+    Pi_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(Pi_overlaps);
     if (not std::isfinite(Pi_expansion.norm()))
         HexException("Unable to expand hydrogen bound orbital in B-splines!");
     
@@ -317,7 +318,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 q.hdfload(ill);
                 
                 if (cmd_.wholematrix)
-                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).hdfload();
+                    const_cast<BlockSymBandMatrix<Complex>&>(dia_blocks_[ill]).hdfload();
             }
             
             // multiply
@@ -332,7 +333,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 q[ill].drop();
                 
                 if (cmd_.wholematrix)
-                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).drop();
+                    const_cast<BlockSymBandMatrix<Complex>&>(dia_blocks_[ill]).drop();
             }
         }
         
@@ -342,7 +343,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         {
             // load data from scratch disk
             if (not cmd_.cache_own_radint and cmd_.wholematrix)
-                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
+                const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).hdfload();
             
             // update all blocks with this multipole potential matrix
             for (int ill = 0;  ill < Nang;  ill++)
@@ -394,7 +395,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             // load data from scratch disk
             if (not cmd_.cache_own_radint)
-                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
+                const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).drop();
         }
         
         // multiply "p" by the off-diagonal blocks multiprocess
@@ -555,7 +556,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 for (int lambda = 0; lambda <= maxlambda; lambda++)
                 {
                     // calculate the radial sub-block
-                    SymBandMatrix R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
+                    SymBandMatrix<Complex> R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
                     
                     // apply all superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))

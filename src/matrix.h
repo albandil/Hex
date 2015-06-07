@@ -36,10 +36,10 @@
 
 // Forward declaration of sparse matrix classes in order to enable them as return types
 // of other classes before proper definition.
-class CooMatrix;
-class CscMatrix;
-class CsrMatrix;
-class SymBandMatrix;
+template <class IdxT, class DataT> class CooMatrix;
+template <class IdxT, class DataT> class CscMatrix;
+template <class IdxT, class DataT> class CsrMatrix;
+template <class DataT> class SymBandMatrix;
 
 // Forward declaration of dense matrix classes in order to enable them as return types
 // of other classes before proper definition. Note that RowMatrix and ColMatrix

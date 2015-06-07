@@ -32,6 +32,10 @@
 #ifndef HEX_SYMBANDMATRIX_H
 #define HEX_SYMBANDMATRIX_H
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "arrays.h"
 #include "coomatrix.h"
 #include "densematrix.h"
@@ -87,7 +91,7 @@ typedef enum {
  *   matrix C = AB is equal to the sum of the bandwidths of the factors
  *   decreased by one.
  */
-class SymBandMatrix
+template <class DataT> class SymBandMatrix
 {
 
 public:
@@ -96,7 +100,7 @@ public:
     //
 
     /// Empty constructor.
-    SymBandMatrix ();
+    SymBandMatrix () : n_(0), d_(0), elems_(0), name_() {}
     
     /// Size constructor.
     SymBandMatrix (std::size_t n);
@@ -107,7 +111,7 @@ public:
      * @param n Size of the matrix.
      * @param d Number of main and upper diagonals.
      */
-    SymBandMatrix (std::size_t n, std::size_t d);
+    SymBandMatrix (std::size_t n, std::size_t d) : n_(n), d_(d), elems_(n * d), name_() {}
     
     /**
      * @brief Data constructor.
@@ -122,16 +126,20 @@ public:
      * @param d Number of main and upper diagonals.
      * @param v Row-padded (main- and upper-) diagonal elements.
      */
-    SymBandMatrix (std::size_t n, std::size_t d, const cArrayView v);
+    SymBandMatrix (std::size_t n, std::size_t d, const ArrayView<DataT> v) : n_(n), d_(d), elems_(v), name_() {}
     
     /// Copy constructor.
-    SymBandMatrix (SymBandMatrix const & A);
+    SymBandMatrix (SymBandMatrix const & A) : n_(A.n_), d_(A.d_), elems_(A.elems_), name_() {}
 
     /// Move constructor.
-    SymBandMatrix (SymBandMatrix && A);
+    SymBandMatrix (SymBandMatrix && A) : n_(std::move(A.n_)), d_(std::move(A.d_)), elems_(std::move(A.elems_)), name_(A.name_) {}
     
     /// Constructor - HDF loader.
-    SymBandMatrix (std::string filename);
+    SymBandMatrix (std::string filename) : name_(filename)
+    {
+        if (not hdfload())
+            HexException("Unable to load from %s.", filename.c_str());
+    }
     
     /**
      * @brief Plain symmetrical populator.
@@ -178,7 +186,7 @@ public:
     // Getters
     //
     
-    Complex operator() (int i, int j) const
+    DataT operator() (int i, int j) const
     {
         std::size_t irow = std::min(i,j);
         std::size_t icol = std::max(i,j);
@@ -188,7 +196,7 @@ public:
         
         return idia < d_ ? elems_[irow * d_ + idia] : 0.;
     }
-    Complex & operator() (int i, int j)
+    DataT & operator() (int i, int j)
     {
         std::size_t irow = std::min(i,j);
         std::size_t icol = std::max(i,j);
@@ -199,8 +207,8 @@ public:
         return elems_[irow * d_ + idia];
     }
     
-    cArray const & data () const { return elems_; }
-    cArray       & data ()       { return elems_; }
+    NumberArray<DataT> const & data () const { return elems_; }
+    NumberArray<DataT>       & data ()       { return elems_; }
     
     /**
      * @brief Matrix dimension.
@@ -227,24 +235,60 @@ public:
      * also that they keep the same diagonals. Such matrices can be very effectively
      * summed and subtracted -- just by doing the operation on the stored element arrays.
      */
-    bool is_compatible (SymBandMatrix const & B) const;
+    bool is_compatible (SymBandMatrix const & B) const
+    {
+        if (n_ != B.n_)
+            HexException("Unequal ranks (%d != %d).", n_, B.n_);
+        
+        if (d_ != B.d_)
+            HexException("Unequal half-bandwidths (%d != %d).", d_, B.d_);
+        
+        return true;
+    }
     
     //
     // Arithmetic and other operators
     //
     
-    SymBandMatrix const & operator = (SymBandMatrix && A);
-    SymBandMatrix const & operator = (SymBandMatrix const & A);
+    SymBandMatrix const & operator = (SymBandMatrix && A)
+    {
+        n_ = std::move(A.n_);
+        d_ = std::move(A.d_);
+        elems_ = std::move(A.elems_);
+        return *this;
+    }
+
+    SymBandMatrix const & operator = (SymBandMatrix const & A)
+    {
+        n_ = A.n_;
+        d_ = A.d_;
+        elems_ = A.elems_;
+        return *this;
+    }
     
-    SymBandMatrix const & operator += (SymBandMatrix const & B);
-    SymBandMatrix const & operator -= (SymBandMatrix const & B);
+    SymBandMatrix const & operator += (SymBandMatrix const & B)
+    {
+        is_compatible(B);
+        elems_ += B.elems_;
+        return *this;
+    }
+    
+    SymBandMatrix const & operator -= (SymBandMatrix const & B)
+    {
+        is_compatible(B);
+        elems_ -= B.elems_;
+        return *this;
+    }
     
     /**
      * @brief Dot product with one or more vectors.
      *
      * @param B Set of vectors to multiply as a column-major dense matrix.
      */
-    cArray dot (const cArrayView B) const;
+    NumberArray<DataT> dot (const ArrayView<DataT> B) const
+    {
+        return sym_band_dot(n_, d_, elems_, B);
+    }
     
     /**
      * @brief Dot product with one or more vectors.
@@ -254,7 +298,7 @@ public:
      * @param M Matrix elements (concatenated row-padded upper triangle rows).
      * @param X Concatenate source vectors.
      */
-    static cArray sym_band_dot (int n, int d, const cArrayView M, const cArrayView X);
+    static NumberArray<DataT> sym_band_dot (int n, int d, const ArrayView<DataT> M, const ArrayView<DataT> X);
     
     /**
      * @brief Back-substitution (lower).
@@ -264,7 +308,7 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray lowerSolve (const cArrayView b) const;
+    NumberArray<DataT> lowerSolve (const ArrayView<DataT> b) const;
     
     /**
      * @brief Back-substitution (upper).
@@ -274,7 +318,7 @@ public:
      * 
      * @param b Right hand side of the triangular system.
      */
-    cArray upperSolve (const cArrayView b) const;
+    NumberArray<DataT> upperSolve (const ArrayView<DataT> b) const;
     
     /**
      * @brief Kronecker product.
@@ -288,7 +332,7 @@ public:
     //
     
     /// Link matrix to a disk file.
-    void hdflink (std::string name);
+    void hdflink (std::string name) { name_ = name; }
     
     /// Return the name of the linked disk file.
     std::string hdfname () const { return name_; }
@@ -305,8 +349,56 @@ public:
      */
     //@{
     bool hdfload () { return hdfload (name_); }
-    bool hdfload (std::string name);
-    bool hdfload (HDFFile & hdf, std::string prefix = "");
+    bool hdfload (std::string name)
+    {
+        // open the HDF file
+        HDFFile hdf(name, HDFFile::readonly);
+        if (not hdf.valid())
+            return false;
+        
+        return hdfload(hdf);
+    }
+    bool hdfload (HDFFile & hdf, std::string prefix = "")
+    {
+        // check the HDF file
+        if (not hdf.valid())
+            return false;
+        
+        // set prefix
+        if (not prefix.empty())
+            hdf.prefix = prefix;
+        
+        // read dimension
+        if (not hdf.read("n", &n_, 1))
+            return false;
+        
+        // read dimension
+        if (not hdf.read("d", &d_, 1))
+            return false;
+        
+        // compressed array info
+        iArray zero_blocks_re, zero_blocks_im;
+        rArray elements_re, elements_im;
+        
+        // read data from file
+        if ((zero_blocks_re.resize(hdf.size("zero_blocks_re")) and not hdf.read("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
+            (zero_blocks_im.resize(hdf.size("zero_blocks_im")) and not hdf.read("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size())) or
+            (elements_re.resize(hdf.size("re")) and not hdf.read("re", &(elements_re[0]), elements_re.size())) or
+            (elements_im.resize(hdf.size("im")) and not hdf.read("im", &(elements_im[0]), elements_im.size())))
+            return false;
+        
+        // decompress
+        elems_ = std::move
+        (
+            interleave
+            (
+                elements_re.decompress(zero_blocks_re),
+                elements_im.decompress(zero_blocks_im)
+            )
+        );
+        
+        return true;
+    }
     //@}
     
     /**
@@ -327,7 +419,46 @@ public:
         HDFFile::FileAccess flags = HDFFile::overwrite,
         bool docompress = false,
         std::size_t consec = 10
-    ) const;
+    ) const
+    {
+        HDFFile hdf(name, flags);
+        
+        if (not hdf.valid())
+            return false;
+        
+        // write dimension and diagonal info
+        if (not hdf.write("n", &n_, 1) or
+            not hdf.write("d", &d_, 1))
+            return false;
+        
+        // compress elements array
+        iArray zero_blocks_re, zero_blocks_im;
+        rArray elements_re, elements_im;
+        
+        if (docompress)
+        {
+            std::tie(zero_blocks_re, elements_re) = realpart(elems_).compress(consec);
+            std::tie(zero_blocks_im, elements_im) = imagpart(elems_).compress(consec);
+        }
+        else
+        {
+            elements_re = std::move(realpart(elems_));
+            elements_im = std::move(imagpart(elems_));
+        }
+        
+        // write compressed elements array (if non-empty); check result
+        if ((not zero_blocks_re.empty() and
+            not hdf.write("zero_blocks_re", &(zero_blocks_re[0]), zero_blocks_re.size())) or
+        ((not zero_blocks_im.empty() and
+            not hdf.write("zero_blocks_im", &(zero_blocks_im[0]), zero_blocks_im.size()))) or
+        ((not elements_re.empty() and
+            not hdf.write("re", &(elements_re[0]), elements_re.size()))) or
+        ((not elements_im.empty() and
+            not hdf.write("im", &(elements_im[0]), elements_im.size()))))
+            return false;
+        
+        return true;
+    }
     bool hdfsave
     (
         HDFFile::FileAccess flags = HDFFile::overwrite,
@@ -402,7 +533,7 @@ public:
      * @f]
      * Then concatenate rows and return as a single array.
      */
-    cArray toPaddedRows () const;
+    NumberArray<DataT> toPaddedRows () const;
     
     /**
      * @brief Zero-pad columns.
@@ -410,16 +541,95 @@ public:
      * Pad rows with zeros as in @ref toPaddedRows, then concatenate
      * columns and return as a single array.
      */
-    cArray toPaddedCols () const;
+    NumberArray<DataT> toPaddedCols () const;
     
     /// Convert matrix part to CooMatrix.
-    CooMatrix tocoo (MatrixTriangle triangle = both) const;
+    template <class IdxT> CooMatrix<IdxT,DataT> tocoo (MatrixTriangle triangle = both) const
+    {
+        NumberArray<IdxT> I, J;
+        NumberArray<DataT> V;
+        
+        DataT const * el = elems_.data();
+        
+        // for all elements
+        for (IdxT i = 0; i < n_; i++)
+        for (IdxT d = 0; d < d_; d++)
+        {
+            if (i + d < n_)
+            {
+                // skip zero elements
+                if (*el == 0.)
+                {
+                    el++;
+                    continue;
+                }
+                
+                // add this element to COO (upper triangle)
+                if ((d != 0) and (triangle & strict_upper))
+                {
+                    I.push_back(i);
+                    J.push_back(i+d);
+                    V.push_back(*el);
+                }
+                
+                // add this element to COO (upper triangle)
+                if ((d != 0) and (triangle & strict_lower))
+                {
+                    I.push_back(i+d);
+                    J.push_back(i);
+                    V.push_back(*el);
+                }
+                
+                // main diagonal
+                if ((d == 0) and (triangle & diagonal))
+                {
+                    I.push_back(i);
+                    J.push_back(i);
+                    V.push_back(*el);
+                }
+            }
+            
+            // move on to the next element
+            el++;
+        }
+        
+        return CooMatrix<IdxT,DataT> (n_, n_, I, J, V);
+    }
     
     /// Convert matrix part to RowMatrix.
-    RowMatrix<Complex> torow (MatrixTriangle triangle = both) const;
+    RowMatrix<DataT> torow (MatrixTriangle triangle = both) const
+    {
+        RowMatrix<DataT> M (n_, n_);
+        
+        DataT const * el = elems_.data();
+        
+        // for all elements
+        for (std::size_t i = 0; i < n_; i++)
+        for (std::size_t d = 0; d < d_; d++)
+        {
+            if (i + d < n_)
+            {
+                // main diagonal
+                if ((d == 0) and (triangle & diagonal))
+                    M(i,i) = *el;
+                
+                // upper triangle
+                if ((d != 0) and (triangle & strict_upper))
+                    M(i,i+d) = *el;
+                
+                // lower triangle
+                if ((d != 0) and (triangle & strict_lower))
+                    M(i+d,i) = *el;
+            }
+            // move on to the next elements
+            el++;
+        }
+        
+        return M;
+    }
     
     /// Output to a text stream.
-    friend std::ostream & operator << (std::ostream & out, SymBandMatrix const & A);
+//     friend std::ostream & operator << (std::ostream & out, SymBandMatrix<DataT> const & A);
     
 private:
 
@@ -430,13 +640,13 @@ private:
     std::size_t d_;
     
     // diagonals concatenated in row-oriented way (and padded, if necessary) of size n_*d_
-    cArray elems_;
+    NumberArray<DataT> elems_;
     
     // name of linked HDF file
     std::string name_;
 };
 
-class BlockSymBandMatrix
+template <class DataT> class BlockSymBandMatrix
 {
     private:
         
@@ -453,7 +663,7 @@ class BlockSymBandMatrix
         std::size_t halfbw_;
         
         /// Data array.
-        cArray data_;
+        NumberArray<DataT> data_;
         
     public:
         
@@ -488,8 +698,65 @@ class BlockSymBandMatrix
         }
         
         /// Access individual blocks.
-        cArray getBlock (int i) const;
-        void setBlock (int i, const cArrayView data);
+        NumberArray<DataT> getBlock (int i) const
+        {
+            if (inmemory_)
+            {
+                return ArrayView<DataT> (data_, i * size_ * halfbw_, size_ * halfbw_);
+            }
+            else
+            {
+                // open disk file
+                HDFFile hdf (diskfile_, HDFFile::readonly);
+                
+                // check success
+                if (not hdf.valid())
+                    HexException("Cannot open file \"%s\".\nError stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
+                
+                // create output array
+                NumberArray<DataT> data (size_ * halfbw_);
+                
+                // read data
+                if (not hdf.read("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
+                    HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), hdf.error().c_str());
+                
+                return data;
+            }
+        }
+        
+        /// Access individual blocks.
+        void setBlock (int i, const ArrayView<DataT> data)
+        {
+            if (data.size() != size_ * halfbw_)
+                HexException("Wrong dimensions: %ld != %ld.", data.size(), size_ * halfbw_);
+            
+            if (inmemory_)
+            {
+                ArrayView<DataT>(data_, i * size_ * halfbw_, size_ * halfbw_) = data;
+            }
+            else
+            {
+                // check that the file exists
+                HDFFile * phdf = new HDFFile (diskfile_, HDFFile::readwrite);
+                if (not phdf->valid())
+                {
+                    // create a new file
+                    phdf = new HDFFile (diskfile_, HDFFile::overwrite);
+                    if (not phdf->valid())
+                        HexException("Cannot open file \"%s\" for writing.\nError stack:\n%s", diskfile_.c_str(), phdf->error().c_str());
+                    
+                    // initialize the dataset to its full length
+                    if (not phdf->write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+                        HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), phdf->error().c_str());
+                }
+                
+                // write data
+                if (not phdf->write("data", &data[0], size_ * halfbw_, i * size_ * halfbw_))
+                    HexException("Cannot access block %d in file \"%s\".\nError stack:\n%s", i, diskfile_.c_str(), phdf->error().c_str());
+                
+                delete phdf;
+            }
+        }
         
         //
         // Arithmetic operators.
@@ -502,7 +769,118 @@ class BlockSymBandMatrix
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          */
-        cArray dot (cArrayView v, bool parallelize = false) const;
+        NumberArray<DataT> dot (ArrayView<DataT> v, bool parallelize = false) const
+        {
+            // check vector size
+            if (v.size() != size_ * size_)
+                HexException("[BlockSymBandMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
+            
+            // create output vector
+            NumberArray<DataT> w(v.size());
+            
+            // check if matrix is empty
+            if (halfbw_ == 0)
+                return w;
+            
+#ifdef _OPENMP
+            // write locks
+            omp_lock_t lock[size_];
+            for (std::size_t i = 0; i < size_; i++)
+                omp_init_lock(&lock[i]);
+#endif
+            
+            // for all blocks
+            # pragma omp parallel if (parallelize)
+            {
+                // open data file for reading
+                NumberArray<DataT> diskdata;
+                HDFFile * hdf = nullptr;
+                if (not inmemory_)
+                    hdf = new HDFFile (diskfile_, HDFFile::readonly);
+                    
+                for (std::size_t d = 0; d < halfbw_; d++)
+                {
+                    // parallel processing of blocks on this diagonal (only if requested, and they are present in memory)
+                    # pragma omp for schedule (dynamic,1)
+                    for (std::size_t i = 0; i < size_; i++)
+                    if (i + d < size_)
+                    {
+                        // block volume and offset
+                        std::size_t vol = size_ * halfbw_;
+                        std::size_t offset = (i * halfbw_ + d) * vol;
+                        
+                        // data view of this block
+                        ArrayView<DataT> view (data_, offset, vol);
+                        
+                        if (not inmemory_)
+                        {
+                            // read data from the disk
+                            diskdata.resize(vol);
+                            if (not hdf->read("data", &diskdata[0], vol, offset))
+                                HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
+                            
+                            // reset view to the new data
+                            view.reset(vol, diskdata.data());
+                        }
+                        
+                        NumberArray<DataT> product;
+                        
+                        // multiply by diagonal block
+                        if (d == 0)
+                        {
+                            product = SymBandMatrix<DataT>::sym_band_dot
+                            (
+                                size_, halfbw_, view,
+                                ArrayView<DataT>(v, i * size_, size_)
+                            );
+                            
+                            // update result (no need to lock access here)
+                            ArrayView<DataT>(w, i * size_, size_) += product;
+                        }
+                        
+                        // multiply by the other diagonals (both symmetries)
+                        if (d != 0)
+                        {
+                            product = SymBandMatrix<DataT>::sym_band_dot
+                            (
+                                size_, halfbw_, view,
+                                ArrayView<DataT>(v, (i + d) * size_, size_)
+                            );
+#ifdef _OPENMP
+                            omp_set_lock(&lock[i]);
+#endif
+                            ArrayView<DataT>(w, i * size_, size_) += product;
+#ifdef _OPENMP
+                            omp_unset_lock(&lock[i]);
+#endif
+                            
+                            product = SymBandMatrix<DataT>::sym_band_dot
+                            (
+                                size_, halfbw_, view,
+                                ArrayView<DataT>(v, i * size_, size_)
+                            );
+#ifdef _OPENMP
+                            omp_set_lock(&lock[i + d]);
+#endif
+                            ArrayView<DataT>(w, (i + d) * size_, size_) += product;
+#ifdef _OPENMP
+                            omp_unset_lock(&lock[i + d]);
+#endif
+                        }
+                    }
+                }
+                
+                if (not inmemory_)
+                    delete hdf;
+            }
+            
+#ifdef _OPENMP
+            for (std::size_t i = 0; i < size_; i++)
+                omp_destroy_lock(&lock[i]);
+#endif
+            
+            return w;
+        }
         
         //
         // Coversions to other matrix types.
@@ -513,7 +891,77 @@ class BlockSymBandMatrix
          * 
          * @param loadblocks Use blocks from scratch file instead of those in memory (if any).
          */
-        CooMatrix tocoo () const;
+        template <class IdxT> CooMatrix<IdxT,DataT> tocoo () const
+        {
+            // number of structurally non-zero blocks (both upper and lower)
+            std::size_t nblocks = size_ * (2 * halfbw_ - 1);
+            
+            // number of structurally non-zero elements (the structure is recursive)
+            std::size_t nelem = nblocks * nblocks;
+            
+            // allocate the ijv arrays
+            NumberArray<IdxT> I; I.reserve(nelem);
+            NumberArray<IdxT> J; J.reserve(nelem); 
+            NumberArray<DataT> V; V.reserve(nelem);
+            
+            // open data file for reading
+            HDFFile * hdf = nullptr;
+            if (not inmemory_)
+                hdf = new HDFFile (diskfile_, HDFFile::readonly);
+            
+            // for all blocks
+            for (std::size_t i = 0; i < size_; i++)
+            for (std::size_t d = 0; d < halfbw_; d++)
+            if (i + d < size_)
+            {
+                // data view of this block diagonal
+                cArrayView view (data_, (i * halfbw_ + d) * size_ * halfbw_, size_ * halfbw_);
+                
+                // it may be necessary to load the data from disk
+                cArray diskdata;
+                if (not inmemory_)
+                {
+                    // read data from the disk
+                    diskdata.resize(size_ * halfbw_);
+                    if (not hdf->read("data", &diskdata[0], size_ * halfbw_, (i * halfbw_ + d) * size_ * halfbw_))
+                        HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
+                    
+                    // reset view to the new data
+                    view.reset(size_ * halfbw_, diskdata.data());
+                }
+                
+                // convert the block to COO format
+                CooMatrix<IdxT,DataT> coo = SymBandMatrix<DataT>(size_, halfbw_, view).tocoo<IdxT>();
+                
+                // copy all elements to whole-matrix arrays
+                for (std::size_t k = 0; k < coo.v().size(); k++)
+                {
+                    I.push_back( coo.i()[k] +  i      * size_ );
+                    J.push_back( coo.j()[k] + (i + d) * size_ );
+                    V.push_back( coo.v()[k]                   );
+                }
+                if (d != 0)
+                for (std::size_t k = 0; k < coo.v().size(); k++)
+                {
+                    I.push_back( coo.i()[k] + (i + d) * size_ );
+                    J.push_back( coo.j()[k] +  i      * size_ );
+                    V.push_back( coo.v()[k]                   );
+                }
+            }
+            
+            if (not inmemory_)
+                delete hdf;
+            
+            // compose the final matrix
+            return CooMatrix<IdxT,DataT>
+            (
+                size_ * size_,  // number of rows
+                size_ * size_,  // number of columns
+                std::move(I),   // row indices
+                std::move(J),   // column indices
+                std::move(V)    // structurally nonzero matrix entries
+            );
+        }
         
         //
         // Scratch file I/O.
@@ -524,28 +972,129 @@ class BlockSymBandMatrix
         std::string & hdfname ()       { return diskfile_; }
         
         /// Release data from memory, but keep HDF link.
-        void drop ();
+        void drop ()
+        {
+            // release memory
+            data_.drop();
+            
+            // turn off the "in memory" flag
+            inmemory_ = false;
+        }
         
         /// Check that the scratch disk file exists.
-        bool hdfcheck () const;
+        bool hdfcheck () const { return HDFFile(diskfile_, HDFFile::readonly).valid(); }
         
         /// Reset (= create empty) HDF scratch file needed when writing individual blocks.
-        bool hdfinit () const;
+        bool hdfinit () const
+        {
+            // create a new file
+            HDFFile hdf (diskfile_, HDFFile::overwrite);
+            if (not hdf.valid())
+                HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
+            
+            // initialize the dataset to its full length
+            if (not hdf.write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+                HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), hdf.error().c_str());
+            
+            return true;
+        }
         
         /// Write all blocks from memory to the disk file.
-        bool hdfsave () const;
+        bool hdfsave () const
+        {
+            // open disk file
+            HDFFile hdf (diskfile_, HDFFile::overwrite);
+            
+            // check success
+            if (not hdf.valid())
+                return false;
+            
+            // save data
+            if (not hdf.write("data", &data_[0], data_.size()))
+                return false;
+            
+            return true;
+        }
         
         /// Load data from disk to memory.
-        bool hdfload ();
+        bool hdfload ()
+        {
+            // open disk file
+            HDFFile hdf (diskfile_, HDFFile::readonly);
+            
+            // check success
+            if (not hdf.valid())
+                return false;
+            
+            // allocate memory
+            data_.resize(size_ * size_ * halfbw_ * halfbw_);
+            
+            // read data
+            if (not hdf.read("data", &data_[0], data_.size()))
+                return false;
+            
+            // turn on the "in memory" flag
+            inmemory_ = true;
+            
+            return true;
+        }
 };
 
-SymBandMatrix operator + (SymBandMatrix const & A, SymBandMatrix const & B);
-SymBandMatrix operator - (SymBandMatrix const & A, SymBandMatrix const & B);
-SymBandMatrix operator * (SymBandMatrix const & A, SymBandMatrix const & B);
-SymBandMatrix operator * (double z, SymBandMatrix const & A);
-SymBandMatrix operator * (Complex z, SymBandMatrix const & A);
+template <class DataT>
+SymBandMatrix<DataT> operator + (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B)
+{
+    A.is_compatible(B);
+    return SymBandMatrix<DataT>(A.size(), A.halfbw(), A.data() + B.data());
+}
 
-BlockSymBandMatrix kron (SymBandMatrix const & A, SymBandMatrix const & B);
-cArray kron_dot (SymBandMatrix const & A, SymBandMatrix const & B, const cArrayView v);
+template <class DataT>
+SymBandMatrix<DataT> operator - (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B)
+{
+    A.is_compatible(B);
+    return SymBandMatrix<DataT>(A.size(), A.halfbw(), A.data() - B.data());
+}
+
+// template <class DataT>
+// SymBandMatrix<DataT> operator * (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B);
+
+template <class DataT>
+SymBandMatrix<DataT> operator * (DataT z, SymBandMatrix<DataT> const & A)
+{
+    return SymBandMatrix<DataT>(A.size(), A.halfbw(), z * A.data());
+}
+
+// template <class DataT>
+// BlockSymBandMatrix<DataT> kron (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B);
+
+template <class DataT>
+NumberArray<DataT> kron_dot (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B, const ArrayView<DataT> v)
+{
+    NumberArray<DataT> w (v.size());
+    
+    std::size_t A_size = A.size();
+    std::size_t B_size = B.size();
+    
+    # pragma omp parallel for collapse (2)
+    for (std::size_t i = 0; i < A_size; i++)
+    for (std::size_t j = 0; j < B_size; j++)
+    {
+        // iteration bounds
+        std::size_t kmin = (i >= A.halfbw() ? i - A.halfbw() : 0);
+        std::size_t lmin = (j >= B.halfbw() ? j - B.halfbw() : 0);
+        std::size_t kmax = std::min(A.size() - 1, i + A.halfbw() - 1);
+        std::size_t lmax = std::min(B.size() - 1, j + B.halfbw() - 1);
+        
+        // calculate the scalar product
+        DataT res = 0;
+        for (std::size_t k = kmin; k <= kmax; k++)
+        for (std::size_t l = lmin; l <= lmax; l++)
+            res += A(i,k) * B(j,l) * v[k * B.size() + l];
+        
+        // save result
+        w[i * B.size() + j] = res;
+    }
+    
+    return w;
+}
 
 #endif // HEX_SYMBANDMATRIX_H

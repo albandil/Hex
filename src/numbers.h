@@ -36,11 +36,23 @@
 #include <complex>
 #include <cmath>
 
-#ifndef NO_MPI
-    #include <mpi.h>
+#undef I
+
+#ifdef WITH_MPI
+#include <mpi.h>
 #endif
 
-#undef I
+//
+// Choose integer type for use in LU-factorization libraries.
+//
+
+#ifndef INT64
+    // use 32-bit integers (supported by both UMFPACK and SuperLU)
+    typedef int LU_int_t;
+#else
+    // use 64-bit integers (not supported by serial SuperLU)
+    typedef std::int64_t LU_int_t;
+#endif
 
 //
 // Complex data type alias.
@@ -105,7 +117,7 @@ template<> class typeinfo<int>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT; }
 #endif
@@ -123,7 +135,7 @@ template<> class typeinfo<std::int64_t>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT64_T; }
 #endif
@@ -141,7 +153,7 @@ template<> class typeinfo<unsigned>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UNSIGNED; }
 #endif
@@ -159,7 +171,7 @@ template<> class typeinfo<std::uint64_t>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UINT64_T; }
 #endif
@@ -177,7 +189,7 @@ template<> class typeinfo<float>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, float x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_FLOAT; }
 #endif
@@ -195,7 +207,7 @@ template<> class typeinfo<double>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
 #endif
@@ -213,7 +225,7 @@ template<> class typeinfo<long double>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_LONG_DOUBLE; }
 #endif
@@ -231,7 +243,7 @@ template<> template<class T> class typeinfo<std::complex<T>>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
-#ifndef NO_MPI
+#ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return typeinfo<T>::mpicmpttype(); }
 #endif

@@ -32,7 +32,7 @@
 #ifndef HEX_DENSEMATRIX_H
 #define HEX_DENSEMATRIX_H
 
-#ifndef NO_PNG
+#ifdef WITH_PNG
 #include <png++/png.hpp>
 #endif
 
@@ -528,7 +528,7 @@ template <class Type, class Base> class RowMatrix : public Base
             }
         }
         
-#ifndef NO_PNG
+#ifdef WITH_PNG
         /**
          * @brief Plot to PNG file.
          * 
@@ -536,8 +536,8 @@ template <class Type, class Base> class RowMatrix : public Base
          * written are the gray-scale representation of the absolute
          * values of the dense matrix entries.
          * 
-         * @note This function uses PNG++ and can be disables if the macro
-         * NO_PNG is defined.
+         * @note This function uses PNG++. Use compile flag -DWITH_PNG to
+         * enable it.
          */
         void plot_abs (std::ofstream & out) const
         {

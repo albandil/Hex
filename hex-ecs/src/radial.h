@@ -474,36 +474,36 @@ class RadialIntegrals
         Bspline const & bspline () const { return bspline_; }
         
         /// Return reference to the precomputed derivative overlap matrix.
-        SymBandMatrix const & D () const { return D_; }
+        SymBandMatrix<Complex> const & D () const { return D_; }
         
         /// Return reference to the precomputed overlap matrix.
-        SymBandMatrix const & S () const { return S_; }
+        SymBandMatrix<Complex> const & S () const { return S_; }
         
         /// Return reference to the precomputed integral moment matrix of order -1.
-        SymBandMatrix const & Mm1 () const { return Mm1_; }
+        SymBandMatrix<Complex> const & Mm1 () const { return Mm1_; }
         
         /// Return reference to the precomputed integral moment matrix of order -1, truncated at the end of the real grid.
-        SymBandMatrix const & Mm1_tr () const { return Mm1_tr_; }
+        SymBandMatrix<Complex> const & Mm1_tr () const { return Mm1_tr_; }
         
         /// Return reference to the precomputed integral moment matrix of order -2.
-        SymBandMatrix const & Mm2 () const { return Mm2_; }
+        SymBandMatrix<Complex> const & Mm2 () const { return Mm2_; }
         
         /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
-        BlockSymBandMatrix const & R_tr_dia (unsigned i) const
+        BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const
         {
             assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
         /// Return reference to precomputed full (scaled) integral moments of order L.
-        SymBandMatrix const & Mtr_L (int L) const
+        SymBandMatrix<Complex> const & Mtr_L (int L) const
         {
             assert(L < Mtr_L_.size());
             return Mtr_L_[L];
         }
         
         /// Return reference to precomputed full (scaled) integral moments of order -L-1.
-        SymBandMatrix const & Mtr_mLm1 (int L) const
+        SymBandMatrix<Complex> const & Mtr_mLm1 (int L) const
         {
             assert(L < Mtr_mLm1_.size());
             return Mtr_mLm1_[L];
@@ -547,7 +547,7 @@ class RadialIntegrals
          * Calculate particular sub-matrix of the radial integrals matrix (with block indices "i" and "k")
          * and return it in a form of a dense array (copying structure of the overlap matrix).
          */
-        SymBandMatrix calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
+        SymBandMatrix<Complex> calc_R_tr_dia_block (unsigned lambda, int i, int k, bool simple = false) const;
         
         /**
          * @brief Multiply vector by matrix of two-electron integrals.
@@ -579,9 +579,9 @@ class RadialIntegrals
         // matrices
         //
         
-        SymBandMatrix D_, S_, Mm1_, Mm1_tr_, Mm2_;
-        Array<BlockSymBandMatrix> R_tr_dia_;
-        std::vector<SymBandMatrix> Mtr_L_, Mtr_mLm1_;
+        SymBandMatrix<Complex> D_, S_, Mm1_, Mm1_tr_, Mm2_;
+        Array<BlockSymBandMatrix<Complex>> R_tr_dia_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_, Mtr_mLm1_;
         
         cArray Mitr_L_, Mitr_mLm1_;
 };

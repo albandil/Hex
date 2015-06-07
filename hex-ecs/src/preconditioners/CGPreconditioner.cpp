@@ -71,6 +71,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             
             // solve using the CG solver
             ConjugateGradients < cArray, cArrayView > CG;
+            CG.reset();
             n[ill] = CG.solve
             (
                 r[ill],                 // rhs

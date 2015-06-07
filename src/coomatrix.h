@@ -49,7 +49,7 @@
  * contain its real and imaginary part. Same coordinates amy be used several
  * times; resulting element is then sum of these entries.
  */
-class CooMatrix
+template <class IdxT, class DataT> class CooMatrix
 {
     
 public:
@@ -58,11 +58,11 @@ public:
     
     CooMatrix ()
         : m_(0), n_(0), sorted_(true) {}
-    CooMatrix (size_t m, size_t n)
+    CooMatrix (IdxT m, IdxT n)
         : m_(m), n_(n), sorted_(true) {}
     CooMatrix (CooMatrix const & A)
         : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
-    CooMatrix (std::size_t m, std::size_t n, lArrayView i, lArrayView j, cArrayView x)
+    CooMatrix (IdxT m, IdxT n, ArrayView<IdxT> i, ArrayView<IdxT> j, ArrayView<DataT> x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, lArray && i, lArray && j, cArray && x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
@@ -74,16 +74,16 @@ public:
      * @param a Column-major ordered dense array with matrix elements.
      *          Only nonzero elements are copied into internal storage.
      */
-    template <class T> CooMatrix (std::size_t m, std::size_t n, T a) : m_(m), n_(n), sorted_(false)
+    template <class T> CooMatrix (IdxT m, IdxT n, T a) : m_(m), n_(n), sorted_(false)
     {
         // initialize from column-major formatted input
-        std::size_t i = 0;
-        for (std::size_t col = 0; col < n; col++)
+        IdxT i = 0;
+        for (IdxT col = 0; col < n; col++)
         {
-            for (std::size_t row = 0; row < m; row++)
+            for (IdxT row = 0; row < m; row++)
             {
                 // get element from array
-                Complex val = *(a + i);
+                DataT val = *(a + i);
                 
                 // if nonzero, store
                 if (val != 0.)
@@ -102,38 +102,38 @@ public:
     // Destructor
     ~CooMatrix () {}
     
-    /// Convert 1×1 matrix to a complex number.
-    operator Complex () const
-    {
-        if (m_ == 1 and n_ == 1)
-        {
-            // get number of nonzero matrix elements
-            std::size_t elems = this->shake().x_.size();
-            if (elems > 1)
-                HexException("[CooMatrix::operator Complex] more elements than nominal volume!");
-            else if (elems == 1)
-                return this->shake().x_[0];
-            else
-                return 0.;
-        }
-        else
-            HexException("[CooMatrix::operator Complex] matrix is not 1×1!");
-    }
+//     /// Convert 1×1 matrix to a complex number.
+//     operator Complex () const
+//     {
+//         if (m_ == 1 and n_ == 1)
+//         {
+//             // get number of nonzero matrix elements
+//             std::size_t elems = this->shake().x_.size();
+//             if (elems > 1)
+//                 HexException("[CooMatrix::operator Complex] more elements than nominal volume!");
+//             else if (elems == 1)
+//                 return this->shake().x_[0];
+//             else
+//                 return 0.;
+//         }
+//         else
+//             HexException("[CooMatrix::operator Complex] matrix is not 1×1!");
+//     }
     
     // Getters
     
     std::size_t rows () const { return m_; }
     std::size_t cols () const { return n_; }
     std::size_t size () const { return i_.size(); }
-    lArray const & i () const { return i_; }
-    lArray const & j () const { return j_; }
-    cArray const & v () const { return x_; }
+    NumberArray<IdxT> const & i () const { return i_; }
+    NumberArray<IdxT> const & j () const { return j_; }
+    NumberArray<DataT> const & v () const { return x_; }
     
     /// Index operator. Returns the existing value or zero.
-    Complex operator() (std::size_t ix, std::size_t iy) const
+    DataT operator() (IdxT ix, IdxT iy) const
     {
         for (std::size_t n = 0; n < i_.size(); n++)
-             if ((std::size_t)i_[n] == ix and (std::size_t)j_[n] == iy)
+             if (i_[n] == ix and j_[n] == iy)
                 return x_[n];
         return 0.;
     }
@@ -150,13 +150,13 @@ public:
      *  Complex (*) (long, long)
      * @endcode
      */
-    template <class Functor> CooMatrix& symm_populate_band (std::size_t d, Functor f)
+    template <class Functor> CooMatrix& symm_populate_band (IdxT d, Functor f)
     {
         Complex val;
         
-        for (std::size_t row = 0; row < m_; row++)
+        for (IdxT row = 0; row < m_; row++)
         {
-            for (std::size_t col = row; col < n_ and col - row <= d; col++)
+            for (IdxT col = row; col < n_ and col - row <= d; col++)
             {
                 val = f(row,col);
                 
@@ -194,9 +194,9 @@ public:
     {
         Complex val;
         
-        for (std::size_t row = 0; row < m_; row++)
+        for (IdxT row = 0; row < m_; row++)
         {
-            for (std::size_t col = 0; col < n_; col++)
+            for (IdxT col = 0; col < n_; col++)
             {
                 val = f(row,col);
                 
@@ -234,7 +234,7 @@ public:
      * Adds a new element to the matrix. If an existing coordinates are used,
      * the numbers will be summed.
      */
-    void add (std::int64_t i, std::int64_t j, Complex v)
+    void add (IdxT i, IdxT j, DataT v)
     {
         i_.push_back(i);
         j_.push_back(j);
@@ -244,9 +244,9 @@ public:
     }
     
     /// Transposition, implemented as an interchange of "i" and "j" data.
-    CooMatrix transpose () const
+    CooMatrix<IdxT,DataT> transpose () const
     {
-        CooMatrix tr;
+        CooMatrix<IdxT,DataT> tr;
         
         tr.m_ = n_;
         tr.n_ = m_;
@@ -260,7 +260,7 @@ public:
     }
     
     /// Addition.
-    CooMatrix& operator += (CooMatrix const & A)
+    CooMatrix<IdxT,DataT>& operator += (CooMatrix<IdxT,DataT> const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
@@ -275,7 +275,7 @@ public:
     }
     
     /// Subtraction.
-    CooMatrix& operator -= (CooMatrix const & A)
+    CooMatrix<IdxT,DataT>& operator -= (CooMatrix<IdxT,DataT> const & A)
     {
         assert(m_ == A.m_);
         assert(n_ == A.n_);
@@ -296,7 +296,7 @@ public:
     }
     
     /// Element-wise multiplication by complex number.
-    CooMatrix& operator *= (Complex c)
+    CooMatrix<IdxT,DataT>& operator *= (DataT c)
     {
         std::size_t nz = i_.size();
         for (std::size_t i = 0; i < nz; i++)
@@ -306,7 +306,43 @@ public:
     }
     
     /// SpMV multiplication.
-    CooMatrix dot (const cArrayView B) const;
+    CooMatrix<IdxT,DataT> dot (const ArrayView<DataT> B) const
+    {
+        // FIXME: This is a memory INEFFICIENT method.
+        // NOTE: Row-major storage assumed for B.
+        
+        // volumes
+        IdxT A_vol = x_.size();
+        IdxT B_vol = B.size();
+        
+        // check B shape
+        assert(B_vol % n_ == 0);
+        
+        // create output matrix
+        IdxT C_rows = m_;
+        IdxT C_cols = B_vol / n_;
+        CooMatrix C(C_rows, C_cols);
+        
+        // for all elements of A
+        for (IdxT i = 0; i < A_vol; i++)
+        {
+            IdxT row = i_[i];
+            IdxT col = j_[i];
+            
+            // for all columns of B
+            for (IdxT icol = 0; icol < C_cols; icol++)
+            {
+                C.add
+                (
+                    row, icol,
+                    x_[i] * B[col*C_cols + icol]
+                );
+            }
+        }
+        
+        // summation is done by shaking
+        return C.shake();
+    }
     
     /**
      * @brief Double inner matrix-matrix product.
@@ -315,7 +351,45 @@ public:
      * @note Works only on sorted data.
      * @param B Other matrix.
      */
-    Complex ddot (CooMatrix const & B) const;
+    DataT ddot (CooMatrix<IdxT,DataT> const & B) const
+    {
+        assert(m_ == B.m_);
+        assert(n_ == B.n_);
+        
+        // sort by i_ and j_
+        if (not sorted() or not B.sorted())
+            HexException("[CooMatrix] Sort matrices before ddot!");
+            
+        DataT result = 0;
+        
+        auto Ai = i_.begin();
+        auto Aj = j_.begin();
+        auto Av = x_.begin();
+        
+        auto Bi = B.i_.begin();
+        auto Bj = B.j_.begin();
+        auto Bv = x_.begin();
+        
+        while (Av != x_.end() and Bv != B.x_.end())
+        {
+            if (*Ai < *Bi or (*Ai == *Bi and *Aj < *Bj))
+            {
+                Ai++; Aj++; Av++;
+            }
+            else if (*Ai > *Bi or (*Ai == *Bi and *Aj > *Bj))
+            {
+                Bi++; Bj++; Bv++;
+            }
+            else // (*Ai == *Bi and *Aj == *Bj)
+            {
+                result += (*Av) * (*Bv);
+                Ai++; Aj++; Av++;
+                Bi++; Bj++; Bv++;
+            }
+        }
+        
+        return result;
+    }
     
     /**
      * @brief SpMV multiplication.
@@ -325,10 +399,13 @@ public:
      *          array, which must be integer multiple of *this's column
      *          count.
      */
-    CooMatrix& operator *= (const cArrayView B);
+    CooMatrix<IdxT,DataT>& operator *= (const ArrayView<DataT> B)
+    {
+        return *this = this->dot(B);
+    }
     
     /// Element-wise divide by a complex number.
-    CooMatrix& operator /= (Complex c)
+    CooMatrix<IdxT,DataT>& operator /= (DataT c)
     {
         return *this *= 1./c;
     }
@@ -337,7 +414,7 @@ public:
      * @brief Change dimension of the matrix.
      * @warning No row/column index range checking.
      */
-    void resize (std::size_t m, std::size_t n)
+    void resize (IdxT m, IdxT n)
     {
         m_ = m;
         n_ = n;
@@ -353,20 +430,58 @@ public:
      * @param m New row count.
      * @param n New column coount.
      */
-    CooMatrix reshape (std::size_t m, std::size_t n) const;
+    CooMatrix<IdxT,DataT> reshape (IdxT m, IdxT n) const
+    {
+        CooMatrix<IdxT,DataT> C = *this;
+        
+        // conserved dimensions
+        IdxT N = C.i_.size();
+        IdxT H = C.m_;
+        
+        // check dimensions
+        assert(m * n == C.m_ * C.n_);
+        
+        // reshape
+        for (IdxT i = 0; i < N; i++)
+        {
+            // conserved position in column-ordered array
+            IdxT idx = C.i_[i] + C.j_[i] * H;
+            
+            // new coordinates
+            IdxT row = idx % m;
+            IdxT col = idx / m;
+            
+            // update values
+            C.i_[i] = row;
+            C.j_[i] = col;
+        }
+        
+        C.m_ = m;
+        C.n_ = n;
+        return C;
+    }
     
     /// Convert matrix to dense column-major ordered 1D-array.
-    cArray todense () const;
+    NumberArray<DataT> todense () const
+    {
+        NumberArray<DataT> v (m_ * n_);
+        
+        IdxT N = i_.size();
+        for (IdxT i = 0; i < N; i++)
+            v[i_[i] + j_[i] * m_] += x_[i];
+        
+        return v;
+    }
     
     /// Sort indices (by i_, then by j_)
     void sort ();
     bool sorted () const { return sorted_; }
     
     /// Convert to CSC matrix.
-    CscMatrix tocsc () const;
+    CscMatrix<IdxT,DataT> tocsc () const;
     
     /// Convert to CSR matrix.
-    CsrMatrix tocsr () const;
+    CsrMatrix<IdxT,DataT> tocsr () const;
     
     /// Convert to dense matrix of a given underlying type.
     template <typename DenseMatrixType> DenseMatrixType todense () const
@@ -378,15 +493,15 @@ public:
     }
     
     /// Convert to dense matrix (row-ordered).
-    RowMatrix<Complex> torow () const
+    RowMatrix<DataT> torow () const
     {
-        return todense<RowMatrix<Complex>>();
+        return todense<RowMatrix<DataT>>();
     }
     
     /// Convert to dense matrix (column-ordered).
-    ColMatrix<Complex> tocol () const
+    ColMatrix<DataT> tocol () const
     {
-        return todense<ColMatrix<Complex>>();
+        return todense<ColMatrix<DataT>>();
     }
     
     /**
@@ -398,7 +513,7 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve (const cArrayView b, std::size_t eqs = 1) const
+    NumberArray<DataT> solve (const ArrayView<DataT> b, std::size_t eqs = 1) const
     {
         // COO format is not optimal for solving -> covert to CSC
         return tocsr().solve(b, eqs);
@@ -414,31 +529,102 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write (const char* filename) const;
+    void write (const char* filename) const
+    {
+        std::ofstream f(filename);
+        
+        f << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
+        
+        for (IdxT i = 0; i < i_.size(); i++)
+        {
+            f << i_[i] << "\t" << j_[i];
+            for (int icmp = 0; icmp < typeinfo<DataT>::ncmpt; icmp++)
+                f << "\t" << typeinfo<DataT>::cmpt(icmp, x_[i]);
+            f << "\n";
+        }
+    }
     
     /// Shake the content, i.e. sum same element entries.
-    CooMatrix shake () const;
+    CooMatrix<IdxT,DataT> shake () const
+    {
+        // ugly and memory inefficient method... FIXME
+        return tocsc().tocoo();
+    }
     
     /**
      * @brief Save matrix to HDF file.
      * @param name Filename.
      */
-    bool hdfsave (const char* name) const;
+    bool hdfsave (const char* name) const
+    {
+        HDFFile hdf(name, HDFFile::overwrite);
+
+        // write dimensions
+        hdf.write("m", &m_, 1);
+        hdf.write("n", &n_, 1);
+
+        // write indices
+        if (not i_.empty())
+            hdf.write("i", &(i_[0]), i_.size());
+        if (not j_.empty())
+            hdf.write("j", &(j_[0]), j_.size());
+
+        // write data
+        if (not x_.empty())
+        {
+            hdf.write
+            (
+                "x",
+                reinterpret_cast<typename typeinfo<DataT>::cmpttype const*>(&x_),
+                x_.size() * typeinfo<DataT>::ncmpt
+            );
+        }
+
+        return true;
+    }
     
     /**
      * @brief Load matrix from HDF file.
      * @param name Filename.
      */
-    bool hdfload (const char* name);
+    bool hdfload (const char* name)
+    {
+        sorted_ = false;
+        
+        HDFFile hdf(name, HDFFile::readonly);
+        
+        // read dimensions
+        hdf.read("m", &m_, 1);
+        hdf.read("n", &n_, 1);
+        
+        // read indices
+        if (i_.resize(hdf.size("i")))
+            hdf.read("i", &(i_[0]), i_.size());
+        if (j_.resize(hdf.size("j")))
+            hdf.read("j", &(j_[0]), j_.size());
+        
+        // read data
+        if (x_.resize(hdf.size("x") / 2))
+        {
+            hdf.read
+            (
+                "x",
+                reinterpret_cast<typename typeinfo<DataT>::cmpttype*>(&(x_[0])),
+                x_.size() * typeinfo<DataT>::ncmpt
+            );
+        }
+        
+        return true;
+    }
 
 private:
 
     // dimensions
-    std::size_t m_, n_;
-
+    IdxT m_, n_;
+    
     // ijv-representation
-    lArray i_, j_;
-    cArray x_;
+    NumberArray<IdxT> i_, j_;
+    NumberArray<DataT> x_;
     
     bool sorted_;
 };
@@ -448,9 +634,10 @@ private:
  * @param A COO-matrix.
  * @param B COO-matrix.
  */
-inline CooMatrix operator + (CooMatrix const & A, CooMatrix const & B)
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> operator + (CooMatrix<IdxT,DataT> const & A, CooMatrix<IdxT,DataT> const & B)
 {
-    CooMatrix C = A;
+    CooMatrix<IdxT,DataT> C = A;
     return C += B;
 }
 
@@ -459,9 +646,10 @@ inline CooMatrix operator + (CooMatrix const & A, CooMatrix const & B)
  * @param A COO-matrix.
  * @param B COO-matrix.
  */
-inline CooMatrix operator - (CooMatrix const & A, CooMatrix const & B)
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> operator - (CooMatrix<IdxT,DataT> const & A, CooMatrix<IdxT,DataT> const & B)
 {
-    CooMatrix C = A;
+    CooMatrix<IdxT,DataT> C = A;
     return C -= B;
 }
 
@@ -470,9 +658,10 @@ inline CooMatrix operator - (CooMatrix const & A, CooMatrix const & B)
  * @param z Number.
  * @param B Matrix.
  */
-inline CooMatrix operator * (Complex z, CooMatrix const & B)
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> operator * (DataT z, CooMatrix<IdxT,DataT> const & B)
 {
-    CooMatrix C = B;
+    CooMatrix<IdxT,DataT> C = B;
     return C *= z;
 }
 
@@ -481,9 +670,10 @@ inline CooMatrix operator * (Complex z, CooMatrix const & B)
  * @param A COO-Matrix.
  * @param B Dense matrix (as a column-major ordered array).
  */
-inline CooMatrix operator * (CooMatrix const & A, const cArrayView B)
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> operator * (CooMatrix<IdxT,DataT> const & A, const ArrayView<DataT> B)
 {
-    CooMatrix C = A;
+    CooMatrix<IdxT,DataT> C = A;
     return C *= B;
 }
 
@@ -492,9 +682,10 @@ inline CooMatrix operator * (CooMatrix const & A, const cArrayView B)
  * @param A COO-Matrix.
  * @param z Number.
  */
-inline CooMatrix operator * (CooMatrix const & A, Complex const & z)
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> operator * (CooMatrix<IdxT,DataT> const & A, DataT z)
 {
-    CooMatrix C = A;
+    CooMatrix<IdxT,DataT> C = A;
     return C *= z;
 }
 
@@ -502,13 +693,29 @@ inline CooMatrix operator * (CooMatrix const & A, Complex const & z)
  * Identity matrix.
  * @param N Dimension.
  */
-CooMatrix eye (std::size_t N);
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> eye (IdxT N)
+{
+    return CooMatrix<IdxT,DataT>(N,N).symm_populate_band
+    (
+        0,
+        [](IdxT i, IdxT j) -> DataT { return 1.; }
+    );
+}
 
 /**
  * Diagonal matrix with diagonal consisting of 0, 1, 2, 3, ..., N - 1.
  * @param N Dimension.
  */
-CooMatrix stairs (std::size_t N);
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> stairs (IdxT N)
+{
+    return CooMatrix<IdxT,DataT>(N,N).symm_populate_band
+    (
+        0,
+        [](IdxT i, IdxT j) -> DataT { return i; }
+    );
+}
 
 /**
  * @brief Kronecker product.
@@ -527,6 +734,7 @@ CooMatrix stairs (std::size_t N);
  * @param A First matrix
  * @param B Second matrix.
  */
-CooMatrix kron (CooMatrix const & A, CooMatrix const & B);
+template <class IdxT, class DataT>
+CooMatrix<IdxT,DataT> kron (CooMatrix<IdxT,DataT> const & A, CooMatrix<IdxT,DataT> const & B);
 
 #endif // HEX_COOMATRIX_H

@@ -40,15 +40,26 @@ const std::string ILUCGPreconditioner::prec_description =
     "Block inversion using conjugate gradients preconditioned by Incomplete LU. "
     "The drop tolerance can be given as the --droptol parameter.";
 
+void ILUCGPreconditioner::setup ()
+{
+    // setup parent
+    CGPreconditioner::setup();
+    
+    // prepare initial (empty) factorization data
+    for (auto & lu : lu_)
+        lu.reset(new LUft<LU_int_t,Complex>());
+}
+
 void ILUCGPreconditioner::update (double E)
 {
+    // reset data on energy change
     if (E != E_)
     {
         // release outdated LU factorizations
         for (auto & lu : lu_)
         {
-            lu.drop();
-            lu.unlink();
+            lu->drop();
+            lu->unlink();
         }
         
         // release outdated CSR diagonal blocks
@@ -70,20 +81,20 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     {
         csr_blocks_[iblock].hdfload();
         # pragma omp critical
-        lu_[iblock].silent_load();
+        lu_[iblock]->silent_load();
     }
     
     // check that the factorization is loaded
-    if (lu_[iblock].size() == 0)
+    if (lu_[iblock]->size() == 0)
     {
         // create CSR block
-        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo().tocsr();
+        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo<LU_int_t>().tocsr();
         
         // start timer
         Timer timer;
         
         // factorize the block and store it
-        lu_[iblock].transfer(csr_blocks_[iblock].factorize(droptol_));
+        lu_[iblock] = csr_blocks_[iblock].factorize(droptol_, cmd_.factorizer);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
@@ -92,7 +103,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
             "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
             iblock, l1_l2_[iblock].first, l1_l2_[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
             timer.seconds() / 60, timer.seconds() % 60,             // factorization time
-            lu_[iblock].size() / 1048576                            // final memory size
+            lu_[iblock]->size() / 1048576                           // final memory size
         );
         
         // save the diagonal block
@@ -104,21 +115,21 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     }
     
     // precondition by LU
-    z = lu_[iblock].solve(r);
+    z = lu_[iblock]->solve(r);
     
     // release memory
     if (cmd_.outofcore)
     {
         // link to a disk file and save (if not already done)
-        if (lu_[iblock].name().size() == 0)
+        if (lu_[iblock]->name().size() == 0)
         {
-            lu_[iblock].link(format("lu-%d.ooc", iblock));
+            lu_[iblock]->link(format("lu-%d.ooc", iblock));
             # pragma omp critical
-            lu_[iblock].save();
+            lu_[iblock]->save();
         }
         
         // release memory objects
-        lu_[iblock].drop();
+        lu_[iblock]->drop();
         csr_blocks_[iblock].drop();
     }
 }

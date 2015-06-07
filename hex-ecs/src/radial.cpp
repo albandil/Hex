@@ -332,8 +332,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     {
         cArrayView(Mitr_L_, lambda * mi_size, mi_size) = computeMi(lambda, bspline_.Nreknot() - 1);
         cArrayView(Mitr_mLm1_, lambda * mi_size, mi_size) = computeMi(-lambda-1, bspline_.Nreknot() - 1);
-        Mtr_L_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1, true); });
-        Mtr_mLm1_[lambda] = SymBandMatrix(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1, true); });
+        Mtr_L_[lambda] = SymBandMatrix<Complex>(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1, true); });
+        Mtr_mLm1_[lambda] = SymBandMatrix<Complex>(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1, true); });
     }
     
     // abandon their computation, if not necessary
@@ -345,7 +345,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     {
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
-        R_tr_dia_[lambda] = BlockSymBandMatrix
+        R_tr_dia_[lambda] = BlockSymBandMatrix<Complex>
         (
             Nspline,            // block count (and size)
             order + 1,          // half-bandwidth
@@ -393,7 +393,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             if (i + d < Nspline)
             {
                 // calculate the block
-                SymBandMatrix block = calc_R_tr_dia_block(lambda, i, i + d);
+                SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
                 
                 // write the finished block to disk
                 # pragma omp critical
@@ -432,14 +432,14 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     std::cout << std::endl;
 }
 
-SymBandMatrix RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
+SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
 {
     // shorthands
     int Nspline = bspline_.Nspline();
     int order = bspline_.order();
     
     // (i,k)-block data
-    SymBandMatrix block_ik (Nspline, order + 1);
+    SymBandMatrix<Complex> block_ik (Nspline, order + 1);
     
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
     for (int j = 0; j < Nspline; j++)
@@ -467,7 +467,7 @@ cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, boo
     for (std::size_t k = i; k < Nspline and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
-        SymBandMatrix block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
+        SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
         
         // multiply source vector by this block
         cArray prod = std::move ( block_ik.dot(cArrayView(src, k * Nspline, Nspline)) );

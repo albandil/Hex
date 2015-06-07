@@ -32,17 +32,16 @@
 #ifndef HEX_CSRMATRIX_H
 #define HEX_CSRMATRIX_H
 
-#ifndef NO_PNG
-#include <png++/png.hpp>
-#endif
+#include <memory>
 
-#ifndef NO_UMFPACK
-#include <umfpack.h>
+#ifdef WITH_PNG
+#include <png++/png.hpp>
 #endif
 
 #include "arrays.h"
 #include "coomatrix.h"
 #include "densematrix.h"
+#include "luft.h"
 
 /**
  * @brief Complex CSR matrix.
@@ -59,7 +58,7 @@
  * holds column indices of elements, which are stored in \c Ax and \c Az, real
  * ang imaginary part being separated.
  */
-class CsrMatrix
+template <class IdxT, class DataT> class CsrMatrix
 {
     
 public:
@@ -72,16 +71,13 @@ public:
         : m_(m), n_(n), name_() {}
     CsrMatrix (CsrMatrix const & A)
         : m_(A.m_), n_(A.n_), p_(A.p_), i_(A.i_), x_(A.x_), name_() {}
-    CsrMatrix (std::size_t m, std::size_t n, lArrayView const & p, lArrayView const & i, cArrayView const & x)
+    CsrMatrix (std::size_t m, std::size_t n, const ArrayView<IdxT> p, const ArrayView<IdxT> i, const ArrayView<DataT> x)
         : m_(m), n_(n), p_(p), i_(i), x_(x), name_() {}
     
-    // Destructor
-    
+    /// Destructor
     ~CsrMatrix () {}
     
-    /**
-     * @brief Clear data.
-     */
+    /// Clear data.
     void drop ()
     {
         m_ = n_ = 0;
@@ -94,19 +90,67 @@ public:
      * Ordinary matrix-vector product, \f$ A\cdot b \f$.
      * @param b Vector to multiply with.
      */
-    cArray dot (cArrayView const & b) const;
+    NumberArray<DataT> dot (const ArrayView<DataT> b) const
+    {
+        // create output array
+        NumberArray<DataT> c(m_);
+        
+        for (IdxT irow = 0; irow < m_; irow++)
+        {
+            IdxT idx1 = p_[irow];
+            IdxT idx2 = p_[irow+1];
+            
+            // for all nonzero elements in this row
+            for (IdxT idx = idx1; idx < idx2; idx++)
+            {
+                // get column number
+                IdxT icol = i_[idx];
+                
+                // store product
+                c[irow] += x_[idx] * b[icol];
+            }
+        }
+        
+        return c;
+    }
     
-    // Getters
-    
+    /// Get number of structurally non-zero elements.
     std::size_t size () const { return i_.size(); }
-    std::size_t rows () const { return m_; }
-    std::size_t cols () const { return n_; }
-    lArray const & p () const { return p_; }
-    lArray const & i () const { return i_; }
-    cArray const & x () const { return x_; }
     
-    // return absolute value of the (in absolute value) largest element
-    double norm () const;
+    /// Get row count.
+    std::size_t rows () const { return m_; }
+    
+    /// Get column count.
+    std::size_t cols () const { return n_; }
+    
+    /// Get row pointers.
+    NumberArray<IdxT> const & p () const { return p_; }
+    
+    /// Get column indices.
+    NumberArray<IdxT> const & i () const { return i_; }
+    
+    /// Get data array.
+    NumberArray<DataT> const & x () const { return x_; }
+    
+    /// Return absolute value of the (in absolute value) largest element.
+    double norm () const
+    {
+        std::size_t N = i_.size();
+        double res = 0.;
+        
+        // return the abs(largest element)
+        for (std::size_t i = 0; i < N; i++)
+        {
+            // compute the absolute value
+            double val = std::abs(x_[i]);
+            
+            // update the winner
+            if (val > res)
+                res = val;
+        }
+        
+        return res;
+    }
     
     /**
      * Write the matrix data to a file.
@@ -118,14 +162,31 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write (const char* filename) const;
+    void write (const char* filename) const
+    {
+        std::ofstream out (filename);
+        out << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
+        for (unsigned irow = 0; irow < m_; irow++)
+        {
+            IdxT idx1 = p_[irow];
+            IdxT idx2 = p_[irow + 1];
+            
+            for (IdxT idx = idx1; idx < idx2; idx++)
+            {
+                out << irow << "\t" << i_[idx];
+                for (int icomp = 0; icomp < typeinfo<DataT>::ncmpt; icomp++)
+                    out << "\t" << typeinfo<DataT>::cmpt(icomp, x_[idx]);
+                out << "\n";
+            }
+        }
+        out.close();
+    }
     
-#ifndef NO_PNG
+#ifdef WITH_PNG
     /**
      * PNG row data generator for use in \ref plot function.
      * 
-     * @note This class requires PNG++. It can be disabled if the macro
-     * NO_PNG is defined.
+     * @note This class requires PNG++.
      */
     class PngGenerator : public png::generator<png::gray_pixel_1,PngGenerator>
     {
@@ -135,253 +196,65 @@ public:
         
         public:
             
-            PngGenerator (CsrMatrix const * mat, double threshold);
-            ~PngGenerator ();
+            PngGenerator (CsrMatrix<IdxT,DataT> const * mat, double threshold)
+                : base_t(mat->cols(), mat->rows()), M_(mat), buff_(mat->cols()), threshold_(threshold)
+            {
+                // do nothing
+            }
             
-            png::byte* get_next_row (std::size_t pos);
+            ~PngGenerator ()
+            {
+                // do nothing
+            }
+            
+            png::byte * get_next_row (std::size_t irow)
+            {
+                // get column indices
+                IdxT idx_min = M_->p_[irow];
+                IdxT idx_max = M_->p_[irow + 1];
+                
+                // clear memory
+                for (std::size_t icol = 0; icol < M_->cols(); icol++)
+                    buff_[icol] = 1;
+                
+                // for all nonzero columns
+                for (IdxT idx = idx_min; idx < idx_max; idx++)
+                    if (std::abs(M_->x_[idx]) > threshold_)
+                        buff_[M_->i_[idx]] = 0;
+                
+                // pass the buffer
+                return reinterpret_cast<png::byte*>(row_traits::get_data(buff_));
+            }
             
         private:
             
-            CsrMatrix const * M_;
+            CsrMatrix<IdxT,DataT> const * M_;
             row buff_;
             double threshold_;
     };
+#endif // WITH_PNG
 
     /**
      * Save matrix structure as a black-and-white image.
      * @param filename File name.
      * @param threshold Largest absolute value represented by white colour.
      */
-    void plot (const char* filename, double threshold = 0.) const;
-#endif
-
-#ifndef NO_UMFPACK
-    /**
-     * @brief LU factorization object
-     * 
-     * This class is returned by the function CsrMatrix::factorize() and
-     * it provides some functions that can be used when solving equations with
-     * that LU factorization. Also, it is possible to store the decomposition
-     * to disk (link,save), destro the data (drop) and load later when needed
-     * (load). The most important function is "solve".
-     */
-    class LUft
+    void plot (const char* filename, double threshold = 0.) const
     {
-    public:
+#ifdef WITH_PNG
+        // create output file
+        std::ofstream out(filename, std::ios_base::out | std::ios_base::binary);
         
-        /// Default constructor.
-        LUft ()
-            : numeric_(nullptr), matrix_(nullptr), filename_(), info_(UMFPACK_INFO) {}
+        // create PNG data generator
+        PngGenerator png(this, threshold);
         
-        /// Copy constructor.
-        LUft (LUft const & lu)
-            : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) {}
-        
-        /// Move constructor.
-        LUft (LUft && lu)
-            : numeric_(lu.numeric_), matrix_(lu.matrix_), filename_(lu.filename_), info_(lu.info_) { lu.numeric_ = nullptr; }
-        
-        /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft (const CsrMatrix* matrix, void* numeric)
-            : numeric_(numeric), matrix_(matrix), filename_(), info_(UMFPACK_INFO) {}
-        
-        /// Destructor.
-        ~LUft ()
-        {
-            drop ();
-        }
-        
-        /**
-         * @brief Transfer data from another factorization object.
-         * 
-         * Move contents of another LUft object to this one. If there are already some
-         * data in this object, delete them.
-         */
-        void transfer (LUft && lu)
-        {
-            // clean this object
-            drop();
-            
-            // transfer data
-            numeric_  = lu.numeric_;
-            matrix_   = lu.matrix_;
-            filename_ = lu.filename_;
-            info_     = lu.info_;
-            
-            // clean source
-            lu.numeric_  = nullptr;
-        }
-        
-        /**
-         * @brief Size of the numerical data.
-         * 
-         * Return the number of bytes occupied by the stored elements
-         * of the LU-factorization. This doesn't contain any other structural data.
-         */
-        std::size_t size () const
-        {
-            if (numeric_ == nullptr)
-                return 0;
-            
-            std::int64_t lnz, unz, m, n, nz_udiag;
-            std::int64_t status = umfpack_zl_get_lunz
-            (
-                &lnz, &unz, &m, &n, &nz_udiag, numeric_
-            );
-            return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
-        }
-        
-        /**
-         * @brief Solve equations.
-         * 
-         * The parameter "b" is assumed to contain several right hand
-         * side vectors (their count is supplied as the optional parameter
-         * "eqs"). The results are stored in "x", which has the same size
-         * as "b".
-         */
-        //@{
-        cArray solve (const cArrayView b, unsigned eqs = 1) const
-        {
-            // reserve space for the solution
-            cArray x(b.size());
-            
-            // solve
-            solve(b, x, eqs);
-            
-            // return the result
-            return x;
-        }
-        void solve (const cArrayView b, cArrayView x, int eqs = 1) const
-        {
-            // check sizes
-            assert (eqs * matrix_->n_ == (int)x.size());
-            assert (eqs * matrix_->n_ == (int)b.size());
-            
-            // solve for all RHSs
-            for (int eq = 0; eq < eqs; eq++)
-            {
-                // solve for current RHS
-                std::int64_t status = umfpack_zl_solve
-                (
-                    UMFPACK_Aat,
-                    matrix_->p_.data(), matrix_->i_.data(),
-                    reinterpret_cast<const double*>(matrix_->x_.data()), nullptr,
-                    reinterpret_cast<double*>(&x[0] + eq * matrix_->n_), nullptr,
-                    reinterpret_cast<const double*>(&b[0] + eq * matrix_->n_), nullptr,
-                    numeric_, nullptr, &info_[0]
-                );
-                
-                // check output
-                if (status != UMFPACK_OK)
-                {
-                    std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << std::endl;
-                    umfpack_zl_report_status(0, status);
-                }
-            }
-        }
-        //@}
-        
-        /**
-         * @brief Get info array.
-         * 
-         * Get UMFPACK "info" array.
-         */
-        rArray const & info () const { return info_; }
-        
-        /**
-         * @brief Link to a disk file.
-         * 
-         * This function will set a filename that will be used if
-         * any of the functions @ref save or @ref load is used without
-         * a specific filename.
-         */
-        void link (std::string name) { filename_ = name; }
-        void unlink () { filename_.clear(); }
-        
-        /**
-         * @brief Name of the linked disk file.
-         */
-        std::string name () const { return filename_; }
-        
-        /**
-         * @brief Save Numeric object to a disk file.
-         * 
-         * Stores the LU-factorization data in the native UMFPACK format
-         * to a disk file.
-         */
-        void save (std::string name) const
-        {
-            std::int64_t err = umfpack_zl_save_numeric (numeric_, const_cast<char*>(filename_.c_str()));
-            
-            if (err == UMFPACK_ERROR_invalid_Numeric_object)
-                HexException("[LUft::save] Invalid numeric object.");
-            
-            if (err == UMFPACK_ERROR_file_IO)
-                HexException("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
-        }
-        void save () const
-        {
-            save (filename_);
-        }
-        
-        /**
-         * @brief Load Numeric object from a disk file.
-         * 
-         * The expected format is the format of umfpack_zl_save_numeric.
-         */
-        //@{
-        void load (std::string name, bool throw_on_io_failure = true)
-        {
-            std::int64_t err = umfpack_zl_load_numeric (&numeric_, const_cast<char*>(filename_.c_str()));
-            
-            if (err == UMFPACK_ERROR_out_of_memory)
-                HexException("[LUft::load] Out of memory.");
-            
-            if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
-                HexException("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
-        }
-        void load ()
-        {
-            load (filename_, true);
-        }
-        void silent_load ()
-        {
-            load (filename_, false);
-        }
-        //@}
-        
-        /**
-         * @brief Free memory.
-         * 
-         * Release memory occupied by the LU-factorization numeric object.
-         */
-        void drop ()
-        {
-            if (numeric_ != nullptr)
-            {
-                umfpack_zl_free_numeric (&numeric_);
-                numeric_ = nullptr;
-            }
-        }
-        
-    private:
-        
-        /// Numeric decomposition as produced by UMFPACK.
-        void* numeric_;
-        
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        const CsrMatrix* matrix_;
-        
-        /// Linked HDF file name.
-        std::string filename_;
-        
-        /// Set of status flags produced by UMFPACK.
-        mutable rArray info_;
-        
-        // Disable bitwise copy
-        LUft const & operator= (LUft const &);
-    };
-
+        // write PNG file
+        png.write(out);
+#else
+        HexException("The program was not built with PNG++ library (use -DWITH_PNG).");
+#endif // WITH_PNG
+    }
+    
     /**
      * @brief Compute (incomplete) LU factorization.
      * 
@@ -395,8 +268,44 @@ public:
      * @return Special structure of the LUft type, holding opaque information about
      *         the factorization.
      */
-    LUft factorize (double droptol = 0) const;
-#endif
+    std::shared_ptr<LUft<IdxT,DataT>> factorize (double droptol = 0, int use_library = LUFT_ANY) const
+    {
+        if (use_library == LUFT_ANY or use_library == LUFT_UMFPACK)
+        {
+#ifdef WITH_UMFPACK
+            return factorize_umfpack(droptol);
+#else
+            if (use_library != LUFT_ANY)
+                HexException("Program is not compiled with UMFPACK support (use -DWITH_UMFPACK).");
+#endif // WITH_UMFPACK
+        }
+        
+        if (use_library == LUFT_ANY or use_library == LUFT_SUPERLU)
+        {
+#ifdef WITH_SUPERLU
+            return factorize_superlu(droptol);
+#else
+            if (use_library != LUFT_ANY)
+                HexException("Program is not compiled with sequential SuperLU support (use -DWITH_SUPERLU).");
+#endif // WITH_SUPERLU
+        }
+        
+        if (use_library == LUFT_ANY or use_library ==  LUFT_SUPERLU_DIST)
+        {
+#ifdef WITH_SUPERLU_DIST
+            return factorize_superlu_dist(droptol);
+#else
+            if (use_library != LUFT_ANY)
+                HexException("Program is not compiled with distributed SuperLU support (use -DWITH_SUPERLU_DIST).");
+#endif // WITH_SUPERLU_DIST
+        }
+        
+        HexException("Unsupported LU factorization method %d.", use_library);
+    }
+    
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (double droptol = 0) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (double droptol = 0) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (double droptol = 0) const;
     
     /**
      * @brief Solve the Ax = b problem, where "b" can be a matrix.
@@ -408,7 +317,20 @@ public:
      * @param eqs Number of columns.
      * @return Array of roots in the same shape as "b".
      */
-    cArray solve (const cArrayView b, size_t eqs = 1) const;
+    NumberArray<DataT> solve (const ArrayView<DataT> b, int eqs = 1, int use_library = LUFT_UMFPACK) const
+    {
+        // only square matrices are allowed
+        assert(m_ == n_);
+        
+        // compute the LU factorization
+        std::shared_ptr<LUft<IdxT,DataT>> luft = factorize(use_library);
+        
+        // solve the equations
+        NumberArray<DataT> solution = luft->solve(b, eqs);
+        
+        // return
+        return solution;
+    }
     
     /**
      * @brief Link to a disk file.
@@ -416,7 +338,7 @@ public:
      * Set a default I/O file that will be used if any of the functions
      * @ref hdfload or @ref hdfsave will be used without an explicit filename.
      */
-    void hdflink (std::string name);
+    void hdflink (std::string name) { name_ = name; }
     void unlink () { name_.clear(); }
     
     /**
@@ -429,7 +351,33 @@ public:
      */
     //@{
     bool hdfsave () const { return hdfsave(name_); }
-    bool hdfsave (std::string name) const;
+    bool hdfsave (std::string name) const
+    {
+        HDFFile hdf(name, HDFFile::overwrite);
+        
+        // write dimensions
+        hdf.write("m", &m_, 1);
+        hdf.write("n", &n_, 1);
+        
+        // write indices
+        if (not p_.empty())
+            hdf.write("p", &(p_[0]), p_.size());
+        if (not i_.empty())
+            hdf.write("i", &(i_[0]), i_.size());
+        
+        // write data
+        if (not x_.empty())
+        {
+            hdf.write
+            (
+                "x",
+                reinterpret_cast<typename typeinfo<DataT>::cmpttype const*>(&(x_[0])),
+                x_.size() * typeinfo<DataT>::ncmpt
+            );
+        }
+        
+        return true;
+    }
     //@}
     
     /**
@@ -437,33 +385,104 @@ public:
      */
     //@{
     bool hdfload () { return hdfload(name_); }
-    bool hdfload (std::string name);
+    bool hdfload (std::string name)
+    {
+        HDFFile hdf(name, HDFFile::readonly);
+        
+        // read dimensions
+        hdf.read("m", &m_, 1);
+        hdf.read("n", &n_, 1);
+        
+        // read indices
+        if (p_.resize(hdf.size("p")))
+            hdf.read("p", &(p_[0]), p_.size());
+        if (i_.resize(hdf.size("i")))
+            hdf.read("i", &(i_[0]), i_.size());
+        
+        // read data
+        if (x_.resize(hdf.size("x") / 2))
+        {
+            hdf.read
+            (
+                "x",
+                reinterpret_cast<typename typeinfo<DataT>::cmpttype*>(&(x_[0])),
+                x_.size() * typeinfo<DataT>::ncmpt
+            );
+        }
+        
+        return true;
+    }
     //@}
     
     /**
      * Element-wise access (const).
      * If a non-existing element is referenced, zero is returned.
      */
-    Complex operator() (unsigned i, unsigned j) const;
+    DataT operator() (IdxT i, IdxT j) const
+    {
+        // get all column indices, which have nonzero element in row "i"
+        IdxT idx1 = p_[i];
+        IdxT idx2 = p_[i + 1];
+        
+        // find the correct column ("j")
+        auto it = std::lower_bound(i_.begin() + idx1, i_.begin() + idx2, j);
+
+        if (it == i_.end() or *it != j)
+            return 0.;
+        
+        // return the value
+        return x_[it - i_.begin()];
+    }
     
     /**
      * Multiplication by a number.
      */
-    CsrMatrix & operator *= (Complex r);
+    CsrMatrix<IdxT,DataT> & operator *= (DataT r)
+    {
+        std::size_t N = i_.size();
+        for (std::size_t i = 0; i < N; i++)
+            x_[i] *= r;
+        return *this;
+    }
     
     /**
      * Addition of another CSR matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
      * checked.
      */
-    CsrMatrix & operator &= (CsrMatrix const & B);
+    CsrMatrix<IdxT,DataT> & operator &= (CsrMatrix<IdxT,DataT> const & B)
+    {
+        std::size_t N = i_.size();
+        
+        // check at least dimensions and non-zero element count
+        assert(m_ == B.m_);
+        assert(n_ == B.n_);
+        assert(N == B.i_.size());
+        
+        for (std::size_t i = 0; i < N; i++)
+            x_[i] += B.x_[i];
+        
+        return *this;
+    }
     
     /**
      * Subtraction of another CSR matrix.
      * The matrices MUST HAVE THE SAME SPARSE STRUCTURE, as no indices are
      * checked.
      */
-    CsrMatrix& operator ^= (CsrMatrix const & B);
+    CsrMatrix<IdxT,DataT> & operator ^= (CsrMatrix<IdxT,DataT> const & B)
+    {
+        std::size_t N = i_.size();
+        
+        assert(m_ == B.m_);
+        assert(n_ == B.n_);
+        assert(N == B.i_.size());
+        
+        for (std::size_t i = 0; i < N; i++)
+            x_[i] -= B.x_[i];
+        
+        return *this;
+    }
     
     /**
      * Sets fill-in elements so that the storage structure of this matrix
@@ -471,22 +490,75 @@ public:
      * “fast” arithmetic operators & and ^.
      * @return self
      */
-    CsrMatrix sparse_like (CsrMatrix const & B) const;
+    CsrMatrix<IdxT,DataT> sparse_like (CsrMatrix<IdxT,DataT> const & B) const
+    {
+        // check dimensions
+        assert(m_ == B.m_);
+        assert(n_ == B.n_);
+        
+        // prepare zero matrix with the same storage pattern the matrix B has
+        CsrMatrix<IdxT,DataT> A = B;
+        std::memset(A.x_.data(), 0, A.x_.size() * sizeof(DataT));
+        
+        // copy all nonzero elements of "this" matrix
+        for (IdxT row = 0; row < m_; row++)
+        {
+            IdxT idx1 = A.p_[row];
+            IdxT idx2 = A.p_[row+1];
+            
+            for (std::size_t idx = idx1; idx < idx2; idx++)
+            {
+                IdxT col = A.i_[idx];
+                A.x_[idx] = (*this)(row,col);
+            }
+        }
+        
+        // return temporary matrix
+        return A;
+    }
     
     /**
      * Return dense array with diagonal elements of the matrix.
      */
-    cArray diag() const;
+    NumberArray<DataT> diag () const
+    {
+        NumberArray<DataT> D (std::min(m_, n_));
+        
+        for (int irow = 0; irow < m_; irow++)
+        for (int idx = p_[irow]; idx < p_[irow+1]; idx++)
+        if (i_[idx] == irow)
+            D[irow] = x_[idx];
+        
+        return D;
+    }
     
     /**
      * Convert to COO format.
      */
-    CooMatrix tocoo() const;
+    CooMatrix<IdxT,DataT> tocoo() const;
     
     /**
      * Convert to dense matrix.
      */
-    RowMatrix<Complex> torow() const;
+    RowMatrix<DataT> torow () const
+    {
+        RowMatrix<DataT> M (rows(),cols());
+        for (IdxT irow = 0; irow < rows(); irow++)
+        {
+            IdxT rptr_begin = p_[irow];
+            IdxT rptr_end = p_[irow + 1];
+            
+            for (IdxT idx = rptr_begin; idx < rptr_end; idx++)
+            {
+                IdxT icol = i_[idx];
+                Complex x = x_[idx];
+                
+                M(irow, icol) = x;
+            }
+        }
+        
+        return M;
+    }
     
     /**
      * Solves upper triangular system of equations using backsubstitution.
@@ -494,7 +566,53 @@ public:
      * won't be used or changed.
      * @param b Right-hand side.
      */
-    cArray upperSolve (cArrayView const & b) const;
+    NumberArray<DataT> upperSolve (ArrayView<DataT> const & b) const
+    {
+        // check size
+        IdxT N = b.size();
+        assert(m_ == N);
+        assert(n_ == N);
+        
+        // create output array
+        NumberArray<DataT> x (N);
+        
+        // loop over rows
+        for (IdxT i = 0; i < N; i++)
+        {
+            IdxT row = N - 1 - i;
+            DataT accum = 0.;
+            
+            // get relevant columns of the sparse matrix
+            IdxT idx1 = p_[row];
+            IdxT idx2 = p_[row + 1];
+            
+            // diagonal element of the matrix
+            DataT a = 0.;
+            
+            // loop over the columns
+            for (IdxT idx = idx1; idx < idx2; idx++)
+            {
+                // which column is this?
+                IdxT col = i_[idx];
+                
+                // diagonal element will be useful in a moment, store it
+                if (col == row)
+                    a = x_[idx];
+                
+                // backsubstitute
+                else if (col > row)
+                    accum += x_[idx] * x[col];
+            }
+            
+            // triangular matrix, in order to be regular, needs nonzero diagonal elements
+            assert(a != 0.);
+            
+            // compute and store the new root
+            x[row] = (b[row] - accum) / a;
+        }
+
+        return x;
+    }
     
     /**
      * Solves lower triangular system of equations using backsubstitution.
@@ -502,7 +620,52 @@ public:
      * won't be used or changed.
      * @param b Right-hand side.
      */
-    cArray lowerSolve (cArrayView const & b) const;
+    NumberArray<DataT> lowerSolve (ArrayView<DataT> const & b) const
+    {
+        // check size
+        IdxT N = b.size();
+        assert(m_ == N);
+        assert(n_ == N);
+        
+        // create output array
+        NumberArray<DataT> x (N);
+        
+        // loop over rows
+        for (IdxT row = 0; row < N; row++)
+        {
+            DataT accum = 0.;
+            
+            // get relevant columns of the sparse matrix
+            IdxT idx1 = p_[row];
+            IdxT idx2 = p_[row + 1];
+            
+            // diagonal element of the matrix
+            DataT a = 0.;
+            
+            // loop over the columns
+            for (IdxT idx = idx1; idx < idx2; idx++)
+            {
+                // which column is this?
+                IdxT col = i_[idx];
+                
+                // diagonal element will be useful in a moment, store it
+                if (col == row)
+                    a = x_[idx];
+                
+                // backsubstitute
+                else if (col < row)
+                    accum += x_[idx] * x[col];
+            }
+            
+            // triangular matrix, in order to be regular, needs nonzero diagonal elements
+            assert(a != 0.);
+            
+            // compute and store the new root
+            x[row] = (b[row] - accum) / a;
+        }
+        
+        return x;
+    }
     
     /**
      * Applies a user transformation on <b>nonzero</b> matrix elements.
@@ -540,13 +703,13 @@ public:
 private:
     
     // dimensions
-    std::int64_t m_;
-    std::int64_t n_;
+    IdxT m_;
+    IdxT n_;
     
     // representation
-    lArray p_;
-    lArray i_;
-    cArray x_;
+    NumberArray<IdxT> p_;
+    NumberArray<IdxT> i_;
+    NumberArray<DataT> x_;
     
     // linked HDF file
     std::string name_;
@@ -555,36 +718,40 @@ private:
 /**
  * Computes a sum of two csr-matrices OF THE SAME SPARSE STRUCTURE.
  */
-inline CsrMatrix operator & (CsrMatrix const & A, CsrMatrix const & B)
+template <class IdxT, class DataT>
+CsrMatrix<IdxT,DataT> operator & (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,DataT> const & B)
 {
-    CsrMatrix C = A;
+    CsrMatrix<IdxT,DataT> C = A;
     return C &= B;
 }
 
 /**
  * Computes a difference of two csr-matrices OF THE SAME SPARSE STRUCTURE.
  */
-inline CsrMatrix operator ^ (CsrMatrix const & A, CsrMatrix const & B)
+template <class IdxT, class DataT>
+CsrMatrix<IdxT,DataT> operator ^ (CsrMatrix<IdxT,DataT> const & A, CsrMatrix<IdxT,DataT> const & B)
 {
-    CsrMatrix C = A;
+    CsrMatrix<IdxT,DataT> C = A;
     return C ^= B;
 }
 
 /**
  * Multiplication of csr-matrix by a number.
  */
-inline CsrMatrix operator * (Complex z, CsrMatrix const &  B)
+template <class IdxT, class DataT>
+CsrMatrix<IdxT,DataT> operator * (DataT z, CsrMatrix<IdxT,DataT> const &  B)
 {
-    CsrMatrix C = B;
+    CsrMatrix<IdxT,DataT> C = B;
     return C *= z;
 }
 
 /**
  * Multiplication of csr-matrix by a number.
  */
-inline CsrMatrix operator * (CsrMatrix const & A, double r)
+template <class IdxT, class DataT>
+CsrMatrix<IdxT,DataT> operator * (CsrMatrix<IdxT,DataT> const & A, double r)
 {
-    CsrMatrix C = A;
+    CsrMatrix<IdxT,DataT> C = A;
     return C *= r;
 }
 

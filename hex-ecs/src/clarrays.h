@@ -13,7 +13,7 @@
 #ifndef HEX_OPENCL
 #define HEX_OPENCL
 
-#ifndef NO_OPENCL
+#ifdef WITH_OPENCL
 
 #include <CL/cl.h>
 
@@ -294,6 +294,6 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         }
 };
 
-#endif
+#endif // WITH_OPENCL
 
 #endif

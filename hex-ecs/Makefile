@@ -13,38 +13,34 @@ CFLAGS = -fopenmp -Wall -mtune=native -march=native
 LFLAGS = -fopenmp
 
 # ---------------------------------------------------------------------------- #
-# Suite Sparse environment                                                     #
+# LU factorization libraries (use at least one)                                #
 # ---------------------------------------------------------------------------- #
 
-SUITESPARSENAMES = umfpack amd cholmod colamd camd ccolamd
+# - SuperLU
+SUPERLUFLAGS = -DWITH_SUPERLU
+SUPERLULIBS = -lsuperlu
 
-# - for repository release
-# SUITESPARSEFLAGS = -I/usr/include/suitesparse
-# SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES))
-
-# - for custom build
-SUITESPARSEFLAGS =
-SUITESPARSELIBS = $(patsubst %,-l%,$(SUITESPARSENAMES)) \
-                  -lmetis -lsuitesparseconfig -lopenblas
+# - SuiteSparse/UMFPACK
+SUITESPARSEFLAGS = -DWITH_UMFPACK
+SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig -lopenblas
 
 # ---------------------------------------------------------------------------- #
-# OpenMPI environment (optional, use -DNO_MPI to omit)                         #
+# OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
-# OPENMPIFLAGS = -DNO_MPI
-# OPENMPILIBS =
-
-# - for repository release
-OPENMPIFLAGS = $(shell mpic++ --showme:compile)
+OPENMPIFLAGS = -DWITH_MPI $(shell mpic++ --showme:compile)
 OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 # ---------------------------------------------------------------------------- #
-# OpenCL                                                                       #
+# OpenCL (optional)                                                            #
 # ---------------------------------------------------------------------------- #
 
-OPENCLFLAGS = -DNO_OPENCL
+# - Intel OpenCL
+OPENCLFLAGS = -DWITH_OPENCL -I/opt/intel/opencl-1.2-4.5.0.8/include
+OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
 
-# OPENCLFLAGS = -I/opt/AMDAPPSDK-3.0-0-Beta/include
+# - AMD OpenCL
+# OPENCLFLAGS = -DWITH_OPENCL -I/opt/AMDAPPSDK-3.0-0-Beta/include
 # OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
 
 # ---------------------------------------------------------------------------- #
@@ -69,42 +65,42 @@ FFTWLIBS = -lfftw3
 # LAPACKLIBS = -lgfortran -llapack
 
 # ---------------------------------------------------------------------------- #
-# PNG++ (optional, use -DNO_PNG to omit)                                       #
+# PNG++ (optional)                                                             #
 # ---------------------------------------------------------------------------- #
 
-PNGPPFLAGS = -DNO_PNG
-PNGPPFLIBS =
-
-# PNGPPFLAGS = -I./libs
-# PNGPPLIBS = -lpng
+PNGPPFLAGS = -DWITH_PNG -I./libs
+PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 
 
 # compiler flags
-CFLAGS +=  -fPIC -std=c++11 $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) \
-          $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS)
+CFLAGS +=  -fPIC -std=c++11 -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
+          $(SUPERLUFLAGS) $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) \
+          $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS) 
 
 # linker flags
-LFLAGS += -fPIC $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
-          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS) -rdynamic
+LFLAGS += -fPIC -rdynamic \
+          $(SUPERLULIBS) $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
+          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 # DEBUG and RELEASE variants
-CXXDEBUG = -g $(CFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXRILIS = -O3 -fcx-limited-range $(CFLAGS) -DNDEBUG -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = -g $(CFLAGS) 
+CXXRILIS = -g $(CFLAGS) -O3 -fcx-limited-range -DNDEBUG
 
 # choose between DEBUG and RELEASE compiler flags
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
 
 # source files
-CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen main \
+CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
            matrix misc radial slater special version \
            preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
-           preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner
+           preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
+           preconditioners/GPUPreconditioner
 
 # sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))

@@ -161,7 +161,7 @@ class Preconditioners
 #ifndef NO_LAPACK
             , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
 #endif
-#ifndef NO_OPENCL
+#ifdef WITH_OPENCL
             , GPUCGPreconditioner         // KPA implemented on GPU.
 #endif
         > AvailableTypes;

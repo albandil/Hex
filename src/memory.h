@@ -69,7 +69,21 @@ template <class T> class PlainAllocator
          */
         static T * alloc (std::size_t n)
         {
-            return new T[n]();
+            try
+            {
+                return new T[n]();
+            }
+            catch (std::bad_alloc const & err)
+            {
+                std::size_t bytes = n * sizeof(T);
+                std::string strsize = (
+                    bytes < 1204           ? format("%d B", bytes) : (
+                    bytes < 1024*1204      ? format("%.2f kiB", bytes / 1024.) : (
+                    bytes < 1024*1024*1024 ? format("%.2f MiB", bytes / (1024. * 1024.)) :
+                      /* else */             format("%.2f GiB", bytes / (1024. * 1024 * 1024.)))));
+                
+                HexException("Insufficent memory (unable to allocate next %s).", strsize.c_str());
+            }
         }
         
         /**

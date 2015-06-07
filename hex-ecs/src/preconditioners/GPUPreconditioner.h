@@ -38,7 +38,7 @@
 #include "../matrix.h"
 #include "../preconditioners.h"
 
-#ifndef NO_OPENCL
+#ifdef WITH_OPENCL
 
 #include <CL/cl.h>
 

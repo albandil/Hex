@@ -29,7 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#if (!defined(NO_OPENCL) && !defined(NO_LAPACK))
+#if (defined(WITH_OPENCL) && !defined(NO_LAPACK))
 
 #include <iostream>
 #include <set>
