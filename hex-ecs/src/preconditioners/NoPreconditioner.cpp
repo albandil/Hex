@@ -393,7 +393,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 }
             }
             
-            // load data from scratch disk
+            // release radial integrals
             if (not cmd_.cache_own_radint)
                 const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).drop();
         }
