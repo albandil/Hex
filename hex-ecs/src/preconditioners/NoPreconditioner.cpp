@@ -94,7 +94,7 @@ void NoPreconditioner::update (double E)
         int l2 = l1_l2_[ill].second;
         
         // initialize diagonal block
-        dia_blocks_[ill] = BlockSymBandMatrix<Complex>
+        dia_blocks_[ill] = BlockSymBandMatrix
         (
             s_bspline_.Nspline(),       // block count (and size)
             s_bspline_.order() + 1,     // half-bandwidth
@@ -117,11 +117,10 @@ void NoPreconditioner::update (double E)
             unsigned j = i + d;
             
             // one-electron part
-            Complex half (0.5,0.0);
-            SymBandMatrix<Complex> block = E * s_rad_.S()(i,j) * s_rad_.S();
-            block -= (half * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
+            SymBandMatrix block = E * s_rad_.S()(i,j) * s_rad_.S();
+            block -= (0.5 * s_rad_.D()(i,j) - s_rad_.Mm1_tr()(i,j)) * s_rad_.S();
             block -= 0.5 * l1 * (l1 + 1) * s_rad_.Mm2()(i,j) * s_rad_.S();
-            block -= s_rad_.S()(i,j) * (half * s_rad_.D() - s_rad_.Mm1_tr());
+            block -= s_rad_.S()(i,j) * (0.5 * s_rad_.D() - s_rad_.Mm1_tr());
             block -= 0.5 * l2 * (l2 + 1) * s_rad_.S()(i,j) * s_rad_.Mm2();
             
             // two-electron part
@@ -195,14 +194,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
-    cArray ji_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
+    cArray ji_expansion = s_rad_.S().tocoo().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
     if (not std::isfinite(ji_expansion.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
     Pi_overlaps = s_rad_.overlapP(ni, li, weightEndDamp(s_rad_.bspline()));
-    Pi_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(Pi_overlaps);
+    Pi_expansion = s_rad_.S().tocoo().tocsr().solve(Pi_overlaps);
     if (not std::isfinite(Pi_expansion.norm()))
         HexException("Unable to expand hydrogen bound orbital in B-splines!");
     
@@ -249,12 +248,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 double f1 = special::computef(lambda, l1, l2, li, l, inp_.L);
                 double f2 = special::computef(lambda, l1, l2, l, li, inp_.L);
                 
-                // abort if any of the coefficients is non-number (factorial overflow etc.)
-                if (not std::isfinite(f1))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
-                if (not std::isfinite(f2))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
-                
                 // add multipole terms (direct/exchange)
                 if (not cmd_.lightweight_radial_cache)
                 {
@@ -299,6 +292,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
+    // precalculate angular integrals
+    double fs[Nang][Nang][s_rad_.maxlambda() + 1];
+    for (int ill  = 0; ill  < Nang; ill ++)
+    for (int illp = 0; illp < Nang; illp++)
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+    
     if (not cmd_.lightweight_radial_cache)
     {
         //
@@ -318,7 +318,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 q.hdfload(ill);
                 
                 if (cmd_.wholematrix)
-                    const_cast<BlockSymBandMatrix<Complex>&>(dia_blocks_[ill]).hdfload();
+                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).hdfload();
             }
             
             // multiply
@@ -333,7 +333,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 q[ill].drop();
                 
                 if (cmd_.wholematrix)
-                    const_cast<BlockSymBandMatrix<Complex>&>(dia_blocks_[ill]).drop();
+                    const_cast<BlockSymBandMatrix&>(dia_blocks_[ill]).drop();
             }
         }
         
@@ -343,59 +343,44 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         {
             // load data from scratch disk
             if (not cmd_.cache_own_radint and cmd_.wholematrix)
-                const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).hdfload();
+                const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).hdfload();
             
-            // update all blocks with this multipole potential matrix
-            for (int ill = 0;  ill < Nang;  ill++)
+            // for all source segments
+            for (int illp = 0; illp < Nang; illp++)
             {
-                if (cmd_.outofcore)
-                    q.hdfload(ill);
+                // do we need to multiply this segment by the matrix?
+                bool needed = false;
+                for (int ill = 0;  ill < Nang;  ill++)
+                    if (ill != illp and fs[ill][illp][lambda] != 0)
+                        needed = true;
                 
-                for (int illp = 0; illp < Nang; illp++)
+                // skip this segment if multiplication not needed
+                if (not needed)
+                    continue;
+                
+                // calculate the product
+                if (cmd_.outofcore) const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                cArray prod = std::move( s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                if (cmd_.outofcore) const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                
+                // update all relevant off-diagonal destination segments
+                for (int ill = 0;  ill < Nang;  ill++)
                 {
-                    // skip diagonal
-                    if (ill == illp)
-                        continue;
-                    
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
-                    // check non-zero
-                    if (f == 0.)
-                        continue;
-                    
-                    // load data
-                    if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p).hdfload(illp);
-                    
-                    // calculate product
-                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
-                    
-                    // unload data
-                    if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                    if (fs[ill][illp][lambda] != 0 and ill != illp)
+                    {
+                        if (cmd_.outofcore) q.hdfload(ill);
+                        
+                        q[ill] += (-fs[ill][illp][lambda]) * prod;
+                        
+                        if (cmd_.outofcore) q.hdfsave(ill);
+                        if (cmd_.outofcore) q[ill].drop();
+                    }
                 }
                 
-                if (cmd_.outofcore)
-                {
-                    q.hdfsave(ill);
-                    q[ill].drop();
-                }
+                // unload data
+                if (not cmd_.cache_own_radint)
+                    const_cast<BlockSymBandMatrix&>(s_rad_.R_tr_dia(lambda)).drop();
             }
-            
-            // load data from scratch disk
-            if (not cmd_.cache_own_radint)
-                const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).drop();
         }
         
         // multiply "p" by the off-diagonal blocks multiprocess
@@ -425,25 +410,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     if (ill == illp)
                         continue;
                     
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
                     // check non-zero
-                    if (f == 0.)
+                    if (fs[ill][illp][lambda] == 0.)
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    cArray p0 = std::move( (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -508,17 +480,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // auxiliary buffers
         cArray buffer (Nang * Nspline);
         
-        // precalculate angular integrals
-        double fs[Nang][Nang][s_rad_.maxlambda() + 1];
-        for (int ill  = 0; ill  < Nang; ill ++)
-        for (int illp = 0; illp < Nang; illp++)
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        {
-            fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-            if (not std::isfinite(fs[ill][illp][lambda]))
-                HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-        }
-        
 #ifdef _OPENMP
         // I/O access locks
         std::vector<omp_lock_t> locks(Nang);
@@ -556,7 +517,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 for (int lambda = 0; lambda <= maxlambda; lambda++)
                 {
                     // calculate the radial sub-block
-                    SymBandMatrix<Complex> R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
+                    SymBandMatrix R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
                     
                     // apply all superblocks
                     for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))

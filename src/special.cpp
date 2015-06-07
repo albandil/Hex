@@ -208,7 +208,14 @@ cArray special::ric_jv (int lmax, Complex z)
                 
                 // check success
                 if (err != GSL_SUCCESS or not std::isfinite(res.val))
-                    HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, z.real());
+                {
+                    // probably deep in classically forbidden region?
+                    if (z.real() * z.real() < l * (l + 1.))
+                        res.val = gsl_sf_pow_int(z.real(), l) / gsl_sf_doublefact(2*l+1);
+                    // other problem...
+                    else
+                        HexException("Error \"%s\" while evaluating j[%d](%g).", gsl_strerror(err), l, z.real());
+                }
                 
                 // save value
                 ev[l] = res.val;
@@ -801,7 +808,11 @@ double special::computef (int lambda, int l1, int l2, int l1p, int l2p, int L)
     if (not std::isfinite(C))
         HexException("Wigner3j(%d,%d,%d,0,0,0) not finite.", l2, lambda, l2p);
     
-    return pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
+    double f = pow(-1, L + l2 + l2p) * sqrt((2*l1 + 1) * (2*l2 + 1) * (2*l1p + 1) * (2*l2p + 1)) * A * B * C;
+    
+    if (not std::isfinite(f))
+        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, L);
+    return f;
 }
 
 inline long double dfact (long double x)
