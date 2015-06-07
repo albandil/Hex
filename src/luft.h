@@ -97,7 +97,7 @@ class LUft
          * "eqs"). The results are stored in "x", which has the same size
          * as "b".
          */
-        virtual void solve (const cArrayView b, cArrayView x, int eqs = 1) const
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const
         {
             std::cout << "Warning: I'm placeholder LUft::solve, not solving anything!" << std::endl;
         }
@@ -111,6 +111,8 @@ class LUft
          */
         virtual NumberArray<DataT> solve (const ArrayView<DataT> b, int eqs = 1) const
         {
+            std::cout << "b = " << b << std::endl;
+            
             // reserve space for the solution
             NumberArray<DataT> x (b.size());
             
@@ -199,7 +201,7 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         virtual std::size_t size () const;
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs = 1) const;
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
         virtual void save (std::string name) const;
@@ -271,7 +273,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         virtual std::size_t size () const { return size_; }
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs = 1) const;
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
         virtual void save (std::string name) const { /* TODO */ }
@@ -331,6 +333,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
 #endif // WITH_SUPERLU
 
 #ifdef WITH_SUPERLU_DIST
+#include <superlu_zdefs.h>
 /**
  * @brief LU factorization object - SuperLU-dist specialization.
  * 
@@ -342,37 +345,63 @@ template <class IdxT, class DataT>
 class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 {
     public:
-    
+        
         /// Default constructor.
         LUft_SUPERLU_DIST ()
             : LUft<IdxT,DataT>() {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft_SUPERLU_DIST (CsrMatrix<IdxT,DataT> const * matrix)
-            : LUft<IdxT,DataT>() {}
+        LUft_SUPERLU_DIST
+        (
+            CsrMatrix<IdxT,DataT> const * matrix,
+            ScalePermstruct_t ScalePermstruct,
+            LUstruct_t LUstruct,
+            gridinfo_t * grid,
+            std::size_t bytes
+        )
+            : LUft<IdxT,DataT>(), ScalePermstruct_(ScalePermstruct), LUstruct_(LUstruct),
+              grid_(grid), size_(bytes)
+        {
+            // nothing to do
+        }
         
         /// Destructor.
         virtual ~LUft_SUPERLU_DIST () { drop (); }
         
         /// Return LU byte size.
-        virtual std::size_t size () const;
+        virtual std::size_t size () const { return size_; }
         
         /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs = 1) const;
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
-        virtual void save (std::string name) const;
+        virtual void save (std::string name) const { /* TODO */ }
         
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        virtual void load (std::string name, bool throw_on_io_failure = true) { /* TODO */ }
         
         /// Release memory.
-        virtual void drop ();
+        virtual void drop ()
+        {
+            // TODO
+        }
         
     private:
         
         /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
         CsrMatrix<IdxT,DataT> const * matrix_;
+        
+        // scaling and permutation data
+        ScalePermstruct_t ScalePermstruct_;
+        
+        // factorization data
+        LUstruct_t LUstruct_;
+        
+        // process grid
+        gridinfo_t * grid_;
+        
+        /// Memory size.
+        std::size_t size_;
         
         // Disable bitwise copy
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &);

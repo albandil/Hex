@@ -366,3 +366,86 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
 }
 
 #endif // WITH_SUPERLU
+
+// ------------------------------------------------------------------------------------
+// SUPERLU-DIST-dependent functions (LP64).
+//
+
+#ifdef WITH_SUPERLU_DIST
+#include <superlu_zdefs.h>
+
+template<>
+void LUft_SUPERLU_DIST<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+{
+    //
+    // Create matrix of the system.
+    //
+    
+        cArray xdata (matrix_->x());
+        iArray idata (matrix_->i());
+        iArray pdata (matrix_->p());
+        
+        NCformat AStore;
+        AStore.nnz    = xdata.size();   // number of non-zero elements
+        AStore.nzval  = &xdata[0];      // pointer to the array of non-zero elements
+        AStore.rowind = &idata[0];      // row indices
+        AStore.colptr = &pdata[0];      // column pointers
+        
+        SuperMatrix A;
+        A.Stype = SLU_NC;           // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
+        A.Dtype = SLU_Z;            // data type: double complex
+        A.Mtype = SLU_GE;           // mathematical type: general
+        A.nrow  = matrix_->rows();  // number of rows
+        A.ncol  = matrix_->cols();  // number of columns
+        A.Store = &AStore;          // data structure pointer
+    
+    //
+    // Prepare SuperLU environment.
+    //
+    
+        // calculation options
+        superlu_options_t options;
+        set_default_options_dist(&options);
+        options.ColPerm = MMD_AT_PLUS_A;
+//         options.ILU_DropRule = DROP_BASIC;
+//         options.ILU_DropTol = droptol;
+        
+        // calculation diagnostic information
+        SuperLUStat_t stat;
+        PStatInit(&stat);
+    
+    //
+    // Solve the system.
+    //
+        
+        // backward error (one element per one right hand side)
+        double berr[eqs];
+        
+        // status indicator
+        int info;
+        
+        // LU factorization
+        x = b;
+        std::cout << "Call solve" << std::endl;
+        pzgssvx_ABglobal
+        (
+            &options,                                           // calculation options
+            &A,                                                 // matrix to factorize
+            const_cast<ScalePermstruct_t*>(&ScalePermstruct_),  // scaling and permutation data
+            reinterpret_cast<doublecomplex*>(&x[0]),            // right hand sides (assume packed)
+            A.nrow,                                             // right hand sides leading dimension
+            eqs,                                                // number of right hand sides
+            grid_,                                              // process grid
+            const_cast<LUstruct_t*>(&LUstruct_),                // factorization data
+            berr,                                               // backward error
+            &stat,                                              // diagnostic information
+            &info                                               // result status
+        );
+        
+        if (info > A.ncol)
+            HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
+        if (info > 0)
+            HexException("SuperLU/zgssvx: Singular factor.");
+}
+
+#endif // WITH_SUPERLU_DIST

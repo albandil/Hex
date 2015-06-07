@@ -48,6 +48,34 @@ void ILUCGPreconditioner::setup ()
     // prepare initial (empty) factorization data
     for (auto & lu : lu_)
         lu.reset(new LUft<LU_int_t,Complex>());
+    
+#ifdef WITH_SUPERLU_DIST
+    // create process grid for SuperLU-dist
+    if (cmd_.factorizer == LUFT_SUPERLU_DIST)
+    {
+        std::cout << "Setting up SuperLU-DIST ILU preconditioner." << std::endl;
+        std::cout << "\t- process allocation:" << std::endl;
+        
+        // list processes
+        for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
+        {
+            // list member processes
+            iArray usermap;
+            for (int iproc = 0; iproc < cmd_.groupsize; iproc++)
+                usermap.push_back(igroup * cmd_.groupsize + iproc);
+            
+            // create the grid
+            gridinfo_t grid;
+            superlu_gridmap(MPI_COMM_WORLD, cmd_.groupsize, 1, &usermap[0], cmd_.groupsize, &grid);
+            
+            // assign this process to the grid, if it is member of current group
+            if (par_.isMyGroupWork(igroup))
+                grid_ = grid;
+        }
+        
+        std::cout << std::endl;
+    }
+#endif // WITH_SUPERLU_DIST
 }
 
 void ILUCGPreconditioner::update (double E)
@@ -94,7 +122,16 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         Timer timer;
         
         // factorize the block and store it
-        lu_[iblock] = csr_blocks_[iblock].factorize(droptol_, cmd_.factorizer);
+        lu_[iblock] = csr_blocks_[iblock].factorize
+        (
+            cmd_.droptol,
+            cmd_.factorizer,
+#ifdef WITH_SUPERLU_DIST
+            cmd_.factorizer == LUFT_SUPERLU_DIST ?
+                const_cast<gridinfo_t*>(&grid_) :
+#endif
+                nullptr
+        );
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
@@ -115,6 +152,9 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     }
     
     // precondition by LU
+    std::cerr << "r = ";
+    std::cerr << r << std::endl;
+    MPI_Barrier(MPI_COMM_WORLD);
     z = lu_[iblock]->solve(r);
     
     // release memory

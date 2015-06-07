@@ -268,12 +268,17 @@ public:
      * @return Special structure of the LUft type, holding opaque information about
      *         the factorization.
      */
-    std::shared_ptr<LUft<IdxT,DataT>> factorize (double droptol = 0, int use_library = LUFT_ANY) const
+    std::shared_ptr<LUft<IdxT,DataT>> factorize
+    (
+        double droptol = 0,
+        int use_library = LUFT_ANY,
+        void * data = nullptr
+    ) const
     {
         if (use_library == LUFT_ANY or use_library == LUFT_UMFPACK)
         {
 #ifdef WITH_UMFPACK
-            return factorize_umfpack(droptol);
+            return factorize_umfpack(droptol, data);
 #else
             if (use_library != LUFT_ANY)
                 HexException("Program is not compiled with UMFPACK support (use -DWITH_UMFPACK).");
@@ -283,7 +288,7 @@ public:
         if (use_library == LUFT_ANY or use_library == LUFT_SUPERLU)
         {
 #ifdef WITH_SUPERLU
-            return factorize_superlu(droptol);
+            return factorize_superlu(droptol, data);
 #else
             if (use_library != LUFT_ANY)
                 HexException("Program is not compiled with sequential SuperLU support (use -DWITH_SUPERLU).");
@@ -293,7 +298,7 @@ public:
         if (use_library == LUFT_ANY or use_library ==  LUFT_SUPERLU_DIST)
         {
 #ifdef WITH_SUPERLU_DIST
-            return factorize_superlu_dist(droptol);
+            return factorize_superlu_dist(droptol, data);
 #else
             if (use_library != LUFT_ANY)
                 HexException("Program is not compiled with distributed SuperLU support (use -DWITH_SUPERLU_DIST).");
@@ -303,9 +308,9 @@ public:
         HexException("Unsupported LU factorization method %d.", use_library);
     }
     
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (double droptol = 0) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (double droptol = 0) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (double droptol = 0) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (double droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (double droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (double droptol = 0, void * data = nullptr) const;
     
     /**
      * @brief Solve the Ax = b problem, where "b" can be a matrix.

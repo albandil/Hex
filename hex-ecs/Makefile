@@ -16,9 +16,13 @@ LFLAGS = -fopenmp
 # LU factorization libraries (use at least one)                                #
 # ---------------------------------------------------------------------------- #
 
-# - SuperLU
+# - sequential SuperLU
 SUPERLUFLAGS = -DWITH_SUPERLU
 SUPERLULIBS = -lsuperlu
+
+# - distributed SuperLU (incompatible with SuperLU)
+# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST
+# SUPERLUDISTLIBS = -lsuperlu_dist -lptscotchmetis -lmetis
 
 # - SuiteSparse/UMFPACK
 SUITESPARSEFLAGS = -DWITH_UMFPACK
@@ -76,13 +80,13 @@ PNGPPLIBS = -lpng
 
 # compiler flags
 CFLAGS +=  -fPIC -std=c++11 -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
-          $(SUPERLUFLAGS) $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) $(OPENCLFLAGS) \
-          $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS) 
+          $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS)  $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) \
+          $(OPENCLFLAGS) $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS) 
 
 # linker flags
 LFLAGS += -fPIC -rdynamic \
-          $(SUPERLULIBS) $(SUITESPARSELIBS) $(OPENMPILIBS) $(OPENCLLIBS) \
-          $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+          $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(SUITESPARSELIBS) $(OPENMPILIBS) \
+          $(OPENCLLIBS) $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)

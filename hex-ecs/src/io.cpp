@@ -133,6 +133,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
+                    "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
                     "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
@@ -193,6 +194,7 @@ void CommandLine::parse (int argc, char* argv[])
             },
         "lu", "F", 1, [&](std::string optarg) -> bool
             {
+                // choose factorizer
                 if (optarg == "umfpack")
                     factorizer = LUFT_UMFPACK;
                 else if (optarg == "superlu")
@@ -201,6 +203,12 @@ void CommandLine::parse (int argc, char* argv[])
                     factorizer = LUFT_SUPERLU_DIST;
                 else
                     HexException("Unknown LU-factorizer '%s'.", optarg.c_str());
+                return true;
+            },
+        "groupsize", "G", 1, [&](std::string optarg) -> bool
+            {
+                // set the groupsize
+                groupsize = std::atoi(optarg.c_str());
                 return true;
             },
 #ifdef WITH_MPI

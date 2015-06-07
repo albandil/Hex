@@ -34,6 +34,10 @@
 
 #include "../preconditioners.h"
 
+#ifdef WITH_SUPERLU_DIST
+#include <superlu_zdefs.h>
+#endif
+
 /**
  * @brief ILU-preconditioned CG-based preconditioner.
  * 
@@ -58,8 +62,7 @@ class ILUCGPreconditioner : public CGPreconditioner
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), droptol_(cmd.droptol),
-            csr_blocks_(ll.size()), lu_(ll.size())
+        ) : CGPreconditioner(par, inp, ll, bspline, cmd), csr_blocks_(ll.size()), lu_(ll.size())
         {
             // nothing more to do
         }
@@ -78,14 +81,16 @@ class ILUCGPreconditioner : public CGPreconditioner
         
     protected:
         
-        // drop tolarance for the factorizations
-        double droptol_;
-        
         // diagonal CSR block for every coupled state
         mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
         
         // LU decompositions of the CSR blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        
+#ifdef WITH_SUPERLU_DIST
+        // process grid
+        gridinfo_t grid_;
+#endif
 };
 
 #endif

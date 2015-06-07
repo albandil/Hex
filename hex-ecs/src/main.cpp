@@ -91,6 +91,8 @@ int main (int argc, char* argv[])
     // check some exclusive options
     if (cmd.parallel_block and cmd.lightweight_radial_cache)
         HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
+    if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
+        HexException("You need to run the program using MPI launcher to use the distributed SuperLU.");
     
 #ifdef _OPENMP
     // set OpenMP parallel nesting (avoid oversubscription)
@@ -107,7 +109,7 @@ int main (int argc, char* argv[])
 #endif
     
     // setup MPI
-    Parallel par (&argc, &argv, cmd.parallel);
+    Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
     
     // check input file
     if (not cmd.inputfile.is_open())
@@ -268,7 +270,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
         Complex prod = 0;
         
         // for all segments
-        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyWork(i))
+        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyGroupWork(i))
         {
             if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
@@ -283,7 +285,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
         par.syncsum(&prod, 1);
         
         // return global scalar product
-        return prod;
+        return prod / double(cmd.groupsize);
     };
     
     // CG norm function that broadcasts master's result to all nodes
@@ -291,7 +293,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
     {
         // compute node-local norm of 'r'
         double rnorm2 = 0;
-        for (std::size_t i = 0; i < r.size(); i++) if (par.isMyWork(i))
+        for (std::size_t i = 0; i < r.size(); i++) if (par.isMyGroupWork(i))
         {
             if (not r.inmemory())
                 const_cast<BlockArray<Complex>&>(r).hdfload(i);
@@ -306,14 +308,14 @@ if (cmd.itinerary & CommandLine::StgSolve)
         par.syncsum(&rnorm2, 1);
         
         // return global norm
-        return std::sqrt(rnorm2);
+        return std::sqrt(rnorm2 / cmd.groupsize);
     };
     
     // CG linear combination
     auto axby_operation = [ & ](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void
     {
         // only references blocks that are local to this MPI node
-        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyWork(i))
+        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyGroupWork(i))
         {
             if (not x.inmemory()) x.hdfload(i);
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
@@ -333,14 +335,19 @@ if (cmd.itinerary & CommandLine::StgSolve)
         BlockArray<Complex> array (N, !cmd.outofcore, name);
         
         // initialize all blocks ('resize' automatically zeroes added elements)
-        for (std::size_t i = 0; i < N; i++) if (par.isMyWork(i))
+        for (std::size_t i = 0; i < N; i++) if (par.isMyGroupWork(i))
         {
+            // allocate memory
             array[i].resize(Nspline * Nspline);
             
+            // take care of out-of-core mode
             if (not array.inmemory())
             {
+                // save to disk if we are not continuing an older calculation
                 if (not cmd.cont)
                     array.hdfsave(i);
+                
+                // release memory
                 array[i].drop();
             }
         }

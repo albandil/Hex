@@ -309,7 +309,7 @@ cArray SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, c
 #include <umfpack.h>
 
 template<>
-std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (double droptol) const
+std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (double droptol, void * data) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -363,7 +363,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (do
 }
 
 template<>
-std::shared_ptr<LUft<std::int64_t,Complex>> CsrMatrix<std::int64_t,Complex>::factorize_umfpack (double droptol) const
+std::shared_ptr<LUft<std::int64_t,Complex>> CsrMatrix<std::int64_t,Complex>::factorize_umfpack (double droptol, void * data) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -708,7 +708,7 @@ CsrMatrix<std::int64_t,Complex> CooMatrix<std::int64_t,Complex>::tocsr () const
 #include <slu_zdefs.h>
 
 template<>
-std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (double droptol) const
+std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (double droptol, void * data) const
 {
     //
     // Create matrix of the system.
@@ -829,4 +829,112 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
 //
 
 #ifdef WITH_SUPERLU_DIST
+#include <superlu_zdefs.h>
+
+template<>
+std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dist (double droptol, void * data) const
+{
+    //
+    // Create matrix of the system.
+    //
+    
+        cArray xdata (this->x());
+        iArray idata (this->i());
+        iArray pdata (this->p());
+        
+        NCformat AStore;
+        AStore.nnz    = xdata.size();   // number of non-zero elements
+        AStore.nzval  = &xdata[0];      // pointer to the array of non-zero elements
+        AStore.rowind = &idata[0];      // row indices
+        AStore.colptr = &pdata[0];      // column pointers
+        
+        SuperMatrix A;
+        A.Stype = SLU_NC;       // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
+        A.Dtype = SLU_Z;        // data type: double complex
+        A.Mtype = SLU_GE;       // mathematical type: general
+        A.nrow  = this->rows(); // number of rows
+        A.ncol  = this->cols(); // number of columns
+        A.Store = &AStore;      // data structure pointer
+    
+    //
+    // Prepare SuperLU environment.
+    //
+    
+        // get process grid
+        gridinfo_t * grid = (gridinfo_t *)data;
+        std::cout << "grid.iam = " << grid->iam << std::endl;
+        std::cout << "grid.nprow = " << grid->nprow << std::endl;
+        std::cout << "grid.npcol = " << grid->npcol << std::endl;
+        std::cout << "grid.rscp.Np = " << grid->rscp.Np << std::endl;
+        std::cout << "grid.rscp.iam = " << grid->rscp.Iam << std::endl;
+        std::cout << "grid.cscp.Np = " << grid->cscp.Np << std::endl;
+        std::cout << "grid.cscp.iam = " << grid->cscp.Iam << std::endl;
+        
+        // calculation options
+        superlu_options_t options;
+        set_default_options_dist(&options);
+        options.ColPerm = MMD_AT_PLUS_A;
+//         options.ILU_DropRule = DROP_BASIC;
+//         options.ILU_DropTol = droptol;
+        
+        // distributed scale and permutation data
+        ScalePermstruct_t ScalePermstruct;
+        ScalePermstructInit(A.nrow, A.ncol, &ScalePermstruct);
+        
+        // distributed factorization data
+        LUstruct_t LUstruct;
+        LUstructInit(A.nrow, A.ncol, &LUstruct);
+        
+        // calculation diagnostic information
+        SuperLUStat_t stat;
+        PStatInit(&stat);
+    
+    //
+    // Compute the factorization.
+    //
+    
+        // backward error (one element per one right hand side)
+        double berr[1];
+        
+        // status indicator
+        int info;
+        
+        // LU factorization
+        std::cout << "Start factorization" << std::endl;
+        pzgssvx_ABglobal
+        (
+            &options,           // calculation options
+            &A,                 // matrix to factorize
+            &ScalePermstruct,   // scaling and permutation data
+            nullptr,            // right hand sides (not used)
+            A.nrow,             // right hand sides leading dimension
+            0,                  // number of right hand sides (none, only factorizing)
+            grid,               // process grid
+            &LUstruct,          // factorization data
+            berr,               // backward error
+            &stat,              // diagnostic information
+            &info               // result status
+        );
+        
+        mem_usage_t mem_usage;
+        zQuerySpace_dist(A.nrow, &LUstruct, grid, &mem_usage);
+        std::cerr << "Factorization done, memory = " << mem_usage.for_lu << std::endl;
+        
+        // TODO : Reduce memory usage over the group.
+        
+        if (info > A.ncol)
+            HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
+        if (info > 0)
+            HexException("SuperLU/zgssvx: Singular factor.");
+    
+    // create a new LU factorization container
+    LUft<int,Complex> * lu_ptr = new LUft_SUPERLU_DIST<int,Complex>
+    (
+        this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
+    );
+    
+    // wrap the pointer into smart pointer
+    return std::shared_ptr<LUft<int,Complex>>(lu_ptr);
+}
+
 #endif // WITH_SUPERLU_DIST

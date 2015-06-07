@@ -87,7 +87,7 @@ void NoPreconditioner::update (double E)
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
         // angular momenta
         int l1 = l1_l2_[ill].first;
@@ -208,7 +208,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     
     // for all segments constituting the RHS
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
@@ -308,7 +308,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // multiply "p" by the diagonal blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
-        if (par_.isMyWork(ill))
+        if (par_.isMyGroupWork(ill))
         {
             // load data from scratch disk
             if (cmd_.outofcore)
@@ -398,7 +398,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 const_cast<BlockSymBandMatrix<Complex>&>(s_rad_.R_tr_dia(lambda)).drop();
         }
         
-        // multiply "p" by the off-diagonal blocks multiprocess
+        // multiply "p" by the off-diagonal blocks (multi-process)
         if (par_.Nproc() > 1)
         for (int ill = 0;  ill < Nang;  ill++)
         {
@@ -406,7 +406,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             cArray product (Nchunk);
             
             // load data
-            if (cmd_.outofcore and par_.isMyWork(ill))
+            if (cmd_.outofcore and par_.isMyGroupWork(ill))
                 q.hdfload(ill);
             
             // maximal multipole
@@ -414,7 +414,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
             for (int illp = 0; illp < Nang; illp++)
-            if (par_.isMyWork(illp))
+            if (par_.isMyGroupWork(illp))
             {
                 if (cmd_.outofcore)
                     const_cast<BlockArray<Complex>&>(p).hdfload(illp);
@@ -461,7 +461,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // finally, owner will update its segment (and move back to disk, if OOC)
             if (par_.isMyWork(ill))
             {
-                q[ill] += product;
+                q[ill] += product / double(cmd_.groupsize);
                 
                 if (cmd_.outofcore)
                 {
@@ -480,7 +480,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // multiply "p" by the diagonal super-blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
-        if (par_.isMyWork(ill))
+        if (par_.isMyGroupWork(ill))
         {
             if (cmd_.outofcore)
             {
@@ -530,7 +530,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         for (int k = 0; k < Nspline; k++)
         {
             // copy owned sub-segments to the buffer
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyWork(illp))
+            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
             {
                 std::memcpy
                 (
@@ -540,8 +540,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 );
             }
             
-            // synchronize source sub-segments buffer across processes
-            par_.sync(&buffer[0], Nspline, Nang);
+            // synchronize source sub-segments buffer across groups
+            par_.sync(&buffer[0], Nspline, Nang); // !!! FIXME !!! Works only for groupsize = 1.
             
             // auxiliary variables
             int min_i = std::max(0, k - order);
@@ -559,7 +559,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     SymBandMatrix<Complex> R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
                     
                     // apply all superblocks
-                    for (int ill  = 0; ill  < Nang; ill ++) if (par_.isMyWork(ill))
+                    for (int ill = 0; ill  < Nang; ill ++) if (par_.isMyGroupWork(ill))
                     {
                         // collected products of superblocks in this row
                         cArray product (Nspline);

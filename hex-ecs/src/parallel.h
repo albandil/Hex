@@ -59,8 +59,8 @@ class Parallel
          * @param active Whether to turn the MPI on or keep with the computation
          *               sequential.
          */
-        Parallel (int* argc, char*** argv, bool active)
-            : active_(active), iproc_(0), Nproc_(1)
+        Parallel (int* argc, char*** argv, bool active, int groupsize)
+            : active_(active), iproc_(0), Nproc_(1), groupsize_(groupsize)
         {
 #ifdef WITH_MPI
             if (active_)
@@ -83,6 +83,10 @@ class Parallel
                 // get number of processes and ID of this process
                 MPI_Comm_size(MPI_COMM_WORLD, &Nproc_);
                 MPI_Comm_rank(MPI_COMM_WORLD, &iproc_);
+                
+                // check compatibility
+                if (Nproc_ % groupsize_ != 0)
+                    HexException("Number of processes (currently %d) must be integer mutiple of groupsize (currently %d).", Nproc_, groupsize_);
             }
 #else
             active_ = false;
@@ -113,17 +117,42 @@ class Parallel
         }
         
         /**
+         * @brief Returns true if this process is the master process within a group.
+         * 
+         * This function returns true if this process is the master process within its,
+         * i.e. it has local ID zero.
+         */
+        inline bool IamGroupMaster () const
+        {
+            return iproc_ % groupsize_ == 0;
+        }
+        
+        /**
          * @brief Returns true if the work item is assigned to this process.
          * 
          * If there are several work items, i-th one is assigned to the
          * (i % Nproc_)-th process. This function returns true whenever given
-         * wirk item (indexed by "i") is to be processed by the current process.
+         * work item (indexed by "i") is to be processed by the current process.
          * 
          * @param i Work item ID.
          */
         inline bool isMyWork (int i) const
         {
             return i % Nproc_ == iproc_;
+        }
+        
+        /**
+         * @brief Returns true if the work item is assigned to this process' group.
+         * 
+         * If there are several work items, i-th one is assigned to the
+         * (i % Ngroup)-th group. This function returns true whenever given
+         * work item (indexed by "i") is to be processed by the current process' group.
+         * 
+         * @param i Work item ID.
+         */
+        inline bool isMyGroupWork (int i) const
+        {
+            return i % (Nproc_ / groupsize_) == iproc_ / groupsize_;
         }
         
         /**
@@ -327,11 +356,14 @@ class Parallel
         // whether the MPI is on
         bool active_;
         
-        // communicator rank
+        // global communicator rank
         int iproc_;
         
-        // communicator size
+        // global communicator size
         int Nproc_;
+        
+        // local communicator size
+        int groupsize_;
 };
 
 #endif
