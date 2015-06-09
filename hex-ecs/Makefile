@@ -17,15 +17,15 @@ LFLAGS = -fopenmp
 # ---------------------------------------------------------------------------- #
 
 # - sequential SuperLU
-SUPERLUFLAGS = -DWITH_SUPERLU
-SUPERLULIBS = -lsuperlu
+# SUPERLUFLAGS = -DWITH_SUPERLU
+# SUPERLULIBS = -lsuperlu
 
 # - distributed SuperLU (incompatible with SuperLU)
 # SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST
 # SUPERLUDISTLIBS = -lsuperlu_dist -lptscotchmetis -lmetis
 
-# - SuiteSparse/UMFPACK
-SUITESPARSEFLAGS = -DWITH_UMFPACK
+# - SuiteSparse/UMFPACK (requires 64-bit integer for work with larger matrices)
+SUITESPARSEFLAGS = -DWITH_UMFPACK -DINT64
 SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig -lopenblas
 
 # ---------------------------------------------------------------------------- #

@@ -333,7 +333,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (do
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << "\n";
+        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
         umfpack_zi_report_status(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -347,7 +347,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (do
     );
     if (status != 0)
     {
-        std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
+        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
         umfpack_zi_report_status(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -387,7 +387,7 @@ std::shared_ptr<LUft<std::int64_t,Complex>> CsrMatrix<std::int64_t,Complex>::fac
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << "\n";
+        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
         umfpack_zl_report_status(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -401,7 +401,7 @@ std::shared_ptr<LUft<std::int64_t,Complex>> CsrMatrix<std::int64_t,Complex>::fac
     );
     if (status != 0)
     {
-        std::cerr << "\n[CscMatrix::factorize] Exit status " << status << "\n";
+        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
         umfpack_zl_report_status(0, status);
         std::exit(EXIT_FAILURE);
     }
