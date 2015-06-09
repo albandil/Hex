@@ -350,7 +350,7 @@ void CommandLine::parse (int argc, char* argv[])
                 reuse_dia_blocks = true;
                 return true;
             },
-#ifndef NO_OPENCL
+#ifdef WITH_OPENCL
         "cl-list", "", 0,  [&](std::string optarg) -> bool
             {
                 // list all available OpenCL platforms and devices
