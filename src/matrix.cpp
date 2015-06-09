@@ -746,6 +746,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
         superlu_options_t options;
         set_default_options(&options);
         options.ColPerm = MMD_AT_PLUS_A;
+        options.SymPattern = YES;
         options.ILU_DropRule = DROP_BASIC;
         options.ILU_DropTol = droptol;
         
@@ -837,7 +838,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
     //
     // Create matrix of the system.
     //
-    
+
         cArray xdata (this->x());
         iArray idata (this->i());
         iArray pdata (this->p());
@@ -855,25 +856,21 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
         A.nrow  = this->rows(); // number of rows
         A.ncol  = this->cols(); // number of columns
         A.Store = &AStore;      // data structure pointer
-    
+
     //
     // Prepare SuperLU environment.
     //
     
         // get process grid
         gridinfo_t * grid = (gridinfo_t *)data;
-        std::cout << "grid.iam = " << grid->iam << std::endl;
-        std::cout << "grid.nprow = " << grid->nprow << std::endl;
-        std::cout << "grid.npcol = " << grid->npcol << std::endl;
-        std::cout << "grid.rscp.Np = " << grid->rscp.Np << std::endl;
-        std::cout << "grid.rscp.iam = " << grid->rscp.Iam << std::endl;
-        std::cout << "grid.cscp.Np = " << grid->cscp.Np << std::endl;
-        std::cout << "grid.cscp.iam = " << grid->cscp.Iam << std::endl;
         
         // calculation options
         superlu_options_t options;
         set_default_options_dist(&options);
-        options.ColPerm = MMD_AT_PLUS_A;
+        options.ParSymbFact = YES;
+        options.ColPerm = METIS_AT_PLUS_A;
+        options.PrintStat = NO;
+        options.SymPattern = YES;
 //         options.ILU_DropRule = DROP_BASIC;
 //         options.ILU_DropTol = droptol;
         
@@ -883,7 +880,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
         
         // distributed factorization data
         LUstruct_t LUstruct;
-        LUstructInit(A.nrow, A.ncol, &LUstruct);
+        LUstructInit(A.nrow, &LUstruct);
         
         // calculation diagnostic information
         SuperLUStat_t stat;
@@ -900,7 +897,6 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
         int info;
         
         // LU factorization
-        std::cout << "Start factorization" << std::endl;
         pzgssvx_ABglobal
         (
             &options,           // calculation options
@@ -917,8 +913,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
         );
         
         mem_usage_t mem_usage;
-        zQuerySpace_dist(A.nrow, &LUstruct, grid, &mem_usage);
-        std::cerr << "Factorization done, memory = " << mem_usage.for_lu << std::endl;
+        zQuerySpace_dist(A.nrow, &LUstruct, grid, &stat, &mem_usage);
         
         // TODO : Reduce memory usage over the group.
         

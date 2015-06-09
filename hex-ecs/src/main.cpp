@@ -88,11 +88,28 @@ int main (int argc, char* argv[])
     // get input from command line
     CommandLine cmd (argc, argv);
     
+    //
+    // Setup parallel environments ----------------------------------------- //
+    //
+    
     // check some exclusive options
     if (cmd.parallel_block and cmd.lightweight_radial_cache)
         HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
     if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
-        HexException("You need to run the program using MPI launcher to use the distributed SuperLU.");
+        HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
+    
+    // setup MPI
+    Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
+    
+    // print information
+    if (par.active())
+    {
+        std::cout << "MPI environment" << std::endl;
+        std::cout << "\tthis process ID:  " << par.iproc() << " / " << par.Nproc() << std::endl;
+        std::cout << "\tbelongs to group: " << par.igroup() << " / " << par.Ngroup() << std::endl;
+        std::cout << "\tID within group:  " << par.igroupproc() << " / " << par.groupsize() << std::endl;
+        std::cout << std::endl;
+    }
     
 #ifdef _OPENMP
     // set OpenMP parallel nesting (avoid oversubscription)
@@ -108,8 +125,9 @@ int main (int argc, char* argv[])
     }
 #endif
     
-    // setup MPI
-    Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
+    //
+    // Read input file ----------------------------------------------------- //
+    //
     
     // check input file
     if (not cmd.inputfile.is_open())
@@ -137,7 +155,7 @@ int main (int argc, char* argv[])
     }
     
     // 
-    // Setup B-spline environment ------------------------------------------ //
+    // Setup B-spline basis ------------------------------------------------ //
     //
     
     double R0 = inp.rknots.back();       // end of real grid
@@ -308,7 +326,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
         par.syncsum(&rnorm2, 1);
         
         // return global norm
-        return std::sqrt(rnorm2 / cmd.groupsize);
+        return std::sqrt(rnorm2 / par.groupsize());
     };
     
     // CG linear combination
@@ -505,8 +523,10 @@ if (cmd.itinerary & CommandLine::StgSolve)
             if (std::isfinite(compute_norm(psi)))
             {
                 for (unsigned ill = 0; ill < coupled_states.size(); ill++)
-                    if (par.isMyWork(ill))
-                        reader.save(psi, ill);
+                {
+                    if (par.isMyGroupWork(ill) and par.IamGroupMaster() and not reader.save(psi, ill))
+                        HexException("Failed to save solution to disk - the data are lost!");
+                }
             }
             
             // reset some one-solution command line flags
@@ -516,6 +536,9 @@ if (cmd.itinerary & CommandLine::StgSolve)
         } // end of For Spin, instate
         
     } // end of For ie = 0, ..., inp.Ei.size() - 1
+    
+    // wait for completition of all processes before next step
+    par.wait();
     
     std::cout << std::endl << "All solutions computed." << std::endl;
     if (computations_done > 0)

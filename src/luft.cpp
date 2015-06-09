@@ -312,6 +312,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         superlu_options_t options;
         set_default_options(&options);
         options.ColPerm = MMD_AT_PLUS_A;
+        options.SymPattern = YES;
         options.ILU_DropRule = DROP_BASIC;
         options.ILU_DropTol = droptol_;
         options.Fact = FACTORED;
@@ -406,7 +407,12 @@ void LUft_SUPERLU_DIST<int,Complex>::solve (const cArrayView b, cArrayView x, in
         // calculation options
         superlu_options_t options;
         set_default_options_dist(&options);
-        options.ColPerm = MMD_AT_PLUS_A;
+        options.ParSymbFact = YES;
+        options.ColPerm = METIS_AT_PLUS_A;
+        options.PrintStat = NO;
+        options.SymPattern = YES;
+        options.Fact = FACTORED;
+        options.IterRefine = NOREFINE;
 //         options.ILU_DropRule = DROP_BASIC;
 //         options.ILU_DropTol = droptol;
         
@@ -426,7 +432,6 @@ void LUft_SUPERLU_DIST<int,Complex>::solve (const cArrayView b, cArrayView x, in
         
         // LU factorization
         x = b;
-        std::cout << "Call solve" << std::endl;
         pzgssvx_ABglobal
         (
             &options,                                           // calculation options
@@ -446,6 +451,12 @@ void LUft_SUPERLU_DIST<int,Complex>::solve (const cArrayView b, cArrayView x, in
             HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
         if (info > 0)
             HexException("SuperLU/zgssvx: Singular factor.");
+    
+    //
+    // Clean up.
+    //
+    
+        PStatFree(&stat);
 }
 
 #endif // WITH_SUPERLU_DIST

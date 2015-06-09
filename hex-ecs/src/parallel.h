@@ -60,7 +60,7 @@ class Parallel
          *               sequential.
          */
         Parallel (int* argc, char*** argv, bool active, int groupsize)
-            : active_(active), iproc_(0), Nproc_(1), groupsize_(groupsize)
+            : active_(active), iproc_(0), Nproc_(1), igroup_(0), Ngroup_(0), groupsize_(groupsize)
         {
 #ifdef WITH_MPI
             if (active_)
@@ -84,13 +84,46 @@ class Parallel
                 MPI_Comm_size(MPI_COMM_WORLD, &Nproc_);
                 MPI_Comm_rank(MPI_COMM_WORLD, &iproc_);
                 
-                // check compatibility
+                // check parameter compatibility
                 if (Nproc_ % groupsize_ != 0)
                     HexException("Number of processes (currently %d) must be integer mutiple of groupsize (currently %d).", Nproc_, groupsize_);
+                
+                // calculate number of groups
+                Ngroup_ = Nproc_ / groupsize_;
+                
+                // calculate group rank
+                igroup_ = iproc_ / groupsize_;
+                
+                // prepare group communicators
+                for (int i = 0; i < Ngroup_; i++)
+                {
+                    // split a new communicator for this group
+                    MPI_Comm newcomm;
+                    MPI_Comm_split
+                    (
+                        MPI_COMM_WORLD,
+                        igroup_ == i ? 0 : MPI_UNDEFINED,
+                        igroupproc(),
+                        &newcomm
+                    );
+                    
+                    // store this communicator
+                    if (igroup_ == i)
+                        groupcomm_ = newcomm;
+                }
+                
+                // construct also set of groups' master processes
+                MPI_Comm_split
+                (
+                    MPI_COMM_WORLD,
+                    IamGroupMaster() ? 0 : MPI_UNDEFINED,
+                    igroup_,
+                    &mastergroup_
+                );
             }
 #else
             active_ = false;
-#endif
+#endif // WITH_MPI
         }
         
         ~Parallel ()
@@ -152,32 +185,29 @@ class Parallel
          */
         inline bool isMyGroupWork (int i) const
         {
-            return i % (Nproc_ / groupsize_) == iproc_ / groupsize_;
+            return i % Ngroup_ == igroup_;
         }
         
-        /**
-         * @brief Returns true if the MPI is active.
-         */
-        inline bool active () const
-        {
-            return active_;
-        }
+        /// Returns true if the MPI is active.
+        inline bool active () const { return active_; }
         
-        /**
-         * @brief Returns the rank of the communicator (process is).
-         */
-        inline int iproc () const
-        {
-            return iproc_;
-        }
+        /// Returns the rank of the communicator (process is).
+        inline int iproc () const { return iproc_; }
         
-        /**
-         * @brief Returns the size of the communicator (process count).
-         */
-        inline int Nproc () const
-        {
-            return Nproc_;
-        }
+        /// Returns the rank of process group.
+        inline int igroup () const { return igroup_; }
+        
+        /// Returns index of rank within the group.
+        inline int igroupproc () const { return iproc_ % groupsize_; }
+        
+        /// Returns the size of the communicator (process count).
+        inline int Nproc () const { return Nproc_; }
+        
+        /// Returns the number of groups.
+        inline int Ngroup () const { return Ngroup_; }
+        
+        /// Return group size.
+        inline int groupsize () const { return groupsize_; }
         
         /**
          * @brief Broadcast array from owner to everyone.
@@ -185,22 +215,46 @@ class Parallel
         template <class T> void bcast (int owner, NumberArray<T> & data) const
         {
 #ifdef WITH_MPI
-            // owner : broadcast size
-            int size = data.size();
-            MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
-            
-            // all : resize data array
-            data.resize(size);
-            
-            // owner : broadcast data
-            MPI_Bcast
-            (
-                data.data(),
-                size * typeinfo<T>::ncmpt,
-                typeinfo<T>::mpicmpttype(),
-                owner,
-                MPI_COMM_WORLD
-            );
+            if (active_)
+            {
+                // owner : broadcast size
+                int size = data.size();
+                MPI_Bcast(&size, 1, MPI_INT, owner, MPI_COMM_WORLD);
+                
+                // all : resize data array
+                data.resize(size);
+                
+                // owner : broadcast data
+                MPI_Bcast
+                (
+                    data.data(),
+                    size * typeinfo<T>::ncmpt,
+                    typeinfo<T>::mpicmpttype(),
+                    owner,
+                    MPI_COMM_WORLD
+                );
+            }
+#endif
+        }
+        
+        /**
+         * @brief Broadcast array from owner to everyone in the group.
+         */
+        template <class T> void bcast_g (int igroup, int groupowner, T * data, std::size_t N) const
+        {
+#ifdef WITH_MPI
+            if (active_ and igroup == igroup_)
+            {
+                // groupowner : broadcast data
+                MPI_Bcast
+                (
+                    data,
+                    N * typeinfo<T>::ncmpt,
+                    typeinfo<T>::mpicmpttype(),
+                    groupowner,
+                    groupcomm_
+                );
+            }
 #endif
         }
         
@@ -284,6 +338,26 @@ class Parallel
 #endif
         }
         
+        template <class T> void sync_m (T * array, std::size_t chunksize, std::size_t Nchunk) const
+        {
+#ifdef WITH_MPI
+            if (active_ and IamGroupMaster())
+            {
+                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
+                {
+                    MPI_Bcast
+                    (
+                        array + ichunk * chunksize,
+                        chunksize * typeinfo<T>::ncmpt,
+                        typeinfo<T>::mpicmpttype(),
+                        ichunk % Ngroup_,
+                        mastergroup_
+                    );
+                }
+            }
+#endif
+        }
+        
         /**
          * @brief Sum arrays to node.
          * 
@@ -310,15 +384,11 @@ class Parallel
         /**
          * @brief Synchronize across processes by summing.
          * 
-         * Synchronize array across processes by summing. There are no assumptions on what
-         * segment is on which node. The whole arrays are broadcasted and summed on every node.
+         * Synchronize array across processes by summing.
          * 
          * @param array Pointer to data array to synchronize.
-         * @param Nchunk Total number of chunks in the array. Altogether chunksize*Nchunk elements
-         *               will be synchronized. If there are some elements more, they will be left
-         *               untouched (and un-broadcast).
-         * 
-         * It is expected that the array has length equal or greater than chunksize * Nchunk.
+         * @param Nchunk Number of elements in the array to sum-synchronize. If there are some
+         *               elements more, they will be left untouched (and un-broadcast).
          */
         template <class T> void syncsum (T* array, std::size_t N) const
         {
@@ -333,6 +403,77 @@ class Parallel
                     typeinfo<T>::mpicmpttype(),
                     MPI_SUM,
                     MPI_COMM_WORLD
+                );
+            }
+#endif
+        }
+        
+        /**
+         * @brief Synchronize across group's processes by summing.
+         * 
+         * Synchronize array across group's processes by summing.
+         * 
+         * @param array Pointer to data array to synchronize.
+         * @param Nchunk Number of elements in the array to sum-synchronize. If there are some
+         *               elements more, they will be left untouched (and un-broadcast).
+         */
+        template <class T> void syncsum_g (T* array, std::size_t N) const
+        {
+#ifdef WITH_MPI
+            if (active_)
+            {
+                MPI_Allreduce
+                (
+                    MPI_IN_PLACE,
+                    array,
+                    typeinfo<T>::ncmpt * N,
+                    typeinfo<T>::mpicmpttype(),
+                    MPI_SUM,
+                    groupcomm_
+                );
+            }
+#endif
+        }
+        
+        /**
+         * @brief Sum array within group to a given process.
+         */
+        template <class T> void sum_g (T* array, std::size_t N, int destination) const
+        {
+#ifdef WITH_MPI
+            if (active_)
+            {
+                MPI_Reduce
+                (
+                    (igroupproc() == destination ? MPI_IN_PLACE : array),
+                    (igroupproc() == destination ? array : nullptr),
+                    typeinfo<T>::ncmpt * N,
+                    typeinfo<T>::mpicmpttype(),
+                    MPI_SUM,
+                    destination,
+                    groupcomm_
+                );
+            }
+#endif
+        }
+        
+        /**
+         * @brief Sum array from all group masters to one of the group masters.
+         */
+        template <class T> void mastersum (T* array, std::size_t N, int destgroup) const
+        {
+#ifdef WITH_MPI
+            if (active_ and IamGroupMaster())
+            {
+                MPI_Reduce
+                (
+                    (igroup_ == destgroup ? MPI_IN_PLACE : array),
+                    (igroup_ == destgroup ? array : nullptr),
+                    typeinfo<T>::ncmpt * N,
+                    typeinfo<T>::mpicmpttype(),
+                    MPI_SUM,
+                    destgroup,
+                    mastergroup_
                 );
             }
 #endif
@@ -362,6 +503,18 @@ class Parallel
         // global communicator size
         int Nproc_;
         
+        // group index
+        int igroup_;
+        
+        // group count
+        int Ngroup_;
+#ifdef WITH_MPI
+        // MPI group communicator
+        MPI_Comm groupcomm_;
+        
+        // MPI master group communicator
+        MPI_Comm mastergroup_;
+#endif
         // local communicator size
         int groupsize_;
 };

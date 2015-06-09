@@ -190,7 +190,7 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
             : LUft<IdxT,DataT>(), numeric_(numeric), matrix_(matrix), info_(UMFPACK_INFO) {}
         
         /// Destructor.
-        virtual ~LUft_UMFPACK () { drop (); }
+        virtual ~LUft_UMFPACK () { drop(); }
         
         /// Return factorization information.
         rArray const & info () const { return info_; }
@@ -265,7 +265,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         }
         
         /// Destructor.
-        virtual ~LUft_SUPERLU () { drop (); }
+        virtual ~LUft_SUPERLU () { drop(); }
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -357,7 +357,7 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
             gridinfo_t * grid,
             std::size_t bytes
         )
-            : LUft<IdxT,DataT>(), ScalePermstruct_(ScalePermstruct), LUstruct_(LUstruct),
+            : LUft<IdxT,DataT>(), matrix_(matrix), ScalePermstruct_(ScalePermstruct), LUstruct_(LUstruct),
               grid_(grid), size_(bytes)
         {
             // nothing to do
@@ -381,7 +381,12 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         /// Release memory.
         virtual void drop ()
         {
-            // TODO
+            if (size_ != 0)
+            {
+                ScalePermstructFree(&ScalePermstruct_);
+                LUstructFree(&LUstruct_);
+                size_ = 0;
+            }
         }
         
     private:

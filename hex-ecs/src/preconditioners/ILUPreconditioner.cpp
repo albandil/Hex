@@ -53,9 +53,6 @@ void ILUCGPreconditioner::setup ()
     // create process grid for SuperLU-dist
     if (cmd_.factorizer == LUFT_SUPERLU_DIST)
     {
-        std::cout << "Setting up SuperLU-DIST ILU preconditioner." << std::endl;
-        std::cout << "\t- process allocation:" << std::endl;
-        
         // list processes
         for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
         {
@@ -72,8 +69,6 @@ void ILUCGPreconditioner::setup ()
             if (par_.isMyGroupWork(igroup))
                 grid_ = grid;
         }
-        
-        std::cout << std::endl;
     }
 #endif // WITH_SUPERLU_DIST
 }
@@ -124,13 +119,13 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         // factorize the block and store it
         lu_[iblock] = csr_blocks_[iblock].factorize
         (
-            cmd_.droptol,
-            cmd_.factorizer,
+                cmd_.droptol,
+                cmd_.factorizer,
 #ifdef WITH_SUPERLU_DIST
-            cmd_.factorizer == LUFT_SUPERLU_DIST ?
-                const_cast<gridinfo_t*>(&grid_) :
+                cmd_.factorizer == LUFT_SUPERLU_DIST ?
+                    const_cast<gridinfo_t*>(&grid_) :
 #endif
-                nullptr
+                    nullptr
         );
         
         // print time and memory info for this block (one thread at a time)
@@ -152,7 +147,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     }
     
     // precondition by LU
-    z = lu_[iblock]->solve(r);
+    lu_[iblock]->solve(r, z, 1);
     
     // release memory
     if (cmd_.outofcore)

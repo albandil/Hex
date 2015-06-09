@@ -299,6 +299,17 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     int Nang = l1_l2_.size();
     int Nchunk = Nspline * Nspline;
     
+    // precalculate angular integrals
+    double fs[Nang][Nang][s_rad_.maxlambda() + 1];
+    for (int ill  = 0; ill  < Nang; ill ++)
+    for (int illp = 0; illp < Nang; illp++)
+    for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+    {
+        fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+        if (not std::isfinite(fs[ill][illp][lambda]))
+            HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+    }
+    
     if (not cmd_.lightweight_radial_cache)
     {
         //
@@ -357,21 +368,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     if (ill == illp)
                         continue;
                     
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
                     // check non-zero
-                    if (f == 0.)
+                    if (fs[ill][illp][lambda] == 0.)
                         continue;
                     
                     // load data
@@ -379,7 +377,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                     
                     // calculate product
-                    q[ill] += (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
+                    q[ill] += (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
                     
                     // unload data
                     if (cmd_.outofcore)
@@ -412,38 +410,27 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // maximal multipole
             int maxlambda = s_rad_.maxlambda();
             
+            // for all source segments that this group owns
             # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-            for (int illp = 0; illp < Nang; illp++)
-            if (par_.isMyGroupWork(illp))
+            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
             {
+                // load the segment, if on disk
                 if (cmd_.outofcore)
                     const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                 
-                for (int lambda = 0; lambda <= maxlambda; lambda++)
+                // for all multipoles (each group's process has a different work)
+                for (int lambda = 0; lambda <= maxlambda; lambda++) if (lambda % par_.groupsize() == par_.igroupproc())
                 {
                     // skip diagonal
                     if (ill == illp)
                         continue;
                     
-                    // row multi-index
-                    int l1 = l1_l2_[ill].first;
-                    int l2 = l1_l2_[ill].second;
-                    
-                    // column multi-index
-                    int l1p = l1_l2_[illp].first;
-                    int l2p = l1_l2_[illp].second;
-                    
-                    // calculate angular integral
-                    double f = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
                     // check non-zero
-                    if (f == 0.)
+                    if (fs[ill][illp][lambda] == 0.)
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-f) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    cArray p0 = std::move( (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -455,13 +442,19 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     const_cast<BlockArray<Complex>&>(p)[illp].drop();
             }
             
-            // sum all contributions to this destination segment on its owner node
-            par_.sum(product.data(), Nchunk, ill % par_.Nproc());
+            // sum all group processes contributions on that group master process
+            par_.sum_g(product.data(), product.size(), 0);
+            
+            // sum all master segments to the master of the group that owns the destination segment
+            par_.mastersum(product.data(), product.size(), ill % par_.Ngroup());
+            
+            // redistribute the summed segment over the whole owning group
+            par_.bcast_g(ill % par_.Ngroup(), 0, &product[0], product.size());
             
             // finally, owner will update its segment (and move back to disk, if OOC)
-            if (par_.isMyWork(ill))
+            if (par_.isMyGroupWork(ill))
             {
-                q[ill] += product / double(cmd_.groupsize);
+                q[ill] += product;
                 
                 if (cmd_.outofcore)
                 {
@@ -479,8 +472,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         // multiply "p" by the diagonal super-blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-        for (int ill = 0;  ill < Nang;  ill++)
-        if (par_.isMyGroupWork(ill))
+        for (int ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
         {
             if (cmd_.outofcore)
             {
@@ -508,17 +500,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // auxiliary buffers
         cArray buffer (Nang * Nspline);
         
-        // precalculate angular integrals
-        double fs[Nang][Nang][s_rad_.maxlambda() + 1];
-        for (int ill  = 0; ill  < Nang; ill ++)
-        for (int illp = 0; illp < Nang; illp++)
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
-        {
-            fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-            if (not std::isfinite(fs[ill][illp][lambda]))
-                HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-        }
-        
 #ifdef _OPENMP
         // I/O access locks
         std::vector<omp_lock_t> locks(Nang);
@@ -530,7 +511,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         for (int k = 0; k < Nspline; k++)
         {
             // copy owned sub-segments to the buffer
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
+            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp) and par_.IamGroupMaster())
             {
                 std::memcpy
                 (
@@ -540,8 +521,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 );
             }
             
-            // synchronize source sub-segments buffer across groups
-            par_.sync(&buffer[0], Nspline, Nang); // !!! FIXME !!! Works only for groupsize = 1.
+            // synchronize source sub-segments buffer across groups' masters
+            par_.sync_m(&buffer[0], Nspline, Nang);
+            
+            // broadcast buffer to all members of the group
+            par_.bcast_g(par_.igroup(), 0, &buffer[0], Nang * Nspline);
             
             // auxiliary variables
             int min_i = std::max(0, k - order);

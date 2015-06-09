@@ -414,7 +414,7 @@ void InputFile::read (std::ifstream & inf)
     ecstheta = ReadNext<double>(inf).val;
     
     std::cout << std::endl;
-    std::cout << "B-spline environment" << std::endl;
+    std::cout << "B-spline basis" << std::endl;
     std::cout << "\torder = " << order << std::endl;
     std::cout << "\tecs angle = " << ecstheta << std::endl;
     

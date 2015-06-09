@@ -697,6 +697,9 @@ template <class DataT> class BlockSymBandMatrix
             return inmemory_;
         }
         
+        /// Access to the memory buffer (maay be empty if data not in memory).
+        NumberArray<DataT> const & data () const { return data_; }
+        
         /// Access individual blocks.
         NumberArray<DataT> getBlock (int i) const
         {
