@@ -105,9 +105,9 @@ int main (int argc, char* argv[])
     if (par.active())
     {
         std::cout << "MPI environment" << std::endl;
-        std::cout << "\tthis process ID:  " << par.iproc() << " / " << par.Nproc() << std::endl;
-        std::cout << "\tbelongs to group: " << par.igroup() << " / " << par.Ngroup() << std::endl;
-        std::cout << "\tID within group:  " << par.igroupproc() << " / " << par.groupsize() << std::endl;
+        std::cout << "\tthis process ID:  " << 1 + par.iproc() << " / " << par.Nproc() << std::endl;
+        std::cout << "\tbelongs to group: " << 1 + par.igroup() << " / " << par.Ngroup() << std::endl;
+        std::cout << "\tID within group:  " << 1 + par.igroupproc() << " / " << par.groupsize() << std::endl;
         std::cout << std::endl;
     }
     

@@ -60,7 +60,7 @@ class Parallel
          *               sequential.
          */
         Parallel (int* argc, char*** argv, bool active, int groupsize)
-            : active_(active), iproc_(0), Nproc_(1), igroup_(0), Ngroup_(0), groupsize_(groupsize)
+            : active_(active), iproc_(0), Nproc_(1), igroup_(0), Ngroup_(1), groupsize_(groupsize)
         {
 #ifdef WITH_MPI
             if (active_)
