@@ -383,8 +383,10 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         {
             if (size_ != 0)
             {
+                Destroy_LU(matrix_->cols(), grid_, &LUstruct_);
                 ScalePermstructFree(&ScalePermstruct_);
                 LUstructFree(&LUstruct_);
+                matrix_ = nullptr;
                 size_ = 0;
             }
         }
