@@ -128,7 +128,7 @@ template<> class typeinfo<std::int64_t>
 {
     public:
         /// Component data type.
-        typedef int cmpttype;
+        typedef std::int64_t cmpttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;
@@ -146,7 +146,7 @@ template<> class typeinfo<unsigned>
 {
     public:
         /// Component data type.
-        typedef int cmpttype;
+        typedef unsigned cmpttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;
@@ -164,7 +164,7 @@ template<> class typeinfo<std::uint64_t>
 {
     public:
         /// Component data type.
-        typedef int cmpttype;
+        typedef std::uint64_t cmpttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;
@@ -182,7 +182,7 @@ template<> class typeinfo<float>
 {
     public:
         /// Component data type.
-        typedef double cmpttype;
+        typedef float cmpttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;
