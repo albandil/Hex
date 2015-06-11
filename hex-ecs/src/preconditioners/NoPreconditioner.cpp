@@ -188,6 +188,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     // impact momentum
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
     
+    // calculate LU-decomposition of the overlap matrix
+    CsrMatrix<LU_int_t,Complex> S_csr = s_rad_.S().tocoo<LU_int_t>().tocsr();
+    std::shared_ptr<LUft<LU_int_t,Complex>> lu_S = S_csr.factorize();
+    
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps = s_rad_.overlapj(inp_.maxell, ki, weightEdgeDamp(s_rad_.bspline()));
     ji_overlaps.hdfsave("ji_overlaps.hdf");
@@ -195,14 +199,14 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
-    cArray ji_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(ji_overlaps, ji_overlaps.size() / Nspline);
+    cArray ji_expansion = lu_S->solve(ji_overlaps, ji_overlaps.size() / Nspline);
     if (not std::isfinite(ji_expansion.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_overlaps, Pi_expansion;
     Pi_overlaps = s_rad_.overlapP(ni, li, weightEndDamp(s_rad_.bspline()));
-    Pi_expansion = s_rad_.S().tocoo<LU_int_t>().tocsr().solve(Pi_overlaps);
+    Pi_expansion = lu_S->solve(Pi_overlaps);
     if (not std::isfinite(Pi_expansion.norm()))
         HexException("Unable to expand hydrogen bound orbital in B-splines!");
     
