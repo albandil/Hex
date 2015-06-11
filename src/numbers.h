@@ -46,9 +46,9 @@
 // Choose integer type for use in LU-factorization libraries.
 //
 
-#ifndef INT64
+#ifndef _LONGINT
     // use 32-bit integers (supported by both UMFPACK and SuperLU)
-    typedef int LU_int_t;
+    typedef std::int32_t LU_int_t;
 #else
     // use 64-bit integers (not supported by serial SuperLU)
     typedef std::int64_t LU_int_t;

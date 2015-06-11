@@ -309,22 +309,22 @@ cArray SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, c
 #include <umfpack.h>
 
 template<>
-std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (double droptol, void * data) const
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_umfpack (double droptol, void * data) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
-    int status;
+    LU_int_t status;
     
     // get default setting
     double Control[UMFPACK_CONTROL];
-    umfpack_zi_defaults(Control);
+    UMFPACK_DEFAULTS_F(Control);
     
     // modify the drop tolerance
     Control[UMFPACK_STRATEGY] = UMFPACK_STRATEGY_SYMMETRIC;
     Control[UMFPACK_DROPTOL] = droptol;
     
     // analyze the sparse structure
-    status = umfpack_zi_symbolic
+    status = UMFPACK_SYMBOLIC_F
     (
         m_, n_,                    // matrix dimensions
         p_.data(), i_.data(),        // column and row indices
@@ -334,12 +334,12 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (do
     if (status != 0)
     {
         std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
-        umfpack_zi_report_status(0, status);
+        UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }
     
     // do some factorizations
-    status = umfpack_zi_numeric
+    status = UMFPACK_NUMERIC_F
     (
         p_.data(), i_.data(),    // column and row indices
         reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
@@ -348,80 +348,26 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_umfpack (do
     if (status != 0)
     {
         std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
-        umfpack_zi_report_status(0, status);
+        UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }
     
     // release unused data
-    umfpack_zi_free_symbolic(&Symbolic);
+    UMFPACK_FREE_SYMBOLIC_F(&Symbolic);
     
     // create a new LU factorization container
-    LUft<int,Complex> * lu_ptr = new LUft_UMFPACK<int,Complex>(this, Numeric);
+    LUft<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(this, Numeric);
     
     // wrap the pointer into smart pointer
-    return std::shared_ptr<LUft<int,Complex>>(lu_ptr);
+    return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);
 }
 
 template<>
-std::shared_ptr<LUft<std::int64_t,Complex>> CsrMatrix<std::int64_t,Complex>::factorize_umfpack (double droptol, void * data) const
+CooMatrix<LU_int_t,Complex> CsrMatrix<LU_int_t,Complex>::tocoo () const
 {
-    // Use standard UMFPACK sequence
-    void *Symbolic, *Numeric;
-    std::int64_t status;
-    
-    // get default setting
-    double Control[UMFPACK_CONTROL];
-    umfpack_zl_defaults(Control);
-    
-    // modify the drop tolerance
-    Control[UMFPACK_STRATEGY] = UMFPACK_STRATEGY_SYMMETRIC;
-    Control[UMFPACK_DROPTOL] = droptol;
-    
-    // analyze the sparse structure
-    status = umfpack_zl_symbolic
-    (
-        m_, n_,                    // matrix dimensions
-        p_.data(), i_.data(),        // column and row indices
-        reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
-        &Symbolic, Control, nullptr                // UMFPACK internals
-    );
-    if (status != 0)
-    {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
-        umfpack_zl_report_status(0, status);
-        std::exit(EXIT_FAILURE);
-    }
-    
-    // do some factorizations
-    status = umfpack_zl_numeric
-    (
-        p_.data(), i_.data(),    // column and row indices
-        reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
-        Symbolic, &Numeric, Control, nullptr    // UMFPACK internals
-    );
-    if (status != 0)
-    {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
-        umfpack_zl_report_status(0, status);
-        std::exit(EXIT_FAILURE);
-    }
-    
-    // release unused data
-    umfpack_zl_free_symbolic(&Symbolic);
-    
-    // create a new LU factorization container
-    LUft<std::int64_t,Complex> * lu_ptr = new LUft_UMFPACK<std::int64_t,Complex>(this, Numeric);
-    
-    // wrap the pointer into smart pointer
-    return std::shared_ptr<LUft<std::int64_t,Complex>>(lu_ptr);
-}
-
-template<>
-CooMatrix<int,Complex> CsrMatrix<int,Complex>::tocoo () const
-{
-    // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
+    // reserve space for the auxiliary (jj) and the output (Ti,Tj,Tx,Tz) arrays
     std::size_t N = x_.size();
-    iArray Ti(N), Tj(N), __j(N);
+    NumberArray<LU_int_t> Ti(N), Tj(N), jj(N);
     cArray Tx(N);
     
     // do we have any elements at all?
@@ -429,13 +375,13 @@ CooMatrix<int,Complex> CsrMatrix<int,Complex>::tocoo () const
     {
     
         // do the conversion
-        int status = umfpack_zi_col_to_triplet(n_, p_.data(), __j.data());
+        LU_int_t status = UMFPACK_COL_TO_TRIPLET_F(n_, p_.data(), jj.data());
         
         // check success
         if (status != 0)
         {
-            std::cerr << "\n[CscMatrix::tocoo] Exit code " << status << "\n";
-            umfpack_zi_report_status(0, status);
+            std::cerr << "\n[CscMatrix::tocoo] Exit code " << status << std::endl;
+            UMFPACK_REPORT_STATUS_F(0, status);
         }
         
         // copy only non-zero entries to output arrays
@@ -445,7 +391,7 @@ CooMatrix<int,Complex> CsrMatrix<int,Complex>::tocoo () const
             if (x_[i] != 0.)
             {
                 Ti[nz] = i_[i];
-                Tj[nz] = __j[i];
+                Tj[nz] = jj[i];
                 Tx[nz] = x_[i];
                 nz++;
             }
@@ -458,155 +404,23 @@ CooMatrix<int,Complex> CsrMatrix<int,Complex>::tocoo () const
     }
     
     // return new CooMatrix
-    return CooMatrix<int,Complex> (m_, n_, Tj, Ti, Tx);
+    return CooMatrix<LU_int_t,Complex> (m_, n_, Tj, Ti, Tx);
 }
 
 template<>
-CooMatrix<std::int64_t,Complex> CsrMatrix<std::int64_t,Complex>::tocoo () const
-{
-    // reserve space for the auxiliary (__j) and the output (Ti,Tj,Tx,Tz) arrays
-    std::size_t N = x_.size();
-    lArray Ti(N), Tj(N), __j(N);
-    cArray Tx(N);
-    
-    // do we have any elements at all?
-    if (N != 0)
-    {
-    
-        // do the conversion
-        std::int64_t status = umfpack_zl_col_to_triplet(n_, p_.data(), __j.data());
-        
-        // check success
-        if (status != 0)
-        {
-            std::cerr << "\n[CscMatrix::tocoo] Exit code " << status << "\n";
-            umfpack_zl_report_status(0, status);
-        }
-        
-        // copy only non-zero entries to output arrays
-        std::size_t nz = 0;
-        for (std::size_t i = 0; i < N; i++)
-        {
-            if (x_[i] != 0.)
-            {
-                Ti[nz] = i_[i];
-                Tj[nz] = __j[i];
-                Tx[nz] = x_[i];
-                nz++;
-            }
-        }
-        
-        // crop the output arrays
-        Ti.resize(nz);
-        Tj.resize(nz);
-        Tx.resize(nz);
-    }
-    
-    // return new CooMatrix
-    return CooMatrix<std::int64_t,Complex> (m_, n_, Tj, Ti, Tx);
-}
-
-template<>
-CooMatrix<std::int64_t,Complex> CscMatrix<std::int64_t,Complex>::tocoo () const
-{
-    // reserve space for the auxiliary (J) and the output (Ti,Tj,Tx,Tz) arrays
-    std::size_t N = x_.size();
-    std::vector<std::int64_t> Ti(N), Tj(N), J(N);
-    std::vector<Complex> Tx(N);
-    
-    // do we have any elements at all?
-    if (N != 0)
-    {
-        // do the conversion
-        std::int64_t status = umfpack_zl_col_to_triplet(n_, p_.data(), J.data());
-        
-        // check success
-        if (status != 0)
-        {
-            std::cerr << "\n[CscMatrix::tocoo] Exit code " << status << "\n";
-            umfpack_zl_report_status(0, status);
-        }
-        
-        // copy only non-zero entries to output arrays
-        std::size_t nz = 0;
-        for (std::size_t i = 0; i < N; i++)
-        {
-            if (x_[i] != 0.)
-            {
-                Ti[nz] = i_[i];
-                Tj[nz] = J[i];
-                Tx[nz] = x_[i];
-                nz++;
-            }
-        }
-        
-        // crop the output arrays
-        Ti.resize(nz);
-        Tj.resize(nz);
-        Tx.resize(nz);
-    }
-    
-    // return new CooMatrix
-    return CooMatrix<std::int64_t,Complex> (m_, n_, Ti, Tj, Tx);
-}
-
-template<>
-CscMatrix<std::int64_t,Complex> CooMatrix<std::int64_t,Complex>::tocsc () const
+CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
 {
     std::size_t nz = x_.size();
     
     // CSC matrix data
-    lArray Ap(n_ + 1), Ai(nz);
+    NumberArray<LU_int_t> Ap(n_ + 1), Ai(nz);
     cArray Ax(nz);
     
     // do we have any elements at all?
     if (nz != 0)
     {
     
-        std::int64_t status = umfpack_zl_triplet_to_col
-        (
-            m_,            // rows
-            n_,            // cols
-            nz,                // data length
-            i_.data(),        // row indices
-            j_.data(),     // column indices
-            reinterpret_cast<const double *>(x_.data()), 0,     // interleaved data
-            Ap.data(),        // column pointers
-            Ai.data(),        // row pointers
-            reinterpret_cast<double *>(Ax.data()), 0,    // interleaved data
-            0
-        );
-        
-        // check success
-        if (status != 0)
-        {
-            std::cerr << "\n[CooMatrix::tocsc] Exit code " << status << "\n";
-            umfpack_zl_report_status(0, status);
-        }
-        
-        // crop storage
-        std::size_t N = Ap[n_];
-        Ai.resize(N);
-        Ax.resize(N);
-    }
-    
-    return CscMatrix<std::int64_t,Complex> (m_, n_, Ap, Ai, Ax);
-}
-
-template<>
-CsrMatrix<int,Complex> CooMatrix<int,Complex>::tocsr () const
-{
-    std::size_t nz = x_.size();
-    
-    // CSC matrix data
-    iArray Ap(n_ + 1), Ai(nz);
-    cArray Ax(nz);
-    
-    // do we have any elements at all?
-    if (nz != 0)
-    {
-    
-        int status = umfpack_zi_triplet_to_col
+        LU_int_t status = UMFPACK_TRIPLET_TO_COL_F
         (
             n_,            // cols (rows of transposed matrix)
             m_,            // rows (cols of transposed matrix)
@@ -633,7 +447,7 @@ CsrMatrix<int,Complex> CooMatrix<int,Complex>::tocsr () const
         if (status != 0)
         {
             std::cerr << "\n[CooMatrix::tocsr] Exit code " << status << "\n";
-            umfpack_zi_report_status(0, status);
+            UMFPACK_REPORT_STATUS_F(0, status);
         }
         
         // crop storage
@@ -642,59 +456,7 @@ CsrMatrix<int,Complex> CooMatrix<int,Complex>::tocsr () const
         Ax.resize(N);
     }
     
-    return CsrMatrix<int,Complex> (m_, n_, Ap, Ai, Ax);
-}
-
-template<>
-CsrMatrix<std::int64_t,Complex> CooMatrix<std::int64_t,Complex>::tocsr () const
-{
-    std::size_t nz = x_.size();
-    
-    // CSC matrix data
-    lArray Ap(n_ + 1), Ai(nz);
-    cArray Ax(nz);
-    
-    // do we have any elements at all?
-    if (nz != 0)
-    {
-    
-        std::int64_t status = umfpack_zl_triplet_to_col
-        (
-            n_,            // cols (rows of transposed matrix)
-            m_,            // rows (cols of transposed matrix)
-            nz,             // data length
-            j_.data(),     // column indices (rows of transposed matrix)
-            i_.data(),     // row indices (cols of transposed matrix)
-            
-            // interleaved data
-            reinterpret_cast<const double *>(x_.data()),
-            nullptr,
-            
-            Ap.data(),      // row pointers
-            Ai.data(),      // column indices
-            
-            // interleaved data
-            reinterpret_cast<double *>(Ax.data()),
-            nullptr,
-         
-            // map
-            nullptr
-        );
-        
-        // check success
-        if (status != 0)
-        {
-            std::cerr << "\n[CooMatrix::tocsr] Exit code " << status << "\n";
-            umfpack_zl_report_status(0, status);
-        }
-        
-        // crop storage
-        std::size_t N = Ap[m_];
-        Ai.resize(N);
-        Ax.resize(N);
-    }
-    
-    return CsrMatrix<std::int64_t,Complex> (m_, n_, Ap, Ai, Ax);
+    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
 }
 
 #endif // WITH_UMFPACK
@@ -833,21 +595,21 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
 #include <superlu_zdefs.h>
 
 template<>
-std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dist (double droptol, void * data) const
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_superlu_dist (double droptol, void * data) const
 {
     //
     // Create matrix of the system.
     //
 
         cArray xdata (this->x());
-        iArray idata (this->i());
-        iArray pdata (this->p());
+        NumberArray<LU_int_t> idata (this->i());
+        NumberArray<LU_int_t> pdata (this->p());
         
         NCformat AStore;
-        AStore.nnz    = xdata.size();   // number of non-zero elements
-        AStore.nzval  = &xdata[0];      // pointer to the array of non-zero elements
-        AStore.rowind = &idata[0];      // row indices
-        AStore.colptr = &pdata[0];      // column pointers
+        AStore.nnz    = xdata.size();                           // number of non-zero elements
+        AStore.nzval  = &xdata[0];                              // pointer to the array of non-zero elements
+        AStore.rowind = reinterpret_cast<int_t*>(&idata[0]);    // row indices
+        AStore.colptr = reinterpret_cast<int_t*>(&pdata[0]);    // column pointers
         
         SuperMatrix A;
         A.Stype = SLU_NC;       // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
@@ -923,13 +685,13 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu_dis
             HexException("SuperLU/zgssvx: Singular factor.");
     
     // create a new LU factorization container
-    LUft<int,Complex> * lu_ptr = new LUft_SUPERLU_DIST<int,Complex>
+    LUft<LU_int_t,Complex> * lu_ptr = new LUft_SUPERLU_DIST<LU_int_t,Complex>
     (
         this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
     );
     
     // wrap the pointer into smart pointer
-    return std::shared_ptr<LUft<int,Complex>>(lu_ptr);
+    return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);
 }
 
 #endif // WITH_SUPERLU_DIST

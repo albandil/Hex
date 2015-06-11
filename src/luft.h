@@ -32,10 +32,6 @@
 #ifndef HEX_LUFT_H
 #define HEX_LUFT_H
 
-#ifdef WITH_UMFPACK
-#include <umfpack.h>
-#endif
-
 /// LU factorization methods.
 enum
 {
@@ -169,6 +165,36 @@ class LUft
 };
 
 #ifdef WITH_UMFPACK
+#include <umfpack.h>
+
+#ifdef _LONGINT
+#define UMFPACK_DEFAULTS_F          umfpack_zl_defaults
+#define UMFPACK_SYMBOLIC_F          umfpack_zl_symbolic
+#define UMFPACK_FREE_SYMBOLIC_F     umfpack_zl_free_symbolic
+#define UMFPACK_NUMERIC_F           umfpack_zl_numeric
+#define UMFPACK_SAVE_NUMERIC_F      umfpack_zl_save_numeric
+#define UMFPACK_LOAD_NUMERIC_F      umfpack_zl_load_numeric
+#define UMFPACK_FREE_NUMERIC_F      umfpack_zl_free_numeric
+#define UMFPACK_SOLVE_F             umfpack_zl_solve
+#define UMFPACK_GET_LUNZ_F          umfpack_zl_get_lunz
+#define UMFPACK_REPORT_STATUS_F     umfpack_zl_report_status
+#define UMFPACK_COL_TO_TRIPLET_F    umfpack_zl_col_to_triplet
+#define UMFPACK_TRIPLET_TO_COL_F    umfpack_zl_triplet_to_col
+#else
+#define UMFPACK_DEFAULTS_F          umfpack_zi_defaults
+#define UMFPACK_SYMBOLIC_F          umfpack_zi_symbolic
+#define UMFPACK_FREE_SYMBOLIC_F     umfpack_zi_free_symbolic
+#define UMFPACK_NUMERIC_F           umfpack_zi_numeric
+#define UMFPACK_SAVE_NUMERIC_F      umfpack_zi_save_numeric
+#define UMFPACK_LOAD_NUMERIC_F      umfpack_zi_load_numeric
+#define UMFPACK_FREE_NUMERIC_F      umfpack_zi_free_numeric
+#define UMFPACK_SOLVE_F             umfpack_zi_solve
+#define UMFPACK_GET_LUNZ_F          umfpack_zi_get_lunz
+#define UMFPACK_REPORT_STATUS_F     umfpack_zi_report_status
+#define UMFPACK_COL_TO_TRIPLET_F    umfpack_zi_col_to_triplet
+#define UMFPACK_TRIPLET_TO_COL_F    umfpack_zi_triplet_to_col
+#endif
+
 /**
  * @brief LU factorization object - UMFPACK specialization.
  * 
@@ -228,6 +254,7 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
 
 #ifdef WITH_SUPERLU
 #include <slu_zdefs.h>
+
 /**
  * @brief LU factorization object - SuperLU specialization.
  * 
@@ -274,10 +301,10 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
-        virtual void save (std::string name) const { /* TODO */ }
+        virtual void save (std::string name) const { HexException("SuperLU factorizer does not yet support --out-of-core option."); }
         
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true) { /* TODO */ }
+        virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("SuperLU factorizer does not yet support --out-of-core option."); }
         
         /// Release memory.
         virtual void drop ()
@@ -332,6 +359,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
 
 #ifdef WITH_SUPERLU_DIST
 #include <superlu_zdefs.h>
+
 /**
  * @brief LU factorization object - SuperLU-dist specialization.
  * 
@@ -373,10 +401,10 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
-        virtual void save (std::string name) const { /* TODO */ }
+        virtual void save (std::string name) const { HexException("SuperLU_dist factorizer does not yet support --out-of-core option."); }
         
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true) { /* TODO */ }
+        virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("SuperLU_dist factorizer does not yet support --out-of-core option."); }
         
         /// Release memory.
         virtual void drop ()

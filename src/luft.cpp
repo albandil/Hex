@@ -31,21 +31,20 @@
 
 #include "luft.h"
 
-
 // ------------------------------------------------------------------------------------
-// UMFPACK-dependent functions (LP64)
+// UMFPACK-dependent functions.
 //
 
 #ifdef WITH_UMFPACK
 
 template<>
-std::size_t LUft_UMFPACK<int,Complex>::size () const
+std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
 {
     if (numeric_ == nullptr)
         return 0;
     
-    int lnz, unz, m, n, nz_udiag;
-    int status = umfpack_zi_get_lunz
+    LU_int_t lnz, unz, m, n, nz_udiag;
+    LU_int_t status = UMFPACK_GET_LUNZ_F
     (
         &lnz,       // number of non-zero elements in L-factor
         &unz,       // number of non-zero elements in U-factor
@@ -55,11 +54,11 @@ std::size_t LUft_UMFPACK<int,Complex>::size () const
         numeric_    // factorization object
     );
     
-    return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
+    return status == 0 ? (lnz + unz) * 16LL : 0LL; // Byte count
 }
 
 template<>
-void LUft_UMFPACK<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // check sizes
     assert(eqs * matrix_->n_ == (int)x.size());
@@ -69,7 +68,7 @@ void LUft_UMFPACK<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     for (int eq = 0; eq < eqs; eq++)
     {
         // solve for current RHS
-        int status = umfpack_zi_solve
+        int status = UMFPACK_SOLVE_F
         (
             UMFPACK_Aat,            // matrix orientation
             matrix_->p().data(),    // row pointers
@@ -96,15 +95,15 @@ void LUft_UMFPACK<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         if (status != UMFPACK_OK)
         {
             std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << std::endl;
-            umfpack_zi_report_status(0, status);
+            UMFPACK_REPORT_STATUS_F(0, status);
         }
     }
 }
 
 template<>
-void LUft_UMFPACK<int,Complex>::save (std::string name) const
+void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
 {
-    int err = umfpack_zi_save_numeric(numeric_, const_cast<char*>(name.c_str()));
+    int err = UMFPACK_SAVE_NUMERIC_F(numeric_, const_cast<char*>(name.c_str()));
     
     if (err == UMFPACK_ERROR_invalid_Numeric_object)
         HexException("[LUft::save] Invalid numeric object.");
@@ -114,9 +113,9 @@ void LUft_UMFPACK<int,Complex>::save (std::string name) const
 }
 
 template<>
-void LUft_UMFPACK<int,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_UMFPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
 {
-    int err = umfpack_zi_load_numeric(&numeric_, const_cast<char*>(name.c_str()));
+    int err = UMFPACK_LOAD_NUMERIC_F(&numeric_, const_cast<char*>(name.c_str()));
     
     if (err == UMFPACK_ERROR_out_of_memory)
         HexException("[LUft::load] Out of memory.");
@@ -126,126 +125,19 @@ void LUft_UMFPACK<int,Complex>::load (std::string name, bool throw_on_io_failure
 }
 
 template<>
-void LUft_UMFPACK<int,Complex>::drop ()
+void LUft_UMFPACK<LU_int_t,Complex>::drop ()
 {
     if (numeric_ != nullptr)
     {
-        umfpack_zi_free_numeric(&numeric_);
+        UMFPACK_FREE_NUMERIC_F(&numeric_);
         numeric_ = nullptr;
     }
 }
 
 #endif // WITH_UMFPACK
 
-
 // ------------------------------------------------------------------------------------
-// UMFPACK-dependent functions (ILP64)
-//
-
-#ifdef WITH_UMFPACK
-
-template<>
-std::size_t LUft_UMFPACK<std::int64_t,Complex>::size () const
-{
-    if (numeric_ == nullptr)
-        return 0;
-    
-    std::int64_t lnz, unz, m, n, nz_udiag;
-    std::int64_t status = umfpack_zl_get_lunz
-    (
-        &lnz,       // number of non-zero elements in L-factor
-        &unz,       // number of non-zero elements in U-factor
-        &m,         // row count
-        &n,         // column count
-        &nz_udiag,  // ?
-        numeric_    // factorization object
-    );
-    
-    return status == 0 ? (lnz + unz) * 16 : 0; // Byte count
-}
-
-template<>
-void LUft_UMFPACK<std::int64_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
-{
-    // check sizes
-    assert(eqs * matrix_->n_ == (int)x.size());
-    assert(eqs * matrix_->n_ == (int)b.size());
-    
-    // solve for all RHSs
-    for (int eq = 0; eq < eqs; eq++)
-    {
-        // solve for current RHS
-        std::int64_t status = umfpack_zl_solve
-        (
-            UMFPACK_Aat,            // matrix orientation
-            matrix_->p().data(),    // row pointers
-            matrix_->i().data(),    // column indices
-            
-            // matrix elements (interleaved)
-            reinterpret_cast<const double*>(matrix_->x().data()),
-            nullptr,
-            
-            // solutions (interleaved)
-            reinterpret_cast<double*>(&x[0] + eq * matrix_->rows()),
-            nullptr,
-            
-            // right-hand side vectors (interleaved)
-            reinterpret_cast<const double*>(&b[0] + eq * matrix_->rows()),
-            nullptr,
-            
-            numeric_,   // factorization object
-            nullptr,    // ?
-            &info_[0]   // diagnostic information
-        );
-        
-        // check output
-        if (status != UMFPACK_OK)
-        {
-            std::cerr << "\n[CsrMatrix::LUft::solve] Exit status " << status << std::endl;
-            umfpack_zl_report_status(0, status);
-        }
-    }
-}
-
-template<>
-void LUft_UMFPACK<std::int64_t,Complex>::save (std::string name) const
-{
-    std::int64_t err = umfpack_zl_save_numeric(numeric_, const_cast<char*>(name.c_str()));
-    
-    if (err == UMFPACK_ERROR_invalid_Numeric_object)
-        HexException("[LUft::save] Invalid numeric object.");
-    
-    if (err == UMFPACK_ERROR_file_IO)
-        HexException("[LUft::save] Failed to save LU object \"%s\" (size = %ld).", name.c_str(), size());
-}
-
-template<>
-void LUft_UMFPACK<std::int64_t,Complex>::load (std::string name, bool throw_on_io_failure)
-{
-    std::int64_t err = umfpack_zl_load_numeric(&numeric_, const_cast<char*>(name.c_str()));
-    
-    if (err == UMFPACK_ERROR_out_of_memory)
-        HexException("[LUft::load] Out of memory.");
-    
-    if (err == UMFPACK_ERROR_file_IO and throw_on_io_failure)
-        HexException("[LUft::save] Failed to load LU object \"%s\".", name.c_str());
-}
-
-template<>
-void LUft_UMFPACK<std::int64_t,Complex>::drop ()
-{
-    if (numeric_ != nullptr)
-    {
-        umfpack_zl_free_numeric(&numeric_);
-        numeric_ = nullptr;
-    }
-}
-
-#endif // WITH_UMFPACK
-
-
-// ------------------------------------------------------------------------------------
-// SUPERLU-dependent functions (LP64).
+// SUPERLU-dependent functions.
 //
 
 #ifdef WITH_SUPERLU
@@ -369,28 +261,28 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
 #endif // WITH_SUPERLU
 
 // ------------------------------------------------------------------------------------
-// SUPERLU-DIST-dependent functions (LP64).
+// SUPERLU-DIST-dependent functions.
 //
 
 #ifdef WITH_SUPERLU_DIST
 #include <superlu_zdefs.h>
 
 template<>
-void LUft_SUPERLU_DIST<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     //
     // Create matrix of the system.
     //
     
         cArray xdata (matrix_->x());
-        iArray idata (matrix_->i());
-        iArray pdata (matrix_->p());
+        NumberArray<LU_int_t> idata (matrix_->i());
+        NumberArray<LU_int_t> pdata (matrix_->p());
         
         NCformat AStore;
-        AStore.nnz    = xdata.size();   // number of non-zero elements
-        AStore.nzval  = &xdata[0];      // pointer to the array of non-zero elements
-        AStore.rowind = &idata[0];      // row indices
-        AStore.colptr = &pdata[0];      // column pointers
+        AStore.nnz    = xdata.size();                           // number of non-zero elements
+        AStore.nzval  = &xdata[0];                              // pointer to the array of non-zero elements
+        AStore.rowind = reinterpret_cast<int_t*>(&idata[0]);    // row indices
+        AStore.colptr = reinterpret_cast<int_t*>(&pdata[0]);    // column pointers
         
         SuperMatrix A;
         A.Stype = SLU_NC;           // storage type: compressed sparse, column-major (SuperLU-dist suports no other)

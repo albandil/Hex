@@ -57,7 +57,7 @@ void ILUCGPreconditioner::setup ()
         for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
         {
             // list member processes
-            iArray usermap;
+            NumberArray<int_t> usermap;
             for (int iproc = 0; iproc < cmd_.groupsize; iproc++)
                 usermap.push_back(igroup * cmd_.groupsize + iproc);
             

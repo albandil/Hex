@@ -5,47 +5,58 @@
 
 # ---------------------------------------------------------------------------- #
 # Compiler and linker + flags                                                  #
+#  - Hex-ecs requires compiler with C++11 support (GCC >= 4.8, ICC >= 2015)    #
 # ---------------------------------------------------------------------------- #
 
+# C++ compiler
 CXX = g++
 
+# build mode ("debug" or "release")
+TARGET = release
+
+# global compiler flags
 CFLAGS = -fopenmp -Wall -mtune=native -march=native
 LFLAGS = -fopenmp
 
 # ---------------------------------------------------------------------------- #
-# LU factorization libraries (use at least one)                                #
+# BLAS & LAPACK                                                                #
 # ---------------------------------------------------------------------------- #
 
-# - sequential SuperLU
-# SUPERLUFLAGS = -DWITH_SUPERLU
+# BLASLAPACKFLAGS = -DNO_LAPACK
+# BLASLAPACKLIBS = -lblas
+
+BLASLAPACKFLAGS =
+BLASLAPACKLIBS = -lopenblas
+
+# ---------------------------------------------------------------------------- #
+# SuiteSparse/UMFPACK                                                          #
+#  - needed for sparse matrix manipulation                                     #
+#  - default choice for LU factorization (e.g. in ILU preconditioner)          #
+#  - supports both LP64 (32-bit integer) and ILP64 (64-bit integer)            #
+#  - already the factorization of moderate matrices requires ILP64, so         #
+#    the flag -D_LONGINT is included by default                                #
+# ---------------------------------------------------------------------------- #
+
+SUITESPARSEFLAGS = -DWITH_UMFPACK -D_LONGINT
+SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
+
+# ---------------------------------------------------------------------------- #
+# Other LU factorization libraries                                             #
+#  - these are optional                                                        #
+#  - use only one at a time                                                    #
+# ---------------------------------------------------------------------------- #
+
+# - sequential SuperLU with only 32-bit integer support
+# SUPERLUFLAGS = -DWITH_SUPERLU -U_LONGINT
 # SUPERLULIBS = -lsuperlu
 
-# - distributed SuperLU (incompatible with SuperLU)
-# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST
-# SUPERLUDISTLIBS = -lsuperlu_dist -lptscotchmetis -lmetis
+# - distributed SuperLU + Metis compiled with 32-bit integer (LP64 mode)
+# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -U_LONGINT
+# SUPERLUDISTLIBS = -lsuperlu_dist_lp64 -lmetis_lp64
 
-# - SuiteSparse/UMFPACK (requires 64-bit integer for work with larger matrices)
-SUITESPARSEFLAGS = -DWITH_UMFPACK -DINT64
-SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig -lopenblas
-
-# ---------------------------------------------------------------------------- #
-# OpenMPI environment (optional)                                               #
-# ---------------------------------------------------------------------------- #
-
-OPENMPIFLAGS = -DWITH_MPI $(shell mpic++ --showme:compile)
-OPENMPILIBS  = $(shell mpic++ --showme:link)
-
-# ---------------------------------------------------------------------------- #
-# OpenCL (optional)                                                            #
-# ---------------------------------------------------------------------------- #
-
-# - Intel OpenCL
-OPENCLFLAGS = -DWITH_OPENCL -I/opt/intel/opencl-1.2-4.5.0.8/include
-OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
-
-# - AMD OpenCL
-# OPENCLFLAGS = -DWITH_OPENCL -I/opt/AMDAPPSDK-3.0-0-Beta/include
-# OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
+# - distributed SuperLU + Metis compiled with 64-bit integer (ILP64 mode)
+# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -D_LONGINT
+# SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lmetis_ilp64
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
@@ -62,42 +73,55 @@ FFTWFLAGS =
 FFTWLIBS = -lfftw3
 
 # ---------------------------------------------------------------------------- #
-# Lapack (optional if not already in OpenBLAS; use -DNO_LAPACK to omit)        #
+# OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
-# LAPACKFLAGS = -DNO_LAPACK
-# LAPACKLIBS = -lgfortran -llapack
+OPENMPIFLAGS = -DWITH_MPI $(shell mpic++ --showme:compile)
+OPENMPILIBS  = $(shell mpic++ --showme:link)
+
+# ---------------------------------------------------------------------------- #
+# OpenCL (optional)                                                            #
+# ---------------------------------------------------------------------------- #
+
+# - Intel OpenCL
+# OPENCLFLAGS = -DWITH_OPENCL -I/opt/intel/opencl-1.2-4.5.0.8/include
+# OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
+
+# - AMD OpenCL
+# OPENCLFLAGS = -DWITH_OPENCL -I/opt/AMDAPPSDK-3.0-0-Beta/include
+# OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
 
 # ---------------------------------------------------------------------------- #
 # PNG++ (optional)                                                             #
 # ---------------------------------------------------------------------------- #
 
-PNGPPFLAGS = -DWITH_PNG -I./libs
-PNGPPLIBS = -lpng
+# PNGPPFLAGS = -DWITH_PNG -I./libs
+# PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
 
 
 # compiler flags
 CFLAGS +=  -fPIC -std=c++11 -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
-          $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS)  $(SUITESPARSEFLAGS) $(OPENMPIFLAGS) \
-          $(OPENCLFLAGS) $(GSLFLAGS) $(FFTWFLAGS) $(LAPACKFLAGS) $(PNGPPFLAGS) 
+          $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
+          $(OPENCLFLAGS) $(GSLFLAGS) $(FFTWFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
 
 # linker flags
 LFLAGS += -fPIC -rdynamic \
-          $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(SUITESPARSELIBS) $(OPENMPILIBS) \
-          $(OPENCLLIBS) $(GSLLIBS) $(FFTWLIBS) $(LAPACKLIBS) $(PNGPPLIBS)
+          $(SUITESPARSELIBS) $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(OPENMPILIBS) \
+          $(OPENCLLIBS) $(GSLLIBS) $(FFTWLIBS) $(BLASLAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
 # DEBUG and RELEASE variants
-CXXDEBUG = -g $(CFLAGS) 
-CXXRILIS = -g $(CFLAGS) -O3 -fcx-limited-range -DNDEBUG
-
-# choose between DEBUG and RELEASE compiler flags
-# CXXFLAGS = $(CXXDEBUG)
-CXXFLAGS = $(CXXRILIS)
+ifeq ($(TARGET),debug)
+CXXFLAGS = -g $(CFLAGS)
+else ifeq ($(TARGET),release)
+CXXFLAGS = -g $(CFLAGS) -O3 -fcx-limited-range -DNDEBUG
+else
+$(error "Unknown target $(TARGET)")
+endif
 
 # source files
 CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
