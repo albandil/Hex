@@ -108,10 +108,7 @@ void hex_import_ (const char* sqlname)
     
     // test input stream
     if (not is.good())
-    {
-        std::cerr << "ERROR: Cannot open file \"" << sqlname << "\"" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
+        HexException("Cannot open file \"%s\".", sqlname);
     
     // line numbers (current and total)
     unsigned line = 0, lines = 0;
@@ -190,7 +187,7 @@ void hex_import_ (const char* sqlname)
     }
     while (not is.eof());
     
-    std::cout << "\rThe SQL batch file has been successfully imported." << std::endl;
+    std::cout << "\rThe SQL batch file \"" << sqlname << "\" has been successfully imported." << std::endl;
 }
 
 void hex_update_ ()
@@ -208,16 +205,15 @@ void hex_update_ ()
             
             st << cmd;
             
-            try {
-                
+            try
+            {
                 st.exec();
-                
-            } catch (sqlitepp::exception & e) {
-                
+            }
+            catch (sqlitepp::exception & e)
+            {
                 std::cerr << "ERROR: Update failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
                 std::exit(EXIT_FAILURE);
-                
             }
         }
     }
@@ -228,15 +224,13 @@ void hex_optimize_ ()
 {
     sqlitepp::statement st(db);
     st << "VACUUM";
-    try {
-        
+    try
+    {
         st.exec();
-        
-    } catch (sqlitepp::exception & e) {
-        
-        std::cerr << "ERROR: Database optimizaion failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-        std::exit(EXIT_FAILURE);
-        
+    }
+    catch (sqlitepp::exception & e)
+    {
+        HexException("Database optimizaion failed, code = %d (\"%s\").", e.code(), e.what());
     }
 }
 

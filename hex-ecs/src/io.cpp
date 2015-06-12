@@ -86,7 +86,7 @@ void CommandLine::parse (int argc, char* argv[])
     (
         argc, argv,
         
-        "example", "e", 0, [&](std::string optarg) -> bool
+        "example", "e", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 std::cout << "Writing sample input file to \"example.inp\".\n\n";
                 
@@ -100,15 +100,15 @@ void CommandLine::parse (int argc, char* argv[])
                 out.close();
                 std::exit(EXIT_SUCCESS);
             },
-        "input", "i", 1, [&](std::string optarg) -> bool
+        "input", "i", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // set custom input file
-                inputfile.open(optarg);
+                inputfile.open(optargs[0]);
                 if (not inputfile.good())
-                    HexException("Error: Input file \"%s\" not found.\n", optarg.c_str());
+                    HexException("Error: Input file \"%s\" not found.\n", optargs[0].c_str());
                 return true;
             },
-        "help", "h", 0, [&](std::string optarg) -> bool
+        "help", "h", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // print usage information
                 std::cout << "\n"
@@ -168,90 +168,90 @@ void CommandLine::parse (int argc, char* argv[])
                 ;
                 std::exit(EXIT_SUCCESS);
             },
-        "write-grid", "g", 0, [&](std::string optarg) -> bool
+        "write-grid", "g", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // write grid to VTK
                 writegrid = true;
                 return true;
             },
-        "zipfile", "z", 1, [&](std::string optarg) -> bool
+        "zipfile", "z", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // zip B-spline expansion file
-                zipfile = optarg;
+                zipfile = optargs[0];
                 return true;
             },
-        "zipcount", "n", 1, [&](std::string optarg) -> bool
+        "zipcount", "n", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // zip samples
-                zipcount = std::atol(optarg.c_str());
+                zipcount = std::atol(optargs[0].c_str());
                 return true;
             },
-        "zipmax", "R", 1, [&](std::string optarg) -> bool
+        "zipmax", "R", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // zip bounding box
-                zipmax = std::atof(optarg.c_str());
+                zipmax = std::atof(optargs[0].c_str());
                 return true;
             },
-        "lu", "F", 1, [&](std::string optarg) -> bool
+        "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // choose factorizer
-                if (optarg == "umfpack")
+                if (optargs[0] == "umfpack")
                     factorizer = LUFT_UMFPACK;
-                else if (optarg == "superlu")
+                else if (optargs[0] == "superlu")
                     factorizer = LUFT_SUPERLU;
-                else if (optarg == "superlu_dist")
+                else if (optargs[0] == "superlu_dist")
                     factorizer = LUFT_SUPERLU_DIST;
                 else
-                    HexException("Unknown LU-factorizer '%s'.", optarg.c_str());
+                    HexException("Unknown LU-factorizer '%s'.", optargs[0].c_str());
                 return true;
             },
-        "groupsize", "G", 1, [&](std::string optarg) -> bool
+        "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // set the groupsize
-                groupsize = std::atoi(optarg.c_str());
+                groupsize = std::atoi(optargs[0].c_str());
                 return true;
             },
 #ifdef WITH_MPI
-        "mpi", "m", 0, [&](std::string optarg) -> bool
+        "mpi", "m", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use MPI
                 parallel = true;
                 return true;
             },
 #endif
-        "stg-integ", "a", 0, [&](std::string optarg) -> bool
+        "stg-integ", "a", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // run only the first part (computation of radial integrals)
                 itinerary = StgRadial;
                 return true;
             },
-        "stg-integ-solve", "b", 0, [&](std::string optarg) -> bool
+        "stg-integ-solve", "b", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // run only the first part (computation of radial integrals)
                 itinerary = StgRadial | StgSolve;
                 return true;
             },
-        "stg-extract", "c", 0, [&](std::string optarg) -> bool
+        "stg-extract", "c", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // run only the third part (extraction of amplitudes)
                 itinerary = StgExtract;
                 return true;
             },
-        "own-radial-cache", "w", 0, [&](std::string optarg) -> bool
+        "own-radial-cache", "w", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not cache un-'owned' two-electron radial integrals in memory
                 cache_own_radint = true;
                 cache_all_radint = false;
                 return true;
             },
-        "no-radial-cache", "r", 0, [&](std::string optarg) -> bool
+        "no-radial-cache", "r", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not cache any two-electron radial integrals in memory at all
                 cache_own_radint = false;
                 cache_all_radint = false;
                 return true;
             },
-        "out-of-core", "o", 0, [&](std::string optarg) -> bool
+        "out-of-core", "o", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use full out-of-core functionality: store also diagonal blocks (and factorizations) on disk
                 cache_all_radint = false;
@@ -259,7 +259,7 @@ void CommandLine::parse (int argc, char* argv[])
                 outofcore = true;
                 return true;
             },
-        "out-of-core-continue", "O", 0, [&](std::string optarg) -> bool
+        "out-of-core-continue", "O", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // continue OOC calculation
                 cache_all_radint = false;
@@ -269,38 +269,38 @@ void CommandLine::parse (int argc, char* argv[])
                 cont = true;
                 return true;
             },
-        "whole-matrix", "W", 0, [&](std::string optarg) -> bool
+        "whole-matrix", "W", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // whether to load whole matrix from scratch disk when calculating dot product (etc.)
                 wholematrix = true;
                 return true;
             },
-        "drop-tolerance", "d", 1, [&](std::string optarg) -> bool
+        "drop-tolerance", "d", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // drop tolerance for iLU-factorization
-                droptol = std::atof(optarg.c_str());
+                droptol = std::atof(optargs[0].c_str());
                 return true;
             },
-        "tolerance", "T", 1, [&](std::string optarg) -> bool
+        "tolerance", "T", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // iteration tolerance for terminating iteration solution
-                itertol = std::atof(optarg.c_str());
+                itertol = std::atof(optargs[0].c_str());
                 return true;
             },
-        "prec-tolerance", "t", 1, [&](std::string optarg) -> bool
+        "prec-tolerance", "t", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // iteration tolerance for terminating iteration solution
-                prec_itertol = std::atof(optarg.c_str());
+                prec_itertol = std::atof(optargs[0].c_str());
                 return true;
             },
-        "preconditioner", "p", 1, [&](std::string optarg) -> bool
+        "preconditioner", "p", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // preconditioner
-                if ((preconditioner = Preconditioners::findByName(optarg)) == -1)
-                    HexException("Unknown preconditioner \"%s\".", optarg.c_str());
+                if ((preconditioner = Preconditioners::findByName(optargs[0])) == -1)
+                    HexException("Unknown preconditioner \"%s\".", optargs[0].c_str());
                 return true;
             },
-        "list-preconditioners", "P", 0, [&](std::string optarg) -> bool
+        "list-preconditioners", "P", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // preconditioners description
                 std::cout << "\nPreconditioners description (first one is default):\n\n";
@@ -312,46 +312,46 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
-        "parallel-block", "", 0, [&](std::string optarg) -> bool
+        "parallel-block", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // parallelize preconditioning
                 parallel_block = true;
                 return true;
             },
-        "lightweight-radial-cache", "l", 0, [&](std::string optarg) -> bool
+        "lightweight-radial-cache", "l", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not precompute two-electron radial integral matrices but only apply them on the fly
                 lightweight_radial_cache = true;
                 return true;
             },
 #ifndef NO_LAPACK
-        "lightweight-full", "L", 0, [&](std::string optarg) -> bool
+        "lightweight-full", "L", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not precompute large matrices but only apply them on the fly
                 lightweight_full = lightweight_radial_cache = true;
                 return true;
             },
-        "kpa-simple-rad", "R", 0, [&](std::string optarg) -> bool
+        "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use simplified radial matrix for KPA nested iterations
                 kpa_simple_rad = true;
                 return true;
             },
 #endif
-        "shared-scratch", "s", 0, [&](std::string optarg) -> bool
+        "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // precompute only the owned subset of radial integrals
                 shared_scratch = true;
                 return true;
             },
-        "reuse-dia-blocks", "", 0, [&](std::string optarg) -> bool
+        "reuse-dia-blocks", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // load dia blocks from scratch files
                 reuse_dia_blocks = true;
                 return true;
             },
 #ifdef WITH_OPENCL
-        "cl-list", "", 0,  [&](std::string optarg) -> bool
+        "cl-list", "", 0,  [&](std::vector<std::string> const & optargs) -> bool
             {
                 // list all available OpenCL platforms and devices
                 std::cout << "Available OpenCL devices" << std::endl;
@@ -378,19 +378,19 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << std::endl;
                 std::exit(0);
             },
-        "cl-platform", "", 1, [&](std::string optarg) -> bool
+        "cl-platform", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use given OpenCL platform
-                ocl_platform = std::atol(optarg.c_str());
+                ocl_platform = std::atol(optargs[0].c_str());
                 return true;
             },
-        "cl-device", "", 1, [&](std::string optarg) -> bool
+        "cl-device", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use given OpenCL device
-                ocl_device = std::atol(optarg.c_str());
+                ocl_device = std::atol(optargs[0].c_str());
                 return true;
             },
-        "cl-use-host-memory", "", 0, [&](std::string optarg) -> bool
+        "cl-use-host-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // keep large data in RAM
                 gpu_large_data = true;
@@ -398,7 +398,7 @@ void CommandLine::parse (int argc, char* argv[])
             },
 #endif
         
-        [&] (std::string optname, std::string optarg) -> bool
+        [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
         {
             HexException("Unknown switch \"%s\".", optname.c_str());
         }

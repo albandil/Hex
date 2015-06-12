@@ -127,6 +127,8 @@ void parse_input_file
     integrate_forbidden = ReadNext<int>(inf).val;
 }
 
+typedef std::vector<std::string> const & Args;
+
 int main (int argc, char* argv[])
 {
     // set proper locale
@@ -156,7 +158,7 @@ int main (int argc, char* argv[])
     (
         argc, argv,
         
-        "example", "e", 0, [&](std::string optarg) -> bool
+        "example", "e", 0, [&](Args optargs) -> bool
             {
                 std::cout << "Writing sample input file to \"example.inp\"." << std::endl << std::endl;
                 
@@ -170,47 +172,43 @@ int main (int argc, char* argv[])
                 out.close();
                 std::exit(EXIT_SUCCESS);
             },
-        "help", "h", 0, [](std::string optarg) -> bool
+        "help", "h", 0, [](Args optargs) -> bool
             {
                 // print usage information
                 std::cout << help_text << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
-        "input", "i", 1, [&](std::string optarg) -> bool
+        "input", "i", 1, [&](Args optargs) -> bool
             {
                 // set custom input file
                 inputfile.open(optarg);
                 if (not inputfile.good())
-                    throw exception ("Error: Input file \"%s\" not found.", optarg.c_str());
-                std::cout << "Using input file \"" << optarg << "\"." << std::endl << std::endl;
+                    throw exception ("Error: Input file \"%s\" not found.", optargs[0].c_str());
+                std::cout << "Using input file \"" << optargs[0] << "\"." << std::endl << std::endl;
                 return true;
             },
-        "partial-wave", "w", 0, [&](std::string optarg) -> bool
+        "partial-wave", "w", 0, [&](Args optargs) -> bool
             {
                 // compute only contribution of a single partial wave
                 partial_wave = true;
                 return true;
             },
-        "direct-integrate", "d", 0, [&](std::string optarg) -> bool
+        "direct-integrate", "d", 0, [&](Args optargs) -> bool
             {
                 // compute multidimensional integral
                 direct_integrate = true;
                 return true;
             },
-        "verbose", "v", 0, [&](std::string optarg) -> bool
+        "verbose", "v", 0, [&](Args optargs) -> bool
             {
                 // verbose output
                 verbose = true;
                 return true;
             },
         
-        [](std::string opt, std::string optarg) -> bool
+        [](std::string opt, Args optargs) -> bool
             {
-                throw exception
-                (
-                    "Unknown option \"%s\" with argument \"%s\".",
-                    opt.c_str(), optarg.c_str()
-                );
+                HexException("Unknown option \"%s\".", opt.c_str());
             }
     );
     

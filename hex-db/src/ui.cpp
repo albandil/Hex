@@ -38,6 +38,8 @@
 #include "variables.h"
 #include "version.h"
 
+typedef std::vector<std::string> const & Args;
+
 const std::string HelpText = 
     "Usage:\n"
     "\thex-db [options]\n"
@@ -106,7 +108,8 @@ int main (int argc, char* argv[])
     }
     
     // program parameters
-    std::string dbname = "hex.db", sqlfile, dumpfile;
+    std::string dbname = "hex.db", dumpfile;
+    std::vector<std::string> sqlfiles;
     bool create_new = false, doupdate = false, doimport = false;
     bool dooptimize = false;
     
@@ -120,14 +123,19 @@ int main (int argc, char* argv[])
     ParseCommandLine
     (
         argc, argv,
-        "help", "h",     0, [ & ](std::string opt) -> bool { print_help_and_exit(); return true; },
-        "new", "n",      0, [ & ](std::string opt) -> bool { create_new = true; return true; },
-        "database", "D", 1, [ & ](std::string opt) -> bool { dbname = opt; return true; },
-        "import", "i",   1, [ & ](std::string opt) -> bool { doimport = true; sqlfile = opt; return true; },
-        "update", "u",   0, [ & ](std::string opt) -> bool { doupdate = true; return true; },
-        "optimize", "o", 0, [ & ](std::string opt) -> bool { dooptimize = true; return true; },
-        "dump", "d",     1, [ & ](std::string opt) -> bool { dumpfile = opt; return true; },
-        "vars", "v",     0, [ & ](std::string opt) -> bool
+        "help", "h",     0, [ & ](Args opts) -> bool { print_help_and_exit(); return true; },
+        "new", "n",      0, [ & ](Args opts) -> bool { create_new = true; return true; },
+        "database", "D", 1, [ & ](Args opts) -> bool { dbname = opts[0]; return true; },
+        "update", "u",   0, [ & ](Args opts) -> bool { doupdate = true; return true; },
+        "optimize", "o", 0, [ & ](Args opts) -> bool { dooptimize = true; return true; },
+        "dump", "d",     1, [ & ](Args opts) -> bool { dumpfile = opts[0]; return true; },
+        "import", "i",  -1, [ & ](Args opts) -> bool
+        {
+            doimport = true;
+            sqlfiles.insert(sqlfiles.end(), opts.begin(), opts.end());
+            return true;
+        },
+        "vars", "v",     0, [ & ](Args opts) -> bool
         {
             OutputTable table;
             table.setAlignment(OutputTable::left, OutputTable::left);
@@ -138,23 +146,23 @@ int main (int argc, char* argv[])
             
             std::exit(EXIT_SUCCESS);
         },
-        "params", "p",   1, [ & ](std::string opt) -> bool
+        "params", "p",   1, [ & ](Args opts) -> bool
         {
             VariableList::const_iterator it = std::find_if
             (
                 vlist.begin(),
                 vlist.end(),
-                [ & ](Variable* const & it) -> bool { return it->id() == opt; }
+                [ & ](Variable* const & it) -> bool { return it->id() == opts[0]; }
             );
             
             if (it == vlist.end())
             {
-                std::cout << "No such variable \"" << opt << "\"" << std::endl;
+                std::cout << "No such variable \"" << opts[0] << "\"" << std::endl;
             }
             else
             {
                 std::cout << std::endl;
-                std::cout << "Variable \"" << opt << "\" uses the following parameters:" << std::endl;
+                std::cout << "Variable \"" << opts[0] << "\" uses the following parameters:" << std::endl;
                 std::cout << std::endl;
                 
                 OutputTable table;
@@ -175,48 +183,42 @@ int main (int argc, char* argv[])
             }
             std::exit(EXIT_SUCCESS);
         },
-        "Eunits", "", 1, [ & ](std::string opt) -> bool
+        "Eunits", "", 1, [ & ](Args opts) -> bool
         { 
-            if (opt == std::string("Ry"))
+            if (opts[0] == std::string("Ry"))
                 Eunits = eUnit_Ry;
-            else if (opt == std::string("a.u."))
+            else if (opts[0] == std::string("a.u."))
                 Eunits = eUnit_au;
-            else if (opt == std::string("eV"))
+            else if (opts[0] == std::string("eV"))
                 Eunits = eUnit_eV;
             else
-            {
-                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                std::abort();
-            }
+                HexException("Unknown units \"%s\"", opts[0].c_str());
+            
             return true;
         },
-        "Tunits", "", 1, [ & ](std::string opt) -> bool
+        "Tunits", "", 1, [ & ](Args opts) -> bool
         {
-            if (opt == std::string("a.u."))
+            if (opts[0] == std::string("a.u."))
                 Lunits = lUnit_au;
-            else if (opt == std::string("cgs"))
+            else if (opts[0] == std::string("cgs"))
                 Lunits = lUnit_cgs;
             else
-            {
-                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                std::abort();
-            }
+                HexException("Unknown units \"%s\"", opts[0].c_str());
+            
             return true;
         },
-        "Aunits", "", 1, [ & ](std::string opt) -> bool
+        "Aunits", "", 1, [ & ](Args opts) -> bool
         {
-            if (opt == std::string("deg"))
+            if (opts[0] == std::string("deg"))
                 Aunits = aUnit_deg;
-            else if (opt == std::string("rad"))
+            else if (opts[0] == std::string("rad"))
                 Aunits = aUnit_rad;
             else
-            {
-                std::cerr << "Unknown units \"" << opt << "\"" << std::endl;
-                std::abort();
-            }
+                HexException("Unknown units \"%s\"", opts[0].c_str());
+            
             return true;
         },
-        /* default*/ [ & ](std::string arg, std::string par) -> bool
+        /* default*/ [ & ](std::string arg, Args opts) -> bool
         {
             // try to find it in the variable ids
             for (const Variable* var : vlist)
@@ -244,14 +246,14 @@ int main (int argc, char* argv[])
                 if (this_arg_is_needed)
                 {
                     // check parameter
-                    if (par.empty())
+                    if (opts.empty())
                     {
                         std::cerr << "ERROR: The option --" << arg << " requires a parameter!" << std::endl;
                         return false;
                     }
                     
                     // insert into scattering data list
-                    sdata[arg] = std::string(par);
+                    sdata[arg] = std::string(opts[0]);
                     return true;
                 }
             }
@@ -287,7 +289,10 @@ int main (int argc, char* argv[])
     
     // import SQL data
     if (doimport)
-        hex_import(sqlfile.c_str());
+    {
+        for (std::string const & sqlfile : sqlfiles)
+            hex_import(sqlfile.c_str());
+    }
     
     // update
     if (doupdate)

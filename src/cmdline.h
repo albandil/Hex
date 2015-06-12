@@ -48,8 +48,8 @@
  *          incremented because the argv[i] will have been digested by this function.
  * @param argc Argc as passed to the main function.
  * @param argv Argv as passed to the main function.
- * @param callback Default callback, which is a functor accepting two std::string
- *                 parameters: the unmatched option and its optarg.
+ * @param callback Default callback, which is a functor accepting the unmatched option and
+ *                 a vector of its parameters.
  */
 template <class DefaultCallback> bool HandleSwitch
 (
@@ -62,7 +62,13 @@ template <class DefaultCallback> bool HandleSwitch
         return false;
     
     // option name
-    std::string optname = argv[i++];
+    std::string optname = argv[i];
+    
+    // collect all parameters
+    int next_i = i + 1;
+    std::vector<std::string> optargs;
+    while (next_i < argc and argv[next_i][0] != '-')
+        optargs.push_back(argv[next_i++]);
     
     // remove leading dashes from the optname
     while (optname[0] == '-')
@@ -78,14 +84,16 @@ template <class DefaultCallback> bool HandleSwitch
         optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
-    else
-    {
-        // look for optarg in the next argv[]
-        if (i < argc and argv[i][0] != '-')
-            optarg = argv[i++];
-    }
     
-    return callback (optname, optarg);
+    // add first optarg, if present
+    if (optarg.size() > 0)
+        optargs.insert(optargs.begin(), optarg);
+    
+    // move on to the next option
+    i = next_i;
+    
+    // handle this (unknown) switch
+    return callback(optname, optargs);
 }
 
 /**
@@ -93,6 +101,7 @@ template <class DefaultCallback> bool HandleSwitch
  * 
  * This function is used by the parser ParseCommandLine and it is not expected
  * to be used on its own by the user.
+ * 
  * @param i Index of the option (argv[i]) to handle. On return, the value can
  *          be once or more times incremented, if more argv[i] values have been
  *          digested as optarg-s.
@@ -100,7 +109,9 @@ template <class DefaultCallback> bool HandleSwitch
  * @param argv Argv as passed to the main function.
  * @param longoptname Long option name of the handler to use.
  * @param shortoptname Short option name of the handler to use.
- * @param noptarg Number of optarg-s needed for this option.
+ * @param noptarg Number of optarg-s needed for this option. The function will print
+ *                an error message when a different number was supplied. If -1 is given,
+ *                the number of arguments is not set and can be arbitrary.
  * @param callback Callback function accepting std::string optarg and returning bool.
  * @param ...params Other params that will be ignored in this pass, but may be used
  *                  in the next one if argv[i] does match neither longoptname nor
@@ -111,7 +122,7 @@ template <class DefaultCallback> bool HandleSwitch
 template <class Callback, class ...Params> bool HandleSwitch
 (
     int &i, int argc, char* argv[],
-    std::string longoptname, std::string shortoptname, unsigned noptarg, Callback callback,
+    std::string longoptname, std::string shortoptname, int noptarg, Callback callback,
     Params ...params
 )
 {
@@ -122,6 +133,12 @@ template <class Callback, class ...Params> bool HandleSwitch
     // option name
     std::string optname = argv[i];
     
+    // collect all parameters
+    int next_i = i + 1;
+    std::vector<std::string> optargs;
+    while (next_i < argc and argv[next_i][0] != '-')
+        optargs.push_back(argv[next_i++]);
+    
     // remove leading dashes from the optname
     while (optname[0] == '-')
         optname.erase(optname.begin());
@@ -130,41 +147,29 @@ template <class Callback, class ...Params> bool HandleSwitch
     std::string optarg = "";
     
     // split option name at equation sign (if present)
-    auto iter = std::find (optname.begin(), optname.end(), '=');
+    auto iter = std::find(optname.begin(), optname.end(), '=');
     if (iter != optname.end())
     {
         optarg = optname.substr(iter-optname.begin()+1);
         optname = optname.substr(0, iter-optname.begin());
     }
     
+    // add first optarg, if present
+    if (optarg.size() > 0)
+        optargs.insert(optargs.begin(), optarg);
+    
     // check that argv[i] is equal to the current optname
     if (optname == longoptname or optname == shortoptname)
     {
-        // move to next argv[]
-        i++;
+        // check number of parameters
+        if (noptarg != -1 and noptarg != optargs.size())
+            HexException("The option --%s accepts %d parameters (given %d).", optname.c_str(), noptarg, optargs.size());
         
-        // get option argument (if required)
-        if (noptarg == 0)
-        {
-            return callback ("");
-        }
-        else if (noptarg == 1)
-        {
-            // use existing optarg (if any)
-            if (optarg.size() > 0)
-                return callback (optarg);
-            
-            // are there any more words in input?
-            if (i == argc)
-                HexException("Missing an argument for the option \"%s\".", optname.c_str());
-            
-            // use the next word as the option
-            return callback (argv[i++]);
-        }
-        else
-        {
-            HexException("An option cannot have more than one arguments, but \"%s\" has %d.", optname.c_str(), noptarg);
-        }
+        // move on to the next option
+        i = next_i;
+        
+        // pass the parameters to the callback function
+        return callback(optargs);
     }
     
     // try to match the switch in the next pass
@@ -181,16 +186,22 @@ template <class Callback, class ...Params> bool HandleSwitch
  * - [std::string] long option name (e.g. "help")
  * - [std::string] short option name (e.g. "h")
  * - [unsigned] expected number of optargs (zero or one in the present implementation)
- * - [functor] callback function that accepts exactly one string argument (the optarg)
+ * - [functor] callback function that accepts exactly one string-vector argument (the optargs)
  * 
  * A typical usage of the parser is:
  * @code
+ *     typedef std::vector<std::string> const & Args;
+ * 
  *     ParseCommandLine (
  *         argc, argv,
- *         "help", "h", 0, [](std::string optarg) -> bool { std::cout << "Help.\n"; return true; },
- *         "sleep", "s", 1, [](std::string optarg) -> bool { sleep(atoi(optarg.c_str())); return true; },
+ *         "help", "h", 0, [](Args optarg) -> bool { std::cout << "Help.\n"; return true; },
+ *         "sleep", "s", 1, [](Args optarg) -> bool { sleep(atoi(optarg[0].c_str())); return true; },
  *         ...
- *         [](std::string opt, std::string optarg) -> bool { std::cout << "Unknown option \"" << opt << "\" with argument \"" << optarg << "\"\n"; return false; }
+ *         [](std::string opt, Args optarg) -> bool
+ *         {
+ *             std::cout << "Unknown option \"" << opt << "\" with " << optargs.size() << " arguments" << std::endl;
+ *             return false;
+ *         }
  *     );
  * @endcode
  * 
