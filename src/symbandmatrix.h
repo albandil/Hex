@@ -154,7 +154,7 @@ public:
      * @param d How many (main and) upper diagonals to populate.
      * @param f The functor that will compute the matrix elements.
      */
-    template <class Functor> SymBandMatrix & populate (Functor f)
+    template <class Functor> SymBandMatrix<DataT> & populate (Functor f)
     {
         // throw away old data
         elems_.resize(n_ * d_);

@@ -64,7 +64,7 @@ public:
         : m_(A.m_), n_(A.n_), i_(A.i_), j_(A.j_), x_(A.x_), sorted_(false) {}
     CooMatrix (IdxT m, IdxT n, ArrayView<IdxT> i, ArrayView<IdxT> j, ArrayView<DataT> x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
-    CooMatrix (std::size_t m, std::size_t n, lArray && i, lArray && j, cArray && x)
+    CooMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && i, NumberArray<IdxT> && j, NumberArray<DataT> && x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     
     /**

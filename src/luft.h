@@ -153,7 +153,10 @@ class LUft
          */
         virtual void load (std::string name, bool throw_on_io_failure = true)
         {
-            std::cout << "Warning: I'm placeholder LUft::load, not loading anything!" << std::endl;
+            if (throw_on_io_failure)
+                HexException("I'm placeholder LUft::load, not loading anything!");
+            else
+                return false;
         }
         virtual void load () { this->load(filename_, true); }
         virtual void silent_load () { this->load(filename_, false); }
