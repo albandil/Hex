@@ -155,8 +155,6 @@ class LUft
         {
             if (throw_on_io_failure)
                 HexException("I'm placeholder LUft::load, not loading anything!");
-            else
-                return false;
         }
         virtual void load () { this->load(filename_, true); }
         virtual void silent_load () { this->load(filename_, false); }
