@@ -206,8 +206,12 @@ cArray special::ric_jv (int lmax, Complex z)
                 gsl_sf_result res;
                 err = gsl_sf_bessel_jl_e(l, z.real(), &res);
                 
+                // check underflow
+                if (err == GSL_EUNDRFLW)
+                    res.val = 0;
+                
                 // check success
-                if (err != GSL_SUCCESS or not std::isfinite(res.val))
+                else if (err != GSL_SUCCESS or not std::isfinite(res.val))
                     HexException("Error %d while evaluating j[l≤%d](%g).", err, lmax, z.real());
                 
                 // save value
