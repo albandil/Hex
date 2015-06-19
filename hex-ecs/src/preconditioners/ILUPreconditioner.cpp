@@ -45,9 +45,19 @@ void ILUCGPreconditioner::setup ()
     // setup parent
     CGPreconditioner::setup();
     
-    // prepare initial (empty) factorization data
-    for (auto & lu : lu_)
-        lu.reset(new LUft<LU_int_t,Complex>());
+    // setup attributes
+    for (unsigned iblock = 0; iblock < l1_l2_.size(); iblock++)
+    {
+        // prepare initial (empty) factorization data
+        lu_[iblock].reset(new LUft<LU_int_t,Complex>());
+        
+        // associate existing disk files
+        if (cmd_.cont)
+        {
+            lu_[iblock]->link(format("lu-%d.ooc", iblock));
+            csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
+        }
+    }
     
 #ifdef WITH_SUPERLU_DIST
     // create process grid for SuperLU-dist
@@ -103,14 +113,13 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     if (cmd_.outofcore)
     {
         csr_blocks_[iblock].hdfload();
-        # pragma omp critical
         lu_[iblock]->silent_load();
     }
     
     // check that the factorization is loaded
     if (lu_[iblock]->size() == 0)
     {
-        // create CSR block
+        // create CSR representation of the current diagonal block
         csr_blocks_[iblock] = dia_blocks_[iblock].tocoo<LU_int_t>().tocsr();
         
         // start timer
@@ -119,13 +128,15 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         // factorize the block and store it
         lu_[iblock] = csr_blocks_[iblock].factorize
         (
-                cmd_.droptol,
-                cmd_.factorizer,
+            cmd_.droptol,
+            cmd_.factorizer,
 #ifdef WITH_SUPERLU_DIST
-                cmd_.factorizer == LUFT_SUPERLU_DIST ?
-                    const_cast<gridinfo_t*>(&grid_) :
+            // pass pointer to grid info if needed
+            cmd_.factorizer == LUFT_SUPERLU_DIST ? const_cast<gridinfo_t*>(&grid_) : nullptr
+#else
+            // do not pass any additional data
+            nullptr
 #endif
-                    nullptr
         );
         
         // print time and memory info for this block (one thread at a time)
@@ -138,11 +149,13 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
             lu_[iblock]->size() / 1048576                           // final memory size
         );
         
-        // save the diagonal block
+        // save the diagonal block's CSR representation and its factorization
         if (cmd_.outofcore)
         {
             csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
             csr_blocks_[iblock].hdfsave();
+            lu_[iblock]->link(format("lu-%d.ooc", iblock));
+            lu_[iblock]->save();
         }
     }
     
@@ -152,16 +165,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // release memory
     if (cmd_.outofcore)
     {
-        // link to a disk file and save (if not already done)
-        if (lu_[iblock]->name().size() == 0)
-        {
-            lu_[iblock]->link(format("lu-%d.ooc", iblock));
-            # pragma omp critical
-            lu_[iblock]->save();
-        }
-        
-        // release memory objects
-        lu_[iblock]->drop();
         csr_blocks_[iblock].drop();
+        lu_[iblock]->drop();
     }
 }
