@@ -46,7 +46,7 @@ void ILUCGPreconditioner::setup ()
     CGPreconditioner::setup();
     
     // setup attributes
-    for (unsigned iblock = 0; iblock < l1_l2_.size(); iblock++)
+    for (int iblock = 0; iblock < l1_l2_.size(); iblock++)
     {
         // prepare initial (empty) factorization data
         lu_[iblock].reset(new LUft<LU_int_t,Complex>());

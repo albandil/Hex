@@ -663,11 +663,10 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
 }
 
-void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
+void zip_solution (CommandLine const & cmd, Bspline const & bspline)
 {
     // use whole grid if not restricted
-    if (cmd.zipmax < 0)
-        cmd.zipmax = bspline.Rmax();
+    double zipmax = (cmd.zipmax < 0 ? bspline.Rmax() : cmd.zipmax);
     
     cArray sol;     // stored solution expansion
     cArray ev;      // evaluated solution
@@ -680,7 +679,7 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
         HexException("Cannot load file %s.", cmd.zipfile.c_str());
     
     // evaluation grid
-    grid = linspace(0., cmd.zipmax, cmd.zipcount);
+    grid = linspace(0., zipmax, cmd.zipcount);
     
     // write to file
     std::ofstream out ((cmd.zipfile + ".vtk").c_str());

@@ -37,6 +37,7 @@
 #include <vector>
 #include <string>
 
+#include "angular.h"
 #include "arrays.h"
 #include "bspline.h"
 #include "luft.h"
@@ -228,7 +229,7 @@ class InputFile
         // public attributes
         //
         
-        int order, ni, L, Pi, levels, maxell;
+        int order, ni, L, S, Pi, levels, maxell;
         double ecstheta, B;
         rArray rknots, cknots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;
@@ -245,7 +246,7 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, unsigned Nspline)
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, AngularBasis const & ang, unsigned Nspline)
             : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), Nspline_(Nspline) {}
         
         /// Get name of the solution file.
@@ -269,7 +270,7 @@ class SolutionIO
                 return HDFFile(name(ill), HDFFile::readonly).valid();
             
             // look for all solution segment files
-            for (unsigned illp = 0; illp < ang_.size(); illp++)
+            for (int illp = 0; illp < ang_.size(); illp++) if (ang_.is_basic_symmetry(illp))
             {
                 if (not HDFFile(name(illp), HDFFile::readonly).valid())
                     return false;
@@ -297,7 +298,7 @@ class SolutionIO
                 segments_to_load = linspace<int>(0, solution.size() - 1, solution.size());
             
             // for all blocks to load
-            for (int i : segments_to_load)
+            for (int i : segments_to_load) if (ang_.is_basic_symmetry(i))
             {
                 //
                 // Either read from the whole monolithic solution file ...
@@ -399,7 +400,7 @@ class SolutionIO
         
         int L_, S_, Pi_, ni_, li_, mi_;
         double E_;
-        std::vector<std::pair<int,int>> ang_;
+        AngularBasis const & ang_;
         std::size_t Nspline_;
 };
 
@@ -421,9 +422,8 @@ class SolutionIO
  */
 void zip_solution
 (
-    CommandLine & cmd,
-    Bspline const & bspline,
-    std::vector<std::pair<int,int>> const & ll
+    CommandLine const & cmd,
+    Bspline const & bspline
 );
 
 /**

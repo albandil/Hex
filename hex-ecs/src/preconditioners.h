@@ -34,6 +34,7 @@
 
 #include <tuple>
 
+#include "angular.h"
 #include "arrays.h"
 #include "matrix.h"
 #include "radial.h"
@@ -86,7 +87,7 @@ class PreconditionerBase
         /**
          * @brief Calculate the right-hand side.
          */
-        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const = 0;
+        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -185,7 +186,7 @@ class Preconditioners
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
         )
@@ -201,7 +202,7 @@ class Preconditioners
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
         )

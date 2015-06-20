@@ -137,7 +137,7 @@ void KPACGPreconditioner::setup ()
         {
             // check if this angular momentum is needed by some of the blocks owned by this process
             bool need_this_l = false;
-            for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+            for (int ill = 0; ill < l1_l2_.size(); ill++)
             {
                 if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
                     need_this_l = true;

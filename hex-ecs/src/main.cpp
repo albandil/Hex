@@ -43,6 +43,7 @@
 #endif
 
 #include "amplitudes.h"
+#include "angular.h"
 #include "arrays.h"
 #include "bspline.h"
 #include "hydrogen.h"
@@ -178,36 +179,12 @@ int main (int argc, char* argv[])
     // Setup angular data -------------------------------------------------- //
     //
     
-    std::cout << "Setting up the coupled angular states..." << std::endl;
-    
     // coupled angular momentum pairs
-    std::vector<std::pair<int,int>> coupled_states;
-    
-    // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
-    for (int ell = 0; ell <= inp.levels; ell++)
-    {
-        std::cout << "\t-> [" << ell << "] ";
-        
-        // get sum of the angular momenta for this angular level
-        int sum = 2 * ell + inp.L + inp.Pi;
-        
-        // for all angular momentum pairs that do compose L
-        for (int l1 = ell; l1 <= sum - ell; l1++)
-        {
-            std::cout << "(" << l1 << "," << sum - l1 << ") ";
-            coupled_states.push_back(std::make_pair(l1, sum - l1));
-        }
-        std::cout << std::endl;
-    }
-    
-    std::cout << "\t-> The matrix of the set contains " << coupled_states.size()
-              << " diagonal blocks." << std::endl;
+    AngularBasis coupled_states (inp.L, 0, inp.Pi, inp.levels);
     
     // skip if there is nothing to compute
-    if (coupled_states.empty())
+    if (coupled_states.size() == 0)
         return EXIT_SUCCESS;
-    
-    std::cout << std::endl;
     
     //
     // Zip solution file into VTK geometry if told so
@@ -215,7 +192,7 @@ int main (int argc, char* argv[])
     
     if (cmd.zipfile.size() != 0 and par.IamMaster())
     {
-        zip_solution (cmd, bspline, coupled_states);
+        zip_solution(cmd, bspline);
         std::cout << std::endl << "Done." << std::endl << std::endl;
         return EXIT_SUCCESS;
     }
@@ -235,7 +212,7 @@ int main (int argc, char* argv[])
     // Create and the preconditioner.
     //
     
-    PreconditionerBase * prec = Preconditioners::choose (par, inp, coupled_states, bspline, cmd);
+    PreconditionerBase * prec = Preconditioners::choose(par, inp, coupled_states, bspline, cmd);
     if (prec == nullptr)
         HexException("Preconditioner %d not implemented.", cmd.preconditioner);
     
@@ -288,13 +265,23 @@ if (cmd.itinerary & CommandLine::StgSolve)
         Complex prod = 0;
         
         // for all segments
-        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyGroupWork(i))
+        for (int i = 0; i < coupled_states.size(); i++)
         {
+            // operate only on owned segments
+            if (not par.isMyGroupWork(coupled_states.basic_symmetry_index(i)))
+                continue;
+            
+            // calculate twice if non-diagonal
+            double factor = (coupled_states[i].first == coupled_states[i].second ? 1 : 2);
+            
+            // load segments from disk, if needed
             if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
             
-            prod += (x[i]|y[i]);
+            // calculate dot product withou complex conjugation!
+            prod += factor * ( x[i] | y[i] );
             
+            // release memory
             if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x)[i].drop();
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
         }
@@ -302,7 +289,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
         // colect products from other nodes
         par.syncsum(&prod, 1);
         
-        // return global scalar product
+        // return (average) global scalar product
         return prod / double(cmd.groupsize);
     };
     
@@ -311,13 +298,27 @@ if (cmd.itinerary & CommandLine::StgSolve)
     {
         // compute node-local norm of 'r'
         double rnorm2 = 0;
-        for (std::size_t i = 0; i < r.size(); i++) if (par.isMyGroupWork(i))
+        for (std::size_t i = 0; i < r.size(); i++)
         {
+            // operate only on basic symmetries
+            if (not coupled_states.is_basic_symmetry(i))
+                continue;
+            
+            // operate only on owned segments
+            if (not par.isMyGroupWork(coupled_states.basic_symmetry_index(i)))
+                continue;
+            
+            // calculate twice if non-diagonal
+            double factor = (coupled_states[i].first == coupled_states[i].second ? 1 : 2);
+            
+            // load array from disk
             if (not r.inmemory())
                 const_cast<BlockArray<Complex>&>(r).hdfload(i);
             
-            rnorm2 += r[i].sqrnorm();
+            // calculate norm contribution
+            rnorm2 += factor * r[i].sqrnorm();
             
+            // release array from memory
             if (not r.inmemory())
                 const_cast<BlockArray<Complex>&>(r)[i].drop();
         }
@@ -333,14 +334,25 @@ if (cmd.itinerary & CommandLine::StgSolve)
     auto axby_operation = [ & ](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void
     {
         // only references blocks that are local to this MPI node
-        for (std::size_t i = 0; i < x.size(); i++) if (par.isMyGroupWork(i))
+        for (std::size_t i = 0; i < x.size(); i++)
         {
+            // operate only on basic symmetries
+            if (not coupled_states.is_basic_symmetry(i))
+                continue;
+            
+            // operate only on owned segments
+            if (not par.isMyGroupWork(coupled_states.basic_symmetry_index(i)))
+                continue;
+            
+            // load data from disk
             if (not x.inmemory()) x.hdfload(i);
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
             
+            // AXBY operation
             for (std::size_t j = 0; j < x[i].size(); j++)
                 x[i][j] = a * x[i][j] + b * y[i][j];
             
+            // release memory
             if (not x.inmemory()) { x.hdfsave(i); x[i].drop(); }
             if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
         }
@@ -353,8 +365,16 @@ if (cmd.itinerary & CommandLine::StgSolve)
         BlockArray<Complex> array (N, !cmd.outofcore, name);
         
         // initialize all blocks ('resize' automatically zeroes added elements)
-        for (std::size_t i = 0; i < N; i++) if (par.isMyGroupWork(i))
+        for (std::size_t i = 0; i < N; i++)
         {
+            // operate only on basic symmetries
+            if (not coupled_states.is_basic_symmetry(i))
+                continue;
+            
+            // operate only on owned segments
+            if (not par.isMyGroupWork(coupled_states.basic_symmetry_index(i)))
+                continue;
+            
             // allocate memory
             array[i].resize(Nspline * Nspline);
             
@@ -457,12 +477,15 @@ if (cmd.itinerary & CommandLine::StgSolve)
             int li = std::get<1>(inp.instates[instate]);
             int mi = std::get<2>(inp.instates[instate]);
             
+            // update spin (used by the preconditioners)
+            coupled_states.spin(Spin);
+            
             // create right hand side
             BlockArray<Complex> chi (coupled_states.size(), !cmd.outofcore, "cg-b");
             if (not cmd.cont)
             {
                 std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
-                prec->rhs(chi, ie, instate, Spin);
+                prec->rhs(chi, ie, instate);
                 std::cout << "ok" << std::endl;
             }
             
@@ -522,7 +545,7 @@ if (cmd.itinerary & CommandLine::StgSolve)
             SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             if (std::isfinite(compute_norm(psi)))
             {
-                for (unsigned ill = 0; ill < coupled_states.size(); ill++)
+                for (int ill = 0; ill < coupled_states.size(); ill++) if (coupled_states.is_basic_symmetry(ill))
                 {
                     if (par.isMyGroupWork(ill) and par.IamGroupMaster() and not reader.save(psi, ill))
                         HexException("Failed to save solution to disk - the data are lost!");

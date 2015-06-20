@@ -87,11 +87,19 @@ void NoPreconditioner::update (double E)
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (int ill = 0; ill < l1_l2_.size(); ill++)
     {
         // angular momenta
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;
+        
+        // operate only on basic symmetries
+        if (not l1_l2_.is_basic_symmetry(ill))
+            continue;
+        
+        // operate only on group-owned symmetries
+        if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+            continue;
         
         // initialize diagonal block
         dia_blocks_[ill] = BlockSymBandMatrix<Complex>
@@ -173,7 +181,7 @@ void NoPreconditioner::update (double E)
     OMP_clean;
 }
 
-void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const
+void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) const
 {
     OMP_prepare;
     
@@ -212,13 +220,22 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     
     // for all segments constituting the RHS
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (int ill = 0; ill < l1_l2_.size(); ill++)
     {
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
+        // operate only on basic symmetries
+        if (not l1_l2_.is_basic_symmetry(ill))
+            continue;
+        
+        // operate only on group-owned symmetries
+        if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+            continue;
         
         // setup storage
         cArray chi_block (Nspline * Nspline);
+        
+        // get angular momenta
+        int l1 = l1_l2_[ill].first;
+        int l2 = l1_l2_[ill].second;
         
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
@@ -228,7 +245,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 continue;
             
             // (anti)symmetrization
-            double Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
+            double Sign = ((l1_l2_.spin() + inp_.Pi) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(Complex(0.,1.),l)
@@ -323,8 +340,15 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // multiply "p" by the diagonal blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
         for (int ill = 0;  ill < Nang;  ill++)
-        if (par_.isMyGroupWork(ill))
         {
+            // operate only on basic symmetries
+            if (not l1_l2_.is_basic_symmetry(ill))
+                continue;
+            
+            // operate only on group-owned symmetries
+            if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+                continue;
+            
             // load data from scratch disk
             if (cmd_.outofcore)
             {
@@ -363,6 +387,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // update all blocks with this multipole potential matrix
             for (int ill = 0;  ill < Nang;  ill++)
             {
+                // operate only on basic symmetries
+                if (not l1_l2_.is_basic_symmetry(ill))
+                    continue;
+                
+                // load destination segment from disk so that we can update it
                 if (cmd_.outofcore)
                     q.hdfload(ill);
                 
@@ -372,20 +401,33 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     if (ill == illp)
                         continue;
                     
-                    // check non-zero
-                    if (fs[ill][illp][lambda] == 0.)
+                    // get ID of basic symmetry segment
+                    int illp0 = l1_l2_.basic_symmetry(illp);
+                    
+                    // calculate angular factor
+                    double factor = -fs[ill][illp][lambda] * l1_l2_.basic_symmetry_sign(illp);
+                    
+                    // skip zero blocks
+                    if (factor == 0.)
                         continue;
                     
-                    // load data
+                    // load source segment from disk
                     if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                        const_cast<BlockArray<Complex>&>(p).hdfload(illp0);
                     
                     // calculate product
-                    q[ill] += (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true);
+                    cArray prod = std::move(s_rad_.R_tr_dia(lambda).dot(p[illp0], true));
+                    
+                    // transpose if a symmetry was used
+                    if (not l1_l2_.is_basic_symmetry(illp))
+                        transpose(prod, Nspline);
+                    
+                    // update destination vector
+                    q[ill] += factor * prod;
                     
                     // unload data
                     if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                        const_cast<BlockArray<Complex>&>(p)[illp0].drop();
                 }
                 
                 if (cmd_.outofcore)
@@ -404,6 +446,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         if (par_.Nproc() > 1)
         for (int ill = 0;  ill < Nang;  ill++)
         {
+            // operate only on basic symmetries
+            if (not l1_l2_.is_basic_symmetry(ill))
+                continue;
+            
             // product of line of blocks with the source vector (-> one segment of destination vector)
             cArray product (Nchunk);
             
@@ -416,25 +462,38 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             // for all source segments that this group owns
             # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
+            for (int illp = 0; illp < Nang; illp++)
             {
-                // load the segment, if on disk
+                // skip diagonal blocks
+                if (ill == illp)
+                    continue;
+                
+                // get ID of anti/symmetric segment
+                int illp0 = l1_l2_.basic_symmetry(illp);
+                double sign = l1_l2_.basic_symmetry_sign(illp);
+                
+                // operate only on group-owned segments
+                if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(illp0)))
+                    continue;
+                
+                // load the source segment, if on disk
                 if (cmd_.outofcore)
-                    const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                    const_cast<BlockArray<Complex>&>(p).hdfload(illp0);
+                
+                // transpose if a symmetry was used
+                cArray pillp0 = p[illp0];
+                if (not l1_l2_.is_basic_symmetry(illp))
+                    transpose(pillp0, Nspline);
                 
                 // for all multipoles (each group's process has a different work)
                 for (int lambda = 0; lambda <= maxlambda; lambda++) if (lambda % par_.groupsize() == par_.igroupproc())
                 {
-                    // skip diagonal
-                    if (ill == illp)
-                        continue;
-                    
                     // check non-zero
                     if (fs[ill][illp][lambda] == 0.)
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    cArray p0 = std::move( (-sign * fs[ill][illp][lambda]) * s_rad_.R_tr_dia(lambda).dot(pillp0, true) );
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -443,7 +502,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 }
                 
                 if (cmd_.outofcore)
-                    const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                    const_cast<BlockArray<Complex>&>(p)[illp0].drop();
             }
             
             // sum all group processes contributions on that group master process
@@ -476,8 +535,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         // multiply "p" by the diagonal super-blocks
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
-        for (int ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
+        for (int ill = 0;  ill < Nang;  ill++)
         {
+            // operate only on group-owned arrays
+            if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+                continue;
+            
+            // load arrays from disk
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(p).hdfload(ill);
@@ -493,6 +557,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             q[ill] -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l1*(l1+1)) * s_rad_.Mm2(), s_rad_.S(), p[ill]);
             q[ill] -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*l2*(l2+1)) * s_rad_.Mm2(), p[ill]);
             
+            // release memory
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(p)[ill].drop();
@@ -502,7 +567,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         }
         
         // auxiliary buffers
-        cArray buffer (Nang * Nspline);
+        cArray buffer (l1_l2_.basic_size() * Nspline);
         
 #ifdef _OPENMP
         // I/O access locks
@@ -515,21 +580,35 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         for (int k = 0; k < Nspline; k++)
         {
             // copy owned sub-segments to the buffer
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp) and par_.IamGroupMaster())
+            for (int illp = 0; illp < Nang; illp++)
             {
+                // this is master work
+                if (not par_.IamGroupMaster())
+                    continue;
+                
+                // this is a group-specific work
+                if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(illp)))
+                    continue;
+                
+                // get index of the basic symmetry
+                int illp0 = l1_l2_.basic_symmetry_index(illp);
+                
+                // copy data
+                // TODO : Transposition.
+                // TODO : Sign.
                 std::memcpy
                 (
-                    &buffer[0] + illp * Nspline,
-                    p.segment(illp, k * Nspline, Nspline).ptr(),
+                    &buffer[0] + illp0 * Nspline,
+                    p.segment(illp0, k * Nspline, Nspline).ptr(),
                     Nspline * sizeof(Complex)
                 );
             }
             
             // synchronize source sub-segments buffer across groups' masters
-            par_.sync_m(&buffer[0], Nspline, Nang);
+            par_.sync_m(&buffer[0], Nspline, l1_l2_.basic_size());
             
             // broadcast buffer to all members of the group
-            par_.bcast_g(par_.igroup(), 0, &buffer[0], Nang * Nspline);
+            par_.bcast_g(par_.igroup(), 0, &buffer[0], l1_l2_.basic_size() * Nspline);
             
             // auxiliary variables
             int min_i = std::max(0, k - order);
@@ -547,16 +626,23 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     SymBandMatrix<Complex> R_block_ik = s_rad_.calc_R_tr_dia_block(lambda, i, k);
                     
                     // apply all superblocks
-                    for (int ill = 0; ill  < Nang; ill ++) if (par_.isMyGroupWork(ill))
+                    for (int ill = 0; ill  < Nang; ill ++)
                     {
+                        // skip segments owned by different group
+                        if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+                            continue;
+                        
                         // collected products of superblocks in this row
                         cArray product (Nspline);
                         
                         // for all superblocks in this row
                         for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
                         {
+                            // get index of the basic symmetry
+                            int illp0 = l1_l2_.basic_symmetry_index(illp);
+                            
                             // multiply sub-segment by the R block
-                            product += fs[ill][illp][lambda] * R_block_ik.dot(cArrayView(buffer, illp * Nspline, Nspline));
+                            product += fs[ill][illp][lambda] * R_block_ik.dot(cArrayView(buffer, illp0 * Nspline, Nspline));
                         }
                         
                         // atomic update of the owned sub-segment

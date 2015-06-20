@@ -59,7 +59,7 @@ class NoPreconditioner : public PreconditionerBase
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
         ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
@@ -70,7 +70,7 @@ class NoPreconditioner : public PreconditionerBase
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const;
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
         
@@ -89,7 +89,7 @@ class NoPreconditioner : public PreconditionerBase
         InputFile const & inp_;
         
         // coupled states
-        std::vector<std::pair<int,int>> const & l1_l2_;
+        AngularBasis const & l1_l2_;
         
         // diagonal blocks in DIA format (these will be used in matrix multiplication)
         mutable std::vector<BlockSymBandMatrix<Complex>> dia_blocks_;

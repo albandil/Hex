@@ -48,130 +48,130 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     int Nspline = s_rad_.bspline().Nspline();
     
     // iterations
-    iArray n (l1_l2_.size());
+    std::vector<int> n (l1_l2_.size(), -1);
     
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block && cmd_.groupsize == 1)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (int ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
-        try
+        // skip this segment, if we computed/will compute a symmetry
+        if (not l1_l2_.is_basic_symmetry(ill))
+            continue;
+        
+        // load blocks, if necessary
+        if (cmd_.outofcore)
         {
-            // load blocks, if necessary
-            if (cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex>&>(r).hdfload(ill);
-                z.hdfload(ill);
-            }
-            
-            // wrappers around the callbacks
-            auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
-            auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
-            
-            // compute norm (part will be computed by every process in group, result will be synchronized)
-            auto compute_norm = [&](const cArrayView a) -> double
-            {
-                // calculate number of elements every group's process will sum
-                std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
-                
-                // calculate part of the norm
-                double norm2 = 0;
-                for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
-                    norm2 += sqrabs(a[i]);
-                
-                // sum across group and return result
-                par_.syncsum_g(&norm2, 1);
-                return std::sqrt(norm2);
-            };
-            
-            // compute scalar product (part will be computed by every process in group, result will be synchronized)
-            auto scalar_product = [&](const cArrayView a, const cArrayView b) -> Complex
-            {
-                assert(a.size() == b.size());
-                
-                // calculate number of elements every group's process will sum
-                std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
-                
-                // calculate part of the norm
-                Complex prod = 0;
-                for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
-                    prod += a[i] * b[i];
-                
-                // sum across group and return result
-                par_.syncsum_g(&prod, 1);
-                return prod;
-            };
-            
-            // a*x + b*y operation
-            auto axby_operation = [&](Complex a, cArrayView x, Complex b, const cArrayView y) -> void
-            {
-                assert(x.size() == y.size());
-                
-                // calculate number of elements each node should process
-                std::size_t N = (x.size() + par_.groupsize() - 1) / par_.groupsize();
-                
-                // calculate linear combination
-                for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < x.size(); i++)
-                    x[i] = a * x[i] + b * y[i];
-                
-                // synchronize the segments
-                for (int inode = 0; inode < par_.groupsize(); inode++)
-                {
-                    // calculate 'begin' and 'end' of inode's data
-                    std::size_t begin = inode * N;
-                    std::size_t end = std::min(x.size(), (inode + 1) * N);
-                    
-                    // broadcast the data
-                    par_.bcast_g
-                    (
-                        par_.igroup(),          // broadcast within this node's group
-                        inode,                  // use inode's data
-                        &x[0] + begin,          // data pointer
-                        end - begin             // number of elements to synchronize
-                    );
-                }
-            };
-            
-            // prepare the block-preconditioner for run
-            this->CG_init(ill);
-            
-            // solve using the CG solver
-            ConjugateGradients < cArray, cArrayView > CG;
-            CG.reset();
-            n[ill] = CG.solve
-            (
-                r[ill],                 // rhs
-                z[ill],                 // solution
-                cmd_.prec_itertol,      // preconditioner tolerance
-                0,                      // min. iterations
-                Nspline * Nspline,      // max. iteration
-                inner_prec,             // preconditioner
-                inner_mmul,             // matrix multiplication
-                false,                  // verbose output
-                compute_norm,           // norm
-                scalar_product,         // scalar product
-                axby_operation          // a*x + b*y operation
-            );
-            
-            // release block-preconditioner block-specific data
-            this->CG_exit(ill);
-            
-            // unload blocks
-            if (cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex>&>(r)[ill].drop();
-                
-                z.hdfsave(ill);
-                z[ill].drop();
-            }
+            const_cast<BlockArray<Complex>&>(r).hdfload(ill);
+            z.hdfload(ill);
         }
-        catch (std::exception const & e)
+        
+        // wrappers around the callbacks
+        auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
+        auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
+        
+        // compute norm (part will be computed by every process in group, result will be synchronized)
+        auto compute_norm = [&](const cArrayView a) -> double
         {
-            HexException("%s", e.what());
+            // calculate number of elements every group's process will sum
+            std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
+            
+            // calculate part of the norm
+            double norm2 = 0;
+            for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
+                norm2 += sqrabs(a[i]);
+            
+            // sum across group and return result
+            par_.syncsum_g(&norm2, 1);
+            return std::sqrt(norm2);
+        };
+        
+        // compute scalar product (part will be computed by every process in group, result will be synchronized)
+        auto scalar_product = [&](const cArrayView a, const cArrayView b) -> Complex
+        {
+            assert(a.size() == b.size());
+            
+            // calculate number of elements every group's process will sum
+            std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
+            
+            // calculate part of the norm
+            Complex prod = 0;
+            for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
+                prod += a[i] * b[i];
+            
+            // sum across group and return result
+            par_.syncsum_g(&prod, 1);
+            return prod;
+        };
+        
+        // a*x + b*y operation
+        auto axby_operation = [&](Complex a, cArrayView x, Complex b, const cArrayView y) -> void
+        {
+            assert(x.size() == y.size());
+            
+            // calculate number of elements each node should process
+            std::size_t N = (x.size() + par_.groupsize() - 1) / par_.groupsize();
+            
+            // calculate linear combination
+            for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < x.size(); i++)
+                x[i] = a * x[i] + b * y[i];
+            
+            // synchronize the segments
+            for (int inode = 0; inode < par_.groupsize(); inode++)
+            {
+                // calculate 'begin' and 'end' of inode's data
+                std::size_t begin = inode * N;
+                std::size_t end = std::min(x.size(), (inode + 1) * N);
+                
+                // broadcast the data
+                par_.bcast_g
+                (
+                    par_.igroup(),          // broadcast within this node's group
+                    inode,                  // use inode's data
+                    &x[0] + begin,          // data pointer
+                    end - begin             // number of elements to synchronize
+                );
+            }
+        };
+        
+        // prepare the block-preconditioner for run
+        this->CG_init(ill);
+        
+        // solve using the CG solver
+        ConjugateGradients < cArray, cArrayView > CG;
+        CG.reset();
+        n[ill] = CG.solve
+        (
+            r[ill],                 // rhs
+            z[ill],                 // solution
+            cmd_.prec_itertol,      // preconditioner tolerance
+            0,                      // min. iterations
+            Nspline * Nspline,      // max. iteration
+            inner_prec,             // preconditioner
+            inner_mmul,             // matrix multiplication
+            false,                  // verbose output
+            compute_norm,           // norm
+            scalar_product,         // scalar product
+            axby_operation          // a*x + b*y operation
+        );
+        
+        // release block-preconditioner block-specific data
+        this->CG_exit(ill);
+        
+        // unload blocks
+        if (cmd_.outofcore)
+        {
+            const_cast<BlockArray<Complex>&>(r)[ill].drop();
+            
+            z.hdfsave(ill);
+            z[ill].drop();
         }
     }
     
+    // erase statistics for unpreconditioned blocks
+    n.erase(std::remove_if(n.begin(), n.end(), [](int i) -> bool { return i == -1; }), n.end());
+    
     // broadcast inner preconditioner iterations
-    par_.sync_m(n.data(), 1, l1_l2_.size());
-    par_.bcast_g(par_.igroup(), 0, n.data(), l1_l2_.size());
+    par_.sync_m(n.data(), 1, n.size());
+    par_.bcast_g(par_.igroup(), 0, n.data(), n.size());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";

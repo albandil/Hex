@@ -491,21 +491,18 @@ class RadialIntegrals
         /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const
         {
-            assert(i < R_tr_dia_.size());
             return R_tr_dia_[i];
         }
         
         /// Return reference to precomputed full (scaled) integral moments of order L.
         SymBandMatrix<Complex> const & Mtr_L (int L) const
         {
-            assert(L < Mtr_L_.size());
             return Mtr_L_[L];
         }
         
         /// Return reference to precomputed full (scaled) integral moments of order -L-1.
         SymBandMatrix<Complex> const & Mtr_mLm1 (int L) const
         {
-            assert(L < Mtr_mLm1_.size());
             return Mtr_mLm1_[L];
         }
         

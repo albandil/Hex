@@ -59,7 +59,7 @@ class ILUCGPreconditioner : public CGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline, cmd), csr_blocks_(ll.size()), lu_(ll.size())
@@ -69,7 +69,7 @@ class ILUCGPreconditioner : public CGPreconditioner
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions

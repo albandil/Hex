@@ -244,7 +244,7 @@ void Amplitudes::writeSQL_files ()
         std::vector<std::pair<cArray,cArray>> const & data = xi.second;
         
         // for all energies and angular momenta
-        for (unsigned ill = 0; ill < ang_.size(); ill++) //??? or triangular
+        for (int ill = 0; ill < ang_.size(); ill++) //??? or triangular
         for (std::size_t ie = 0; ie < inp_.Etot.size(); ie++)
         {
             // get Chebyshev expansion coefficients
@@ -409,22 +409,41 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
         
         // compute radial factor
-        for (unsigned ill = 0; ill < ang_.size(); ill++)
+        for (int ill = 0; ill < ang_.size(); ill++)
         {
-            // skip blocks that do not contribute to (l1 = ) lf
-            if (ang_[ill].first != T.lf)
+            if (not ang_.is_basic_symmetry(ill))
                 continue;
             
-            // get angular momentum
-            int ell = ang_[ill].second;
+            // skip blocks that do not contribute to (l1 = ) lf
+            if (ang_[ill].first != T.lf and ang_[ill].second != T.lf)
+                continue;
             
             // load solution block
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
+            
+            // reshape to a row-based matrix
             RowMatrixView<Complex> PsiSc(Nspline, Nspline, solution[ill]);
             
             // calculate radial integral
-            Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell])) / double(samples);
+            Complex lambda;
+            int ell = (ang_[ill].first == T.lf ? ang_[ill].second : ang_[ill].first);
+            if (ang_[ill].first == T.lf)
+            {
+                // use the solution as it is
+                ell = ang_[ill].second;
+                lambda = (Pf_overlaps | (PsiSc * Wj[ell])) / double(samples);
+            }
+            else
+            {
+                // use transposed solution
+                ell = ang_[ill].first;
+                lambda = (Wj[ell] | (PsiSc * Pf_overlaps)) / double(samples);
+            
+                // change the sign
+                if ((Spin + inp_.Pi) % 2 != 0)
+                    lambda = -lambda;
+            }
             
             // update the stored value
             # pragma omp critical
@@ -645,7 +664,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
     
     // for all angular states ???: (triangle ℓ₂ ≤ ℓ₁)
 //     # pragma omp parallel for schedule (dynamic, 1)
-    for (unsigned ill = 0; ill < ang_.size(); ill++)
+    for (int ill = 0; ill < ang_.size(); ill++)
     {
         int l1 = ang_[ill].first;
         int l2 = ang_[ill].second;
@@ -686,7 +705,7 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
     
     // for all energies and angular blocks
     for (std::size_t ie = 0; ie < Nenergy; ie++)
-    for (unsigned ill = 0; ill < ang_.size(); ill++)
+    for (int ill = 0; ill < ang_.size(); ill++)
     {
         // maximal available momentum
         double kmax = std::sqrt(inp_.Etot[ie]);

@@ -259,8 +259,16 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     }
     
     // for all diagonal blocks
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (int ill = 0; ill < l1_l2_.size(); ill++)
     {
+        // operate only on basic symmetries
+        if (not l1_l2_.is_basic_symmetry(ill))
+            continue;
+        
+        // operate only on group-owned symmetries
+        if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
+            continue;
+        
         // get angular momenta
         int l1 = l1_l2_[ill].first;
         int l2 = l1_l2_[ill].second;

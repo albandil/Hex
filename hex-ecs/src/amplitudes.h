@@ -61,12 +61,12 @@ class Amplitudes
         
         Amplitudes
         (
-            Bspline const & bspline, InputFile const & inp, Parallel const & par, CommandLine const & cmd,
-            std::vector<std::pair<int,int>> const & ang
-        ) : bspline_(bspline), rad_(bspline_), inp_(inp), par_(par), cmd_(cmd), ang_(ang)
-        {
-            // nothing to do
-        }
+            Bspline const & bspline,
+            InputFile const & inp,
+            Parallel const & par,
+            CommandLine const & cmd,
+            AngularBasis const & ang
+        ) : bspline_(bspline), rad_(bspline_), inp_(inp), par_(par), cmd_(cmd), ang_(ang) { }
         
         /**
          * @brief Extract the amplitudes.
@@ -254,7 +254,7 @@ class Amplitudes
         CommandLine const & cmd_;
         
         // angular basis
-        std::vector<std::pair<int,int>> const & ang_;
+        AngularBasis const & ang_;
 };
 
 #endif
