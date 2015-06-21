@@ -358,6 +358,26 @@ class Parallel
 #endif
         }
         
+        template <class T> void sync_m (T * array, std::size_t chunksize, std::size_t Nchunk, iArray const & ownmap) const
+        {
+#ifdef WITH_MPI
+            if (active_ and IamGroupMaster())
+            {
+                for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
+                {
+                    MPI_Bcast
+                    (
+                        array + ichunk * chunksize,
+                        chunksize * typeinfo<T>::ncmpt,
+                        typeinfo<T>::mpicmpttype(),
+                        ownmap[ichunk],
+                        mastergroup_
+                    );
+                }
+            }
+#endif
+        }
+        
         /**
          * @brief Sum arrays to node.
          * 

@@ -71,6 +71,38 @@
  * @f$ \psi_{sc,\ell_1 \ell_2}^{LMS}(r_1,r_2) = (-1)^{L+\Pi} \psi_{sc,\ell_2 \ell_1}^{LMS}(r_2,r_1) @f$,
  * only half of them -- fifteen -- are linearly independent.
  * 
+ * In this example, the IDs of the angular states are given consecutively in rows:
+ * 
+ * @verbatim
+ * [0]  0   1   2   3   4   5
+ * [1]  6   7   8   9   10  11
+ * [2]  12  13  14  15  16  17
+ * [3]  18  19  20  21  22  23
+ * [4]  24  25  26  27  28  29
+ * @endverbatim
+ * 
+ * The basic symmetries for a all angular states are those where ℓ₁ <= ℓ₂. These are returned
+ * by the function @ref basic_symmetry.
+ * 
+ * @verbatim
+ * [0]  0   1   2   2   1   0
+ * [1]  6   7   8   8   7   6
+ * [2]  12  13  14  14  13  12
+ * [3]  18  19  20  20  19  18
+ * [4]  24  25  26  26  25  24
+ * @endverbatim
+ * 
+ * The basic symmetries are numbered consecutively in rows. This number is returned by
+ * the function @ref basic_symmetry_index.
+ * 
+ * @verbatim
+ * [0]  0   1   2   2   1   0
+ * [1]  3   4   5   5   4   3
+ * [2]  6   7   8   8   7   6
+ * [3]  9   10  11  11  10  9
+ * [4]  12  13  14  14  13  12
+ * @endverbatim
+ * 
  * The class offers a limited STL-container-like interface through the functions
  * 'size', 'begin', 'end' and 'operator[]'.
  */
@@ -117,14 +149,9 @@ class AngularBasis
         /// Get index of basic symmetry in the full list of all angular states.
         int basic_symmetry (int ill) const
         {
-            int ill0 = ill;
-            if (not is_basic_symmetry(ill))
-            {
-                int igroup = ill / (L_ + 1 - Pi_);
-                int istate = ill % (L_ + 1 - Pi_);
-                ill0 = igroup * (L_ + 1 - Pi_) + (L_ + 1 - Pi_ - istate - 1);
-            }
-            return ill0;
+            int igroup = ill / (L_ + 1 - Pi_);
+            int istate = ill % (L_ + 1 - Pi_);
+            return igroup * (L_ + 1 - Pi_) + std::min(istate, L_ + 1 - Pi_ - istate - 1);
         }
         
         /// Get index of the basic symmetry in hypothetic list of basic symmetries.
@@ -132,7 +159,7 @@ class AngularBasis
         {
             int igroup = ill / (L_ + 1 - Pi_);
             int istate = ill % (L_ + 1 - Pi_);
-            return igroup * ((L_ + 2 - Pi_) / 2) + (L_ + 1 - Pi_ - istate - 1);
+            return igroup * ((L_ + 2 - Pi_) / 2) + std::min(istate, L_ + 1 - Pi_ - istate - 1);
         }
         
         /// Get basic symmetry relative sign.

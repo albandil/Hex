@@ -48,13 +48,21 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     int Nspline = s_rad_.bspline().Nspline();
     
     // iterations
-    std::vector<int> n (l1_l2_.size(), -1);
+    iArray n (l1_l2_.basic_size());
+    iArray ownmap (l1_l2_.basic_size());
     
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block && cmd_.groupsize == 1)
-    for (int ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (int ill = 0; ill < l1_l2_.size(); ill++)
     {
-        // skip this segment, if we computed/will compute a symmetry
+        // precondition only basic symmetry blocks
         if (not l1_l2_.is_basic_symmetry(ill))
+            continue;
+        
+        // save segment owner (useful for later synchronization)
+        ownmap[l1_l2_.basic_symmetry_index(ill)] = l1_l2_.basic_symmetry_index(ill) % par_.Ngroup();
+        
+        // precondition only blocks owned by this process group
+        if (not par_.isMyGroupWork(l1_l2_.basic_symmetry_index(ill)))
             continue;
         
         // load blocks, if necessary
@@ -138,7 +146,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         // solve using the CG solver
         ConjugateGradients < cArray, cArrayView > CG;
         CG.reset();
-        n[ill] = CG.solve
+        n[l1_l2_.basic_symmetry_index(ill)] = CG.solve
         (
             r[ill],                 // rhs
             z[ill],                 // solution
@@ -147,7 +155,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             Nspline * Nspline,      // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false,                  // verbose output
+            false,                  // no verbose output
             compute_norm,           // norm
             scalar_product,         // scalar product
             axby_operation          // a*x + b*y operation
@@ -166,11 +174,8 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         }
     }
     
-    // erase statistics for unpreconditioned blocks
-    n.erase(std::remove_if(n.begin(), n.end(), [](int i) -> bool { return i == -1; }), n.end());
-    
     // broadcast inner preconditioner iterations
-    par_.sync_m(n.data(), 1, n.size());
+    par_.sync_m(n.data(), 1, n.size(), ownmap);
     par_.bcast_g(par_.igroup(), 0, n.data(), n.size());
     
     // inner preconditioner info (max and avg number of iterations)

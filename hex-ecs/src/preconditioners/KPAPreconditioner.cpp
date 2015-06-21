@@ -139,7 +139,7 @@ void KPACGPreconditioner::setup ()
             bool need_this_l = false;
             for (int ill = 0; ill < l1_l2_.size(); ill++)
             {
-                if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
+                if (par_.isMyWork(l1_l2_.basic_symmetry_index(ill)) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
                     need_this_l = true;
             }
             

@@ -2159,7 +2159,7 @@ cArray interleave (const rArrayView re, const rArrayView im);
 template <class T> void transpose (ArrayView<T> A, std::size_t N)
 {
     for (std::size_t i = 0; i < N; i++)
-    for (std::size_t j = i; j < N; j++)
+    for (std::size_t j = i + 1; j < N; j++)
         std::swap(A[i * N + j], A[j * N + i]);
 }
 

@@ -94,8 +94,6 @@ int main (int argc, char* argv[])
     //
     
     // check some exclusive options
-    if (cmd.parallel_block and cmd.lightweight_radial_cache)
-        HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
     if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
         HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
     
@@ -545,9 +543,23 @@ if (cmd.itinerary & CommandLine::StgSolve)
             SolutionIO reader (inp.L, Spin, inp.Pi, ni, li, mi, inp.Etot[ie], coupled_states, Nspline);
             if (std::isfinite(compute_norm(psi)))
             {
-                for (int ill = 0; ill < coupled_states.size(); ill++) if (coupled_states.is_basic_symmetry(ill))
+                // for all angular states
+                for (int ill = 0; ill < coupled_states.size(); ill++)
                 {
-                    if (par.isMyGroupWork(ill) and par.IamGroupMaster() and not reader.save(psi, ill))
+                    // only operate on basic symmetries
+                    if (not coupled_states.is_basic_symmetry(ill))
+                        continue;
+                    
+                    // only operate on group-owned blocks
+                    if (not par.isMyGroupWork(coupled_states.basic_symmetry_index(ill)))
+                        continue;
+                    
+                    // this is master's work
+                    if (not par.IamGroupMaster())
+                        continue;
+                    
+                    // try to save the solution
+                    if (not reader.save(psi, ill))
                         HexException("Failed to save solution to disk - the data are lost!");
                 }
             }
