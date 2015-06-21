@@ -766,9 +766,11 @@ template <class DataT> class BlockSymBandMatrix
         //
         
         /**
-         * @brief Multiply (block) vector by the matrix.
+         * @brief Multiply block vector by the block matrix.
          * 
-         * @param v Vector to multiply. It should be of equal size to the size of the matrix.
+         * Multiplies every block separately using xSBMV routine from BLAS. 
+         * 
+         * @param v Vector to multiply. It should be of equal size and block structure as this matrix.
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          */
@@ -800,7 +802,7 @@ template <class DataT> class BlockSymBandMatrix
                 HDFFile * hdf = nullptr;
                 if (not inmemory_)
                     hdf = new HDFFile (diskfile_, HDFFile::readonly);
-                    
+                
                 for (std::size_t d = 0; d < halfbw_; d++)
                 {
                     // parallel processing of blocks on this diagonal (only if requested, and they are present in memory)

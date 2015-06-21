@@ -441,7 +441,7 @@ int Bspline::knot (Complex x) const
         return -1;
 }
 
-Complex Bspline::eval(const cArrayView coeff, double x) const
+Complex Bspline::eval (const cArrayView coeff, double x) const
 {
     Complex z = rotate(x);
     
@@ -464,7 +464,7 @@ Complex Bspline::eval(const cArrayView coeff, double x) const
     return result;
 }
 
-Complex Bspline::eval(const cArrayView coeff, double x, double y) const
+Complex Bspline::eval (const cArrayView coeff, double x, double y) const
 {
     Complex w = rotate(x);
     Complex z = rotate(y);

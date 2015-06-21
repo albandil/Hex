@@ -56,6 +56,21 @@
  * dependent angular states to so called "basic symmetries", where by convention
  * ℓ₁ <= ℓ₂.
  * 
+ * Example: Consider angular basis with L = 5, Pi = 0 and nL = 4. Then there are 30
+ * blocks on the diagonal of the main matrix.
+ * 
+ * @verbatim
+ * [0] (0,5) (1,4) (2,3) (3,2) (4,1) (5,0)
+ * [1] (1,6) (2,5) (3,4) (4,3) (5,2) (6,1)
+ * [2] (2,7) (3,6) (4,5) (5,4) (6,3) (7,2)
+ * [3] (3,8) (4,7) (5,6) (6,5) (7,4) (8,3)
+ * [4] (4,9) (5,8) (6,7) (7,6) (8,5) (9,4)
+ * @endverbatim
+ * 
+ * However, due to the fact that
+ * @f$ \psi_{sc,\ell_1 \ell_2}^{LMS}(r_1,r_2) = (-1)^{L+\Pi} \psi_{sc,\ell_2 \ell_1}^{LMS}(r_2,r_1) @f$,
+ * only half of them -- fifteen -- are linearly independent.
+ * 
  * The class offers a limited STL-container-like interface through the functions
  * 'size', 'begin', 'end' and 'operator[]'.
  */
@@ -88,9 +103,9 @@ class AngularBasis
             // sanity check
             assert((int)ll_.size() == (nL_ + 1) * (L_ + 1 - Pi_));
             
-            std::cout << "\t-> The matrix of the set contains " << (nL_ + 1) * (L_ + 1 - Pi_)
-                    << " diagonal blocks, of which " << (nL_ + 1) * ((L_ + 2 - Pi_) / 2)
-                    << " are independent and will be solved for." << std::endl << std::endl;
+            std::cout << "\t-> The matrix of the set contains " << (nL_ + 1) * (L_ + 1 - Pi_) << " diagonal blocks." << std::endl;
+            std::cout << "\t-> Of that " << (nL_ + 1) * ((L_ + 2 - Pi_) / 2) << " blocks are independent and will be solved for." << std::endl;
+            std::cout << std::endl;
         }
         
         /// Check that chosen angular pair is a basic symmetry.
