@@ -70,13 +70,13 @@ class Parallel
                 MPI_Init(argc, argv);
     #else
                 // initialize MPI compatible with OpenMP
-                int req_flag = MPI_THREAD_FUNNELED, prov_flag;
+                int req_flag = MPI_THREAD_SERIALIZED, prov_flag;
                 MPI_Init_thread(argc, argv, req_flag, &prov_flag);
                 
                 // check thread support
-                if (prov_flag == MPI_THREAD_SINGLE)
+                if (prov_flag != MPI_THREAD_SERIALIZED)
                 {
-                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_FUNNELED. ";
+                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_SERIALIZED. ";
                     std::cout << "Every MPI process may thus run only on a single core." << std::endl;
                 }
     #endif
@@ -246,6 +246,7 @@ class Parallel
             if (active_ and igroup == igroup_)
             {
                 // groupowner : broadcast data
+                std::cout << "Bcast_g(" << igroup << "," << groupowner << "," << data << "," << N << ")" << std::endl;
                 MPI_Bcast
                 (
                     data,
@@ -254,6 +255,7 @@ class Parallel
                     groupowner,
                     groupcomm_
                 );
+                std::cout << "Bcast_g(" << igroup << "," << groupowner << "," << data << "," << N << ") OK" << std::endl;
             }
 #endif
         }
@@ -345,6 +347,7 @@ class Parallel
             {
                 for (unsigned ichunk = 0; ichunk < Nchunk; ichunk++)
                 {
+                    std::cout << "sync_m(" << array << "," << chunksize << "," << Nchunk << ") : " << ichunk << std::endl;
                     MPI_Bcast
                     (
                         array + ichunk * chunksize,
@@ -353,6 +356,7 @@ class Parallel
                         ichunk % Ngroup_,
                         mastergroup_
                     );
+                    std::cout << "sync_m(" << array << "," << chunksize << "," << Nchunk << ") : " << ichunk << " OK" << std::endl;
                 }
             }
 #endif
