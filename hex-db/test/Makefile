@@ -14,10 +14,10 @@ distclean: ;
 #
 
 test-hexdb-lib-c: test-hexdb-lib-c.o
-	gcc test-hexdb-lib-c.o -L../lib -lhex-db -o test-hexdb-lib-c
+	gcc -std=c99 test-hexdb-lib-c.o -L../lib -lhex-db -o test-hexdb-lib-c
 
 test-hexdb-lib-c.o: test-hexdb-lib-c.c
-	gcc -c test-hexdb-lib-c.c -o test-hexdb-lib-c.o
+	gcc -std=c99 -c test-hexdb-lib-c.c -o test-hexdb-lib-c.o
 
 #
 # Fortran test
