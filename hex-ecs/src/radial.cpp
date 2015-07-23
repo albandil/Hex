@@ -42,25 +42,43 @@
 #include "radial.h"
 #include "special.h"
 
+RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj)
+  : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
+    g_atom_(bspline_atom), g_proj_(bspline_proj),
+    D_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    S_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    Mm1_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    Mm1_tr_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    Mm2_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    D_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    S_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1)
+{
+    // nothing to do
+}
+
+
 void RadialIntegrals::Mi_integrand
 (
     int n,
     Complex * const restrict in,
     Complex * const restrict out,
-    int i, int j, int a,
+    Bspline const & bspline_ij, int i, int j, int a,
     int iknot, int iknotmax
 ) const
 {
     // extract data
-    Complex R = bspline_.t(iknotmax);
+    Complex R = bspline_ij.t(iknotmax);
     
     // evaluate B-splines
     Complex values_i[n], values_j[n];
-    bspline_.B(i, iknot, n, in, values_i);
-    bspline_.B(j, iknot, n, in, values_j);
+    bspline_ij.B(i, iknot, n, in, values_i);
+    bspline_ij.B(j, iknot, n, in, values_j);
     
     // get upper bound
-    double t = bspline_.t()[iknot + 1].real();
+    double t = bspline_ij.t(iknot + 1).real();
     
     // scale factor for the multipole
     double scalef = 1 / t;
@@ -80,10 +98,10 @@ void RadialIntegrals::Mi_integrand
     }
 }
 
-cArray RadialIntegrals::computeMi (int a, int iknotmax) const
+cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const & g, int a, int iknotmax) const
 {
-    int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
+    int Nspline = bspline.Nspline();
+    int order = bspline.order();
     
     // partial integral moments
     cArray m (Nspline * (2 * order + 1) * (order + 1));
@@ -106,8 +124,8 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
             for (int iknot = ileft; iknot < iright; iknot++)
             {
                 // get integration boundaries
-                Complex xa = bspline_.t(iknot);
-                Complex xb = bspline_.t(iknot+1);
+                Complex xa = bspline.t(iknot);
+                Complex xb = bspline.t(iknot+1);
                 
                 // throw away zero length intervals
                 if (xa == xb)
@@ -120,11 +138,11 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
                 int points = std::max(2, order + std::abs(a) + 1);
                 
                 // integrate
-                integral = g_.quadMFP
+                integral = g.quadMFP
                 (
                     this, &RadialIntegrals::Mi_integrand,      // integrand pointer
                     points, iknot, xa, xb,                     // integration parameters
-                    i, j, a, iknot, iknotmax                   // data to pass to the integrator
+                    bspline, i, j, a, iknot, iknotmax          // data to pass to the integrator
                 );
                 
                 // get the coordinates in m-matrix
@@ -148,14 +166,18 @@ cArray RadialIntegrals::computeMi (int a, int iknotmax) const
 }
 
 
-Complex RadialIntegrals::computeD_iknot (int i, int j, int iknot) const
+Complex RadialIntegrals::computeD_iknot
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int i, int j, int iknot
+) const
 {
     if (iknot < 0)
-        iknot = bspline_.Nknot() - 1;
+        iknot = bspline.Nknot() - 1;
     
     // get interval boundaries
-    Complex x1 = bspline_.t(iknot);
-    Complex x2 = bspline_.t(iknot + 1);
+    Complex x1 = bspline.t(iknot);
+    Complex x2 = bspline.t(iknot + 1);
     
     // throw away zero-length intervals
     if (x1 == x2)
@@ -163,14 +185,14 @@ Complex RadialIntegrals::computeD_iknot (int i, int j, int iknot) const
     
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
     // - use at least 2nd order
-    int points = std::max (2, bspline_.order());
+    int points = std::max(2, bspline.order());
     Complex xs[points], ws[points];
-    g_.scaled_nodes_and_weights(points, x1, x2, xs, ws);
+    g.scaled_nodes_and_weights(points, x1, x2, xs, ws);
     
     // evaluate B-splines at Gauss-Legendre nodes
     Complex values_i[points], values_j[points];
-    bspline_.dB(i, iknot, points, xs, values_i);
-    bspline_.dB(j, iknot, points, xs, values_j);
+    bspline.dB(i, iknot, points, xs, values_i);
+    bspline.dB(j, iknot, points, xs, values_j);
     
     // result
     Complex res = 0;
@@ -182,11 +204,15 @@ Complex RadialIntegrals::computeD_iknot (int i, int j, int iknot) const
     return res;
 }
 
-Complex RadialIntegrals::computeD (int i, int j, int maxknot) const
+Complex RadialIntegrals::computeD
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int i, int j, int maxknot
+) const
 {
     // get boundary iknots
     int left = std::max(i, j);
-    int right = std::min(i, j) + bspline_.order();
+    int right = std::min(i, j) + bspline.order();
     
     // cut at maxknot
     if (right > maxknot)
@@ -197,16 +223,21 @@ Complex RadialIntegrals::computeD (int i, int j, int maxknot) const
     
     // undergo integration on sub-intervals
     for (int iknot = left; iknot <= right; iknot++)
-        res += computeD_iknot(i, j, iknot);
+        res += computeD_iknot(bspline, g, i, j, iknot);
         
     return res;
 }
 
-Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex R, double scale) const
+Complex RadialIntegrals::computeM_iknot
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int a, int i, int j,
+    int iknot, Complex R, double scale
+) const
 {
     // get interval boundaries
-    Complex x1 = bspline_.t(iknot);
-    Complex x2 = bspline_.t(iknot + 1);
+    Complex x1 = bspline.t(iknot);
+    Complex x2 = bspline.t(iknot + 1);
     
     // throw away zero-length intervals
     if (x1 == x2)
@@ -214,14 +245,14 @@ Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex
     
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
     // - use at least 2nd order
-    int points = std::max (2, bspline_.order() + std::abs(a) + 1);
+    int points = std::max(2, bspline.order() + std::abs(a) + 1);
     Complex xs[points], ws[points];
-    g_.scaled_nodes_and_weights(points, x1, x2, xs, ws);
+    g.scaled_nodes_and_weights(points, x1, x2, xs, ws);
     
     // evaluate B-splines at Gauss-Legendre nodes
     Complex values_i[points], values_j[points];
-    bspline_.B(i, iknot, points, xs, values_i);
-    bspline_.B(j, iknot, points, xs, values_j);
+    bspline.B(i, iknot, points, xs, values_i);
+    bspline.B(j, iknot, points, xs, values_j);
     
     // result
     Complex res = 0;
@@ -230,36 +261,41 @@ Complex RadialIntegrals::computeM_iknot (int a, int i, int j, int iknot, Complex
     if (R != 0.)
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * pow(scale * xs[k], a) * ws[k] * damp(xs[k], 0., R);
+            res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k] * damp(xs[k], 0., R);
     }
     else
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * pow(scale * xs[k], a) * ws[k];
+            res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k];
     }
     
     return res;
 }
 
-Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot, bool doscale) const
+Complex RadialIntegrals::computeM
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int a, int i, int j,
+    int maxknot, bool doscale
+) const
 {
     // get boundary iknots
     int left = std::max(i, j);
-    int right = std::min(i, j) + bspline_.order() + 1;
+    int right = std::min(i, j) + bspline.order() + 1;
     
     // cut at maxknot
     if (maxknot != 0 and right > maxknot)
         right = maxknot;
     
     // calculate scaling factor
-    double scale = (doscale ? 1 / bspline_.t(right).real() : 1);
+    double scale = (doscale ? 1 / bspline.t(right).real() : 1);
     
     // the result
     Complex res = 0;
     
     // undergo integration on sub-intervals
     for (int iknot = left; iknot < right; iknot++)
-        res += computeM_iknot(a, i, j, iknot, bspline_.t(maxknot), scale);
+        res += computeM_iknot(bspline, g, a, i, j, iknot, bspline.t(maxknot), scale);
     
     return res;
 }
@@ -267,34 +303,42 @@ Complex RadialIntegrals::computeM (int a, int i, int j, int maxknot, bool doscal
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
-    int order   = bspline_.order();
-    int Nknot   = bspline_.Nknot();
-    int Nreknot = bspline_.Nreknot();
+    int order        = bspline_atom_.order();
+    int Nknot_atom   = bspline_atom_.Nknot();   int Nknot_proj   = bspline_proj_.Nknot();
+    int Nreknot_atom = bspline_atom_.Nreknot(); int Nreknot_proj = bspline_proj_.Nreknot();
+    int Nspline_atom = bspline_atom_.Nspline(); int Nspline_proj = bspline_proj_.Nspline();
     
-    // create file names for this radial integrals
-    D_.hdflink(format("%d-D.hdf", order));
-    S_.hdflink(format("%d-S.hdf", order));
-    Mm1_.hdflink(format("%d-Mm1.hdf", order));
-    Mm1_tr_.hdflink(format("%d-Mm1_tr.hdf", order));
-    Mm2_.hdflink(format("%d-Mm2.hdf", order));
+    // create file names for these radial integrals
+    D_atom_     .hdflink(format("%dx%d-D.hdf",      order, Nspline_atom));  D_proj_     .hdflink(format("%dx%d-D.hdf",      order, Nspline_proj));
+    S_atom_     .hdflink(format("%dx%d-S.hdf",      order, Nspline_atom));  S_proj_     .hdflink(format("%dx%d-S.hdf",      order, Nspline_proj));
+    Mm1_atom_   .hdflink(format("%dx%d-Mm1.hdf",    order, Nspline_atom));  Mm1_proj_   .hdflink(format("%dx%d-Mm1.hdf",    order, Nspline_proj));
+    Mm1_tr_atom_.hdflink(format("%dx%d-Mm1_tr.hdf", order, Nspline_atom));  Mm1_tr_proj_.hdflink(format("%dx%d-Mm1_tr.hdf", order, Nspline_proj));
+    Mm2_atom_   .hdflink(format("%dx%d-Mm2.hdf",    order, Nspline_atom));  Mm2_proj_   .hdflink(format("%dx%d-Mm2.hdf",    order, Nspline_proj));
     
     std::cout << "Precomputing one-electron matrices... " << std::flush;
     
-    // compute one-electron matrices
-    D_.populate([=](int m, int n) -> Complex { return computeD(m, n, Nknot - 1); });
-    S_.populate([=](int m, int n) -> Complex { return computeM(0, m, n); });
-    Mm1_.populate([=](int m, int n) -> Complex { return computeM(-1, m, n); });
-    Mm1_tr_.populate([=](int m, int n) -> Complex { return computeM(-1, m, n, Nreknot - 1);});
-    Mm2_.populate([=](int m, int n) -> Complex { return computeM(-2, m, n); });
+    // compute one-electron matrices (atom basis)
+    D_atom_     .populate([=](int m, int n) -> Complex { return computeD(bspline_atom_, g_atom_,     m, n, Nknot_atom - 1  ); });
+    S_atom_     .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_,  0, m, n                  ); });
+    Mm1_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n                  ); });
+    Mm1_tr_atom_.populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n, Nreknot_atom - 1); });
+    Mm2_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -2, m, n                  ); });
+    
+    // compute one-electron matrices (projectile basis)
+    D_proj_     .populate([=](int m, int n) -> Complex { return computeD(bspline_proj_, g_proj_,     m, n, Nknot_proj - 1  ); });
+    S_proj_     .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_,  0, m, n                  ); });
+    Mm1_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n                  ); });
+    Mm1_tr_proj_.populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n, Nreknot_proj - 1); });
+    Mm2_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -2, m, n                  ); });
     
     // save the matrices to disk
     if (not cmd.shared_scratch or par.IamMaster())
     {
-        D_.hdfsave();
-        S_.hdfsave();
-        Mm1_.hdfsave();
-        Mm1_tr_.hdfsave();
-        Mm2_.hdfsave();
+        D_atom_     .hdfsave();  D_proj_     .hdfsave();
+        S_atom_     .hdfsave();  S_proj_     .hdfsave();
+        Mm1_atom_   .hdfsave();  Mm1_proj_   .hdfsave();
+        Mm1_tr_atom_.hdfsave();  Mm1_tr_proj_.hdfsave();
+        Mm2_atom_   .hdfsave();  Mm2_proj_   .hdfsave();
     }
     
     std::cout << "ok" << std::endl << std::endl;
@@ -303,14 +347,16 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
 {
     // shorthands
-    int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
-    int Nreknot = bspline_.Nreknot();
+    int order = bspline_atom_.order();
+    int Nspline_atom = bspline_atom_.Nspline();
+    int Nreknot_atom = bspline_atom_.Nreknot();
+    int Nspline_proj = bspline_proj_.Nspline();
+    int Nreknot_proj = bspline_proj_.Nreknot();
     
     // get knot that terminates (x^lambda)-scaled region
-    for (int i = 0; i < bspline_.Nknot(); i++)
+    for (int i = 0; i < bspline_atom_.Nknot(); i++)
     {
-        if (bspline_.t(i).real() < 1)
+        if (bspline_atom_.t(i).real() < 1)
             lastscaled_ = i;
         else
             break;
@@ -323,17 +369,25 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     std::cout << "Precomputing partial integral moments." << std::endl << std::endl;
     
     // compute partial moments
-    std::size_t mi_size = Nspline * (2 * order + 1) * (order + 1);
-    Mitr_L_.resize(lambdas.size() * mi_size);
-    Mitr_mLm1_.resize(lambdas.size() * mi_size);
-    Mtr_L_.resize(lambdas.size());
-    Mtr_mLm1_.resize(lambdas.size());
+    std::size_t mi_size_atom = Nspline_atom * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_proj = Nspline_proj * (2 * order + 1) * (order + 1);
+    Mitr_L_atom_   .resize(lambdas.size() * mi_size_atom);    Mitr_L_proj_   .resize(lambdas.size() * mi_size_proj);
+    Mitr_mLm1_atom_.resize(lambdas.size() * mi_size_atom);    Mitr_mLm1_proj_.resize(lambdas.size() * mi_size_proj);
+    Mtr_L_atom_    .resize(lambdas.size());                   Mtr_L_proj_    .resize(lambdas.size());
+    Mtr_mLm1_atom_ .resize(lambdas.size());                   Mtr_mLm1_proj_ .resize(lambdas.size());
     for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
     {
-        cArrayView(Mitr_L_, lambda * mi_size, mi_size) = computeMi(lambda, bspline_.Nreknot() - 1);
-        cArrayView(Mitr_mLm1_, lambda * mi_size, mi_size) = computeMi(-lambda-1, bspline_.Nreknot() - 1);
-        Mtr_L_[lambda] = SymBandMatrix<Complex>(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(lambda, i, j, Nreknot - 1, true); });
-        Mtr_mLm1_[lambda] = SymBandMatrix<Complex>(Nspline, order + 1).populate([&](int i, int j) -> Complex { return computeM(-lambda-1, i, j, Nreknot - 1, true); });
+        // atomic basis
+        cArrayView(Mitr_L_atom_,    lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,   lambda,   Nreknot_atom - 1);
+        cArrayView(Mitr_mLm1_atom_, lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,  -lambda-1, Nreknot_atom - 1);
+        Mtr_L_atom_[lambda]    = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_,  lambda,   i, j, Nreknot_atom - 1, true); });
+        Mtr_mLm1_atom_[lambda] = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_, -lambda-1, i, j, Nreknot_atom - 1, true); });
+        
+        // projectile basis
+        cArrayView(Mitr_L_proj_,    lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_,  lambda,   Nreknot_proj - 1);
+        cArrayView(Mitr_mLm1_proj_, lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_, -lambda-1, Nreknot_proj - 1);
+        Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
+        Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
     }
     
     // abandon their computation, if not necessary
@@ -343,14 +397,21 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // allocate storage and associate names
     for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
     {
+        // keep data in memory?
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
+        // compose the file name
+        std::string filename = format("%dx%dx%d-R_tr_dia_%d.hdf", order, Nspline_atom, Nspline_proj, lambda);
+        
+        // create the block matrix for radial integrals of this multipole
         R_tr_dia_[lambda] = BlockSymBandMatrix<Complex>
         (
-            Nspline,            // block count (and size)
-            order + 1,          // half-bandwidth
+            Nspline_atom,       // block count
+            order + 1,          // block structure half-bandwidth
+            Nspline_proj,       // block size
+            order + 1,          // block half-bandwidth
             keep_in_memory,     // whether to keep in memory
-            format("%d-R_tr_dia_%d.hdf", bspline_.order(), lambda) // HDF scratch disk file name
+            filename            // HDF scratch disk file name
         );
     }
     
@@ -388,9 +449,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         {
             // for all blocks of the radial matrix
             # pragma omp for schedule (dynamic,1)
-            for (int i = 0; i < Nspline; i++)
+            for (int i = 0; i < Nspline_atom; i++)
             for (int d = 0; d <= order; d++)
-            if (i + d < Nspline)
+            if (i + d < Nspline_atom)
             {
                 // calculate the block
                 SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
@@ -435,15 +496,15 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
 {
     // shorthands
-    int Nspline = bspline_.Nspline();
-    int order = bspline_.order();
+    int Nspline_proj = bspline_proj_.Nspline();
+    int order = bspline_proj_.order();
     
     // (i,k)-block data
-    SymBandMatrix<Complex> block_ik (Nspline, order + 1);
+    SymBandMatrix<Complex> block_ik (Nspline_proj, order + 1);
     
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-    for (int j = 0; j < Nspline; j++)
-    for (int l = j; l < Nspline and l <= j + order; l++)
+    for (int j = 0; j < Nspline_proj; j++)
+    for (int l = j; l < Nspline_proj and l <= j + order; l++)
         block_ik(j,l) = computeR(lambda, i, j, k, l, simple);
     
     return block_ik;
@@ -455,36 +516,37 @@ cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, boo
     int N = src.size();
     
     // shorthands
-    std::size_t Nspline = bspline_.Nspline();
-    std::size_t order = bspline_.order();
+    std::size_t Nspline_atom = bspline_atom_.Nspline();
+    std::size_t Nspline_proj = bspline_proj_.Nspline();
+    std::size_t order = bspline_atom_.order();
     
     // output array (the product)
     cArray dst(N);
     
     // for all blocks of the radial matrix
     # pragma omp parallel for schedule (dynamic, 1)
-    for (unsigned i = 0; i < Nspline; i++)
-    for (std::size_t k = i; k < Nspline and k <= i + order; k++)
+    for (unsigned i = 0; i < Nspline_atom; i++)
+    for (std::size_t k = i; k < Nspline_atom and k <= i + order; k++)
     {
         // (i,k)-block data (= concatenated non-zero upper diagonals)
         SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
         
         // multiply source vector by this block
-        cArray prod = std::move ( block_ik.dot(cArrayView(src, k * Nspline, Nspline)) );
+        cArray prod = std::move ( block_ik.dot(cArrayView(src, k * Nspline_proj, Nspline_proj)) );
         
         // update destination vector
         # pragma omp critical
-        cArrayView(dst, i * Nspline, Nspline) += prod;
+        cArrayView(dst, i * Nspline_proj, Nspline_proj) += prod;
         
         // also handle symmetric case
         if (i != k)
         {
             // multiply source vector by this block
-            prod = std::move ( block_ik.dot(cArrayView(src, i * Nspline, Nspline)) );
+            prod = std::move ( block_ik.dot(cArrayView(src, i * Nspline_proj, Nspline_proj)) );
             
             // update destination vector
             # pragma omp critical
-            cArrayView(dst, k * Nspline, Nspline) += prod;
+            cArrayView(dst, k * Nspline_proj, Nspline_proj) += prod;
         }
     }
     

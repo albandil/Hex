@@ -60,9 +60,11 @@ class ILUCGPreconditioner : public CGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd), csr_blocks_(ll.size()), lu_(ll.size())
+        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+            csr_blocks_(ll.size()), lu_(ll.size())
         {
             // nothing more to do
         }

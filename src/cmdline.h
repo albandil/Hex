@@ -162,7 +162,7 @@ template <class Callback, class ...Params> bool HandleSwitch
     if (optname == longoptname or optname == shortoptname)
     {
         // check number of parameters
-        if (noptarg != -1 and noptarg != optargs.size())
+        if (noptarg != -1 and noptarg != (int)optargs.size())
             HexException("The option --%s accepts %d parameters (given %d).", optname.c_str(), noptarg, optargs.size());
         
         // move on to the next option

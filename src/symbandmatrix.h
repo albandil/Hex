@@ -552,10 +552,10 @@ public:
         DataT const * el = elems_.data();
         
         // for all elements
-        for (IdxT i = 0; i < n_; i++)
-        for (IdxT d = 0; d < d_; d++)
+        for (IdxT i = 0; i < (IdxT)n_; i++)
+        for (IdxT d = 0; d < (IdxT)d_; d++)
         {
-            if (i + d < n_)
+            if (i + d < (IdxT)n_)
             {
                 // skip zero elements
                 if (*el == 0.)
@@ -656,7 +656,13 @@ template <class DataT> class BlockSymBandMatrix
         /// Whether to keep in memory.
         bool inmemory_;
         
-        /// Size of a matrix block and also of the block structure.
+        /// Number of blocks in a block row.
+        std::size_t blockcount_;
+        
+        /// Block structure half-bandwidth.
+        std::size_t blockhalfbw_;
+        
+        /// Size of a matrix block.
         std::size_t size_;
         
         /// Half bandwidth.
@@ -671,9 +677,6 @@ template <class DataT> class BlockSymBandMatrix
         // Constructors.
         //
         
-        BlockSymBandMatrix (int size = 0, int halfbw = 0)
-            : diskfile_(), inmemory_(true), size_(size), halfbw_(halfbw), data_() {}
-        
         /**
          * @brief Main constructor.
          * 
@@ -682,13 +685,11 @@ template <class DataT> class BlockSymBandMatrix
          * @param blockstructure Vector of block positions; only upper part of the matrix (+ main diagonal) allowed.
          * @param name Name of the optional scratch disk file.
          */
-        BlockSymBandMatrix (int size, int halfbw, bool inmemory = true, std::string name = "")
-            : diskfile_(name), inmemory_(inmemory), size_(size), halfbw_(halfbw), data_()
+        BlockSymBandMatrix (int blockcount = 0, int blockhalfbw = 0, int size = 0, int halfbw = 0, bool inmemory = true, std::string name = "")
+            : diskfile_(name), inmemory_(inmemory), blockcount_(blockcount), blockhalfbw_(blockhalfbw), size_(size), halfbw_(halfbw), data_()
         {
             if (inmemory_)
-            {
-                data_.resize(size_ * size_ * halfbw_ * halfbw_);
-            }
+                data_.resize(blockcount_ * size_ * blockhalfbw_ * halfbw_);
         }
         
         /// Is this object cached in memory?
@@ -775,8 +776,8 @@ template <class DataT> class BlockSymBandMatrix
         NumberArray<DataT> dot (ArrayView<DataT> v, bool parallelize = false) const
         {
             // check vector size
-            if (v.size() != size_ * size_)
-                HexException("[BlockSymBandMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", size_ * size_, v.size());
+            if (v.size() != blockcount_ * size_)
+                HexException("[BlockSymBandMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", blockcount_ * size_, v.size());
             
             // create output vector
             NumberArray<DataT> w(v.size());
@@ -801,16 +802,16 @@ template <class DataT> class BlockSymBandMatrix
                 if (not inmemory_)
                     hdf = new HDFFile (diskfile_, HDFFile::readonly);
                     
-                for (std::size_t d = 0; d < halfbw_; d++)
+                for (std::size_t d = 0; d < blockhalfbw_; d++)
                 {
                     // parallel processing of blocks on this diagonal (only if requested, and they are present in memory)
                     # pragma omp for schedule (dynamic,1)
-                    for (std::size_t i = 0; i < size_; i++)
-                    if (i + d < size_)
+                    for (std::size_t i = 0; i < blockcount_; i++)
+                    if (i + d < blockcount_)
                     {
                         // block volume and offset
                         std::size_t vol = size_ * halfbw_;
-                        std::size_t offset = (i * halfbw_ + d) * vol;
+                        std::size_t offset = (i * blockhalfbw_ + d) * vol;
                         
                         // data view of this block
                         ArrayView<DataT> view (data_, offset, vol);
@@ -897,10 +898,10 @@ template <class DataT> class BlockSymBandMatrix
         template <class IdxT> CooMatrix<IdxT,DataT> tocoo () const
         {
             // number of structurally non-zero blocks (both upper and lower)
-            std::size_t nblocks = size_ * (2 * halfbw_ - 1);
+            std::size_t nblocks = blockcount_ * (2 * blockhalfbw_ - 1);
             
             // number of structurally non-zero elements (the structure is recursive)
-            std::size_t nelem = nblocks * nblocks;
+            std::size_t nelem = nblocks * size_ * (2 * halfbw_ - 1);
             
             // allocate the ijv arrays
             NumberArray<IdxT> I; I.reserve(nelem);
@@ -913,12 +914,12 @@ template <class DataT> class BlockSymBandMatrix
                 hdf = new HDFFile (diskfile_, HDFFile::readonly);
             
             // for all blocks
-            for (std::size_t i = 0; i < size_; i++)
-            for (std::size_t d = 0; d < halfbw_; d++)
-            if (i + d < size_)
+            for (std::size_t i = 0; i < blockcount_; i++)
+            for (std::size_t d = 0; d < blockhalfbw_; d++)
+            if (i + d < blockcount_)
             {
                 // data view of this block diagonal
-                cArrayView view (data_, (i * halfbw_ + d) * size_ * halfbw_, size_ * halfbw_);
+                cArrayView view (data_, (i * blockhalfbw_ + d) * size_ * halfbw_, size_ * halfbw_);
                 
                 // it may be necessary to load the data from disk
                 cArray diskdata;
@@ -926,7 +927,7 @@ template <class DataT> class BlockSymBandMatrix
                 {
                     // read data from the disk
                     diskdata.resize(size_ * halfbw_);
-                    if (not hdf->read("data", &diskdata[0], size_ * halfbw_, (i * halfbw_ + d) * size_ * halfbw_))
+                    if (not hdf->read("data", &diskdata[0], size_ * halfbw_, (i * blockhalfbw_ + d) * size_ * halfbw_))
                         HexException("Failed to read HDF file \"%s\".\nHDF error stack:\n%s", diskfile_.c_str(), hdf->error().c_str());
                     
                     // reset view to the new data
@@ -958,8 +959,8 @@ template <class DataT> class BlockSymBandMatrix
             // compose the final matrix
             return CooMatrix<IdxT,DataT>
             (
-                size_ * size_,  // number of rows
-                size_ * size_,  // number of columns
+                blockcount_ * size_,  // number of rows
+                blockcount_* size_,  // number of columns
                 std::move(I),   // row indices
                 std::move(J),   // column indices
                 std::move(V)    // structurally nonzero matrix entries
@@ -996,7 +997,7 @@ template <class DataT> class BlockSymBandMatrix
                 HexException("Cannot open file \"%s\" for writing.\nHDF error stack:\n%s", diskfile_.c_str(), hdf.error().c_str());
             
             // initialize the dataset to its full length
-            if (not hdf.write("data", (Complex*)nullptr, size_ * halfbw_ * size_ * halfbw_))
+            if (not hdf.write("data", (Complex*)nullptr, blockcount_ * blockhalfbw_ * size_ * halfbw_))
                 HexException("Failed to initialize file \"%s\" (size %.1f).\n%s", diskfile_.c_str(), double(size_ * halfbw_)/std::pow(2,30), hdf.error().c_str());
             
             return true;
@@ -1030,7 +1031,7 @@ template <class DataT> class BlockSymBandMatrix
                 return false;
             
             // allocate memory
-            data_.resize(size_ * size_ * halfbw_ * halfbw_);
+            data_.resize(blockcount_ * size_ * blockhalfbw_ * halfbw_);
             
             // read data
             if (not hdf.read("data", &data_[0], data_.size()))

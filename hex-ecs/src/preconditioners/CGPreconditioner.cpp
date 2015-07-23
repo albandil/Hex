@@ -45,7 +45,8 @@ const std::string CGPreconditioner::prec_description =
 void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // shorthands
-    int Nspline = s_rad_.bspline().Nspline();
+    int Nspline_atom = rad_.bspline_atom().Nspline();
+    int Nspline_proj = rad_.bspline_proj().Nspline();
     
     // iterations
     iArray n (l1_l2_.size());
@@ -142,7 +143,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 z[ill],                 // solution
                 cmd_.prec_itertol,      // preconditioner tolerance
                 0,                      // min. iterations
-                Nspline * Nspline,      // max. iteration
+                Nspline_atom * Nspline_proj, // max. iteration
                 inner_prec,             // preconditioner
                 inner_mmul,             // matrix multiplication
                 false,                  // verbose output

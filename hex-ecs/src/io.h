@@ -86,7 +86,7 @@ class CommandLine
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_block(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1)
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1)
         {
             // get command line options
             parse(argc, argv);
@@ -178,6 +178,9 @@ class CommandLine
         
         /// Size of the local MPI communicator, used for distributed SuperLU.
         int groupsize;
+        
+        /// Number of panels (solver + propagator sections).
+        int panels;
 };
 
 /**
@@ -230,7 +233,7 @@ class InputFile
         
         int order, ni, L, Pi, levels, maxell;
         double ecstheta, B;
-        rArray rknots, cknots, Etot;
+        rArray rknots, rknots_next, cknots, overlap_knots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;
 };
 
@@ -245,8 +248,8 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, unsigned Nspline)
-            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), Nspline_(Nspline) {}
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang)
+            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang) {}
         
         /// Get name of the solution file.
         std::string name (int ill = -1) const
@@ -306,11 +309,14 @@ class SolutionIO
                     HDFFile hdf (name(), HDFFile::readonly);
                     if (hdf.valid())
                     {
+                        // get segment size
+                        std::size_t segsize = hdf.size("array") / ang_.size();
+                        
                         // allocate memory
-                        solution[i].resize(Nspline_ * Nspline_);
+                        solution[i].resize(segsize);
                         
                         // read data from the file
-                        if (not hdf.read("array", solution[i].data(), Nspline_ * Nspline_, i * Nspline_ * Nspline_))
+                        if (not hdf.read("array", solution[i].data(), segsize, i * segsize))
                             return false;
                         
                         // dump to disk
@@ -330,16 +336,6 @@ class SolutionIO
                         // simply load the requested solution segment file
                         if (not solution[i].hdfload(name(i)))
                             return false;
-                        
-                        // check size
-                        if (solution[i].size() != Nspline_ * Nspline_)
-                        {
-                            HexException
-                            (
-                                "The solution file \"%s\" doesn't seem to contain data for this input: it has %ld elements, whereas expected is %ld.",
-                                name(i).c_str(), solution[i].size(), Nspline_ * Nspline_
-                            );
-                        }
                         
                         // dump to disk
                         if (not solution.inmemory())
@@ -400,7 +396,6 @@ class SolutionIO
         int L_, S_, Pi_, ni_, li_, mi_;
         double E_;
         std::vector<std::pair<int,int>> ang_;
-        std::size_t Nspline_;
 };
 
 /**

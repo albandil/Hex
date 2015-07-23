@@ -54,10 +54,22 @@ std::string current_time ()
     return std::asctime(std::localtime(&result));
 }
 
+Amplitudes::Amplitudes
+(
+    Bspline const & bspline_atom, Bspline const & bspline_proj,
+    InputFile const & inp, Parallel const & par, CommandLine const & cmd,
+    std::vector<std::pair<int,int>> const & ang
+) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
+    rad_(bspline_atom_,bspline_proj),
+    inp_(inp), par_(par), cmd_(cmd), ang_(ang)
+{
+    // nothing to do
+}
+
 void Amplitudes::extract ()
 {
     // radial integrals
-    RadialIntegrals rad (bspline_);
+    RadialIntegrals rad (bspline_atom_, bspline_proj_);
     
     std::cout << std::endl << "Extracting T-matrices" << std::endl;
     
@@ -82,7 +94,7 @@ void Amplitudes::extract ()
                 int mi = std::get<2>(instate);
                 
                 // load the solution
-                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_, bspline_.Nspline());
+                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
                 BlockArray<Complex> solution (ang_.size(), !cmd_.outofcore, "sol");
                 if (not reader.load(solution))
                 {
@@ -346,14 +358,13 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     rArray kf = sqrt(inp_.Etot + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
     // shorthands
-    unsigned Nenergy = kf.size();                // energy count
-    Complex const * const t = &(bspline_.t(0));   // B-spline knots
-    int order   = bspline_.order();               // B-spline order
-    int Nspline = bspline_.Nspline();             // B-spline count
-    int Nreknot = bspline_.Nreknot();             // number of real knots
+    unsigned Nenergy = kf.size();               // energy count
+    int order   = inp_.order;                   // B-spline order
+    int Nspline_atom = bspline_atom_.Nspline(); // B-spline count (atomic basis)
+    int Nspline_proj = bspline_proj_.Nspline(); // B-spline count (projectile basis)
     
     // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_overlaps = rad_.overlapP(T.nf, T.lf, weightEndDamp(bspline_));
+    cArray Pf_overlaps = rad_.overlapP(bspline_atom_, rad_.gaussleg_atom(), T.nf, T.lf, weightEndDamp(bspline_atom_));
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -373,7 +384,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     char const * HEX_RHO = std::getenv("HEX_RHO");
     char const * HEX_SAMPLES = std::getenv("HEX_SAMPLES");
     int samples = (HEX_SAMPLES == nullptr) ? 10 : std::atoi(HEX_SAMPLES);
-    double R0 = (HEX_RHO == nullptr) ? t[Nreknot - 1].real() : std::atof(HEX_RHO);
+    double R0 = (HEX_RHO == nullptr) ? bspline_proj_.t(bspline_proj_.Nreknot() - 1).real() : std::atof(HEX_RHO);
     
     // skip impact energies with undefined outgoing momentum
     if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
@@ -386,21 +397,21 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         double eval_r = R0 - wavelength * n / samples;
         
         // determine knot
-        int eval_knot = bspline_.knot(eval_r);
+        int eval_knot = bspline_proj_.knot(eval_r);
         
         // evaluate j and dj at far radius for all angular momenta up to maxell
         cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
         
         // evaluate B-splines and their derivatives at evaluation radius
-        cArray Bspline_R0(Nspline), Dspline_R0(Nspline);
-        for (int ispline = 0; ispline < Nspline; ispline++)
+        cArray Bspline_R0(Nspline_proj), Dspline_R0(Nspline_proj);
+        for (int ispline = 0; ispline < Nspline_proj; ispline++)
         {
             // evaluate B-spline
-            Bspline_R0[ispline] = bspline_.bspline(ispline, eval_knot, order, eval_r);
+            Bspline_R0[ispline] = bspline_proj_.bspline(ispline, eval_knot, order, eval_r);
             
             // evaluate B-spline derivative
-            Dspline_R0[ispline] = bspline_.dspline(ispline, eval_knot, order, eval_r);
+            Dspline_R0[ispline] = bspline_proj_.dspline(ispline, eval_knot, order, eval_r);
         }
         
         // evaluate Wronskians
@@ -421,7 +432,9 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             // load solution block
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
-            RowMatrixView<Complex> PsiSc(Nspline, Nspline, solution[ill]);
+            
+            // change view to row-major dense matrix
+            RowMatrixView<Complex> PsiSc (Nspline_atom, Nspline_proj, solution[ill]);
             
             // calculate radial integral
             Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell])) / double(samples);
@@ -658,7 +671,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
             const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
         
         // compute new ionization amplitude
-        Chebyshev<double,Complex> CB = fcheb(bspline_, solution[ill], kmax, l1, l2);
+        Chebyshev<double,Complex> CB = fcheb(bspline_atom_, solution[ill], kmax, l1, l2);
         if (Spin == 0)
             Xi_Sl1l2[T][ill * inp_.Etot.size() + ie].first = CB.coeffs();
         else

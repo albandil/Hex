@@ -125,7 +125,7 @@ endif
 
 # source files
 CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
-           matrix misc radial slater special version \
+           matrix misc radial slater solver special version \
            preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
            preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
            preconditioners/GPUPreconditioner

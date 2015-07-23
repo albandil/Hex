@@ -43,40 +43,95 @@
 #include "preconditioners.h"
 
 const std::string sample_input =
-    "# B-spline parameters \n"
-    "# order      θ\n"
-    "      4   0.63\n"
+    "# This is a sample input file for the program hex-ecs.\n"
+    "# Lines introduced by the hash symbol are comments, which document the options,\n"
+    "# and can be omitted. Otherwise there are just a few numbers and characters.\n"
     "\n"
-    "# real knot sequences\n"
-    "# L[inear] <Start> <End> <Sample>\n"
-    "# G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
+    "# ------------ B-spline parameters ----------------\n"
+    "\n"
+    "# B-spline order.\n"
+    "# Recommended value is 4, higher values lead to larger matrices.\n"
+    "# Smaller values can lead to insufficent description in coordinate origin.\n"
+    "   4\n"
+    "\n"
+    "# ECS rotation angle in radians.\n"
+    "# Typically around 45 degrees, the calculation is totally immune to small changes\n"
+    "# in this parameter.\n"
+    "   0.63\n"
+    "\n"
+    "# B-spline knots.\n"
+    "# For each section use any of the following options and terminate by -1.\n"
+    "#     L[inear] <Start> <End> <Samples>\n"
+    "#     G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
+    "# The sections of the example are graphically demonstrated below.\n"
+    "# Letters used here are the same as in numbering of the user input given\n"
+    "# after this comment.\n"
+    "#\n"
+    "#         0      60   100   150 a.u.\n"
+    "#  solver |aaaaaa|bbbb|ccccc|\n"
+    "#                            160  200   250 a.u.\n"
+    "#  1. propagator |bbbb|dddddd|bbbb|ccccc|\n"
+    "#                                        260  300   350 a.u.\n"
+    "#  2. propagator             |bbbb|dddddd|bbbb|ccccc|\n"
+    "#                                                    360  400   450 a.u.\n"
+    "#  3. propagator                         |bbbb|dddddd|bbbb|ccccc|\n"
+    "#\n"
+    "#  etc.\n"
+    "#\n"
+    "#   1) Solver grid (0 a.u. - 100 a.u. / 150 a.u.)\n"
+    "#      - multiple knots at origin (4×)\n"
+    "#      - densely spaced 20 knots to distance 2 a.u.\n"
+    "#      - uniform grid to distance (60 a.u. + 40 a.u.) = 100 a.u.\n"
+    "#      - complex absorbtion layer to distance 150 a.u.\n"
+    "#   2) First propagation grid (60 a.u. - 200 a.u. / 250 a.u.)\n"
+    "#      - uniform grid of length (40 a.u. + 60 a.u. + 40 a.u.) = 140 a.u. to distance 200 a.u.\n"
+    "#      - complex absorbtion layer of length 50 a.u. to distance 250 a.u.\n"
+    "#   3+) Further propagation grids, always extending the distance by 100 a.u.\n"
+    "#\n"
+    "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
     "  L  0.1  2.0  20\n"
     "  L    3   60  58\n"
     " -1\n"
-    "\n"
-    "# complex knot sequences\n"
-    "  G   60  100   1  1.02\n"
+    "# b) Real knots of the panel overlap, if any.\n"
+    "  L    0   40  41\n"
+    " -1\n"
+    "# c) Complex region knots.\n"
+    "  G    0   50   1  1.02\n"
+    " -1\n"
+    "# d) Knots of other panels (propagator projectile basis).\n"
+    "  L    0   60  61\n"
     " -1\n"
     "\n"
-    "# initial atomic states (ni, li, mi)\n"
+    "# --------------- Atomic states -------------------\n"
+    "\n"
+    "# Initial atomic states (ni, li, mi).\n"
+    "# Specified as vertical triplets terminated by -1 on the first line.\n"
+    "# Computation of all angular quantum numbers can be requested by asterisk.\n"
     "  1 -1\n"
     "  *\n"
     "  *\n"
     "\n"
-    "# final atomic states (nf, lf)\n"
+    "# Final atomic states (nf, lf).\n"
+    "# Specified by vertival doublets terminated by -1 on the first line.\n"
     "  1  -1\n"
     "  *\n"
     "\n"
-    "# angular momenta\n"
+    "# --------------- Other conditions ----------------\n"
+    "\n"
+    "# Angular momenta.\n"
     "# L  Pi limit\n"
     "  0  0  4\n"
     "\n"
-    "# atom + projectile total energies in Rydbergs\n"
+    "# Atom + projectile total energies in Rydbergs.\n"
+    "# Use any of the following options:\n"
+    "#     L[inear] <Start> <End> <Samples>\n"
+    "#     G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
+    "#     E[xplicit] <Sample-1> <Sample-2> ... <Sample-last> -1\n"
     "  L  -0.35  -0.05  3\n"
     " -1\n"
     "\n"
-    "# magnetic field\n"
+    "# Weak magnetic field in atomic units.\n"
     " 0\n";
 
 
@@ -146,6 +201,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
+                    "\t--propagate <number>             Propagate solution through given number of panels.                                                                     \n"
 #ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
@@ -396,6 +452,12 @@ void CommandLine::parse (int argc, char* argv[])
                 gpu_large_data = true;
                 return true;
             },
+        "panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // propagate solution along the projectile axis
+                panels = std::atoi(optargs[0].c_str());
+                return true;
+            },
 #endif
         
         [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
@@ -403,6 +465,42 @@ void CommandLine::parse (int argc, char* argv[])
             HexException("Unknown switch \"%s\".", optname.c_str());
         }
     );
+}
+
+void ReadArrays (std::ifstream & inf, rArray & arr)
+{
+    arr.resize(0);
+    std::string type;
+    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
+    {
+        if (type[0] == 'L')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            int samples = ReadNext<int>(inf).val;
+            arr.append(linspace(begin, end, samples));
+        }
+        else if (type[0] == 'G')
+        {
+            double begin = ReadNext<double>(inf).val;
+            double end = ReadNext<double>(inf).val;
+            double d = ReadNext<double>(inf).val;
+            double quotient = ReadNext<double>(inf).val;
+            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
+            arr.append(geomspace(begin, end, samples, quotient));
+        }
+        else if (type[0] == 'E')
+        {
+            // explicit list samples
+            double X;
+            while ((X = ReadNext<double>(inf).val) != -1)
+                arr.push_back(X);
+        }
+        else
+        {
+            HexException("Unknown sequence type \"%s\".", type.c_str());
+        }
+    }
 }
 
 void InputFile::read (std::ifstream & inf)
@@ -419,33 +517,10 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tecs angle = " << ecstheta << std::endl;
     
     //
-    // load real knot data
+    // load real solver knot data
     //
     
-    std::string type;
-    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
-    {
-        if (type[0] == 'L')
-        {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            int samples = ReadNext<int>(inf).val;
-            rknots.append(linspace(begin, end, samples));
-        }
-        else if (type[0] == 'G')
-        {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            double d = ReadNext<double>(inf).val;
-            double quotient = ReadNext<double>(inf).val;
-            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
-            rknots.append(geomspace(begin, end, samples, quotient));
-        }
-        else
-        {
-            HexException("Unknown sequence type \"%s\".", type.c_str());
-        }
-    }
+    ReadArrays(inf, rknots);
     
     // print info
     std::cout << std::endl;
@@ -459,32 +534,31 @@ void InputFile::read (std::ifstream & inf)
             HexException("The real knot sequence is not monotonous.");
     
     //
+    // load basis overlap knot data
+    //
+    
+    ReadArrays(inf, overlap_knots);
+    
+    // print info
+    std::cout << std::endl;
+    std::cout << "Overlap knots (" << overlap_knots.size() << ")" << std::endl;
+    for (std::string line : overlap_knots.lines(100))
+        std::cout << '\t' << line << std::endl;
+    
+    // check that the first knot is zero
+    if (overlap_knots.size() > 0 and overlap_knots[0] != 0.)
+        HexException("The first knot in overlap region must be zero.");
+    
+    // check order of knots
+    for (unsigned i = 1; i < overlap_knots.size(); i++)
+        if (overlap_knots[i] < overlap_knots[i-1])
+            HexException("The overlap knot sequence is not monotonous.");
+    
+    //
     // load complex knot data
     //
     
-    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
-    {
-        if (type[0] == 'L')
-        {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            int samples = ReadNext<int>(inf).val;
-            cknots.append(linspace(begin, end, samples));
-        }
-        else if (type[0] == 'G')
-        {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            double d = ReadNext<double>(inf).val;
-            double quotient = ReadNext<double>(inf).val;
-            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
-            cknots.append(geomspace(begin, end, samples, quotient));
-        }
-        else
-        {
-            HexException("Complex knot sequence: Unknown sequence type \"%s\".", type.c_str());
-        }
-    }
+    ReadArrays(inf, cknots);
     
     // print info
     std::cout << std::endl;
@@ -492,14 +566,31 @@ void InputFile::read (std::ifstream & inf)
     for (std::string line : cknots.lines(100))
         std::cout << '\t' << line << std::endl;
     
-    // check continuity
-    if (cknots.front() < rknots.back())
-        HexException("Complex part of the grid overlaps with the real part (%g < %g).", cknots.front(), rknots.back());
+    // check that the first knot is zero
+    if (cknots.size() > 0 and cknots[0] != 0.)
+        HexException("The first knot in complex region must be zero.");
     
     // check order of knots
     for (unsigned i = 1; i < cknots.size(); i++)
         if (cknots[i] < cknots[i-1])
             HexException("The complex knot sequence is not monotonous.");
+    
+    //
+    // load real propagator knot data
+    //
+    
+    ReadArrays(inf, rknots_next);
+    
+    // print info
+    std::cout << std::endl;
+    std::cout << "Propagator real knots (" << rknots_next.size() << ")" << std::endl;
+    for (std::string line : rknots_next.lines(100))
+        std::cout << '\t' << line << std::endl;
+    
+    // check order of knots
+    for (unsigned i = 1; i < rknots_next.size(); i++)
+        if (rknots_next[i] < rknots_next[i-1])
+            HexException("The propagator real knot sequence is not monotonous.");
     
     //
     // load initial atomic quantum numbers
@@ -612,41 +703,10 @@ void InputFile::read (std::ifstream & inf)
     // load initial energies
     //
     
-    std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
-    while ((type = ReadNext<std::string>(inf).val) != std::string("-1"))
-    {
-        if (type[0] == 'L')
-        {
-            // linear scale samples
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            int samples = ReadNext<int>(inf).val;
-            Etot.append(linspace(begin, end, samples));
-        }
-        else if (type[0] == 'G')
-        {
-            // geometric scale samples
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            double d = ReadNext<double>(inf).val;
-            double quotient = ReadNext<double>(inf).val;
-            int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
-            Etot.append(geomspace(begin, end, samples, quotient));
-        }
-        else if (type[0] == 'E')
-        {
-            // explicit list samples
-            double e;
-            while ((e = ReadNext<double>(inf).val) != -1)
-                Etot.push_back(e);
-        }
-        else
-        {
-            HexException("Energy list: Unknown sequence type \"%s\".", type.c_str());
-        }
-    }
+    ReadArrays(inf, Etot);
     
     // print info
+    std::cout << std::endl << "Total projectile + atom energies [Ry]" << std::endl;
     std::cout << "\tcount: "     << Etot.size()  << std::endl;
     std::cout << "\tfull list: " << Etot         << std::endl;
     

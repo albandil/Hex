@@ -30,7 +30,6 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
-#include <set>
 
 #include "../arrays.h"
 #include "../gauss.h"
@@ -119,13 +118,93 @@ void KPACGPreconditioner::sData::drop ()
     Dl.clear();
 }
 
+void KPACGPreconditioner::prepare
+(
+    std::vector<Data> & prec,
+    int Nspline,
+    SymBandMatrix<Complex> const & mS,
+    SymBandMatrix<Complex> const & mD,
+    SymBandMatrix<Complex> const & mMm1_tr,
+    SymBandMatrix<Complex> const & mMm2,
+    Array<bool> done,
+    std::set<int> comp_l,
+    std::set<int> needed_l
+)
+{
+    Timer timer;
+    cArray D;
+    ColMatrix<Complex> S = mS.torow().T(), CR, invCR, invsqrtS;
+    
+    // diagonalize overlap matrix
+    if (not all(done))
+    {
+        std::cout << "\t- overlap matrix factorization" << std::endl;
+        
+        S.diagonalize(D, nullptr, &CR);
+        CR.invert(invCR);
+        
+        // Now S = CR * (D * CR⁻¹)
+        std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
+        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+            invCR.data()[i] *= D[i % Nspline];
+        std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
+        S = ColMatrix<Complex>();
+        
+        // compute √S⁻¹
+        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+            invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
+        invsqrtS = std::move(CR * invCR);
+    }
+    
+    // diagonalize one-electron hamiltonians for all angular momenta
+    for (int l : comp_l)
+    {
+        // skip loaded
+        if (done[l])
+            continue;
+        
+        // reset timer
+        std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
+        timer.reset();
+        
+        // compose the symmetrical one-electron hamiltonian
+        ColMatrix<Complex> tHl = (Complex(0.5) * mD - mMm1_tr + Complex(0.5*l*(l+1)) * mMm2).torow().T();
+        
+        // symmetrically transform by inverse square root of the overlap matrix
+        tHl = std::move(invsqrtS * tHl * invsqrtS);
+        
+        // diagonalize the transformed matrix
+        tHl.diagonalize(D, nullptr, &CR);
+        CR.invert(invCR);
+        
+        // store the preconditioner data
+        prec[l].Dl = D;
+        prec[l].invsqrtS_Cl = std::move(RowMatrix<Complex>(invsqrtS * CR));
+        prec[l].invCl_invsqrtS = std::move(RowMatrix<Complex>(invCR * invsqrtS));
+        prec[l].hdfsave();
+        prec[l].drop();
+        
+        // Now Hl = ClR * D * ClR⁻¹
+        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+            invCR.data()[i] *= D[i % Nspline];
+        std::cout << "\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
+    }
+    
+    // wait for completition of diagonalization on other nodes
+    par_.wait();
+
+    // load all preconditioner matrices needed by this MPI node
+    for (int l : needed_l)
+        if (not cmd_.outofcore and not prec[l].hdfload())
+            HexException("Failed to read preconditioner matrix for l = %d.", l);
+}
+
 void KPACGPreconditioner::setup ()
 {
     NoPreconditioner::setup();
     
     std::cout << "Set up KPA preconditioner" << std::endl;
-    
-    std::size_t Nspline = s_bspline_.Nspline();
     
     //
     // Preparations (presence checking, loading, ...).
@@ -167,20 +246,34 @@ void KPACGPreconditioner::setup ()
         // "to compute matrices": link them to scratch disk files and check presence
         for (int l : comp_l)
         {
-            prec_[l].hdflink(format("kpa-%d.hdf",l).c_str());
-            done[l] = prec_[l].hdfcheck();
+            prec_atom_[l].hdflink(format("kpa-x%d-%d.hdf",rad_.bspline_atom().Nspline(),l).c_str());
+            prec_proj_[l].hdflink(format("kpa-x%d-%d.hdf",rad_.bspline_proj().Nspline(),l).c_str());
+            
+            done[l] = (prec_atom_[l].hdfcheck() and prec_proj_[l].hdfcheck());
         }
         
         // "needed matrices": link them to scratch disk files and check presence, load if present
         for (int l : needed_l)
         {
-            prec_[l].hdflink(format("kpa-%d.hdf",l).c_str());
-            done[l] = prec_[l].hdfcheck();
+            prec_atom_[l].hdflink(format("kpa-x%d-%d.hdf",rad_.bspline_atom().Nspline(), l).c_str());
+            prec_proj_[l].hdflink(format("kpa-x%d-%d.hdf",rad_.bspline_proj().Nspline(), l).c_str());
+            
+            done[l] = (prec_atom_[l].hdfcheck() and prec_proj_[l].hdfcheck());
             
             if (cmd_.outofcore and done[l])
-                std::cout << "\t- preconditioner data for l = " << l << " present in \"" << prec_[l].filename << "\"" << std::endl;
-            if (not cmd_.outofcore and (done[l] = prec_[l].hdfload()))
-                std::cout << "\t- preconditioner data for l = " << l << " loaded from \"" << prec_[l].filename << "\"" << std::endl;
+            {
+                std::cout << "\t- preconditioner data for l = " << l
+                          << " present in \"" << prec_atom_[l].filename
+                          << "\" and \"" << prec_proj_[l].filename
+                          << "\"" << std::endl;
+            }
+            if (not cmd_.outofcore and (done[l] = (prec_atom_[l].hdfload() and prec_proj_[l].hdfload())))
+            {
+                std::cout << "\t- preconditioner data for l = " << l
+                          << " loaded from \"" << prec_atom_[l].filename
+                          << "\" and \"" << prec_proj_[l].filename
+                          << "\"" << std::endl;
+            }
         }
         
         // if all preconditioners have been loaded, exit this routine
@@ -188,84 +281,24 @@ void KPACGPreconditioner::setup ()
             std::cout << std::endl;
     
     //
-    // Calculation of the preconditioner matrices.
+    // Calculation of the preconditioner for atomic basis.
     //
         
-        Timer timer;
+        // prepare preconditioner for atomic basis
+        prepare
+        (
+            prec_atom_, bspline_atom_.Nspline(),
+            rad_.S_atom(), rad_.D_atom(), rad_.Mm1_tr_atom(), rad_.Mm2_atom(),
+            done, comp_l, needed_l
+        );
         
-        // diagonalize overlap matrix
-        cArray D;
-        ColMatrix<Complex> S = s_rad_.S().torow().T(), CR, invCR, invsqrtS;
-        if (not all(done))
-        {
-            std::cout << "\t- overlap matrix factorization" << std::endl;
-            
-            S.diagonalize(D, nullptr, &CR);
-            CR.invert(invCR);
-            
-            // Now S = CR * (D * CR⁻¹)
-            std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
-            for (std::size_t i = 0; i < Nspline * Nspline; i++)
-                invCR.data()[i] *= D[i % Nspline];
-            std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
-            S = ColMatrix<Complex>();
-            
-            // compute √S⁻¹
-            for (std::size_t i = 0; i < Nspline * Nspline; i++)
-                invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
-            invsqrtS = std::move(CR * invCR);
-        }
-        
-        // diagonalize one-electron hamiltonians for all angular momenta
-        for (int l : comp_l)
-        {
-            // skip loaded
-            if (done[l])
-                continue;
-            
-            // reset timer
-            std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
-            timer.reset();
-            
-            // compose the symmetrical one-electron hamiltonian
-            ColMatrix<Complex> tHl = (
-                Complex(0.5) * s_rad_.D()
-                - s_rad_.Mm1_tr()
-                + Complex(0.5*l*(l+1)) * s_rad_.Mm2()
-            ).torow().T();
-            
-            // symmetrically transform by inverse square root of the overlap matrix
-            tHl = std::move(invsqrtS * tHl * invsqrtS);
-            
-            // diagonalize the transformed matrix
-            tHl.diagonalize(D, nullptr, &CR);
-            CR.invert(invCR);
-            
-            // store the preconditioner data
-            prec_[l].Dl = D;
-            prec_[l].invsqrtS_Cl = std::move(RowMatrix<Complex>(invsqrtS * CR));
-            prec_[l].invCl_invsqrtS = std::move(RowMatrix<Complex>(invCR * invsqrtS));
-            prec_[l].hdfsave();
-            prec_[l].drop();
-            
-            // Now Hl = ClR * D * ClR⁻¹
-            std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
-            for (std::size_t i = 0; i < Nspline * Nspline; i++)
-                invCR.data()[i] *= D[i % Nspline];
-            std::cout << "\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
-        }
-        
-        // wait for completition of diagonalization on other nodes
-        par_.wait();
-    
-    //
-    // Finalization.
-    //
-    
-        // load all preconditioner matrices needed by this MPI node
-        for (int l : needed_l)
-            if (not cmd_.outofcore and not prec_[l].hdfload())
-                HexException("Failed to read preconditioner matrix for l = %d.", l);
+        // prepare preconditioner for projectile basis
+        prepare
+        (
+            prec_proj_, bspline_proj_.Nspline(),
+            rad_.S_proj(), rad_.D_proj(), rad_.Mm1_tr_proj(), rad_.Mm2_proj(),
+            done, comp_l, needed_l
+        );
         
         std::cout << std::endl;
 }
@@ -283,9 +316,9 @@ void KPACGPreconditioner::CG_init (int iblock) const
         int l2 = l1_l2_[iblock].second;
         
         // load preconditioner from disk
-        if (not prec_[l1].hdfload())
+        if (not prec_atom_[l1].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l1);
-        if (not prec_[l2].hdfload())
+        if (not prec_proj_[l2].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l2);
     }
 }
@@ -300,12 +333,12 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = l1_l2_[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        q  = kron_dot(Complex(E_) * s_rad_.S(), s_rad_.S(), p);
-        q -= kron_dot(Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l1+1)*l1) * s_rad_.Mm2(), s_rad_.S(), p);
-        q -= kron_dot(s_rad_.S(), Complex(0.5) * s_rad_.D() - s_rad_.Mm1_tr() + Complex(0.5*(l2+1)*l2) * s_rad_.Mm2(), p);
+        q  = kron_dot(Complex(E_) * rad_.S_atom(), rad_.S_proj(), p);
+        q -= kron_dot(Complex(0.5) * rad_.D_atom() - rad_.Mm1_tr_atom() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_atom(), rad_.S_proj(), p);
+        q -= kron_dot(rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_proj(), p);
         
         // multiply 'p' by the two-electron integrals
-        for (int lambda = 0; lambda <= s_rad_.maxlambda(); lambda++)
+        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
         {
             // calculate angular integral
             double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
@@ -314,7 +347,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                q -= s_rad_.apply_R_matrix(lambda, f * p, cmd_.kpa_simple_rad);
+                q -= rad_.apply_R_matrix(lambda, f * p, cmd_.kpa_simple_rad);
         }
     }
     
@@ -332,27 +365,28 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     int l2 = l1_l2_[iblock].second;
     
     // dimension of the matrices
-    std::size_t Nspline = s_bspline_.Nspline();
+    std::size_t Nspline_atom = bspline_atom_.Nspline();
+    std::size_t Nspline_proj = bspline_proj_.Nspline();
     
     // multiply by the first Kronecker product
     dense_kron_dot
     (
-        Nspline, Nspline, prec_[l1].invCl_invsqrtS.data().data(),
-        Nspline, Nspline, prec_[l2].invCl_invsqrtS.data().data(),
+        Nspline_atom, Nspline_atom, prec_atom_[l1].invCl_invsqrtS.data().data(),
+        Nspline_proj, Nspline_proj, prec_proj_[l2].invCl_invsqrtS.data().data(),
         r.data(), z.data()
     );
     
     // divide by the diagonal
     # pragma omp parallel for
-    for (std::size_t i = 0; i < Nspline; i++) 
-    for (std::size_t j = 0; j < Nspline; j++)
-        z[i * Nspline + j] /= E_ - prec_[l1].Dl[i] - prec_[l2].Dl[j];
+    for (std::size_t i = 0; i < Nspline_atom; i++) 
+    for (std::size_t j = 0; j < Nspline_proj; j++)
+        z[i * Nspline_proj + j] /= E_ - prec_atom_[l1].Dl[i] - prec_proj_[l2].Dl[j];
     
     // multiply by the second Kronecker product
     dense_kron_dot
     (
-        Nspline, Nspline, prec_[l1].invsqrtS_Cl.data().data(),
-        Nspline, Nspline, prec_[l2].invsqrtS_Cl.data().data(),
+        Nspline_atom, Nspline_atom, prec_atom_[l1].invsqrtS_Cl.data().data(),
+        Nspline_proj, Nspline_proj, prec_proj_[l2].invsqrtS_Cl.data().data(),
         z.data(), z.data()
     );
 }
@@ -367,8 +401,8 @@ void KPACGPreconditioner::CG_exit (int iblock) const
         int l2 = l1_l2_[iblock].second;
         
         // release memory
-        prec_[l1].drop();
-        prec_[l2].drop();
+        prec_atom_[l1].drop();
+        prec_proj_[l2].drop();
     }
     
     // exit parent

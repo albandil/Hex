@@ -186,7 +186,8 @@ class Preconditioners
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
         )
         {
@@ -194,15 +195,16 @@ class Preconditioners
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
             return   (i == cmd.preconditioner)
-                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline, cmd)
-                   : choose<i+1>(par, inp, ll, bspline, cmd);
+                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_atom, bspline_proj, cmd)
+                   : choose<i+1>(par, inp, ll, bspline_atom, bspline_proj, cmd);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
         (
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
         )
         {

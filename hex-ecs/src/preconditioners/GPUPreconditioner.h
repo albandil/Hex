@@ -91,9 +91,10 @@ class GPUCGPreconditioner : public KPACGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
-        ) : KPACGPreconditioner(par, inp, ll, bspline, cmd)
+        ) : KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd)
         {
             // nothing more to do
         }

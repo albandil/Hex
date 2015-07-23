@@ -115,37 +115,44 @@ class RadialIntegrals
     public:
         
         // constructor
-        RadialIntegrals(Bspline const & bspline)
-            : bspline_(bspline),
-              g_(bspline),
-              D_(bspline.Nspline(),bspline.order()+1),
-              S_(bspline.Nspline(),bspline.order()+1),
-              Mm1_(bspline.Nspline(),bspline.order()+1),
-              Mm1_tr_(bspline.Nspline(),bspline.order()+1),
-              Mm2_(bspline.Nspline(),bspline.order()+1) {}
+        RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj);
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
         
         /**
+         * @brief Partial derivative overlap.
+         * 
          * Compute derivative overlap of B-splines @f$ B_i @f$ and @f$ B_j @f$
          * over the knot "iknot", using Gauss-Legendre integration.
          * @param i      B-spline index.
          * @param j      B-spline index.
          * @param iknot  Interval index.
          */
-        Complex computeD_iknot (int i, int j, int iknot) const;
+        Complex computeD_iknot
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int i, int j, int iknot
+        ) const;
         
         /**
+         * @brief Derivative overlap.
+         * 
          * Compute derivative overlap for B-splines @f$ B_i @f$ and @f$ B_j @f$.
          * @param i B-spline index.
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeD (int i, int j, int maxknot = -1) const;
+        Complex computeD
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int i, int j, int maxknot = -1
+        ) const;
         
         /**
+         * @brief Partial integral moment.
+         * 
          * Compute integral moment of coordinate power between the B-splines
          * @f$ B_i @f$ and @f$ B_j @f$
          * over the knot "iknot", using Gauss-Legendre integration.
@@ -155,9 +162,16 @@ class RadialIntegrals
          * @param iknot  Interval index.
          * @param R      Potential truncation point.
          */
-        Complex computeM_iknot (int a, int i, int j, int iknot, Complex R, double scale) const;
+        Complex computeM_iknot
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int a, int i, int j,
+            int iknot, Complex R, double scale
+        ) const;
         
         /**
+         * @brief Integral moments.
+         * 
          * Compute integral moment of coordinate power between the B-splines
          * @f$ B_i @f$ and @f$ B_j @f$
          * @param a Exponent.
@@ -165,9 +179,16 @@ class RadialIntegrals
          * @param j B-spline index.
          * @param maxknot Right-most knot of any integration.
          */
-        Complex computeM (int a, int i, int j, int maxknot = 0, bool scale = false) const;
+        Complex computeM
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int a, int i, int j,
+            int maxknot = 0, bool scale = false
+        ) const;
         
         /**
+         * @brief Partial integral moments.
+         * 
          * Compute logarithms of integral moment of degree "a" for every B-spline pair and every
          * interknot sub-interval. Store in 1-D array of shape
          * @code
@@ -177,11 +198,28 @@ class RadialIntegrals
          * @param a Moment degree.
          * @param iknotmax Index of knot that terminates the integration range.
          */
-        cArray computeMi (int a, int iknotmax = 0) const;
-        
-        void Mi_integrand (int n, Complex *in, Complex *out, int i, int j, int a, int iknot, int iknotmax) const;
+        cArray computeMi
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int a, int iknotmax = 0
+        ) const;
         
         /**
+         * @brief Integrand used in calculation of integral moments.
+         * 
+         * This function is used by @ref computeMi to calculate partial integral moments
+         * of a coordinate between two B-splines.
+         */
+        void Mi_integrand
+        (
+            int n, Complex *in, Complex *out,
+            Bspline const & bspline_ij, int i, int j,
+            int a, int iknot, int iknotmax
+        ) const;
+        
+        /**
+         * @brief Two-electron integral.
+         * 
          * Compute the two-electron (Slater-type) four-B-spline integral.
          * 
          * @param lambda Multipole degree.
@@ -262,7 +300,13 @@ class RadialIntegrals
          * @param iknot Integration interval (t[iknot] ... t[iknot+1]).
          * @param iknotmax Truncation knot for use in damping factor.
          */
-        Complex computeRtri (int L, int k, int l, int m, int n, int iknot, int iknotmax) const;
+        Complex computeRtri
+        (
+            int L,
+            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
+            Bspline const & bspline_mn, GaussLegendre const & g_mn, int m, int n,
+            int iknot, int iknotmax
+        ) const;
         
         /**
          * @brief Evaluates inner integrand of the triangular R-integral.
@@ -283,7 +327,12 @@ class RadialIntegrals
          * @param iknotmax Damping parameter.
          * @param x Fixed value of @f$ r_1 @f$.
          */
-        void R_inner_integrand (int n, Complex* in, Complex* out, int i, int j, int L, int iknot, int iknotmax, Complex x) const;
+        void R_inner_integrand
+        (
+            int n, Complex* in, Complex* out,
+            Bspline const & bspline_ij, int i, int j,
+            int L, int iknot, int iknotmax, Complex x
+        ) const;
         
         /**
          * @brief Evaluates outer integrand of the triangular R-integral.
@@ -305,42 +354,50 @@ class RadialIntegrals
          * @param iknotmax Damping parameter.
          * @param x Fixed value of @f$ r_1 @f$.
          */
-        void R_outer_integrand (int n, Complex* in, Complex* out, int i, int j, int k, int l, int L, int iknot, int iknotmax) const;
+        void R_outer_integrand
+        (
+            int n, Complex* in, Complex* out,
+            Bspline const & bspline_ij, int i, int j,
+            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
+            int L, int iknot, int iknotmax
+        ) const;
         
         /** 
          * @brief Compute P-overlaps
          * 
          * Compute overlap vector of B-splines vs. hydrogen Pnl function.
          * 
+         * @param bspline B-spline basis.
+         * @param g Gauss-Legendre integrator adapted to the B-spline basis.
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
          * @param weightf Weight function to multiply every value of the hydrogenic function.
          *                It is expected to have the "double operator() (Complex z)" interface,
          *                where the sent value is the complex coordinate.
          */
-        template <class Functor> cArray overlapP (int n, int l, Functor weightf) const
+        template <class Functor> cArray overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, Functor weightf) const
         {
-            cArray res(bspline_.Nspline());
+            // result
+            cArray res (bspline.Nspline());
             
             // per interval
             int points = 20;
             
-            // evaluated B-spline and hydrogenic functions (auxiliary variables)
-            cArray evalB(points);
-            cArray evalP(points);
+            // evaluated B-spline and hydrogenic functions
+            cArray evalB (points), evalP (points);
             
             // quadrature nodes and weights
-            cArray xs(points), ws(points);
+            cArray xs (points), ws (points);
             
             // for all knots
-            for (int iknot = 0; iknot < bspline_.Nknot() - 1; iknot++)
+            for (int iknot = 0; iknot < bspline.Nknot() - 1; iknot++)
             {
                 // skip zero length intervals
-                if (bspline_.t(iknot) == bspline_.t(iknot+1))
+                if (bspline.t(iknot) == bspline.t(iknot+1))
                     continue;
                 
                 // which points are to be used here?
-                g_.scaled_nodes_and_weights(points, bspline_.t(iknot), bspline_.t(iknot+1), &xs[0], &ws[0]);
+                g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
                 
                 // evaluate the hydrogenic function
                 std::transform
@@ -357,10 +414,10 @@ class RadialIntegrals
                 );
                 
                 // for all relevant B-splines
-                for (int ispline = std::max(iknot-bspline_.order(),0); ispline < bspline_.Nspline() and ispline <= iknot; ispline++)
+                for (int ispline = std::max(iknot-bspline.order(),0); ispline < bspline.Nspline() and ispline <= iknot; ispline++)
                 {
                     // evaluate the B-spline
-                    bspline_.B(ispline, iknot, points, xs.data(), evalB.data());
+                    bspline.B(ispline, iknot, points, xs.data(), evalB.data());
                     
                     // sum with weights
                     Complex sum = 0.;
@@ -387,41 +444,41 @@ class RadialIntegrals
          *                where the sent value is the complex coordinate.
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
-        template <class Functor> cArray overlapj (int maxell, const rArrayView vk, Functor weightf) const
+        template <class Functor> cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, Functor weightf) const
         {
             // shorthands
             int Nenergy = vk.size();
-            int Nspline = bspline_.Nspline();
-            int Nknot = bspline_.Nknot();
-            int order = bspline_.order();
+            int Nspline = bspline.Nspline();
+            int Nknot = bspline.Nknot();
+            int order = bspline.order();
             
             // reserve space for the output array
             std::size_t size = Nspline * Nenergy * (maxell + 1);
-            cArray res(size);
+            cArray res (size);
             
             // per interval
             int points = 20;
             
             // quadrature weights and nodes
-            cArray xs(points), ws(points);
+            cArray xs (points), ws (points);
             
             // for all knots
             # pragma omp parallel for firstprivate (xs,ws)
             for (int iknot = 0; iknot < Nknot - 1; iknot++)
             {
                 // skip zero length intervals
-                if (bspline_.t(iknot) == bspline_.t(iknot+1))
+                if (bspline.t(iknot) == bspline.t(iknot+1))
                     continue;
                 
                 // which points are to be used here?
-                g_.scaled_nodes_and_weights(points, bspline_.t(iknot), bspline_.t(iknot+1), &xs[0], &ws[0]);
+                g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
                 
                 // evaluate relevant B-splines on this knot
                 cArrays evalB(Nspline);
                 for (int ispline = std::max(iknot-order,0); ispline < Nspline and ispline <= iknot; ispline++)
                 {
                     evalB[ispline] = cArray(points);
-                    bspline_.B(ispline, iknot, points, xs.data(), evalB[ispline].data());
+                    bspline.B(ispline, iknot, points, xs.data(), evalB[ispline].data());
                 }
                 
                 // for all linear momenta (= energies)
@@ -471,22 +528,32 @@ class RadialIntegrals
         }
         
         /// Return reference to the B-spline object.
-        Bspline const & bspline () const { return bspline_; }
+        Bspline const & bspline_atom () const { return bspline_atom_; }
+        Bspline const & bspline_proj () const { return bspline_proj_; }
+        
+        /// Return the Gauss-Legendre integrator object.
+        GaussLegendre const & gaussleg_atom () const { return g_atom_; }
+        GaussLegendre const & gaussleg_proj () const { return g_proj_; }
         
         /// Return reference to the precomputed derivative overlap matrix.
-        SymBandMatrix<Complex> const & D () const { return D_; }
+        SymBandMatrix<Complex> const & D_atom () const { return D_atom_; }
+        SymBandMatrix<Complex> const & D_proj () const { return D_proj_; }
         
         /// Return reference to the precomputed overlap matrix.
-        SymBandMatrix<Complex> const & S () const { return S_; }
+        SymBandMatrix<Complex> const & S_atom () const { return S_atom_; }
+        SymBandMatrix<Complex> const & S_proj () const { return S_proj_; }
         
         /// Return reference to the precomputed integral moment matrix of order -1.
-        SymBandMatrix<Complex> const & Mm1 () const { return Mm1_; }
+        SymBandMatrix<Complex> const & Mm1_atom () const { return Mm1_atom_; }
+        SymBandMatrix<Complex> const & Mm1_proj () const { return Mm1_proj_; }
         
         /// Return reference to the precomputed integral moment matrix of order -1, truncated at the end of the real grid.
-        SymBandMatrix<Complex> const & Mm1_tr () const { return Mm1_tr_; }
+        SymBandMatrix<Complex> const & Mm1_tr_atom () const { return Mm1_tr_atom_; }
+        SymBandMatrix<Complex> const & Mm1_tr_proj () const { return Mm1_tr_proj_; }
         
         /// Return reference to the precomputed integral moment matrix of order -2.
-        SymBandMatrix<Complex> const & Mm2 () const { return Mm2_; }
+        SymBandMatrix<Complex> const & Mm2_atom () const { return Mm2_atom_; }
+        SymBandMatrix<Complex> const & Mm2_proj () const { return Mm2_proj_; }
         
         /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const
@@ -496,46 +563,68 @@ class RadialIntegrals
         }
         
         /// Return reference to precomputed full (scaled) integral moments of order L.
-        SymBandMatrix<Complex> const & Mtr_L (int L) const
-        {
-            assert(L < Mtr_L_.size());
-            return Mtr_L_[L];
-        }
+        SymBandMatrix<Complex> const & Mtr_L_atom (int L) const { return Mtr_L_atom_[L]; }
+        SymBandMatrix<Complex> const & Mtr_L_proj (int L) const { return Mtr_L_proj_[L]; }
         
         /// Return reference to precomputed full (scaled) integral moments of order -L-1.
-        SymBandMatrix<Complex> const & Mtr_mLm1 (int L) const
-        {
-            assert(L < Mtr_mLm1_.size());
-            return Mtr_mLm1_[L];
-        }
+        SymBandMatrix<Complex> const & Mtr_mLm1_atom (int L) const { return Mtr_mLm1_atom_[L]; }
+        SymBandMatrix<Complex> const & Mtr_mLm1_proj (int L) const { return Mtr_mLm1_proj_[L]; }
         
         /// Return view of precomputed partial integral moments of order L.
-        cArrayView Mitr_L (int L) const
+        cArrayView Mitr_L_atom (int L) const
         {
             if (L < 0)
-                return Mitr_L_;
+                return Mitr_L_atom_;
             
-            std::size_t mi_size = bspline_.Nspline() * (2 * bspline_.order() + 1) * (bspline_.order() + 1);
+            std::size_t mi_size = bspline_atom_.Nspline() * (2 * bspline_atom_.order() + 1) * (bspline_atom_.order() + 1);
             
             return cArrayView
             (
-                Mitr_L_,
+                Mitr_L_atom_,
+                L * mi_size,
+                mi_size
+            );
+        }
+        cArrayView Mitr_L_proj (int L) const
+        {
+            if (L < 0)
+                return Mitr_L_proj_;
+            
+            std::size_t mi_size = bspline_proj_.Nspline() * (2 * bspline_proj_.order() + 1) * (bspline_proj_.order() + 1);
+            
+            return cArrayView
+            (
+                Mitr_L_proj_,
                 L * mi_size,
                 mi_size
             );
         }
         
         /// Return view of precomputed partial integral moments of order -L-1.
-        cArrayView Mitr_mLm1 (int L) const
+        cArrayView Mitr_mLm1_atom (int L) const
         {
             if (L < 0)
-                return Mitr_mLm1_;
+                return Mitr_mLm1_atom_;
             
-            std::size_t mi_size = bspline_.Nspline() * (2 * bspline_.order() + 1) * (bspline_.order() + 1);
+            std::size_t mi_size = bspline_atom_.Nspline() * (2 * bspline_atom_.order() + 1) * (bspline_atom_.order() + 1);
             
             return cArrayView
             (
-                Mitr_mLm1_,
+                Mitr_mLm1_atom_,
+                L * mi_size,
+                mi_size
+            );
+        }
+        cArrayView Mitr_mLm1_proj (int L) const
+        {
+            if (L < 0)
+                return Mitr_mLm1_proj_;
+            
+            std::size_t mi_size = bspline_proj_.Nspline() * (2 * bspline_proj_.order() + 1) * (bspline_proj_.order() + 1);
+            
+            return cArrayView
+            (
+                Mitr_mLm1_proj_,
                 L * mi_size,
                 mi_size
             );
@@ -567,23 +656,30 @@ class RadialIntegrals
     private:
         
         // B-spline environment
-        Bspline const & bspline_;
+        Bspline const & bspline_atom_;
+        Bspline const & bspline_proj_;
         
         // Gauss-Legendre integrator
-        GaussLegendre g_;
+        GaussLegendre g_atom_;
+        GaussLegendre g_proj_;
         
         // knot that terminates multipole scaled region
         int lastscaled_;
         
-        //
-        // matrices
-        //
+        // one-electron moment and overlap matrices
+        SymBandMatrix<Complex> D_atom_, S_atom_, Mm1_atom_, Mm1_tr_atom_, Mm2_atom_;
+        SymBandMatrix<Complex> D_proj_, S_proj_, Mm1_proj_, Mm1_tr_proj_, Mm2_proj_;
         
-        SymBandMatrix<Complex> D_, S_, Mm1_, Mm1_tr_, Mm2_;
+        // one-electron full integral moments for various orders (used to calculate R-integrals)
+        std::vector<SymBandMatrix<Complex>> Mtr_L_atom_, Mtr_mLm1_atom_;
+        std::vector<SymBandMatrix<Complex>> Mtr_L_proj_, Mtr_mLm1_proj_;
+        
+        // partial one-electron integral moments for various orders (used to calculate R-integrals)
+        cArray Mitr_L_atom_, Mitr_mLm1_atom_;
+        cArray Mitr_L_proj_, Mitr_mLm1_proj_;
+        
+        // two-electron integral matrices
         Array<BlockSymBandMatrix<Complex>> R_tr_dia_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_, Mtr_mLm1_;
-        
-        cArray Mitr_L_, Mitr_mLm1_;
 };
 
 #endif
