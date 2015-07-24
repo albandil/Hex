@@ -168,6 +168,7 @@ class Bspline
          * these first \c Nspline**2 coefficients that are used in evaluation.
          */
         cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
+        static cArray zip (Bspline const & bx, Bspline const & by, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid);
         
         /**
          * @brief Get knot index for coordinate.

@@ -41,6 +41,16 @@
 #include "special.h"
 
 /**
+ * @brief Constrain the solution.
+ * 
+ * The constriction is done by a projection of the residual vector "r".
+ */
+template <class TArrayView> void default_constraint (TArrayView r)
+{
+    // no constraint by default
+}
+
+/**
  * @brief Return new complex array.
  * 
  * Create (and return a copy of) a NumberArray<Complex> object. This is used as
@@ -177,7 +187,8 @@ template < class TArray, class TArrayView > class ConjugateGradients
             class ComputeNorm   = decltype(default_compute_norm),
             class ScalarProduct = decltype(default_scalar_product),
             class AxbyOperation = decltype(default_complex_axby),
-            class NewArray      = decltype(default_new_complex_array)
+            class NewArray      = decltype(default_new_complex_array),
+            class Constraint    = decltype(default_constraint<TArrayView>)
         >
         unsigned solve
         (
@@ -192,7 +203,8 @@ template < class TArray, class TArrayView > class ConjugateGradients
             ComputeNorm compute_norm       = default_compute_norm,
             ScalarProduct scalar_product   = default_scalar_product,
             AxbyOperation axby             = default_complex_axby,
-            NewArray new_array             = default_new_complex_array
+            NewArray new_array             = default_new_complex_array,
+            Constraint constrain           = default_constraint<TArrayView>
         )
         {
             Timer timer (time_offset);
@@ -219,6 +231,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
                 matrix_multiply(x, r); // r = A x
                 axby(-1., r, 1., b); // r = b - r
             }
+            constrain(r);
             rnorm = compute_norm(r);
             recovered = false;
             
@@ -235,6 +248,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
             {
                 axby(0., x, 0., b); // x = 0 b
                 axby(0., r, 1., b); // r = b
+                constrain(r);
             }
             
             // some auxiliary arrays (search directions etc.)
@@ -283,6 +297,7 @@ template < class TArray, class TArrayView > class ConjugateGradients
                 // update the solution and the residual
                 axby(1., x, alpha, p); // x = x + α p
                 axby(1., r, -alpha, z); // r = r - α z
+                constrain(r);
                 
                 // compute and check norm
                 rnorm = compute_norm(r);

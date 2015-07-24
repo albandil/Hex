@@ -260,24 +260,32 @@ class SolutionIO
                 return format("psi-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
         
-        /// Check that the file exists.
-        bool check (int ill = -1) const
+        /// Check that the file exists, return size.
+        std::size_t check (int ill = -1) const
         {
             // look for monolithic solution file
-            if (HDFFile(name(), HDFFile::readonly).valid())
-                return true;
+            HDFFile fmono (name(), HDFFile::readonly);
+            if (fmono.valid()) return fmono.size("array")/2 / ang_.size();
             
             // look for specific solution segment file
             if (ill >= 0)
-                return HDFFile(name(ill), HDFFile::readonly).valid();
+            {
+                HDFFile fsingle (name(ill), HDFFile::readonly);
+                return fsingle.valid() ? fsingle.size("array")/2 : 0;
+            }
             
             // look for all solution segment files
+            std::vector<std::size_t> size (ang_.size());
             for (unsigned illp = 0; illp < ang_.size(); illp++)
             {
-                if (not HDFFile(name(illp), HDFFile::readonly).valid())
-                    return false;
+                HDFFile fsingle (name(illp), HDFFile::readonly);
+                size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
             }
-            return true;
+            
+            // check that the sizes are consistent
+            std::size_t min_size = *std::min_element(size.begin(), size.end());
+            std::size_t max_size = *std::max_element(size.begin(), size.end());
+            return min_size == max_size ? min_size : 0;
         }
         
         /**
@@ -409,7 +417,8 @@ class SolutionIO
  * grid can be further refined by the command line arguments --zipcount and --zipmax).
  * 
  * @param cmd Class containing command line options.
- * @param bspline B-spline environment.
+ * @param bspline B-spline environments. The appropriate one will be chosen
+ *                by the match between the B-spline count and the solution size.
  * @param ll Angular basis.
  * 
  * See the respective classes for deeper explanation of individual parameters.
@@ -417,13 +426,16 @@ class SolutionIO
 void zip_solution
 (
     CommandLine & cmd,
-    Bspline const & bspline,
+    std::vector<Bspline> const & bspline,
     std::vector<std::pair<int,int>> const & ll
 );
 
 /**
  * @brief Write grid to a VTK file.
  */
-void write_grid (Bspline const & bspline);
+void write_grid
+(
+    std::vector<Bspline> const & bspline
+);
 
 #endif /* HEX_IO_H */

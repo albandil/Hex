@@ -247,39 +247,34 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView grid) const
     return f;
 }
 
-cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const
+cArray Bspline::zip (Bspline const & bx, Bspline const & by, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid)
 {
     // evaluated function
-    cArray f(xgrid.size() * ygrid.size());
+    cArray f (xgrid.size() * ygrid.size());
     
     // rotate the grids
-    cArray x(xgrid.size()), y(ygrid.size());
+    cArray x (xgrid.size()), y (ygrid.size());
     for (std::size_t i = 0; i < xgrid.size(); i++)
-        x[i] = rotate(xgrid[i]);
+        x[i] = bx.rotate(xgrid[i]);
     for (std::size_t i = 0; i < ygrid.size(); i++)
-        y[i] = rotate(ygrid[i]);
+        y[i] = by.rotate(ygrid[i]);
     
-    // evaluate B-splines on x-grid
-    cArrays evBx(Nspline_);
-    cArray::const_iterator xleft = x.begin(), xright = x.begin();
-    for (int ispline = 0; ispline < Nspline_; ispline++)
+    // evaluate B-splines (from "bx") on x-grid
+    cArrays evBx (bx.Nspline_);
+    cArray::const_iterator xleft = x.begin(), xright;
+    for (int ispline = 0; ispline < bx.Nspline_; ispline++)
     {
-        // get relevant subset of x[]
-        xleft = std::upper_bound<Complex const*>
-        (
-            x.begin(), x.end(),
-            t_[ispline],
-            Complex_realpart_less
-        );
-        xright = std::lower_bound<Complex const*>
-        (
-            xleft, x.end(),
-            t_[ispline + order_ + 1],
-            Complex_realpart_less
-        );
+        // get first x-coordinate within this spline's support
+        while (xleft < x.end() and xleft->real() < bx.t_[ispline].real())
+            xleft++;
+        
+        // get (one beyond the) last x-coordinate within this spline's support
+        xright = xleft;
+        while (xright < x.end() and xright->real() < bx.t_[ispline + bx.order_ + 1].real())
+            xright++;
         
         // setup evaluation vector
-        evBx[ispline].resize(xright-xleft);
+        evBx[ispline].resize(xright - xleft);
         
         // evaluation interval
         int iknot = ispline;
@@ -287,37 +282,32 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
         // evaluate at x[]
         for (cArray::const_iterator ix = xleft; ix != xright; ix++)
         {
-            // increment knot
-            while ( ix->real() > t_[iknot+1].real() )
-                if (++iknot >= Nknot_)
+            // increment knot to match current evaluation point
+            while ( ix->real() > bx.t_[iknot + 1].real() )
+                if (++iknot >= bx.Nknot_)
                     HexException("Some evaluation points are outside of grid.");
             
-            // evaluate this spline at *ix
-            evBx[ispline][ix-xleft] = bspline(ispline, iknot, order_, *ix);
+            // evaluate this spline at the current evaluation point
+            evBx[ispline][ix - xleft] = bx.bspline(ispline, iknot, bx.order_, *ix);
         }
     }
     
-    // evaluate B-splines on y-grid
-    cArrays evBy(Nspline_);
-    cArray::const_iterator yleft = y.begin(), yright = y.begin();
-    for (int ispline = 0; ispline < Nspline_; ispline++)
+    // evaluate B-splines (from "by") on y-grid
+    cArrays evBy (by.Nspline_);
+    cArray::const_iterator yleft = y.begin(), yright;
+    for (int ispline = 0; ispline < by.Nspline_; ispline++)
     {
-        // get relevant subset of y[]
-        yleft = std::upper_bound<Complex const*>
-        (
-            y.begin(), y.end(),
-            t_[ispline],
-            Complex_realpart_less
-        );
-        yright = std::lower_bound<Complex const*>
-        (
-            yleft, y.end(),
-            t_[ispline + order_ + 1],
-            Complex_realpart_less
-        );
+        // get first y-coordinate within this spline's support
+        while (yleft < y.end() and yleft->real() < by.t_[ispline].real())
+            yleft++;
+        
+        // get (one beyond the) last y-coordinate within this spline's support
+        yright = yleft;
+        while (yright < y.end() and yright->real() < by.t_[ispline + by.order_ + 1].real())
+            yright++;
         
         // setup evaluation vector
-        evBy[ispline].resize(yright-yleft);
+        evBy[ispline].resize(yright - yleft);
         
         // evaluation interval
         int iknot = ispline;
@@ -325,73 +315,72 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
         // evaluate at y[]
         for (cArray::const_iterator iy = yleft; iy != yright; iy++)
         {
-            // increment knot
-            while ( iy->real() > t_[iknot+1].real() )
-                if (++iknot >= Nknot_)
+            // increment knot to match current evaluation point
+            while ( iy->real() > by.t_[iknot + 1].real() )
+                if (++iknot >= by.Nknot_)
                     HexException("Some evaluation points are outside of grid.");
             
-            // evaluate this spline at *ix
-            evBy[ispline][iy-yleft] = bspline(ispline, iknot, order_, *iy);
+            // evaluate this spline at the current evaluation point
+            evBy[ispline][iy - yleft] = by.bspline(ispline, iknot, by.order_, *iy);
         }
     }
     
     // zip double expansion
-    xleft = xright = x.begin();
-    for (int ixspline = 0; ixspline < Nspline_; ixspline++)
+    xleft = x.begin();
+    for (int ixspline = 0; ixspline < bx.Nspline_; ixspline++)
     {
-        // get relevant subset of x[]
-        xleft = std::upper_bound<Complex const*>
-        (
-            x.begin(), x.end(),
-            t_[ixspline],
-            Complex_realpart_less
-        );
-        xright = std::lower_bound<Complex const*>
-        (
-            xleft, x.end(),
-            t_[ixspline + order_ + 1],
-            Complex_realpart_less
-        );
+        // get first x-coordinate within this spline's support
+        while (xleft < x.end() and xleft->real() < bx.t_[ixspline].real())
+            xleft++;
+        
+        // get (one beyond the) last x-coordinate within this spline's support
+        xright = xleft;
+        while (xright < x.end() and xright->real() < bx.t_[ixspline + bx.order_ + 1].real())
+            xright++;
         
         // get relevant evaluations
         cArray const & Bx_row = evBx[ixspline];
         
-        yleft = yright = y.begin();
-        for (int iyspline = 0; iyspline < Nspline_; iyspline++)
+        // for all y-splines
+        yleft = y.begin();
+        for (int iyspline = 0; iyspline < by.Nspline_; iyspline++)
         {
-            // get relevant subset of y[]
-            yleft = std::upper_bound<Complex const*>
-            (
-                y.begin(), y.end(),
-                t_[iyspline],
-                Complex_realpart_less
-            );
-            yright = std::lower_bound<Complex const*>
-            (
-                yleft, y.end(),
-                t_[iyspline + order_ + 1],
-                Complex_realpart_less
-            );
+            // get first y-coordinate within this spline's support
+            while (yleft < y.end() and yleft->real() < by.t_[iyspline].real())
+                yleft++;
+            
+            // get (one beyond the) last y-coordinate within this spline's support
+            yright = yleft;
+            while (yright < y.end() and yright->real() < by.t_[iyspline + by.order_ + 1].real())
+                yright++;
             
             // get relevant evaluations
             cArray const & By_row = evBy[iyspline];
             
             // get coefficient of the expansion
-            Complex C = coeff[ixspline * Nspline_ + iyspline];
+            Complex C = coeff[ixspline * by.Nspline_ + iyspline];
             
             // loop over relevant points
             for (cArray::const_iterator ix = xleft; ix != xright; ix++)
+            for (cArray::const_iterator iy = yleft; iy != yright; iy++)
             {
-                Complex CBx = C * Bx_row[ix-xleft];
-                Complex *fx = &f[0] + (ix-x.begin()) * y.size();
+                // get position indices within various arrays
+                std::size_t idx = ix - x.begin(), evx = ix - xleft;
+                std::size_t idy = iy - y.begin(), evy = iy - yleft;
                 
-                for (cArray::const_iterator iy = yleft; iy != yright; iy++)
-                    fx[iy-y.begin()] += CBx * By_row[iy-yleft];
+                // update the evaluation
+                f[idy * x.size() + idx] += C * Bx_row[evx] * By_row[evy];
             }
         }
     }
     
     return f;
+}
+
+
+cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const
+{
+    return zip (*this, *this, coeff, xgrid, ygrid);
 }
 
 // ----------------------------------------------------------------------- //

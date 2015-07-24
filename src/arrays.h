@@ -1350,6 +1350,16 @@ template <class T> class BlockArray
             return arrays_[i];
         }
         
+        /**
+         * @brief Retrieve a segment of the block array.
+         * 
+         * The returned object contains either a reference to the requested data, if those are
+         * present in the memory, or a copy of the requested data, if those are kept on disk.
+         * 
+         * @param iblock Index of the block.
+         * @param seg Position of the segment within the block.
+         * @param nseg Number of elements in the segment.
+         */
         TmpNumberArray<T> segment (std::size_t iblock, std::size_t seg, std::size_t nseg) const
         {
             // return a view to existing data ...
@@ -1742,7 +1752,8 @@ void writeVTK_points
     const ArrayView<Complex> f,
     const ArrayView<double> xgrid,
     const ArrayView<double> ygrid,
-    const ArrayView<double> zgrid
+    const ArrayView<double> zgrid,
+    bool with_header = true
 );
 
 /**

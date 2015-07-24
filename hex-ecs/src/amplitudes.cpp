@@ -415,7 +415,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         }
         
         // evaluate Wronskians
-        cArrays Wj(inp_.maxell + 1);
+        cArrays Wj (inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
         

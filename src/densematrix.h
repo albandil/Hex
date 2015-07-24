@@ -741,8 +741,10 @@ rArray operator * (RowMatrix<double,Base> const & A, const rArrayView v)
 template <class Base>
 cArray operator * (RowMatrix<Complex,Base> const & A, const cArrayView v)
 {
+    assert(A.cols() == (int)v.size());
+    
     // output array
-    cArray w (v.size());
+    cArray w (A.rows());
     
     // auxiliary variables
     char trans = 'T';
@@ -752,7 +754,7 @@ cArray operator * (RowMatrix<Complex,Base> const & A, const cArrayView v)
     // calculate the product
     zgemv_
     (
-        &trans, &m, &n, &alpha, const_cast<Complex*>(A.data().data()), &m,
+        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
         const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
     );
     

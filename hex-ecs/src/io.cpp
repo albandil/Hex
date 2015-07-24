@@ -80,17 +80,19 @@ const std::string sample_input =
     "#\n"
     "#   1) Solver grid (0 a.u. - 100 a.u. / 150 a.u.)\n"
     "#      - multiple knots at origin (4×)\n"
-    "#      - densely spaced 20 knots to distance 2 a.u.\n"
-    "#      - uniform grid to distance (60 a.u. + 40 a.u.) = 100 a.u.\n"
+    "#      - geometric grid to 10 a.u.\n"
+    "#      - uniform grid to distance (60 a.u. + 40 a.u. =) 100 a.u.\n"
     "#      - complex absorbtion layer to distance 150 a.u.\n"
     "#   2) First propagation grid (60 a.u. - 200 a.u. / 250 a.u.)\n"
-    "#      - uniform grid of length (40 a.u. + 60 a.u. + 40 a.u.) = 140 a.u. to distance 200 a.u.\n"
+    "#      - uniform grid of length (40 a.u. + 60 a.u. + 40 a.u. =) 140 a.u. to distance 200 a.u.\n"
     "#      - complex absorbtion layer of length 50 a.u. to distance 250 a.u.\n"
     "#   3+) Further propagation grids, always extending the distance by 100 a.u.\n"
+    "# It is a good idea to visualise the grid before the calculation. You can use the command\n"
+    "# \"hex-ecs --write-grid\" and view the result in ParaView, or any other program supporting VTK.\n"
     "#\n"
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
-    "  L  0.1  2.0  20\n"
+    "  G  0.1 10.0  0.1  1.1\n"
     "  L    3   60  58\n"
     " -1\n"
     "# b) Real knots of the panel overlap, if any.\n"
@@ -723,15 +725,12 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
 }
 
-void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::pair<int,int>> const & ll)
+void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std::vector<std::pair<int,int>> const & ll)
 {
-    // use whole grid if not restricted
-    if (cmd.zipmax < 0)
-        cmd.zipmax = bspline.Rmax();
-    
     cArray sol;     // stored solution expansion
     cArray ev;      // evaluated solution
-    rArray grid;    // real evaluation grid
+    rArray grid_x;  // real evaluation grid (atomic electron)
+    rArray grid_y;  // real evaluation grid (projectile electron)
     
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
     
@@ -739,22 +738,63 @@ void zip_solution (CommandLine & cmd, Bspline const & bspline, std::vector<std::
     if (not sol.hdfload(cmd.zipfile.c_str()))
         HexException("Cannot load file %s.", cmd.zipfile.c_str());
     
+    // determine which B-spline basis to use
+    unsigned i;
+    for (i = 0; i < bspline.size(); i++)
+    {
+        if (sol.size() == (std::size_t)bspline[0].Nspline() * (std::size_t)bspline[i].Nspline())
+            break;
+    }
+    
+    // was some bases appropriate?
+    if (i == bspline.size())
+        HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
+    
+    // write picture
+    std::ofstream ofs ("solution.png");
+    RowMatrixView<Complex>(bspline[0].Nspline(), bspline[i].Nspline(), sol).plot_abs(ofs);
+    ofs.close();
+    
     // evaluation grid
-    grid = linspace(0., cmd.zipmax, cmd.zipcount);
+    double Rx = cmd.zipmax < 0 ? bspline[0].Rmax() : cmd.zipmax;
+    double Ry = cmd.zipmax < 0 ? bspline[i].Rmax() : cmd.zipmax;
+    grid_x = linspace(0., Rx, Rx * cmd.zipcount / std::max(Rx, Ry));
+    grid_y = linspace(0., Ry, Ry * cmd.zipcount / std::max(Rx, Ry));
     
     // write to file
     std::ofstream out ((cmd.zipfile + ".vtk").c_str());
-    writeVTK_points(out, bspline.zip(sol, grid, grid), grid, grid, rArray({0.}));
+    writeVTK_points
+    (
+        out,                                // output file stream
+        Bspline::zip
+        (
+            bspline[0], bspline[i],         // B-spline bases (for x and y)
+            sol,                            // function expansion in those two bases
+            grid_x, grid_y                  // evaluation grids
+        ),
+        grid_x, grid_y, rArray({0.})        // x,y,z
+    );
 }
 
-void write_grid (Bspline const & bspline)
+void write_grid (std::vector<Bspline> const & bspline)
 {
-    // get knots
-    rArray knots = bspline.rknots();
-    knots.pop_back();
-    knots.append(bspline.cknots());
+    // get atomic grid
+    rArray knots0 = bspline[0].rknots();
+    knots0.pop_back();
+    knots0.append(bspline[0].cknots());
     
-    // write rectilinear grid
-    std::ofstream out ("grid.vtk");
-    writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
+    // for all grids
+    for (unsigned i = 0; i < bspline.size(); i++)
+    {
+        // output file
+        std::ofstream out (format("grid-%d.vtk", i).c_str());
+        
+        // get knots
+        rArray knots = bspline[i].rknots();
+        knots.pop_back();
+        knots.append(bspline[i].cknots());
+        
+        // write knots (write header only for the first time)
+        writeVTK_points(out, cArray(), knots0, knots, rArray({0.}));
+    }
 }

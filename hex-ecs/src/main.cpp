@@ -157,15 +157,17 @@ int main (int argc, char* argv[])
         // create all panels' bases
         rArray rknots = inp.rknots;
         Nspline_fixed.push_back(rknots.size() - inp.order - 2);
-        rknots.append(rknots.back() + inp.overlap_knots.slice(1, inp.overlap_knots.size() - 1));
+        if (not inp.overlap_knots.empty())
+            rknots.append(rknots.back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
         for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
         {
             // update B-spline knots for this panel
             if (ipanel > 0)
             {
-                rknots.append(rknots.back() + inp.rknots_next.slice(1, inp.rknots_next.size() - 1));
+                rknots.append(rknots.back() + inp.rknots_next.slice(1, inp.rknots_next.size()));
                 Nspline_fixed.push_back(rknots.size() - inp.order - 2);
-                rknots.append(rknots.back() + inp.overlap_knots.slice(1, inp.overlap_knots.size() - 1));
+                if (not inp.overlap_knots.empty())
+                    rknots.append(rknots.back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
             }
             
             // create the new B-spline object
@@ -179,9 +181,6 @@ int main (int argc, char* argv[])
                     rknots.back() + inp.cknots
                 )
             );
-            
-            // print some information
-            std::cout << "B-spline count for panel " << ipanel << ": " << bspline.back().Nspline() << std::endl;
         }
         std::cout << std::endl;
     
@@ -223,25 +222,24 @@ int main (int argc, char* argv[])
     //
     // Zip solution file into VTK geometry if told so
     //
-    /*
+    
         if (cmd.zipfile.size() != 0 and par.IamMaster())
         {
-            zip_solution (cmd, bspline, coupled_states);
+            zip_solution(cmd, bspline, coupled_states);
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
-    */
+    
     //
     // Write grid into VTK file if told so.
     //
-    /*
+    
         if (cmd.writegrid and par.IamMaster())
         {
             write_grid(bspline);
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
-    */
     
     //
     // Solve the equations
@@ -253,6 +251,30 @@ int main (int argc, char* argv[])
         // for all solver & propagator panels
         for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
         {
+            std::cout << std::endl;
+            std::cout << "--------------------------------------------------------------------------------" << std::endl;
+            std::cout << std::endl;
+            std::cout << "Bspline basis summary for panel " << ipanel << std::endl;
+            std::cout << "\t- atomic basis" << std::endl;
+            std::cout << "\t\t- real knots : " << bspline[0].rknots().front() << " to " << bspline[0].rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline[0].cknots().front() << " to " << bspline[0].cknots().back() << std::endl;
+            std::cout << "\t- projectile basis" << std::endl;
+            std::cout << "\t\t- real knots : " << bspline[ipanel].rknots().front() << " to " << bspline[ipanel].rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline[ipanel].cknots().front() << " to " << bspline[ipanel].cknots().back() << std::endl;
+            if (ipanel > 0 and not inp.overlap_knots.empty())
+            {
+                std::cout << "\t\t- shared real knots with previous panel : " << bspline[ipanel-1].rknots().back() - inp.overlap_knots.back()
+                          << " to " << bspline[ipanel-1].rknots().back() << std::endl;
+            }
+            if (not inp.overlap_knots.empty())
+            {
+                std::cout << "\t\t- shared real knots with next panel : " << bspline[ipanel].rknots().back() - inp.overlap_knots.back()
+                            << " to " << bspline[ipanel].rknots().back() << std::endl;
+            }
+            std::cout << std::endl;
+            std::cout << "--------------------------------------------------------------------------------" << std::endl;
+            std::cout << std::endl;
+            
             // pick preconditioner according to the user preferences
             solver.choose_preconditioner(ipanel);
             

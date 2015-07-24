@@ -138,16 +138,16 @@ void KPACGPreconditioner::prepare
     // diagonalize overlap matrix
     if (not all(done))
     {
-        std::cout << "\t- overlap matrix factorization" << std::endl;
+        std::cout << "\t\t- overlap matrix factorization" << std::endl;
         
         S.diagonalize(D, nullptr, &CR);
         CR.invert(invCR);
         
         // Now S = CR * (D * CR⁻¹)
-        std::cout << "\t\ttime: " << timer.nice_time() << std::endl;
+        std::cout << "\t\t\ttime: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
-        std::cout << "\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
+        std::cout << "\t\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
         S = ColMatrix<Complex>();
         
         // compute √S⁻¹
@@ -164,7 +164,7 @@ void KPACGPreconditioner::prepare
             continue;
         
         // reset timer
-        std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
+        std::cout << "\t\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
         timer.reset();
         
         // compose the symmetrical one-electron hamiltonian
@@ -185,10 +185,10 @@ void KPACGPreconditioner::prepare
         prec[l].drop();
         
         // Now Hl = ClR * D * ClR⁻¹
-        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        std::cout << "\t\t\t- time: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
-        std::cout << "\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
+        std::cout << "\t\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
     }
     
     // wait for completition of diagonalization on other nodes
@@ -285,6 +285,7 @@ void KPACGPreconditioner::setup ()
     //
         
         // prepare preconditioner for atomic basis
+        std::cout << std::endl << "\tPrepare preconditioner matrices for atomic grid" << std::endl;
         prepare
         (
             prec_atom_, bspline_atom_.Nspline(),
@@ -293,6 +294,7 @@ void KPACGPreconditioner::setup ()
         );
         
         // prepare preconditioner for projectile basis
+        std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
         prepare
         (
             prec_proj_, bspline_proj_.Nspline(),
