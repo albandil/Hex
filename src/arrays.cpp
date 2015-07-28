@@ -144,7 +144,8 @@ void writeVTK_points
     const cArrayView ev,
     const rArrayView xgrid,
     const rArrayView ygrid,
-    const rArrayView zgrid
+    const rArrayView zgrid,
+    bool with_header
 )
 {
     // array lengths
@@ -154,9 +155,14 @@ void writeVTK_points
     unsigned N = nx * ny * nz;
     
     // write VTK header
-    out << "# vtk DataFile Version 3.0" << std::endl;
-    out << "Wave function" << std::endl;
-    out << "ASCII" << std::endl;
+    if (with_header)
+    {
+        out << "# vtk DataFile Version 3.0" << std::endl;
+        out << "Wave function" << std::endl;
+        out << "ASCII" << std::endl;
+    }
+    
+    // write grid data
     out << "DATASET RECTILINEAR_GRID" << std::endl;
     out << "DIMENSIONS " << nx << " " << ny << " " << nz << std::endl;
     out << "X_COORDINATES " << nx << " float" << std::endl;

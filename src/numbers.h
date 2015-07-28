@@ -86,6 +86,28 @@ inline bool Complex_finite (Complex const & z)
 }
 
 //
+// Data types.
+//
+
+/**
+ * @brief HDF data types.
+ * 
+ * These data types are used for Hex data format. The identificators are always a multiple
+ * of 0x100 (= 256) plus the bytesize of the data type.
+ */
+typedef enum
+{
+    DataInt32    = 0x100 + sizeof(int),
+    DataInt64    = 0x200 + sizeof(std::int64_t),
+    DataUInt32   = 0x300 + sizeof(unsigned),
+    DataUInt64   = 0x400 + sizeof(std::uint64_t),
+    DataFloat32  = 0x500 + sizeof(float),
+    DataDouble64 = 0x600 + sizeof(double),
+    DataDouble80 = 0x700 + sizeof(long double)
+}
+HDFDataType;
+
+//
 // Data type abstract traits.
 //
 
@@ -117,6 +139,10 @@ template<> class typeinfo<int>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataInt32; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT; }
@@ -135,6 +161,10 @@ template<> class typeinfo<std::int64_t>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataInt64; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_INT64_T; }
@@ -153,6 +183,10 @@ template<> class typeinfo<unsigned>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataUInt32; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UNSIGNED; }
@@ -171,6 +205,10 @@ template<> class typeinfo<std::uint64_t>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, int x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataUInt64; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_UINT64_T; }
@@ -189,6 +227,10 @@ template<> class typeinfo<float>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, float x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataFloat32; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_FLOAT; }
@@ -207,6 +249,10 @@ template<> class typeinfo<double>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataDouble64; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_DOUBLE; }
@@ -225,6 +271,10 @@ template<> class typeinfo<long double>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, double x) { assert(i < ncmpt); return x; }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return DataDouble80; }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return MPI_LONG_DOUBLE; }
@@ -243,6 +293,10 @@ template<> template<class T> class typeinfo<std::complex<T>>
         
         /// Component getter.
         static cmpttype cmpt (std::size_t i, std::complex<T> x) { assert(i < ncmpt); return (i == 0 ? x.real() : x.imag()); }
+        
+        /// HDF data type identification.
+        static HDFDataType hdfcmpttype () { return typeinfo<T>::hdfcmpttype(); }
+        
 #ifdef WITH_MPI
         /// MPI data type of a component.
         static MPI_Datatype mpicmpttype () { return typeinfo<T>::mpicmpttype(); }

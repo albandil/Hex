@@ -386,6 +386,29 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
         }
         
         /**
+         * @brief Remove the first element from the array.
+         * 
+         * Moves all elements one element back.
+         */
+        virtual T pop_front ()
+        {
+            if (size() > 0)
+            {
+                T elem = std::move(data()[0]);
+                
+                --ArrayView<T>::N_;
+                for (std::size_t i = 0; i < ArrayView<T>::N_; i++)
+                    data()[i] = std::move(data()[i+1]);
+                
+                return elem;
+            }
+            else
+            {
+                HexException("Array has no element to pop!");
+            }
+        }
+        
+        /**
          * @brief Append more items.
          * 
          * The function appends a range of items to the end of the
@@ -609,7 +632,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         
         // copy constructor from Array rvalue reference
         NumberArray (NumberArray<T> && a)
-            : Array<T,Alloc>(), name_()
+            : NumberArray<T,Alloc>()
         {
             std::swap(ArrayView<T>::N_, a.ArrayView<T>::N_);
             std::swap(ArrayView<T>::array_, a.ArrayView<T>::array_);
@@ -1350,6 +1373,16 @@ template <class T> class BlockArray
             return arrays_[i];
         }
         
+        /**
+         * @brief Retrieve a segment of the block array.
+         * 
+         * The returned object contains either a reference to the requested data, if those are
+         * present in the memory, or a copy of the requested data, if those are kept on disk.
+         * 
+         * @param iblock Index of the block.
+         * @param seg Position of the segment within the block.
+         * @param nseg Number of elements in the segment.
+         */
         TmpNumberArray<T> segment (std::size_t iblock, std::size_t seg, std::size_t nseg) const
         {
             // return a view to existing data ...
@@ -1413,7 +1446,7 @@ template <class T> class BlockArray
             NumberArray<T> elements(n);
             
             // open the file
-            HDFFile hdf(name, HDFFile::readonly);
+            HDFFile hdf (name, HDFFile::readonly);
             
             if (not hdf.valid())
                 HexException("File \"%s\" can't be opened for reading.", name.c_str());
@@ -1434,7 +1467,7 @@ template <class T> class BlockArray
         static void hdfwrite (std::string const & name, std::size_t offset, std::size_t n, T const * data)
         {
             // open the file
-            HDFFile hdf(name, HDFFile::readwrite);
+            HDFFile hdf (name, HDFFile::readwrite);
             
             if (not hdf.valid())
                 HexException("File \"%s\" can't be opened for writing.", name.c_str());
@@ -1742,7 +1775,8 @@ void writeVTK_points
     const ArrayView<Complex> f,
     const ArrayView<double> xgrid,
     const ArrayView<double> ygrid,
-    const ArrayView<double> zgrid
+    const ArrayView<double> zgrid,
+    bool with_header = true
 );
 
 /**
@@ -2061,7 +2095,7 @@ template <typename Tidx, typename Tval> void merge
 /// Join elements from all subarrays.
 template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> arrays)
 {
-    NumberArray<std::size_t> partial_sizes(arrays.size() + 1);
+    NumberArray<std::size_t> partial_sizes (arrays.size() + 1);
     
     // get partial sizes
     partial_sizes[0] = 0;
@@ -2069,7 +2103,7 @@ template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> array
         partial_sizes[i+1] = partial_sizes[i] + arrays[i].size();
     
     // result array
-    NumberArray<T> res(partial_sizes.back());
+    NumberArray<T> res (partial_sizes.back());
     
     // concatenate arrays
     for (std::size_t i = 0; i < arrays.size(); i++)
@@ -2085,7 +2119,7 @@ template <typename T> NumberArray<T> join (const ArrayView<NumberArray<T>> array
 template <class T> NumberArray<T> sorted_unique (const ArrayView<T> v, int n = 1)
 {
     // create output array
-    NumberArray<T> w(v.size());
+    NumberArray<T> w (v.size());
     
     // iterators
     T * iw = w.begin();
