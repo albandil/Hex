@@ -70,13 +70,13 @@ class Parallel
                 MPI_Init(argc, argv);
     #else
                 // initialize MPI compatible with OpenMP
-                int req_flag = MPI_THREAD_FUNNELED, prov_flag;
+                int req_flag = MPI_THREAD_SERIALIZED, prov_flag;
                 MPI_Init_thread(argc, argv, req_flag, &prov_flag);
                 
                 // check thread support
-                if (prov_flag == MPI_THREAD_SINGLE)
+                if (prov_flag != MPI_THREAD_SERIALIZED)
                 {
-                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_FUNNELED. ";
+                    std::cout << "Warning: The MPI implementation doesn't support MPI_THREAD_SERIALIZED. ";
                     std::cout << "Every MPI process may thus run only on a single core." << std::endl;
                 }
     #endif
