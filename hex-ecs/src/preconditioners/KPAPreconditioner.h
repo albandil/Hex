@@ -32,7 +32,9 @@
 #ifndef HEX_KPAPRECONDITIONER_H
 #define HEX_KPAPRECONDITIONER_H
 
+#include <set>
 #include <string>
+#include <vector>
 
 #include "../arrays.h"
 #include "../matrix.h"
@@ -95,17 +97,18 @@ class KPACGPreconditioner : public CGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline, cmd),
-            prec_(inp.maxell+1)
+        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+            prec_atom_(inp.maxell+1), prec_proj_(inp.maxell+1)
         {
             // nothing more to do
         }
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, int ipanel) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin,ipanel); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         virtual void update (double E) { CGPreconditioner::update(E); }
         
@@ -120,8 +123,23 @@ class KPACGPreconditioner : public CGPreconditioner
         
     protected:
         
+        // internal setup routine
+        void prepare
+        (
+            std::vector<Data> & prec,
+            int Nspline,
+            SymBandMatrix<Complex> const & mS,
+            SymBandMatrix<Complex> const & mD,
+            SymBandMatrix<Complex> const & mMm1_tr,
+            SymBandMatrix<Complex> const & mMm2,
+            Array<bool> done,
+            std::set<int> comp_l,
+            std::set<int> needed_l
+        );
+        
         // preconditioner data
-        mutable std::vector<Data> prec_;
+        mutable std::vector<Data> prec_atom_;
+        mutable std::vector<Data> prec_proj_;
 };
 
 #endif

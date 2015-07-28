@@ -60,17 +60,19 @@ class NoPreconditioner : public PreconditionerBase
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
         ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
-            dia_blocks_(l1_l2_.size()), s_bspline_(bspline), s_rad_(s_bspline_)
+            dia_blocks_(l1_l2_.size()), bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
+            rad_(bspline_atom,bspline_proj)
         {
             // nothing to do
         }
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const;
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, int ipanel) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
         
@@ -95,10 +97,11 @@ class NoPreconditioner : public PreconditionerBase
         mutable std::vector<BlockSymBandMatrix<Complex>> dia_blocks_;
         
         // B-spline environment for the solution
-        Bspline s_bspline_;
+        Bspline const & bspline_atom_;
+        Bspline const & bspline_proj_;
             
         // radial integrals for the solution
-        RadialIntegrals s_rad_;
+        RadialIntegrals rad_;
 };
 
 #endif

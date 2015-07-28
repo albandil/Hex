@@ -31,8 +31,10 @@
 
 // Necessary compile-time definitions:
 // -D ORDER=... (implies local size in "mmul_2el")
-// -D NSPLINE=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
-// -D NREKNOT=... (needed by "mmul_2el")
+// -D NSPLINE_ATOM=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
+// -D NSPLINE_PROJ=... (needed by "mmul_1el", "mmul_2el", "mul_ABt" and "kron_div")
+// -D NREKNOT_ATOM=... (needed by "mmul_2el")
+// -D NREKNOT_PROJ=... (needed by "mmul_2el")
 // -D NLOCAL=... (local size in "scalar_product", "norm" and "mmul_1el")
 // -D NBLOCK_SIZE=... (block size and local size in "mul_ABt")
 
@@ -40,7 +42,7 @@
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
-#define NROW            (NSPLINE * NSPLINE)
+#define NROW            (NSPLINE_ATOM * NSPLINE_PROJ)
 #define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
 #define NUM_BLOCKS      ((NSPLINE + BLOCK_SIZE - 1) / BLOCK_SIZE)
 
@@ -221,16 +223,16 @@ kernel void mmul_1el
 )
 {
     // output vector element index
-    private int i = get_global_id(0) / NSPLINE;
-    private int j = get_global_id(0) % NSPLINE;
+    private int i = get_global_id(0) / NSPLINE_PROJ;
+    private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // initialize the output element
-    y[i * NSPLINE + j] = 0;
+    y[i * NSPLINE_PROJ + j] = 0;
     
     // for all source vector elements
     if (i < NSPLINE)
-    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
-    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // compute multi-indices
         private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
@@ -243,7 +245,7 @@ kernel void mmul_1el
         elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
         
         // multiply right-hand side by that matrix element
-        y[i * NSPLINE + j] += cmul(elem, x[k * NSPLINE + l]);
+        y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
     }
 }
 
@@ -280,8 +282,8 @@ kernel void mmul_2el
 )
 {
     // output vector element index
-    private int i = get_global_id(0) / NSPLINE;
-    private int j = get_global_id(0) % NSPLINE;
+    private int i = get_global_id(0) / NSPLINE_PROJ;
+    private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // auxiliary variables
     private double2 m_ik, m_jl;
@@ -292,9 +294,9 @@ kernel void mmul_2el
     global double2 const * restrict M_jl;
     
     // for all source vector elements
-    if (i < NSPLINE)
-    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE)
-    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE)
+    if (i < NSPLINE_ATOM)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // matrix element
         private double2 elem = 0;
@@ -361,7 +363,7 @@ kernel void mmul_2el
         }
         
         // multiply right-hand side by that matrix element
-        y[i * NSPLINE + j] -= f * cmul(elem, x[k * NSPLINE + l]);
+        y[i * NSPLINE_PROJ + j] -= f * cmul(elem, x[k * NSPLINE_PROJ + l]);
     }
 }
 
@@ -400,18 +402,18 @@ kernel void mul_ABt
     {
         // load source blocks into the local memory (WARNING: Should be padded by zeros: will segfault on CPU.)
         barrier(CLK_LOCAL_MEM_FENCE);
-        Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE + (iblock * BLOCK_SIZE + ixlocal)];
-        Bloc[iylocal][ixlocal] = B[(idxblock * BLOCK_SIZE + ixlocal) * NSPLINE + (iblock * BLOCK_SIZE + iylocal)];
+        Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE_PROJ + (iblock * BLOCK_SIZE + ixlocal)];
+        Bloc[iylocal][ixlocal] = B[(idxblock * BLOCK_SIZE + ixlocal) * NSPLINE_PROJ + (iblock * BLOCK_SIZE + iylocal)];
         barrier(CLK_LOCAL_MEM_FENCE);
         
         // each group's thread will calculate one of BLOCK_VOLUME scalar products
         for (private int k = 0; k < BLOCK_SIZE; k++)
-            if (iblock * BLOCK_SIZE + k < NSPLINE)
+            if (iblock * BLOCK_SIZE + k < NSPLINE_ATOM)
                 res += cmul(Aloc[k][iylocal],Bloc[k][ixlocal]);
     }
     
     // store result to device memory
-    if (get_global_id(0) < NSPLINE && get_global_id(1) < NSPLINE)
+    if (get_global_id(0) < NSPLINE_ATOM && get_global_id(1) < NSPLINE_PROJ)
         C[get_global_id(0) * NSPLINE + get_global_id(1)] = res;
 }
 
@@ -432,10 +434,10 @@ kernel void kron_div
     global double2       * const restrict y
 )
 {
-    // get worker's segment index (0 <= i < NSPLINE)
+    // get worker's segment index (0 <= i < NSPLINE_ATOM)
     private int i = get_global_id(0);
     
     // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
-    for (private int j = 0; j < NSPLINE; j++)
-        y[j * NSPLINE + i] = cdiv(y[j * NSPLINE + i], E - D1[j] - D2[i]);
+    for (private int j = 0; j < NSPLINE_PROJ; j++)
+        y[j * NSPLINE_ATOM + i] = cdiv(y[j * NSPLINE_ATOM + i], E - D1[j] - D2[i]);
 }

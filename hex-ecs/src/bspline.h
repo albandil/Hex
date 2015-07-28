@@ -168,6 +168,7 @@ class Bspline
          * these first \c Nspline**2 coefficients that are used in evaluation.
          */
         cArray zip (const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid) const;
+        static cArray zip (Bspline const & bx, Bspline const & by, const cArrayView coeff, const rArrayView xgrid, const rArrayView ygrid);
         
         /**
          * @brief Get knot index for coordinate.
@@ -235,7 +236,12 @@ class Bspline
         
         /// complex knots
         inline rArray const & cknots () const { return cknots_; }
-    
+        
+        /**
+         * @brief Return (almost) unique identification for this B-spline object.
+         */
+        std::size_t hash () const;
+        
     private:
     
         /// real knots

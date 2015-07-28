@@ -56,14 +56,15 @@ class CGPreconditioner : public NoPreconditioner
             Parallel const & par,
             InputFile const & inp,
             std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline,
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
             CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline, cmd) {}
+        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd) {}
         
         // reuse parent definitions
         virtual void setup () { return NoPreconditioner::setup(); }
         virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, int ipanel) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin, ipanel); }
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions
