@@ -61,8 +61,8 @@ template<>
 void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // check sizes
-    assert(eqs * matrix_->n_ == (int)x.size());
-    assert(eqs * matrix_->n_ == (int)b.size());
+    assert(eqs * matrix_->cols() == x.size());
+    assert(eqs * matrix_->cols() == b.size());
     
     // solve for all RHSs
     for (int eq = 0; eq < eqs; eq++)
