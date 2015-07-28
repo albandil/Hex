@@ -76,59 +76,45 @@ int convert_hdf_to_h5 (std::string srcfile, std::string dstfile)
     for (HDFFile::DatasetInfo const & di : hdf.datasets())
     {
         // read dataset into memory
-        int * buffer = new int [di.bytes * di.elements / 4];
-        if (not hdf.read(di.name, buffer, di.elements * di.bytes / 4))
+        int * buffer = new int [(di.datatype % 0x100) * di.elements / 4];
+        if (not hdf.read(di.name, buffer, di.elements * (di.datatype % 0x100) / 4))
         {
             std::cerr << "Failed to read dataset \"" << di.name << "\": " << hdf.error() << std::endl;
             return EXIT_FAILURE;
         }
         
-        // Hex data files lack type information, we may need a hint from the user
-        char choice;
-        switch (di.bytes)
+        // write array with correct data type
+        switch (di.datatype)
         {
-            case 4:
-                std::cout << std::endl;
-                std::cout << "Dataset \"" << di.name << "\" has byte size 4 (32 bits). The data type is" << std::endl;
-                std::cout << "a) int32" << std::endl;
-                std::cout << "b) uint32" << std::endl;
-                std::cout << "c) float" << std::endl << std::endl;
-                while (1)
-                {
-                    std::cout << "a/b/c ? " << std::flush;
-                    std::cin >> choice;
-                    if (choice == 'a') { h5f.write(di.name, (std::int32_t*)buffer, di.elements);    break; }
-                    if (choice == 'b') { h5f.write(di.name, (std::uint32_t*)buffer, di.elements);   break; }
-                    if (choice == 'c') { h5f.write(di.name, (float*)buffer, di.elements);           break; }
-                }
+            case DataInt32:
+                h5f.write(di.name, (int*)buffer, di.elements);
                 break;
-            
-            case 8:
-                std::cout << std::endl;
-                std::cout << "Dataset \"" << di.name << "\" has byte size 8 (64 bits). The data type is" << std::endl;
-                std::cout << "a) int64" << std::endl;
-                std::cout << "b) uint64" << std::endl;
-                std::cout << "c) double" << std::endl << std::endl;
-                while (1)
-                {
-                    std::cout << "a/b/c ? " << std::flush;
-                    std::cin >> choice;
-                    if (choice == 'a') { h5f.write(di.name, (std::int64_t*)buffer, di.elements);    break; }
-                    if (choice == 'b') { h5f.write(di.name, (std::uint64_t*)buffer, di.elements);   break; }
-                    if (choice == 'c') { h5f.write(di.name, (double*)buffer, di.elements);          break; }
-                }
+            case DataInt64:
+                h5f.write(di.name, (std::int64_t*)buffer, di.elements);
                 break;
-            
+            case DataUInt32:
+                h5f.write(di.name, (unsigned*)buffer, di.elements);
+                break;
+            case DataUInt64:
+                h5f.write(di.name, (std::uint64_t*)buffer, di.elements);
+                break;
+            case DataFloat32:
+                h5f.write(di.name, (float*)buffer, di.elements);
+                break;
+            case DataDouble64:
+                h5f.write(di.name, (double*)buffer, di.elements);
+                break;
+            case DataDouble80:
+                h5f.write(di.name, (long double*)buffer, di.elements);
+                break;
             default:
-                std::cerr << "Unknown data type of byte size " << di.bytes << " (" << di.bytes * 8 << " bits)." << std::endl;
+                std::cerr << "Unknown data type of byte size " << (di.datatype % 0x100) << " (" << (di.datatype % 0x100) * 8 << " bits)." << std::endl;
                 break;
-        }
+        };
         
         // release buffer
         delete [] buffer;
     }
-    
-    std::cout << std::endl;
     
     return EXIT_SUCCESS;
 }
@@ -191,7 +177,7 @@ int convert_h5_to_hdf (std::string srcfile, std::string dstfile)
         }
         else if (H5Tequal(dtyp, H5T_NATIVE_INT64) > 0)
         {
-            NumberArray<std::int64_t> arr(nElem);
+            lArray arr(nElem);
             h5f.read(dataset, &arr[0], nElem);
             hdf.write(dataset, &arr[0], nElem);
         }

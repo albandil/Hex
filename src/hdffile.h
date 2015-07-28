@@ -97,13 +97,13 @@ public:
     /// Load data from a valid file.
     template <typename T> bool read (std::string dataset, T * buffer, std::size_t length, std::size_t offset = 0) const
     {
-        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, sizeof(typename typeinfo<T>::cmpttype));
+        return read_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
     
     /// Write data to a valid file.
     template <typename T> bool write (std::string dataset, T const * buffer, std::size_t length, std::size_t offset = 0)
     {
-        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, sizeof(typename typeinfo<T>::cmpttype));
+        return write_(dataset, buffer, length * typeinfo<T>::ncmpt, offset * typeinfo<T>::ncmpt, typeinfo<T>::hdfcmpttype());
     }
     
     /// Check that the file is valid.
@@ -120,8 +120,8 @@ public:
         /// Name of the dataset.
         std::string name;
         
-        /// Byte size of one element.
-        std::size_t bytes;
+        /// Data type of the elements.
+        std::size_t datatype;
         
         /// Number of elements.
         std::size_t elements;
@@ -152,10 +152,10 @@ private:
     bool changed_;
     
     /// Auxiliary read function.
-    bool read_(std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t dtype) const;
+    bool read_(std::string dataset, void * buffer, std::size_t length, std::size_t offset, HDFDataType dtype) const;
     
     /// Auxiliary write function.
-    bool write_(std::string dataset, void const * buffer, std::size_t length, std::size_t offset, std::size_t dtype);
+    bool write_(std::string dataset, void const * buffer, std::size_t length, std::size_t offset, HDFDataType dtype);
     
     /// Set error and return false.
     void save_error () const;

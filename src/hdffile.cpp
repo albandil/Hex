@@ -89,7 +89,7 @@ HDFFile::HDFFile (std::string filename, FileAccess flag)
             file_.read(&(datasets_[idt].name[0]), len);
             
             // read datatype byte size and element count
-            file_.read(reinterpret_cast<char*>(&(datasets_[idt].bytes)), sizeof(std::size_t));
+            file_.read(reinterpret_cast<char*>(&(datasets_[idt].datatype)), sizeof(std::size_t));
             file_.read(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
         }
     }
@@ -118,7 +118,7 @@ HDFFile::~HDFFile ()
                 file_.write(&(datasets_[idt].name[0]), len);
                 
                 // write datatype byte size and element count
-                file_.write(reinterpret_cast<char*>(&(datasets_[idt].bytes)), sizeof(std::size_t));
+                file_.write(reinterpret_cast<char*>(&(datasets_[idt].datatype)), sizeof(std::size_t));
                 file_.write(reinterpret_cast<char*>(&(datasets_[idt].elements)), sizeof(std::size_t));
             }
         }
@@ -138,8 +138,11 @@ std::size_t HDFFile::size (std::string dataset) const
     return 0;
 }
 
-bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std::size_t offset, std::size_t bytes) const
+bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std::size_t offset, HDFDataType datatype) const
 {
+    // decode byte size from the datatype
+    std::size_t bytes = datatype % 0x100;
+    
     // skip reading invalid files
     if (not file_.is_open())
     {
@@ -173,7 +176,7 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
         }
         else
         {
-            seek += datasets_[i].elements * datasets_[i].bytes;
+            seek += datasets_[i].elements * (datasets_[i].datatype % 0x100);
         }
     }
     
@@ -186,9 +189,9 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     }
     
     // check that the selection fits into the dataset
-    if ((offset + length) * bytes > datasets_[id].elements * datasets_[id].bytes)
+    if ((offset + length) * bytes > datasets_[id].elements * (datasets_[id].datatype % 0x100))
     {
-        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].bytes);
+        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].datatype % 0x100);
         return false;
     }
     
@@ -211,8 +214,11 @@ bool HDFFile::read_ (std::string dataset, void * buffer, std::size_t length, std
     return true;
 }
 
-bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t length, std::size_t offset, std::size_t bytes)
+bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t length, std::size_t offset, HDFDataType datatype)
 {
+    // decode byte size
+    std::size_t bytes = datatype % 0x100;
+    
     // skip writing into invalid files
     if (not file_.is_open())
     {
@@ -239,7 +245,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         }
         else
         {
-            seek += datasets_[i].elements * datasets_[i].bytes;
+            seek += datasets_[i].elements * (datasets_[i].datatype % 0x100);
         }
     }
     
@@ -249,7 +255,7 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
         // create a new dataset
         DatasetInfo dst;
         dst.name = dataset;
-        dst.bytes = bytes;
+        dst.datatype = datatype;
         dst.elements = length + offset;
         datasets_.push_back(dst);
         id = datasets_.size() - 1;
@@ -257,9 +263,9 @@ bool HDFFile::write_ (std::string dataset, void const * buffer, std::size_t leng
     }
     
     // check that the selection fits into the dataset
-    if ((offset + length) * bytes > datasets_[id].elements * datasets_[id].bytes)
+    if ((offset + length) * bytes > datasets_[id].elements * (datasets_[id].datatype % 0x100))
     {
-        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, datasets_[id].bytes);
+        error_ = format("Selection does not fit into the dataset ((%ld + %ld) * %ld >= %ld * %ld).", offset, length, bytes, datasets_[id].elements, (datasets_[id].datatype % 0x100));
         return false;
     }
     
