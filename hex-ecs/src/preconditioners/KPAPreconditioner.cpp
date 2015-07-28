@@ -135,11 +135,6 @@ void KPACGPreconditioner::prepare
     cArray D;
     ColMatrix<Complex> S = mS.torow().T(), CR, invCR, invsqrtS;
     
-    std::ofstream ofs ("S2.png");
-    mS.torow().plot_abs(ofs);
-    write_array(S.T().data(), "S2.txt");
-    ofs.close();
-    
     // diagonalize overlap matrix
     if (not all(done))
     {
