@@ -238,11 +238,11 @@ void dense_kron_dot
     
     // C = V * A^T
     {
-        int m = B_rows, k = B_cols, n = A_rows;
+        int m = B_cols, k = A_cols, n = A_rows;
         zgemm_
         (
             &norm, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(v_data), &n,
+            &alpha, const_cast<Complex*>(v_data), &m,
             const_cast<Complex*>(A_data), &k,
             &beta, C_data, &m
         );
@@ -250,12 +250,12 @@ void dense_kron_dot
     
     // W = B * C
     {
-        int m = A_rows, k = A_cols, n = C_cols;
+        int m = B_rows, k = B_cols, n = A_rows;
         zgemm_
         (
             &trans, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(B_data), &n,
-            C_data, &n,
+            &alpha, const_cast<Complex*>(B_data), &k,
+            C_data, &k,
             &beta, w_data, &m
         );
     }
