@@ -6,10 +6,10 @@
 int main (void)
 {
     // setup the database (create new if non-existant)
-    hex_initialize("hex-c.db");
+    hex_initialize_("hex-c.db");
     
     // create new content in the database
-    hex_new();
+    hex_new_();
     
     // create some data-file
     FILE* sql = fopen("batch-c.sql", "w");
@@ -24,15 +24,15 @@ int main (void)
     fclose(sql);
     
     // import the data-file
-    hex_import("batch-c.sql");
+    hex_import_("batch-c.sql");
     
     // precompute cross sections
-    hex_update();
+    hex_update_();
     
     // compute the cross sections
     double energy[3] = { 0.65, 0.75, 0.85 };
     double ccs[3];
-    hex_complete_cross_section
+    hex_complete_cross_section_
     (
         1,0,0,      // initial state (1s)
         1,0,0,      // final state (1s)
