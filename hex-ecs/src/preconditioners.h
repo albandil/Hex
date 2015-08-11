@@ -86,7 +86,7 @@ class PreconditionerBase
         /**
          * @brief Calculate the right-hand side.
          */
-        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, int ipanel) const = 0;
+        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.

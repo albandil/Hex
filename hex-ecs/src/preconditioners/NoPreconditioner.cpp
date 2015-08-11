@@ -176,10 +176,8 @@ void NoPreconditioner::update (double E)
     OMP_clean;
 }
 
-void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, int ipanel) const
+void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const
 {
-    OMP_prepare;
-    
     // shorthands
     int ni = std::get<0>(inp_.instates[instate]);
     int li = std::get<1>(inp_.instates[instate]);
@@ -192,31 +190,49 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     // impact momentum
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
     
+    // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
+    RadialIntegrals radf (rad_.bspline_atom(), bspline_proj_full);
+    radf.verbose(false);
+    radf.setupOneElectronIntegrals(par_, cmd_);
+    
     // calculate LU-decomposition of the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr_atom = rad_.S_atom().tocoo<LU_int_t>().tocsr();
-    CsrMatrix<LU_int_t,Complex> S_csr_proj = rad_.S_proj().tocoo<LU_int_t>().tocsr();
+    CsrMatrix<LU_int_t,Complex> S_csr_proj = radf.S_proj().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_atom = S_csr_atom.factorize();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
     
-    // j-overlaps of shape [Nangmom × Nspline] : TODO Expand in full basis !
+    // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_atom()));
-    cArray ji_overlaps_proj = rad_.overlapj(rad_.bspline_proj(), rad_.gaussleg_proj(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_proj()));
+    cArray ji_overlaps_proj = radf.overlapj(radf.bspline_proj(), radf.gaussleg_proj(), inp_.maxell, ki, weightEdgeDamp(radf.bspline_proj()));
     if (not std::isfinite(ji_overlaps_atom.norm()) or not std::isfinite(ji_overlaps_proj.norm()))
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
-    // j-expansions : TODO Expand in full basis !
-    cArray ji_expansion_atom = lu_S_atom->solve(ji_overlaps_atom, ji_overlaps_atom.size() / Nspline_atom);
-    cArray ji_expansion_proj = lu_S_proj->solve(ji_overlaps_proj, ji_overlaps_proj.size() / Nspline_proj);
+    // j-expansions
+    cArray ji_expansion_atom = lu_S_atom->solve(ji_overlaps_atom, inp_.maxell + 1);
+    cArray ji_expansion_proj = lu_S_proj->solve(ji_overlaps_proj, inp_.maxell + 1);
     if (not std::isfinite(ji_expansion_atom.norm()) or not std::isfinite(ji_expansion_proj.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
-    // compute P-overlaps and P-expansion : TODO Expand in full basis !
+    // compute P-overlaps and P-expansion
     cArray Pi_overlaps_atom = rad_.overlapP(rad_.bspline_atom(), rad_.gaussleg_atom(), ni, li, weightEndDamp(rad_.bspline_atom()));
-    cArray Pi_overlaps_proj = rad_.overlapP(rad_.bspline_proj(), rad_.gaussleg_proj(), ni, li, weightEndDamp(rad_.bspline_proj()));
+    cArray Pi_overlaps_proj = radf.overlapP(radf.bspline_proj(), radf.gaussleg_proj(), ni, li, weightEndDamp(radf.bspline_proj()));
     cArray Pi_expansion_atom = lu_S_atom->solve(Pi_overlaps_atom);
     cArray Pi_expansion_proj = lu_S_proj->solve(Pi_overlaps_proj);
     if (not std::isfinite(Pi_expansion_atom.norm()) or not std::isfinite(Pi_expansion_proj.norm()))
         HexException("Unable to expand hydrogen bound orbital in B-splines!");
+    
+    // truncate the projectile expansions for non-origin panels
+    if (rad_.bspline_proj().Nspline() != radf.bspline_proj().Nspline())
+    {
+        // truncate all Riccati-Bessel function expansion (for various angular momenta)
+        cArrays ji_expansion_proj_trunc;
+        for (int i = 0; i <= inp_.maxell; i++)
+            ji_expansion_proj_trunc.push_back(cArrayView(ji_expansion_proj, (i + 1) * radf.bspline_proj().Nspline() - Nspline_proj, Nspline_proj));
+        ji_expansion_proj = join(ji_expansion_proj_trunc);
+        
+        // truncate the hydrogen radial orbital expansion
+        Pi_expansion_proj = Pi_expansion_proj.slice(Pi_expansion_proj.size() - Nspline_proj, Pi_expansion_proj.size());
+    }
     
     // for all segments constituting the RHS
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_block)
@@ -286,20 +302,16 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 chi_block += (-prefactor       ) * outer_product(rad_.S_atom().dot(Pi_expansion_atom), rad_.Mm1_tr_proj().dot(Ji_expansion_proj));
             if (li == l2 and l == l1)
                 chi_block += (-prefactor * Sign) * outer_product(rad_.Mm1_tr_atom().dot(Ji_expansion_atom), rad_.S_proj().dot(Pi_expansion_proj));
-            
-            // update the right-hand side
-            OMP_exclusive_in;
-            chi[ill] = chi_block;
-            if (not chi.inmemory())
-            {
-                chi.hdfsave(ill);
-                chi[ill].drop();
-            }
-            OMP_exclusive_out;
+        }
+        
+        // update the right-hand side
+        chi[ill] = chi_block;
+        if (not chi.inmemory())
+        {
+            chi.hdfsave(ill);
+            chi[ill].drop();
         }
     }
-    
-    OMP_clean;
 }
 
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const

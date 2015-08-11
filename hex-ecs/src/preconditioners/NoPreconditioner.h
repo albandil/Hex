@@ -72,7 +72,7 @@ class NoPreconditioner : public PreconditionerBase
         
         virtual void setup ();
         virtual void update (double E);
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, int ipanel) const;
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
         

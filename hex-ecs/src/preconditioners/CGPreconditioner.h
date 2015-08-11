@@ -64,7 +64,7 @@ class CGPreconditioner : public NoPreconditioner
         // reuse parent definitions
         virtual void setup () { return NoPreconditioner::setup(); }
         virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, int ipanel) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin, ipanel); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin, bfull); }
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions

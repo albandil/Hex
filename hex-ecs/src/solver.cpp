@@ -220,22 +220,9 @@ void Solver::solve ()
                 std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
-                prec_->rhs(chi, ie, instate, Spin, ipanel_);
+                prec_->rhs(chi, ie, instate, Spin, bspline_full_[ipanel_]);
                 
                 std::cout << "ok" << std::endl;
-                
-//                 /// DEBUG
-//                 static int st = 0; st++;
-//                 for (int ill = 0; ill < angs_.size(); ill++)
-//                 {
-//                     write_2D_data
-//                     (
-//                         Nspline_proj,
-//                         Nspline_atom,
-//                         format("chia-%d-%d.mat", st, ill).c_str(),
-//                         [&](std::size_t i, std::size_t j) -> double { return chi[ill][j * Nspline_proj + i].real(); }
-//                     );
-//                 }
                 
                 // previous solution
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], angs_);
@@ -251,14 +238,6 @@ void Solver::solve ()
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
                     rad.setupTwoElectronIntegrals(par_, cmd_, lambdas);
-                    
-//                     /// DEBUG
-//                     rArray xgrid = linspace(bspline_[0].t(0).real(), bspline_[0].Rmax(), 1000);
-//                     rArray ygrid = linspace(bspline_[ipanel_].t(0).real(), bspline_[ipanel_].Rmax(), 1000);
-//                     write_array(chi[0], "chi-0.txt");
-//                     std::ofstream chi_vtk_0 ("chi-0.vtk");
-//                     writeVTK_points(chi_vtk_0, Bspline::zip(bspline_[0], bspline_[ipanel_], chi[0], xgrid, ygrid), xgrid, ygrid, rArray({0}));
-//                     chi_vtk_0.close();
                     
                     // for all angular segments of the right-hand side
                     for (unsigned ill = 0; ill < angs_.size(); ill++)
@@ -352,24 +331,6 @@ void Solver::solve ()
                     }
                     
                     std::cout << "ok" << std::endl;
-                    
-//                     /// DEBUG
-//                     write_array(chi[0], "chi-1.txt");
-//                     std::ofstream chi_vtk_1 ("chi-1.vtk");
-//                     writeVTK_points(chi_vtk_1, Bspline::zip(bspline_[0], bspline_[ipanel_], chi[0], xgrid, ygrid), xgrid, ygrid, rArray({0}));
-//                     chi_vtk_1.close();
-//                     
-//                     /// DEBUG
-//                     for (int ill = 0; ill < angs_.size(); ill++)
-//                     {
-//                         write_2D_data
-//                         (
-//                             Nspline_proj,
-//                             Nspline_atom,
-//                             format("chib-%d-%d.mat", st, ill).c_str(),
-//                             [&](std::size_t i, std::size_t j) -> double { return chi[ill][j * Nspline_proj + i].real(); }
-//                         );
-//                     }
                 }
             }
             
