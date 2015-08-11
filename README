@@ -1,22 +1,22 @@
 The following configuration successfully builds the package:
 
 Compiler:
-    GCC 4.8.3 or
+    GCC 5.0.0 or
     Intel C++ Composer XE 15.0
 
 Third-party libraries:
     GSL 1.16
-    OpenBLAS 0.2.13
-    SuiteSparse 4.3.1
+    OpenBLAS 0.2.14
+    SuiteSparse 4.4.4
     sqlitepp 0.2            (included in libs/, works e.g. with sqlite3 3.7.17)
     CLN 1.3.4
     FFTW 3.3.4
-    GiNaC 1.6.2
+    GiNaC 1.6.3
     
 Optional dependencies:
     png++ 0.2.5             (included in libs/, works e.g. with libpng 1.6.6)
-    OpenMPI 1.7.2
-    OpenCL 1.2
+    OpenMPI 1.8.3
+    OpenCL 2.0
     
 Code documentation generation:
     Doxygen 1.8.5
