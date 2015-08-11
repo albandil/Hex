@@ -44,7 +44,8 @@
 // Derived variables.
 #define NROW            (NSPLINE_ATOM * NSPLINE_PROJ)
 #define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
-#define NUM_BLOCKS      ((NSPLINE + BLOCK_SIZE - 1) / BLOCK_SIZE)
+#define NUM_BLOCKS_X    ((NSPLINE_ATOM + BLOCK_SIZE - 1) / BLOCK_SIZE)
+#define NUM_BLOCKS_Y    ((NSPLINE_PROJ + BLOCK_SIZE - 1) / BLOCK_SIZE)
 
 /**
  * @brief Complex multiplication.
@@ -230,7 +231,7 @@ kernel void mmul_1el
     y[i * NSPLINE_PROJ + j] = 0;
     
     // for all source vector elements
-    if (i < NSPLINE)
+    if (i < NSPLINE_ATOM)
     for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
     for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
@@ -334,11 +335,11 @@ kernel void mmul_2el
             // ix < iy
             M_ik = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
             M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-            for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
+            for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT_ATOM - 1); ix++) if (t[ix + 1].x > 0)
             {
                 m_ik = M_ik[ix - i]; tx = t[ix + 1].x;
                 
-                for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT - 1); iy++)
+                for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT_PROJ - 1); iy++)
                 {
                     m_jl = M_jl[iy - j]; ty = t[iy + 1].x;
                     scale = pow_int(tx/ty,lambda)/ty;
@@ -349,11 +350,11 @@ kernel void mmul_2el
             // ix > iy (by renaming the ix,iy indices)
             M_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
             M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-            for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT - 1); ix++) if (t[ix + 1].x > 0)
+            for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT_PROJ - 1); ix++) if (t[ix + 1].x > 0)
             {
                 m_jl = M_jl[ix - j]; tx = t[ix + 1].x;
                 
-                for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT - 1); iy++)
+                for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT_ATOM - 1); iy++)
                 {
                     m_ik = M_ik[iy - i]; ty = t[iy + 1].x;
                     scale = pow_int(tx/ty,lambda)/ty;
@@ -398,7 +399,7 @@ kernel void mul_ABt
     private double2 res = 0;
     
     // for all source blocks
-    for (private int iblock = 0; iblock < NUM_BLOCKS; iblock++)
+    for (private int iblock = 0; iblock < NUM_BLOCKS_X; iblock++)
     {
         // load source blocks into the local memory (WARNING: Should be padded by zeros: will segfault on CPU.)
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -414,7 +415,7 @@ kernel void mul_ABt
     
     // store result to device memory
     if (get_global_id(0) < NSPLINE_ATOM && get_global_id(1) < NSPLINE_PROJ)
-        C[get_global_id(0) * NSPLINE + get_global_id(1)] = res;
+        C[get_global_id(0) * NSPLINE_PROJ + get_global_id(1)] = res;
 }
 
 /**
