@@ -83,13 +83,8 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # OpenCL (optional)                                                            #
 # ---------------------------------------------------------------------------- #
 
-# - Intel OpenCL
-# OPENCLFLAGS = -DWITH_OPENCL -I/opt/intel/opencl-1.2-4.5.0.8/include
-# OPENCLLIBS = -L/opt/intel/opencl-1.2-4.5.0.8/lib64 -lOpenCL
-
-# - AMD OpenCL
-# OPENCLFLAGS = -DWITH_OPENCL -I/opt/AMDAPPSDK-3.0-0-Beta/include
-# OPENCLLIBS = -L/opt/AMDAPPSDK-3.0-0-Beta/lib/x86_64/sdk -lOpenCL
+# OPENCLFLAGS = -DWITH_OPENCL
+# OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
 # PNG++ (optional)                                                             #
