@@ -115,7 +115,7 @@ const std::string sample_input =
     "  *\n"
     "\n"
     "# Final atomic states (nf, lf).\n"
-    "# Specified by vertival doublets terminated by -1 on the first line.\n"
+    "# Specified by vertical doublets terminated by -1 on the first line.\n"
     "  1  -1\n"
     "  *\n"
     "\n"
