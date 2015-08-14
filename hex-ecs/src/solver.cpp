@@ -394,6 +394,9 @@ void Solver::solve ()
                 {
                     if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
                     {
+                        if (not psi.inmemory())
+                            psi.hdfload(ill);
+                        
                         // save origin panel
                         if (ipanel_ == 0)
                         {
@@ -417,6 +420,9 @@ void Solver::solve ()
                             if (not prev_psi.hdfsave(reader.name(ill)))
                                 HexException("Failed to save solution to disk - the data are lost!");
                         }
+                        
+                        if (not psi.inmemory())
+                            psi[ill].drop();
                     }
                 }
             }
