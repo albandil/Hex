@@ -120,7 +120,7 @@ template <class T> class ArrayView
         ~ArrayView () {}
         
         /// Change view.
-        void reset (std::size_t n, T * ptr)
+        void reset (std::size_t n, T const * ptr)
         {
             N_ = n;
             array_ = const_cast<T*>(ptr);

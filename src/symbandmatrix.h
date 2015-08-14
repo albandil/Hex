@@ -814,9 +814,14 @@ template <class DataT> class BlockSymBandMatrix
                         std::size_t offset = (i * blockhalfbw_ + d) * vol;
                         
                         // data view of this block
-                        ArrayView<DataT> view (data_, offset, vol);
+                        ArrayView<DataT> view;
                         
-                        if (not inmemory_)
+                        if (inmemory_)
+                        {
+                            // use data in memory
+                            view.reset(vol, data_.begin() + offset);
+                        }
+                        else
                         {
                             // read data from the disk
                             diskdata.resize(vol);
@@ -919,11 +924,16 @@ template <class DataT> class BlockSymBandMatrix
             if (i + d < blockcount_)
             {
                 // data view of this block diagonal
-                cArrayView view (data_, (i * blockhalfbw_ + d) * size_ * halfbw_, size_ * halfbw_);
+                cArrayView view;
                 
                 // it may be necessary to load the data from disk
                 cArray diskdata;
-                if (not inmemory_)
+                if (inmemory_)
+                {
+                    // use data from memory
+                    view.reset(size_ * halfbw_, data_.begin() + (i * blockhalfbw_ + d) * size_ * halfbw_);
+                }
+                else
                 {
                     // read data from the disk
                     diskdata.resize(size_ * halfbw_);

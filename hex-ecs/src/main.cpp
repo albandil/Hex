@@ -270,7 +270,7 @@ int main (int argc, char* argv[])
             std::cout << std::endl;
             std::cout << "--------------------------------------------------------------------------------" << std::endl;
             std::cout << std::endl;
-            std::cout << "Bspline basis summary for panel " << ipanel << std::endl;
+            std::cout << "Bspline basis summary for panel " << ipanel + 1 << std::endl;
             std::cout << "\t- atomic basis" << std::endl;
             std::cout << "\t\t- real knots : " << bspline_panel[0].rknots().front() << " to " << bspline_panel[0].rknots().back() << std::endl;
             std::cout << "\t\t- complex knots : " << bspline_panel[0].cknots().front() << " to " << bspline_panel[0].cknots().back() << std::endl;

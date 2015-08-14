@@ -276,7 +276,7 @@ void Solver::solve ()
                                     int lp = bspline_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + l;
                                     
                                     // get indices in the previous full basis
-                                    int jf = bspline_full_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + j;
+                                    //int jf = bspline_full_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + j;
                                     int lf = bspline_full_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + l;
                                     
                                     // compute two-electron integrals
