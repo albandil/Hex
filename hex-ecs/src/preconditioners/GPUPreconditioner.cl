@@ -42,21 +42,20 @@
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
-#define NROW            (NSPLINE_ATOM * NSPLINE_PROJ)
-#define BLOCK_VOLUME    (BLOCK_SIZE * BLOCK_SIZE)
-#define NUM_BLOCKS_X    ((NSPLINE_ATOM + BLOCK_SIZE - 1) / BLOCK_SIZE)
-#define NUM_BLOCKS_Y    ((NSPLINE_PROJ + BLOCK_SIZE - 1) / BLOCK_SIZE)
+#define NROW (NSPLINE_ATOM * NSPLINE_PROJ)
 
 /**
  * @brief Complex multiplication.
  * 
  * Multiplies two complex numbers and returns the product.
  */
-double2 cmul (double2 a, double2 b)
+double2 cmul (private double2 a, private double2 b)
 {
-    double2 c;
+    private double2 c;
+    
     c.x = a.x * b.x - a.y * b.y;
     c.y = a.x * b.y + a.y * b.x;
+    
     return c;
 }
 
@@ -66,10 +65,10 @@ double2 cmul (double2 a, double2 b)
  * Divides two complex numbers and returns the fraction. No overflow
  * checking is done.
  */
-double2 cdiv (double2 a, double2 b)
+double2 cdiv (private double2 a, private double2 b)
 {
-    double2 c;
-    double b2 = b.x * b.x + b.y * b.y;
+    private double2 c;
+    private double b2 = b.x * b.x + b.y * b.y;
     
     c.x = (a.x * b.x + a.y * b.y) / b2;
     c.y = (a.y * b.x - a.x * b.y) / b2;
@@ -84,19 +83,19 @@ double2 cdiv (double2 a, double2 b)
  * multiplications. The number of multiplications is proportional
  * to log(n).
  */
-double pow_int (double x, unsigned n)
+double pow_int (private double x, private int n)
 {
-    double value = 1;
+    private double value = 1;
     
     do
     {
-        if(n % 2 == 1)
+        if (n % 2 == 1)
             value *= x;
         
         n /= 2;
         x *= x;
     }
-    while (n);
+    while (n != 0);
     
     return value;
 }
@@ -113,7 +112,7 @@ double pow_int (double x, unsigned n)
  */
 kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
 {
-    uint i = get_global_id(0);
+    private int i = get_global_id(0);
     
     if (i < NROW)
         x[i] = cmul(a,x[i]) + cmul(b,y[i]);
@@ -210,11 +209,16 @@ kernel void mmul_1el
 (
     // energy
     private double E,
-    // row-padded one-electron matrices
-    global double2 const * const restrict Sp,
-    global double2 const * const restrict Dp,
-    global double2 const * const restrict M1p,
-    global double2 const * const restrict M2p,
+    // row-padded one-electron matrices (atom)
+    global double2 const * const restrict Spa,
+    global double2 const * const restrict Dpa,
+    global double2 const * const restrict M1pa,
+    global double2 const * const restrict M2pa,
+    // row-padded one-electron matrices (projectile)
+    global double2 const * const restrict Spp,
+    global double2 const * const restrict Dpp,
+    global double2 const * const restrict M1pp,
+    global double2 const * const restrict M2pp,
     // angular momenta and nonzero multipoles
     private int l1,
     private int l2,
@@ -240,10 +244,10 @@ kernel void mmul_1el
         private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
         
         // calculate the one-electron part of the hamiltonian matrix element Hijkl
-        private double2 elem = E * cmul(Sp[ik],Sp[jl]);
-        elem -= 0.5 * (cmul(Dp[ik],Sp[jl]) + cmul(Sp[ik],Dp[jl]));
-        elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2p[ik],Sp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Sp[ik],M2p[jl]);
-        elem += cmul(M1p[ik],Sp[jl]) + cmul(Sp[ik],M1p[jl]);
+        private double2 elem = E * cmul(Spa[ik],Spp[jl]);
+        elem -= 0.5 * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
+        elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2pa[ik],Spp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Spa[ik],M2pp[jl]);
+        elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
         
         // multiply right-hand side by that matrix element
         y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
@@ -265,18 +269,23 @@ kernel void mmul_1el
  */
 kernel void mmul_2el
 (
-    // B-spline knots
-    constant double2 const * const restrict t,
+    // B-spline knots (atom and projectile)
+    constant double2 const * const restrict ta,
+    constant double2 const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
     private double f,
-    // one-electron dull moments
-    global double2 const * const restrict ML,
-    global double2 const * const restrict MmLm1,
-    // one-electron partial moments
-    global double2 const * const restrict MiL,
-    global double2 const * const restrict MimLm1,
+    // one-electron full and partial moments (atom)
+    global double2 const * const restrict MLa,
+    global double2 const * const restrict MmLm1a,
+    global double2 const * const restrict MiLa,
+    global double2 const * const restrict MimLm1a,
+    // one-electron full and partial moments (projectile)
+    global double2 const * const restrict MLp,
+    global double2 const * const restrict MmLm1p,
+    global double2 const * const restrict MiLp,
+    global double2 const * const restrict MimLm1p,
     // source and target vector
     global double2 const * const restrict x,
     global double2       * const restrict y
@@ -302,26 +311,38 @@ kernel void mmul_2el
         // matrix element
         private double2 elem = 0;
         
-        // Are the integral moments completely decoupled, i.e. there is there no overlap between Bi, Bj, Bk and Bl?
-        // In such cases we can compute the off-diagonal contribution just as a product of the two
-        // (scaled) integral moments of order "lambda" and "-lambda-1", respectively.
+        // boundary knots of the participating B-splines
+        private double ti1 = ta[i].x, ti2 = ta[i + ORDER + 1].x;
+        private double tj1 = tp[j].x, tj2 = tp[j + ORDER + 1].x;
+        private double tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
+        private double tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
         
-        tx = t[min(i,k) + ORDER + 1].x;
-        ty = t[min(j,l) + ORDER + 1].x;
+        // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
+        // In such cases we can compute the off-diagonal contribution just as a product of the two
+        // integral moments of order "lambda" and "-lambda-1", respectively. Moreover, in such
+        // case there is no diagonal contribution, because there is no overlap between the _four_
+        // participating B-splines.
         
         // (j,l) << (i,k)
-        if (min(j,l) + ORDER < max(i,k))
+        if (min(tj2,tl2) <= max(ti1,tk1))
         {
+            tx = min(ti2,tk2);
+            ty = min(tj2,tl2);
             scale = pow_int(ty / tx, lambda) / tx;
-            elem += scale * MmLm1[min(i,k) * (ORDER + 1) + abs(i-k)] * ML[min(j,l) * (ORDER + 1) + abs(j-l)];
+            elem += scale * MmLm1a[min(i,k) * (ORDER + 1) + abs(i-k)] * MLp[min(j,l) * (ORDER + 1) + abs(j-l)];
         }
         
         // (i,k) << (j,l)
-        else if (min(i,k) + ORDER < max(j,l))
+        else if (min(ti2,tk2) <= max(tj1,tl1))
         {
+            tx = min(ti2,tk2);
+            ty = min(tj2,tl2);
             scale = pow_int(tx / ty, lambda) / ty;
-            elem += scale * ML[min(i,k) * (ORDER + 1) + abs(i-k)] * MmLm1[min(j,l) * (ORDER + 1) + abs(j-l)];
+            elem += scale * MLa[min(i,k) * (ORDER + 1) + abs(i-k)] * MmLm1p[min(j,l) * (ORDER + 1) + abs(j-l)];
         }
+        
+        // The rest allows overlap of the four B-splines and is used only by the first
+        // (origin) panel.
         
         // Further parts are a bit cryptical, because we are using precomputed
         // (partial, per knot) integral moments, which are quite compactly stored
@@ -333,30 +354,30 @@ kernel void mmul_2el
         else
         {
             // ix < iy
-            M_ik = MiL    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-            M_jl = MimLm1 + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-            for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT_ATOM - 1); ix++) if (t[ix + 1].x > 0)
+            M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+            M_jl = MimLm1p + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+            for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT_ATOM - 1); ix++) if (ta[ix + 1].x > 0)
             {
-                m_ik = M_ik[ix - i]; tx = t[ix + 1].x;
+                m_ik = M_ik[ix - i]; tx = ta[ix + 1].x;
                 
                 for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT_PROJ - 1); iy++)
                 {
-                    m_jl = M_jl[iy - j]; ty = t[iy + 1].x;
+                    m_jl = M_jl[iy - j]; ty = tp[iy + 1].x;
                     scale = pow_int(tx/ty,lambda)/ty;
                     elem += cmul(m_ik,m_jl) * scale;
                 }
             }
             
             // ix > iy (by renaming the ix,iy indices)
-            M_ik = MimLm1 + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
-            M_jl = MiL    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
-            for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT_PROJ - 1); ix++) if (t[ix + 1].x > 0)
+            M_ik = MimLm1a + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+            M_jl = MiLp    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+            for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT_PROJ - 1); ix++) if (tp[ix + 1].x > 0)
             {
-                m_jl = M_jl[ix - j]; tx = t[ix + 1].x;
+                m_jl = M_jl[ix - j]; tx = tp[ix + 1].x;
                 
                 for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT_ATOM - 1); iy++)
                 {
-                    m_ik = M_ik[iy - i]; ty = t[iy + 1].x;
+                    m_ik = M_ik[iy - i]; ty = ta[iy + 1].x;
                     scale = pow_int(tx/ty,lambda)/ty;
                     elem += cmul(m_ik,m_jl) * scale;
                 }
@@ -372,50 +393,65 @@ kernel void mmul_2el
  * @brief Matrix-matrix multiplication.
  * 
  * General matrix-matrix multiplication.
- * @param A Input matrix (row-major storage).
- * @param B Input matrix (column-major storage).
- * @param C Outpu matrix (row-major storage).
+ * @param m Row count of A.
+ * @param n Column count of B.
+ * @param k Column count of A.
+ * @param A Input m-by-k matrix in row-major storage.
+ * @param B Input k-by-n matrix in column-major(!) storage (i.e., transposed).
+ * @param C Output m-by-n matrix in row-major storage.
  */
 kernel void mul_ABt
 (
-    global double2 const * const restrict A, // input matrix A (row-major)
-    global double2 const * const restrict B, // input matrix B (col-major)
-    global double2       * const restrict C  // output matrix C (row-major)
+    private int m, private int n, private int k,
+    global double2 const * const restrict A,
+    global double2 const * const restrict B,
+    global double2       * const restrict C
 )
 {
+    // destination block indices
+    private int irow_block = get_group_id(0);
+    private int icol_block = get_group_id(1);
+    
+    // global destination index
+    private int irow_glob = get_global_id(0);
+    private int icol_glob = get_global_id(1);
+    
+    // group worker threads; indices within the destination block
+    private int irow_loc = get_local_id(0);
+    private int icol_loc = get_local_id(1);
+    
     // work arrays
     local double2 Aloc[BLOCK_SIZE][BLOCK_SIZE];
     local double2 Bloc[BLOCK_SIZE][BLOCK_SIZE];
     
-    // destination blocks
-    private int idyblock = get_group_id(0); // row
-    private int idxblock = get_group_id(1); // col
-    
-    // group worker threads
-    private int iylocal = get_local_id(0); // row
-    private int ixlocal = get_local_id(1); // col
-    
-    // aggregated scalar product of the destination element C[get_global_id(0),get_global_id(1)]
+    // aggregated scalar product of the destination element C[idy,idx]
     private double2 res = 0;
     
+    // calculate number of blocks
+    private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    
     // for all source blocks
-    for (private int iblock = 0; iblock < NUM_BLOCKS_X; iblock++)
+    for (private int iblock = 0; iblock < Nblock; iblock++)
     {
-        // load source blocks into the local memory (WARNING: Should be padded by zeros: will segfault on CPU.)
+        // get indices of the current elements in the matrices
+        private int Arow = irow_glob, Acol = iblock * BLOCK_SIZE + icol_loc;
+        private int Bcol = icol_glob, Brow = iblock * BLOCK_SIZE + irow_loc;
+        
+        // load elements of the source blocks into the local memory, pad by zeros
         barrier(CLK_LOCAL_MEM_FENCE);
-        Aloc[ixlocal][iylocal] = A[(idyblock * BLOCK_SIZE + iylocal) * NSPLINE_PROJ + (iblock * BLOCK_SIZE + ixlocal)];
-        Bloc[iylocal][ixlocal] = B[(idxblock * BLOCK_SIZE + ixlocal) * NSPLINE_PROJ + (iblock * BLOCK_SIZE + iylocal)];
+        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (double2)(0.,0.));
+        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (double2)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
         
-        // each group's thread will calculate one of BLOCK_VOLUME scalar products
-        for (private int k = 0; k < BLOCK_SIZE; k++)
-            if (iblock * BLOCK_SIZE + k < NSPLINE_ATOM)
-                res += cmul(Aloc[k][iylocal],Bloc[k][ixlocal]);
+        // each group's thread will calculate one of the scalar products
+        for (private int K = 0; K < BLOCK_SIZE; K++)
+            if (iblock * BLOCK_SIZE + K < k)
+                res += cmul(Aloc[K][irow_loc],Bloc[K][icol_loc]);
     }
     
     // store result to device memory
-    if (get_global_id(0) < NSPLINE_ATOM && get_global_id(1) < NSPLINE_PROJ)
-        C[get_global_id(0) * NSPLINE_PROJ + get_global_id(1)] = res;
+    if (irow_glob < m && icol_glob < n)
+        C[irow_glob * n + icol_glob] = res;
 }
 
 /**
@@ -435,10 +471,10 @@ kernel void kron_div
     global double2       * const restrict y
 )
 {
-    // get worker's segment index (0 <= i < NSPLINE_ATOM)
-    private int i = get_global_id(0);
+    // get worker's offset index (0 <= j < NSPLINE_PROJ)
+    private int j = get_global_id(0);
     
     // y = y / (E (I kron I) - (D1 kron I) - (I kron D2))
-    for (private int j = 0; j < NSPLINE_PROJ; j++)
-        y[j * NSPLINE_ATOM + i] = cdiv(y[j * NSPLINE_ATOM + i], E - D1[j] - D2[i]);
+    for (private int i = 0; i < NSPLINE_ATOM; i++)
+        y[i * NSPLINE_PROJ + j] = cdiv(y[i * NSPLINE_PROJ + j], E - D1[i] - D2[j]);
 }
