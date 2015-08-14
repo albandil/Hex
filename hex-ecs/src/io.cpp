@@ -750,11 +750,6 @@ void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std:
     if (i == bspline.size())
         HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
     
-    // write picture
-    std::ofstream ofs ("solution.png");
-    RowMatrixView<Complex>(bspline[0].Nspline(), bspline[i].Nspline(), sol).plot_abs(ofs);
-    ofs.close();
-    
     // evaluation grid
     double Rx = cmd.zipmax < 0 ? bspline[0].Rmax() : cmd.zipmax;
     double Ry = cmd.zipmax < 0 ? bspline[i].Rmax() : cmd.zipmax;
