@@ -3,7 +3,7 @@
 all: ../bin/hex-hdf2txt
 
 ../bin/hex-hdf2txt: hdf2txt.cpp ../../src/arrithm.h  ../../src/arrays.cpp ../../src/arrays.h ../../src/numbers.h ../../src/hdffile.cpp
-	g++ -std=c++11 -O2 hdf2txt.cpp -o ../bin/hex-hdf2txt -lhdf5 -DNO_MPI
+	$(CXX) -std=c++11 -O2 hdf2txt.cpp -o ../bin/hex-hdf2txt -lstdc++ -lm
 
 clean:
-	rm -rf ../bin/hdf2txt
+	rm -rf ../bin/hex-hdf2txt
