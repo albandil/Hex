@@ -181,7 +181,7 @@ int main (int argc, char* argv[])
         "input", "i", 1, [&](Args optargs) -> bool
             {
                 // set custom input file
-                inputfile.open(optarg);
+                inputfile.open(optargs[0]);
                 if (not inputfile.good())
                     throw exception ("Error: Input file \"%s\" not found.", optargs[0].c_str());
                 std::cout << "Using input file \"" << optargs[0] << "\"." << std::endl << std::endl;

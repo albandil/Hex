@@ -58,6 +58,6 @@ namespace PWBA2
         bool verbose
     );
     
-}; /* namespace PWBA2 */
+} /* namespace PWBA2 */
 
 #endif

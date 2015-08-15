@@ -143,14 +143,14 @@ template <int dim> class ndCube
             std::vector<ndCube<dim>> subcubes;
             
             // new subdivision history for sub-cubes
-            char new_history[lvl_ + 1];
+            std::vector<char> new_history(lvl_ + 1);
             
             // copy the current subdivision history and append a new element for new subdivision
             if (lvl_ > 0)
-                std::memcpy(new_history, history_, lvl_ * sizeof(char));
+                std::memcpy(new_history.data(), history_, lvl_ * sizeof(char));
             
             // the last subdivision info
-            char & subhistory = *(new_history + lvl_);
+            char & subhistory = *(new_history.data() + lvl_);
             
             // for all vertices (there is a sub-cube adjacent to each of them)
             for (int i = 0; i < nVertex(); i++)
@@ -159,7 +159,7 @@ template <int dim> class ndCube
                 subhistory = i;
                 
                 // add sub-cube
-                subcubes.push_back(ndCube<dim>(lvl_ + 1, new_history));
+                subcubes.push_back(ndCube<dim>(lvl_ + 1, new_history.data()));
             }
             
             return subcubes;
@@ -255,6 +255,6 @@ template <int dim> std::ostream & operator << (std::ostream & os, ndCube<dim> co
     return os;
 }
 
-}; // namespace geom
+} // namespace geom
 
 #endif // HEX_NDCUBE

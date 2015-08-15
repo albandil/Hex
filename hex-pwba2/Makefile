@@ -10,8 +10,8 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -fPIC -fopenmp
-LFLAGS = -fopenmp
+CFLAGS = -Wall -std=c++11 -pedantic-errors -fPIC -fopenmp
+LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #

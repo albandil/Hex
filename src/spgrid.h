@@ -353,8 +353,8 @@ template <class T, int dim> class Domains
             assert (dom.cube.level() == lvl_);
             
             // serialize the item to add
-            char data [nbytes_];
-            pack_(dom, data);
+            std::vector<char> data (nbytes_);
+            pack_(dom, data.data());
             
 #ifdef _OPENMP
             // enable only a single thread at once to access the data
@@ -366,14 +366,14 @@ template <class T, int dim> class Domains
             {
                 // write data to the end of scratch file
                 std::fseek(file_, 0, SEEK_END);
-                std::fwrite(data, nbytes_, 1, file_);
+                std::fwrite(data.data(), nbytes_, 1, file_);
             }
             else
             {
                 try
                 {
                     // try to add new element to memory
-                    data_.insert(data_.end(), data, data + nbytes_);
+                    data_.insert(data_.end(), data.data(), data.data() + nbytes_);
                 }
                 catch (std::bad_alloc const & ex)
                 {
@@ -410,7 +410,7 @@ template <class T, int dim> class Domains
                     data_.clear();
                     
                     // finally add the new element
-                    std::fwrite(data, nbytes_, 1, file_);
+                    std::fwrite(data.data(), nbytes_, 1, file_);
                 }
             }
             
@@ -427,8 +427,8 @@ template <class T, int dim> class Domains
         void update (std::size_t i, Domain const & dom)
         {
             // serialize the item to write
-            char data [nbytes_];
-            pack_(dom, data);
+            std::vector<char> data (nbytes_);
+            pack_(dom, data.data());
             
 #ifdef _OPENMP
             // enable only a single thread at once to access the data
@@ -439,11 +439,11 @@ template <class T, int dim> class Domains
             if (file_ != nullptr)
             {
                 std::fseek(file_, i * nbytes_, SEEK_SET);
-                std::fwrite(data, nbytes_, 1, file_);
+                std::fwrite(data.data(), nbytes_, 1, file_);
             }
             else
             {
-                std::memcpy(data_.data() + i * nbytes_, data, nbytes_);
+                std::memcpy(data_.data() + i * nbytes_, data.data(), nbytes_);
             }
             
 #ifdef _OPENMP
@@ -462,17 +462,17 @@ template <class T, int dim> class Domains
             omp_set_lock(&lock_);
 #endif
             // packed data
-            char data [nbytes_];
+            std::vector<char> data (nbytes_);
             
             // check if there is already an open scratch file
             if (file_ != nullptr)
             {
                 std::fseek(file_, i * nbytes_, SEEK_SET);
-                std::fread(data, nbytes_, 1, file_);
+                std::fread(data.data(), nbytes_, 1, file_);
             }
             else
             {
-                std::memcpy(data, data_.data() + i * nbytes_, nbytes_);
+                std::memcpy(data.data(), data_.data() + i * nbytes_, nbytes_);
             }
             
 #ifdef _OPENMP
@@ -481,7 +481,7 @@ template <class T, int dim> class Domains
 #endif
             
             // deserialize
-            unpack_(ret, data);
+            unpack_(ret, data.data());
             
             // return
             return ret;
@@ -776,8 +776,8 @@ template <class T> class SparseGrid
             const double * pw = nodes.at(i).w.data();
             
             // evaluate function at the nodes
-            T eval[N];
-            F(N, dim, domain.origin().data(), domain.edge(), px, eval);
+            NumberArray<T> eval(N);
+            F(N, dim, domain.origin().data(), domain.edge(), px, eval.data());
             
             // evaluate the quadrature rule
             T res = 0;
@@ -802,7 +802,7 @@ template <class T> class SparseGrid
             
             // return the result (extrapolate omitted nodes)
             return res / (1.0 - orphaned_weights) * domain.volume();
-        };
+        }
         
         /**
          * @brief Globally adaptive sparse-grid-based quadrature.
