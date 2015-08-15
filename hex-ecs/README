@@ -13,8 +13,7 @@ Dependencies
 The program is written in C++11 and can be successfully compiled by the
 following compilers:
 
- * GCC 4.8.3
- * Intel C++ Composer XE 15.0 (tested with GCC 4.8.3 headers)
+ * GCC 4.9.2
  
 There are several external libraries that are being used for some partial tasks.
 Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
@@ -30,8 +29,7 @@ Here is the list of the libraries with versions that were used:
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 
- * OpenBLAS 0.2.13
-            Optional, but some BLAS implementation is necessary for dense matrix routines.
+ * OpenBLAS 0.2.14
             OpenBLAS is one of the best open-source implementations. Obtainable from
                 http://www.openblas.net/
 
