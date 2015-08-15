@@ -278,55 +278,55 @@ private:
 };
 
 /// Create class for T-matrix (tmat)
-AddNewVariableClass(TMatrix);
+AddNewVariableClass(TMatrix)
 
 /// Create class for scattering amplitude (scatamp)
-AddNewVariableClass(ScatteringAmplitude);
+AddNewVariableClass(ScatteringAmplitude)
 
 /// Create class for scattering amplitude with arbitrary impact direction (scatamp-dir)
-AddNewVariableClass(ScatteringAmplitudeDir);
+AddNewVariableClass(ScatteringAmplitudeDir)
 
 /// Create class for differential cross section (dcs)
-AddNewVariableClass(DifferentialCrossSection);
+AddNewVariableClass(DifferentialCrossSection)
 
 /// Create class for integral cross section (ics)
-AddNewVariableClass(IntegralCrossSection);
+AddNewVariableClass(IntegralCrossSection)
 
 /// Create class for complete cross section (ccs)
-AddNewVariableClass(CompleteCrossSection);
+AddNewVariableClass(CompleteCrossSection)
 
 /// Create class for extrapolated cross section (xcs)
-AddNewVariableClass(ExtrapolatedCrossSection);
+AddNewVariableClass(ExtrapolatedCrossSection)
 
 /// Create class for collision strength (colls)
-AddNewVariableClass(CollisionStrength);
+AddNewVariableClass(CollisionStrength)
 
 /// Create class for momentum transfer (momtf)
-AddNewVariableClass(MomentumTransfer);
+AddNewVariableClass(MomentumTransfer)
 
 /// Create class for total cross section (tcs)
-AddNewVariableClass(TotalCrossSection);
+AddNewVariableClass(TotalCrossSection)
 
 /// Create class for ionization amplitude radial part (ionf)
-AddNewVariableClass(IonizationF);
+AddNewVariableClass(IonizationF)
 
 /// Create class for the angle dependent full second Born T-matrix (bornf)
-AddNewVariableClass(BornFullTMatrix);
+AddNewVariableClass(BornFullTMatrix)
 
 /// Create class for ionization amplitude (ionamp)
-AddNewVariableClass(IonizationAmplitude);
+AddNewVariableClass(IonizationAmplitude)
 
 /// Triple ionization differential cross section (tdcs).
-AddNewVariableClass(TripleDifferentialCrossSection);
+AddNewVariableClass(TripleDifferentialCrossSection)
 
 /// Create class for stokes parameters (stokes)
-AddNewVariableClass(StokesParameters);
+AddNewVariableClass(StokesParameters)
 
 /// Create class for spin asymmetry (asy)
-AddNewVariableClass(SpinAsymmetry);
+AddNewVariableClass(SpinAsymmetry)
 
 /// Create class for Born T-matrix (tmatb)
-AddNewVariableClass(TMatrixB);
+AddNewVariableClass(TMatrixB)
 
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;

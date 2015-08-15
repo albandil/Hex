@@ -86,4 +86,4 @@ std::istream & operator >> (std::istream & is, vec3d & v)
     return is;
 }
 
-}; // namespace geom
+} // namespace geom

@@ -93,6 +93,6 @@ std::ostream & operator << (std::ostream & os, vec3d const & v);
 /// Read from stream.
 std::istream & operator >> (std::istream & is, vec3d & v);
 
-}; // namespace geom
+} // namespace geom
 
 #endif

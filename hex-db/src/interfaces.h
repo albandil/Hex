@@ -426,7 +426,7 @@ inline void hex_complete_cross_section
 }
 
 #ifdef __cplusplus
-};
+}
 #endif // __cplusplus
 
 #endif

@@ -10,8 +10,8 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -fPIC 
-LFLAGS = 
+CFLAGS = -Wall -std=c++11 -pedantic-errors -fPIC 
+LFLAGS = -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # GiNaC                                                                        #

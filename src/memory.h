@@ -51,7 +51,6 @@
     #define assume_aligned(x,a) __builtin_assume_aligned((x),(a))
 #else
     #define assume_aligned(x,a) (x)
-    #warning "Don't know how to use aligned pointers with this compiler. The resulting code may be slower."
 #endif
 
 // restricted pointers
@@ -59,7 +58,6 @@
     #define restrict __restrict
 #else
     #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
 #endif
 
 /**
