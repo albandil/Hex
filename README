@@ -2,6 +2,7 @@ The following configuration successfully builds and runs the package:
 
 Compiler:
     GCC 4.9.2
+    LLVM/clang 3.5.0
 
 Third-party libraries:
     GSL 1.16

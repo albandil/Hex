@@ -32,10 +32,15 @@
 #include <algorithm>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "arrays.h"
 #include "bspline.h"
 #include "memory.h"
 
+const std::size_t Bspline::work_size_ = 1024;
 
 // ----------------------------------------------------------------------- //
 //  Recursive single-point B-spline evaluation                             //
@@ -48,8 +53,23 @@ Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
     // if (r <= t_[i] or t_[i + k] <= r)
     //    return 0.;
     
+    // check that we have a work array for this thread; allocate the space if we do not
+#ifdef _OPENMP
+    unsigned ithread = omp_get_thread_num();
+    # pragma omp critical
+    if (work_.size() <= ithread)
+    {
+        while (work_.size() <= ithread)
+            work_.push_back(rArray(work_size_));
+    }
+#else
+    unsigned ithread = 0;
+    if (work_.size() == 0)
+        work_.push_back(rArray(work_size_));
+#endif
+    
     // value of the parent B-splines of the requested B-spline
-    Complex b[k + 1];
+    Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
     
     // initialize zero-order B-splines
     for (int n = 0; n <= k; n++)
@@ -94,6 +114,21 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     // NOTE: The caller's responsibility is to check that all 'x' lie in the interval (t[iknot],t[iknot+1])
     //       and that the i-th B-spline is defined there.
     
+    // check that we have a work array for this thread; allocate the space if we do not
+#ifdef _OPENMP
+    unsigned ithread = omp_get_thread_num();
+    # pragma omp critical
+    if (work_.size() <= ithread)
+    {
+        while (work_.size() <= ithread)
+            work_.push_back(rArray(work_size_));
+    }
+#else
+    unsigned ithread = 0;
+    if (work_.size() == 0)
+        work_.push_back(rArray(work_size_));
+#endif
+    
     //
     // a) Use real arithmetic when using only real knots. Allow SIMD auto-vectorization.
     //
@@ -104,12 +139,14 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
         int nvec = (M + simd_double_vec_size - 1) / simd_double_vec_size;
         
         // copy real parts of the evaluation points, pad by zeros
-        simd_double_vec_t rx[nvec];
+        double * const restrict rx = (double*)assume_aligned(work_[ithread].data(), NumberArray<double>::Alloc::alignment);
+        // --- v --- likely to autovectorize --- v ---
         for (int m = 0; m < nvec * (int)simd_double_vec_size; m++)
-            rx[m / simd_double_vec_size][m % simd_double_vec_size] = (m < M ? x[m].real() : 0);
+            rx[m] = (m < M ? x[m].real() : 0);
+        // --- ^ --- likely to autovectorize --- ^ ---
         
         // evaluations of the parent B-splines of the wanted B-spline
-        simd_double_vec_t b[order_ + 1][nvec];
+        double * const restrict b = (double*)assume_aligned(rx + nvec * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
         
         // initialize all ancestral zero-order B-splines
         for (int n = 0; n <= order_; n++)
@@ -119,12 +156,18 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             
             // store the value at all points
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < (int)simd_double_vec_size; v++) // <-- likely to auto-vectorize
-                b[n][m][v] = val;
+            {
+                double * const restrict pb = (double*)assume_aligned(b + (m + n * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                
+                // --- v --- likely to autovectorize --- v ---
+                for (unsigned v = 0; v < simd_double_vec_size; v++)
+                    pb[v] = val;
+                // --- ^ --- likely to autovectorize --- ^ ---
+            }
         }
         
         // precomputed denominators (used later)
-        double invden[order_ + 1];
+        double * const restrict invden = b + (order_ + 1) * nvec * simd_double_vec_size;
         
         // real knots restricted pointer (for fast access)
         double const * const restrict rknots = rknots_.data();
@@ -139,13 +182,21 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             // evaluate B-splines from lower orders
             for (int n = 0; n <= order_ - ord; n++)
             for (int m = 0; m < nvec; m++)
-            for (int v = 0; v < (int)simd_double_vec_size; v++) // <-- likely to auto-vectorize
-                b[n][m][v] = b[n][m][v] * (rx[m][v] - rknots[i+n]) * invden[n] + b[n+1][m][v] * (rknots[i+ord+n+1] - rx[m][v]) * invden[n+1];
+            {
+                double * const restrict pb  = (double*)assume_aligned(b  + (m +  n      * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                double * const restrict pbn = (double*)assume_aligned(b  + (m + (n + 1) * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                double * const restrict pr  = (double*)assume_aligned(rx +  m                   * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                
+                // --- v --- likely to autovectorize --- v ---
+                for (unsigned v = 0; v < simd_double_vec_size; v++)
+                    pb[v] = pb[v] * (pr[v] - rknots[i+n]) * invden[n] + pbn[v] * (rknots[i+ord+n+1] - pr[v]) * invden[n+1];
+                // --- ^ --- likely to autovectorize --- ^ ---
+            }
         }
         
         // return the collected value of the requested B-spline
         for (int m = 0; m < M; m++)
-            y[m] = b[0][m / simd_double_vec_size][m % simd_double_vec_size];
+            y[m] = b[m];
     }
     
     //
@@ -155,12 +206,12 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     else
     {
         // value of the parent B-splines of the requested B-spline
-        Complex b[M][order_ + 1];
+        Complex * const restrict b = reinterpret_cast<Complex*>(work_[ithread].data());
         
         // initialize zero-order B-splines
-        for (int m = 0; m < M; m++)
         for (int n = 0; n <= order_; n++)
-            b[m][n] = (i + n == iknot ? 1. : 0.);
+        for (int m = 0; m < M; m++)
+            b[n * M + m] = (i + n == iknot ? 1. : 0.);
         
         // calculate higher orders
         for (int ord = 1; ord <= order_; ord++)
@@ -171,16 +222,20 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
                 Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0. : 1. / (t_[i+ord+n]   - t_[i+n]));
                 Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0. : 1. / (t_[i+ord+n+1] - t_[i+n+1]));
                 
+                Complex * const restrict pb  = b +  n      * M;
+                Complex * const restrict pbn = b + (n + 1) * M;
+                
                 // for all evaluation points
                 for (int m = 0; m < M; m++)
-                    b[m][n] = b[m][n] * (x[m] - t_[i+n]) * invden1 + b[m][n+1] * (t_[i+ord+n+1] - x[m]) * invden2;
+                    pb[m] = pb[m] * (x[m] - t_[i+n]) * invden1 + pbn[m] * (t_[i+ord+n+1] - x[m]) * invden2;
             }
         }
         
         // return the collected value of the requested B-spline
         for (int m = 0; m < M; m++)
-            y[m] = b[m][0];
+            y[m] = b[m];
     }
+
 }
 
 void Bspline::dB (int i, int iknot, int n, Complex const * const restrict x, Complex * const restrict y) const

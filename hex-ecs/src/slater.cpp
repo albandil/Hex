@@ -54,9 +54,9 @@ void RadialIntegrals::R_inner_integrand
     Complex R = bspline_ij.t(iknotmax);
     
     // evaluate B-splines
-    Complex values_i[n], values_j[n];
-    bspline_ij.B(i, iknot, n, in, values_i);
-    bspline_ij.B(j, iknot, n, in, values_j);
+    cArray values_i(n), values_j(n);
+    bspline_ij.B(i, iknot, n, in, values_i.data());
+    bspline_ij.B(j, iknot, n, in, values_j.data());
     
     // fill output array
     for (int k = 0; k < n; k++)
@@ -75,9 +75,9 @@ void RadialIntegrals::R_outer_integrand
     Complex R = bspline_ij.t(iknotmax);
     
     // evaluate B-splines
-    Complex values_i[n], values_j[n];
-    bspline_ij.B(i, iknot, n, in, values_i);
-    bspline_ij.B(j, iknot, n, in, values_j);
+    cArray values_i(n), values_j(n);
+    bspline_ij.B(i, iknot, n, in, values_i.data());
+    bspline_ij.B(j, iknot, n, in, values_j.data());
     
     // use at least 2nd order
     int points2 = std::max(2, bspline_kl.order() + L + 1);

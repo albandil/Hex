@@ -788,7 +788,7 @@ template <class DataT> class BlockSymBandMatrix
             
 #ifdef _OPENMP
             // write locks
-            omp_lock_t lock[size_];
+            std::vector<omp_lock_t> lock(size_);
             for (std::size_t i = 0; i < size_; i++)
                 omp_init_lock(&lock[i]);
 #endif
@@ -945,7 +945,7 @@ template <class DataT> class BlockSymBandMatrix
                 }
                 
                 // convert the block to COO format
-                CooMatrix<IdxT,DataT> coo = SymBandMatrix<DataT>(size_, halfbw_, view).tocoo<IdxT>();
+                CooMatrix<IdxT,DataT> coo = SymBandMatrix<DataT>(size_, halfbw_, view).template tocoo<IdxT>();
                 
                 // copy all elements to whole-matrix arrays
                 for (std::size_t k = 0; k < coo.v().size(); k++)

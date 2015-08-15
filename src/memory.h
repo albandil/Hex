@@ -39,6 +39,29 @@
 
 #include "misc.h"
 
+// number array alignment (256 bits ~ AVX2)
+#define SIMD_VECTOR_BITS 256u
+#define SIMD_VECTOR_BYTES (SIMD_VECTOR_BITS / 8u)
+
+// number of components of vector of doubles that fits into SIMD vector type
+#define simd_double_vec_size (SIMD_VECTOR_BYTES / sizeof(double))
+
+// aligned pointers
+#if (defined(__GNUC__) && !defined(__clang__))
+    #define assume_aligned(x,a) __builtin_assume_aligned((x),(a))
+#else
+    #define assume_aligned(x,a) (x)
+    #warning "Don't know how to use aligned pointers with this compiler. The resulting code may be slower."
+#endif
+
+// restricted pointers
+#ifdef __GNUC__
+    #define restrict __restrict
+#else
+    #define restrict
+    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
+#endif
+
 /**
  * @brief Basic memory allocator.
  * 
@@ -255,15 +278,5 @@ template <class T, std::size_t alignment_ = std::alignment_of<T>::value> class A
             std::cout << "   alignment    : " << align << " Bytes (default: " << alignof(max_align_t) << ")" << std::endl;
         }
 };
-
-// number array alignment (256 bits ~ AVX)
-#define SIMD_VECTOR_BITS 256u
-#define SIMD_VECTOR_BYTES (SIMD_VECTOR_BITS / 8u)
-
-// number of components of vector of doubles that fits into SIMD vector type
-#define simd_double_vec_size (SIMD_VECTOR_BYTES / sizeof(double))
-
-// SIMD vector of doubles
-typedef double simd_double_vec_t [simd_double_vec_size] alignas (SIMD_VECTOR_BYTES);
 
 #endif /* HEX_MEMORY */

@@ -16,7 +16,7 @@ TARGET = release
 
 # global compiler flags
 CFLAGS = -fopenmp -Wall -mtune=native -march=native
-LFLAGS = -fopenmp
+LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
@@ -97,7 +97,7 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 
 # compiler flags
-CFLAGS +=  -fPIC -std=c++11 -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
+CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
           $(OPENCLFLAGS) $(GSLFLAGS) $(FFTWFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
 

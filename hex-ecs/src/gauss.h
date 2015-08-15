@@ -127,11 +127,11 @@ class GaussLegendre : public GaussLegendreData
             }
             
             // get evaluation points and weights
-            Complex xs[points], ws[points], fs[points];
-            scaled_nodes_and_weights(points, x1, x2, xs, ws);
+            std::vector<Complex> xs(points), ws(points), fs(points);
+            scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
             
             // evaluate the function
-            f(points, xs, fs, data...);
+            f(points, xs.data(), fs.data(), data...);
             
             // sum the results
             Complex result = 0.;
@@ -167,11 +167,11 @@ class GaussLegendre : public GaussLegendreData
             }
             
             // get evaluation points and weights
-            Complex xs[points], ws[points], fs[points];
-            scaled_nodes_and_weights(points, x1, x2, xs, ws);
+            std::vector<Complex> xs(points), ws(points), fs(points);
+            scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
             
             // evaluate the function
-            (ptr->*f)(points, xs, fs, data...);
+            (ptr->*f)(points, xs.data(), fs.data(), data...);
             
             // sum the results
             Complex result = 0.;

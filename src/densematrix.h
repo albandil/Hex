@@ -701,7 +701,7 @@ cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> co
 template <class Type, class Base>
 NumberArray<Type> operator * (RowMatrix<Type,Base> const & A, const ArrayView<Type> v)
 {
-    HexException("Don't know how to multipy matrix times vector of type %s.", typeid(Type).name);
+    HexException("Don't know how to multipy matrix times vector of type %s.", typeid(Type).name());
 }
 
 /**
@@ -773,7 +773,7 @@ cArray operator * (RowMatrix<Complex,Base> const & A, const cArrayView v)
 template <class Type, class Base1, class Base2>
 RowMatrix<Type,DenseMatrix<Type>> operator * (RowMatrix<Type,Base1> const & A, ColMatrix<Type,Base2> const & B)
 {
-    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name);
+    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name());
 }
 
 /**
@@ -861,7 +861,7 @@ RowMatrix<Complex> operator * (RowMatrix<Complex,Base1> const & A, ColMatrix<Com
 template <class Type, class Base1, class Base2>
 ColMatrix<Type> operator * (ColMatrix<Type> const & A, ColMatrix<Type> const & B)
 {
-    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name);
+    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name());
 }
 
 /**

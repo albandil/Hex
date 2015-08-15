@@ -1505,13 +1505,8 @@ template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const 
     T result = 0;
     
     // iterators
-#ifdef __GNUC__
-    T const * const restrict pa = (T const *)__builtin_assume_aligned(a.data(), NumberArray<T>::Alloc::alignment);
-    T const * const restrict pb = (T const *)__builtin_assume_aligned(b.data(), NumberArray<T>::Alloc::alignment);
-#else
-    T const * const restrict pa = a.data();
-    T const * const restrict pb = b.data();
-#endif
+    T const * const restrict pa = (T const *)assume_aligned(a.data(), NumberArray<T>::Alloc::alignment);
+    T const * const restrict pb = (T const *)assume_aligned(b.data(), NumberArray<T>::Alloc::alignment);
     
     // sum the products
     for (std::size_t i = 0; i < N; i++)
@@ -1920,13 +1915,13 @@ template <class T> NumberArray<T> fun       \
     return out;                             \
 }
 
-DEFINE_FUN_1ARR(exp,std::exp);
-DEFINE_FUN_1ARR(sin,std::sin);
-DEFINE_FUN_1ARR(cos,std::cos);
-DEFINE_FUN_1ARR(asin,std::asin);
-DEFINE_FUN_1ARR(sqrt,std::sqrt);
-DEFINE_FUN_2ARR(atan2,std::atan2);
-DEFINE_FUN_1ARR_1DBL(pow,std::pow);
+DEFINE_FUN_1ARR(exp,std::exp)
+DEFINE_FUN_1ARR(sin,std::sin)
+DEFINE_FUN_1ARR(cos,std::cos)
+DEFINE_FUN_1ARR(asin,std::asin)
+DEFINE_FUN_1ARR(sqrt,std::sqrt)
+DEFINE_FUN_2ARR(atan2,std::atan2)
+DEFINE_FUN_1ARR_1DBL(pow,std::pow)
 
 /// Return per-element hypot.
 NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);

@@ -326,13 +326,14 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     int Nchunk = Nspline_atom * Nspline_proj;
     
     // precalculate angular integrals
-    double fs[Nang][Nang][rad_.maxlambda() + 1];
+    rArray ffs (Nang * Nang * (rad_.maxlambda() + 1));
+    # define fs(i,j,k) (ffs[k + (j + i * Nang) * (rad_.maxlambda() + 1)])
     for (int ill  = 0; ill  < Nang; ill ++)
     for (int illp = 0; illp < Nang; illp++)
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
     {
-        fs[ill][illp][lambda] = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-        if (not std::isfinite(fs[ill][illp][lambda]))
+        fs(ill,illp,lambda) = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
+        if (not std::isfinite(fs(ill,illp,lambda)))
             HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
     }
     
@@ -395,7 +396,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // check non-zero
-                    if (fs[ill][illp][lambda] == 0.)
+                    if (fs(ill,illp,lambda) == 0.)
                         continue;
                     
                     // load data
@@ -403,7 +404,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                     
                     // calculate product
-                    q[ill] += (-fs[ill][illp][lambda]) * rad_.R_tr_dia(lambda).dot(p[illp], true);
+                    q[ill] += (-fs(ill,illp,lambda)) * rad_.R_tr_dia(lambda).dot(p[illp], true);
                     
                     // unload data
                     if (cmd_.outofcore)
@@ -452,11 +453,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // check non-zero
-                    if (fs[ill][illp][lambda] == 0.)
+                    if (fs(ill,illp,lambda) == 0.)
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-fs[ill][illp][lambda]) * rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    cArray p0 = std::move( (-fs(ill,illp,lambda)) * rad_.R_tr_dia(lambda).dot(p[illp], true) );
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -575,10 +576,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         cArray product (Nspline_proj);
                         
                         // for all superblocks in this row
-                        for (int illp = 0; illp < Nang; illp++) if (fs[ill][illp][lambda] != 0.)
+                        for (int illp = 0; illp < Nang; illp++) if (fs(ill,illp,lambda) != 0.)
                         {
                             // multiply sub-segment by the R block
-                            product += fs[ill][illp][lambda] * R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
+                            product += fs(ill,illp,lambda) * R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
                         }
                         
                         // atomic update of the owned sub-segment

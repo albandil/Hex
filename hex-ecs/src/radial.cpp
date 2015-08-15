@@ -76,9 +76,9 @@ void RadialIntegrals::Mi_integrand
     Complex R = bspline_ij.t(iknotmax);
     
     // evaluate B-splines
-    Complex values_i[n], values_j[n];
-    bspline_ij.B(i, iknot, n, in, values_i);
-    bspline_ij.B(j, iknot, n, in, values_j);
+    cArray values_i(n), values_j(n);
+    bspline_ij.B(i, iknot, n, in, values_i.data());
+    bspline_ij.B(j, iknot, n, in, values_j.data());
     
     // get upper bound
     double t = bspline_ij.t(iknot + 1).real();
@@ -190,13 +190,13 @@ Complex RadialIntegrals::computeD_iknot
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
     // - use at least 2nd order
     int points = std::max(2, bspline.order());
-    Complex xs[points], ws[points];
-    g.scaled_nodes_and_weights(points, x1, x2, xs, ws);
+    cArray xs(points), ws(points);
+    g.scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
     
     // evaluate B-splines at Gauss-Legendre nodes
-    Complex values_i[points], values_j[points];
-    bspline.dB(i, iknot, points, xs, values_i);
-    bspline.dB(j, iknot, points, xs, values_j);
+    cArray values_i(points), values_j(points);
+    bspline.dB(i, iknot, points, xs.data(), values_i.data());
+    bspline.dB(j, iknot, points, xs.data(), values_j.data());
     
     // result
     Complex res = 0;
@@ -250,13 +250,13 @@ Complex RadialIntegrals::computeM_iknot
     // get Gauss-Legendre nodes and weights for the interval [-1, 1]
     // - use at least 2nd order
     int points = std::max(2, bspline.order() + std::abs(a) + 1);
-    Complex xs[points], ws[points];
-    g.scaled_nodes_and_weights(points, x1, x2, xs, ws);
+    cArray xs(points), ws(points);
+    g.scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
     
     // evaluate B-splines at Gauss-Legendre nodes
-    Complex values_i[points], values_j[points];
-    bspline.B(i, iknot, points, xs, values_i);
-    bspline.B(j, iknot, points, xs, values_j);
+    cArray values_i(points), values_j(points);
+    bspline.B(i, iknot, points, xs.data(), values_i.data());
+    bspline.B(j, iknot, points, xs.data(), values_j.data());
     
     // result
     Complex res = 0;

@@ -84,14 +84,13 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
     char jobz = 'N';
     
     // memory array
-    double oldzeros[nzeros];
-    std::memset(oldzeros, 0, sizeof(oldzeros));
+    rArray oldzeros (nzeros, 0.);
     
     // for different sizes of the tridiagonal matrix
     for (int n = nzeros; ; n *= 2)
     {
         // compose diagonal
-        double d[n];
+        rArray d(n);
         for (int i = 1; i <= n; i++)
         {
             // compute diagonal element
@@ -106,7 +105,7 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
         }
         
         // compose subdiagonal
-        double e[n-1];
+        rArray e(n-1);
         for (int i = 1; i <= n-1; i++)
             e[i-1] = std::sqrt((L+i+1)*(L+i+1)+eta*eta) / ((L+i+1)*std::sqrt((2*(L+i)+1)*(2*(L+i)+3)));
         

@@ -55,20 +55,6 @@
     #include <unistd.h>
 #endif
 
-//
-// Restricted pointers.
-// - allow some compiler optimizations on arrays
-//
-
-#ifndef restrict
-#ifdef __GNUC__
-    #define restrict __restrict
-#else
-    #define restrict
-    #warning "Don't know how to use restricted pointers with this compiler. The resulting code may be slower."
-#endif
-#endif
-
 /**
  * @brief printf-like formatting.
  * 
@@ -175,7 +161,7 @@ template <class T> struct is_complex { static const bool value = false; };
 #define declareTypeAsComplex(T) \
     template <> struct is_complex<T> { static const bool value = true; }
 #define declareTemplateTypeAsComplex(TT) \
-    template <> template <class T> struct is_complex<TT<T>> { static const bool value = true; }
+    template <class T> struct is_complex<TT<T>> { static const bool value = true; }
 
 declareTemplateTypeAsComplex(std::complex);
 

@@ -279,6 +279,12 @@ class Bspline
         
         /// B-spline order
         int order_;
+        
+        /// Work arrays (one per thread)
+        mutable rArrays work_;
+        
+        /// Work max size
+        static const std::size_t work_size_;
 };
 
 #endif

@@ -91,7 +91,7 @@ const double Inf = std::numeric_limits<double>::infinity();     // +∞
 const double Nan = std::numeric_limits<double>::quiet_NaN();    // NaN
 const double eps = std::numeric_limits<double>::epsilon();      // machine precision
 
-}; // end of namespace "special::constant"
+} // end of namespace "special::constant"
 
 namespace integral
 {
@@ -157,7 +157,7 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
     return z;
 }
 
-}; // end of namespace "special::integral"
+} // end of namespace "special::integral"
 
 /**
  * @brief Fast integer power of two.
@@ -820,6 +820,6 @@ double Gaunt (int l1, int m1, int l2, int m2, int l, int m);
  */
 int triangle_count (int L, int maxell);
 
-}; // end of namespace "special"
+} // end of namespace "special"
 
 #endif
