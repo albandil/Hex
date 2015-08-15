@@ -52,12 +52,12 @@
 template <class Functor, typename FType> FType lim (Functor F, double x, int * n = nullptr)
 {
     // initial position
-    double x0;
+    double x0 = 0;
     if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
     if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
 
     // function value
-    FType f0 = F(x0), f;
+    FType f0 = F(x0), f = special::constant::Nan;
 
     // main loop
     int i;
