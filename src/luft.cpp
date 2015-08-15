@@ -241,17 +241,17 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             const_cast<SuperMatrix*>(&L_),  // L-factor
             const_cast<SuperMatrix*>(&U_),  // U-factor
             nullptr,                        // workspace (not used)
-            0,              // size of the workspace (0 = dynamic allocation)
-            &B,             // right-hand sides
-            &X,             // solution matrix
-            &rpg,           // reciprocal pivot growth factor
-            &rcond,         // reciprocal condition number
-            &ferr[0],       // forward error
-            &berr[0],       // backward error
-            &Glu_,          // reusable information
-            &mem_usage,     // memory usage
-            &stat,          // diagnostic infomation
-            &info           // result status
+            0,                              // size of the workspace (0 = dynamic allocation)
+            &B,                             // right-hand sides
+            &X,                             // solution matrix
+            &rpg,                           // reciprocal pivot growth factor
+            &rcond,                         // reciprocal condition number
+            &ferr[0],                       // forward error
+            &berr[0],                       // backward error
+            const_cast<GlobalLU_t*>(&Glu_), // reusable information
+            &mem_usage,                     // memory usage
+            &stat,                          // diagnostic infomation
+            &info                           // result status
         );
     
     // check status
