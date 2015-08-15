@@ -110,10 +110,11 @@ cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const 
     cArray m (Nspline * (2 * order + 1) * (order + 1));
     
     // for all B-splines
-    for (int i = 0; i < (int)Nspline; i++)
+    # pragma omp parallel
+    for (int i = 0; i < Nspline; i++)
     {
         // for all B-splines (use symmetry)
-        for (int j = i; j <= i + (int)order and j < (int)Nspline; j++)
+        for (int j = i; j <= i + order and j < Nspline; j++)
         {
             // determine relevant knots
             int ileft = j;
