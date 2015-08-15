@@ -284,10 +284,11 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
             rArray const & C,
             SuperMatrix L,
             SuperMatrix U,
+            GlobalLU_t Glu,
             int bytes,
             double droptol
         ) : LUft<IdxT,DataT>(), matrix_(matrix), perm_c_(perm_c), perm_r_(perm_r), etree_(etree), equed_(equed),
-            R_(R), C_(R), L_(L), U_(U), size_(bytes), droptol_(droptol)
+            R_(R), C_(R), L_(L), U_(U), Glu_(Glu), size_(bytes), droptol_(droptol)
         {
             // nothing to do
         }
@@ -346,6 +347,9 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         
         /// U-factor.
         SuperMatrix U_;
+        
+        /// Reusable information.
+        GlobalLU_t Glu_;
         
         /// Memory size.
         std::size_t size_;

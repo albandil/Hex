@@ -516,6 +516,9 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
         SuperLUStat_t stat;
         StatInit(&stat);
         
+        // reusable information
+        GlobalLU_t Glu;
+        
         // memory usage
         mem_usage_t mem_usage;
     
@@ -559,6 +562,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
             &rcond,         // reciprocal condition number
             &ferr,          // forward error
             &berr,          // backward error
+            &Glu,           // reusable information
             &mem_usage,     // memory usage
             &stat,          // diagnostic infomation
             &info           // result status
@@ -577,7 +581,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
     LUft<int,Complex> * lu_ptr = new LUft_SUPERLU<int,Complex>
     (
         this, perm_c, perm_r, etree, equed,
-        R, C, L, U, mem_usage.for_lu, droptol
+        R, C, L, U, Glu, mem_usage.for_lu, droptol
     );
     
     // wrap the pointer into smart pointer

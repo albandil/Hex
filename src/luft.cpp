@@ -248,6 +248,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             &rcond,         // reciprocal condition number
             &ferr[0],       // forward error
             &berr[0],       // backward error
+            &Glu_,          // reusable information
             &mem_usage,     // memory usage
             &stat,          // diagnostic infomation
             &info           // result status
