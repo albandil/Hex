@@ -65,11 +65,13 @@
  * @return N for successful run of n < N for forced terminantion on overflow,
  *         where n is the index of last valid field in yg and ypg.
  */
-int solve2 (
-    double xg[], int N, double h, double yg[][2],
-    int (*derivs) (double, const double [2], double [2], void*),
+int solve2
+(
+    double * xg, int N, double h, double ** yg,
+    int (*derivs) (double, const double*, double*, void*),
     void * data, int flag
-) {
+)
+{
     // initialize auxiliary variables
     size_t ntrial = 100000000;	// 10⁷
     double x0 = xg[0], x1 = xg[N - 2];
@@ -95,7 +97,7 @@ int solve2 (
     for(int i = 1; i < N - 1 and status == GSL_SUCCESS; i++)
     {
         xnext = x0 + (x1 - x0) * ((double)i)/((double)(N - 2));
-        double (& y_row) [2] = yg[i];
+        double * y_row = yg[i];
         y_row[0] = yg[i-1][0];
         y_row[1] = yg[i-1][1];
         
@@ -103,7 +105,8 @@ int solve2 (
         bool done = false;
         while (not done and status == GSL_SUCCESS)
         {
-            status = gsl_odeiv2_evolve_apply (
+            status = gsl_odeiv2_evolve_apply
+            (
                 evolve,
                 control,
                 step,

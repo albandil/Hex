@@ -163,7 +163,10 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         //
         
         // data arrays
-        double x0g[samples0], y0g[samples0][2];
+        double * x0g = new double [samples0];
+        double ** y0g = new double* [samples0];
+        for (int i = 0; i < samples0; i++)
+            y0g[i] = new double [samples0];
         
         if (ln > 0)
         {
@@ -176,7 +179,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
             y0g[0][1] = -1./(ln+1);
             
             // solve the equation
-            solve2 (x0g, samples0 + 1, h0, y0g, derivs0, &data, NORMALIZE_ON_OVERFLOW);
+            solve2(x0g, samples0 + 1, h0, y0g, derivs0, &data, NORMALIZE_ON_OVERFLOW);
         }
         
         //
@@ -184,7 +187,10 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         //
         
         // data arrays
-        double xg[samples], yg[samples][2];
+        double * xg = new double [samples];
+        double ** yg = new double* [samples];
+        for (int i = 0; i < samples; i++)
+            yg[i] = new double [samples];
         
         // create grid
         for (int i = 0; i < samples; i++)
@@ -205,7 +211,7 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         }
         
         // solve
-        solve2 (xg, samples + 1, h, yg, derivs, &data, NORMALIZE_ON_OVERFLOW);
+        solve2(xg, samples + 1, h, yg, derivs, &data, NORMALIZE_ON_OVERFLOW);
         
         // values y0g[last] and yg[first] shoud be equal -- normalize the classically forbidden part (if any)
         if (ln > 0)
@@ -243,6 +249,17 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         array.push_back(phase);
         array.hdfsave(filename);
         array.pop_back();
+        
+        // release memory
+        for (int i = 0; i < samples0; i++)
+            delete [] y0g[i];
+        delete [] x0g;
+        delete [] y0g;
+        
+        for (int i = 0; i < samples; i++)
+            delete [] yg[i];
+        delete [] xg;
+        delete [] yg;
     }
     
     // setup the interpolators

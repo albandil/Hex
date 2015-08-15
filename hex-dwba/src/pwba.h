@@ -85,6 +85,6 @@ double compute_Iexc
     int Nf, int Lf, double kf
 );
 
-}; /* namespace PWBA1 */
+} /* namespace PWBA1 */
 
 #endif /* HEX_PWBA */
