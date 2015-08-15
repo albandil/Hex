@@ -243,7 +243,7 @@ class Parallel
         template <class T> void bcast_g (int igroup, int groupowner, T * data, std::size_t N) const
         {
 #ifdef WITH_MPI
-            if (active_ and igroup == igroup_)
+            if (active_ and igroup == igroup_ and groupsize_ > 1)
             {
                 // groupowner : broadcast data
                 MPI_Bcast
@@ -441,7 +441,7 @@ class Parallel
         template <class T> void sum_g (T* array, std::size_t N, int destination) const
         {
 #ifdef WITH_MPI
-            if (active_)
+            if (active_ and groupsize_ > 1)
             {
                 MPI_Reduce
                 (
@@ -463,7 +463,7 @@ class Parallel
         template <class T> void mastersum (T* array, std::size_t N, int destgroup) const
         {
 #ifdef WITH_MPI
-            if (active_ and IamGroupMaster())
+            if (active_ and IamGroupMaster() and Ngroup_ > 1)
             {
                 MPI_Reduce
                 (

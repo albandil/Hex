@@ -460,6 +460,12 @@ void CommandLine::parse (int argc, char* argv[])
                 panels = std::atoi(optargs[0].c_str());
                 return true;
             },
+        "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // allow multiple factorizations at a time
+                parallel_factorization = true;
+                return true;
+            },
 #endif
         
         [&] (std::string optname, std::vector<std::string> const & optargs) -> bool

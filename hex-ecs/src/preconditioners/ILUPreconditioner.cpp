@@ -119,6 +119,12 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // check that the factorization is loaded
     if (lu_[iblock]->size() == 0)
     {
+#ifdef _OPENMP
+        // allow only one factorization at a time when not using SuperLU DIST
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST or not cmd_.parallel_factorization)
+            omp_set_lock(&lu_lock_);
+#endif
+        
         // create CSR representation of the current diagonal block
         csr_blocks_[iblock] = dia_blocks_[iblock].tocoo<LU_int_t>().tocsr();
         
@@ -157,6 +163,12 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
             lu_[iblock]->link(format("lu-%d.ooc", iblock));
             lu_[iblock]->save();
         }
+        
+#ifdef _OPENMP
+        // release lock
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST or not cmd_.parallel_factorization)
+            omp_unset_lock(&lu_lock_);
+#endif
     }
     
     // precondition by LU

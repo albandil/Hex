@@ -159,18 +159,22 @@ int main (int argc, char* argv[])
             if (ipanel == 0)
             {
                 rknots_panel.push_back(inp.rknots);
-                rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
+                if (not inp.overlap_knots.empty())
+                    rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
                 rknots_full = rknots_panel;
             }
             else
             {
                 rknots_panel.resize(0);
-                rknots_panel.push_back(rknots_full.back().back() - inp.overlap_knots.back() + inp.overlap_knots);
+                if (not inp.overlap_knots.empty())
+                    rknots_panel.push_back(rknots_full.back().back() - inp.overlap_knots.back() + inp.overlap_knots);
                 rknots_panel.push_back(rknots_panel.back().back() + inp.rknots_next.slice(1, inp.rknots_next.size()));
-                rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
+                if (not inp.overlap_knots.empty())
+                    rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
                 
                 rknots_full.push_back(rknots_full.back().back() + inp.rknots_next.slice(1, inp.rknots_next.size()));
-                rknots_full.push_back(rknots_full.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
+                if (not inp.overlap_knots.empty())
+                    rknots_full.push_back(rknots_full.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
             }
             
             // create new B-spline basis for this panel

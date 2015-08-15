@@ -86,7 +86,8 @@ class CommandLine
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_block(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1)
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
+              parallel_factorization(false)
         {
             // get command line options
             parse(argc, argv);
@@ -181,6 +182,9 @@ class CommandLine
         
         /// Number of panels (solver + propagator sections).
         int panels;
+        
+        /// Allow parallel factorization.
+        int parallel_factorization;
 };
 
 /**

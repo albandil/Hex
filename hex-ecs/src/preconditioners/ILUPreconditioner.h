@@ -34,6 +34,10 @@
 
 #include "../preconditioners.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #ifdef WITH_SUPERLU_DIST
 #include <superlu_zdefs.h>
 #endif
@@ -66,7 +70,16 @@ class ILUCGPreconditioner : public CGPreconditioner
         ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
             csr_blocks_(ll.size()), lu_(ll.size())
         {
-            // nothing more to do
+#ifdef _OPENMP
+            omp_init_lock(&lu_lock_);
+#endif
+        }
+        
+        ~ILUCGPreconditioner ()
+        {
+#ifdef _OPENMP
+            omp_destroy_lock(&lu_lock_);
+#endif
         }
         
         // reuse parent definitions
@@ -88,6 +101,11 @@ class ILUCGPreconditioner : public CGPreconditioner
         
         // LU decompositions of the CSR blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        
+#ifdef _OPENMP
+        // factorization lock
+        mutable omp_lock_t lu_lock_;
+#endif
         
 #ifdef WITH_SUPERLU_DIST
         // process grid
