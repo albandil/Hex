@@ -190,6 +190,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
+                    "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
@@ -203,7 +204,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
                     "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
-                    "\t--propagate <number>             Propagate solution through given number of panels.                                                                     \n"
+                    "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
 #ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
@@ -454,6 +455,7 @@ void CommandLine::parse (int argc, char* argv[])
                 gpu_large_data = true;
                 return true;
             },
+#endif
         "panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // propagate solution along the projectile axis
@@ -466,7 +468,6 @@ void CommandLine::parse (int argc, char* argv[])
                 parallel_factorization = true;
                 return true;
             },
-#endif
         
         [&] (std::string optname, std::vector<std::string> const & optargs) -> bool
         {
