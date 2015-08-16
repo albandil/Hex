@@ -172,7 +172,7 @@ cArrays PWBA2::PartialWave_direct
                         double kn = std::sqrt(std::abs(Etot - Kn * Kn));
                         
                         // compute the radial integral
-                        return 2. * Kn * Kn * Idir_nFree_allowed
+                        Complex inte = 2. * Kn * Kn * Idir_nFree_allowed
                         (
                             grid, L,
                             Nf, Lf, kf, lf,
@@ -180,6 +180,8 @@ cArrays PWBA2::PartialWave_direct
                             Ni, Li, ki, li,
                             log
                         );
+                        
+                        return Complex_finite(inte) ? inte : 0.;
                     };
                     
                     // use complex Clenshaw-Curtis integrator
@@ -223,7 +225,7 @@ cArrays PWBA2::PartialWave_direct
                         if (val == 0)
                             far = Kn;
                         
-                        return val;
+                        return std::isfinite(val) ? val : 0;
                     };
                     
                     // use real compactified Gauss-Kronrod integrator
