@@ -87,7 +87,7 @@ class CommandLine
               itertol(1e-8), prec_itertol(1e-8), parallel_block(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
-              parallel_factorization(false)
+              parallel_factorization(false), parallel_extraction(true)
         {
             // get command line options
             parse(argc, argv);
@@ -185,6 +185,9 @@ class CommandLine
         
         /// Allow parallel factorization.
         int parallel_factorization;
+        
+        /// Allow parallel extraction.
+        int parallel_extraction;
 };
 
 /**

@@ -420,6 +420,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
         
         // compute radial factor
+        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
         for (unsigned ill = 0; ill < ang_.size(); ill++)
         {
             // skip blocks that do not contribute to (l1 = ) lf

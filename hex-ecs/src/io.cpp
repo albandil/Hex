@@ -191,6 +191,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
+                    "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
                     "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
@@ -466,6 +467,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // allow multiple factorizations at a time
                 parallel_factorization = true;
+                return true;
+            },
+        "no-parallel-extraction", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // disallow parallel extraction
+                parallel_extraction = false;
                 return true;
             },
         
