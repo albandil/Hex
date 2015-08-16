@@ -53,19 +53,10 @@ Complex Bspline::bspline (int i, int iknot, int k, Complex r) const
     // if (r <= t_[i] or t_[i + k] <= r)
     //    return 0.;
     
-    // check that we have a work array for this thread; allocate the space if we do not
 #ifdef _OPENMP
     unsigned ithread = omp_get_thread_num();
-    # pragma omp critical
-    if (work_.size() <= ithread)
-    {
-        while (work_.size() <= ithread)
-            work_.push_back(rArray(work_size_));
-    }
 #else
     unsigned ithread = 0;
-    if (work_.size() == 0)
-        work_.push_back(rArray(work_size_));
 #endif
     
     // value of the parent B-splines of the requested B-spline
@@ -114,19 +105,10 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     // NOTE: The caller's responsibility is to check that all 'x' lie in the interval (t[iknot],t[iknot+1])
     //       and that the i-th B-spline is defined there.
     
-    // check that we have a work array for this thread; allocate the space if we do not
 #ifdef _OPENMP
     unsigned ithread = omp_get_thread_num();
-    # pragma omp critical
-    if (work_.size() <= ithread)
-    {
-        while (work_.size() <= ithread)
-            work_.push_back(rArray(work_size_));
-    }
 #else
     unsigned ithread = 0;
-    if (work_.size() == 0)
-        work_.push_back(rArray(work_size_));
 #endif
     
     //
@@ -459,6 +441,15 @@ Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView co
         t_[i] = rknots[i];
     for (int i = 1; i < cknots_len; i++)
         t_[i + rknots_len - 1] = rotate(cknots[i]);
+    
+    // allocate workspace for all threads
+    unsigned nthreads = 1;
+#ifdef _OPENMP
+    #pragma omp parallel
+    nthreads = omp_get_num_threads();
+#endif
+    while (work_.size() <= nthreads)
+        work_.push_back(rArray(work_size_));
 }
 
 

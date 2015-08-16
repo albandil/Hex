@@ -43,6 +43,8 @@
 #include "special.h"
 #include "matrix.h"
 
+#define EXPANSION_QUADRATURE_POINTS 20
+
 /**
  * Potential suppressing factor. 
  * @param y Radial coordinate of some electron.
@@ -115,11 +117,11 @@ class RadialIntegrals
     public:
         
         // constructor
-        RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj);
+        RadialIntegrals (const Bspline& bspline_atom, const Bspline& bspline_proj, int Nlambdas);
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
-        void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas);
+        void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         
         // verbosity control
         void verbose (bool v) { verbose_ = v; }
@@ -384,7 +386,7 @@ class RadialIntegrals
             cArray res (bspline.Nspline());
             
             // per interval
-            int points = 20;
+            int points = EXPANSION_QUADRATURE_POINTS;
             
             // evaluated B-spline and hydrogenic functions
             cArray evalB (points), evalP (points);
@@ -460,7 +462,7 @@ class RadialIntegrals
             cArray res (size);
             
             // per interval
-            int points = 20;
+            int points = EXPANSION_QUADRATURE_POINTS;
             
             // quadrature weights and nodes
             cArray xs (points), ws (points);
@@ -654,7 +656,7 @@ class RadialIntegrals
         cArray apply_R_matrix (unsigned lambda, cArray const & src, bool simple = false) const;
         
         /// Return maximal multipole, for which there are precomputed two-electron integrals.
-        int maxlambda () const { return R_tr_dia_.size() - 1; }
+        int maxlambda () const { return Nlambdas_ - 1; }
         
     private:
         
@@ -686,6 +688,9 @@ class RadialIntegrals
         
         // verbose output
         bool verbose_;
+        
+        // number of multipole matrices
+        int Nlambdas_;
 };
 
 #endif

@@ -56,16 +56,8 @@ const std::string NoPreconditioner::prec_description = "\"Preconditioning\" by t
 
 void NoPreconditioner::setup ()
 {
-    // TODO : Determine which lambdas are needed by this process.
-    // NOTE : At the moment each process holds in memory radial integrals
-    //        for all lambdas, which needlessly raises memory requirements.
-    Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
-    
-    // compute one-electron radial integrals
     rad_.setupOneElectronIntegrals(par_, cmd_);
-    
-    // compute two-eletron radial integrals
-    rad_.setupTwoElectronIntegrals(par_, cmd_, lambdas);
+    rad_.setupTwoElectronIntegrals(par_, cmd_);
 }
 
 void NoPreconditioner::update (double E)
@@ -191,7 +183,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
     
     // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
-    RadialIntegrals radf (rad_.bspline_atom(), bspline_proj_full);
+    RadialIntegrals radf (rad_.bspline_atom(), bspline_proj_full, 0);
     radf.verbose(false);
     radf.setupOneElectronIntegrals(par_, cmd_);
     

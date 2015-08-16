@@ -45,55 +45,57 @@ std::vector<std::pair<double*,double*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
-int GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
+void GaussLegendreData::precompute_nodes_and_weights (int points) const
+{
+    # pragma omp critical
+    for (int n = data_.size(); n <= points; n++)
+    {
+        double* nodes = new double [n];
+        double* weights = new double [n];
+        
+        gsl_integration_glfixed_table *t = gsl_integration_glfixed_table_alloc(n);
+        
+        // add anti/symmetrically the nodes and weights
+        for (int i = 0; i < n/2; i++)
+        {
+            nodes[n/2-i-1] = -t->x[i+n%2];
+            nodes[n/2+i+n%2] = t->x[i+n%2];
+            
+            weights[n/2-i-1] = t->w[i+n%2];
+            weights[n/2+i+n%2] = t->w[i+n%2];
+        }
+        
+        // for odd 'n' add also the node and weight in zero
+        if (n % 2 != 0)
+        {
+            nodes[n/2] = 0.;
+            weights[n/2] = t->w[0];
+        }
+        
+        data_.push_back(std::make_pair(nodes,weights));
+    }
+}
+
+void GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
 {
     // enforce at least second order rule
     if (points < 2)
         HexException("[gauss_nodes_and_weights] Nor implemented for orders less than 2. Your input: %d.", points);
     
     // first of all generate any missing data
-    # pragma omp critical
     if (points >= (int)data_.size())
-    {
-        for (int n = data_.size(); n <= points; n++)
-        {
-            double* nodes = new double [n];
-            double* weights = new double [n];
-            
-            gsl_integration_glfixed_table *t = gsl_integration_glfixed_table_alloc(n);
-            
-            // add anti/symmetrically the nodes and weights
-            for (int i = 0; i < n/2; i++)
-            {
-                nodes[n/2-i-1] = -t->x[i+n%2];
-                nodes[n/2+i+n%2] = t->x[i+n%2];
-                
-                weights[n/2-i-1] = t->w[i+n%2];
-                weights[n/2+i+n%2] = t->w[i+n%2];
-            }
-            
-            // for odd 'n' add also the node and weight in zero
-            if (n % 2 != 0)
-            {
-                nodes[n/2] = 0.;
-                weights[n/2] = t->w[0];
-            }
-            
-            data_.push_back(std::make_pair(nodes,weights));
-        }
-    }
+        HexException("[gauss_nodes_and_weights] Not enough precomputed data; requested order = %d, available = %d", points, data_.size());
     
-    // return the arrays
+    // choose arrays
     vx = data_[points].first;
     vw = data_[points].second;
-    return points;
 }
 
 void GaussLegendre::scaled_nodes_and_weights (int points, Complex x1, Complex x2, Complex* xs, Complex* ws) const
 {
     // get the Gauss-Legendre nodes and weights
     const double *vx, *vw;
-    points = gauss_nodes_and_weights(points, vx, vw);
+    gauss_nodes_and_weights(points, vx, vw);
     
     // prepare centre and half-width of the interval
     Complex hw = 0.5 * (x2 - x1);

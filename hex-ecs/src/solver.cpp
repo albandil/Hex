@@ -116,7 +116,7 @@ void Solver::solve ()
             int mi = std::get<2>(inp_.instates[instate]);
             
             // skip energy-forbidden states
-            if (inp_.Etot[ie] < -1./(ni*ni))
+            if (inp_.Etot[ie] <= -1./(ni*ni))
             {
                 std::cout << "\tSkip initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin
                           << ") : not allowed by total E." << std::endl;;
@@ -233,11 +233,10 @@ void Solver::solve ()
                     std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
                     
                     // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1]);
-                    Array<bool> lambdas (inp_.L + 2 * inp_.levels + 1, true);
+                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
-                    rad.setupTwoElectronIntegrals(par_, cmd_, lambdas);
+                    rad.setupTwoElectronIntegrals(par_, cmd_);
                     
                     // for all angular segments of the right-hand side
                     for (unsigned ill = 0; ill < angs_.size(); ill++)

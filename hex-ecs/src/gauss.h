@@ -44,15 +44,19 @@ class GaussLegendreData
         /**
          * @brief Retrieve Gauss-Legendre data.
          * 
-         * Precompute Gauss-Legendre quadrature data (if not already done
-         * is some previous call) and return pointers to the chache table.
-         * 
          * @param points Gauss-Legendre points half-count. If too low/high, the return value
          *               will contain the (used) nearest implemented value.
          * @param vx     On return, the Gauss-Legendre nodes (nonnegative half of them).
          * @param vw     On return, the corresponding Gauss-Legendre weights.
          */
-        int gauss_nodes_and_weights (int points, const double* &vx, const double* &vw) const;
+        void gauss_nodes_and_weights (int points, const double*& vx, const double*& vw) const;
+        
+        /**
+         * @brief Precalculate nodes and weights so that the retrieval is fast and thread-safe.
+         * 
+         * Uses the GSL routine \c gsl_integration_glfixed_table_alloc.
+         */
+        void precompute_nodes_and_weights (int points) const;
     
     private:
         

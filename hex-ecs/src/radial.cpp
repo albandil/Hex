@@ -44,7 +44,7 @@
 
 int debug = false;
 
-RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj)
+RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj, int Nlambdas)
   : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
     g_atom_(bspline_atom), g_proj_(bspline_proj),
     D_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
@@ -57,11 +57,15 @@ RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & 
     Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    verbose_(true)
+    verbose_(true), Nlambdas_(Nlambdas)
 {
-    // nothing to do
+    // maximal number of evaluation points (quadrature rule)
+    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas + 1);
+    
+    // precompute Gaussian weights
+    g_atom_.precompute_nodes_and_weights(npts);
+    g_proj_.precompute_nodes_and_weights(npts);
 }
-
 
 void RadialIntegrals::Mi_integrand
 (
@@ -348,7 +352,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
         std::cout << "ok" << std::endl << std::endl;
 }
 
-void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd, Array<bool> const & lambdas)
+void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
     int order = bspline_atom_.order();
@@ -367,7 +371,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     }
     
     // set number of two-electron integrals
-    R_tr_dia_.resize(lambdas.size());
+    R_tr_dia_.resize(Nlambdas_);
     
     // print information
     if (verbose_)
@@ -376,11 +380,11 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // compute partial moments
     std::size_t mi_size_atom = Nspline_atom * (2 * order + 1) * (order + 1);
     std::size_t mi_size_proj = Nspline_proj * (2 * order + 1) * (order + 1);
-    Mitr_L_atom_   .resize(lambdas.size() * mi_size_atom);    Mitr_L_proj_   .resize(lambdas.size() * mi_size_proj);
-    Mitr_mLm1_atom_.resize(lambdas.size() * mi_size_atom);    Mitr_mLm1_proj_.resize(lambdas.size() * mi_size_proj);
-    Mtr_L_atom_    .resize(lambdas.size());                   Mtr_L_proj_    .resize(lambdas.size());
-    Mtr_mLm1_atom_ .resize(lambdas.size());                   Mtr_mLm1_proj_ .resize(lambdas.size());
-    for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
+    Mitr_L_atom_   .resize(Nlambdas_ * mi_size_atom);    Mitr_L_proj_   .resize(Nlambdas_ * mi_size_proj);
+    Mitr_mLm1_atom_.resize(Nlambdas_ * mi_size_atom);    Mitr_mLm1_proj_.resize(Nlambdas_ * mi_size_proj);
+    Mtr_L_atom_    .resize(Nlambdas_);                   Mtr_L_proj_    .resize(Nlambdas_);
+    Mtr_mLm1_atom_ .resize(Nlambdas_);                   Mtr_mLm1_proj_ .resize(Nlambdas_);
+    for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
     {
         // atomic basis
         cArrayView(Mitr_L_atom_,    lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,   lambda,   Nreknot_atom - 1);
@@ -400,7 +404,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         return;
     
     // allocate storage and associate names
-    for (unsigned lambda = 0; lambda < lambdas.size(); lambda++)
+    for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
         // keep data in memory?
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
@@ -422,10 +426,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     
     // print information
     if (verbose_)
-        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << lambdas.size() - 1 << ")." << std::endl;
+        std::cout << "Precomputing multipole integrals (lambda = 0 .. " << Nlambdas_ - 1 << ")." << std::endl;
     
     // for all multipoles : compute / load
-    for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
+    for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
     {
         // if the radial integrals are shared, this process will only compute the owned subset of radial integrals
         if (cmd.shared_scratch and not par.isMyWork(lambda))
@@ -485,7 +489,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // if this process skipped some lambda-s due to scratch sharing and still it needs them in memory, load them
     if (cmd.shared_scratch and cmd.cache_all_radint)
     {
-        for (int lambda = 0; lambda < (int)lambdas.size(); lambda++)
+        for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
         {
             // skip own data (already loaded since calculation)
             if (par.isMyWork(lambda))

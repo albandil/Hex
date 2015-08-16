@@ -60,7 +60,7 @@ Amplitudes::Amplitudes
     InputFile const & inp, Parallel const & par, CommandLine const & cmd,
     std::vector<std::pair<int,int>> const & ang
 ) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-    rad_(bspline_atom_,bspline_proj),
+    rad_(bspline_atom_,bspline_proj,0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang)
 {
     // nothing to do
@@ -68,9 +68,6 @@ Amplitudes::Amplitudes
 
 void Amplitudes::extract ()
 {
-    // radial integrals
-    RadialIntegrals rad (bspline_atom_, bspline_proj_);
-    
     std::cout << std::endl << "Extracting T-matrices" << std::endl;
     
     for (unsigned Spin = 0; Spin <= 1; Spin++)

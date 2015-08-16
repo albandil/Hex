@@ -65,7 +65,7 @@ class NoPreconditioner : public PreconditionerBase
             CommandLine const & cmd
         ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
             dia_blocks_(l1_l2_.size()), bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-            rad_(bspline_atom,bspline_proj)
+            rad_(bspline_atom, bspline_proj, inp.L + 2 * inp.levels + 1)
         {
             // nothing to do
         }
