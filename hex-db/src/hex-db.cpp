@@ -54,6 +54,7 @@ eUnit Eunits = eUnit_Ry;
 lUnit Lunits = lUnit_au;
 aUnit Aunits = aUnit_deg;
 
+void hex_initialize (const char* dbname) { hex_initialize_(dbname); }
 void hex_initialize_ (const char* dbname)
 {
     // open database
@@ -69,6 +70,7 @@ void hex_initialize_ (const char* dbname)
         var->initialize(db);
 }
 
+void hex_new () { hex_new_(); }
 void hex_new_ ()
 {
     // create tables
@@ -96,6 +98,7 @@ void hex_new_ ()
     }
 }
 
+void hex_import (const char* sqlname) { hex_import_(sqlname); }
 void hex_import_ (const char* sqlname)
 {
     // open file, if necessary
@@ -190,6 +193,7 @@ void hex_import_ (const char* sqlname)
     std::cout << "\rThe SQL batch file \"" << sqlname << "\" has been successfully imported." << std::endl;
 }
 
+void hex_update () { hex_update_(); }
 void hex_update_ ()
 {
     for (const Variable* var : vlist)
@@ -220,6 +224,7 @@ void hex_update_ ()
     std::cout << "\rThe database has been successfully updated." << std::endl;
 }
 
+void hex_optimize () { hex_optimize_(); }
 void hex_optimize_ ()
 {
     sqlitepp::statement st(db);
@@ -234,6 +239,7 @@ void hex_optimize_ ()
     }
 }
 
+void hex_dump (const char* dumpfile) { hex_dump_(dumpfile); }
 void hex_dump_ (const char* dumpfile)
 {
     sqlitepp::statement st(db);

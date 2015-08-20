@@ -186,6 +186,23 @@ void hex_scattering_amplitude_Born_
     }
 }
 
+void hex_scattering_amplitude
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E, int N,
+    double * angles, double * result
+)
+{
+    hex_scattering_amplitude_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &S, &E, &N,
+        angles, result
+    );
+}
+
 void hex_scattering_amplitude_
 (
     int * ni, int * li, int * mi,

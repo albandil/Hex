@@ -74,6 +74,23 @@ std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
     return cmd;
 }
 
+void hex_differential_cross_section
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E, int N,
+    double * angles, double * dcs
+)
+{
+    hex_differential_cross_section_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &S, &E, &N,
+        angles, dcs
+    );
+}
+
 void hex_differential_cross_section_
 (
     int * ni, int * li, int * mi,

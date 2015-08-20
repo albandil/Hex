@@ -58,7 +58,7 @@ extern "C"
    @param dbname Zero-terminated character string.
 */
 void hex_initialize_ (const char* dbname);
-inline void hex_initialize (const char* dbname) { hex_initialize_ (dbname); }
+void hex_initialize (const char* dbname);
 
 /**
    @brief Create new database.
@@ -73,7 +73,7 @@ inline void hex_initialize (const char* dbname) { hex_initialize_ (dbname); }
    which are executed.
 */
 void hex_new_ ();
-inline void hex_new () { hex_new_(); }
+void hex_new ();
 
 /**
    @brief Import SQL batch file.
@@ -92,7 +92,7 @@ inline void hex_new () { hex_new_(); }
    @param sqlname Zero-terminated character string.
 */
 void hex_import_ (const char* sqlname);
-inline void hex_import (const char* sqlname) { hex_import_(sqlname); }
+void hex_import (const char* sqlname);
 
 /**
    @brief Update integral and complete cross section.
@@ -108,7 +108,7 @@ inline void hex_import (const char* sqlname) { hex_import_(sqlname); }
    set by the order in the list.
 */
 void hex_update_ ();
-inline void hex_update () { hex_update_(); }
+void hex_update ();
 
 /**
    @brief Optimize the SQLite database file.
@@ -116,7 +116,7 @@ inline void hex_update () { hex_update_(); }
    Reduces the occupied space using the VACUUM statement.
 */
 void hex_optimize_ ();
-inline void hex_optimize () { hex_optimize_(); }
+void hex_optimize ();
 
 /**
    @brief Dump contents of the T-matrix table.
@@ -129,7 +129,7 @@ inline void hex_optimize () { hex_optimize_(); }
    @endcode
 */
 void hex_dump_ (const char* dumpname);
-inline void hex_dump (const char* dumpname) { hex_dump_(dumpname); }
+void hex_dump (const char* dumpname);
 
 /**
    @brief Scattering anplitude (Fortran).
@@ -182,22 +182,13 @@ void hex_scattering_amplitude_
    @param angles Real array of length N containing scattering angles.
    @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
 */
-inline void hex_scattering_amplitude
+void hex_scattering_amplitude
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int S, double E, int N,
     double * angles, double * result
-)
-{
-    hex_scattering_amplitude_
-    (
-        &ni, &li, &mi,
-        &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, result
-    );
-}
+);
 
 /**
    @brief Scattering anplitude for non-aligned impact direction (Fortran).
@@ -273,24 +264,14 @@ void hex_scattering_amplitude_dir_
    @param angles Real array of length N containing scattering angles.
    @param result Complex array of length N (or real array of length 2N) to contain the amplitudes.
 */
-inline void hex_scattering_amplitude_dir
+void hex_scattering_amplitude_dir
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int S, double E, int N,
     double alpha, double beta, double gamma,
     double * angles, double * result
-)
-{
-    hex_scattering_amplitude_dir_
-    (
-        &ni, &li, &mi,
-        &nf, &lf, &mf,
-        &S, &E, &N,
-        &alpha, &beta, &gamma,
-        angles, result
-    );
-}
+);
 
 /**
    @brief Differential cross section (Fortran).
@@ -343,22 +324,13 @@ void hex_differential_cross_section_
    @param angles Real array of length N containing scattering angles.
    @param dcs Real array of length N to contain the cross sections.
 */
-inline void hex_differential_cross_section
+void hex_differential_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int S, double E, int N,
     double * angles, double * dcs
-)
-{
-    hex_differential_cross_section_
-    (
-        &ni, &li, &mi,
-        &nf, &lf, &mf,
-        &S, &E, &N,
-        angles, dcs
-    );
-}
+);
 
 /**
    @brief Complete cross section (Fortran).
@@ -409,21 +381,13 @@ void hex_complete_cross_section_
    @param ccs Real array of length N to contain the cross sections.
    @param Nall Number of energies available in database; will be set if 
 */
-inline void hex_complete_cross_section
+void hex_complete_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int N, double * energies,
     double * ccs, int * Nall
-)
-{
-    hex_complete_cross_section_
-    (
-        &ni, &li, &mi,
-        &nf, &lf, &mf,
-        &N, energies, ccs, Nall
-    );
-}
+);
 
 #ifdef __cplusplus
 }

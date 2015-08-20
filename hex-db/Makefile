@@ -10,7 +10,7 @@
 
 CXX = g++
 
-CFLAGS = -Wall -std=c++11 -pedantic-errors -fPIC 
+CFLAGS = -Wall -std=c++11 -pedantic-errors -fPIC
 LFLAGS = -lstdc++
 
 # ---------------------------------------------------------------------------- #

@@ -131,6 +131,22 @@ std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
     return cmd;
 }
 
+void hex_complete_cross_section
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int N, double * energies,
+    double * ccs, int * Nall
+)
+{
+    hex_complete_cross_section_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &N, energies, ccs, Nall
+    );
+}
+
 void hex_complete_cross_section_
 (
     int * ni, int * li, int * mi,

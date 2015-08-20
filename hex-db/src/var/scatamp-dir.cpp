@@ -74,6 +74,25 @@ std::vector<std::string> const & ScatteringAmplitudeDir::SQL_CreateTable () cons
     return cmd;
 }
 
+void hex_scattering_amplitude_dir
+(
+    int ni, int li, int mi,
+    int nf, int lf, int mf,
+    int S, double E, int N,
+    double alpha, double beta, double gamma,
+    double * angles, double * result
+)
+{
+    hex_scattering_amplitude_dir_
+    (
+        &ni, &li, &mi,
+        &nf, &lf, &mf,
+        &S, &E, &N,
+        &alpha, &beta, &gamma,
+        angles, result
+    );
+}
+
 void hex_scattering_amplitude_dir_
 (
     int * ni, int * li, int * mi,
