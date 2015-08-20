@@ -776,12 +776,15 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 // reallocate
                 T* new_array = Alloc::alloc(Nres_);
                 
-                // copy original data
-                memcpy(new_array + 1, data(), size() * sizeof(T));
-                
-                // destroy original array
-                if (data() != nullptr)
+                // check if we have any previous data
+                if (size() > 0 and data() != nullptr)
+                {
+                    // copy original data
+                    std::memcpy(new_array + 1, data(), size() * sizeof(T));
+                    
+                    // destroy original array
                     Alloc::free (ArrayView<T>::array_);
+                }
                 
                 // use new array
                 ArrayView<T>::array_ = new_array;
@@ -804,15 +807,18 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 // double the capacity
                 Nres_ = 2 * Nres_ + 1;
                 
-                // allocate space
+               // allocate space
                 T* new_array = Alloc::alloc(Nres_);
                 
-                // copy original data
-                memcpy(new_array, data(), size() * sizeof(T));
-                
-                // destroy original array
-                if (data() != nullptr)
+                // check if we have any previous data
+                if (size() > 0 and data() != nullptr)
+                {
+                    // copy original data
+                    std::memcpy(new_array, data(), size() * sizeof(T));
+                    
+                    // destroy original array
                     Alloc::free (ArrayView<T>::array_);
+                }
                 
                 // use new array
                 ArrayView<T>::array_ = new_array;
@@ -850,12 +856,15 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
                 // allocate space
                 T* new_array = Alloc::alloc(Nres_);
                 
-                // copy original data
-                std::memcpy(new_array, data(), size() * sizeof(T));
-                
-                // destroy original array
-                if (data() != nullptr)
+                // check if we have any previous data
+                if (size() > 0 and data() != nullptr)
+                {
+                    // copy original data
+                    std::memcpy(new_array, data(), size() * sizeof(T));
+                    
+                    // destroy original array
                     Alloc::free (ArrayView<T>::array_);
+                }
                 
                 // use new array
                 ArrayView<T>::array_ = new_array;
