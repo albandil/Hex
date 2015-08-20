@@ -246,8 +246,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     clArrayView<Complex> Mm2_proj_p (rad_.Mm2_proj().data().size(), rad_.Mm2_proj().data().data());             Mm2_proj_p.connect(context_, smallDataFlags_);
     
     // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
-    clArrayView<Complex> Mi_L_atom[rad_.maxlambda() + 1], Mi_mLm1_atom[rad_.maxlambda() + 1];
-    clArrayView<Complex> M_L_atom[rad_.maxlambda() + 1], M_mLm1_atom[rad_.maxlambda() + 1];
+    std::vector<clArrayView<Complex>> Mi_L_atom(rad_.maxlambda() + 1), Mi_mLm1_atom(rad_.maxlambda() + 1);
+    std::vector<clArrayView<Complex>> M_L_atom(rad_.maxlambda() + 1), M_mLm1_atom(rad_.maxlambda() + 1);
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
     {
         Mi_L_atom[lambda].reset(rad_.Mitr_L_atom(lambda).size(), rad_.Mitr_L_atom(lambda).data());
@@ -260,8 +260,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         M_L_atom[lambda].connect(context_, smallDataFlags_);
         M_mLm1_atom[lambda].connect(context_, smallDataFlags_);
     }
-    clArrayView<Complex> Mi_L_proj[rad_.maxlambda() + 1], Mi_mLm1_proj[rad_.maxlambda() + 1];
-    clArrayView<Complex> M_L_proj[rad_.maxlambda() + 1], M_mLm1_proj[rad_.maxlambda() + 1];
+    std::vector<clArrayView<Complex>> Mi_L_proj(rad_.maxlambda() + 1), Mi_mLm1_proj(rad_.maxlambda() + 1);
+    std::vector<clArrayView<Complex>> M_L_proj(rad_.maxlambda() + 1), M_mLm1_proj(rad_.maxlambda() + 1);
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
     {
         Mi_L_proj[lambda].reset(rad_.Mitr_L_proj(lambda).size(), rad_.Mitr_L_proj(lambda).data());
