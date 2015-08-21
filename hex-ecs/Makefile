@@ -66,13 +66,6 @@ GSLFLAGS = $(shell gsl-config --cflags)
 GSLLIBS = $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
-# FFTW                                                                         #
-# ---------------------------------------------------------------------------- #
-
-FFTWFLAGS = 
-FFTWLIBS = -lfftw3
-
-# ---------------------------------------------------------------------------- #
 # OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
@@ -99,12 +92,12 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # compiler flags
 CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
-          $(OPENCLFLAGS) $(GSLFLAGS) $(FFTWFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
+          $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
 
 # linker flags
 LFLAGS += -fPIC -rdynamic \
           $(SUITESPARSELIBS) $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(OPENMPILIBS) \
-          $(OPENCLLIBS) $(GSLLIBS) $(FFTWLIBS) $(BLASLAPACKLIBS) $(PNGPPLIBS)
+          $(OPENCLLIBS) $(GSLLIBS) $(BLASLAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)

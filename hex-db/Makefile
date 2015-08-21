@@ -40,19 +40,12 @@ SQLITEPPLIBS = -L$(shell pwd)/libs -lsqlitepp
 
 GSLFLAGS = $(shell gsl-config --cflags)
 GSLLIBS = $(shell gsl-config --libs) 
-
-# ---------------------------------------------------------------------------- #
-# FFTW                                                                         #
-# ---------------------------------------------------------------------------- #
-
-FFTWFLAGS = 
-FFTWLIBS = -lfftw3 
                                                                                #
 ################################################################################
 
 
-CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS) $(FFTWFLAGS)
-LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(SQLITEPPLIBS) $(GSLLIBS) $(FFTWLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
+CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS)
+LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(SQLITEPPLIBS) $(GSLLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

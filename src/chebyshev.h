@@ -37,7 +37,8 @@
 #include <numeric>
 #include <vector>
 
-#include <fftw3.h>
+#include <gsl/gsl_fft_real.h>
+#include <gsl/gsl_fft_complex.h>
 
 #include "arrays.h"
 #include "misc.h"
@@ -215,11 +216,13 @@ public:
     /**
      * Integration types.
      */
-    typedef enum {
+    typedef enum
+    {
         Integ_Indef,
         Integ_Low,
         Integ_High
-    } Integration;
+    }
+    Integration;
     
     /**
      * @brief Get expansion of integral of the approximated function.
@@ -387,9 +390,6 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     // input array
     rArray fvals(N);
     
-    // create the FFTW plan
-    fftw_plan plan = fftw_plan_r2r_1d (N, &fvals[0], &C[0], FFTW_REDFT10, 0);
-    
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
     for (int k = 0; k < N; k++)
@@ -399,13 +399,10 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     }
     
     // execute the transform
-    fftw_execute(plan);
-    fftw_destroy_plan(plan);
+    gsl_fft_real_radix2_transform(fvals.data(), 1, N);
     
     // normalize
-    double scal = 1./N;
-    for (double & c : C)
-        c *= scal;
+    C *= 1. / N;
 }
 
 /**
@@ -423,17 +420,7 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     C.resize(N);
     
     // input array
-    cArray fvals(4*N), ftraf(4*N);
-    
-    // create the FFTW plan
-    fftw_plan plan = fftw_plan_dft_1d
-    (
-        4*N,
-        reinterpret_cast<fftw_complex*>(&fvals[0]),
-        reinterpret_cast<fftw_complex*>(&ftraf[0]),
-        FFTW_FORWARD,
-        0
-    );
+    cArray fvals(4*N);
     
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
@@ -444,13 +431,10 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     }
     
     // execute the transform
-    fftw_execute(plan);
-    fftw_destroy_plan(plan);
+    gsl_fft_complex_radix2_forward(reinterpret_cast<double*>(fvals.data()), 1, 4 * N);
     
     // copy normalized coefficients
-    double scal = 1./N;
-    for (int i = 0; i < N; i++)
-        C[i] = ftraf[i] * scal;
+    C = fvals / double(N);
 }
 
 #endif /* HEX_CHEBYSHEV */

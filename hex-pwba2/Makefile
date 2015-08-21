@@ -28,13 +28,6 @@ GINACFLAGS =
 GINACLIBS = -lcln -lginac
 
 # ---------------------------------------------------------------------------- #
-# FFTW                                                                         #
-# ---------------------------------------------------------------------------- #
-
-FFTWFLAGS = 
-FFTWLIBS = -lfftw3
-
-# ---------------------------------------------------------------------------- #
 # Lapack                                                                       #
 # ---------------------------------------------------------------------------- #
 
@@ -44,8 +37,8 @@ LAPACKLIBS = -lopenblas
 ################################################################################
 
 
-CFLAGS += $(GSLFLAGS) $(GINACFLAGS) $(LAPACKFLAGS) $(FFTWFLAGS) $(MPCFLAGS)
-LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) $(FFTWLIBS) $(MPCLIBS) -rdynamic
+CFLAGS += $(GSLFLAGS) $(GINACFLAGS) $(LAPACKFLAGS)
+LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) -rdynamic
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 

@@ -37,8 +37,8 @@
 #include <numeric>
 #include <vector>
 
-#include <fftw3.h>
 #include <gsl/gsl_sf.h>
+#include <gsl/gsl_fft_complex.h>
 
 #include "arrays.h"
 #include "compact.h"
@@ -52,8 +52,7 @@
  * call to ClenshawCurtis::integrate. Clenshaw-Curtis quadrature evaluates
  * the function in the Chebyshev nodes and uses sophisticated algorithm to
  * extract the value of the quadrature. For more details see Numerical
- * recipes (3rd ed.). The present implementation uses fast Fourier transform
- * from FFTW for fast computation.
+ * recipes (3rd ed.).
  */
 template <class Functor, typename FType> class ClenshawCurtis
 {
@@ -246,21 +245,6 @@ public:
             
             // reserve memory
             fvals.resize(2*N + 1);
-            ftraf.resize(2*N);
-            
-            // create plan (thread-safe)
-            fftw_plan plan;
-#ifdef _OPENMP
-            # pragma omp critical
-#endif
-            plan = fftw_plan_dft_1d
-            (
-                2*N,
-                reinterpret_cast<fftw_complex*>(&fvals[0]),
-                reinterpret_cast<fftw_complex*>(&ftraf[0]),
-                FFTW_BACKWARD,
-                0
-            );
             
             // is this the first iteration?
             if (coefs.empty())
@@ -297,13 +281,8 @@ public:
             coefs.resize(N + 1);
 
             // compute coefficients using FFT/DCT-I
-            fftw_execute(plan);
-            
-            // delete plan (thread-safe)
-#ifdef _OPENMP
-            # pragma omp critical
-#endif
-            fftw_destroy_plan(plan);
+            ftraf = fvals;
+            gsl_fft_complex_radix2_backward(reinterpret_cast<double*>(&ftraf[0]), 1, 2 * N);
             
             // create type-correct pointer
             FType const * ftraf_ptr = reinterpret_cast<FType*>(&ftraf[0]);
