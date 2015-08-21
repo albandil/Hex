@@ -51,7 +51,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     // iterations
     iArray n (l1_l2_.size());
     
-    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_block && cmd_.groupsize == 1)
+    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
         try

@@ -204,7 +204,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
 #endif
-                    "\t--parallel-block                 Enable concurrent handling of matrix blocks by OpenMP (e.g. in preconditioning and multiplication).                    \n"
+                    "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
+                    "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
                     "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
 #ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
@@ -372,10 +373,16 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
-        "parallel-block", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+        "parallel-precondition", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // parallelize preconditioning
-                parallel_block = true;
+                parallel_precondition = true;
+                return true;
+            },
+        "parallel-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // parallelize multiplication by the super-matrix
+                parallel_multiply = true;
                 return true;
             },
         "lightweight-radial-cache", "l", 0, [&](std::vector<std::string> const & optargs) -> bool

@@ -83,8 +83,8 @@ int main (int argc, char* argv[])
     //
     
         // check some exclusive options
-        if (cmd.parallel_block and cmd.lightweight_radial_cache)
-            HexException("The options --parallel-block and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
+        if (cmd.parallel_multiply and cmd.lightweight_radial_cache)
+            HexException("The options --parallel-multiply and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
         if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
             HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
         
@@ -102,16 +102,11 @@ int main (int argc, char* argv[])
         }
     
 #ifdef _OPENMP
-        // set OpenMP parallel nesting (avoid oversubscription)
-        // - disable for concurrent diagonal block preconditioning
-        // - enable for sequential diagonal block preconditioning
-        omp_set_nested(!cmd.parallel_block);
         # pragma omp parallel
         # pragma omp master
         {
             std::cout << "OpenMP environment" << std::endl;
             std::cout << "\tthreads: " << omp_get_num_threads() << std::endl;
-            std::cout << "\tnesting: " << (omp_get_nested() ? "on" : "off") << std::endl;
         }
 #endif
     
