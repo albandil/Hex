@@ -107,8 +107,11 @@ void ILUCGPreconditioner::update (double E)
     CGPreconditioner::update(E);
 }
 
-void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+void ILUCGPreconditioner::CG_init (int iblock) const
 {
+    // update parent
+    CGPreconditioner::CG_init(iblock);
+    
     // load data from linked disk files
     if (cmd_.outofcore)
     {
@@ -170,14 +173,23 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
             omp_unset_lock(&lu_lock_);
 #endif
     }
-    
+}
+
+void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
-    
+}
+
+void ILUCGPreconditioner::CG_exit (int iblock) const
+{
     // release memory
     if (cmd_.outofcore)
     {
         csr_blocks_[iblock].drop();
         lu_[iblock]->drop();
     }
+    
+    // exit parent
+    CGPreconditioner::CG_exit(iblock);
 }

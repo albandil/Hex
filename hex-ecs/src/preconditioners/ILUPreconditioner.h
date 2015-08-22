@@ -92,7 +92,9 @@ class ILUCGPreconditioner : public CGPreconditioner
         virtual void update (double E);
         
         // inner CG callback (needed by parent)
+        virtual void CG_init (int iblock) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_exit (int iblock) const;
         
     protected:
         
