@@ -42,8 +42,8 @@ LFLAGS += $(GSLLIBS) $(GINACLIBS) $(LAPACKLIBS) -rdynamic
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -O3 -fcx-limited-range -DNO_HDF -DNO_MPI -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
-CXXDEBUG = $(CFLAGS) -g -fcx-limited-range -DNO_HDF -DNO_MPI -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -O3 -fcx-limited-range -DGIT_COMMIT=\"$(GIT_COMMIT)\" -DNDEBUG
+CXXDEBUG = $(CFLAGS) -g -fcx-limited-range -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = -g $(CXXRILIS)
