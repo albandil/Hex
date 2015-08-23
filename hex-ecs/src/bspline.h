@@ -237,9 +237,7 @@ class Bspline
         /// complex knots
         inline rArray const & cknots () const { return cknots_; }
         
-        /**
-         * @brief Return (almost) unique identification for this B-spline object.
-         */
+        /// Return (almost) unique identification for this B-spline object.
         std::size_t hash () const;
         
     private:
@@ -286,5 +284,11 @@ class Bspline
         /// Work max size
         static const std::size_t work_size_;
 };
+
+/// Compare two B-spline objects (uses the hash).
+inline bool operator== (Bspline const & b1, Bspline const & b2)
+{
+    return b1.hash() == b2.hash();
+}
 
 #endif

@@ -170,6 +170,9 @@ void NoPreconditioner::update (double E)
 
 void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const
 {
+    // copy spin
+    S_ = Spin;
+    
     // shorthands
     int ni = std::get<0>(inp_.instates[instate]);
     int li = std::get<1>(inp_.instates[instate]);

@@ -29,6 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <algorithm>
 #include <iostream>
 #include <cstdio>
 
@@ -54,6 +55,20 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
+        // skip (anti)symmetries
+        if (rad_.bspline_atom() == rad_.bspline_proj())
+        {
+            // get angular momenta of this block
+            int l1 = l1_l2_[ill].first, l2 = l1_l2_[ill].second;
+            
+            // get index of the block that is (anti)symmetrical to this one
+            unsigned ill_sym = std::find(l1_l2_.begin(), l1_l2_.end(), std::make_pair(l2,l1)) - l1_l2_.begin();
+            
+            // skip preconditioning of this block, if located on the same node
+            if (l1 > l2 and ill_sym < l1_l2_.size() and par_.isMyGroupWork(ill_sym))
+                continue;
+        }
+        
         try
         {
             // load blocks, if necessary
@@ -167,6 +182,49 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         catch (std::exception const & e)
         {
             HexException("%s", e.what());
+        }
+    }
+    
+    // use (anti)symmetries
+    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    {
+        // check for first panel
+        if (rad_.bspline_atom() == rad_.bspline_proj())
+        {
+            // get angular momenta of this block
+            int l1 = l1_l2_[ill].first, l2 = l1_l2_[ill].second;
+            
+            // get index of the block that is (anti)symmetrical to this one
+            unsigned ill_sym = std::find(l1_l2_.begin(), l1_l2_.end(), std::make_pair(l2,l1)) - l1_l2_.begin();
+            
+            // transpose current block to the (anti)symmetrical
+            if (l1 <= l2 and ill_sym < l1_l2_.size() and par_.isMyGroupWork(ill_sym))
+            {
+                // load blocks, if necessary
+                if (cmd_.outofcore)
+                {
+                    const_cast<BlockArray<Complex>&>(z).hdfload(ill);
+                    z.hdfload(ill_sym);
+                }
+                
+                // copy with the correct sign
+                int sym = ((inp_.Pi + S_) % 2 == 0); // 0 = symmetrical, 1 = antisymmetrical
+                for (int i = 0; i < Nspline_atom; i++)
+                for (int j = 0; j < Nspline_proj; j++)
+                    z[ill_sym][i * Nspline_proj + j] = sym ? z[ill][j * Nspline_proj + i] : -z[ill][j * Nspline_proj + i];
+                
+                // unload blocks
+                if (cmd_.outofcore)
+                {
+                    const_cast<BlockArray<Complex>&>(z)[ill].drop();
+                    
+                    z.hdfsave(ill_sym);
+                    z[ill_sym].drop();
+                }
+            }
+            
+            // copy preconditioner iteration count
+            n[ill_sym] = n[ill];
         }
     }
     

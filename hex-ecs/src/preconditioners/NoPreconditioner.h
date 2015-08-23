@@ -93,6 +93,9 @@ class NoPreconditioner : public PreconditionerBase
         // coupled states
         std::vector<std::pair<int,int>> const & l1_l2_;
         
+        // spin of the last RHS constructed
+        mutable int S_;
+        
         // diagonal blocks in DIA format (these will be used in matrix multiplication)
         mutable std::vector<BlockSymBandMatrix<Complex>> dia_blocks_;
         
