@@ -87,6 +87,8 @@ int main (int argc, char* argv[])
             HexException("The options --parallel-multiply and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
         if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
             HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
+        if (cmd.parallel_multiply and not cmd.cache_all_radint)
+            HexException("Please do not use --parallel-multiply together with --out-of-core/--no-radial-cache/--own-radial-cache.");
         
         // setup MPI
         Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
@@ -100,7 +102,7 @@ int main (int argc, char* argv[])
             std::cout << "\tID within group:  " << 1 + par.igroupproc() << " / " << par.groupsize() << std::endl;
             std::cout << std::endl;
         }
-    
+        
 #ifdef _OPENMP
         # pragma omp parallel
         # pragma omp master
