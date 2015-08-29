@@ -361,8 +361,6 @@ void KPACGPreconditioner::CG_init (int iblock) const
 
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-    std::cout << "Mmul in " << p.norm() << std::endl;
-    
     // multiply by components
     if (cmd_.kpa_simple_rad or cmd_.lightweight_full)
     {
@@ -394,8 +392,6 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
     {
         CGPreconditioner::CG_mmul(iblock, p, q);
     }
-    
-    std::cout << "Mmul out " << q.norm() << std::endl;
 }
 
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -410,8 +406,6 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // dimension of the matrices
     std::size_t Nspline_atom = bspline_atom_.Nspline();
     std::size_t Nspline_proj = bspline_proj_.Nspline();
-    
-    std::cout << "Prec in " << r.norm() << std::endl;
     
     // multiply by the first Kronecker product
     dense_kron_dot
@@ -434,8 +428,6 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         Nspline_proj, Nspline_proj, prec_proj_[l2].invsqrtS_Cl.data().data(),
         z.data(), z.data()
     );
-    
-    std::cout << "Prec out " << z.norm() << std::endl;
 }
 
 void KPACGPreconditioner::CG_exit (int iblock) const

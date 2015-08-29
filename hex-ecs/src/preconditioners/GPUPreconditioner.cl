@@ -340,7 +340,7 @@ kernel void mmul_2el
             tx = min(ti2,tk2);
             ty = min(tj2,tl2);
             scale = pow_int(ty / tx, lambda) / tx;
-            elem += scale * MmLm1a[min(i,k) * (ORDER + 1) + abs(i-k)] * MLp[min(j,l) * (ORDER + 1) + abs(j-l)];
+            elem += scale * cmul(MmLm1a[min(i,k) * (ORDER + 1) + abs(i-k)], MLp[min(j,l) * (ORDER + 1) + abs(j-l)]);
         }
         
         // (i,k) << (j,l)
@@ -349,7 +349,7 @@ kernel void mmul_2el
             tx = min(ti2,tk2);
             ty = min(tj2,tl2);
             scale = pow_int(tx / ty, lambda) / ty;
-            elem += scale * MLa[min(i,k) * (ORDER + 1) + abs(i-k)] * MmLm1p[min(j,l) * (ORDER + 1) + abs(j-l)];
+            elem += scale * cmul(MLa[min(i,k) * (ORDER + 1) + abs(i-k)], MmLm1p[min(j,l) * (ORDER + 1) + abs(j-l)]);
         }
         
         // The rest allows overlap of the four B-splines and is used only by the first
@@ -365,14 +365,14 @@ kernel void mmul_2el
         else
         {
             // retrieve diagonal contribution
-            /*if (i <= j && i <= k && i <= l)
+            if (i <= j && i <= k && i <= l)
                 elem += Rdia[((i * (ORDER+1) + (j-i)) * (ORDER+1) + (k-i)) * (ORDER+1) + (l-i)];
             else if (j <= i && j <= k && j <= l)
                 elem += Rdia[((j * (ORDER+1) + (i-j)) * (ORDER+1) + (l-j)) * (ORDER+1) + (k-j)];
             else if (k <= i && k <= j && k <= l)
                 elem += Rdia[((k * (ORDER+1) + (j-k)) * (ORDER+1) + (i-k)) * (ORDER+1) + (l-k)];
             else // (l <= i && l <= j && l <= k)
-                elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];*/
+                elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];
             
             // ix < iy
             M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);

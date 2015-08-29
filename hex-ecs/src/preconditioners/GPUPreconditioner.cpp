@@ -292,7 +292,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         // copy source vector to the device memory
         for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
         {
-            std::cout << "before 1el: " << p[illp].norm() << std::endl;
             ph[illp].reset(p[illp].size(), p[illp].data());
             ph[illp].connect(context_, largeDataFlags_);
         }
@@ -320,10 +319,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clSetKernelArg(mml1_,12, sizeof(cl_mem), &(tmA_.handle()));
             clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
-            
-            tmA_.EnqueueDownload(queue_);
-            clFinish(queue_);
-            std::cout << "after 1el: " << tmA_.norm() << std::endl;
             
             // for all source segments
             for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
@@ -362,10 +357,8 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 }
                 clFinish(queue_);
             }
-            
             tmA_.EnqueueDownload(queue_);
             clFinish(queue_);
-            std::cout << "after 2el: " << tmA_.norm() << std::endl;
             q[ill] = tmA_;
         }
         
@@ -462,10 +455,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             
             Timer timer;
             
-            a.EnqueueDownload(queue_);
-            clFinish(queue_);
-            std::cout << "Mmul in " << a.norm() << std::endl;
-            
             // one-electron contribution
             clSetKernelArg(mml1_, 0, sizeof(double), &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
@@ -508,19 +497,11 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clFinish(queue_);
             
             us_mmul += timer.microseconds();
-            
-            b.EnqueueDownload(queue_);
-            clFinish(queue_);
-            std::cout << "Mmul out " << b.norm() << std::endl;
         };
         
         // applies KPA preconditioner (two "kron-dots")
         auto inner_prec = [&](/* const */ clArrayView<Complex> x, clArrayView<Complex> y) -> void
         {
-            x.EnqueueDownload(queue_);
-            clFinish(queue_);
-            std::cout << "Prec in " << x.norm() << std::endl;
-            
             // multiply by approximate inverse block
             Timer timer;
             
@@ -584,10 +565,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clFinish(queue_);
             
             us_prec += timer.microseconds();
-            
-            y.EnqueueDownload(queue_);
-            clFinish(queue_);
-            std::cout << "Prec out " << y.norm() << std::endl;
         };
         
         // computes norm of the vector
@@ -660,7 +637,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            true,                  // verbose output
+            false,                  // verbose output
             compute_norm,           // norm of an array
             scalar_product,         // scalar product of two arrays
             axby,                   // weighted sum of two arrays
