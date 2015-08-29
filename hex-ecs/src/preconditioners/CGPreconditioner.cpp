@@ -146,7 +146,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 Nspline_atom * Nspline_proj, // max. iteration
                 inner_prec,             // preconditioner
                 inner_mmul,             // matrix multiplication
-                false,                  // verbose output
+                true,                  // verbose output
                 compute_norm,           // norm
                 scalar_product,         // scalar product
                 axby_operation          // a*x + b*y operation

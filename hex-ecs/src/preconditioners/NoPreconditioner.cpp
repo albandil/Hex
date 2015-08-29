@@ -494,6 +494,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
         for (int ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
         {
+            std::cout << "before 1el: " << p[ill].norm() << std::endl;
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(p).hdfload(ill);
@@ -515,6 +516,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 q.hdfsave(ill);
                 q[ill].drop();
             }
+            
+            std::cout << "after 1el: " << q[ill].norm() << std::endl;
         }
         
         // auxiliary buffers
@@ -587,6 +590,9 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 }
             }
         }
+        
+        for (int ill = 0;  ill < Nang;  ill++)
+            std::cout << "after 2el: " << q[ill].norm() << std::endl;
         
 #ifdef _OPENMP
         for (omp_lock_t & lock : locks)

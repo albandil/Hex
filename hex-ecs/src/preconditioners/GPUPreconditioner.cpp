@@ -292,6 +292,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         // copy source vector to the device memory
         for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
         {
+            std::cout << "before 1el: " << p[illp].norm() << std::endl;
             ph[illp].reset(p[illp].size(), p[illp].data());
             ph[illp].connect(context_, largeDataFlags_);
         }
@@ -320,6 +321,10 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
             
+            tmA_.EnqueueDownload(queue_);
+            clFinish(queue_);
+            std::cout << "after 1el: " << tmA_.norm() << std::endl;
+            
             // for all source segments
             for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
             {
@@ -327,42 +332,30 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                 int l1p = l1_l2_[illp].first;
                 int l2p = l1_l2_[illp].second;
                 
-                // angular integrals
-                iArray lambdas (rad_.maxlambda() + 1);
-                rArray fs (rad_.maxlambda() + 1);
-                int Nlambdas = 0;
+                // two-electron contribution
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
                 {
+                    // angular integral
                     double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-                    
                     if (not std::isfinite(f))
                         HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    
                     if (f == 0)
                         continue;
                     
-                    lambdas[Nlambdas] = lambda;
-                    fs[Nlambdas] = f;
-                    
-                    Nlambdas++;
-                }
-                
-                // two-electron contribution
-                for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
-                {
+                    // multiply by two-electron interals block
                     clSetKernelArg(mml2_, 0, sizeof(cl_mem), &t_atom_.handle());
                     clSetKernelArg(mml2_, 1, sizeof(cl_mem), &t_proj_.handle());
-                    clSetKernelArg(mml2_, 2, sizeof(int),    &(lambdas[ilambda]));
-                    clSetKernelArg(mml2_, 3, sizeof(double), &(fs[ilambda]));
-                    clSetKernelArg(mml2_, 4, sizeof(cl_mem), &(M_L_atom_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_, 5, sizeof(cl_mem), &(M_mLm1_atom_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_, 6, sizeof(cl_mem), &(Mi_L_atom_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_, 7, sizeof(cl_mem), &(Mi_mLm1_atom_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_, 8, sizeof(cl_mem), &(M_L_proj_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_, 9, sizeof(cl_mem), &(M_mLm1_proj_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_,10, sizeof(cl_mem), &(Mi_L_proj_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_,11, sizeof(cl_mem), &(Mi_mLm1_proj_[lambdas[ilambda]].handle()));
-                    clSetKernelArg(mml2_,12, sizeof(cl_mem), &(Rdia_[lambdas[ilambda]].handle()));
+                    clSetKernelArg(mml2_, 2, sizeof(int),    &(lambda));
+                    clSetKernelArg(mml2_, 3, sizeof(double), &(f));
+                    clSetKernelArg(mml2_, 4, sizeof(cl_mem), &(M_L_atom_[lambda].handle()));
+                    clSetKernelArg(mml2_, 5, sizeof(cl_mem), &(M_mLm1_atom_[lambda].handle()));
+                    clSetKernelArg(mml2_, 6, sizeof(cl_mem), &(Mi_L_atom_[lambda].handle()));
+                    clSetKernelArg(mml2_, 7, sizeof(cl_mem), &(Mi_mLm1_atom_[lambda].handle()));
+                    clSetKernelArg(mml2_, 8, sizeof(cl_mem), &(M_L_proj_[lambda].handle()));
+                    clSetKernelArg(mml2_, 9, sizeof(cl_mem), &(M_mLm1_proj_[lambda].handle()));
+                    clSetKernelArg(mml2_,10, sizeof(cl_mem), &(Mi_L_proj_[lambda].handle()));
+                    clSetKernelArg(mml2_,11, sizeof(cl_mem), &(Mi_mLm1_proj_[lambda].handle()));
+                    clSetKernelArg(mml2_,12, sizeof(cl_mem), &(Rdia_[lambda].handle()));
                     clSetKernelArg(mml2_,13, sizeof(cl_mem), &(ph[illp].handle()));
                     clSetKernelArg(mml2_,14, sizeof(cl_mem), &(tmA_.handle()));
                     clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
@@ -372,6 +365,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             
             tmA_.EnqueueDownload(queue_);
             clFinish(queue_);
+            std::cout << "after 2el: " << tmA_.norm() << std::endl;
             q[ill] = tmA_;
         }
         
@@ -460,13 +454,17 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             return a;
         };
         
-        // multiplies vector by the (approximate) ill-th diagonal block
+        // multiplies vector by the ill-th diagonal block
         auto inner_mmul = [&](/* const */ clArrayView<Complex> a, clArrayView<Complex> b) -> void
         {
             // multiply
             //      b = A · a
             
             Timer timer;
+            
+            a.EnqueueDownload(queue_);
+            clFinish(queue_);
+            std::cout << "Mmul in " << a.norm() << std::endl;
             
             // one-electron contribution
             clSetKernelArg(mml1_, 0, sizeof(double), &E_);
@@ -510,11 +508,19 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clFinish(queue_);
             
             us_mmul += timer.microseconds();
+            
+            b.EnqueueDownload(queue_);
+            clFinish(queue_);
+            std::cout << "Mmul out " << b.norm() << std::endl;
         };
         
         // applies KPA preconditioner (two "kron-dots")
-        auto inner_prec = [&](const clArrayView<Complex> x, clArrayView<Complex> y) -> void
+        auto inner_prec = [&](/* const */ clArrayView<Complex> x, clArrayView<Complex> y) -> void
         {
+            x.EnqueueDownload(queue_);
+            clFinish(queue_);
+            std::cout << "Prec in " << x.norm() << std::endl;
+            
             // multiply by approximate inverse block
             Timer timer;
             
@@ -578,6 +584,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clFinish(queue_);
             
             us_prec += timer.microseconds();
+            
+            y.EnqueueDownload(queue_);
+            clFinish(queue_);
+            std::cout << "Prec out " << y.norm() << std::endl;
         };
         
         // computes norm of the vector
@@ -650,7 +660,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Nsegsiz,                // max. iteration
             inner_prec,             // preconditioner
             inner_mmul,             // matrix multiplication
-            false,                  // verbose output
+            true,                  // verbose output
             compute_norm,           // norm of an array
             scalar_product,         // scalar product of two arrays
             axby,                   // weighted sum of two arrays

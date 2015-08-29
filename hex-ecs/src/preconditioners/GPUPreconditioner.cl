@@ -79,13 +79,12 @@ double2 cdiv (private double2 a, private double2 b)
 /**
  * @brief Integer power.
  * 
- * Fast integer power of arbitrary numerical type. Uses only
- * multiplications. The number of multiplications is proportional
- * to log(n).
+ * Fast integer power; uses only multiplications.
+ * The number of multiplications is proportional to log(n).
  */
 double pow_int (private double x, private int n)
 {
-    private double value = 1;
+    private double value = 1; // = x^0
     
     do
     {
@@ -105,6 +104,9 @@ double pow_int (private double x, private int n)
  * 
  * Computes the linear combination @f$ ax + by @f$ of vectors @f$ x @f$ and 
  * @f$ y @f$ and stores the result in @f$ x @f$.
+ * \f[
+ *         x_i = a x_i + b y_i
+ * \f]
  * @param a Complex factor.
  * @param x Source and destination vector.
  * @param b Complex factor.
@@ -122,7 +124,7 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
  * @brief Full scalar product.
  * 
  * Calculates element-wise product of the arrays and reduces them using local memory
- * to one number per work group. These intermediate numbers are the summed by CPU.
+ * to one number per work group. These intermediate numbers are then summed by CPU.
  * @param u Source vector.
  * @param v Source vector.
  * @param z Output vector for intermediate segment scalar products.
@@ -157,7 +159,7 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
  * @brief Full vector norm.
  * 
  * Calculates scalar product of the segments of the arrays belonging to different groups
- * as one number per work group. These intermediate numbers are the summed by CPU.
+ * as one number per work group. These intermediate numbers are then summed by CPU.
  * @param v Source vector.
  * @param z Output vector for intermediate segment norms.
  */
@@ -195,6 +197,11 @@ kernel void norm (global double2 *v, global double *z)
  * 
  * Multiplies given vector by one-electron part of the Hamiltonian matrix,
  * that can expressed as a Kronecker product of simple one-electron matrices.
+ * \f[
+ *     y_{ij} = \sum_{kl} \left(
+ *         E S_{ik} S_{jl} - H_{ik}^{(1)} S_{jl} - S_{ik} H_{jl}^{(2)}
+ *     \right) x_{kl}
+ * \f]
  * @param E Total energy of the system.
  * @param Sp Row-padded upper overlap matrix.
  * @param Dp Row-padded upper derivative overlap matrix.
@@ -219,7 +226,7 @@ kernel void mmul_1el
     global double2 const * const restrict Dpp,
     global double2 const * const restrict M1pp,
     global double2 const * const restrict M2pp,
-    // angular momenta and nonzero multipoles
+    // angular momenta
     private int l1,
     private int l2,
     // source and target vector
@@ -260,7 +267,9 @@ kernel void mmul_1el
  * Multiplies vector by a two-electron Hamiltonian matrix @f$ R_{ijkl}^\lambda @f$.
  * Each multi-index @f$ (i,j) @f$ is assigned to a different thread.
  * This kernel is called for every multipole independently.
- * 
+ * \f[
+ *     y_{ij} = y_{ij} - \sum_{kl} f^{\lambda} R_{ijkl}^{\lambda} x_{kl}
+ * \f]
  * @param f Real prefactor (angular integral).
  * @param MiL Partial integral moments (r^lambda).
  * @param MimLm1 Partial integral moments (r^(-lambda-1)).
@@ -356,14 +365,14 @@ kernel void mmul_2el
         else
         {
             // retrieve diagonal contribution
-            if (i <= j && i <= k && i <= l)
+            /*if (i <= j && i <= k && i <= l)
                 elem += Rdia[((i * (ORDER+1) + (j-i)) * (ORDER+1) + (k-i)) * (ORDER+1) + (l-i)];
             else if (j <= i && j <= k && j <= l)
                 elem += Rdia[((j * (ORDER+1) + (i-j)) * (ORDER+1) + (l-j)) * (ORDER+1) + (k-j)];
             else if (k <= i && k <= j && k <= l)
                 elem += Rdia[((k * (ORDER+1) + (j-k)) * (ORDER+1) + (i-k)) * (ORDER+1) + (l-k)];
             else // (l <= i && l <= j && l <= k)
-                elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];
+                elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];*/
             
             // ix < iy
             M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
@@ -405,6 +414,9 @@ kernel void mmul_2el
  * @brief Matrix-matrix multiplication.
  * 
  * General matrix-matrix multiplication.
+ * \f[
+ *     C_{ij} = \sum_{k} A_{ik} B_{kj}
+ * \f]
  * @param m Row count of A.
  * @param n Column count of B.
  * @param k Column count of A.
@@ -470,6 +482,9 @@ kernel void mul_ABt
  * @brief KPA preconditioner.
  * 
  * Divides the source vector by the KPA preconditioner term.
+ * \f[
+ *     y_{ij} = \frac{y_{ij}}{E - D_i - D_j}
+ * \f]
  * @param E Total energy.
  * @param D1 Eigenvalues for first angular momentum.
  * @param D2 Eigenvalues for second angular momentum.
