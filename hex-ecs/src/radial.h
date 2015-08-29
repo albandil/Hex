@@ -562,6 +562,13 @@ class RadialIntegrals
         SymBandMatrix<Complex> const & Mm2_atom () const { return Mm2_atom_; }
         SymBandMatrix<Complex> const & Mm2_proj () const { return Mm2_proj_; }
         
+        /// Return reference to the precomputed array of diagonal contributions to two-electron integrals.
+        cArray const & R_tr_dia_diag (unsigned i) const
+        {
+            assert(i < R_tr_dia_diag_.size());
+            return R_tr_dia_diag_[i];
+        }
+        
         /// Return reference to the precomputed matrix of two-electron integrals for given multipole.
         BlockSymBandMatrix<Complex> const & R_tr_dia (unsigned i) const
         {

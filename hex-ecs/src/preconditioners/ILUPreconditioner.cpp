@@ -193,3 +193,10 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
     // exit parent
     CGPreconditioner::CG_exit(iblock);
 }
+
+void ILUCGPreconditioner::finish ()
+{
+    lu_.resize(0);
+    csr_blocks_.resize(0);
+    CGPreconditioner::finish();
+}

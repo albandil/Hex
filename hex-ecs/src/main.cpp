@@ -300,6 +300,9 @@ int main (int argc, char* argv[])
             
             // find the solution of the scattering equations
             solver.solve();
+            
+            // release resources
+            solver.finish();
         }
 
     //

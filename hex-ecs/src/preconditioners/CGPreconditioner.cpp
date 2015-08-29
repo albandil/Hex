@@ -205,3 +205,9 @@ void CGPreconditioner::CG_exit (int iblock) const
     if (cmd_.outofcore and cmd_.wholematrix)
         dia_blocks_[iblock].drop();
 }
+
+void CGPreconditioner::finish ()
+{
+    dia_blocks_.resize(0);
+    NoPreconditioner::finish();
+}

@@ -63,6 +63,9 @@ class Solver
         
         /// Find solution of the scattering equations on chosen panel.
         void solve ();
+        
+        /// Release resources.
+        void finish ();
     
     protected:
         

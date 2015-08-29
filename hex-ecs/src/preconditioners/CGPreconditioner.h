@@ -69,6 +69,7 @@ class CGPreconditioner : public NoPreconditioner
         
         // declare own definitions
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        virtual void finish ();
         
         // inner CG callbacks
         virtual void CG_init (int iblock) const;

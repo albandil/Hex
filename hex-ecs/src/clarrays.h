@@ -213,19 +213,25 @@ template <class T, class Alloc = PlainAllocator<T>> class clArray : public clArr
         clArray & operator = (const ArrayView<T> v)
         {
             // realloc memory if needed
-            if (size() != v.size())
-            {
-                // resize
-                Alloc::free(data());
-                ArrayView<T>::array_ = Alloc::alloc(v.size());
-                ArrayView<T>::N_ = v.size();
-            }
+            resize(v.size());
             
             // copy data
             for (std::size_t j = 0; j < size(); j++)
                 (*this)[j] = v[j];
             
             return *this;
+        }
+        
+        void resize (std::size_t newsize)
+        {
+            if (newsize != size())
+            {
+                if (size() != 0)
+                    Alloc::free(data());
+                
+                ArrayView<T>::array_ = Alloc::alloc(newsize);
+                ArrayView<T>::N_ = newsize;
+            }
         }
         
         //

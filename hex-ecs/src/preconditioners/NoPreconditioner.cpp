@@ -596,3 +596,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     
     OMP_clean;
 }
+
+void NoPreconditioner::finish ()
+{
+    dia_blocks_.resize(0);
+}

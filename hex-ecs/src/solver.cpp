@@ -581,3 +581,8 @@ void Solver::concatenate_panels_ (cArray & psi, cArray const & psi_panel) const
     for (std::size_t j = Nspline_full_prev_nonoverlap; j < Nspline_full_curr; j++)
         psi[i * Nspline_full_curr + j] = psi_panel[i * Nspline_panel_curr + j - Nspline_full_prev_nonoverlap];
 }
+
+void Solver::finish ()
+{
+    prec_->finish();
+}

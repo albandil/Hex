@@ -398,6 +398,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
         Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
         
+        // no need to do anything else for non-identical B-spline bases
+        if (bspline_atom_.hash() != bspline_proj_.hash())
+            continue;
+        
         // diagonal contributions to two-electron integrals
         std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_atom_.hash(), bspline_proj_.hash());
         if (R_tr_dia_diag_[lambda].hdfload(filename))

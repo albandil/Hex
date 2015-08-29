@@ -40,7 +40,7 @@
 
 #ifdef WITH_OPENCL
 
-#include <CL/cl.h>
+#include "../clarrays.h"
 
 /**
  * @brief KPA-preconditioned CG-preconditioner.
@@ -100,13 +100,14 @@ class GPUCGPreconditioner : public KPACGPreconditioner
         }
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { KPACGPreconditioner::multiply(p,q); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { KPACGPreconditioner::rhs(chi,ienergy,instate,Spin,bfull); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void update (double E) { KPACGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
+        virtual void finish ();
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
     protected:
         
@@ -133,6 +134,16 @@ class GPUCGPreconditioner : public KPACGPreconditioner
         cl_kernel norm_;
         cl_kernel spro_;
         cl_kernel krdv_;
+        
+        // device data connections
+        mutable clArray<Complex> tmp_, tmA_;
+        mutable clArray<double> nrm_;
+        clArrayView<Complex> t_atom_, t_proj_;
+        clArrayView<Complex> S_atom_p_, D_atom_p_, Mm1_tr_atom_p_, Mm2_atom_p_;
+        clArrayView<Complex> S_proj_p_, D_proj_p_, Mm1_tr_proj_p_, Mm2_proj_p_;
+        std::vector<clArrayView<Complex>> Mi_L_atom_, Mi_mLm1_atom_, M_L_atom_, M_mLm1_atom_;
+        std::vector<clArrayView<Complex>> Mi_L_proj_, Mi_mLm1_proj_, M_L_proj_, M_mLm1_proj_;
+        std::vector<clArrayView<Complex>> Rdia_;
 };
 
 #endif

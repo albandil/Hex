@@ -84,6 +84,15 @@ class PreconditionerBase
         virtual void update (double E) = 0;
         
         /**
+         * @brief Clean up memory etc.
+         * 
+         * This function is called when the preconditioner will no longer be used
+         * to release resources. To re-enable the same preconditioner then would require
+         * a new call to @ref setup.
+         */
+        virtual void finish () = 0;
+        
+        /**
          * @brief Calculate the right-hand side.
          */
         virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const = 0;

@@ -286,6 +286,8 @@ kernel void mmul_2el
     global double2 const * const restrict MmLm1p,
     global double2 const * const restrict MiLp,
     global double2 const * const restrict MimLm1p,
+    // two-electron diagonal contributions
+    global double2 const * const restrict Rdia,
     // source and target vector
     global double2 const * const restrict x,
     global double2       * const restrict y
@@ -353,6 +355,16 @@ kernel void mmul_2el
         // (i,k) ~ (j,l)
         else
         {
+            // retrieve diagonal contribution
+            if (i <= j && i <= k && i <= l)
+                elem += Rdia[((i * (ORDER+1) + (j-i)) * (ORDER+1) + (k-i)) * (ORDER+1) + (l-i)];
+            else if (j <= i && j <= k && j <= l)
+                elem += Rdia[((j * (ORDER+1) + (i-j)) * (ORDER+1) + (l-j)) * (ORDER+1) + (k-j)];
+            else if (k <= i && k <= j && k <= l)
+                elem += Rdia[((k * (ORDER+1) + (j-k)) * (ORDER+1) + (i-k)) * (ORDER+1) + (l-k)];
+            else // (l <= i && l <= j && l <= k)
+                elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];
+            
             // ix < iy
             M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
             M_jl = MimLm1p + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);

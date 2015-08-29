@@ -90,6 +90,7 @@ class ILUCGPreconditioner : public CGPreconditioner
         // declare own definitions
         virtual void setup ();
         virtual void update (double E);
+        virtual void finish ();
         
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;

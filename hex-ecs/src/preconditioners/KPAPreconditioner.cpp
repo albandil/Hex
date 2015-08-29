@@ -448,4 +448,11 @@ void KPACGPreconditioner::CG_exit (int iblock) const
     CGPreconditioner::CG_exit(iblock);
 }
 
+void KPACGPreconditioner::finish ()
+{
+    prec_atom_.clear();
+    prec_proj_.clear();
+    CGPreconditioner::finish();
+}
+
 #endif
