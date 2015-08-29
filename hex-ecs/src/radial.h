@@ -222,6 +222,8 @@ class RadialIntegrals
             int a, int iknot, int iknotmax
         ) const;
         
+        cArray diagonalR (int lambda) const;
+        
         /**
          * @brief Two-electron integral.
          * 
@@ -682,6 +684,9 @@ class RadialIntegrals
         // partial one-electron integral moments for various orders (used to calculate R-integrals)
         cArray Mitr_L_atom_, Mitr_mLm1_atom_;
         cArray Mitr_L_proj_, Mitr_mLm1_proj_;
+        
+        // diagonal contributions to R_tr_dia
+        cArrays R_tr_dia_diag_;
         
         // two-electron integral matrices
         Array<BlockSymBandMatrix<Complex>> R_tr_dia_;

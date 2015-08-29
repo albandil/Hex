@@ -136,6 +136,31 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
          + computeRtri(L,bspline_atom_,g_atom_,a,c,bspline_proj_,g_proj_,b,d,iknot,iknotmax);
 }
 
+cArray RadialIntegrals::diagonalR (int lambda) const
+{
+    // assume bspline_atom == bspline_proj
+    int order = bspline_atom_.order();
+    int Nspline = bspline_atom_.Nspline();
+    int Nreknot = bspline_atom_.Nreknot();
+    
+    // allocate space
+    std::size_t O = order + 1;
+    cArray R (Nspline * O * O * O, 0.);
+    
+    // calculate elements
+    # pragma omp parallel for
+    for (int a = 0; a < Nspline; a++)
+    for (int b = a; b <= a + order; b++)
+    for (int c = a; c <= a + order; c++)
+    for (int d = a; d <= a + order; d++)
+    {
+        for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
+            R[((a * O + (b-a)) * O + (c-a)) * O + (d-a)] += computeRdiag(lambda, a, b, c, d, iknot, Nreknot - 1);
+    }
+    
+    return R;
+}
+
 Complex RadialIntegrals::computeR
 (
     int lambda,
@@ -191,9 +216,19 @@ Complex RadialIntegrals::computeR
     
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
     if (not simple)
-        // calculate diagonal contribution exactly
-        for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot_atom - 1; iknot++)
-            Rtr_Labcd_diag += computeRdiag(lambda,a,b,c,d,iknot,Nreknot_atom-1);
+    {
+        std::size_t O = order + 1;
+        
+        // retrieve diagonal contribution
+        if (a <= b and a <= c and a <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((a * O + (b-a)) * O + (c-a)) * O + (d-a)];
+        else if (b <= a and b <= c and b <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((b * O + (a-b)) * O + (d-b)) * O + (c-b)];
+        else if (c <= a and c <= b and c <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((c * O + (b-c)) * O + (a-c)) * O + (d-c)];
+        else // (d <= a and d <= b and d <= c)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((d * O + (a-d)) * O + (b-d)) * O + (c-d)];
+    }
 /*
     // The following "simple" alternative does not perform very well -> commented out.
     else

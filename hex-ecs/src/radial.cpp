@@ -373,9 +373,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // set number of two-electron integrals
     R_tr_dia_.resize(Nlambdas_);
     
-    // print information
     if (verbose_)
-        std::cout << "Precomputing partial integral moments." << std::endl << std::endl;
+        std::cout << "Precomputing partial integral moments (lambda = 0 .. " << Nlambdas_ - 1 << ")" << std::endl;
     
     // compute partial moments
     std::size_t mi_size_atom = Nspline_atom * (2 * order + 1) * (order + 1);
@@ -384,6 +383,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     Mitr_mLm1_atom_.resize(Nlambdas_ * mi_size_atom);    Mitr_mLm1_proj_.resize(Nlambdas_ * mi_size_proj);
     Mtr_L_atom_    .resize(Nlambdas_);                   Mtr_L_proj_    .resize(Nlambdas_);
     Mtr_mLm1_atom_ .resize(Nlambdas_);                   Mtr_mLm1_proj_ .resize(Nlambdas_);
+    R_tr_dia_diag_ .resize(Nlambdas_);
     for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
     {
         // atomic basis
@@ -397,7 +397,25 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         cArrayView(Mitr_mLm1_proj_, lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_, -lambda-1, Nreknot_proj - 1);
         Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
         Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
+        
+        // diagonal contributions to two-electron integrals
+        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_atom_.hash(), bspline_proj_.hash());
+        if (R_tr_dia_diag_[lambda].hdfload(filename))
+        {
+            if (verbose_)
+                std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+        }
+        else
+        {
+            R_tr_dia_diag_[lambda] = diagonalR(lambda);
+            R_tr_dia_diag_[lambda].hdfsave(filename);
+            if (verbose_)
+                std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+        }
     }
+    
+    if (verbose_)
+        std::cout << std::endl;
     
     // abandon their computation, if not necessary
     if (cmd.lightweight_radial_cache)
