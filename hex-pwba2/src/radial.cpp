@@ -1044,8 +1044,13 @@ Complex Idir_allowed
         gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
         gsl_spline_init(spline, grid.data(), jf_Vfn_yn.data(), N);
         gsl_interp_accel * acc = gsl_interp_accel_alloc();
-        for (int i = 0; i < N; i++)
-            yn_Vfn_jf_r_inf[i] = gsl_spline_eval_integ(spline, grid[i], grid.back(), acc);
+        for (int i = N - 1; i >= 0; i--)
+        {
+            if (i == N - 1)
+                yn_Vfn_jf_r_inf[i] = 0;
+            else
+                yn_Vfn_jf_r_inf[i] = yn_Vfn_jf_r_inf[i+1] + gsl_spline_eval_integ(spline, grid[i], grid[i+1], acc);
+        }
         gsl_interp_accel_free(acc);
         gsl_spline_free(spline);
         
@@ -1071,8 +1076,13 @@ Complex Idir_allowed
         gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
         gsl_spline_init(spline, grid.data(), yn_Vni_ji.data(), N);
         gsl_interp_accel * acc = gsl_interp_accel_alloc();
-        for (int i = 0; i < N; i++)
-            yn_Vni_ji_r_inf[i] = gsl_spline_eval_integ(spline, grid[i], grid.back(), acc);
+        for (int i = N - 1; i >= 0; i--)
+        {
+            if (i == N - 1)
+                yn_Vni_ji_r_inf[i] = 0;
+            else
+                yn_Vni_ji_r_inf[i] = yn_Vni_ji_r_inf[i+1] + gsl_spline_eval_integ(spline, grid[i], grid[i+1], acc);
+        }
         gsl_interp_accel_free(acc);
         gsl_spline_free(spline);
         
