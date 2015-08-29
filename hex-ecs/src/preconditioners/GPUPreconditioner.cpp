@@ -448,7 +448,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         };
         
         // multiplies vector by the ill-th diagonal block
-        auto inner_mmul = [&](/* const */ clArrayView<Complex> a, clArrayView<Complex> b) -> void
+        auto inner_mmul = [&](const clArrayView<Complex> a, clArrayView<Complex> b) -> void
         {
             // multiply
             //      b = A · a
@@ -500,7 +500,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         };
         
         // applies KPA preconditioner (two "kron-dots")
-        auto inner_prec = [&](/* const */ clArrayView<Complex> x, clArrayView<Complex> y) -> void
+        auto inner_prec = [&](const clArrayView<Complex> x, clArrayView<Complex> y) -> void
         {
             // multiply by approximate inverse block
             Timer timer;
