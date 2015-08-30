@@ -282,9 +282,6 @@ void hex_scattering_amplitude_
                 // interpolate requested energy
                 tmatrices.push_back(interpolate(energies_ell, tmatrices_ell, { *E })[0]);
                 missing = false;
-                
-                if (not missing)
-                    std::cout << "# retrieve " << ell << " " << tmatrices.back() << std::endl;
             }
         }
         
