@@ -291,12 +291,12 @@ Complex RadialIntegrals::computeM
     int left = std::max(i, j);
     int right = std::min(i, j) + bspline.order() + 1;
     
+    // calculate scaling factor
+    double scale = (doscale ? 1 / bspline.t(right).real() : 1);
+    
     // cut at maxknot
     if (maxknot != -1 and right > maxknot)
         right = maxknot;
-    
-    // calculate scaling factor
-    double scale = (doscale ? 1 / bspline.t(right).real() : 1);
     
     // the result
     Complex res = 0;

@@ -8,7 +8,8 @@ hex-db --new
 
 # compute the T-matrices using hex-ecs and insert data into the database
 for L in 0 1 2 3; do
-for S in 0 1; do
+mkdir L$L
+cd L$L
 cat > ./ecs.inp <<EOF
 # B-spline parameters 
 # order        θ
@@ -19,11 +20,17 @@ cat > ./ecs.inp <<EOF
   L  0.1  2.0  20
   L    3   80  78
  -1
- 
-# complex knot sequences
-  L  80  120  41
+
+# real overlap
  -1
- 
+
+# complex knot sequences
+  L  0  40  41
+ -1
+
+# further (propagation) grids
+ -1
+
 # initial atomic states
   1 -1
   *
@@ -44,9 +51,9 @@ cat > ./ecs.inp <<EOF
 # magnetic field
   0
 EOF
-hex-ecs | tee -a test-run.log
-hex-db --import tmat-$L-$Pi.sql >> test-run.log
-done
+hex-ecs | tee -a test-run-L$L.log
+cd ..
+hex-db --import L$L/tmat-L$L-Pi0.sql | tee -a L$L/test-run-L$L.log
 done
 
 # optionally precompute some cross sections (not necessary here, DCS is being computed directly from the stored T-matrices)
