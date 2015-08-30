@@ -1,612 +1,0 @@
-                                          
-        / /   / /    __    \ \  / /     
-       / /__ / /   / _ \    \ \/ /     
-      /  ___  /   | |/_/    / /\ \      
-     / /   / /    \_\      / /  \ \   
-                                          
-              UK MFF (c) 2015             
-                                          
-           version: 1.05 538dea4e               
-                                          
-
-=== Exterior complex scaling in B-splines ===
-
-Command line used
-	hex-ecs 
-
-OpenMP environment
-	threads: 4
-	nesting: on
-
-B-spline environment
-	order = 4
-	ecs angle = 0.63
-
-Real knots
-	[0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,
-	10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,
-	43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,
-	76,77,78,79,80]
-
-Complex knots (before scaling)
-	[80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,
-	109,110,111,112,113,114,115,116,117,118,119,120]
-
-Initial atomic states
-	[n l m]: [1 0 0] 
-
-Final atomic states
-	[n l m]: [1 0 *] 
-
-Angular momentum limits
-	L = 0
-	Pi = 0
-	nL = 4
-
-Total projectile + atom energies [Ry]
-	count: 1
-	full list: [3]
-
-Other parameters
-	magnetic field: 0 a.u.
-
-B-spline count: 137
-
-Setting up the coupled angular states...
-	-> [0] (0,0) 
-	-> [1] (1,1) 
-	-> [2] (2,2) 
-	-> [3] (3,3) 
-	-> [4] (4,4) 
-	-> The matrix of the set contains 5 diagonal blocks.
-
-Precomputing one-electron matrices... ok
-
-Precomputing partial integral moments.
-
-Precomputing multipole integrals (lambda = 0 .. 8).
-	- integrals for lambda = 0 computed
-	- integrals for lambda = 1 computed
-	- integrals for lambda = 2 computed
-	- integrals for lambda = 3 computed
-	- integrals for lambda = 4 computed
-	- integrals for lambda = 5 computed
-	- integrals for lambda = 6 computed
-	- integrals for lambda = 7 computed
-	- integrals for lambda = 8 computed
-
-Hamiltonian size: 93845
-
-Solving the system for Etot[0] = 3 (0 % finished, typically 0 CG iterations per energy)
-	Precompute diagonal blocks... ok
-	Create right-hand side for initial state 1s(0) and total spin S = 0 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 0.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:00    | 1              
-	LU #0 (0,0) in 0:01 (158 MiB)       
-	LU #1 (1,1) in 0:01 (152 MiB)       
-	LU #2 (2,2) in 0:01 (153 MiB)       
-	LU #3 (3,3) in 0:01 (147 MiB)       
-	LU #4 (4,4) in 0:01 (144 MiB)        | 1    1    1    
-	   2 | 00:00:06    | 0.731081        | 1    1    1    
-	   3 | 00:00:07    | 0.327288        | 1    1    1    
-	   4 | 00:00:07    | 0.26642         | 1    1    1    
-	   5 | 00:00:08    | 0.334585        | 1    1    1    
-	   6 | 00:00:09    | 0.144418        | 1    1    1    
-	   7 | 00:00:10    | 0.0449733       | 1    1    1    
-	   8 | 00:00:10    | 0.0245666       | 1    1    1    
-	   9 | 00:00:11    | 0.00638057      | 1    1    1    
-	  10 | 00:00:12    | 0.0020656       | 1    1    1    
-	  11 | 00:00:13    | 0.000612068     | 1    1    1    
-	  12 | 00:00:13    | 0.00023455      | 1    1    1    
-	  13 | 00:00:14    | 4.60527e-05     | 1    1    1    
-	  14 | 00:00:15    | 1.5893e-05      | 1    1    1    
-	  15 | 00:00:15    | 3.30765e-06     | 1    1    1    
-	  16 | 00:00:16    | 1.20238e-06     | 1    1    1    
-	  17 | 00:00:17    | 6.54448e-07     | 1    1    1    
-	  18 | 00:00:18    | 7.06344e-08     | 1    1    1    
-	  19 | 00:00:18    | 2.39294e-08     | 1    1    1    
-	Solution converged.
-	Create right-hand side for initial state 1s(0) and total spin S = 1 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 1.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:00    | 1               | 1    1    1    
-	   2 | 00:00:00    | 0.29838         | 1    1    1    
-	   3 | 00:00:01    | 0.0793409       | 1    1    1    
-	   4 | 00:00:02    | 0.029881        | 1    1    1    
-	   5 | 00:00:03    | 0.0124715       | 1    1    1    
-	   6 | 00:00:03    | 0.00603021      | 1    1    1    
-	   7 | 00:00:04    | 0.00134077      | 1    1    1    
-	   8 | 00:00:05    | 0.000910684     | 1    1    1    
-	   9 | 00:00:05    | 0.000439527     | 1    1    1    
-	  10 | 00:00:06    | 0.000139738     | 1    1    1    
-	  11 | 00:00:07    | 4.13887e-06     | 1    1    1    
-	  12 | 00:00:08    | 5.49091e-07     | 1    1    1    
-	  13 | 00:00:08    | 1.21688e-07     | 1    1    1    
-	  14 | 00:00:09    | 1.77166e-08     | 1    1    1    
-	Solution converged.
-
-All solutions computed.
-	(typically 16 CG iterations per solution)
-
-Extracting T-matrices
-	Singlet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-	Triplet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-
-Done.
-
-Counting lines...Importing data...  Importing data...  0 % Importing data...  5 % Importing data...  10 % Importing data...  15 % Importing data...  20 % Importing data...  25 % Importing data...  30 % Importing data...  35 % Importing data...  40 % Importing data...  45 % Importing data...  50 % Importing data...  55 % Importing data...  60 % Importing data...  65 % Importing data...  70 % Importing data...  75 % Importing data...  80 % Importing data...  85 % Importing data...  90 % Importing data...  95 % Importing data...  100 % The SQL batch file has been successfully imported.
-                                          
-        / /   / /    __    \ \  / /     
-       / /__ / /   / _ \    \ \/ /     
-      /  ___  /   | |/_/    / /\ \      
-     / /   / /    \_\      / /  \ \   
-                                          
-              UK MFF (c) 2015             
-                                          
-           version: 1.05 538dea4e               
-                                          
-
-=== Exterior complex scaling in B-splines ===
-
-Command line used
-	hex-ecs 
-
-OpenMP environment
-	threads: 4
-	nesting: on
-
-B-spline environment
-	order = 4
-	ecs angle = 0.63
-
-Real knots
-	[0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,
-	10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,
-	43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,
-	76,77,78,79,80]
-
-Complex knots (before scaling)
-	[80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,
-	109,110,111,112,113,114,115,116,117,118,119,120]
-
-Initial atomic states
-	[n l m]: [1 0 0] 
-
-Final atomic states
-	[n l m]: [1 0 *] 
-
-Angular momentum limits
-	L = 1
-	Pi = 0
-	nL = 4
-
-Total projectile + atom energies [Ry]
-	count: 1
-	full list: [3]
-
-Other parameters
-	magnetic field: 0 a.u.
-
-B-spline count: 137
-
-Setting up the coupled angular states...
-	-> [0] (0,1) (1,0) 
-	-> [1] (1,2) (2,1) 
-	-> [2] (2,3) (3,2) 
-	-> [3] (3,4) (4,3) 
-	-> [4] (4,5) (5,4) 
-	-> The matrix of the set contains 10 diagonal blocks.
-
-Precomputing one-electron matrices... ok
-
-Precomputing partial integral moments.
-
-Precomputing multipole integrals (lambda = 0 .. 9).
-	- integrals for lambda = 0 loaded from "4-R_tr_dia_0.hdf"
-	- integrals for lambda = 1 loaded from "4-R_tr_dia_1.hdf"
-	- integrals for lambda = 2 loaded from "4-R_tr_dia_2.hdf"
-	- integrals for lambda = 3 loaded from "4-R_tr_dia_3.hdf"
-	- integrals for lambda = 4 loaded from "4-R_tr_dia_4.hdf"
-	- integrals for lambda = 5 loaded from "4-R_tr_dia_5.hdf"
-	- integrals for lambda = 6 loaded from "4-R_tr_dia_6.hdf"
-	- integrals for lambda = 7 loaded from "4-R_tr_dia_7.hdf"
-	- integrals for lambda = 8 loaded from "4-R_tr_dia_8.hdf"
-	- integrals for lambda = 9 computed
-
-Hamiltonian size: 187690
-
-Solving the system for Etot[0] = 3 (0 % finished, typically 0 CG iterations per energy)
-	Precompute diagonal blocks... ok
-	Create right-hand side for initial state 1s(0) and total spin S = 0 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 0.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:00    | 1              
-	LU #0 (0,1) in 0:01 (153 MiB)       
-	LU #1 (1,0) in 0:01 (157 MiB)       
-	LU #2 (1,2) in 0:01 (151 MiB)       
-	LU #3 (2,1) in 0:01 (151 MiB)       
-	LU #4 (2,3) in 0:01 (149 MiB)       
-	LU #5 (3,2) in 0:01 (147 MiB)       
-	LU #6 (3,4) in 0:01 (145 MiB)       
-	LU #7 (4,3) in 0:01 (146 MiB)       
-	LU #8 (4,5) in 0:01 (144 MiB)       
-	LU #9 (5,4) in 0:01 (141 MiB)        | 1    1    1    
-	   2 | 00:00:13    | 0.559161        | 1    1    1    
-	   3 | 00:00:15    | 0.409492        | 1    1    1    
-	   4 | 00:00:17    | 0.385457        | 1    1    1    
-	   5 | 00:00:18    | 0.481853        | 1    1    1    
-	   6 | 00:00:20    | 0.133646        | 1    1    1    
-	   7 | 00:00:22    | 0.0466742       | 1    1    1    
-	   8 | 00:00:24    | 0.0163793       | 1    1    1    
-	   9 | 00:00:26    | 0.00260817      | 1    1    1    
-	  10 | 00:00:27    | 0.0028204       | 1    1    1    
-	  11 | 00:00:29    | 0.000643566     | 1    1    1    
-	  12 | 00:00:31    | 0.000239157     | 1    1    1    
-	  13 | 00:00:33    | 4.00278e-05     | 1    1    1    
-	  14 | 00:00:35    | 1.93027e-05     | 1    1    1    
-	  15 | 00:00:36    | 8.44349e-06     | 1    1    1    
-	  16 | 00:00:38    | 1.65079e-06     | 1    1    1    
-	  17 | 00:00:40    | 1.45386e-06     | 1    1    1    
-	  18 | 00:00:42    | 3.19774e-07     | 1    1    1    
-	  19 | 00:00:43    | 4.09637e-08     | 1    1    1    
-	Solution converged.
-	Create right-hand side for initial state 1s(0) and total spin S = 1 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 1.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:00    | 1               | 1    1    1    
-	   2 | 00:00:02    | 0.40469         | 1    1    1    
-	   3 | 00:00:04    | 0.11598         | 1    1    1    
-	   4 | 00:00:05    | 0.0494568       | 1    1    1    
-	   5 | 00:00:07    | 0.0241629       | 1    1    1    
-	   6 | 00:00:09    | 0.0108379       | 1    1    1    
-	   7 | 00:00:11    | 0.0126331       | 1    1    1    
-	   8 | 00:00:13    | 0.00499362      | 1    1    1    
-	   9 | 00:00:14    | 0.000246722     | 1    1    1    
-	  10 | 00:00:16    | 0.000269908     | 1    1    1    
-	  11 | 00:00:18    | 1.66673e-05     | 1    1    1    
-	  12 | 00:00:20    | 3.05968e-06     | 1    1    1    
-	  13 | 00:00:22    | 7.95025e-07     | 1    1    1    
-	  14 | 00:00:23    | 1.96032e-07     | 1    1    1    
-	  15 | 00:00:25    | 2.64155e-08     | 1    1    1    
-	Solution converged.
-
-All solutions computed.
-	(typically 17 CG iterations per solution)
-
-Extracting T-matrices
-	Singlet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-	Triplet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-
-Done.
-
-Counting lines...Importing data...  Importing data...  0 % Importing data...  5 % Importing data...  10 % Importing data...  15 % Importing data...  20 % Importing data...  25 % Importing data...  30 % Importing data...  35 % Importing data...  40 % Importing data...  45 % Importing data...  50 % Importing data...  55 % Importing data...  60 % Importing data...  65 % Importing data...  70 % Importing data...  75 % Importing data...  80 % Importing data...  85 % Importing data...  90 % Importing data...  95 % Importing data...  100 % The SQL batch file has been successfully imported.
-                                          
-        / /   / /    __    \ \  / /     
-       / /__ / /   / _ \    \ \/ /     
-      /  ___  /   | |/_/    / /\ \      
-     / /   / /    \_\      / /  \ \   
-                                          
-              UK MFF (c) 2015             
-                                          
-           version: 1.05 538dea4e               
-                                          
-
-=== Exterior complex scaling in B-splines ===
-
-Command line used
-	hex-ecs 
-
-OpenMP environment
-	threads: 4
-	nesting: on
-
-B-spline environment
-	order = 4
-	ecs angle = 0.63
-
-Real knots
-	[0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,
-	10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,
-	43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,
-	76,77,78,79,80]
-
-Complex knots (before scaling)
-	[80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,
-	109,110,111,112,113,114,115,116,117,118,119,120]
-
-Initial atomic states
-	[n l m]: [1 0 0] 
-
-Final atomic states
-	[n l m]: [1 0 *] 
-
-Angular momentum limits
-	L = 2
-	Pi = 0
-	nL = 4
-
-Total projectile + atom energies [Ry]
-	count: 1
-	full list: [3]
-
-Other parameters
-	magnetic field: 0 a.u.
-
-B-spline count: 137
-
-Setting up the coupled angular states...
-	-> [0] (0,2) (1,1) (2,0) 
-	-> [1] (1,3) (2,2) (3,1) 
-	-> [2] (2,4) (3,3) (4,2) 
-	-> [3] (3,5) (4,4) (5,3) 
-	-> [4] (4,6) (5,5) (6,4) 
-	-> The matrix of the set contains 15 diagonal blocks.
-
-Precomputing one-electron matrices... ok
-
-Precomputing partial integral moments.
-
-Precomputing multipole integrals (lambda = 0 .. 10).
-	- integrals for lambda = 0 loaded from "4-R_tr_dia_0.hdf"
-	- integrals for lambda = 1 loaded from "4-R_tr_dia_1.hdf"
-	- integrals for lambda = 2 loaded from "4-R_tr_dia_2.hdf"
-	- integrals for lambda = 3 loaded from "4-R_tr_dia_3.hdf"
-	- integrals for lambda = 4 loaded from "4-R_tr_dia_4.hdf"
-	- integrals for lambda = 5 loaded from "4-R_tr_dia_5.hdf"
-	- integrals for lambda = 6 loaded from "4-R_tr_dia_6.hdf"
-	- integrals for lambda = 7 loaded from "4-R_tr_dia_7.hdf"
-	- integrals for lambda = 8 loaded from "4-R_tr_dia_8.hdf"
-	- integrals for lambda = 9 loaded from "4-R_tr_dia_9.hdf"
-	- integrals for lambda = 10 computed
-
-Hamiltonian size: 281535
-
-Solving the system for Etot[0] = 3 (0 % finished, typically 0 CG iterations per energy)
-	Precompute diagonal blocks... ok
-	Create right-hand side for initial state 1s(0) and total spin S = 0 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 0.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:01    | 1              
-	LU #0 (0,2) in 0:01 (152 MiB)       
-	LU #1 (1,1) in 0:01 (153 MiB)       
-	LU #2 (2,0) in 0:01 (156 MiB)       
-	LU #3 (1,3) in 0:01 (150 MiB)       
-	LU #4 (2,2) in 0:01 (150 MiB)       
-	LU #5 (3,1) in 0:01 (148 MiB)       
-	LU #6 (2,4) in 0:01 (151 MiB)       
-	LU #7 (3,3) in 0:01 (147 MiB)       
-	LU #8 (4,2) in 0:01 (147 MiB)       
-	LU #9 (3,5) in 0:01 (145 MiB)       
-	LU #10 (4,4) in 0:01 (144 MiB)      
-	LU #11 (5,3) in 0:01 (143 MiB)      
-	LU #12 (4,6) in 0:01 (142 MiB)      
-	LU #13 (5,5) in 0:01 (140 MiB)      
-	LU #14 (6,4) in 0:01 (138 MiB)       | 1    1    1    
-	   2 | 00:00:24    | 0.479095        | 1    1    1    
-	   3 | 00:00:27    | 0.244564        | 1    1    1    
-	   4 | 00:00:30    | 0.195684        | 1    1    1    
-	   5 | 00:00:34    | 0.246447        | 1    1    1    
-	   6 | 00:00:37    | 0.114818        | 1    1    1    
-	   7 | 00:00:40    | 0.0579775       | 1    1    1    
-	   8 | 00:00:43    | 0.0101303       | 1    1    1    
-	   9 | 00:00:47    | 0.00713633      | 1    1    1    
-	  10 | 00:00:50    | 0.00234887      | 1    1    1    
-	  11 | 00:00:53    | 0.000325121     | 1    1    1    
-	  12 | 00:00:56    | 0.000205334     | 1    1    1    
-	  13 | 00:01:00    | 4.66177e-05     | 1    1    1    
-	  14 | 00:01:03    | 2.85418e-05     | 1    1    1    
-	  15 | 00:01:06    | 6.23224e-06     | 1    1    1    
-	  16 | 00:01:09    | 1.65423e-06     | 1    1    1    
-	  17 | 00:01:13    | 1.05728e-06     | 1    1    1    
-	  18 | 00:01:16    | 3.44476e-07     | 1    1    1    
-	  19 | 00:01:19    | 8.0384e-08      | 1    1    1    
-	  20 | 00:01:22    | 1.58996e-08     | 1    1    1    
-	Solution converged.
-	Create right-hand side for initial state 1s(0) and total spin S = 1 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 1.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:01    | 1               | 1    1    1    
-	   2 | 00:00:04    | 0.335269        | 1    1    1    
-	   3 | 00:00:07    | 0.101693        | 1    1    1    
-	   4 | 00:00:11    | 0.0398546       | 1    1    1    
-	   5 | 00:00:14    | 0.0254786       | 1    1    1    
-	   6 | 00:00:17    | 0.00859434      | 1    1    1    
-	   7 | 00:00:20    | 0.00631662      | 1    1    1    
-	   8 | 00:00:24    | 0.00181314      | 1    1    1    
-	   9 | 00:00:27    | 0.000279666     | 1    1    1    
-	  10 | 00:00:30    | 4.9592e-05      | 1    1    1    
-	  11 | 00:00:33    | 2.32442e-05     | 1    1    1    
-	  12 | 00:00:37    | 2.17269e-06     | 1    1    1    
-	  13 | 00:00:40    | 1.05002e-06     | 1    1    1    
-	  14 | 00:00:43    | 7.89334e-08     | 1    1    1    
-	  15 | 00:00:46    | 1.22633e-07     | 1    1    1    
-	  16 | 00:00:50    | 1.73459e-08     | 1    1    1    
-	Solution converged.
-
-All solutions computed.
-	(typically 18 CG iterations per solution)
-
-Extracting T-matrices
-	Singlet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-	Triplet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-
-Done.
-
-Counting lines...Importing data...  Importing data...  0 % Importing data...  5 % Importing data...  10 % Importing data...  15 % Importing data...  20 % Importing data...  25 % Importing data...  30 % Importing data...  35 % Importing data...  40 % Importing data...  45 % Importing data...  50 % Importing data...  55 % Importing data...  60 % Importing data...  65 % Importing data...  70 % Importing data...  75 % Importing data...  80 % Importing data...  85 % Importing data...  90 % Importing data...  95 % Importing data...  100 % The SQL batch file has been successfully imported.
-                                          
-        / /   / /    __    \ \  / /     
-       / /__ / /   / _ \    \ \/ /     
-      /  ___  /   | |/_/    / /\ \      
-     / /   / /    \_\      / /  \ \   
-                                          
-              UK MFF (c) 2015             
-                                          
-           version: 1.05 538dea4e               
-                                          
-
-=== Exterior complex scaling in B-splines ===
-
-Command line used
-	hex-ecs 
-
-OpenMP environment
-	threads: 4
-	nesting: on
-
-B-spline environment
-	order = 4
-	ecs angle = 0.63
-
-Real knots
-	[0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,
-	10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,
-	43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,
-	76,77,78,79,80]
-
-Complex knots (before scaling)
-	[80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,
-	109,110,111,112,113,114,115,116,117,118,119,120]
-
-Initial atomic states
-	[n l m]: [1 0 0] 
-
-Final atomic states
-	[n l m]: [1 0 *] 
-
-Angular momentum limits
-	L = 3
-	Pi = 0
-	nL = 4
-
-Total projectile + atom energies [Ry]
-	count: 1
-	full list: [3]
-
-Other parameters
-	magnetic field: 0 a.u.
-
-B-spline count: 137
-
-Setting up the coupled angular states...
-	-> [0] (0,3) (1,2) (2,1) (3,0) 
-	-> [1] (1,4) (2,3) (3,2) (4,1) 
-	-> [2] (2,5) (3,4) (4,3) (5,2) 
-	-> [3] (3,6) (4,5) (5,4) (6,3) 
-	-> [4] (4,7) (5,6) (6,5) (7,4) 
-	-> The matrix of the set contains 20 diagonal blocks.
-
-Precomputing one-electron matrices... ok
-
-Precomputing partial integral moments.
-
-Precomputing multipole integrals (lambda = 0 .. 11).
-	- integrals for lambda = 0 loaded from "4-R_tr_dia_0.hdf"
-	- integrals for lambda = 1 loaded from "4-R_tr_dia_1.hdf"
-	- integrals for lambda = 2 loaded from "4-R_tr_dia_2.hdf"
-	- integrals for lambda = 3 loaded from "4-R_tr_dia_3.hdf"
-	- integrals for lambda = 4 loaded from "4-R_tr_dia_4.hdf"
-	- integrals for lambda = 5 loaded from "4-R_tr_dia_5.hdf"
-	- integrals for lambda = 6 loaded from "4-R_tr_dia_6.hdf"
-	- integrals for lambda = 7 loaded from "4-R_tr_dia_7.hdf"
-	- integrals for lambda = 8 loaded from "4-R_tr_dia_8.hdf"
-	- integrals for lambda = 9 loaded from "4-R_tr_dia_9.hdf"
-	- integrals for lambda = 10 loaded from "4-R_tr_dia_10.hdf"
-	- integrals for lambda = 11 computed
-
-Hamiltonian size: 375380
-
-Solving the system for Etot[0] = 3 (0 % finished, typically 0 CG iterations per energy)
-	Precompute diagonal blocks... ok
-	Create right-hand side for initial state 1s(0) and total spin S = 0 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 0.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:02    | 1              
-	LU #0 (0,3) in 0:01 (152 MiB)       
-	LU #1 (1,2) in 0:01 (151 MiB)       
-	LU #2 (2,1) in 0:01 (150 MiB)       
-	LU #3 (3,0) in 0:01 (154 MiB)       
-	LU #4 (1,4) in 0:01 (149 MiB)       
-	LU #5 (2,3) in 0:01 (149 MiB)       
-	LU #6 (3,2) in 0:01 (147 MiB)       
-	LU #7 (4,1) in 0:01 (147 MiB)       
-	LU #8 (2,5) in 0:01 (147 MiB)       
-	LU #9 (3,4) in 0:01 (145 MiB)       
-	LU #10 (4,3) in 0:01 (146 MiB)      
-	LU #11 (5,2) in 0:01 (143 MiB)      
-	LU #12 (3,6) in 0:01 (143 MiB)      
-	LU #13 (4,5) in 0:01 (144 MiB)      
-	LU #14 (5,4) in 0:01 (141 MiB)      
-	LU #15 (6,3) in 0:01 (139 MiB)      
-	LU #16 (4,7) in 0:01 (142 MiB)      
-	LU #17 (5,6) in 0:01 (139 MiB)      
-	LU #18 (6,5) in 0:01 (137 MiB)      
-	LU #19 (7,4) in 0:01 (136 MiB)       | 1    1    1    
-	   2 | 00:00:36    | 0.458704        | 1    1    1    
-	   3 | 00:00:41    | 0.336479        | 1    1    1    
-	   4 | 00:00:46    | 0.271679        | 1    1    1    
-	   5 | 00:00:51    | 0.400397        | 1    1    1    
-	   6 | 00:00:57    | 0.157479        | 1    1    1    
-	   7 | 00:01:02    | 0.0498442       | 1    1    1    
-	   8 | 00:01:07    | 0.00823502      | 1    1    1    
-	   9 | 00:01:12    | 0.00502346      | 1    1    1    
-	  10 | 00:01:17    | 0.0015493       | 1    1    1    
-	  11 | 00:01:22    | 0.000644805     | 1    1    1    
-	  12 | 00:01:27    | 0.000154271     | 1    1    1    
-	  13 | 00:01:33    | 7.36619e-05     | 1    1    1    
-	  14 | 00:01:38    | 2.98345e-05     | 1    1    1    
-	  15 | 00:01:43    | 5.54868e-06     | 1    1    1    
-	  16 | 00:01:48    | 2.64783e-06     | 1    1    1    
-	  17 | 00:01:53    | 1.14368e-06     | 1    1    1    
-	  18 | 00:01:58    | 2.77551e-07     | 1    1    1    
-	  19 | 00:02:04    | 8.78929e-08     | 1    1    1    
-	  20 | 00:02:09    | 7.58058e-08     | 1    1    1    
-	  21 | 00:02:14    | 2.18547e-08     | 1    1    1    
-	Solution converged.
-	Create right-hand side for initial state 1s(0) and total spin S = 1 ... ok
-	Start linear solver with tolerance 1e-08 for initial state 1s(0) and total spin S = 1.
-	   i | time        | residual        | min  max  avg  block precond. iter.
-	   1 | 00:00:02    | 1               | 1    1    1    
-	   2 | 00:00:07    | 0.314243        | 1    1    1    
-	   3 | 00:00:13    | 0.0921944       | 1    1    1    
-	   4 | 00:00:18    | 0.0482785       | 1    1    1    
-	   5 | 00:00:23    | 0.0217789       | 1    1    1    
-	   6 | 00:00:28    | 0.0132691       | 1    1    1    
-	   7 | 00:00:33    | 0.00503555      | 1    1    1    
-	   8 | 00:00:38    | 0.00442238      | 1    1    1    
-	   9 | 00:00:44    | 0.000743561     | 1    1    1    
-	  10 | 00:00:49    | 6.26585e-05     | 1    1    1    
-	  11 | 00:00:54    | 8.2414e-06      | 1    1    1    
-	  12 | 00:00:59    | 3.48336e-06     | 1    1    1    
-	  13 | 00:01:04    | 9.88672e-07     | 1    1    1    
-	  14 | 00:01:09    | 1.63821e-07     | 1    1    1    
-	  15 | 00:01:15    | 3.21519e-08     | 1    1    1    
-	  16 | 00:01:20    | 1.32278e-08     | 1    1    1    
-	Solution converged.
-
-All solutions computed.
-	(typically 18 CG iterations per solution)
-
-Extracting T-matrices
-	Singlet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-	Triplet
-		Ei = 3
-			exc: (1,0,0) -> (1,0,*) 
-
-Done.
-
-Counting lines...Importing data...  Importing data...  0 % Importing data...  5 % Importing data...  10 % Importing data...  15 % Importing data...  20 % Importing data...  25 % Importing data...  30 % Importing data...  35 % Importing data...  40 % Importing data...  45 % Importing data...  50 % Importing data...  55 % Importing data...  60 % Importing data...  65 % Importing data...  70 % Importing data...  75 % Importing data...  80 % Importing data...  85 % Importing data...  90 % Importing data...  95 % Importing data...  100 % The SQL batch file has been successfully imported.
