@@ -1,7 +1,7 @@
 The following configuration successfully builds and runs the package:
 
 Compiler:
-    GCC 5.1.1
+    GCC 5.1.1 (also MinGW-w64 based on this GCC)
     LLVM/clang 3.5.0
 
 Third-party libraries:
