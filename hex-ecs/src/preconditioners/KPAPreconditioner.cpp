@@ -195,9 +195,9 @@ void KPACGPreconditioner::prepare
     par_.wait();
 
     // load all preconditioner matrices needed by this MPI node
-    for (int l : needed_l)
-        if (not cmd_.outofcore and not prec[l].hdfload())
-            HexException("Failed to read preconditioner matrix for l = %d.", l);
+//     for (int l : needed_l)
+//         if (not cmd_.outofcore and not prec[l].hdfload())
+//             HexException("Failed to read preconditioner matrix for l = %d.", l);
 }
 
 void KPACGPreconditioner::setup ()
@@ -262,7 +262,7 @@ void KPACGPreconditioner::setup ()
             done_atom[l] = prec_atom_[l].hdfcheck();
             done_proj[l] = prec_proj_[l].hdfcheck();
             
-            if (cmd_.outofcore)
+//             if (cmd_.outofcore)
             {
                 if (done_atom[l] and not done_proj[l])
                 {
@@ -281,31 +281,31 @@ void KPACGPreconditioner::setup ()
                             << "\" and \"" << prec_proj_[l].filename << std::endl;
                 }
             }
-            else
-            {
-                done_atom[l] = prec_atom_[l].hdfload();
-                done_proj[l] = prec_proj_[l].hdfload();
-                
-                if (done_atom[l] and not done_proj[l])
-                {
-                    std::cout << "\t- atomic preconditioner data for l = " << l
-                            << " loaded from \"" << prec_atom_[l].filename
-                            << "\"" << std::endl;
-                }
-                if (not done_atom[l] and done_proj[l])
-                {
-                    std::cout << "\t- projectile preconditioner data for l = " << l
-                            << " loaded from \"" << prec_proj_[l].filename
-                            << "\"" << std::endl;
-                }
-                if (done_atom[l] and done_proj[l])
-                {
-                    std::cout << "\t- preconditioner data for l = " << l
-                            << " loaded from \"" << prec_atom_[l].filename
-                            << "\" and \"" << prec_proj_[l].filename
-                            << "\"" << std::endl;
-                }
-            }
+//             else
+//             {
+//                 done_atom[l] = prec_atom_[l].hdfload();
+//                 done_proj[l] = prec_proj_[l].hdfload();
+//                 
+//                 if (done_atom[l] and not done_proj[l])
+//                 {
+//                     std::cout << "\t- atomic preconditioner data for l = " << l
+//                             << " loaded from \"" << prec_atom_[l].filename
+//                             << "\"" << std::endl;
+//                 }
+//                 if (not done_atom[l] and done_proj[l])
+//                 {
+//                     std::cout << "\t- projectile preconditioner data for l = " << l
+//                             << " loaded from \"" << prec_proj_[l].filename
+//                             << "\"" << std::endl;
+//                 }
+//                 if (done_atom[l] and done_proj[l])
+//                 {
+//                     std::cout << "\t- preconditioner data for l = " << l
+//                             << " loaded from \"" << prec_atom_[l].filename
+//                             << "\" and \"" << prec_proj_[l].filename
+//                             << "\"" << std::endl;
+//                 }
+//             }
         }
         
         // if all preconditioners have been loaded, exit this routine
@@ -345,7 +345,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // initialize self
-    if (cmd_.outofcore)
+//     if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = l1_l2_[iblock].first;
@@ -369,9 +369,9 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         int l2 = l1_l2_[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
-        q  = kron_dot(Complex(E_) * rad_.S_atom(), rad_.S_proj(), p);
-        q -= kron_dot(Complex(0.5) * rad_.D_atom() - rad_.Mm1_tr_atom() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_atom(), rad_.S_proj(), p);
-        q -= kron_dot(rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_proj(), p);
+        kron_dot(0., q,  1., p, Complex(E_) * rad_.S_atom(), rad_.S_proj());
+        kron_dot(1., q, -1., p, Complex(0.5) * rad_.D_atom() - rad_.Mm1_tr_atom() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_atom(), rad_.S_proj());
+        kron_dot(1., q, -1., p, rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_proj());
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -433,7 +433,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void KPACGPreconditioner::CG_exit (int iblock) const
 {
     // exit self
-    if (cmd_.outofcore)
+//     if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = l1_l2_[iblock].first;

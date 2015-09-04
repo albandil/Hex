@@ -1068,23 +1068,28 @@ SymBandMatrix<DataT> operator - (SymBandMatrix<DataT> const & A, SymBandMatrix<D
     return SymBandMatrix<DataT>(A.size(), A.halfbw(), A.data() - B.data());
 }
 
-// template <class DataT>
-// SymBandMatrix<DataT> operator * (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B);
-
 template <class DataT>
 SymBandMatrix<DataT> operator * (DataT z, SymBandMatrix<DataT> const & A)
 {
     return SymBandMatrix<DataT>(A.size(), A.halfbw(), z * A.data());
 }
 
-// template <class DataT>
-// BlockSymBandMatrix<DataT> kron (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B);
-
-template <class DataT>
-NumberArray<DataT> kron_dot (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT> const & B, const ArrayView<DataT> v)
+/**
+ * @brief Kronecker product.
+ * 
+ * Applies the following operation:
+ * \f[
+ *     \mathbf{w} = a \mathbf{w} + b (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,.
+ * \f]
+ */
+template <class DataT> void kron_dot
+(
+    double a,       ArrayView<DataT> w,
+    double b, const ArrayView<DataT> v,
+    SymBandMatrix<DataT> const & A,
+    SymBandMatrix<DataT> const & B
+)
 {
-    NumberArray<DataT> w (v.size());
-    
     std::size_t A_size = A.size();
     std::size_t B_size = B.size();
     
@@ -1105,10 +1110,8 @@ NumberArray<DataT> kron_dot (SymBandMatrix<DataT> const & A, SymBandMatrix<DataT
             res += A(i,k) * B(j,l) * v[k * B.size() + l];
         
         // save result
-        w[i * B.size() + j] = res;
+        w[i * B.size() + j] = a * w[i * B.size() + j] + b * res;
     }
-    
-    return w;
 }
 
 #endif // HEX_SYMBANDMATRIX_H

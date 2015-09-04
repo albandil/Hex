@@ -505,9 +505,9 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             int l2 = l1_l2_[ill].second;
             
             // multiply 'p_block' by the diagonal block (except for the two-electron term)
-            q[ill]  = kron_dot(Complex(E_) * rad_.S_atom(), rad_.S_proj(), p[ill]);
-            q[ill] -= kron_dot(Complex(0.5) * rad_.D_atom() - rad_.Mm1_tr_atom() + Complex(0.5*l1*(l1+1)) * rad_.Mm2_atom(), rad_.S_proj(), p[ill]);
-            q[ill] -= kron_dot(rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*l2*(l2+1)) * rad_.Mm2_proj(), p[ill]);
+            kron_dot(0., q[ill],  1., p[ill], Complex(E_) * rad_.S_atom(), rad_.S_proj());
+            kron_dot(1., q[ill], -1., p[ill], Complex(0.5) * rad_.D_atom() - rad_.Mm1_tr_atom() + Complex(0.5*l1*(l1+1)) * rad_.Mm2_atom(), rad_.S_proj());
+            kron_dot(1., q[ill], -1., p[ill], rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*l2*(l2+1)) * rad_.Mm2_proj());
             
             if (cmd_.outofcore)
             {
