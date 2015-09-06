@@ -383,7 +383,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                q -= rad_.apply_R_matrix(lambda, f * p, cmd_.kpa_simple_rad);
+                rad_.apply_R_matrix(lambda, -f, p, 1., q, cmd_.kpa_simple_rad);
         }
     }
     

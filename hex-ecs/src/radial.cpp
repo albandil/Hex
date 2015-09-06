@@ -549,21 +549,29 @@ SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda
     return block_ik;
 }
 
-cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, bool simple) const
+void RadialIntegrals::apply_R_matrix
+(
+    unsigned lambda,
+    Complex a, const cArrayView src,
+    Complex b,       cArrayView dst,
+    bool simple
+) const
 {
-    // number of source vectors
-    int N = src.size();
-    
     // shorthands
     std::size_t Nspline_atom = bspline_atom_.Nspline();
     std::size_t Nspline_proj = bspline_proj_.Nspline();
     std::size_t order = bspline_atom_.order();
     
-    // output array (the product)
-    cArray dst(N);
+    // update destination vector
+    # pragma omp simd
+    for (std::size_t j = 0; j < dst.size(); j++)
+        dst[j] *= b;
+    
+    // workspace
+    cArray prod (Nspline_proj);
     
     // for all blocks of the radial matrix
-    # pragma omp parallel for schedule (dynamic, 1)
+    # pragma omp parallel for firstprivate (prod) schedule (dynamic, 1)
     for (unsigned i = 0; i < Nspline_atom; i++)
     for (std::size_t k = i; k < Nspline_atom and k <= i + order; k++)
     {
@@ -571,24 +579,29 @@ cArray RadialIntegrals::apply_R_matrix (unsigned lambda, cArray const & src, boo
         SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
         
         // multiply source vector by this block
-        cArray prod = std::move ( block_ik.dot(cArrayView(src, k * Nspline_proj, Nspline_proj)) );
+        block_ik.dot(1., cArrayView(src, k * Nspline_proj, Nspline_proj), 0., prod);
         
         // update destination vector
         # pragma omp critical
-        cArrayView(dst, i * Nspline_proj, Nspline_proj) += prod;
+        {
+            # pragma omp simd
+            for (std::size_t j  = 0; j < Nspline_proj; j++)
+                dst[i * Nspline_proj + j] += a * prod[j];
+        }
         
         // also handle symmetric case
         if (i != k)
         {
             // multiply source vector by this block
-            prod = std::move ( block_ik.dot(cArrayView(src, i * Nspline_proj, Nspline_proj)) );
+            block_ik.dot(1., cArrayView(src, i * Nspline_proj, Nspline_proj), 0., prod);
             
             // update destination vector
             # pragma omp critical
-            cArrayView(dst, k * Nspline_proj, Nspline_proj) += prod;
+            {
+                # pragma omp simd
+                for (std::size_t j  = 0; j < Nspline_proj; j++)
+                    dst[k * Nspline_proj + j] += a * prod[j];
+            }
         }
     }
-    
-    // return result
-    return dst;
 }

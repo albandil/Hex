@@ -192,7 +192,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     if (cmd_.lightweight_full)
         HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
         
-    q = dia_blocks_[iblock].dot(p, true);
+    dia_blocks_[iblock].dot(1., p, 0., q, true);
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const

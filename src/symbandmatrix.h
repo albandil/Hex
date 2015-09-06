@@ -285,9 +285,15 @@ public:
      *
      * @param B Set of vectors to multiply as a column-major dense matrix.
      */
-    NumberArray<DataT> dot (const ArrayView<DataT> B) const
+    void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B) const
     {
-        return sym_band_dot(n_, d_, elems_, B);
+        sym_band_dot(n_, d_, elems_, a, A, b, B);
+    }
+    NumberArray<DataT> dot (const ArrayView<DataT> A) const
+    {
+        NumberArray<DataT> B (A.size());
+        sym_band_dot(n_, d_, elems_, 1., A, 0., B);
+        return B;
     }
     
     /**
@@ -298,7 +304,12 @@ public:
      * @param M Matrix elements (concatenated row-padded upper triangle rows).
      * @param X Concatenate source vectors.
      */
-    static NumberArray<DataT> sym_band_dot (int n, int d, const ArrayView<DataT> M, const ArrayView<DataT> X);
+    static void sym_band_dot
+    (
+        int n, int d, const ArrayView<DataT> M,
+        DataT a, const ArrayView<DataT> A,
+        DataT b, const ArrayView<DataT> B
+    );
     
     /**
      * @brief Back-substitution (lower).
@@ -773,18 +784,15 @@ template <class DataT> class BlockSymBandMatrix
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          */
-        NumberArray<DataT> dot (ArrayView<DataT> v, bool parallelize = false) const
+        void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false) const
         {
             // check vector size
             if (v.size() != blockcount_ * size_)
                 HexException("[BlockSymBandMatrix::dot] Different size of matrix and vector in multiplication routine: %ld (mat) != %ld (vec).", blockcount_ * size_, v.size());
             
-            // create output vector
-            NumberArray<DataT> w(v.size());
-            
             // check if matrix is empty
             if (halfbw_ == 0)
-                return w;
+                return;
             
 #ifdef _OPENMP
             // write locks
@@ -792,9 +800,11 @@ template <class DataT> class BlockSymBandMatrix
             for (std::size_t i = 0; i < size_; i++)
                 omp_init_lock(&lock[i]);
 #endif
+            // workspace
+            NumberArray<DataT> product (size_);
             
             // for all blocks
-            # pragma omp parallel if (parallelize)
+            # pragma omp parallel firstprivate (product) if (parallelize)
             {
                 // open data file for reading
                 NumberArray<DataT> diskdata;
@@ -832,46 +842,52 @@ template <class DataT> class BlockSymBandMatrix
                             view.reset(vol, diskdata.data());
                         }
                         
-                        NumberArray<DataT> product;
-                        
                         // multiply by diagonal block
                         if (d == 0)
                         {
-                            product = SymBandMatrix<DataT>::sym_band_dot
+                            SymBandMatrix<DataT>::sym_band_dot
                             (
                                 size_, halfbw_, view,
-                                ArrayView<DataT>(v, i * size_, size_)
+                                1., ArrayView<DataT>(v, i * size_, size_),
+                                0., product
                             );
                             
-                            // update result (no need to lock access here)
-                            ArrayView<DataT>(w, i * size_, size_) += product;
+                            # pragma omp simd
+                            for (std::size_t pos = 0; pos < size_; pos++)
+                                w[i * size_ + pos] = a * product[pos] + b * w[i * size_ + pos];
                         }
                         
                         // multiply by the other diagonals (both symmetries)
                         if (d != 0)
                         {
-                            product = SymBandMatrix<DataT>::sym_band_dot
+                            SymBandMatrix<DataT>::sym_band_dot
                             (
                                 size_, halfbw_, view,
-                                ArrayView<DataT>(v, (i + d) * size_, size_)
+                                1., ArrayView<DataT>(v, (i + d) * size_, size_),
+                                0., product
                             );
 #ifdef _OPENMP
                             omp_set_lock(&lock[i]);
 #endif
-                            ArrayView<DataT>(w, i * size_, size_) += product;
+                            # pragma omp simd
+                            for (std::size_t pos = 0; pos < size_; pos++)
+                                w[i * size_ + pos] = a * product[pos] + b * w[i * size_ + pos];
 #ifdef _OPENMP
                             omp_unset_lock(&lock[i]);
 #endif
                             
-                            product = SymBandMatrix<DataT>::sym_band_dot
+                            SymBandMatrix<DataT>::sym_band_dot
                             (
                                 size_, halfbw_, view,
-                                ArrayView<DataT>(v, i * size_, size_)
+                                1., ArrayView<DataT>(v, i * size_, size_),
+                                0., product
                             );
 #ifdef _OPENMP
                             omp_set_lock(&lock[i + d]);
 #endif
-                            ArrayView<DataT>(w, (i + d) * size_, size_) += product;
+                            # pragma omp simd
+                            for (std::size_t pos = 0; pos < size_; pos++)
+                                w[(i + d) * size_ + pos] = a * product[pos] + b * w[(i + d) * size_ + pos];
 #ifdef _OPENMP
                             omp_unset_lock(&lock[i + d]);
 #endif
@@ -887,8 +903,6 @@ template <class DataT> class BlockSymBandMatrix
             for (std::size_t i = 0; i < size_; i++)
                 omp_destroy_lock(&lock[i]);
 #endif
-            
-            return w;
         }
         
         //

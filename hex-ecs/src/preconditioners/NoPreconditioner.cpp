@@ -279,13 +279,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
                 // add multipole terms (direct/exchange)
                 if (not cmd_.lightweight_radial_cache)
                 {
-                    if (f1 != 0.) chi_block += (       prefactor * f1) * rad_.R_tr_dia(lambda).dot(Pj1, true);
-                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * rad_.R_tr_dia(lambda).dot(Pj2, true);
+                    if (f1 != 0.) rad_.R_tr_dia(lambda).dot(       prefactor * f1, Pj1, 1., chi_block, true);
+                    if (f2 != 0.) rad_.R_tr_dia(lambda).dot(Sign * prefactor * f2, Pj2, 1., chi_block, true);
                 }
                 else
                 {
-                    if (f1 != 0.) chi_block += (       prefactor * f1) * rad_.apply_R_matrix(lambda, Pj1);
-                    if (f2 != 0.) chi_block += (Sign * prefactor * f2) * rad_.apply_R_matrix(lambda, Pj2);
+                    if (f1 != 0.) rad_.apply_R_matrix(lambda,        prefactor * f1, Pj1, 1., chi_block);
+                    if (f2 != 0.) rad_.apply_R_matrix(lambda, Sign * prefactor * f2, Pj2, 1., chi_block);
                 }
             }
             
@@ -352,7 +352,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             }
             
             // multiply
-            q[ill] = dia_blocks_[ill].dot(p[ill], true);
+            dia_blocks_[ill].dot(1., p[ill], 0., q[ill], true);
             
             // unload data
             if (cmd_.outofcore)
@@ -376,12 +376,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 const_cast<BlockSymBandMatrix<Complex>&>(rad_.R_tr_dia(lambda)).hdfload();
             
             // update all blocks with this multipole potential matrix
+            # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply and !cmd_.outofcore)
             for (int ill = 0;  ill < Nang;  ill++)
             {
                 if (cmd_.outofcore)
                     q.hdfload(ill);
                 
-                # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
                 for (int illp = 0; illp < Nang; illp++)
                 {
                     // skip diagonal
@@ -397,7 +397,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                     
                     // calculate product
-                    q[ill] += (-fs(ill,illp,lambda)) * rad_.R_tr_dia(lambda).dot(p[illp], true);
+                    rad_.R_tr_dia(lambda).dot(-fs(ill,illp,lambda), p[illp], 1., q[ill], true);
                     
                     // unload data
                     if (cmd_.outofcore)
@@ -430,8 +430,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // maximal multipole
             int maxlambda = rad_.maxlambda();
             
+            // work array
+            cArray p0 (Nchunk);
+            
             // for all source segments that this group owns
-            # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
+            # pragma omp parallel for firstprivate(p0) schedule (dynamic,1) if (cmd_.parallel_multiply)
             for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
             {
                 // load the segment, if on disk
@@ -450,7 +453,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // calculate product
-                    cArray p0 = std::move( (-fs(ill,illp,lambda)) * rad_.R_tr_dia(lambda).dot(p[illp], true) );
+                    rad_.R_tr_dia(lambda).dot(-fs(ill,illp,lambda), p[illp], 0., p0, true);
                     
                     // update collected product
                     OMP_exclusive_in;

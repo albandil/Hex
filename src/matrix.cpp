@@ -266,26 +266,22 @@ void dense_kron_dot
 //
 
 template<>
-cArray SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, const cArrayView X)
+void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Complex alpha, const cArrayView A, Complex beta, cArrayView B)
 {
     // check dimensions
-    if (X.size() % n != 0)
-        HexException("Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n, X.size());
+    if (A.size() % n != 0)
+        HexException("Incompatible dimensions: %d (mat) × %ld (vec). You are probably mixing radial data for different grids.", n, A.size());
     
     // get number of source vectors
-    int Nvec = X.size() / n;
-    
-    // allocate the same number of destination vectors
-    cArray Y (X.size());
+    int Nvec = A.size() / n;
     
     // skip if there are no data
     if (n == 0 or d == 0)
-        return Y;
+        return;
     
     // auxiliary variables
     char uplo = 'L';
     int k = d - 1, inc = 1;
-    Complex alpha = 1, beta = 1;
     
     // for all source vectors (columns)
     for (int j = 0; j < Nvec; j++)
@@ -293,12 +289,12 @@ cArray SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, c
         zsbmv_
         (
             &uplo, &n, &k, &alpha, const_cast<Complex*>(M.data()), &d,
-            const_cast<Complex*>(X.data()) + j * n, &inc, &beta,
-            Y.data() + j * n, &inc
+            const_cast<Complex*>(A.data()) + j * n, &inc, &beta,
+            B.data() + j * n, &inc
         );
     }
     
-    return Y;
+    return;
 }
 
 // -------------------------------------------------------------------------------------

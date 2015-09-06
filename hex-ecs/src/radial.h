@@ -662,7 +662,13 @@ class RadialIntegrals
          * matrix in memory or on disk - is used in the 'lightweight' mode,
          * which can be requested by the command line option --lightweight.
          */
-        cArray apply_R_matrix (unsigned lambda, cArray const & src, bool simple = false) const;
+        void apply_R_matrix
+        (
+            unsigned lambda,
+            Complex a, const cArrayView src,
+            Complex b,       cArrayView dst,
+            bool simple = false
+        ) const;
         
         /// Return maximal multipole, for which there are precomputed two-electron integrals.
         int maxlambda () const { return Nlambdas_ - 1; }
