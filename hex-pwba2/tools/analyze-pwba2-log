@@ -37,17 +37,45 @@ do
     echo "i = $i : lines $begin ... $end" | tee -a $DIR/summary
     echo "$subset" | head -1 >> $DIR/summary
     
-    bound_begin=$(echo "$subset" | grep -n "Bound intermediate states" | cut -f1 -d:)
-    allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
-    forbidden_begin=$(echo "$subset" | grep -n "Forbidden intermediate states" | cut -f1 -d:)
+    rm -f $DIR/$i-bound.log
+    rm -f $DIR/$i-allowed.log
+    rm -f $DIR/$i-forbidden.log
     
-    bound_subset=$(echo "$subset" | head -$allowed_begin | tail -n +$bound_begin)
-    allowed_subset=$(echo "$subset" | head -$forbidden_begin | tail -n +$allowed_begin)
-    forbidden_subset=$(echo "$subset" | tail -n +$forbidden_begin)
-    
-    echo "$bound_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print -1/($10*$10), $20, $21 }' | sort -n | uniq > $DIR/$i-bound.log
-    echo "$allowed_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  > $DIR/$i-allowed.log
-    echo "$forbidden_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  > $DIR/$i-forbidden.log
+    isubs=1
+    echo "$subset" | grep transfer | sed "s/\(.*\)\(transfer \[.*\]\)\(.*\)/\2/g" | sort | uniq | while read line
+    do
+        bound_begin=$(echo "$subset" | grep -n "Bound intermediate states" | cut -f1 -d:)
+        allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
+        forbidden_begin=$(echo "$subset" | grep -n "Forbidden intermediate states" | cut -f1 -d:)
+        
+        echo "$bound_begin $allowed_begin $forbidden_begin"
+        
+        if [ "$allowed_begin" ]
+        then
+            bound_subset=$(echo "$subset" | head -$allowed_begin | tail -n +$bound_begin | grep -F "$line")
+            if [ "$forbidden_begin" ]
+            then
+                allowed_subset=$(echo "$subset" | head -$forbidden_begin | tail -n +$allowed_begin | grep -F "$line")
+                forbidden_subset=$(echo "$subset" | tail -n +$forbidden_begin | grep -F "$line")
+            else
+                allowed_subset=$(echo "$subset" | tail -n +$allowed_begin | grep -F "$line")
+                forbidden_subset=""
+            fi
+        else
+            bound_subset=$(echo "$subset" | tail -n +$bound_begin | grep -F "$line")
+            allowed_subset=""
+        fi
+        
+        echo "$bound_subset"
+        
+        echo "$bound_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print -1/($10*$10), $20, $21 }' | sort -n | uniq >> $DIR/$i-bound.log
+        echo "$allowed_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  >> $DIR/$i-allowed.log
+        echo "$forbidden_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  >> $DIR/$i-forbidden.log
+        
+        echo >> $DIR/$i-bound.log
+        echo >> $DIR/$i-allowed.log
+        echo >> $DIR/$i-forbidden.log
+    done
 done
 
 rm -f "$1-plot.gp"
