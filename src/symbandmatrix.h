@@ -308,7 +308,7 @@ public:
     (
         int n, int d, const ArrayView<DataT> M,
         DataT a, const ArrayView<DataT> A,
-        DataT b, const ArrayView<DataT> B
+        DataT b,       ArrayView<DataT> B
     );
     
     /**
@@ -794,6 +794,9 @@ template <class DataT> class BlockSymBandMatrix
             if (halfbw_ == 0)
                 return;
             
+            // scale destination vector
+            w *= b;
+            
 #ifdef _OPENMP
             // write locks
             std::vector<omp_lock_t> lock(size_);
@@ -854,7 +857,7 @@ template <class DataT> class BlockSymBandMatrix
                             
                             # pragma omp simd
                             for (std::size_t pos = 0; pos < size_; pos++)
-                                w[i * size_ + pos] = a * product[pos] + b * w[i * size_ + pos];
+                                w[i * size_ + pos] += a * product[pos];
                         }
                         
                         // multiply by the other diagonals (both symmetries)
@@ -871,7 +874,7 @@ template <class DataT> class BlockSymBandMatrix
 #endif
                             # pragma omp simd
                             for (std::size_t pos = 0; pos < size_; pos++)
-                                w[i * size_ + pos] = a * product[pos] + b * w[i * size_ + pos];
+                                w[i * size_ + pos] += a * product[pos];
 #ifdef _OPENMP
                             omp_unset_lock(&lock[i]);
 #endif
@@ -887,7 +890,7 @@ template <class DataT> class BlockSymBandMatrix
 #endif
                             # pragma omp simd
                             for (std::size_t pos = 0; pos < size_; pos++)
-                                w[(i + d) * size_ + pos] = a * product[pos] + b * w[(i + d) * size_ + pos];
+                                w[(i + d) * size_ + pos] += a * product[pos];
 #ifdef _OPENMP
                             omp_unset_lock(&lock[i + d]);
 #endif
