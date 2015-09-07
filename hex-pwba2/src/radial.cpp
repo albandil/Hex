@@ -1065,9 +1065,7 @@ Complex Idir_allowed
             
             double V_phi = -special::constant::pi_half * (jf.l - yn.l);
             Complex V_k (0., -(jf.k - yn.k));
-            Complex V = special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
-            
-//             std::cout << 0.5 * Vfn.asy_factor * (U.imag() + V.imag()) << std::endl;
+            Complex V = (V_k.imag() == 0. ? 0. : special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back()));
             
             yn_Vfn_jf_r_inf += 0.5 * Vfn.asy_factor * (U.imag() + V.imag());
         }
@@ -1097,9 +1095,7 @@ Complex Idir_allowed
             
             double V_phi = -special::constant::pi_half * (ji.l - yn.l);
             Complex V_k (0., -(ji.k - yn.k));
-            Complex V = special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
-            
-//             std::cout << 0.5 * Vni.asy_factor * (U.imag() + V.imag()) << std::endl;
+            Complex V = (V_k.imag() == 0 ? 0. : special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back()));
             
             yn_Vni_ji_r_inf += 0.5 * Vni.asy_factor * (U.imag() + V.imag());
         }
@@ -1136,13 +1132,11 @@ Complex Idir_allowed
         {
             double U_phi = -special::constant::pi_half * (jn.l - jf.l);
             Complex U_k (0., -(jn.k - jf.k));
-            Complex U = special::cis(U_phi) * std::pow(U_k, Vfn.power) * special::cfgamma(-Vfn.power, U_k * grid.back());
+            Complex U = (U_k.imag() == 0. ? 0. : special::cis(U_phi) * std::pow(U_k, Vfn.power) * special::cfgamma(-Vfn.power, U_k * grid.back()));
             
             double V_phi = -special::constant::pi_half * (jn.l + jf.l);
             Complex V_k (0., -(jn.k + jf.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
-            
-//             std::cout << 0.5 * Vfn.asy_factor * (U.real() - V.real()) << std::endl;
             
             integ_fn += 0.5 * Vfn.asy_factor * (U.real() - V.real());
         }
@@ -1157,14 +1151,11 @@ Complex Idir_allowed
         {
             double U_phi = -special::constant::pi_half * (jn.l - ji.l);
             Complex U_k (0., -(jn.k - ji.k));
-            Complex U = special::cis(U_phi) * std::pow(U_k, Vni.power) * special::cfgamma(-Vni.power, U_k * grid.back());
+            Complex U = (U_k.imag() == 0. ? 0. : special::cis(U_phi) * std::pow(U_k, Vni.power) * special::cfgamma(-Vni.power, U_k * grid.back()));
             
             double V_phi = -special::constant::pi_half * (jn.l + ji.l);
             Complex V_k (0., -(jn.k + ji.k));
             Complex V = special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
-            
-//             std::cout << 0.5 * Vni.asy_factor * (U.real() - V.real()) << std::endl;
-            
             integ_ni += 0.5 * Vni.asy_factor * (U.real() - V.real());
         }
         
@@ -1757,8 +1748,11 @@ Complex Idir_nFree_allowed
         // comment this result
         log << format
         (
-            "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)",
-            lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kn, ln, Nf, Lf, kf, lf, inte.real(), inte.imag()
+            "\t\ttransfer [%d %d] initial (%d %d, %g %d) intermediate (%g %d, %g %d) final (%d %d, %g %d) : (%g,%g)%s",
+            lambdai, lambdaf, Ni, Li, ki, li, Kn, Ln, kn, ln, Nf, Lf, kf, lf,
+            std::isfinite(inte.real()) ? inte.real() : 0.,
+            std::isfinite(inte.imag()) ? inte.imag() : 0.,
+            Complex_finite(inte) ? "" : " *"
         ) << std::endl;
         
         // update result

@@ -164,12 +164,12 @@ cArrays PWBA2::PartialWave_direct
                 {
                     auto allowed_energy_contribution = [&](double Kn) -> Complex
                     {
-                        // boundary values
-                        if (Kn == 0)
-                            return 0.;
-                        
                         // get momentum of the projectile
                         double kn = std::sqrt(std::abs(Etot - Kn * Kn));
+                        
+                        // boundary values
+                        if (Kn == 0.)
+                            return 0.;
                         
                         // compute the radial integral
                         Complex inte = 2. * Kn * Kn * Idir_nFree_allowed
