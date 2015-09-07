@@ -170,7 +170,11 @@ Complex special::cfgamma (Complex s, Complex z)
         Bpp = Bp; Bp = B;
         n++; k++;
     }
-    while (n < maxiter and std::abs(cf - cfp) > epsrel * std::abs(cf));
+    while (n < maxiter and Complex_finite(cf) and std::abs(cf - cfp) > epsrel * std::abs(cf));
+    
+    // use previous iterate if the last exploded (this happens when A & B overflow, even though their ratio converges)
+    if (not Complex_finite(cf))
+        cf = cfp;
     
     // scale by z^s e^(-z)
     return cf * std::pow(z,s) * std::exp(-z);
