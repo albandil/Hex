@@ -136,7 +136,7 @@ void GPUCGPreconditioner::setup ()
         greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
     // - solution vector
     if (cmd_.lightweight_radial_cache and not cmd_.gpu_large_data)
-        greq += l1_l2_.size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
+        greq += 2 * l1_l2_.size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
     // - all these were complex numbers
     greq *= 16;
     
@@ -180,6 +180,7 @@ void GPUCGPreconditioner::setup ()
     flags << " -D NREKNOT_PROJ=" << Nreknot_proj << " ";
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
+    flags << " -D ANGULAR_BASIS_SIZE=" << l1_l2_.size() << " ";
     
     // build program
     program_ = clCreateProgramWithSource(context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -205,13 +206,15 @@ void GPUCGPreconditioner::setup ()
         largeDataFlags_ = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
     
     // set program entry points
-    mml1_ = clCreateKernel(program_, "mmul_1el",        nullptr);
-    mml2_ = clCreateKernel(program_, "mmul_2el",        nullptr);
-    axby_ = clCreateKernel(program_, "a_vec_b_vec",     nullptr);
-    norm_ = clCreateKernel(program_, "norm",            nullptr);
-    spro_ = clCreateKernel(program_, "scalar_product",  nullptr);
-    mabt_ = clCreateKernel(program_, "mul_ABt",         nullptr);
-    krdv_ = clCreateKernel(program_, "kron_div",        nullptr);
+    mml1_       = clCreateKernel(program_, "mmul_1el",        nullptr);
+    mml1_offset_= clCreateKernel(program_, "mmul_1el_offset", nullptr);
+    mml2_       = clCreateKernel(program_, "mmul_2el",        nullptr);
+    mml2_offset_= clCreateKernel(program_, "mmul_2el_offset", nullptr);
+    axby_       = clCreateKernel(program_, "a_vec_b_vec",     nullptr);
+    norm_       = clCreateKernel(program_, "norm",            nullptr);
+    spro_       = clCreateKernel(program_, "scalar_product",  nullptr);
+    mabt_       = clCreateKernel(program_, "mul_ABt",         nullptr);
+    krdv_       = clCreateKernel(program_, "kron_div",        nullptr);
     
     // round 'Nsegsiz' to nearest larger multiple of Nlocal_
     std::size_t Nsegsiz = Nspline_atom * Nspline_proj;
@@ -283,88 +286,106 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
     }
     else
     {
-        // device data handles
-        std::vector<clArrayView<Complex>> ph (l1_l2_.size());
-        
         // shorthands
         std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
         
+        // device data handles
+        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, l1_l2_.size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, l1_l2_.size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        
         // copy source vector to the device memory
+        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+            clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), p[ill].data(), 0, nullptr, nullptr);
+        clFinish(queue_);
+        
+        // precompute angular integrals
+        rArray fs ((rad_.maxlambda() + 1) * l1_l2_.size() * l1_l2_.size());
+        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
         for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
         {
-            ph[illp].reset(p[illp].size(), p[illp].data());
-            ph[illp].connect(context_, largeDataFlags_);
+            int l1 = l1_l2_[ill].first, l2 = l1_l2_[ill].second;
+            int l1p = l1_l2_[illp].first, l2p = l1_l2_[illp].second;
+            
+            double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
+            if (not std::isfinite(f))
+                HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1p, l2p, inp_.L);
+            
+            fs[(lambda * l1_l2_.size() + ill) * l1_l2_.size() + illp] = f;
         }
+        clArrayView<double> fgpu (fs.size(), fs.data()); fgpu.connect(context_, smallDataFlags_);
         
-        // for all destination segments
+        // one-electron contribution
         for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
         {
             // decode angular momenta
             int l1 = l1_l2_[ill].first;
             int l2 = l1_l2_[ill].second;
             
-            // multiply by diagonal block (one-electron contribution)
-            clSetKernelArg(mml1_, 0, sizeof(double), &E_);
-            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
-            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
-            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
-            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_proj_p_.handle());
-            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_proj_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
-            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
-            clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
-            clSetKernelArg(mml1_,10, sizeof(int),    &l2);
-            clSetKernelArg(mml1_,11, sizeof(cl_mem), &(ph[ill].handle()));
-            clSetKernelArg(mml1_,12, sizeof(cl_mem), &(tmA_.handle()));
-            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-            clFinish(queue_);
+            // memory offset
+            cl_int offset = ill * Nsegsiz;
             
-            // for all source segments
-            for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
-            {
-                // decode angular momenta
-                int l1p = l1_l2_[illp].first;
-                int l2p = l1_l2_[illp].second;
-                
-                // two-electron contribution
-                for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-                {
-                    // angular integral
-                    double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-                    if (not std::isfinite(f))
-                        HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-                    if (f == 0)
-                        continue;
-                    
-                    // multiply by two-electron interals block
-                    clSetKernelArg(mml2_, 0, sizeof(cl_mem), &t_atom_.handle());
-                    clSetKernelArg(mml2_, 1, sizeof(cl_mem), &t_proj_.handle());
-                    clSetKernelArg(mml2_, 2, sizeof(int),    &(lambda));
-                    clSetKernelArg(mml2_, 3, sizeof(double), &(f));
-                    clSetKernelArg(mml2_, 4, sizeof(cl_mem), &(M_L_atom_[lambda].handle()));
-                    clSetKernelArg(mml2_, 5, sizeof(cl_mem), &(M_mLm1_atom_[lambda].handle()));
-                    clSetKernelArg(mml2_, 6, sizeof(cl_mem), &(Mi_L_atom_[lambda].handle()));
-                    clSetKernelArg(mml2_, 7, sizeof(cl_mem), &(Mi_mLm1_atom_[lambda].handle()));
-                    clSetKernelArg(mml2_, 8, sizeof(cl_mem), &(M_L_proj_[lambda].handle()));
-                    clSetKernelArg(mml2_, 9, sizeof(cl_mem), &(M_mLm1_proj_[lambda].handle()));
-                    clSetKernelArg(mml2_,10, sizeof(cl_mem), &(Mi_L_proj_[lambda].handle()));
-                    clSetKernelArg(mml2_,11, sizeof(cl_mem), &(Mi_mLm1_proj_[lambda].handle()));
-                    clSetKernelArg(mml2_,12, sizeof(cl_mem), &(Rdia_[lambda].handle()));
-                    clSetKernelArg(mml2_,13, sizeof(cl_mem), &(ph[illp].handle()));
-                    clSetKernelArg(mml2_,14, sizeof(cl_mem), &(tmA_.handle()));
-                    clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
-                }
-                clFinish(queue_);
-            }
-            tmA_.EnqueueDownload(queue_);
+            // multiply by diagonal block (one-electron contribution)
+            clSetKernelArg(mml1_offset_, 0, sizeof(double), &E_);
+            clSetKernelArg(mml1_offset_, 1, sizeof(cl_mem), &S_atom_p_.handle());
+            clSetKernelArg(mml1_offset_, 2, sizeof(cl_mem), &D_atom_p_.handle());
+            clSetKernelArg(mml1_offset_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
+            clSetKernelArg(mml1_offset_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
+            clSetKernelArg(mml1_offset_, 5, sizeof(cl_mem), &S_proj_p_.handle());
+            clSetKernelArg(mml1_offset_, 6, sizeof(cl_mem), &D_proj_p_.handle());
+            clSetKernelArg(mml1_offset_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
+            clSetKernelArg(mml1_offset_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
+            clSetKernelArg(mml1_offset_, 9, sizeof(int),    &l1);
+            clSetKernelArg(mml1_offset_,10, sizeof(int),    &l2);
+            clSetKernelArg(mml1_offset_,11, sizeof(cl_mem), &pgpu);
+            clSetKernelArg(mml1_offset_,12, sizeof(cl_int), &offset);
+            clSetKernelArg(mml1_offset_,13, sizeof(cl_mem), &qgpu);
+            clSetKernelArg(mml1_offset_,14, sizeof(cl_int), &offset);
+            clEnqueueNDRangeKernel(queue_, mml1_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
-            q[ill] = tmA_;
+        }
+        
+        // two-electron contribution
+        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+        {
+            // memory offset
+            cl_int foffset = lambda * l1_l2_.size() * l1_l2_.size();
+            cl_int nooffset = -1;
+            
+            // multiply by two-electron interals block
+            clSetKernelArg(mml2_offset_, 0, sizeof(cl_mem), &t_atom_.handle());
+            clSetKernelArg(mml2_offset_, 1, sizeof(cl_mem), &t_proj_.handle());
+            clSetKernelArg(mml2_offset_, 2, sizeof(int),    &(lambda));
+            clSetKernelArg(mml2_offset_, 3, sizeof(cl_mem), &(fgpu.handle()));
+            clSetKernelArg(mml2_offset_, 4, sizeof(cl_int), &foffset);
+            clSetKernelArg(mml2_offset_, 5, sizeof(cl_mem), &(M_L_atom_[lambda].handle()));
+            clSetKernelArg(mml2_offset_, 6, sizeof(cl_mem), &(M_mLm1_atom_[lambda].handle()));
+            clSetKernelArg(mml2_offset_, 7, sizeof(cl_mem), &(Mi_L_atom_[lambda].handle()));
+            clSetKernelArg(mml2_offset_, 8, sizeof(cl_mem), &(Mi_mLm1_atom_[lambda].handle()));
+            clSetKernelArg(mml2_offset_, 9, sizeof(cl_mem), &(M_L_proj_[lambda].handle()));
+            clSetKernelArg(mml2_offset_,10, sizeof(cl_mem), &(M_mLm1_proj_[lambda].handle()));
+            clSetKernelArg(mml2_offset_,11, sizeof(cl_mem), &(Mi_L_proj_[lambda].handle()));
+            clSetKernelArg(mml2_offset_,12, sizeof(cl_mem), &(Mi_mLm1_proj_[lambda].handle()));
+            clSetKernelArg(mml2_offset_,13, sizeof(cl_mem), &(Rdia_[lambda].handle()));
+            clSetKernelArg(mml2_offset_,14, sizeof(cl_mem), &pgpu);
+            clSetKernelArg(mml2_offset_,15, sizeof(cl_int), &nooffset);
+            clSetKernelArg(mml2_offset_,16, sizeof(cl_mem), &qgpu);
+            clSetKernelArg(mml2_offset_,17, sizeof(cl_int), &nooffset);
+            clEnqueueNDRangeKernel(queue_, mml2_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+        }
+        clFinish(queue_);
+        
+        // read back the product
+        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        {
+            clEnqueueReadBuffer(queue_, qgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
+            clFinish(queue_);
         }
         
         // release device memory
-        for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
-            ph[illp].disconnect();
+        clReleaseMemObject(pgpu);
+        clReleaseMemObject(qgpu);
+        fgpu.disconnect();
     }
 }
 
