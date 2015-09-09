@@ -230,8 +230,8 @@ kernel void mmul_1el
     private int l1,
     private int l2,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global double2 const * const restrict x, private int xoffset,
+    global double2       * const restrict y, private int yoffset
 )
 {
     // output vector element index
@@ -239,7 +239,7 @@ kernel void mmul_1el
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // initialize the output element
-    y[i * NSPLINE_PROJ + j] = 0;
+    y[yoffset + i * NSPLINE_PROJ + j] = 0;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
@@ -257,7 +257,7 @@ kernel void mmul_1el
         elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
         
         // multiply right-hand side by that matrix element
-        y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
+        y[yoffset + i * NSPLINE_PROJ + j] += cmul(elem, x[xoffset + k * NSPLINE_PROJ + l]);
     }
 }
 
@@ -284,7 +284,7 @@ kernel void mmul_2el
     // multipole
     private int lambda,
     // angular integral
-    private double f,
+    global double  const * const restrict f, private int foffset,
     // one-electron full and partial moments (atom)
     global double2 const * const restrict MLa,
     global double2 const * const restrict MmLm1a,
@@ -298,8 +298,8 @@ kernel void mmul_2el
     // two-electron diagonal contributions
     global double2 const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global double2 const * const restrict x, private int xoffset,
+    global double2       * const restrict y, private int yoffset
 )
 {
     // output vector element index
@@ -406,7 +406,18 @@ kernel void mmul_2el
         }
         
         // multiply right-hand side by that matrix element
-        y[i * NSPLINE_PROJ + j] -= f * cmul(elem, x[k * NSPLINE_PROJ + l]);
+        if (xoffset < 0 || yoffset < 0)
+        {
+            // all-to-all-segments multiplication
+            for (int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill ++)
+            for (int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
+                y[(ill * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -= f[foffset + ill * ANGULAR_BASIS_SIZE + illp] * cmul(elem, x[(illp * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
+        }
+        else
+        {
+            // one-to-one-segment multiplication
+            y[yoffset + i * (ulong)(NSPLINE_PROJ) + j] -= f[foffset] * cmul(elem, x[xoffset + k * (ulong)(NSPLINE_PROJ) + l]);
+        }
     }
 }
 
