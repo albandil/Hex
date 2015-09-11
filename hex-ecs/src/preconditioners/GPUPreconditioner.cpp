@@ -478,8 +478,6 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             
             Timer timer;
             
-            cl_int offset = 0;
-            
             // one-electron contribution
             clSetKernelArg(mml1_, 0, sizeof(double), &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
@@ -493,9 +491,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
             clSetKernelArg(mml1_,10, sizeof(int),    &l2);
             clSetKernelArg(mml1_,11, sizeof(cl_mem), &a.handle());
-            clSetKernelArg(mml1_,12, sizeof(cl_int), &offset);
-            clSetKernelArg(mml1_,13, sizeof(cl_mem), &b.handle());
-            clSetKernelArg(mml1_,14, sizeof(cl_int), &offset);
+            clSetKernelArg(mml1_,12, sizeof(cl_mem), &b.handle());
             clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
             
@@ -504,26 +500,21 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // two-electron contribution
             for (int ilambda = 0; ilambda < Nlambdas; ilambda++)
             {
-                cl_int foffset = ilambda;
-                
                 clSetKernelArg(mml2_, 0, sizeof(cl_mem), &t_atom_.handle());
                 clSetKernelArg(mml2_, 1, sizeof(cl_mem), &t_proj_.handle());
                 clSetKernelArg(mml2_, 2, sizeof(int),    &(lambdas[ilambda]));
-                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &(fgpu.handle()));
-                clSetKernelArg(mml2_, 4, sizeof(cl_int), &foffset);
-                clSetKernelArg(mml2_, 5, sizeof(cl_mem), &(M_L_atom_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 6, sizeof(cl_mem), &(M_mLm1_atom_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 7, sizeof(cl_mem), &(Mi_L_atom_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 8, sizeof(cl_mem), &(Mi_mLm1_atom_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_, 9, sizeof(cl_mem), &(M_L_proj_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_,10, sizeof(cl_mem), &(M_mLm1_proj_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_,11, sizeof(cl_mem), &(Mi_L_proj_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_,12, sizeof(cl_mem), &(Mi_mLm1_proj_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_,13, sizeof(cl_mem), &(Rdia_[lambdas[ilambda]].handle()));
-                clSetKernelArg(mml2_,14, sizeof(cl_mem), &a.handle());
-                clSetKernelArg(mml2_,15, sizeof(cl_int), &offset);
-                clSetKernelArg(mml2_,16, sizeof(cl_mem), &b.handle());
-                clSetKernelArg(mml2_,17, sizeof(cl_int), &offset);
+                clSetKernelArg(mml2_, 3, sizeof(cl_mem), &(fs[ilambda]));
+                clSetKernelArg(mml2_, 4, sizeof(cl_mem), &(M_L_atom_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 5, sizeof(cl_mem), &(M_mLm1_atom_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 6, sizeof(cl_mem), &(Mi_L_atom_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 7, sizeof(cl_mem), &(Mi_mLm1_atom_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 8, sizeof(cl_mem), &(M_L_proj_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_, 9, sizeof(cl_mem), &(M_mLm1_proj_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_,10, sizeof(cl_mem), &(Mi_L_proj_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_,11, sizeof(cl_mem), &(Mi_mLm1_proj_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_,12, sizeof(cl_mem), &(Rdia_[lambdas[ilambda]].handle()));
+                clSetKernelArg(mml2_,13, sizeof(cl_mem), &a.handle());
+                clSetKernelArg(mml2_,14, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
             }
             clFinish(queue_);
