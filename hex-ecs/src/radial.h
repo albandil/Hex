@@ -222,6 +222,15 @@ class RadialIntegrals
             int a, int iknot, int iknotmax
         ) const;
         
+        /**
+         * @brief Diagonal contribution to two-electron integral.
+         * 
+         * The two-electron integrals @f$ R_{ijkl}^\lambda @f$ have two contributions:
+         * the "diagonal", where both integrals are over the same knot, for every knot of the
+         * four-B-spline overlap, and "off-diagonal", when the integrals are over different
+         * knots and can be factorized to one-dimensional integrals. This function calculates
+         * the former contribution.
+         */
         cArray diagonalR (int lambda) const;
         
         /**
@@ -678,6 +687,9 @@ class RadialIntegrals
         // B-spline environment
         Bspline const & bspline_atom_;
         Bspline const & bspline_proj_;
+        
+        // radial bases shift
+        int pshift_;
         
         // Gauss-Legendre integrator
         GaussLegendre g_atom_;
