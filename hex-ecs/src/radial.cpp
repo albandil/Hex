@@ -59,10 +59,6 @@ RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & 
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     verbose_(true), Nlambdas_(Nlambdas)
 {
-    // get B-spline basis shift (projectile vs. atomic)
-    // NOTE: If the shift is unknown, it will be set to Nknot_atom (> Nspline_atom).
-    pshift_ = std::find(bspline_atom_.t().begin(), bspline_atom_.t().end(), bspline_proj_.t().front()) - bspline_atom_.t().begin();
-    
     // maximal number of evaluation points (quadrature rule)
     int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas + 1);
     
@@ -402,8 +398,12 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
         Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
         
+        // no need to do anything else for non-identical B-spline bases
+        if (bspline_atom_.hash() != bspline_proj_.hash())
+            continue;
+        
         // diagonal contributions to two-electron integrals
-        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_atom_.hash(), bspline_atom_.hash());
+        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx-%.4lx.hdf", lambda, bspline_atom_.hash(), bspline_proj_.hash());
         if (R_tr_dia_diag_[lambda].hdfload(filename))
         {
             if (verbose_)

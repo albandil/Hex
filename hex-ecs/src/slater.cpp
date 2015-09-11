@@ -132,8 +132,8 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
         return 0.;
     
     // sum the two triangle integrals
-    return computeRtri(L,bspline_atom_,g_atom_,b,d,bspline_atom_,g_atom_,a,c,iknot,iknotmax)
-         + computeRtri(L,bspline_atom_,g_atom_,a,c,bspline_atom_,g_atom_,b,d,iknot,iknotmax);
+    return computeRtri(L,bspline_proj_,g_proj_,b,d,bspline_atom_,g_atom_,a,c,iknot,iknotmax)
+         + computeRtri(L,bspline_atom_,g_atom_,a,c,bspline_proj_,g_proj_,b,d,iknot,iknotmax);
 }
 
 cArray RadialIntegrals::diagonalR (int lambda) const
@@ -169,7 +169,6 @@ Complex RadialIntegrals::computeR
 ) const
 {
     int order = bspline_atom_.order();
-    int Nspline_atom = bspline_atom_.Nspline();
     int Nreknot_atom = bspline_atom_.Nreknot();
     int Nreknot_proj = bspline_proj_.Nreknot();
     
@@ -218,29 +217,25 @@ Complex RadialIntegrals::computeR
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
     if (not simple)
     {
-        // work in atomic basis index space -> translate indices
-        int Ta = a;
-        int Tb = b + pshift_;
-        int Tc = c;
-        int Td = d + pshift_;
+        std::size_t O = order + 1;
         
-        // check that all indices are valid and that there is a four-B-spline overlap
-        if (Tb < Nspline_atom and Td < Nspline_atom and mmax(Ta,Tb,Tc,Td) + order < mmin(Ta,Tb,Tc,Td))
-        {
-            // auxiliary parameter
-            std::size_t O = order + 1;
-            
-            // retrieve diagonal contribution
-            if (Ta <= Tb and Ta <= Tc and Ta <= Td)
-                Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((Ta * O + (Tb-Ta)) * O + (Tc-Ta)) * O + (Td-Ta)];
-            else if (Tb <= Ta and Tb <= Tc and Tb <= Td)
-                Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((Tb * O + (Ta-Tb)) * O + (Td-Tb)) * O + (Tc-Tb)];
-            else if (Tc <= Ta and Tc <= Tb and Tc <= Td)
-                Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((Tc * O + (Tb-Tc)) * O + (Ta-Tc)) * O + (Td-Tc)];
-            else // (Td <= Ta and Td <= Tb and Td <= Tc)
-                Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((Td * O + (Ta-Td)) * O + (Tb-Td)) * O + (Tc-Td)];
-        }
+        // retrieve diagonal contribution
+        if (a <= b and a <= c and a <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((a * O + (b-a)) * O + (c-a)) * O + (d-a)];
+        else if (b <= a and b <= c and b <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((b * O + (a-b)) * O + (d-b)) * O + (c-b)];
+        else if (c <= a and c <= b and c <= d)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((c * O + (b-c)) * O + (a-c)) * O + (d-c)];
+        else // (d <= a and d <= b and d <= c)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((d * O + (a-d)) * O + (b-d)) * O + (c-d)];
     }
+/*
+    // The following "simple" alternative does not perform very well -> commented out.
+    else
+        // use asymptotic form (or zero if too near)
+        for (int iknot = mmax(a,b,c,d); iknot <= mmin(a,b,c,d) + order and iknot < Nreknot - 1; iknot++)
+            Rtr_Labcd_diag += (bspline_.t()[iknot].real() > 1. ? S_(a,c) * S_(b,d) / bspline_.t()[iknot] : 0.);
+*/
     
     // Further parts are a bit cryptical, because we are using precomputed
     // (partial, per knot) integral moments, which are quite compactly stored
