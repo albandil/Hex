@@ -29,6 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#include <algorithm>
+
 #include "../preconditioners.h"
 
 const std::string HybCGPreconditioner::prec_name = "HYB";
@@ -40,7 +42,20 @@ bool HybCGPreconditioner::ilu_needed (int iblock) const
     if (CGPreconditioner::n_[iblock] >= 0 and
         NoPreconditioner::cmd_.kpa_max_iter >= 0 and
         CGPreconditioner::n_[iblock] > NoPreconditioner::cmd_.kpa_max_iter)
-        prec_[iblock] = UseILU;
+    {
+        // count ILU blocks
+        int nILU = std::count_if
+        (
+            prec_.begin(),
+            prec_.end(),
+            [](int i) -> bool { return i == UseILU; }
+        );
+        
+        // only allow next factorization if fitting in restriction
+        if (NoPreconditioner::cmd_.ilu_max_blocks < 0 or
+            NoPreconditioner::cmd_.ilu_max_blocks > nILU)
+            prec_[iblock] = UseILU;
+    }
     
     return prec_[iblock] == UseILU;
 }

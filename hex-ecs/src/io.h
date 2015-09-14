@@ -87,7 +87,7 @@ class CommandLine
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), parallel_multiply(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
-              parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1)
+              parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1)
         {
             // get command line options
             parse(argc, argv);
@@ -194,6 +194,9 @@ class CommandLine
         
         /// Maximal number of KPA iterations for hybrid preconditioner.
         int kpa_max_iter;
+        
+        /// Maximal number of ILU-preconditioned blocks for hybrid preconditioner.
+        int ilu_max_blocks;
 };
 
 /**
