@@ -150,7 +150,10 @@ void Solver::solve ()
             
             // solution has the expected size
             if (size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
+            {
+                std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") found." << std::endl;
                 continue;
+            }
             
             // solution is smaller
             if (0 < size and size < (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
@@ -181,7 +184,10 @@ void Solver::solve ()
                 
                 // consider this solution all right if sizes match for some further panel
                 if (higher_panel_match)
+                {
+                    std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") present and propagated." << std::endl;
                     continue;
+                }
                 
                 // inform user that there is already some incompatible solution file
                 std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
