@@ -116,7 +116,7 @@ CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
            matrix misc radial slater solver special version \
            preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
            preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
-           preconditioners/GPUPreconditioner
+           preconditioners/GPUPreconditioner preconditioners/HybPreconditioner
 
 # sources and derived files (object files, dep-files, etc)
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))

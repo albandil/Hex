@@ -29,59 +29,60 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_CGPRECONDITIONER_H
-#define HEX_CGPRECONDITIONER_H
-
 #include "../preconditioners.h"
 
-/**
- * @brief CG iteration-based preconditioner.
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-class CGPreconditioner : public NoPreconditioner
-{
-    public:
-        
-        static const std::string prec_name;
-        static const std::string prec_description;
-        
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
-        
-        CGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
-            n_(l1_l2_.size(), -1) {}
-        
-        // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { NoPreconditioner::rhs(chi, ienergy, instate, Spin, bfull); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
-        
-        // inner CG callbacks
-        virtual void CG_init (int iblock) const;
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
-    
-    protected:
-        
-        // last iterations
-        mutable iArray n_;
-};
+const std::string HybCGPreconditioner::prec_name = "HYB";
+const std::string HybCGPreconditioner::prec_description = "Combination of ILU and KPA.";
 
-#endif
+bool HybCGPreconditioner::ilu_needed (int iblock) const
+{
+    // decide which preconditioner to use
+    if (CGPreconditioner::n_[iblock] >= 0 and
+        NoPreconditioner::cmd_.kpa_max_iter >= 0 and
+        CGPreconditioner::n_[iblock] > NoPreconditioner::cmd_.kpa_max_iter)
+        prec_[iblock] = UseILU;
+    
+    return prec_[iblock] == UseILU;
+}
+
+void HybCGPreconditioner::setup ()
+{
+    ILUCGPreconditioner::setup();
+    KPACGPreconditioner::setup();
+}
+
+void HybCGPreconditioner::CG_init (int iblock) const
+{
+    if (ilu_needed(iblock))
+        ILUCGPreconditioner::CG_init(iblock);
+    else
+        KPACGPreconditioner::CG_init(iblock);
+}
+
+void HybCGPreconditioner::CG_mmul (int iblock, const cArrayView r, cArrayView z) const
+{
+    if (ilu_needed(iblock))
+        ILUCGPreconditioner::CG_mmul(iblock, r, z);
+    else
+        KPACGPreconditioner::CG_mmul(iblock, r, z);
+}
+
+void HybCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
+{
+    if (ilu_needed(iblock))
+        ILUCGPreconditioner::CG_prec(iblock, r, z);
+    else
+        KPACGPreconditioner::CG_prec(iblock, r, z);
+}
+
+void HybCGPreconditioner::CG_exit (int iblock) const
+{
+    ILUCGPreconditioner::CG_exit(iblock);
+    KPACGPreconditioner::CG_exit(iblock);
+}
+
+void HybCGPreconditioner::finish()
+{
+    ILUCGPreconditioner::finish();
+    KPACGPreconditioner::finish();
+}

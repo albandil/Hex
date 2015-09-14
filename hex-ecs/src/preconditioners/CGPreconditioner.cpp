@@ -48,9 +48,6 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     int Nspline_atom = rad_.bspline_atom().Nspline();
     int Nspline_proj = rad_.bspline_proj().Nspline();
     
-    // iterations
-    iArray n (l1_l2_.size());
-    
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
     for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
     {
@@ -137,7 +134,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             // solve using the CG solver
             ConjugateGradients < cArray, cArrayView > CG;
             CG.reset();
-            n[ill] = CG.solve
+            n_[ill] = CG.solve
             (
                 r[ill],                 // rhs
                 z[ill],                 // solution
@@ -171,14 +168,14 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     }
     
     // broadcast inner preconditioner iterations
-    par_.sync_m(n.data(), 1, l1_l2_.size());
-    par_.bcast_g(par_.igroup(), 0, n.data(), l1_l2_.size());
+    par_.sync_m(n_.data(), 1, l1_l2_.size());
+    par_.bcast_g(par_.igroup(), 0, n_.data(), l1_l2_.size());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";
-    std::cout << std::setw(5) << (*std::min_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << (*std::max_element(n.begin(), n.end()));
-    std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
+    std::cout << std::setw(5) << (*std::min_element(n_.begin(), n_.end()));
+    std::cout << std::setw(5) << (*std::max_element(n_.begin(), n_.end()));
+    std::cout << std::setw(5) << format("%g", std::accumulate(n_.begin(), n_.end(), 0) / float(n_.size()));
 }
 
 void CGPreconditioner::CG_init (int iblock) const
@@ -209,5 +206,6 @@ void CGPreconditioner::CG_exit (int iblock) const
 void CGPreconditioner::finish ()
 {
     dia_blocks_.resize(0);
+    n_.fill(-1);
     NoPreconditioner::finish();
 }

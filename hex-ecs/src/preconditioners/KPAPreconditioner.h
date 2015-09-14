@@ -55,7 +55,7 @@
  * which can be easily diagonalized (only diagonalization of the small matrices are needed)
  * and so also inverted, which we need for solution of the equations.
  */
-class KPACGPreconditioner : public CGPreconditioner
+class KPACGPreconditioner : public virtual CGPreconditioner
 {
     public:
         

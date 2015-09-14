@@ -29,27 +29,25 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_ILUPRECONDITIONER_H
-#define HEX_ILUPRECONDITIONER_H
+#ifndef HEX_HYBPRECONDITIONER_H
+#define HEX_HYBPRECONDITIONER_H
 
+#include <set>
+#include <string>
+#include <vector>
+
+#include "../arrays.h"
+#include "../matrix.h"
 #include "../preconditioners.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
-#ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
-#endif
+#ifndef NO_LAPACK
 
 /**
- * @brief ILU-preconditioned CG-based preconditioner.
+ * @brief Hybrid preconditioner.
  * 
- * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
- * preconditioning. This is done by redefining virtual function CG_prec. The factorization
- * is drop tolerance based and is computed by UMFPACK.
+ * Combination of ILU and KPA.
  */
-class ILUCGPreconditioner : public virtual CGPreconditioner
+class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
 {
     public:
         
@@ -59,7 +57,7 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         virtual std::string const & name () const { return prec_name; }
         virtual std::string const & description () const { return prec_description; }
         
-        ILUCGPreconditioner
+        HybCGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
@@ -68,52 +66,44 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_proj,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
-            csr_blocks_(ll.size()), lu_(ll.size())
+            ILUCGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+            prec_(ll.size(), Undecided)
         {
-#ifdef _OPENMP
-            omp_init_lock(&lu_lock_);
-#endif
-        }
-        
-        ~ILUCGPreconditioner ()
-        {
-#ifdef _OPENMP
-            omp_destroy_lock(&lu_lock_);
-#endif
+            // nothing more to do
         }
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin,bfull); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        virtual void update (double E) { CGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (double E);
         virtual void finish ();
         
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
         
     protected:
         
-        // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
+        bool ilu_needed (int iblock) const;
         
-        // LU decompositions of the CSR blocks
-        mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        enum Prec
+        {
+            Undecided,
+            UseILU,
+            UseKPA
+        };
         
-#ifdef _OPENMP
-        // factorization lock
-        mutable omp_lock_t lu_lock_;
-#endif
-        
-#ifdef WITH_SUPERLU_DIST
-        // process grid
-        gridinfo_t grid_;
-#endif
+        // which preconditioner to use
+        mutable iArray prec_;
 };
+
+#endif
 
 #endif

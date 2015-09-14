@@ -55,7 +55,7 @@
  * which can be easily diagonalized (only diagonalization of the small matrices are needed)
  * and so also inverted, which we need for solution of the equations.
  */
-class GPUCGPreconditioner : public KPACGPreconditioner
+class GPUCGPreconditioner : public virtual KPACGPreconditioner
 {
     public:
         
@@ -94,7 +94,8 @@ class GPUCGPreconditioner : public KPACGPreconditioner
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             CommandLine const & cmd
-        ) : KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd)
+        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd)
         {
             // nothing more to do
         }
