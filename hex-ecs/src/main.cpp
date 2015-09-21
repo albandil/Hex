@@ -220,7 +220,7 @@ int main (int argc, char* argv[])
             // for all angular momentum pairs that do compose L
             for (int l1 = ell; l1 <= sum - ell; l1++)
             {
-                int l2 = ell - l1;
+                int l2 = sum - l1;
                 if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2)
                 {
                     std::cout << "(" << l1 << "," << l2 << ") ";
