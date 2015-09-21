@@ -90,7 +90,7 @@ void GPUCGPreconditioner::setup ()
     
     // check that the chosen device is available
     clGetDeviceIDs(platform_, CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
-    if (cmd_.ocl_device >= nplatforms)
+    if (cmd_.ocl_device >= ndevices)
         HexException("The requested device index (%d) does not exist for platform %d. Run hex-ecs --cl-list to find all existing.",  cmd_.ocl_device, cmd_.ocl_platform);
     
     device_ = devices[cmd_.ocl_device];
