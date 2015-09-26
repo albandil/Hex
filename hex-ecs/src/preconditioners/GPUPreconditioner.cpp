@@ -68,12 +68,48 @@ void GPUCGPreconditioner::setup ()
     int Nspline_proj = bspline_proj_.Nspline();
     int Nreknot_proj = bspline_proj_.Nreknot();
     
-    std::cout << "Setting up OpenCL environment" << std::endl;
-    
     // auxiliary variables
     char platform_name[1024], platform_vendor[1024], platform_version[1024], device_name[1024], device_vendor[1024];
     cl_platform_id platforms[10]; cl_uint nplatforms;
     cl_device_id devices[10]; cl_uint ndevices;
+    
+    {
+        std::cout << "Available OpenCL devices" << std::endl;
+        clGetPlatformIDs(10, platforms, &nplatforms);
+        for (cl_uint i = 0; i < nplatforms; i++)
+        {
+            clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
+            clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
+            clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
+                    std::cout << "\e[1;37m";
+#endif
+            std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
+                    std::cout << "\e[0m";
+#endif
+            clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
+            for (cl_uint j = 0; j < ndevices; j++)
+            {
+                clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
+                clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
+                    std::cout << "\e[1;37m";
+#endif
+                std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
+                    std::cout << "\e[0m";
+#endif
+            }
+        }
+        std::cout << std::endl;
+    }
+    
+    std::cout << "Setting up OpenCL environment" << std::endl;
     
     // check that the chosen platform is available
     clGetPlatformIDs(10, platforms, &nplatforms);
@@ -91,7 +127,7 @@ void GPUCGPreconditioner::setup ()
     // check that the chosen device is available
     clGetDeviceIDs(platform_, CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
     if (cmd_.ocl_device >= ndevices)
-        HexException("The requested device index (%d) does not exist for platform %d. Run hex-ecs --cl-list to find all existing.",  cmd_.ocl_device, cmd_.ocl_platform);
+        HexException("The requested device index (%d) does not exist for platform %d (ndevices = %d). Run hex-ecs --cl-list to find all existing.",  cmd_.ocl_device, cmd_.ocl_platform, ndevices);
     
     device_ = devices[cmd_.ocl_device];
     clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
