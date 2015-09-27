@@ -709,6 +709,9 @@ class RadialIntegrals
         
         // number of multipole matrices
         int Nlambdas_;
+        
+        // projectile basis shift
+        int proj_basis_shift_;
 };
 
 #endif

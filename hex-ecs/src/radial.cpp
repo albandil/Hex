@@ -42,8 +42,6 @@
 #include "radial.h"
 #include "special.h"
 
-int debug = false;
-
 RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj, int Nlambdas)
   : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
     g_atom_(bspline_atom), g_proj_(bspline_proj),
@@ -61,6 +59,9 @@ RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & 
 {
     // maximal number of evaluation points (quadrature rule)
     int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas + 1);
+    
+    // get projectile basis shift
+    proj_basis_shift_ = std::find(bspline_atom_.t().begin(), bspline_atom_.t().end(), bspline_proj_.t().front()) - bspline_atom_.t().begin();
     
     // precompute Gaussian weights
     g_atom_.precompute_nodes_and_weights(npts);
