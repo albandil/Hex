@@ -662,6 +662,10 @@ void InputFile::read (std::ifstream & inf)
         if (mis[i].val != mi and not (mis[i].flags & ReadItem<int>::asterisk))
             continue;
         
+        // skip negative projections if asterisk was used (symmetry)
+        if (mi < 0 and (mis[i].flags & ReadItem<int>::asterisk))
+            continue;
+        
         // add this initial state
         instates.push_back(std::make_tuple(nis[i].val,li,mi));
     }
