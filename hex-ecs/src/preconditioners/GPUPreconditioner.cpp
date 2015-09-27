@@ -83,12 +83,12 @@ void GPUCGPreconditioner::setup ()
             clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
 #ifdef __linux__
                 if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
-                    std::cout << "\e[1;37m";
+                    std::cout << "\x1B[1;37m";
 #endif
             std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
 #ifdef __linux__
                 if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
-                    std::cout << "\e[0m";
+                    std::cout << "\x1B[0m";
 #endif
             clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
             for (cl_uint j = 0; j < ndevices; j++)
@@ -97,12 +97,12 @@ void GPUCGPreconditioner::setup ()
                 clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
 #ifdef __linux__
                 if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
-                    std::cout << "\e[1;37m";
+                    std::cout << "\x1B[1;37m";
 #endif
                 std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
 #ifdef __linux__
                 if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
-                    std::cout << "\e[0m";
+                    std::cout << "\x1B[0m";
 #endif
             }
         }
