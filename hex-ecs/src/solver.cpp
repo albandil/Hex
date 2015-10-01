@@ -301,6 +301,7 @@ void Solver::solve ()
                                     // get known element of the solution
                                     Complex x_kl = prev_solution[k * bspline_full_[ipanel_ - 1].Nspline() + lf];
                                     
+                                    // calculate one-electron part of the hamiltonian
                                     if (ill == illp)
                                     {
                                         // compute element of the atomic hamiltonian

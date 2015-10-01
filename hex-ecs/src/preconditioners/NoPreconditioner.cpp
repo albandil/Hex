@@ -376,7 +376,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 const_cast<BlockSymBandMatrix<Complex>&>(rad_.R_tr_dia(lambda)).hdfload();
             
             // update all blocks with this multipole potential matrix
-            # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply and !cmd_.outofcore)
+            # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply and not cmd_.outofcore)
             for (int ill = 0;  ill < Nang;  ill++)
             {
                 if (cmd_.outofcore)

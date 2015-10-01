@@ -310,8 +310,8 @@ class RadialIntegrals
         Complex computeRtri
         (
             int L,
-            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
-            Bspline const & bspline_mn, GaussLegendre const & g_mn, int m, int n,
+            int k, int l,
+            int m, int n,
             int iknot, int iknotmax
         ) const;
         
@@ -337,7 +337,7 @@ class RadialIntegrals
         void R_inner_integrand
         (
             int n, Complex* in, Complex* out,
-            Bspline const & bspline_ij, int i, int j,
+            int i, int j,
             int L, int iknot, int iknotmax, Complex x
         ) const;
         
@@ -364,8 +364,8 @@ class RadialIntegrals
         void R_outer_integrand
         (
             int n, Complex* in, Complex* out,
-            Bspline const & bspline_ij, int i, int j,
-            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
+            int i, int j,
+            int k, int l,
             int L, int iknot, int iknotmax
         ) const;
         
