@@ -77,10 +77,14 @@ bool ExtrapolatedCrossSection::run (std::map<std::string,std::string> const & sd
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", Id);
     int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
+    int mi0= Conv<int>(sdata, "mi", Id);
     int nf = Conv<int>(sdata, "nf", Id);
     int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
+    int mf0= Conv<int>(sdata, "mf", Id);
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi0 < 0 ? -mi0 : mi0);
+    int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // energies
     rArray energies;

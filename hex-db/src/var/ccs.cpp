@@ -149,14 +149,18 @@ void hex_complete_cross_section
 
 void hex_complete_cross_section_
 (
-    int * ni, int * li, int * mi,
-    int * nf, int * lf, int * mf,
+    int * ni, int * li, int * pmi,
+    int * nf, int * lf, int * pmf,
     int * N, double * energies,
     double * ccs, int * n
 )
 {
     double E, sigma, sigmab, sigmaB;
     rArray E_arr, sigma_arr, sigmab_arr, EB_arr, sigmaB_arr;
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi < 0 ? -(*pmi) : (*pmi));
+    int mf = (mi < 0 ? -(*pmf) : (*pmf));
     
     // if there is nothing to compute, return
     if (*N == 0)
@@ -174,8 +178,8 @@ void hex_complete_cross_section_
                 "  AND lf = :lf "
                 "  AND mf = :mf ",
             sqlitepp::into(*n),
-            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
         st.exec();
         
         // if a reallocation is needed, return
@@ -199,8 +203,8 @@ void hex_complete_cross_section_
             "GROUP BY Ei "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmab),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     
     // retrieve data
     while (st.exec())
@@ -229,8 +233,8 @@ void hex_complete_cross_section_
             "  AND mf = :mf "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigmaB),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf);
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     
     // retrieve data
     while (stb.exec())

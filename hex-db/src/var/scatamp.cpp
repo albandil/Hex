@@ -101,14 +101,18 @@ cArray FirstBornFullTMatrix (int ni, int li, int mi, int nf, int lf, int mf, dou
 
 void hex_scattering_amplitude_Born_
 (
-    int * ni, int * li, int * mi,
-    int * nf, int * lf, int * mf,
+    int * ni, int * li, int * pmi,
+    int * nf, int * lf, int * pmf,
     int * S, double * E, int * N,
     double * angles, double * result
 )
 {
     cArrayView results(*N,reinterpret_cast<Complex*>(result));
     results.fill(0.);
+    
+    // use mi >= 0; if mi < 0, flip both signs
+    int mi = (mi < 0 ? -(*pmi) : (*pmi));
+    int mf = (mi < 0 ? -(*pmf) : (*pmf));
     
     // we need cosines, not angles
     rArray cos_angles = rArray(*N,angles).transform([](double x){ return std::cos(x); });
@@ -125,8 +129,8 @@ void hex_scattering_amplitude_Born_
            "  AND mf = :mf "
            "  AND  S = :S  ",
         sqlitepp::into(min_ell), sqlitepp::into(max_ell),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
         sqlitepp::use(*S);
     st.exec();
     
@@ -153,8 +157,8 @@ void hex_scattering_amplitude_Born_
             "GROUP BY Ei "
             "ORDER BY Ei ASC ",
             sqlitepp::into(Ei), sqlitepp::into(ReT), sqlitepp::into(ImT),
-            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(*mi),
-            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(*mf),
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
             sqlitepp::use(*S), sqlitepp::use(ell);
         
         // load the data corresponding to the statement
@@ -180,7 +184,7 @@ void hex_scattering_amplitude_Born_
         // update scattering amplitudes¨
         for (int i = 0; i < *N; i++)
         {
-            double Y = gsl_sf_legendre_sphPlm(ell,std::abs((*mi)-(*mf)),cos_angles[i]);
+            double Y = gsl_sf_legendre_sphPlm(ell,std::abs(mi-mf),cos_angles[i]);
             results[i] += -tmatrices.back() * Y / special::constant::two_pi;
         }
     }
