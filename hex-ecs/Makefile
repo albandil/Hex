@@ -15,7 +15,7 @@ CXX = g++
 TARGET = release
 
 # global compiler flags
-CFLAGS = -fopenmp -Wall -mtune=native -march=native
+CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range
 LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
@@ -106,7 +106,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 ifeq ($(TARGET),debug)
 CXXFLAGS = -g $(CFLAGS)
 else ifeq ($(TARGET),release)
-CXXFLAGS = -g $(CFLAGS) -O3 -fcx-limited-range -DNDEBUG
+CXXFLAGS = -g $(CFLAGS) -O3 -DNDEBUG
 else
 $(error "Unknown target $(TARGET)")
 endif
@@ -119,14 +119,15 @@ CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
            preconditioners/GPUPreconditioner preconditioners/HybPreconditioner
 
 # sources and derived files (object files, dep-files, etc)
+BASECXX      = $(shell basename $(CXX))
 CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
-OBJECTS      = $(patsubst %,obj/%.o,  $(CXXFILES))
-DEPENDENCIES = $(patsubst %,obj/%.dep,$(CXXFILES))
+OBJECTS      = $(patsubst %,obj/$(BASECXX)/%.o,  $(CXXFILES))
+DEPENDENCIES = $(patsubst %,obj/$(BASECXX)/%.dep,$(CXXFILES))
 OCLSOURCES   = src/preconditioners/GPUPreconditioner.cl
 OCLKERNELS   = src/preconditioners/GPUPreconditioner.inc
 
 # build all targets
-all: pollversion bin/hex-ecs
+all: pollversion bin/hex-ecs.$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
@@ -153,7 +154,7 @@ dist:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs $(OBJECTS) $(DEPENDENCIES)
+	rm -f bin/hex-ecs.$(BASECXX) $(OBJECTS) $(DEPENDENCIES)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean distclean
@@ -163,18 +164,20 @@ distclean:
 	rm -rf hex-ecs hex-ecs-*.tar.gz
 
 # main program target
-bin/hex-ecs: $(OCLKERNELS) $(OBJECTS)
+bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
+	@ln -fs hex-ecs.$(BASECXX) bin/hex-ecs
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 src/%.inc: src/%.cl
 	xxd -i $< | tail -n+2 | head -n-2 > $@
 
 # CPP -> O rule (compile source files)
-obj/%.o: src/%.cpp
+obj/$(BASECXX)/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # include generated source dependencied
 -include $(DEPENDENCIES)
+
