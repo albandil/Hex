@@ -90,7 +90,7 @@ void HybCGPreconditioner::update (double E)
     CGPreconditioner::update(E);
     
     // reset counters
-    CGPreconditioner::n_.fill(0);
+    CGPreconditioner::n_.fill(-1);
     prec_.fill(Undecided);
 }
 
