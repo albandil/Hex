@@ -66,6 +66,34 @@ void HybCGPreconditioner::setup ()
     KPACGPreconditioner::setup();
 }
 
+void HybCGPreconditioner::update (double E)
+{
+    // update ILU
+    if (E != CGPreconditioner::E_)
+    {
+        // release outdated LU factorizations
+        for (auto & lu : ILUCGPreconditioner::lu_)
+        {
+            lu->drop();
+            lu->unlink();
+        }
+        
+        // release outdated CSR diagonal blocks
+        for (auto & csr : ILUCGPreconditioner::csr_blocks_)
+        {
+            csr.drop();
+            csr.unlink();
+        }
+    }
+    
+    // update common ancestor
+    CGPreconditioner::update(E);
+    
+    // reset counters
+    CGPreconditioner::n_.fill(0);
+    prec_.fill(Undecided);
+}
+
 void HybCGPreconditioner::CG_init (int iblock) const
 {
     if (ilu_needed(iblock))

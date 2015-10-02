@@ -77,10 +77,10 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin,bfull); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
-        virtual void update (double E) { CGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
+        virtual void update (double E);
         virtual void finish ();
         
         // inner CG callback (needed by parent)
