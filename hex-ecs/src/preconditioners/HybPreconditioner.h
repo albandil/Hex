@@ -64,10 +64,11 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
-            ILUCGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
+            ILUCGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
             prec_(ll.size(), Undecided)
         {
             // nothing more to do
@@ -75,7 +76,7 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin,bfull); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         virtual void update (double E) { CGPreconditioner::update(E); }
         

@@ -62,10 +62,11 @@ class NoPreconditioner : public PreconditionerBase
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
             CommandLine const & cmd
         ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), l1_l2_(ll),
             dia_blocks_(l1_l2_.size()), bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-            rad_(bspline_atom, bspline_proj, inp.L + 2 * inp.levels + 1)
+            rad_(bspline_atom, bspline_proj, bspline_proj_full, inp.L + 2 * inp.levels + 1)
         {
             // nothing to do
         }
@@ -73,7 +74,7 @@ class NoPreconditioner : public PreconditionerBase
         virtual void setup ();
         virtual void update (double E);
         virtual void finish ();
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin, Bspline const & bfull) const;
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
         

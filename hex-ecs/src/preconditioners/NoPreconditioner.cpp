@@ -168,7 +168,7 @@ void NoPreconditioner::update (double E)
     OMP_clean;
 }
 
-void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const
+void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const
 {
     // shorthands
     int ni = std::get<0>(inp_.instates[instate]);
@@ -183,7 +183,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
     
     // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
-    RadialIntegrals radf (rad_.bspline_atom(), bspline_proj_full, 0);
+    RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj_full(), rad_.bspline_proj_full(), 0);
     radf.verbose(false);
     radf.setupOneElectronIntegrals(par_, cmd_);
     

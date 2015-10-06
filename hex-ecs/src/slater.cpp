@@ -173,6 +173,7 @@ Complex RadialIntegrals::computeR
     int order = bspline_atom_.order();
     int Nreknot_atom = bspline_atom_.Nreknot();
     int Nreknot_proj = bspline_proj_.Nreknot();
+    int Nreknot_proj_full = bspline_proj_full_.Nreknot();
     
     // leading and trailing knots of the B-splines
     double ta1 = bspline_atom_.t(a).real(), ta2 = bspline_atom_.t(a + order + 1).real();
@@ -261,12 +262,12 @@ Complex RadialIntegrals::computeR
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
     // ta[ix] < tp[iy]
-    for (int ix = ta;                   ix < std::min(ta + order + 1, Nreknot_atom - 1); ix++) if (bspline_atom_.t(ix+1).real() > 0)
-    for (int iy = std::max(tb, ix + 1); iy < std::min(tb + order + 1, Nreknot_atom - 1); iy++)
+    for (int ix = ta;                   ix < std::min(ta + order + 1, Nreknot_atom - 1); ix++) if (bspline_atom_.t(ix+1).real() != 0.)
+    for (int iy = std::max(tb, ix + 1); iy < std::min(tb + order + 1, Nreknot_proj_full - 1); iy++)
     {
         // calculate scale factor
         double tx = bspline_atom_.t(ix+1).real();
-        double ty = bspline_atom_.t(iy+1).real();
+        double ty = bspline_proj_full_.t(iy+1).real();
         double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
@@ -274,11 +275,11 @@ Complex RadialIntegrals::computeR
     }
     
     // ta[ix] > tp[iy] (by swapping (a,c) and (b,d) multi-indices)
-    for (int ix = tb;                   ix < std::min(tb + order + 1, Nreknot_atom - 1); ix++) if (bspline_atom_.t(ix+1).real() > 0)
+    for (int ix = tb;                   ix < std::min(tb + order + 1, Nreknot_proj_full - 1); ix++) if (bspline_proj_full_.t(ix+1).real() != 0.)
     for (int iy = std::max(ta, ix + 1); iy < std::min(ta + order + 1, Nreknot_atom - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_atom_.t(ix+1).real();
+        double tx = bspline_proj_full_.t(ix+1).real();
         double ty = bspline_atom_.t(iy+1).real();
         double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         

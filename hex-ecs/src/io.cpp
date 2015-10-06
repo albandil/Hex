@@ -204,7 +204,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
                     "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
-                    "\t--ilu-max-blocks                 maximal number of ILU preconditioned blocks for hybrid preconditioner.                                                 \n"
+                    "\t--ilu-max-blocks                 maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #endif
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
                     "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"

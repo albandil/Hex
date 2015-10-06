@@ -52,7 +52,7 @@ void Solver::choose_preconditioner (int ipanel)
     ipanel_ = ipanel;
     
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, angs_, bspline_[0], bspline_[ipanel_], cmd_);
+    prec_ = Preconditioners::choose(par_, inp_, angs_, bspline_[0], bspline_[ipanel_], bspline_full_[ipanel_], cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -226,7 +226,7 @@ void Solver::solve ()
                 std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
-                prec_->rhs(chi, ie, instate, Spin, bspline_full_[ipanel_]);
+                prec_->rhs(chi, ie, instate, Spin);
                 
                 std::cout << "ok" << std::endl;
                 
@@ -239,7 +239,7 @@ void Solver::solve ()
                     std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
                     
                     // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
+                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
                     rad.setupTwoElectronIntegrals(par_, cmd_);

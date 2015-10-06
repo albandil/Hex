@@ -42,8 +42,14 @@
 #include "radial.h"
 #include "special.h"
 
-RadialIntegrals::RadialIntegrals (Bspline const & bspline_atom, Bspline const & bspline_proj, int Nlambdas)
-  : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
+RadialIntegrals::RadialIntegrals
+(
+    Bspline const & bspline_atom,
+    Bspline const & bspline_proj,
+    Bspline const & bspline_proj_full,
+    int Nlambdas
+)
+  : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj), bspline_proj_full_(bspline_proj_full),
     g_atom_(bspline_atom), g_proj_(bspline_proj),
     D_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
     S_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),

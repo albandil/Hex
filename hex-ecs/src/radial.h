@@ -117,7 +117,13 @@ class RadialIntegrals
     public:
         
         // constructor
-        RadialIntegrals (const Bspline& bspline_atom, const Bspline& bspline_proj, int Nlambdas);
+        RadialIntegrals
+        (
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
+            int Nlambdas
+        );
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
@@ -537,6 +543,7 @@ class RadialIntegrals
         /// Return reference to the B-spline object.
         Bspline const & bspline_atom () const { return bspline_atom_; }
         Bspline const & bspline_proj () const { return bspline_proj_; }
+        Bspline const & bspline_proj_full () const { return bspline_proj_full_; }
         
         /// Return the Gauss-Legendre integrator object.
         GaussLegendre const & gaussleg_atom () const { return g_atom_; }
@@ -678,6 +685,7 @@ class RadialIntegrals
         // B-spline environment
         Bspline const & bspline_atom_;
         Bspline const & bspline_proj_;
+        Bspline const & bspline_proj_full_;
         
         // Gauss-Legendre integrator
         GaussLegendre g_atom_;
