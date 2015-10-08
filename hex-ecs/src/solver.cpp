@@ -266,6 +266,15 @@ void Solver::solve ()
                             int l1p = angs_[illp].first;
                             int l2p = angs_[illp].second;
                             
+                            // precompute f
+                            rArray f (rad.maxlambda() + 1);
+                            for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
+                            {
+                                f[lambda] = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
+                                if (not std::isfinite(f[lambda]))
+                                    HexException("Evaluation of the angular integrals failed.");
+                            }
+                            
                             // for all atomic B-splines
                             # pragma omp parallel for collapse (2) schedule (dynamic,inp_.order)
                             for (int i = 0; i < Nspline_atom; i++)  // for all atomic B-splines
@@ -288,11 +297,8 @@ void Solver::solve ()
                                     Complex R_ijkl = 0;
                                     for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
                                     {
-                                        double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-                                        if (not std::isfinite(f))
-                                            HexException("Evaluation of the angular integrals failed.");
-                                        if (f != 0)
-                                            R_ijkl += f * rad.computeR(lambda, i, jp, k, lp);
+                                        if (f[lambda] != 0)
+                                            R_ijkl += f[lambda] * rad.computeR(lambda, i, jp, k, lp);
                                     }
                                     
                                     // evaluate the matrix element (start by the two-electron part)
