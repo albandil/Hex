@@ -52,7 +52,7 @@ void Solver::choose_preconditioner (int ipanel)
     ipanel_ = ipanel;
     
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, angs_, bspline_[0], bspline_[ipanel_], cmd_);
+    prec_ = Preconditioners::choose(par_, inp_, angs_, bspline_[0], bspline_[ipanel_], bspline_full_[ipanel_], cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -226,7 +226,7 @@ void Solver::solve ()
                 std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
-                prec_->rhs(chi, ie, instate, Spin, bspline_full_[ipanel_]);
+                prec_->rhs(chi, ie, instate, Spin);
                 
                 std::cout << "ok" << std::endl;
                 
@@ -239,7 +239,7 @@ void Solver::solve ()
                     std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
                     
                     // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
+                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
                     rad.setupTwoElectronIntegrals(par_, cmd_);
@@ -266,6 +266,15 @@ void Solver::solve ()
                             int l1p = angs_[illp].first;
                             int l2p = angs_[illp].second;
                             
+                            // precompute f
+                            rArray f (rad.maxlambda() + 1);
+                            for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
+                            {
+                                f[lambda] = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
+                                if (not std::isfinite(f[lambda]))
+                                    HexException("Evaluation of the angular integrals failed.");
+                            }
+                            
                             // for all atomic B-splines
                             # pragma omp parallel for collapse (2) schedule (dynamic,inp_.order)
                             for (int i = 0; i < Nspline_atom; i++)  // for all atomic B-splines
@@ -288,11 +297,8 @@ void Solver::solve ()
                                     Complex R_ijkl = 0;
                                     for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
                                     {
-                                        double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-                                        if (not std::isfinite(f))
-                                            HexException("Evaluation of the angular integrals failed.");
-                                        if (f != 0)
-                                            R_ijkl += f * rad.computeR(lambda, i, jp, k, lp);
+                                        if (f[lambda] != 0)
+                                            R_ijkl += f[lambda] * rad.computeR(lambda, i, jp, k, lp);
                                     }
                                     
                                     // evaluate the matrix element (start by the two-electron part)
@@ -301,6 +307,7 @@ void Solver::solve ()
                                     // get known element of the solution
                                     Complex x_kl = prev_solution[k * bspline_full_[ipanel_ - 1].Nspline() + lf];
                                     
+                                    // calculate one-electron part of the hamiltonian
                                     if (ill == illp)
                                     {
                                         // compute element of the atomic hamiltonian

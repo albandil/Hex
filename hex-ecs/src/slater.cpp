@@ -47,16 +47,16 @@
 void RadialIntegrals::R_inner_integrand
 (
     int n, Complex* in, Complex* out,
-    Bspline const & bspline_ij, int i, int j,
+    int i, int j,
     int L, int iknot, int iknotmax, Complex x
 ) const
 {
-    Complex R = bspline_ij.t(iknotmax);
+    Complex R = bspline_atom_.t(iknotmax);
     
     // evaluate B-splines
     cArray values_i(n), values_j(n);
-    bspline_ij.B(i, iknot, n, in, values_i.data());
-    bspline_ij.B(j, iknot, n, in, values_j.data());
+    bspline_atom_.B(i, iknot, n, in, values_i.data());
+    bspline_atom_.B(j, iknot, n, in, values_j.data());
     
     // fill output array
     for (int k = 0; k < n; k++)
@@ -66,30 +66,30 @@ void RadialIntegrals::R_inner_integrand
 void RadialIntegrals::R_outer_integrand
 (
     int n, Complex* in, Complex* out,
-    Bspline const & bspline_ij, int i, int j,
-    Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
+    int i, int j,
+    int k, int l,
     int L, int iknot, int iknotmax
 ) const
 {
     // extract data
-    Complex R = bspline_ij.t(iknotmax);
+    Complex R = bspline_atom_.t(iknotmax);
     
     // evaluate B-splines
     cArray values_i(n), values_j(n);
-    bspline_ij.B(i, iknot, n, in, values_i.data());
-    bspline_ij.B(j, iknot, n, in, values_j.data());
+    bspline_atom_.B(i, iknot, n, in, values_i.data());
+    bspline_atom_.B(j, iknot, n, in, values_j.data());
     
     // use at least 2nd order
-    int points2 = std::max(2, bspline_kl.order() + L + 1);
+    int points2 = std::max(2, bspline_atom_.order() + L + 1);
     
     // evaluate inner integral, fill output array
     for (int u = 0; u < n; u++)
     {
-        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_kl.quadMFP
+        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_atom_.quadMFP
         (
             this, &RadialIntegrals::R_inner_integrand,      // integrand pointers
-            points2, iknot, bspline_kl.t(iknot), in[u],     // integrator parameters
-            bspline_kl, k, l, L, iknot, iknotmax, in[u]     // integrand data
+            points2, iknot, bspline_atom_.t(iknot), in[u],     // integrator parameters
+            k, l, L, iknot, iknotmax, in[u]     // integrand data
         );
     }
 }
@@ -97,27 +97,28 @@ void RadialIntegrals::R_outer_integrand
 Complex RadialIntegrals::computeRtri
 (
     int L,
-    Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
-    Bspline const & bspline_mn, GaussLegendre const & g_mn, int m, int n,
+    int k, int l,
+    int m, int n,
     int iknot, int iknotmax
 ) const
 {
     // compute integral of Bk(1) Bl(1) V(1,2) Bm(2) Bn(2)
     
     // integration points (the integrand is a poly of order equal to the four times the order of B-splines)
-    int points = 2 * bspline_kl.order() + 1; 
+    int points = 2 * bspline_atom_.order() + 1; 
     
     // integrate
-    return g_kl.quadMFP
+    return g_atom_.quadMFP
     (
         this, &RadialIntegrals::R_outer_integrand,                      // integrand pointers
-        points, iknot, bspline_kl.t(iknot), bspline_kl.t(iknot+1),      // integrator parameters
-        bspline_kl, k, l, bspline_mn, g_mn, m, n, L, iknot, iknotmax    // integrand data
+        points, iknot, bspline_atom_.t(iknot), bspline_atom_.t(iknot+1),      // integrator parameters
+        k, l, m, n, L, iknot, iknotmax    // integrand data
     );
 }
 
 Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int iknot, int iknotmax) const
 {
+    // shorthands
     int order = bspline_atom_.order();
     
     // throw away if any B-spline identically zero here
@@ -125,15 +126,15 @@ Complex RadialIntegrals::computeRdiag (int L, int a, int b, int c, int d, int ik
         iknot < b or b + order < iknot or
         iknot < c or c + order < iknot or
         iknot < d or d + order < iknot)
-        return 0;
+        return 0.;
     
     // throw away zero length intervals as well
-    if (bspline_atom_.t(iknot) == bspline_atom_.t(iknot + 1))
+    if (bspline_atom_.t(iknot).real() == bspline_atom_.t(iknot + 1).real())
         return 0.;
     
     // sum the two triangle integrals
-    return computeRtri(L,bspline_proj_,g_proj_,b,d,bspline_atom_,g_atom_,a,c,iknot,iknotmax)
-         + computeRtri(L,bspline_atom_,g_atom_,a,c,bspline_proj_,g_proj_,b,d,iknot,iknotmax);
+    return computeRtri(L,b,d,a,c,iknot,iknotmax)
+         + computeRtri(L,a,c,b,d,iknot,iknotmax);
 }
 
 cArray RadialIntegrals::diagonalR (int lambda) const
@@ -168,16 +169,19 @@ Complex RadialIntegrals::computeR
     bool simple
 ) const
 {
+    // shorthands
     int order = bspline_atom_.order();
     int Nreknot_atom = bspline_atom_.Nreknot();
     int Nreknot_proj = bspline_proj_.Nreknot();
+    int Nreknot_proj_full = bspline_proj_full_.Nreknot();
     
+    // leading and trailing knots of the B-splines
     double ta1 = bspline_atom_.t(a).real(), ta2 = bspline_atom_.t(a + order + 1).real();
     double tb1 = bspline_proj_.t(b).real(), tb2 = bspline_proj_.t(b + order + 1).real();
     double tc1 = bspline_atom_.t(c).real(), tc2 = bspline_atom_.t(c + order + 1).real();
     double td1 = bspline_proj_.t(d).real(), td2 = bspline_proj_.t(d + order + 1).real();
     
-    // check overlaps
+    // dismiss if there are no pair overlaps
     if (ta2 <= tc1 or tc2 <= ta1 or tb2 <= td1 or td2 <= tb1)
         return 0.;
     
@@ -187,7 +191,7 @@ Complex RadialIntegrals::computeR
     // case there is no diagonal contribution, because there is no overlap between the _four_
     // participating B-splines.
     
-    // (b,d) << (a,c)
+    // the overlap of Bb,Bd precedes the overlap of Ba,Bc
     if (std::min(tb2,td2) <= std::max(ta1,tc1))
     {
         double t_ac = std::min(ta2,tc2);
@@ -196,7 +200,7 @@ Complex RadialIntegrals::computeR
         return scale * Mtr_mLm1_atom_[lambda](a,c) * Mtr_L_proj_[lambda](b,d);
     }
     
-    // (a,c) << (b,d)   [this is used by non-first panels]
+    // the overlap of Ba,Bc precedes the overlap of Bb,Bd
     if (std::min(ta2,tc2) <= std::max(tb1,td1))
     {
         double t_ac = std::min(ta2,tc2);
@@ -205,8 +209,7 @@ Complex RadialIntegrals::computeR
         return scale * Mtr_L_atom_[lambda](a,c) * Mtr_mLm1_proj_[lambda](b,d);
     }
     
-    // The rest allows overlap of the four B-splines and is used only by the first
-    // (origin) panel.
+    // The rest allows overlap of the four B-splines.
     
     // diagonal part
     Complex Rtr_Labcd_diag = 0;
@@ -214,20 +217,27 @@ Complex RadialIntegrals::computeR
     // off-diagonal part
     Complex Rtr_Labcd_offdiag = 0;
     
+    // translate knot indices into atom-atom basis
+    int ta = a;
+    int tb = b + proj_basis_shift_;
+    int tc = c;
+    int td = d + proj_basis_shift_;
+    
     // sum the diagonal (iknot_x = iknot_y = iknot) contributions
-    if (not simple)
+    if (not simple and proj_basis_shift_ < bspline_atom_.Nspline() and mmax(ta,tb,tc,td) < Nreknot_atom - 1)
     {
+        // shorthand
         std::size_t O = order + 1;
         
         // retrieve diagonal contribution
-        if (a <= b and a <= c and a <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((a * O + (b-a)) * O + (c-a)) * O + (d-a)];
-        else if (b <= a and b <= c and b <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((b * O + (a-b)) * O + (d-b)) * O + (c-b)];
-        else if (c <= a and c <= b and c <= d)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((c * O + (b-c)) * O + (a-c)) * O + (d-c)];
-        else // (d <= a and d <= b and d <= c)
-            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((d * O + (a-d)) * O + (b-d)) * O + (c-d)];
+        if (ta <= tb and ta <= tc and ta <= td)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((ta * O + (tb-ta)) * O + (tc-ta)) * O + (td-ta)];
+        else if (tb <= ta and tb <= tc and tb <= td)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((tb * O + (ta-tb)) * O + (td-tb)) * O + (tc-tb)];
+        else if (tc <= ta and tc <= tb and tc <= td)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((tc * O + (tb-tc)) * O + (ta-tc)) * O + (td-tc)];
+        else // (td <= ta and td <= tb and td <= tc)
+            Rtr_Labcd_diag = R_tr_dia_diag_[lambda][((td * O + (ta-td)) * O + (tb-td)) * O + (tc-td)];
     }
 /*
     // The following "simple" alternative does not perform very well -> commented out.
@@ -251,30 +261,30 @@ Complex RadialIntegrals::computeR
     
     // sum the off-diagonal (iknot_x ≠ iknot_y) contributions for R_tr
     
-    // ix < iy
-    for (int ix = a;                   ix < std::min(a + order + 1, Nreknot_atom - 1); ix++) if (bspline_atom_.t(ix+1).real() > 0)
-    for (int iy = std::max(b, ix + 1); iy < std::min(b + order + 1, Nreknot_proj - 1); iy++)
+    // ta[ix] < tp[iy]
+    for (int ix = ta;                   ix < std::min(ta + order + 1, Nreknot_atom - 1); ix++) if (bspline_atom_.t(ix+1).real() != 0.)
+    for (int iy = std::max(tb, ix + 1); iy < std::min(tb + order + 1, Nreknot_proj_full - 1); iy++)
     {
         // calculate scale factor
         double tx = bspline_atom_.t(ix+1).real();
-        double ty = bspline_proj_.t(iy+1).real();
+        double ty = bspline_proj_full_.t(iy+1).real();
         double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
-        Rtr_Labcd_offdiag += Mitr_L_ac[ix-a] * Mitr_mLm1_bd[iy-b] * scale;
+        Rtr_Labcd_offdiag += Mitr_L_ac[ix-ta] * Mitr_mLm1_bd[iy-tb] * scale;
     }
     
-    // ix > iy (by swapping (a,c) and (b,d) multi-indices)
-    for (int ix = b;                   ix < std::min(b + order + 1, Nreknot_proj - 1); ix++) if (bspline_proj_.t(ix+1).real() > 0)
-    for (int iy = std::max(a, ix + 1); iy < std::min(a + order + 1, Nreknot_atom - 1); iy++)
+    // ta[ix] > tp[iy] (by swapping (a,c) and (b,d) multi-indices)
+    for (int ix = tb;                   ix < std::min(tb + order + 1, Nreknot_proj_full - 1); ix++) if (bspline_proj_full_.t(ix+1).real() != 0.)
+    for (int iy = std::max(ta, ix + 1); iy < std::min(ta + order + 1, Nreknot_atom - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_proj_.t(ix+1).real();
+        double tx = bspline_proj_full_.t(ix+1).real();
         double ty = bspline_atom_.t(iy+1).real();
         double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
-        Rtr_Labcd_offdiag += Mitr_L_bd[ix-b] * Mitr_mLm1_ac[iy-a] * scale;
+        Rtr_Labcd_offdiag += Mitr_L_bd[ix-tb] * Mitr_mLm1_ac[iy-ta] * scale;
     }
     
     // sum the diagonal and offdiagonal contributions

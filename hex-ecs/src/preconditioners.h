@@ -95,7 +95,7 @@ class PreconditionerBase
         /**
          * @brief Calculate the right-hand side.
          */
-        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin, Bspline const & bspline_proj_full) const = 0;
+        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -199,6 +199,7 @@ class Preconditioners
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
             CommandLine const & cmd
         )
         {
@@ -206,8 +207,8 @@ class Preconditioners
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
             return   (i == cmd.preconditioner)
-                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_atom, bspline_proj, cmd)
-                   : choose<i+1>(par, inp, ll, bspline_atom, bspline_proj, cmd);
+                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd)
+                   : choose<i+1>(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
         (
@@ -216,6 +217,7 @@ class Preconditioners
             std::vector<std::pair<int,int>> const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
             CommandLine const & cmd
         )
         {

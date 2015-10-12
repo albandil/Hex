@@ -8,7 +8,7 @@
 #  - Hex-ecs requires compiler with C++11 support (GCC >= 4.8, ICC >= 2015)    #
 # ---------------------------------------------------------------------------- #
 
-# C++ compiler
+# C++ compiler (g++, clang, ...)
 CXX = g++
 
 # build mode ("debug" or "release")

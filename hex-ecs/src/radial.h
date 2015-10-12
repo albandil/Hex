@@ -117,7 +117,13 @@ class RadialIntegrals
     public:
         
         // constructor
-        RadialIntegrals (const Bspline& bspline_atom, const Bspline& bspline_proj, int Nlambdas);
+        RadialIntegrals
+        (
+            Bspline const & bspline_atom,
+            Bspline const & bspline_proj,
+            Bspline const & bspline_proj_full,
+            int Nlambdas
+        );
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
@@ -310,8 +316,8 @@ class RadialIntegrals
         Complex computeRtri
         (
             int L,
-            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
-            Bspline const & bspline_mn, GaussLegendre const & g_mn, int m, int n,
+            int k, int l,
+            int m, int n,
             int iknot, int iknotmax
         ) const;
         
@@ -337,7 +343,7 @@ class RadialIntegrals
         void R_inner_integrand
         (
             int n, Complex* in, Complex* out,
-            Bspline const & bspline_ij, int i, int j,
+            int i, int j,
             int L, int iknot, int iknotmax, Complex x
         ) const;
         
@@ -364,8 +370,8 @@ class RadialIntegrals
         void R_outer_integrand
         (
             int n, Complex* in, Complex* out,
-            Bspline const & bspline_ij, int i, int j,
-            Bspline const & bspline_kl, GaussLegendre const & g_kl, int k, int l,
+            int i, int j,
+            int k, int l,
             int L, int iknot, int iknotmax
         ) const;
         
@@ -537,6 +543,7 @@ class RadialIntegrals
         /// Return reference to the B-spline object.
         Bspline const & bspline_atom () const { return bspline_atom_; }
         Bspline const & bspline_proj () const { return bspline_proj_; }
+        Bspline const & bspline_proj_full () const { return bspline_proj_full_; }
         
         /// Return the Gauss-Legendre integrator object.
         GaussLegendre const & gaussleg_atom () const { return g_atom_; }
@@ -678,6 +685,7 @@ class RadialIntegrals
         // B-spline environment
         Bspline const & bspline_atom_;
         Bspline const & bspline_proj_;
+        Bspline const & bspline_proj_full_;
         
         // Gauss-Legendre integrator
         GaussLegendre g_atom_;
@@ -709,6 +717,9 @@ class RadialIntegrals
         
         // number of multipole matrices
         int Nlambdas_;
+        
+        // projectile basis shift
+        int proj_basis_shift_;
 };
 
 #endif

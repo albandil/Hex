@@ -60,7 +60,7 @@ Amplitudes::Amplitudes
     InputFile const & inp, Parallel const & par, CommandLine const & cmd,
     std::vector<std::pair<int,int>> const & ang
 ) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-    rad_(bspline_atom_,bspline_proj,0),
+    rad_(bspline_atom_,bspline_proj,bspline_proj,0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang)
 {
     // nothing to do
@@ -95,6 +95,9 @@ void Amplitudes::extract ()
                 BlockArray<Complex> solution (ang_.size(), !cmd_.outofcore, "sol");
                 if (not reader.load(solution))
                 {
+                    // complain only if the solution is allowed
+                    // TODO
+                    
                     std::cout << "\t\t\tSolution file(s) for L = " << inp_.L << ", Pi = " << inp_.Pi << ", ni = " << ni << ", li = " << li << ", mi = " << mi << " not found." << std::endl;
                     continue;
                 }
