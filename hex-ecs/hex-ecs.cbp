@@ -13,65 +13,86 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O3" />
-					<Add option="-fcx-limited-range" />
 					<Add option="-std=c++11" />
 					<Add option="-Wall" />
+					<Add option="-fcx-limited-range" />
 					<Add option="-fexceptions" />
 					<Add option="-fopenmp" />
 					<Add option="-DNDEBUG" />
-					<Add option="-DNO_OPENCL" />
-					<Add option="-DNO_PNG" />
+					<Add option="-DWITH_OPENCL" />
+					<Add option="-DWITH_UMFPACK" />
+					<Add option="-D_LONGINT" />
 					<Add directory="../Win64/include" />
 					<Add directory='&quot;c:/Program Files/Microsoft MPI/Inc&quot;' />
 					<Add directory="../Win64/include/SuiteSparse" />
+					<Add directory="../common" />
+					<Add directory="src" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
 					<Add option="-fopenmp" />
-					<Add library="..\Win64\lib\libgsl-1.16.dll.a" />
-					<Add library="..\Win64\lib\libfftw3-3.3.4.dll.a" />
-					<Add library="..\Win64\lib\libhdf5-1.8.14.dll.a" />
+					<Add library="..\Win64\lib\libgsl.dll.a" />
 					<Add library="..\Win64\lib\libmsmpi.dll.a" />
-					<Add library="..\Win64\lib\libopenblas-0.2.13.dll.a" />
-					<Add library="..\Win64\lib\libumfpack-5.7.1.dll.a" />
+					<Add library="..\Win64\lib\libopenblas.dll.a" />
+					<Add library="..\Win64\lib\libumfpack.dll.a" />
 					<Add library="gfortran" />
+					<Add library="..\Win64\lib\libOpenCL.dll.a" />
 				</Linker>
 			</Target>
 		</Build>
+		<Unit filename="../common/hex-arrays.cpp" />
+		<Unit filename="../common/hex-arrays.h" />
+		<Unit filename="../common/hex-arrithm.h" />
+		<Unit filename="../common/hex-chebyshev.h" />
+		<Unit filename="../common/hex-clenshawcurtis.h" />
+		<Unit filename="../common/hex-cmdline.h" />
+		<Unit filename="../common/hex-compact.h" />
+		<Unit filename="../common/hex-coomatrix.h" />
+		<Unit filename="../common/hex-cscmatrix.h" />
+		<Unit filename="../common/hex-csrmatrix.h" />
+		<Unit filename="../common/hex-densematrix.h" />
+		<Unit filename="../common/hex-gausskronrod.h" />
+		<Unit filename="../common/hex-hdffile.cpp" />
+		<Unit filename="../common/hex-hdffile.h" />
+		<Unit filename="../common/hex-hydrogen.cpp" />
+		<Unit filename="../common/hex-hydrogen.h" />
+		<Unit filename="../common/hex-interpolate.h" />
+		<Unit filename="../common/hex-itersolve.h" />
+		<Unit filename="../common/hex-luft.cpp" />
+		<Unit filename="../common/hex-luft.h" />
+		<Unit filename="../common/hex-matrix.cpp" />
+		<Unit filename="../common/hex-matrix.h" />
+		<Unit filename="../common/hex-memory.h" />
+		<Unit filename="../common/hex-misc.cpp" />
+		<Unit filename="../common/hex-misc.h" />
+		<Unit filename="../common/hex-ndcube.h" />
+		<Unit filename="../common/hex-nodeintegrate.h" />
+		<Unit filename="../common/hex-numbers.h" />
+		<Unit filename="../common/hex-special.cpp" />
+		<Unit filename="../common/hex-special.h" />
+		<Unit filename="../common/hex-spgrid.h" />
+		<Unit filename="../common/hex-symbandmatrix.h" />
+		<Unit filename="../common/hex-version.cpp" />
+		<Unit filename="../common/hex-version.h" />
 		<Unit filename="src/amplitudes.cpp" />
 		<Unit filename="src/amplitudes.h" />
-		<Unit filename="src/arrays.cpp" />
-		<Unit filename="src/arrays.h" />
-		<Unit filename="src/arrithm.h" />
 		<Unit filename="src/bspline.cpp" />
 		<Unit filename="src/bspline.h" />
-		<Unit filename="src/chebyshev.h" />
-		<Unit filename="src/clenshawcurtis.h" />
-		<Unit filename="src/cmdline.h" />
-		<Unit filename="src/compact.h" />
-		<Unit filename="src/complex.h" />
+		<Unit filename="src/clarrays.h" />
 		<Unit filename="src/doc.h" />
 		<Unit filename="src/gauss.cpp" />
 		<Unit filename="src/gauss.h" />
-		<Unit filename="src/hdffile.cpp" />
-		<Unit filename="src/hdffile.h" />
-		<Unit filename="src/hydrogen.cpp" />
-		<Unit filename="src/hydrogen.h" />
 		<Unit filename="src/io.cpp" />
 		<Unit filename="src/io.h" />
-		<Unit filename="src/itersolve.h" />
 		<Unit filename="src/main.cpp" />
-		<Unit filename="src/matrix.cpp" />
-		<Unit filename="src/matrix.h" />
-		<Unit filename="src/memory.h" />
-		<Unit filename="src/misc.h" />
-		<Unit filename="src/opencl.h" />
 		<Unit filename="src/parallel.h" />
 		<Unit filename="src/preconditioners.h" />
 		<Unit filename="src/preconditioners/CGPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/CGPreconditioner.h" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/GPUPreconditioner.h" />
+		<Unit filename="src/preconditioners/HybPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/HybPreconditioner.h" />
 		<Unit filename="src/preconditioners/ILUPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/ILUPreconditioner.h" />
 		<Unit filename="src/preconditioners/KPAPreconditioner.cpp" />
@@ -81,10 +102,8 @@
 		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/slater.cpp" />
-		<Unit filename="src/special.cpp" />
-		<Unit filename="src/special.h" />
-		<Unit filename="src/version.cpp" />
-		<Unit filename="src/version.h" />
+		<Unit filename="src/solver.cpp" />
+		<Unit filename="src/solver.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
