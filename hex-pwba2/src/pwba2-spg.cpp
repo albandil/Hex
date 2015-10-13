@@ -37,13 +37,14 @@
 #include <map>
 #include <sstream>
 
-#include "arrays.h"
-#include "born.h"
-#include "misc.h"
+#include "hex-arrays.h"
+#include "hex-born.h"
+#include "hex-misc.h"
+#include "hex-vec3d.h"
+#include "hex-special.h"
+#include "hex-spgrid.h"
+
 #include "pwba2.h"
-#include "vec3d.h"
-#include "special.h"
-#include "spgrid.h"
 
 inline Complex WA (double k, double nu, double q)
 {

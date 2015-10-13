@@ -33,10 +33,11 @@
 #include <cstring>
 #include <iostream>
 
-#include "cmdline.h"
-#include "hex-db.h"
+#include "hex-cmdline.h"
+#include "hex-version.h"
+
+#include "db.h"
 #include "variables.h"
-#include "version.h"
 
 typedef std::vector<std::string> const & Args;
 

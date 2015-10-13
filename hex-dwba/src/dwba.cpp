@@ -29,12 +29,13 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-hydrogen.h"
+#include "hex-gausskronrod.h"
+#include "hex-special.h"
+
 #include "potential.h"
 #include "dwba.h"
-#include "hydrogen.h"
-#include "gausskronrod.h"
-#include "special.h"
 #include "wave_distort.h"
 
 using special::constant::pi;

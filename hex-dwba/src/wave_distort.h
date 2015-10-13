@@ -34,8 +34,9 @@
 
 #include <gsl/gsl_interp.h>
 
+#include "hex-special.h"
+
 #include "potential.h"
-#include "special.h"
 
 /**
  * \brief Distorted wave information.

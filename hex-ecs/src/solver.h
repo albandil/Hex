@@ -34,9 +34,10 @@
 
 #include <vector>
 
+#include "hex-itersolve.h"
+
 #include "bspline.h"
 #include "io.h"
-#include "itersolve.h"
 #include "parallel.h"
 #include "preconditioners.h"
 

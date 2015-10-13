@@ -36,9 +36,10 @@
 #include <string>
 #include <vector>
 
-#include "../arrays.h"
-#include "../matrix.h"
-#include "../preconditioners.h"
+#include "hex-arrays.h"
+#include "hex-matrix.h"
+
+#include "preconditioners.h"
 
 #ifndef NO_LAPACK
 

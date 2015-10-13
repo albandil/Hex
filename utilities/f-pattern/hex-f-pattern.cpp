@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 
-#include "special.h"
+#include "hex-special.h"
 
 // Usage
 //   hex-f-pattern <L> <Pi> <nL>

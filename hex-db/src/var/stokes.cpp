@@ -33,11 +33,12 @@
 #include <string>
 #include <vector>
 
-#include "../arrays.h"
-#include "../interfaces.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-arrays.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
+#include "interfaces.h"
+#include "variables.h"
 
 //
 // StokesParameters members

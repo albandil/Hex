@@ -32,10 +32,11 @@
 #include <iostream>
 #include <cstdio>
 
-#include "../arrays.h"
-#include "../itersolve.h"
-#include "../misc.h"
-#include "../preconditioners.h"
+#include "hex-arrays.h"
+#include "hex-itersolve.h"
+#include "hex-misc.h"
+
+#include "preconditioners.h"
 
 const std::string CGPreconditioner::prec_name = "CG";
 const std::string CGPreconditioner::prec_description = 

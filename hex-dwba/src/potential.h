@@ -32,9 +32,9 @@
 #ifndef HEX_DISTORTING_POTENTIAL
 #define HEX_DISTORTING_POTENTIAL
 
-#include "arrays.h"
-#include "hydrogen.h"
-#include "special.h"
+#include "hex-arrays.h"
+#include "hex-hydrogen.h"
+#include "hex-special.h"
 
 /**
  * @brief U polynomial coefficients.

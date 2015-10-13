@@ -36,9 +36,10 @@
 #include <omp.h>
 #endif
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-memory.h"
+
 #include "bspline.h"
-#include "memory.h"
 
 const std::size_t Bspline::work_size_ = 1024;
 

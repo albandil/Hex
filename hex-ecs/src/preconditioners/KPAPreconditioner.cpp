@@ -31,11 +31,12 @@
 
 #include <iostream>
 
-#include "../arrays.h"
-#include "../gauss.h"
-#include "../misc.h"
-#include "../preconditioners.h"
-#include "../radial.h"
+#include "hex-arrays.h"
+#include "hex-misc.h"
+
+#include "gauss.h"
+#include "preconditioners.h"
+#include "radial.h"
 
 #ifndef NO_LAPACK
 

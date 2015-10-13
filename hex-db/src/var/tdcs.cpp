@@ -33,13 +33,14 @@
 #include <string>
 #include <vector>
 
-#include "../arrays.h"
-#include "../interpolate.h"
-#include "../chebyshev.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../vec3d.h"
-#include "../version.h"
+#include "hex-arrays.h"
+#include "hex-interpolate.h"
+#include "hex-chebyshev.h"
+#include "hex-special.h"
+#include "hex-vec3d.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string TripleDifferentialCrossSection::Id = "tdcs";
 const std::string TripleDifferentialCrossSection::Description = "Triple differential ionization cross section.";

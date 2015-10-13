@@ -32,7 +32,7 @@
 #ifndef HEX_NOPRECONDITIONER_H
 #define HEX_NOPRECONDITIONER_H
 
-#include "../preconditioners.h"
+#include "preconditioners.h"
 
 /**
  * @brief Solution driver without actual preconditioner.

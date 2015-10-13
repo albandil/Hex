@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "../src/spgrid.cpp"
+#include "../src/hex-spgrid.cpp"
 
 // template <class T> using integrand_t = void (*) (int n, int dim, double const * origin, double range, const double * scale, T * eval);
 

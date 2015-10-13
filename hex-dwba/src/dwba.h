@@ -32,7 +32,8 @@
 #ifndef HEX_DWBA_DWBA1
 #define HEX_DWBA_DWBA1
 
-#include "arrays.h"
+#include "hex-arrays.h"
+
 #include "potential.h"
 
 /**

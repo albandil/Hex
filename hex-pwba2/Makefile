@@ -48,38 +48,40 @@ CXXDEBUG = $(CFLAGS) -g -fcx-limited-range -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = -g $(CXXRILIS)
 
-FILES = arrays born hydrogen pwba2-pwx pwba2-spg misc radial special spgrid \
-        ui vec3d version hyp_2F1
-SOURCES = $(patsubst %,src/%.cpp,$(FILES))
-OBJECTS = $(patsubst %,obj/%.o,$(FILES))
-DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+BASECXX = $(shell basename $(CXX))
+
+COMMON_FILES   = hex-arrays hex-born hex-hydrogen hex-misc hex-special hex-spgrid \
+                 hex-vec3d hex-version
+COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
+
+HEX_PWBA2_FILES   = pwba2-pwx pwba2-spg radial ui hyp_2F1
+HEX_PWBA2_SOURCES = $(patsubst %,src/%.cpp,$(HEX_PWBA2_FILES))
+HEX_PWBA2_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-pwba2/%.o,$(HEX_PWBA2_FILES))
+HEX_PWBA2_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-pwba2/%.dep,$(HEX_PWBA2_FILES))
 
 all: pollversion bin/hex-pwba2
 
-allclean: clean docclean distclean
+allclean: clean docclean
 
 pollversion:
-	@touch src/version.cpp
+	@touch ../common/hex-version.cpp
 
-dist:
-	mkdir -p hex-pwba2
-	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-pwba2/
-	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-pwba2/Makefile
-	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-pwba2/Makefile
-	sed -i "s/\.\.\/media\///g" hex-pwba2/Doxyfile
-	tar --create --gzip --file=hex-pwba2-$(GIT_COMMIT).tar.gz hex-pwba2
-	rm -rf hex-pwba2/
+bin/hex-pwba2: bin/hex-pwba2.$(BASECXX)
+	@ln -fs hex-pwba2.$(BASECXX) bin/hex-pwba2
 
-distclean:
-	rm -rf hex-pwba2 hex-pwba2-*.tar.gz
-
-bin/hex-pwba2: $(OBJECTS)
+bin/hex-pwba2.$(BASECXX): $(COMMON_OBJECTS) $(HEX_PWBA2_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $^ $(LFLAGS) -o $@
 
-obj/%.o: src/%.cpp
+obj/$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) $(CXXFLAGS) -I../common -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+
+obj/$(BASECXX)/hex-pwba2/%.o: src/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -I../common -Isrc -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDENCIES) bin/pwba2
@@ -90,4 +92,4 @@ doc:
 docclean:
 	rm -rf html
 
--include $(wildcard obj/*.dep)
+-include $(COMMON_DEPS) $(HEX_PWBA2_DEPS)

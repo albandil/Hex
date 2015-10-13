@@ -32,7 +32,7 @@
 #ifndef HEX_ILUPRECONDITIONER_H
 #define HEX_ILUPRECONDITIONER_H
 
-#include "../preconditioners.h"
+#include "preconditioners.h"
 
 #ifdef _OPENMP
 #include <omp.h>

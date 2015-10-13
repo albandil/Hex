@@ -29,12 +29,13 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include "arrays.h"
-#include "gausskronrod.h"
-#include "hydrogen.h"
+#include "hex-arrays.h"
+#include "hex-gausskronrod.h"
+#include "hex-hydrogen.h"
+#include "hex-special.h"
+#include "hex-symbolic.h"
+
 #include "pwba.h"
-#include "special.h"
-#include "symbolic.h"
 
 using special::constant::pi;
 using special::constant::Inf;

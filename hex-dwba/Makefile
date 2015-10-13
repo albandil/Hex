@@ -41,41 +41,42 @@ CXXDEBUG = $(CFLAGS) -g -DNO_LAPACK -DNO_MPI -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
 
-FILES = arrays dwba hdffile hydrogen misc potential pwba special symbolic ui \
-        version wave_distort
-SOURCES = $(patsubst %,src/%.cpp,$(FILES))
-OBJECTS = $(patsubst %,obj/%.o,$(FILES))
-DEPENDENCIES = $(patsubst %,obj/%.dep,$(FILES))
+BASECXX = $(shell basename $(CXX))
+
+COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-misc hex-special hex-symbolic hex-version
+COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
+
+HEX_DWBA_FILES   = dwba potential pwba ui wave_distort
+HEX_DWBA_SOURCES = $(patsubst %,src/%.cpp,$(HEX_DWBA_FILES))
+HEX_DWBA_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-dwba/%.o,$(HEX_DWBA_FILES))
+HEX_DWBA_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-dwba/%.dep,$(HEX_DWBA_FILES))
 
 all: pollversion bin/hex-dwba
 
-allclean: clean docclean distclean
+allclean: clean docclean
 
 pollversion:
-	touch src/version.cpp
+	touch ../common/hex-version.cpp
 
-dist:
-	mkdir -p hex-dwba
-	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-dwba/
-	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-dwba/Makefile
-	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-dwba/Makefile
-	sed -i "s/\.\.\/media\///g" hex-dwba/Doxyfile
-	tar --create --gzip --file=hex-dwba-$(GIT_COMMIT).tar.gz hex-dwba
-	rm -rf hex-dwba/
+bin/hex-dwba: bin/hex-dwba.$(BASECXX)
+	@ln -s hex-dwba.$(BASECXX) bin/hex-dwba
 
-distclean:
-	rm -rf hex-dwba hex-dwba-*.tar.gz
-
-bin/hex-dwba: $(OBJECTS)
+bin/hex-dwba.$(BASECXX): $(COMMON_OBJECTS) $(HEX_DWBA_OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $^ $(LFLAGS) -o $@
 
-obj/%.o: src/%.cpp
+obj/$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) -c $(CXXFLAGS) $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+	$(CXX) -c $(CXXFLAGS) -I../common $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+
+obj/$(BASECXX)/hex-dwba/%.o: src/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) -c $(CXXFLAGS) -I../common -Isrc $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
-	rm -f $(OBJECTS) $(DEPENDENCIES) bin/hex-dwba
+	rm -rf obj/$(BASECXX) bin/hex-dwba.$(BASECXX) bin/hex-dwba
 
 doc:
 	doxygen
@@ -83,4 +84,4 @@ doc:
 docclean:
 	rm -rf html
 
--include $(wildcard obj/*.dep)
+-include $(COMMON_DEPS) $(HEX_DWBA_DEPS)

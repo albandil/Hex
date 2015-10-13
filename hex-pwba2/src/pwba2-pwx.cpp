@@ -35,13 +35,14 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "arrays.h"
-#include "clenshawcurtis.h"
-#include "gausskronrod.h"
-#include "misc.h"
+#include "hex-arrays.h"
+#include "hex-clenshawcurtis.h"
+#include "hex-gausskronrod.h"
+#include "hex-misc.h"
+#include "hex-vec3d.h"
+
 #include "pwba2.h"
 #include "radial.h"
-#include "vec3d.h"
 
 cArrays PWBA2::PartialWave_direct
 (

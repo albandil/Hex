@@ -34,8 +34,9 @@
 
 #include <tuple>
 
-#include "arrays.h"
-#include "matrix.h"
+#include "hex-arrays.h"
+#include "hex-matrix.h"
+
 #include "radial.h"
 #include "parallel.h"
 

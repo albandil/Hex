@@ -31,10 +31,9 @@
 
 #include <iostream>
 
-#include "../../src/arrays.h"
-#include "../../src/arrays.cpp"
-#include "../../src/hdffile.cpp"
-#include "../../src/misc.cpp"
+#include "hex-arrays.h"
+#include "hex-hdffile.h"
+#include "hex-misc.h"
 
 int main (int argc, char *argv[])
 {

@@ -32,7 +32,7 @@
 #ifndef HEX_PWBA
 #define HEX_PWBA
 
-#include "arrays.h"
+#include "hex-arrays.h"
 
 /**
  * @brief Plane-wave Born approximation.

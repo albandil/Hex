@@ -32,7 +32,7 @@
 #ifndef HEX_CGPRECONDITIONER_H
 #define HEX_CGPRECONDITIONER_H
 
-#include "../preconditioners.h"
+#include "preconditioners.h"
 
 /**
  * @brief CG iteration-based preconditioner.

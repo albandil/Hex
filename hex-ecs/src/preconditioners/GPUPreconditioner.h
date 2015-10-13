@@ -34,13 +34,14 @@
 
 #include <string>
 
-#include "../arrays.h"
-#include "../matrix.h"
-#include "../preconditioners.h"
+#include "hex-arrays.h"
+#include "hex-matrix.h"
+
+#include "preconditioners.h"
 
 #ifdef WITH_OPENCL
 
-#include "../clarrays.h"
+#include "clarrays.h"
 
 /**
  * @brief KPA-preconditioned CG-preconditioner.

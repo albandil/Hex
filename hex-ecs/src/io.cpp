@@ -36,10 +36,11 @@
 #include <string>
 #include <tuple>
 
-#include "arrays.h"
-#include "cmdline.h"
+#include "hex-arrays.h"
+#include "hex-cmdline.h"
+#include "hex-matrix.h"
+
 #include "io.h"
-#include "matrix.h"
 #include "preconditioners.h"
 
 const std::string sample_input =

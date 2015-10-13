@@ -34,7 +34,8 @@
 
 #include <vector>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"

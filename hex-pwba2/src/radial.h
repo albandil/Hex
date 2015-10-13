@@ -34,7 +34,7 @@
 
 #include <iostream>
 
-#include "arrays.h"
+#include "hex-arrays.h"
 
 /**
  * @brief Calculate bound-bound intermediate multipole potential.

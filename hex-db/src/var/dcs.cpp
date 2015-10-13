@@ -36,11 +36,12 @@
 
 #include <sqlitepp/sqlitepp.hpp>
 
-#include "../chebyshev.h"
-#include "../interpolate.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-chebyshev.h"
+#include "hex-interpolate.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string DifferentialCrossSection::Id = "dcs";
 const std::string DifferentialCrossSection::Description = "Differential cross section.";

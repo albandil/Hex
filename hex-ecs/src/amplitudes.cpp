@@ -37,16 +37,17 @@
 #include <ctime>
 #include <vector>
 
+#include "hex-arrays.h"
+#include "hex-chebyshev.h"
+#include "hex-clenshawcurtis.h"
+#include "hex-hydrogen.h"
+#include "hex-matrix.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
 #include "amplitudes.h"
-#include "arrays.h"
 #include "bspline.h"
-#include "chebyshev.h"
-#include "clenshawcurtis.h"
-#include "hydrogen.h"
-#include "matrix.h"
 #include "radial.h"
-#include "special.h"
-#include "version.h"
 
 std::string current_time () 
 {

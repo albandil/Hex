@@ -31,7 +31,7 @@
 
 #include <algorithm>
 
-#include "../preconditioners.h"
+#include "preconditioners.h"
 
 const std::string HybCGPreconditioner::prec_name = "HYB";
 const std::string HybCGPreconditioner::prec_description = "Combination of ILU and KPA.";

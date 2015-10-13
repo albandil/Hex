@@ -33,14 +33,11 @@
 #include <cstdlib>
 #include <string>
 
-#include "../../src/arrays.h"
-#include "../../src/arrays.cpp"
-#include "../../src/misc.h"
-#include "../../src/misc.cpp"
-#include "../../src/numbers.h"
-#include "../../src/compact.h"
-#include "../../src/chebyshev.h"
-#include "../../src/hdffile.cpp"
+#include "hex-arrays.h"
+#include "hex-misc.h"
+#include "hex-compact.h"
+#include "hex-chebyshev.h"
+#include "hex-hdffile.h"
 
 template<typename T> void load_and_write(const char* hdf, int samples)
 {

@@ -34,14 +34,15 @@
 #include <iostream>
 #include <set>
 
-#include "../arrays.h"
-#include "../clarrays.h"
-#include "../gauss.h"
-#include "../itersolve.h"
-#include "../misc.h"
-#include "../preconditioners.h"
-#include "../radial.h"
-#include "../special.h"
+#include "hex-arrays.h"
+#include "hex-itersolve.h"
+#include "hex-misc.h"
+#include "hex-special.h"
+
+#include "clarrays.h"
+#include "gauss.h"
+#include "preconditioners.h"
+#include "radial.h"
 
 #include <CL/cl.h>
 

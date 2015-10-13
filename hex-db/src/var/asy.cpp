@@ -33,11 +33,12 @@
 #include <string>
 #include <vector>
 
-#include "../interfaces.h"
-#include "../interpolate.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-interpolate.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
+#include "interfaces.h"
+#include "variables.h"
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 

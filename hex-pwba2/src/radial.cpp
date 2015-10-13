@@ -32,13 +32,14 @@
 #include <gsl/gsl_interp.h>
 #include <gsl/gsl_spline.h>
 
-#include "arrays.h"
-#include "gausskronrod.h"
-#include "hydrogen.h"
-#include "misc.h"
-#include "nodeintegrate.h"
+#include "hex-arrays.h"
+#include "hex-gausskronrod.h"
+#include "hex-hydrogen.h"
+#include "hex-misc.h"
+#include "hex-nodeintegrate.h"
+#include "hex-special.h"
+
 #include "radial.h"
-#include "special.h"
 
 // include Michel's hypergeometric function implementation
 #include "hyp_2F1.H"

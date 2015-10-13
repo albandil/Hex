@@ -42,15 +42,16 @@
     #include <omp.h>
 #endif
 
+#include "hex-arrays.h"
+#include "hex-misc.h"
+#include "hex-version.h"
+
 #include "amplitudes.h"
-#include "arrays.h"
 #include "bspline.h"
 #include "io.h"
-#include "misc.h"
 #include "parallel.h"
 #include "radial.h"
 #include "solver.h"
-#include "version.h"
 
 int main (int argc, char* argv[])
 {

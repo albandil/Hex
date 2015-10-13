@@ -31,10 +31,11 @@
 
 #include <algorithm>
 
-#include "special.h"
+#include "hex-special.h"
+#include "hex-vec3d.h"
+#include "hex-version.h"
+
 #include "variables.h"
-#include "vec3d.h"
-#include "version.h"
 
 VariableList::VariableList () :
     list ({

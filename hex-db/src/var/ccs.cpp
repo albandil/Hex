@@ -36,11 +36,12 @@
 
 #include <sqlite3.h>
 
-#include "../chebyshev.h"
-#include "../clenshawcurtis.h"
-#include "../interpolate.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-chebyshev.h"
+#include "hex-clenshawcurtis.h"
+#include "hex-interpolate.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 // -------------------------------------------------------------------------- //
 

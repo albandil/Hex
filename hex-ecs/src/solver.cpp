@@ -29,7 +29,8 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include "hydrogen.h"
+#include "hex-hydrogen.h"
+
 #include "solver.h"
 
 Solver::Solver

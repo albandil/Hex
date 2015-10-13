@@ -35,11 +35,12 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
 #include "dwba.h"
 #include "pwba.h"
-#include "special.h"
-#include "version.h"
 
 using special::constant::pi;
 

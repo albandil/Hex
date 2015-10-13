@@ -33,10 +33,10 @@
 #include <vector>
 #include <string>
 
-#include "../../src/arrays.cpp"
-#include "../../src/hdffile.cpp"
-#include "../../src/h5file.cpp"
-#include "../../src/misc.cpp"
+#include "hex-arrays.h"
+#include "hex-hdffile.h"
+#include "hex-h5file.h"
+#include "hex-misc.h"
 
 std::string get_extension (std::string filename)
 {

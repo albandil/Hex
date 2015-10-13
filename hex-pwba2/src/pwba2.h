@@ -32,7 +32,7 @@
 #ifndef HEX_PWBA2_H
 #define HEX_PWBA2_H
 
-#include "arrays.h"
+#include "hex-arrays.h"
 
 namespace PWBA2
 {

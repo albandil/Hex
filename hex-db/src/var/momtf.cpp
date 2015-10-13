@@ -33,10 +33,11 @@
 #include <string>
 #include <vector>
 
-#include "../special.h"
-#include "../interpolate.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-special.h"
+#include "hex-interpolate.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string MomentumTransfer::Id = "momtf";
 const std::string MomentumTransfer::Description = "Momentum transfer.";

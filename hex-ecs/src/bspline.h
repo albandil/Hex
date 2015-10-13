@@ -32,8 +32,8 @@
 #ifndef HEX_BSPLINE
 #define HEX_BSPLINE
 
-#include "arrays.h"
-#include "misc.h"
+#include "hex-arrays.h"
+#include "hex-misc.h"
 
 /**
  * @brief B-spline environment.

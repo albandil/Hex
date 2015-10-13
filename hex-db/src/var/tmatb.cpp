@@ -33,10 +33,11 @@
 #include <string>
 #include <vector>
 
-#include "../arrays.h"
-#include "../interpolate.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-arrays.h"
+#include "hex-interpolate.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string TMatrixB::Id = "tmatb";
 const std::string TMatrixB::Description = "Born T-matrix.";

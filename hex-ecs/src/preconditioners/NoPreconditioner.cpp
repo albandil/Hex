@@ -44,12 +44,13 @@
     #define OMP_clean
 #endif
 
-#include "../arrays.h"
-#include "../gauss.h"
-#include "../misc.h"
-#include "../parallel.h"
-#include "../preconditioners.h"
-#include "../radial.h"
+#include "hex-arrays.h"
+#include "hex-misc.h"
+
+#include "gauss.h"
+#include "parallel.h"
+#include "preconditioners.h"
+#include "radial.h"
 
 const std::string NoPreconditioner::prec_name = "none";
 const std::string NoPreconditioner::prec_description = "\"Preconditioning\" by the identity matrix.";

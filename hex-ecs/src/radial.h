@@ -35,13 +35,14 @@
 #include <cmath>
 #include <vector>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-matrix.h"
+#include "hex-special.h"
+
 #include "bspline.h"
 #include "gauss.h"
 #include "io.h"
 #include "parallel.h"
-#include "special.h"
-#include "matrix.h"
 
 #define EXPANSION_QUADRATURE_POINTS 20
 

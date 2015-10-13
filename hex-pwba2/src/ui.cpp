@@ -39,11 +39,12 @@
 #include <omp.h>
 #endif
 
-#include "arrays.h"
-#include "cmdline.h"
+#include "hex-arrays.h"
+#include "hex-cmdline.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
 #include "pwba2.h"
-#include "special.h"
-#include "version.h"
 
 const std::string sample_input =
     "# ------------------------\n"

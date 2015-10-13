@@ -35,12 +35,13 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "../arrays.h"
-#include "../interpolate.h"
-#include "../chebyshev.h"
-#include "../variables.h"
-#include "../vec3d.h"
-#include "../version.h"
+#include "hex-arrays.h"
+#include "hex-interpolate.h"
+#include "hex-chebyshev.h"
+#include "hex-vec3d.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string IonizationF::Id = "ionf";
 const std::string IonizationF::Description = "Ionization amplitude radial part.";

@@ -29,13 +29,11 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include "../../src/special.h"
-#include "../../src/special.cpp"
-#include "../../src/misc.h"
-#include "../../src/misc.cpp"
-
 #include <cstdlib>
 #include <iostream>
+
+#include "hex-misc.h"
+#include "hex-special.h"
 
 std::vector<std::string> help = {
     std::string("-h"),

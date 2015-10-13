@@ -37,9 +37,10 @@
 #include <vector>
 #include <string>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-luft.h"
+
 #include "bspline.h"
-#include "luft.h"
 
 /**
  * @brief Command line parameters.

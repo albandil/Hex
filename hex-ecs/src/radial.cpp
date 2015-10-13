@@ -35,12 +35,13 @@
 #include <cstdio>
 #include <cstring>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-special.h"
+
 #include "bspline.h"
 #include "gauss.h"
 #include "parallel.h"
 #include "radial.h"
-#include "special.h"
 
 RadialIntegrals::RadialIntegrals
 (

@@ -34,9 +34,10 @@
 #include <string>
 #include <vector>
 
-#include "../interpolate.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-interpolate.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string CollisionStrength::Id = "colls";
 const std::string CollisionStrength::Description = "Collision strength (energy scaled integral cross section).";

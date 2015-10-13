@@ -39,9 +39,10 @@
 
 #include <sqlitepp/sqlitepp.hpp>
 
-#include "arrays.h"
-#include "hex-db.h"
-#include "vec3d.h"
+#include "hex-arrays.h"
+#include "hex-vec3d.h"
+
+#include "db.h"
 
 /**
  * @brief Energy units change.

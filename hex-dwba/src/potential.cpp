@@ -35,7 +35,8 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+
 #include "potential.h"
 
 const rArrays Ucoeffs = {

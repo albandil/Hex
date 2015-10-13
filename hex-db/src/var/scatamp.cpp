@@ -33,12 +33,13 @@
 #include <string>
 #include <vector>
 
-#include "../interpolate.h"
-#include "../born.h"
-#include "../chebyshev.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-interpolate.h"
+#include "hex-born.h"
+#include "hex-chebyshev.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string ScatteringAmplitude::Id = "scatamp";
 const std::string ScatteringAmplitude::Description = "Scattering amplitude.";

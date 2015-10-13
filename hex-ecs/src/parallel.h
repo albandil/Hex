@@ -36,7 +36,7 @@
 #include <mpi.h>
 #endif
 
-#include "arrays.h"
+#include "hex-arrays.h"
 
 /**
  * @brief MPI info.

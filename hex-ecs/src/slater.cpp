@@ -38,11 +38,12 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-special.h"
+
 #include "bspline.h"
 #include "gauss.h"
 #include "radial.h"
-#include "special.h"
 
 void RadialIntegrals::R_inner_integrand
 (

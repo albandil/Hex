@@ -35,8 +35,9 @@
 
 #include <gsl/gsl_sf.h>
 
-#include "arrays.h"
-#include "ode.h"
+#include "hex-arrays.h"
+#include "hex-ode.h"
+
 #include "potential.h"
 #include "wave_distort.h"
 

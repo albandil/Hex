@@ -36,9 +36,10 @@
 
 #include <gsl/gsl_integration.h>
 
-#include "arrays.h"
+#include "hex-arrays.h"
+#include "hex-misc.h"
+
 #include "gauss.h"
-#include "misc.h"
 
 std::vector<std::pair<double*,double*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr),  // n = 0

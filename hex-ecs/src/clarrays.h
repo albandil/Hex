@@ -17,7 +17,7 @@
 
 #include <CL/cl.h>
 
-#include "arrays.h"
+#include "hex-arrays.h"
 
 /**
  * @brief OpenCL array wrapper.

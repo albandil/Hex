@@ -31,9 +31,10 @@
 
 #include <iostream>
 
-#include "../arrays.h"
-#include "../misc.h"
-#include "../preconditioners.h"
+#include "hex-arrays.h"
+#include "hex-misc.h"
+
+#include "preconditioners.h"
 
 const std::string ILUCGPreconditioner::prec_name = "ILU";
 const std::string ILUCGPreconditioner::prec_description = 

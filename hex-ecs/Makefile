@@ -83,7 +83,7 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # PNG++ (optional)                                                             #
 # ---------------------------------------------------------------------------- #
 
-# PNGPPFLAGS = -DWITH_PNG -I./libs
+# PNGPPFLAGS = -DWITH_PNG -I../libs
 # PNGPPLIBS = -lpng
                                                                                #
 ################################################################################
@@ -91,6 +91,7 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 
 # compiler flags
 CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
+          -Isrc -I../common \
           $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
           $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
 
@@ -111,27 +112,35 @@ else
 $(error "Unknown target $(TARGET)")
 endif
 
-# source files
-CXXFILES = amplitudes arrays gauss bspline io hdffile hydrogen luft main \
-           matrix misc radial slater solver special version \
-           preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
-           preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
-           preconditioners/GPUPreconditioner preconditioners/HybPreconditioner
+# compiler name
+BASECXX = $(shell basename $(CXX))
 
-# sources and derived files (object files, dep-files, etc)
-BASECXX      = $(shell basename $(CXX))
-CXXSOURCES   = $(patsubst %,src/%.cpp,$(CXXFILES))
-OBJECTS      = $(patsubst %,obj/$(BASECXX)/%.o,  $(CXXFILES))
-DEPENDENCIES = $(patsubst %,obj/$(BASECXX)/%.dep,$(CXXFILES))
-OCLSOURCES   = src/preconditioners/GPUPreconditioner.cl
-OCLKERNELS   = src/preconditioners/GPUPreconditioner.inc
+# common source files
+COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-luft hex-matrix \
+                 hex-misc hex-special hex-version
+COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
+COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
+COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
+
+# source files specific to hex-ecs
+HEX_ECS_FILES   = amplitudes gauss bspline io main radial slater solver \
+                  preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
+                  preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
+                  preconditioners/GPUPreconditioner preconditioners/HybPreconditioner
+HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
+HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
+HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
+
+# OpenCL kernels
+OCLSOURCES = src/preconditioners/GPUPreconditioner.cl
+OCLKERNELS = src/preconditioners/GPUPreconditioner.inc
 
 # build all targets
 all: pollversion bin/hex-ecs.$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
-	@touch src/version.cpp
+	@touch ../common/hex-version.cpp
 
 # build documentation from source comments using Doxygen
 doc:
@@ -141,43 +150,30 @@ doc:
 docclean:
 	rm -rf html
 
-# make distribution archive
-dist:
-	mkdir -p hex-ecs/libs
-	cp --recursive --dereference README Makefile Doxyfile *.cbp ../media/hexe-small.gif src hex-ecs/
-	cp --recursive libs/png++ hex-ecs/libs
-	sed -i "s/\(^GIT_COMMIT = \)\(.*\)/\1$(GIT_COMMIT)/g" hex-ecs/Makefile
-	sed -i "s/\(^all:.*\)\(pollversion\)\(.*\)/\1\3/g" hex-ecs/Makefile
-	sed -i "s/\.\.\/media\///g" hex-ecs/Doxyfile
-	tar --create --gzip --file=hex-ecs-$(GIT_COMMIT).tar.gz hex-ecs
-	rm -rf hex-ecs/
-
 # remove build files
 clean:
-	rm -f bin/hex-ecs.$(BASECXX) $(OBJECTS) $(DEPENDENCIES)
+	rm -f bin/hex-ecs bin/hex-ecs.$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
 
 # remove everything (build files, documentation and distribution files)
-allclean: clean docclean distclean
-
-# remove distribution files
-distclean:
-	rm -rf hex-ecs hex-ecs-*.tar.gz
+allclean: clean docclean
 
 # main program target
-bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(OBJECTS)
+bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $(OBJECTS) $(LFLAGS) -o $@
+	$(CXX) $(HEX_ECS_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
 	@ln -fs hex-ecs.$(BASECXX) bin/hex-ecs
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
-src/%.inc: src/%.cl
+%.inc: %.cl
 	xxd -i $< | tail -n+2 | head -n-2 > $@
 
 # CPP -> O rule (compile source files)
-obj/$(BASECXX)/%.o: src/%.cpp
+obj/$(BASECXX)/common/%.o: ../common/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
+obj/$(BASECXX)/hex-ecs/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # include generated source dependencied
--include $(DEPENDENCIES)
-
+-include $(COMMON_DEPS) $(HEX_ECS_DEPS)

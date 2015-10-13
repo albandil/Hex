@@ -33,10 +33,11 @@
 #include <string>
 #include <vector>
 
-#include "../interpolate.h"
-#include "../special.h"
-#include "../variables.h"
-#include "../version.h"
+#include "hex-interpolate.h"
+#include "hex-special.h"
+#include "hex-version.h"
+
+#include "variables.h"
 
 const std::string ExtrapolatedCrossSection::Id = "xcs";
 const std::string ExtrapolatedCrossSection::Description = "Extrapolated cross section (using Aitken Δ²-process).";
