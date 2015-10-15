@@ -22,14 +22,14 @@
 					<Add option="-DNO_HDF" />
 					<Add option="-DNO_MPI" />
 					<Add directory="../Win64/include" />
-					<Add directory="libs" />
+					<Add directory="../libs" />
+					<Add directory="src" />
 				</Compiler>
 				<Linker>
-					<Add library="..\Win64\lib\libgsl-1.16.dll.a" />
-					<Add library="..\Win64\lib\libsqlite3-3.8.3.dll.a" />
-					<Add library="..\Win64\lib\libginac-1.6.3.dll.a" />
-					<Add library="..\Win64\lib\libcln-1.3.4.dll.a" />
-					<Add library="..\Win64\lib\libfftw3-3.3.4.dll.a" />
+					<Add library="..\Win64\lib\libgsl.dll.a" />
+					<Add library="..\Win64\lib\libsqlite3.dll.a" />
+					<Add library="..\Win64\lib\libginac.dll.a" />
+					<Add library="..\Win64\lib\libcln.dll.a" />
 				</Linker>
 			</Target>
 			<Target title="exe">
@@ -79,139 +79,163 @@
 		<VirtualTargets>
 			<Add alias="All" targets="lib;exe;test-c;test-f;" />
 		</VirtualTargets>
-		<Unit filename="libs/sqlitepp/binders.cpp">
+		<Compiler>
+			<Add directory="../common" />
+		</Compiler>
+		<Unit filename="../common/hex-arrays.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/binders.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-arrays.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/converters.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-arrithm.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/exception.cpp">
+		<Unit filename="../common/hex-born.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/exception.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-born.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/into.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-chebyshev.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/query.cpp">
+		<Unit filename="../common/hex-clenshawcurtis.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/query.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-cmdline.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/session.cpp">
+		<Unit filename="../common/hex-compact.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/session.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-gausskronrod.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/sqlitepp.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-hdffile.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/statement.cpp">
+		<Unit filename="../common/hex-hdffile.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/statement.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-hydrogen.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/string.cpp">
+		<Unit filename="../common/hex-hydrogen.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/string.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-interpolate.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/transaction.cpp">
+		<Unit filename="../common/hex-itersolve.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/transaction.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-luft.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/unicode.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-memory.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="libs/sqlitepp/use.hpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-misc.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/arrays.cpp">
-			<Option target="exe" />
+		<Unit filename="../common/hex-misc.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/arrays.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/arrithm.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/born.cpp">
+		<Unit filename="../common/hex-numbers.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/born.h">
+		<Unit filename="../common/hex-special.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/chebyshev.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/clenshawcurtis.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/cmdline.h">
-			<Option target="exe" />
+		<Unit filename="../common/hex-special.h">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/compact.h">
+		<Unit filename="../common/hex-symbolic.cpp">
 			<Option target="lib" />
-			<Option target="exe" />
+		</Unit>
+		<Unit filename="../common/hex-symbolic.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../common/hex-vec3d.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../common/hex-vec3d.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../common/hex-version.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../common/hex-version.h">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/binders.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/binders.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/converters.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/exception.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/exception.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/into.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/query.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/query.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/session.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/session.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/sqlitepp.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/statement.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/statement.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/string.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/string.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/transaction.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/transaction.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/unicode.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="../libs/sqlitepp/use.hpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/db.cpp">
+			<Option target="lib" />
+		</Unit>
+		<Unit filename="src/db.h">
+			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/doc.h">
 			<Option target="lib" />
-			<Option target="exe" />
 		</Unit>
-		<Unit filename="src/hex-db.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/hex-db.h">
-			<Option target="exe" />
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/interfaces.h" />
-		<Unit filename="src/interpolate.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/memory.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/misc.h">
-			<Option target="exe" />
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/numbers.h">
-			<Option target="lib" />
-			<Option target="exe" />
-		</Unit>
-		<Unit filename="src/special.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/special.h">
+		<Unit filename="src/interfaces.h">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/ui.cpp">
@@ -272,18 +296,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/variables.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/vec3d.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/vec3d.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/version.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/version.h">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="test/test-hexdb-lib-c.c">
