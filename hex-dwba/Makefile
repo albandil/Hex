@@ -61,7 +61,7 @@ pollversion:
 	touch ../common/hex-version.cpp
 
 bin/hex-dwba: bin/hex-dwba.$(BASECXX)
-	@ln -s hex-dwba.$(BASECXX) bin/hex-dwba
+	@ln -fs hex-dwba.$(BASECXX) bin/hex-dwba
 
 bin/hex-dwba.$(BASECXX): $(COMMON_OBJECTS) $(HEX_DWBA_OBJECTS)
 	@mkdir -p $(@D)
