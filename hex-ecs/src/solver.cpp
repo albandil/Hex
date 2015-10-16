@@ -370,6 +370,13 @@ void Solver::solve ()
             // prepare solution vector
             BlockArray<Complex> psi (std::move(new_array(angs_.size(),"cg-x")));
             
+            // load initial guess
+            if (not cmd_.cont and ipanel_ == 0 and ie > 0 and cmd_.carry_initial_guess)
+            {
+                SolutionIO prev_sol_reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie-1], angs_);
+                prev_sol_reader.load(psi);
+            }
+            
             // launch the linear system solver
             unsigned max_iter = (inp_.maxell + 1) * Nspline_atom;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << "." << std::endl;

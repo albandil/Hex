@@ -210,6 +210,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
                     "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
                     "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
+                    "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
 #ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
@@ -495,6 +496,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // disallow parallel extraction
                 parallel_extraction = false;
+                return true;
+            },
+        "carry-initial-guess", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use previous solution as an initial guess
+                carry_initial_guess = true;
                 return true;
             },
         
