@@ -47,12 +47,12 @@ class AngularBasis
         
         /// Constructor.
         AngularBasis (InputFile const & inp);
+        AngularBasis (AngularBasis const & ang)
+            : L_(ang.L_), S_(ang.S_), Pi_(ang.Pi_), maxell_(ang.maxell_),
+            maxlambda_(ang.maxlambda_), states_(ang.states_), f_(ang.f_) {}
         
         /// List of coupled angular states.
-        std::vector<std::pair<int,int>> const & states () const
-        {
-            return states_;
-        }
+        std::vector<std::pair<int,int>> const & states () const { return states_; }
         
         /// Highest orbital number.
         int maxell () const { return maxell_; }
@@ -63,7 +63,7 @@ class AngularBasis
         /// Angular integrals.
         double f (int ill, int illp, int lambda) const
         {
-            return f_[lambda * (states_.size() + ill) * states_.size() + illp];
+            return f_[(lambda * states_.size() + ill) * states_.size() + illp];
         }
         
         /// Angular integrals.

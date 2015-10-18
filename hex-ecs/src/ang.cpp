@@ -60,9 +60,9 @@ AngularBasis::AngularBasis (InputFile const & inp)
     }
     
     // precompute angular integrals
+    for (int lambda = 0; lambda <= maxlambda_; lambda++)
     for (unsigned ill = 0; ill < states_.size(); ill++)
     for (unsigned illp = 0; illp < states_.size(); illp++)
-    for (int lambda = 0; lambda <= maxlambda_; lambda++)
     {
         f_.push_back
         (
