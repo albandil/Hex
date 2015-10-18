@@ -37,6 +37,8 @@
 // -D NREKNOT_PROJ=... (needed by "mmul_2el")
 // -D NLOCAL=... (local size in "scalar_product", "norm" and "mmul_1el")
 // -D NBLOCK_SIZE=... (block size and local size in "mul_ABt")
+// -D ANGULAR_BASIS_SIZE=... (number of coupled angular states, used in offset routines)
+// -D PROJECTILE_BASIS_OFFSET=... (skipped projectile basis splines, used in "mmul_2el")
 
 // Enable double precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
@@ -410,6 +412,26 @@ kernel void mmul_2el
     }
 }
 
+/**
+ * @brief Multiplication by one-electron Hamiltonian matrix.
+ * 
+ * Multiplies given vector by one-electron part of the Hamiltonian matrix,
+ * that can expressed as a Kronecker product of simple one-electron matrices.
+ * \f[
+ *     y_{ij} = \sum_{kl} \left(
+ *         E S_{ik} S_{jl} - H_{ik}^{(1)} S_{jl} - S_{ik} H_{jl}^{(2)}
+ *     \right) x_{kl}
+ * \f]
+ * @param E Total energy of the system.
+ * @param Sp Row-padded upper overlap matrix.
+ * @param Dp Row-padded upper derivative overlap matrix.
+ * @param M1p Row-padded upper integral moment matrix (for r^1).
+ * @param M2p Row-padded upper integral moment matrix (for r^2).
+ * @param l1 Angular momentum of first electron.
+ * @param l2 Angular momentum of second electron.
+ * @param x Source vector.
+ * @param y Destination vector.
+ */
 kernel void mmul_1el_offset
 (
     // energy

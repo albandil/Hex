@@ -62,6 +62,9 @@ void GPUCGPreconditioner::setup ()
 {
     KPACGPreconditioner::setup();
     
+    if (bspline_atom_.hash() != bspline_proj_.hash())
+        HexException("GPU preconditioner only supports #0 panel (use KPA for further panels).");
+    
     // shorthands
     int order = bspline_atom_.order();
     int Nspline_atom = bspline_atom_.Nspline();
