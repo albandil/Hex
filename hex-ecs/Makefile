@@ -165,7 +165,7 @@ bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 %.inc: %.cl
-	xxd -i $< | tail -n+2 | head -n-2 > $@
+	xxd -i $< > $@
 
 # CPP -> O rule (compile source files)
 obj/$(BASECXX)/common/%.o: ../common/%.cpp
