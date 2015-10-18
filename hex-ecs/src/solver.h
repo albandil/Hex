@@ -36,6 +36,7 @@
 
 #include "hex-itersolve.h"
 
+#include "ang.h"
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"
@@ -51,7 +52,7 @@ class Solver
             CommandLine & cmd,
             InputFile const & inp,
             Parallel const & par,
-            std::vector<std::pair<int,int>> const & angs,
+            AngularBasis const & ang,
             std::vector<Bspline> const & bspline,
             std::vector<Bspline> const & bspline_full
         );
@@ -103,7 +104,7 @@ class Solver
         Parallel const & par_;
         
         /// Angular basis.
-        std::vector<std::pair<int,int>> const & angs_;
+        AngularBasis ang_;
         
         /// Radial bases.
         std::vector<Bspline> const & bspline_;

@@ -38,10 +38,10 @@ Solver::Solver
     CommandLine & cmd,
     InputFile const & inp,
     Parallel const & par,
-    std::vector<std::pair<int,int>> const & angs,
+    AngularBasis const & ang,
     std::vector<Bspline> const & bspline,
     std::vector<Bspline> const & bspline_full
-) : cmd_(cmd), inp_(inp), par_(par), angs_(angs), bspline_(bspline),
+) : cmd_(cmd), inp_(inp), par_(par), ang_(ang), bspline_(bspline),
     bspline_full_(bspline_full), prec_(nullptr), ipanel_(0)
 {
     // nothing to do
@@ -53,7 +53,7 @@ void Solver::choose_preconditioner (int ipanel)
     ipanel_ = ipanel;
     
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, angs_, bspline_[0], bspline_[ipanel_], bspline_full_[ipanel_], cmd_);
+    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_[0], bspline_[ipanel_], bspline_full_[ipanel_], cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -85,7 +85,7 @@ void Solver::solve ()
     int Nspline_proj = bspline_[ipanel_].Nspline();
     
     // print some information on the Hamiltonian
-    std::cout << "Hamiltonian size: " << Nspline_atom * Nspline_proj * angs_.size() << std::endl;
+    std::cout << "Hamiltonian size: " << Nspline_atom * Nspline_proj * ang_.states().size() << std::endl;
     
     // wrap member functions to lambda-functions for use in the CG solver
     auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void { this->apply_preconditioner_(r,z); };
@@ -146,7 +146,7 @@ void Solver::solve ()
             }
             
             // check if there is some precomputed solution on the disk
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], angs_);
+            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
             std::size_t size = reader.check();
             
             // solution has the expected size
@@ -215,24 +215,24 @@ void Solver::solve ()
         {
             // decode initial state
             int instate = std::get<0>(workitem);
-            int Spin = std::get<1>(workitem);
+            ang_.S() = std::get<1>(workitem);
             int ni = std::get<0>(inp_.instates[instate]);
             int li = std::get<1>(inp_.instates[instate]);
             int mi = std::get<2>(inp_.instates[instate]);
             
             // create right hand side
-            BlockArray<Complex> chi (angs_.size(), !cmd_.outofcore, "cg-b");
+            BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.cont)
             {
-                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << " ... " << std::flush;
+                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
-                prec_->rhs(chi, ie, instate, Spin);
+                prec_->rhs(chi, ie, instate);
                 
                 std::cout << "ok" << std::endl;
                 
                 // previous solution
-                SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], angs_);
+                SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
                 
                 // apply the boundary condition
                 if (ipanel_ > 0 and reader.check() == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_-1].Nspline())
@@ -240,32 +240,32 @@ void Solver::solve ()
                     std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
                     
                     // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], inp_.L + 2 * inp_.maxell + 1);
+                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], ang_.maxlambda() + 1);
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
                     rad.setupTwoElectronIntegrals(par_, cmd_);
                     
                     // for all angular segments of the right-hand side
-                    for (unsigned ill = 0; ill < angs_.size(); ill++)
+                    for (unsigned ill = 0; ill < ang_.states().size(); ill++)
                     {
                         // load the segment
                         if (not chi.inmemory())
                             chi.hdfload(ill);
                         
                         // decode the angular quantum numbers
-                        int l1 = angs_[ill].first;
-                        int l2 = angs_[ill].second;
+                        int l1 = ang_.states()[ill].first;
+                        int l2 = ang_.states()[ill].second;
                         
                         // for all angular segments of the solution
-                        for (unsigned illp = 0; illp < angs_.size(); illp++)
+                        for (unsigned illp = 0; illp < ang_.states().size(); illp++)
                         {
                             // load the previous panel's solution
                             cArray prev_solution;
                             prev_solution.hdfload(reader.name(illp));
                             
                             // decode the angular quantum numbers
-                            int l1p = angs_[illp].first;
-                            int l2p = angs_[illp].second;
+                            int l1p = ang_.states()[illp].first;
+                            int l2p = ang_.states()[illp].second;
                             
                             // precompute f
                             rArray f (rad.maxlambda() + 1);
@@ -368,18 +368,18 @@ void Solver::solve ()
             if (cmd_.cont) CG_.recover(); else CG_.reset();
             
             // prepare solution vector
-            BlockArray<Complex> psi (std::move(new_array(angs_.size(),"cg-x")));
+            BlockArray<Complex> psi (std::move(new_array(ang_.states().size(),"cg-x")));
             
             // load initial guess
             if (not cmd_.cont and ipanel_ == 0 and ie > 0 and cmd_.carry_initial_guess)
             {
-                SolutionIO prev_sol_reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie-1], angs_);
+                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie-1], ang_.states());
                 prev_sol_reader.load(psi);
             }
             
             // launch the linear system solver
             unsigned max_iter = (inp_.maxell + 1) * Nspline_atom;
-            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << Spin << "." << std::endl;
+            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             unsigned iterations = CG_.solve
             (
@@ -407,10 +407,10 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], angs_);
+            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
             if (std::isfinite(compute_norm(psi)))
             {
-                for (unsigned ill = 0; ill < angs_.size(); ill++)
+                for (unsigned ill = 0; ill < ang_.states().size(); ill++)
                 {
                     if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
                     {

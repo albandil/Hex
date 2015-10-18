@@ -50,7 +50,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     int Nspline_proj = rad_.bspline_proj().Nspline();
     
     # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         try
         {
@@ -169,8 +169,8 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     }
     
     // broadcast inner preconditioner iterations
-    par_.sync_m(n_.data(), 1, l1_l2_.size());
-    par_.bcast_g(par_.igroup(), 0, n_.data(), l1_l2_.size());
+    par_.sync_m(n_.data(), 1, ang_.states().size());
+    par_.bcast_g(par_.igroup(), 0, n_.data(), ang_.states().size());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";

@@ -91,7 +91,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
@@ -103,7 +103,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         }
         
         // reuse parent definitions
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { KPACGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { KPACGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void update (double E) { KPACGPreconditioner::update(E); }
         
         // declare own definitions

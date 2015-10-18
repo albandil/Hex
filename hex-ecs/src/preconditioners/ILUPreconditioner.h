@@ -63,13 +63,13 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            csr_blocks_(ll.size()), lu_(ll.size())
+            csr_blocks_(ll.states().size()), lu_(ll.states().size())
         {
 #ifdef _OPENMP
             omp_init_lock(&lu_lock_);
@@ -85,7 +85,7 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions

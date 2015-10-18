@@ -97,7 +97,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
@@ -110,7 +110,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         virtual void update (double E) { CGPreconditioner::update(E); }
         
@@ -130,7 +130,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         void prepare
         (
             std::vector<Data> & prec,
-            int Nspline,
+            std::size_t Nspline,
             SymBandMatrix<Complex> const & mS,
             SymBandMatrix<Complex> const & mD,
             SymBandMatrix<Complex> const & mMm1_tr,

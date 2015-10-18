@@ -173,7 +173,7 @@ void GPUCGPreconditioner::setup ()
         greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
     // - solution vector
     if (cmd_.lightweight_radial_cache and not cmd_.gpu_large_data)
-        greq += 2 * l1_l2_.size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
+        greq += 2 * ang_.states().size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
     // - all these were complex numbers
     greq *= 16;
     
@@ -217,7 +217,7 @@ void GPUCGPreconditioner::setup ()
     flags << " -D NREKNOT_PROJ=" << Nreknot_proj << " ";
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
-    flags << " -D ANGULAR_BASIS_SIZE=" << l1_l2_.size() << " ";
+    flags << " -D ANGULAR_BASIS_SIZE=" << ang_.states().size() << " ";
     
     // build program
     program_ = clCreateProgramWithSource(context_, 1, const_cast<const char**>(&source), nullptr, nullptr);
@@ -327,37 +327,24 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
         
         // device data handles
-        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, l1_l2_.size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
-        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, l1_l2_.size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, ang_.states().size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, ang_.states().size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         
         // copy source vector to the device memory
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
             clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), p[ill].data(), 0, nullptr, nullptr);
         clFinish(queue_);
         
-        // precompute angular integrals
-        rArray fs ((rad_.maxlambda() + 1) * l1_l2_.size() * l1_l2_.size());
-        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
-        for (unsigned illp = 0; illp < l1_l2_.size(); illp++)
-        {
-            int l1 = l1_l2_[ill].first, l2 = l1_l2_[ill].second;
-            int l1p = l1_l2_[illp].first, l2p = l1_l2_[illp].second;
-            
-            double f = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-            if (not std::isfinite(f))
-                HexException("Failed to compute angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1, l2, l1p, l2p, inp_.L);
-            
-            fs[(lambda * l1_l2_.size() + ill) * l1_l2_.size() + illp] = f;
-        }
-        clArrayView<double> fgpu (fs.size(), fs.data()); fgpu.connect(context_, smallDataFlags_);
+        // copy angular integrals
+        clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
+        fgpu.connect(context_, smallDataFlags_);
         
         // one-electron contribution
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             // decode angular momenta
-            int l1 = l1_l2_[ill].first;
-            int l2 = l1_l2_[ill].second;
+            int l1 = ang_.states()[ill].first;
+            int l2 = ang_.states()[ill].second;
             
             // memory offset
             cl_int offset = ill * Nsegsiz;
@@ -386,7 +373,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
         {
             // memory offset
-            cl_int foffset = lambda * l1_l2_.size() * l1_l2_.size();
+            cl_int foffset = lambda * ang_.states().size() * ang_.states().size();
             cl_int nooffset = -1;
             
             // multiply by two-electron interals block
@@ -413,7 +400,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         clFinish(queue_);
         
         // read back the product
-        for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             clEnqueueReadBuffer(queue_, qgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
             clFinish(queue_);
@@ -441,14 +428,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
     
     // iterations
-    iArray n (l1_l2_.size());
+    iArray n (ang_.states().size());
     
     // for all diagonal blocks
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyWork(ill))
+    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyWork(ill))
     {
         // get angular momenta
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
+        int l1 = ang_.states()[ill].first;
+        int l2 = ang_.states()[ill].second;
         
         // load blocks
         if (cmd_.outofcore)
@@ -732,7 +719,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     }
     
     // broadcast inner preconditioner iterations
-    par_.sync(n.data(), 1, l1_l2_.size());
+    par_.sync(n.data(), 1, ang_.states().size());
     
     // inner preconditioner info (max and avg number of iterations)
     std::cout << " | ";

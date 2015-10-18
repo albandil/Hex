@@ -122,7 +122,7 @@ void KPACGPreconditioner::sData::drop ()
 void KPACGPreconditioner::prepare
 (
     std::vector<Data> & prec,
-    int Nspline,
+    std::size_t Nspline,
     SymBandMatrix<Complex> const & mS,
     SymBandMatrix<Complex> const & mD,
     SymBandMatrix<Complex> const & mMm1_tr,
@@ -146,13 +146,13 @@ void KPACGPreconditioner::prepare
         
         // Now S = CR * (D * CR⁻¹)
         std::cout << "\t\t\ttime: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
         std::cout << "\t\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
         S = ColMatrix<Complex>();
         
         // compute √S⁻¹
-        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
         invsqrtS = std::move(CR * invCR);
     }
@@ -187,7 +187,7 @@ void KPACGPreconditioner::prepare
         
         // Now Hl = ClR * D * ClR⁻¹
         std::cout << "\t\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < (std::size_t)Nspline * (std::size_t)Nspline; i++)
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
         std::cout << "\t\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
     }
@@ -217,9 +217,9 @@ void KPACGPreconditioner::setup ()
         {
             // check if this angular momentum is needed by some of the blocks owned by this process
             bool need_this_l = false;
-            for (unsigned ill = 0; ill < l1_l2_.size(); ill++)
+            for (unsigned ill = 0; ill < ang_.states().size(); ill++)
             {
-                if (par_.isMyWork(ill) and (l1_l2_[ill].first == l or l1_l2_[ill].second == l))
+                if (par_.isMyWork(ill) and (ang_.states()[ill].first == l or ang_.states()[ill].second == l))
                     need_this_l = true;
             }
             
@@ -349,8 +349,8 @@ void KPACGPreconditioner::CG_init (int iblock) const
 //     if (cmd_.outofcore)
     {
         // get block angular momenta
-        int l1 = l1_l2_[iblock].first;
-        int l2 = l1_l2_[iblock].second;
+        int l1 = ang_.states()[iblock].first;
+        int l2 = ang_.states()[iblock].second;
         
         // load preconditioner from disk
         if (not prec_atom_[l1].hdfload())
@@ -366,8 +366,8 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
     if (cmd_.kpa_simple_rad or cmd_.lightweight_full)
     {
         // get block angular momemnta
-        int l1 = l1_l2_[iblock].first;
-        int l2 = l1_l2_[iblock].second;
+        int l1 = ang_.states()[iblock].first;
+        int l2 = ang_.states()[iblock].second;
         
         // multiply 'p' by the diagonal block (except for the two-electron term)
         kron_dot(0., q,  1., p, Complex(E_) * rad_.S_atom(), rad_.S_proj());
@@ -401,8 +401,8 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         HexException("The preconditioner KPA doesn't support the option --parallel_precondition.");
     
     // get angular momenta of this block
-    int l1 = l1_l2_[iblock].first;
-    int l2 = l1_l2_[iblock].second;
+    int l1 = ang_.states()[iblock].first;
+    int l2 = ang_.states()[iblock].second;
     
     // dimension of the matrices
     std::size_t Nspline_atom = bspline_atom_.Nspline();
@@ -437,8 +437,8 @@ void KPACGPreconditioner::CG_exit (int iblock) const
 //     if (cmd_.outofcore)
     {
         // get block angular momenta
-        int l1 = l1_l2_[iblock].first;
-        int l2 = l1_l2_[iblock].second;
+        int l1 = ang_.states()[iblock].first;
+        int l2 = ang_.states()[iblock].second;
         
         // release memory
         prec_atom_[l1].drop();

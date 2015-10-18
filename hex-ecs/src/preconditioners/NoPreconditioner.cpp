@@ -81,11 +81,11 @@ void NoPreconditioner::update (double E)
     
     // setup diagonal blocks
     # pragma omp parallel for if (cmd_.parallel_multiply)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         // angular momenta
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
+        int l1 = ang_.states()[ill].first;
+        int l2 = ang_.states()[ill].second;
         
         // initialize diagonal block
         dia_blocks_[ill] = BlockSymBandMatrix<Complex>
@@ -123,15 +123,8 @@ void NoPreconditioner::update (double E)
             // two-electron part
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
             {
-                // calculate angular integral
-                Complex f = special::computef(lambda,l1,l2,l1,l2,inp_.L);
-                
-                // check that the "f" coefficient is valid (no factorial overflow etc.)
-                if (not Complex_finite(f))
-                    HexException("Overflow in computation of f[%d](%d,%d,%d,%d).", inp_.L, l1, l2, l1, l2);
-                
                 // check that the "f" coefficient is nonzero
-                if (f == 0.)
+                if (ang_.f(ill,ill,lambda) == 0.)
                     continue;
                 
                 // calculate two-electron term
@@ -141,18 +134,18 @@ void NoPreconditioner::update (double E)
                     if (not cmd_.cache_all_radint) // ... from scratch file
                     {
                         OMP_exclusive_in;
-                        block.data() += (-f) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
+                        block.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                         OMP_exclusive_out;
                     }
                     else // ... from memory
                     {
-                        block.data() += (-f) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
+                        block.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                     }
                 }
                 else
                 {
                     // compute the data anew
-                    block += (-f) * rad_.calc_R_tr_dia_block(lambda, i, j);
+                    block += Complex(-ang_.f(ill,ill,lambda)) * rad_.calc_R_tr_dia_block(lambda, i, j);
                 }
             }
             
@@ -169,7 +162,7 @@ void NoPreconditioner::update (double E)
     OMP_clean;
 }
 
-void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const
+void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) const
 {
     // shorthands
     int ni = std::get<0>(inp_.instates[instate]);
@@ -229,23 +222,23 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate, int 
     
     // for all segments constituting the RHS
     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
-    for (unsigned ill = 0; ill < l1_l2_.size(); ill++) if (par_.isMyGroupWork(ill))
+    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
-        int l1 = l1_l2_[ill].first;
-        int l2 = l1_l2_[ill].second;
+        int l1 = ang_.states()[ill].first;
+        int l2 = ang_.states()[ill].second;
         
         // setup storage
         cArray chi_block (Nspline_atom * Nspline_proj);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
-        for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+        for (int l = std::abs(li - ang_.L()); l <= li + ang_.L(); l++)
         {
             // skip wrong parity
-            if ((inp_.L + li + l) % 2 != inp_.Pi)
+            if ((ang_.L() + li + l) % 2 != ang_.Pi())
                 continue;
             
             // (anti)symmetrization
-            double Sign = ((Spin + inp_.Pi) % 2 == 0) ? 1. : -1.;
+            double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(Complex(0.,1.),l)
@@ -315,20 +308,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     int order = rad_.bspline_atom().order();
     int Nspline_atom = rad_.bspline_atom().Nspline();
     int Nspline_proj = rad_.bspline_proj().Nspline();
-    int Nang = l1_l2_.size();
+    int Nang = ang_.states().size();
     int Nchunk = Nspline_atom * Nspline_proj;
-    
-    // precalculate angular integrals
-    rArray ffs (Nang * Nang * (rad_.maxlambda() + 1));
-    # define fs(i,j,k) (ffs[k + (j + i * Nang) * (rad_.maxlambda() + 1)])
-    for (int ill  = 0; ill  < Nang; ill ++)
-    for (int illp = 0; illp < Nang; illp++)
-    for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-    {
-        fs(ill,illp,lambda) = special::computef(lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-        if (not std::isfinite(fs(ill,illp,lambda)))
-            HexException("Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).", lambda, l1_l2_[ill].first, l1_l2_[ill].second, l1_l2_[illp].first, l1_l2_[illp].second, inp_.L);
-    }
     
     if (not cmd_.lightweight_radial_cache)
     {
@@ -390,7 +371,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // check non-zero
-                    if (fs(ill,illp,lambda) == 0.)
+                    if (ang_.f(ill,illp,lambda) == 0.)
                         continue;
                     
                     // load data
@@ -398,7 +379,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                     
                     // calculate product
-                    rad_.R_tr_dia(lambda).dot(-fs(ill,illp,lambda), p[illp], 1., q[ill], true);
+                    rad_.R_tr_dia(lambda).dot(-ang_.f(ill,illp,lambda), p[illp], 1., q[ill], true);
                     
                     // unload data
                     if (cmd_.outofcore)
@@ -450,11 +431,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         continue;
                     
                     // check non-zero
-                    if (fs(ill,illp,lambda) == 0.)
+                    if (ang_.f(ill,illp,lambda) == 0.)
                         continue;
                     
                     // calculate product
-                    rad_.R_tr_dia(lambda).dot(-fs(ill,illp,lambda), p[illp], 0., p0, true);
+                    rad_.R_tr_dia(lambda).dot(-ang_.f(ill,illp,lambda), p[illp], 0., p0, true);
                     
                     // update collected product
                     OMP_exclusive_in;
@@ -505,8 +486,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             }
             
             // get block angular momemnta
-            int l1 = l1_l2_[ill].first;
-            int l2 = l1_l2_[ill].second;
+            int l1 = ang_.states()[ill].first;
+            int l2 = ang_.states()[ill].second;
             
             // multiply 'p_block' by the diagonal block (except for the two-electron term)
             kron_dot(0., q[ill],  1., p[ill], Complex(E_) * rad_.S_atom(), rad_.S_proj());
@@ -573,10 +554,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         cArray product (Nspline_proj);
                         
                         // for all superblocks in this row
-                        for (int illp = 0; illp < Nang; illp++) if (fs(ill,illp,lambda) != 0.)
+                        for (int illp = 0; illp < Nang; illp++) if (ang_.f(ill,illp,lambda) != 0.)
                         {
                             // multiply sub-segment by the R block
-                            product += fs(ill,illp,lambda) * R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
+                            product += ang_.f(ill,illp,lambda) * R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
                         }
                         
                         // atomic update of the owned sub-segment

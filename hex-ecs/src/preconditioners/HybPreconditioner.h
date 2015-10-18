@@ -62,7 +62,7 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
@@ -70,14 +70,14 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
             ILUCGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
             KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            prec_(ll.size(), Undecided)
+            prec_(ll.states().size(), Undecided)
         {
             // nothing more to do
         }
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate, int Spin) const { CGPreconditioner::rhs(chi,ienergy,instate,Spin); }
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions

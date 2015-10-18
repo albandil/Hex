@@ -29,60 +29,72 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_CGPRECONDITIONER_H
-#define HEX_CGPRECONDITIONER_H
+#ifndef HEX_ANG_H
+#define HEX_ANG_H
 
-#include "preconditioners.h"
+#include "hex-arrays.h"
+
+#include "io.h"
 
 /**
- * @brief CG iteration-based preconditioner.
+ * @brief Angular basis.
  * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
+ * List of coupled angular states included in the calculation.
  */
-class CGPreconditioner : public NoPreconditioner
+class AngularBasis
 {
     public:
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        /// Constructor.
+        AngularBasis (InputFile const & inp);
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        /// List of coupled angular states.
+        std::vector<std::pair<int,int>> const & states () const
+        {
+            return states_;
+        }
         
-        CGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            n_(ang_.states().size(), -1) {}
+        /// Highest orbital number.
+        int maxell () const { return maxell_; }
         
-        // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
+        /// Highest multipole.
+        int maxlambda () const { return maxlambda_; }
         
-        // declare own definitions
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
+        /// Angular integrals.
+        double f (int ill, int illp, int lambda) const
+        {
+            return f_[lambda * (states_.size() + ill) * states_.size() + illp];
+        }
         
-        // inner CG callbacks
-        virtual void CG_init (int iblock) const;
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
-    
-    protected:
+        /// Angular integrals.
+        rArray const & f () const { return f_; }
         
-        // last iterations
-        mutable iArray n_;
+        /// Total angular momentum.
+        int L () const { return L_; }
+        
+        /// Total spin.
+        int S () const { return S_; }
+        int & S () { return S_; }
+        
+        /// Total parity.
+        int Pi () const { return Pi_; }
+        
+    private:
+        
+        // Quantum numbers.
+        int L_, S_, Pi_, nL_;
+        
+        // Highest orbital number.
+        int maxell_;
+        
+        // Highest multipole.
+        int maxlambda_;
+        
+        // List of coupled angular states.
+        std::vector<std::pair<int,int>> states_;
+        
+        // Angular integrals.
+        rArray f_;
 };
 
 #endif

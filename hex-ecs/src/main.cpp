@@ -47,6 +47,7 @@
 #include "hex-version.h"
 
 #include "amplitudes.h"
+#include "ang.h"
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"
@@ -205,37 +206,13 @@ int main (int argc, char* argv[])
     // Setup angular data
     //
     
-        std::cout << "Setting up the coupled angular states..." << std::endl;
+        AngularBasis ang (inp);
         
-        // coupled angular momentum pairs
-        std::vector<std::pair<int,int>> coupled_states;
-        
-        // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
-        for (int ell = 0; ell <= inp.levels; ell++)
-        {
-            std::cout << "\t-> [" << ell << "] ";
-            
-            // get sum of the angular momenta for this angular level
-            int sum = 2 * ell + inp.L + inp.Pi;
-            
-            // for all angular momentum pairs that do compose L
-            for (int l1 = ell; l1 <= sum - ell; l1++)
-            {
-                int l2 = sum - l1;
-                if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2)
-                {
-                    std::cout << "(" << l1 << "," << l2 << ") ";
-                    coupled_states.push_back(std::make_pair(l1, l2));
-                }
-            }
-            std::cout << std::endl;
-        }
-        
-        std::cout << "\t-> The matrix of the set contains " << coupled_states.size()
+        std::cout << "\t-> The matrix of the set contains " << ang.states().size()
                 << " diagonal blocks." << std::endl;
         
         // skip if there is nothing to compute
-        if (coupled_states.empty())
+        if (ang.states().empty())
             return EXIT_SUCCESS;
         
         std::cout << std::endl;
@@ -246,7 +223,7 @@ int main (int argc, char* argv[])
     
         if (cmd.zipfile.size() != 0 and par.IamMaster())
         {
-            zip_solution(cmd, bspline_full, coupled_states);
+            zip_solution(cmd, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
@@ -268,7 +245,7 @@ int main (int argc, char* argv[])
     //
     
         // create the solver instance
-        Solver solver (cmd, inp, par, coupled_states, bspline_panel, bspline_full);
+        Solver solver (cmd, inp, par, ang, bspline_panel, bspline_full);
         
         // for all solver & propagator panels
         for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
@@ -317,7 +294,7 @@ int main (int argc, char* argv[])
         if (cmd.itinerary & CommandLine::StgExtract)
         {
             // extract amplitudes
-            Amplitudes ampl (bspline_full.front(), bspline_full.back(), inp, par, cmd, coupled_states);
+            Amplitudes ampl (bspline_full.front(), bspline_full.back(), inp, par, cmd, ang.states());
             ampl.extract();
             
             // write T-matrices to a text file as SQL statements 

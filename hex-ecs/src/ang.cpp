@@ -29,60 +29,66 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_CGPRECONDITIONER_H
-#define HEX_CGPRECONDITIONER_H
+#include "hex-special.h"
 
-#include "preconditioners.h"
+#include "ang.h"
 
-/**
- * @brief CG iteration-based preconditioner.
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-class CGPreconditioner : public NoPreconditioner
+AngularBasis::AngularBasis (InputFile const & inp)
+    : L_(inp.L), S_(0), Pi_(inp.Pi), maxell_(inp.maxell), maxlambda_(inp.L + 2 * inp.levels)
 {
-    public:
-        
-        static const std::string prec_name;
-        static const std::string prec_description;
-        
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
-        
-        CGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            n_(ang_.states().size(), -1) {}
-        
-        // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
-        
-        // inner CG callbacks
-        virtual void CG_init (int iblock) const;
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
+    std::cout << "Setting up the coupled angular states..." << std::endl;
     
-    protected:
+    // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
+    for (int ell = 0; ell <= inp.levels; ell++)
+    {
+        std::cout << "\t-> [" << ell << "] ";
         
-        // last iterations
-        mutable iArray n_;
-};
-
-#endif
+        // get sum of the angular momenta for this angular level
+        int sum = 2 * ell + inp.L + inp.Pi;
+        
+        // for all angular momentum pairs that do compose L
+        for (int l1 = ell; l1 <= sum - ell; l1++)
+        {
+            int l2 = sum - l1;
+            if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2)
+            {
+                std::cout << "(" << l1 << "," << l2 << ") ";
+                states_.push_back(std::make_pair(l1, l2));
+            }
+        }
+        std::cout << std::endl;
+    }
+    
+    // precompute angular integrals
+    for (unsigned ill = 0; ill < states_.size(); ill++)
+    for (unsigned illp = 0; illp < states_.size(); illp++)
+    for (int lambda = 0; lambda <= maxlambda_; lambda++)
+    {
+        f_.push_back
+        (
+            special::computef
+            (
+                lambda,
+                states_[ill].first,
+                states_[ill].second,
+                states_[illp].first,
+                states_[illp].second,
+                L_
+            )
+        );
+        
+        if (not std::isfinite(f_.back()))
+        {
+            HexException
+            (
+                "Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).",
+                lambda,
+                states_[ill].first,
+                states_[ill].second,
+                states_[illp].first,
+                states_[illp].second,
+                L_
+            );
+        }
+    }
+}

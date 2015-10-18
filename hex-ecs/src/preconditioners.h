@@ -37,6 +37,7 @@
 #include "hex-arrays.h"
 #include "hex-matrix.h"
 
+#include "ang.h"
 #include "radial.h"
 #include "parallel.h"
 
@@ -96,7 +97,7 @@ class PreconditionerBase
         /**
          * @brief Calculate the right-hand side.
          */
-        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate, int Spin) const = 0;
+        virtual void rhs (BlockArray<Complex> & chi, int ie, int instate) const = 0;
         
         /**
          * @brief Multiply by the matrix equation.
@@ -197,7 +198,7 @@ class Preconditioners
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
@@ -215,7 +216,7 @@ class Preconditioners
         (
             Parallel const & par,
             InputFile const & inp,
-            std::vector<std::pair<int,int>> const & ll,
+            AngularBasis const & ll,
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,

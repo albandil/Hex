@@ -47,7 +47,7 @@ void ILUCGPreconditioner::setup ()
     CGPreconditioner::setup();
     
     // setup attributes
-    for (unsigned iblock = 0; iblock < l1_l2_.size(); iblock++)
+    for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
         // prepare initial (empty) factorization data
         lu_[iblock].reset(new LUft<LU_int_t,Complex>());
@@ -154,7 +154,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         std::cout << std::endl << std::setw(37) << format
         (
             "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
-            iblock, l1_l2_[iblock].first, l1_l2_[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
+            iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
             timer.seconds() / 60, timer.seconds() % 60,             // factorization time
             lu_[iblock]->size() / 1048576                           // final memory size
         );
