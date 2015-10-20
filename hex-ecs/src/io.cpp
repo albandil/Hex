@@ -216,6 +216,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
                     "\t--cl-device <index>              Use given OpenCL device for GPU preconditioner (default is 0, i.e. the first device found).                            \n"
                     "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.          \n"
+                    "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).                                          \n"
 #endif
                     "                                                                                                                                                          \n"
                     "There are also some environment variables that control the execution.                                                                                     \n"
@@ -477,6 +478,13 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // keep large data in RAM
                 gpu_large_data = true;
+                return true;
+            },
+        "cl-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // do the lightweight multiplication on OpenCL device
+                lightweight_radial_cache = true;
+                gpu_multiply = true;
                 return true;
             },
 #endif

@@ -160,7 +160,7 @@ void GPUCGPreconditioner::setup ()
     
     // compute global memory requirements of the preconditioner
     std::size_t greq = 0;
-    if (not cmd_.gpu_large_data)
+    if (not cmd_.gpu_multiply)
     {
         // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
         greq += 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
@@ -322,7 +322,7 @@ void GPUCGPreconditioner::setup ()
 
 void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const
 {
-    if (not cmd_.lightweight_radial_cache)
+    if (not cmd_.gpu_multiply)
     {
         // user parent's routine
         KPACGPreconditioner::multiply(p,q);

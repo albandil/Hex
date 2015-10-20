@@ -89,7 +89,7 @@ class CommandLine
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
-              carry_initial_guess(false)
+              carry_initial_guess(false), gpu_multiply(false)
         {
             // get command line options
             parse(argc, argv);
@@ -202,6 +202,9 @@ class CommandLine
         
         /// Whether to use previous-energy solution as an initial guess.
         bool carry_initial_guess;
+        
+        /// Do the sparse matrix multiplication on the OpenCL device (memory intensive!).
+        bool gpu_multiply;
 };
 
 /**
