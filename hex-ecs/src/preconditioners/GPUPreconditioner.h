@@ -147,6 +147,8 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         std::vector<clArrayView<Complex>> Mi_L_atom_, Mi_mLm1_atom_, M_L_atom_, M_mLm1_atom_;
         std::vector<clArrayView<Complex>> Mi_L_proj_, Mi_mLm1_proj_, M_L_proj_, M_mLm1_proj_;
         std::vector<clArrayView<Complex>> Rdia_;
+        
+        cl_short nsrcseg_, ndstseg_;
 };
 
 #endif

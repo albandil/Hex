@@ -39,6 +39,8 @@
 // -D NBLOCK_SIZE=... (block size and local size in "mul_ABt")
 // -D ANGULAR_BASIS_SIZE=... (number of coupled angular states, used in offset routines)
 // -D PROJECTILE_BASIS_OFFSET=... (skipped projectile basis splines, used in "mmul_2el")
+// -D NSRCSEG=...
+// -D NDSTSEG=...
 
 // Enable double precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
@@ -518,8 +520,11 @@ kernel void mmul_2el_offset
     // two-electron diagonal contributions
     global double2 const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x, private int xoffset,
-    global double2       * const restrict y, private int yoffset
+    global double2 const * const restrict x,
+    global double2       * const restrict y,
+    // angular block domain
+    private short x_ang_begin,
+    private short y_ang_begin
 )
 {
     // output vector element index
@@ -626,9 +631,13 @@ kernel void mmul_2el_offset
         }
         
         // all-to-all-segments multiplication
-        for (int ill  = 0; ill  < ANGULAR_BASIS_SIZE; ill ++)
-        for (int illp = 0; illp < ANGULAR_BASIS_SIZE; illp++)
-            y[(ill * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -= f[foffset + ill * ANGULAR_BASIS_SIZE + illp] * cmul(elem, x[(illp * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
+        for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
+        for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
+        {
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+                f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
+                * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
+        }
     }
 }
 

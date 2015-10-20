@@ -62,9 +62,9 @@ void GPUCGPreconditioner::setup ()
     
     // create program source, append zero
     std::string source;
-    source.resize(GPUPreconditioner_cl_len + 1);
-    for (unsigned i = 0; i < GPUPreconditioner_cl_len; i++)
-        source[i] = GPUPreconditioner_cl[i];
+    source.resize(src_preconditioners_GPUPreconditioner_cl_len + 1);
+    for (unsigned i = 0; i < src_preconditioners_GPUPreconditioner_cl_len; i++)
+        source[i] = src_preconditioners_GPUPreconditioner_cl[i];
     source.back() = '\0';
     
     // shorthands
@@ -158,6 +158,22 @@ void GPUCGPreconditioner::setup ()
     blocksize_ = std::min<std::size_t>(blocksize_, std::sqrt(max_work_group_size));
     std::cout << "\t- matrix multiplication tile size: " << blocksize_ << std::endl;
     
+    // determine how many solution segments will fit into the device memory
+    unsigned memseg = global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
+    if (memseg < 2 and cmd_.gpu_multiply)
+        HexException("Insufficent OpenCL device memory for lightweight on-device multiplication.");
+    
+    // calculate how many block rows will fit into the memory and what space will remain
+    unsigned rows_fit = memseg / (ang_.states().size() + 1); rows_fit = std::min<unsigned>(rows_fit, ang_.states().size());
+    unsigned cols_rmn = memseg % (ang_.states().size() + 1);
+    
+    // calculate how many source/destination vector segments will be processed at once
+    nsrcseg_ = (rows_fit > 0 ? ang_.states().size() : cols_rmn);
+    ndstseg_ = (rows_fit > 0 ? rows_fit             : 1       );
+    
+    if (cmd_.gpu_multiply)
+        std::cout << "\t- multiply blocks " << ndstseg_ << " × " << nsrcseg_ << std::endl;
+    
     // compute global memory requirements of the preconditioner
     std::size_t greq = 0;
     if (not cmd_.gpu_multiply)
@@ -178,7 +194,7 @@ void GPUCGPreconditioner::setup ()
         greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
     // - solution vector
     if (cmd_.gpu_multiply and not cmd_.gpu_large_data)
-        greq += 2 * ang_.states().size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
+        greq = std::max(greq, (std::size_t)nsrcseg_ * ndstseg_ * bspline_atom_.Nspline() * bspline_proj_.Nspline());
     // - all these were complex numbers
     greq *= 16;
     
@@ -188,6 +204,8 @@ void GPUCGPreconditioner::setup ()
     if (cmd_.gpu_large_data)
     {
         std::size_t host_mem = 16 * 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
+        if (cmd_.gpu_multiply)
+            host_mem += 16 * nsrcseg_ * ndstseg_ * (std::size_t)bspline_atom_.Nspline() * (std::size_t)bspline_proj_.Nspline();
         std::cout << "\t- data kept in host memory: " << format("%.2f", host_mem/gsl_sf_pow_int(1024,3)) << " GiB " << std::endl;
         std::cout << "\t- WARNING: --ocl-use-host-memory will slow down the solution due to the host-device data transfers." << std::endl;
     }
@@ -223,6 +241,8 @@ void GPUCGPreconditioner::setup ()
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_.states().size() << " ";
+    flags << " -D NSRCSEG="      << nsrcseg_     << " ";
+    flags << " -D NDSTSEG="      << ndstseg_     << " ";
     
     // build program
     const char * source_ptr = source.data();
@@ -333,45 +353,46 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
         
         // device data handles
-        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, ang_.states().size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
-        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY, ang_.states().size() * Nsegsiz * sizeof(Complex), nullptr, nullptr);
-        
-        // copy source vector to the device memory
-        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
-            clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), p[ill].data(), 0, nullptr, nullptr);
-        clFinish(queue_);
+        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY,  nsrcseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_WRITE, ndstseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         
         // copy angular integrals
         clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
         fgpu.connect(context_, smallDataFlags_);
         
+        //
         // one-electron contribution
+        //
+        
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             // decode angular momenta
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
             
-            // memory offset
-            cl_int offset = ill * Nsegsiz;
+            // copy source vector to the device memory
+            clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, 0, Nsegsiz * sizeof(Complex), p[ill].data(), 0, nullptr, nullptr);
+            clFinish(queue_);
             
             // multiply by diagonal block (one-electron contribution)
-            clSetKernelArg(mml1_offset_, 0, sizeof(double), &E_);
-            clSetKernelArg(mml1_offset_, 1, sizeof(cl_mem), &S_atom_p_.handle());
-            clSetKernelArg(mml1_offset_, 2, sizeof(cl_mem), &D_atom_p_.handle());
-            clSetKernelArg(mml1_offset_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
-            clSetKernelArg(mml1_offset_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
-            clSetKernelArg(mml1_offset_, 5, sizeof(cl_mem), &S_proj_p_.handle());
-            clSetKernelArg(mml1_offset_, 6, sizeof(cl_mem), &D_proj_p_.handle());
-            clSetKernelArg(mml1_offset_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
-            clSetKernelArg(mml1_offset_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
-            clSetKernelArg(mml1_offset_, 9, sizeof(int),    &l1);
-            clSetKernelArg(mml1_offset_,10, sizeof(int),    &l2);
-            clSetKernelArg(mml1_offset_,11, sizeof(cl_mem), &pgpu);
-            clSetKernelArg(mml1_offset_,12, sizeof(cl_int), &offset);
-            clSetKernelArg(mml1_offset_,13, sizeof(cl_mem), &qgpu);
-            clSetKernelArg(mml1_offset_,14, sizeof(cl_int), &offset);
-            clEnqueueNDRangeKernel(queue_, mml1_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(mml1_, 0, sizeof(double), &E_);
+            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
+            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
+            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
+            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_proj_p_.handle());
+            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_proj_p_.handle());
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
+            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
+            clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
+            clSetKernelArg(mml1_,10, sizeof(int),    &l2);
+            clSetKernelArg(mml1_,11, sizeof(cl_mem), &pgpu);
+            clSetKernelArg(mml1_,12, sizeof(cl_mem), &qgpu);
+            clEnqueueNDRangeKernel(queue_, mml1_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clFinish(queue_);
+            
+            // read back the product
+            clEnqueueReadBuffer(queue_, qgpu, CL_TRUE, 0, Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
             clFinish(queue_);
         }
         
@@ -380,9 +401,8 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         {
             // memory offset
             cl_int foffset = lambda * ang_.states().size() * ang_.states().size();
-            cl_int nooffset = -1;
             
-            // multiply by two-electron interals block
+            // set kernel arguments
             clSetKernelArg(mml2_offset_, 0, sizeof(cl_mem), &t_atom_.handle());
             clSetKernelArg(mml2_offset_, 1, sizeof(cl_mem), &t_proj_.handle());
             clSetKernelArg(mml2_offset_, 2, sizeof(int),    &(lambda));
@@ -398,19 +418,40 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clSetKernelArg(mml2_offset_,12, sizeof(cl_mem), &(Mi_mLm1_proj_[lambda].handle()));
             clSetKernelArg(mml2_offset_,13, sizeof(cl_mem), &(Rdia_[lambda].handle()));
             clSetKernelArg(mml2_offset_,14, sizeof(cl_mem), &pgpu);
-            clSetKernelArg(mml2_offset_,15, sizeof(cl_int), &nooffset);
-            clSetKernelArg(mml2_offset_,16, sizeof(cl_mem), &qgpu);
-            clSetKernelArg(mml2_offset_,17, sizeof(cl_int), &nooffset);
-            clEnqueueNDRangeKernel(queue_, mml2_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(mml2_offset_,15, sizeof(cl_mem), &qgpu);
+            
+            // for all destination vector segments
+            for (cl_short first_srcseg = 0; first_srcseg < (cl_short)ang_.states().size(); first_srcseg += nsrcseg_)
+            {
+                std::cout << "illp = " << first_srcseg << " .. " << std::min<cl_short>(first_srcseg + nsrcseg_, ang_.states().size()) << std::endl;
+                
+                // copy source vector segment to the device memory
+                for (cl_short illp = first_srcseg; illp < std::min<cl_short>(first_srcseg + nsrcseg_, ang_.states().size()); illp++)
+                    clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, (illp - first_srcseg) * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), p[illp].data(), 0, nullptr, nullptr);
+                clFinish(queue_);
+                
+                // for all source vector segments
+                for (cl_short first_dstseg = 0; first_dstseg < (cl_short)ang_.states().size(); first_dstseg += ndstseg_)
+                {
+                    // copy destination vector segments to the device memory
+                    for (cl_short ill = first_dstseg; ill < std::min<cl_short>(first_dstseg + ndstseg_, ang_.states().size()); ill++)
+                        clEnqueueWriteBuffer(queue_, qgpu, CL_TRUE, (ill - first_dstseg) * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
+                    clFinish(queue_);
+                    
+                    // execute the kernel
+                    clSetKernelArg(mml2_offset_, 16, sizeof(cl_short), &first_srcseg);
+                    clSetKernelArg(mml2_offset_, 17, sizeof(cl_short), &first_dstseg);
+                    clEnqueueNDRangeKernel(queue_, mml2_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
+                    clFinish(queue_);
+                    
+                    // read back the product
+                    for (cl_short ill = first_dstseg; ill < std::min<cl_short>(first_dstseg + ndstseg_, ang_.states().size()); ill++)
+                        clEnqueueReadBuffer(queue_, qgpu, CL_TRUE, (ill - first_dstseg) * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
+                    clFinish(queue_);
+                }
+            }
         }
         clFinish(queue_);
-        
-        // read back the product
-        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
-        {
-            clEnqueueReadBuffer(queue_, qgpu, CL_TRUE, ill * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), q[ill].data(), 0, nullptr, nullptr);
-            clFinish(queue_);
-        }
         
         // release device memory
         clReleaseMemObject(pgpu);
