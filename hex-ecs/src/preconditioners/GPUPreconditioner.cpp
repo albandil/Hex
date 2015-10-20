@@ -177,7 +177,7 @@ void GPUCGPreconditioner::setup ()
     if (bspline_atom_.hash() == bspline_proj_.hash() and not cmd_.gpu_large_data)
         greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
     // - solution vector
-    if (cmd_.lightweight_radial_cache and not cmd_.gpu_large_data)
+    if (cmd_.gpu_multiply and not cmd_.gpu_large_data)
         greq += 2 * ang_.states().size() * bspline_atom_.Nspline() * bspline_proj_.Nspline();
     // - all these were complex numbers
     greq *= 16;
