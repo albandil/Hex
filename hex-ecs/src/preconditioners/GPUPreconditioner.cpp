@@ -423,8 +423,6 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             // for all destination vector segments
             for (cl_short first_srcseg = 0; first_srcseg < (cl_short)ang_.states().size(); first_srcseg += nsrcseg_)
             {
-                std::cout << "illp = " << first_srcseg << " .. " << std::min<cl_short>(first_srcseg + nsrcseg_, ang_.states().size()) << std::endl;
-                
                 // copy source vector segment to the device memory
                 for (cl_short illp = first_srcseg; illp < std::min<cl_short>(first_srcseg + nsrcseg_, ang_.states().size()); illp++)
                     clEnqueueWriteBuffer(queue_, pgpu, CL_TRUE, (illp - first_srcseg) * Nsegsiz * sizeof(Complex), Nsegsiz * sizeof(Complex), p[illp].data(), 0, nullptr, nullptr);
