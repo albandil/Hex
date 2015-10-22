@@ -389,7 +389,7 @@ class SolutionIO
          * (substituted by position & length information). The function
          * return 'true' when write was successful, 'false' otherwise.
          */
-        bool save (BlockArray<Complex> const & solution, int ill = -1)
+        bool save (BlockArray<Complex> const & solution, int ill = -1) const
         {
             // select segments
             iArray segments_to_save = { ill };
@@ -399,25 +399,35 @@ class SolutionIO
             // for all segments
             for (int iseg : segments_to_save)
             {
-                // open file
-                HDFFile hdf (name(iseg), HDFFile::overwrite);
-                
-                // check file status
-                if (not hdf.valid())
-                    return false;
-                
                 // load data
                 if (not solution.inmemory())
                     const_cast<BlockArray<Complex>&>(solution).hdfload(iseg);
                 
                 // write data
-                if (not hdf.write("array", solution[iseg].data(), solution[iseg].size()))
+                if (not save_segment(solution[iseg], iseg))
                     return false;
                 
                 // unload data
                 if (not solution.inmemory())
                     const_cast<BlockArray<Complex>&>(solution)[iseg].drop();
             }
+            
+            // success
+            return true;
+        }
+        
+        bool save_segment (const cArrayView solution, int ill) const
+        {
+            // open file
+            HDFFile hdf (name(ill), HDFFile::overwrite);
+            
+            // check file status
+            if (not hdf.valid())
+                return false;
+            
+            // write data
+            if (not hdf.write("array", solution.data(), solution.size()))
+                return false;
             
             // success
             return true;
