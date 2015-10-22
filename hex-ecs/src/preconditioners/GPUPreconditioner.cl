@@ -85,6 +85,8 @@ double2 cdiv (private double2 a, private double2 b)
  * 
  * Fast integer power; uses only multiplications.
  * The number of multiplications is proportional to log(n).
+ * 
+ * This is faster than "pown" when all workitems have the same exponent.
  */
 double pow_int (private double x, private int n)
 {
@@ -320,8 +322,8 @@ kernel void mmul_2el
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
-    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
-    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+    for (private int k = max(0, i - ORDER); k <= min(i + ORDER, NSPLINE_ATOM - 1); k++)
+    for (private int l = max(0, j - ORDER); l <= min(j + ORDER, NSPLINE_PROJ - 1); l++)
     {
         // matrix element
         private double2 elem = 0;
@@ -332,7 +334,7 @@ kernel void mmul_2el
         private double tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
         private double tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
         
-        // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
+        // Are the integral moments completely decoupled, i.e. is there no overlap between Ba, Bb, Bc and Bd?
         // In such cases we can compute the off-diagonal contribution just as a product of the two
         // integral moments of order "lambda" and "-lambda-1", respectively. Moreover, in such
         // case there is no diagonal contribution, because there is no overlap between the _four_
@@ -414,72 +416,151 @@ kernel void mmul_2el
     }
 }
 
-/**
- * @brief Multiplication by one-electron Hamiltonian matrix.
- * 
- * Multiplies given vector by one-electron part of the Hamiltonian matrix,
- * that can expressed as a Kronecker product of simple one-electron matrices.
- * \f[
- *     y_{ij} = \sum_{kl} \left(
- *         E S_{ik} S_{jl} - H_{ik}^{(1)} S_{jl} - S_{ik} H_{jl}^{(2)}
- *     \right) x_{kl}
- * \f]
- * @param E Total energy of the system.
- * @param Sp Row-padded upper overlap matrix.
- * @param Dp Row-padded upper derivative overlap matrix.
- * @param M1p Row-padded upper integral moment matrix (for r^1).
- * @param M2p Row-padded upper integral moment matrix (for r^2).
- * @param l1 Angular momentum of first electron.
- * @param l2 Angular momentum of second electron.
- * @param x Source vector.
- * @param y Destination vector.
- */
-kernel void mmul_1el_offset
+kernel void mmul_2el_decoupled
 (
-    // energy
-    private double E,
-    // row-padded one-electron matrices (atom)
-    global double2 const * const restrict Spa,
-    global double2 const * const restrict Dpa,
-    global double2 const * const restrict M1pa,
-    global double2 const * const restrict M2pa,
-    // row-padded one-electron matrices (projectile)
-    global double2 const * const restrict Spp,
-    global double2 const * const restrict Dpp,
-    global double2 const * const restrict M1pp,
-    global double2 const * const restrict M2pp,
-    // angular momenta
-    private int l1,
-    private int l2,
+    // B-spline knots (atom and projectile)
+    constant double2 const * const restrict ta,
+    constant double2 const * const restrict tp,
+    // multipole
+    private int lambda,
+    // angular integral
+    private double f,
+    // one-electron moments
+    global double2 const * const restrict MLa,
+    global double2 const * const restrict MmLm1a,
+    global double2 const * const restrict MLp,
+    global double2 const * const restrict MmLm1p,
     // source and target vector
-    global double2 const * const restrict x, private int xoffset,
-    global double2       * const restrict y, private int yoffset
+    global double2 const * const restrict x,
+    global double2       * const restrict y
 )
 {
     // output vector element index
     private int i = get_global_id(0) / NSPLINE_PROJ;
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
-    // initialize the output element
-    y[yoffset + i * NSPLINE_PROJ + j] = 0;
+    // auxiliary variables
+    private double scale, tx, ty;
+    private double2 elem;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
-    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
-    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+    for (private int k = max(0, i - ORDER); k <= min(i + ORDER, NSPLINE_ATOM - 1); k++)
+    for (private int l = max(0, j - ORDER); l <= min(j + ORDER, NSPLINE_PROJ - 1); l++)
     {
-        // compute multi-indices
-        private int ik = min(i,k) * (ORDER + 1) + abs(i - k);
-        private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
+        // matrix element
+        elem = 0;
         
-        // calculate the one-electron part of the hamiltonian matrix element Hijkl
-        private double2 elem = E * cmul(Spa[ik],Spp[jl]);
-        elem -= 0.5 * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
-        elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2pa[ik],Spp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Spa[ik],M2pp[jl]);
-        elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
+        // (j,l) << (i,k)
+        if (min(j,l) + ORDER < max(i,k))
+        {
+            tx = min(ta[i + ORDER + 1].x,ta[k + ORDER + 1].x);
+            ty = min(tp[j + ORDER + 1].x,tp[l + ORDER + 1].x);
+            scale = pow_int(ty / tx, lambda) / tx;
+            elem += scale * cmul(MmLm1a[min(i,k) * (ORDER + 1) + abs(i-k)], MLp[min(j,l) * (ORDER + 1) + abs(j-l)]);
+        }
+        
+        // (i,k) << (j,l)
+        if (min(i,k) + ORDER < max(j,l))
+        {
+            tx = min(ta[i + ORDER + 1].x,ta[k + ORDER + 1].x);
+            ty = min(tp[j + ORDER + 1].x,tp[l + ORDER + 1].x);
+            scale = pow_int(tx / ty, lambda) / ty;
+            elem += scale * cmul(MLa[min(i,k) * (ORDER + 1) + abs(i-k)], MmLm1p[min(j,l) * (ORDER + 1) + abs(j-l)]);
+        }
+        
+        // multiply right-hand side by the matrix element
+        y[i * (ulong)(NSPLINE_PROJ) + j] -= f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
+    }
+}
+
+kernel void mmul_2el_coupled
+(
+    // B-spline knots (atom and projectile)
+    constant double2 const * const restrict ta,
+    constant double2 const * const restrict tp,
+    // multipole
+    private int lambda,
+    // angular integral
+    private double f,
+    // one-electron partial moments (atom)
+    global double2 const * const restrict MiLa,
+    global double2 const * const restrict MimLm1a,
+    // one-electron partial moments (projectile)
+    global double2 const * const restrict MiLp,
+    global double2 const * const restrict MimLm1p,
+    // two-electron diagonal contributions
+    global double2 const * const restrict Rdia,
+    // source and target vector
+    global double2 const * const restrict x,
+    global double2       * const restrict y
+)
+{
+    // output vector element index
+    private int i = get_global_id(0) / (2 * ORDER + 1);
+    private int j = get_global_id(0) % (2 * ORDER + 1) + i - ORDER;
+    
+    // auxiliary variables
+    private double2 elem, m_ik, m_jl;
+    private double scale, tx, ty;
+    
+    // pointers to the needed partial integral moments
+    global double2 const * restrict M_ik;
+    global double2 const * restrict M_jl;
+    
+    // for all source vector elements
+    if (i < NSPLINE_ATOM && 0 <= j && j <= NSPLINE_PROJ)
+    for (private int k = max(0, i - ORDER); k <= min(i + ORDER, NSPLINE_ATOM - 1); k++)
+    for (private int l = max(0, j - ORDER); l <= min(j + ORDER, NSPLINE_PROJ - 1); l++)
+    if (max(i,k) <= min(j,l) + ORDER && max(j,l) <= min(i,k) + ORDER)
+    {
+        // matrix element
+        elem = 0;
+        
+        // (i,k) ~ (j,l)
+        
+        // retrieve diagonal contribution
+        if (i <= j && i <= k && i <= l)
+            elem += Rdia[((i * (ORDER+1) + (j-i)) * (ORDER+1) + (k-i)) * (ORDER+1) + (l-i)];
+        else if (j <= i && j <= k && j <= l)
+            elem += Rdia[((j * (ORDER+1) + (i-j)) * (ORDER+1) + (l-j)) * (ORDER+1) + (k-j)];
+        else if (k <= i && k <= j && k <= l)
+            elem += Rdia[((k * (ORDER+1) + (j-k)) * (ORDER+1) + (i-k)) * (ORDER+1) + (l-k)];
+        else // (l <= i && l <= j && l <= k)
+            elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];
+        
+        // ix < iy
+        M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MimLm1p + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT_ATOM - 1); ix++) if (ta[ix + 1].x > 0)
+        {
+            m_ik = M_ik[ix - i]; tx = ta[ix + 1].x;
+            
+            for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT_PROJ - 1); iy++)
+            {
+                m_jl = M_jl[iy - j]; ty = tp[iy + 1].x;
+                scale = pow_int(tx/ty,lambda)/ty;
+                elem += cmul(m_ik,m_jl) * scale;
+            }
+        }
+        
+        // ix > iy (by renaming the ix,iy indices)
+        M_ik = MimLm1a + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MiLp    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT_PROJ - 1); ix++) if (tp[ix + 1].x > 0)
+        {
+            m_jl = M_jl[ix - j]; tx = tp[ix + 1].x;
+            
+            for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT_ATOM - 1); iy++)
+            {
+                m_ik = M_ik[iy - i]; ty = ta[iy + 1].x;
+                scale = pow_int(tx/ty,lambda)/ty;
+                elem += cmul(m_ik,m_jl) * scale;
+            }
+        }
         
         // multiply right-hand side by that matrix element
-        y[yoffset + i * NSPLINE_PROJ + j] += cmul(elem, x[xoffset + k * NSPLINE_PROJ + l]);
+        y[i * (ulong)(NSPLINE_PROJ) + j] -= f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
     }
 }
 
@@ -627,6 +708,178 @@ kernel void mmul_2el_offset
                     scale = pow_int(tx/ty,lambda)/ty;
                     elem += cmul(m_ik,m_jl) * scale;
                 }
+            }
+        }
+        
+        // all-to-all-segments multiplication
+        for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
+        for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
+        {
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+                f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
+                * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
+        }
+    }
+}
+
+kernel void mmul_2el_decoupled_offset
+(
+    // B-spline knots (atom and projectile)
+    constant double2 const * const restrict ta,
+    constant double2 const * const restrict tp,
+    // multipole
+    private int lambda,
+    // angular integral
+    global double  const * const restrict f, private int foffset,
+    // one-electron moments (atom)
+    global double2 const * const restrict MLa,
+    global double2 const * const restrict MmLm1a,
+    // one-electron moments (projectile)
+    global double2 const * const restrict MLp,
+    global double2 const * const restrict MmLm1p,
+    // source and target vector
+    global double2 const * const restrict x,
+    global double2       * const restrict y,
+    // angular block domain
+    private short x_ang_begin,
+    private short y_ang_begin
+)
+{
+    // output vector element index
+    private int i = get_global_id(0) / NSPLINE_PROJ;
+    private int j = get_global_id(0) % NSPLINE_PROJ;
+    
+    // auxiliary variables
+    private double scale, tx, ty;
+    
+    // for all source vector elements
+    if (i < NSPLINE_ATOM)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+    {
+        // matrix element
+        private double2 elem = 0;
+        
+        // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
+        // In such cases we can compute the off-diagonal contribution just as a product of the two
+        // integral moments of order "lambda" and "-lambda-1", respectively. Moreover, in such
+        // case there is no diagonal contribution, because there is no overlap between the _four_
+        // participating B-splines.
+        
+        // (j,l) << (i,k)
+        if (min(j,l) + ORDER < max(i,k))
+        {
+            tx = min(ta[i + ORDER + 1].x,ta[k + ORDER + 1].x);
+            ty = min(tp[j + ORDER + 1].x,tp[l + ORDER + 1].x);
+            scale = pow_int(ty / tx, lambda) / tx;
+            elem += scale * cmul(MmLm1a[min(i,k) * (ORDER + 1) + abs(i-k)], MLp[min(j,l) * (ORDER + 1) + abs(j-l)]);
+        }
+        
+        // (i,k) << (j,l)
+        if (min(i,k) + ORDER < max(j,l))
+        {
+            tx = min(ta[i + ORDER + 1].x,ta[k + ORDER + 1].x);
+            ty = min(tp[j + ORDER + 1].x,tp[l + ORDER + 1].x);
+            scale = pow_int(tx / ty, lambda) / ty;
+            elem += scale * cmul(MLa[min(i,k) * (ORDER + 1) + abs(i-k)], MmLm1p[min(j,l) * (ORDER + 1) + abs(j-l)]);
+        }
+        
+        // all-to-all-segments multiplication
+        for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
+        for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
+        {
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+                f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
+                * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
+        }
+    }
+}
+
+kernel void mmul_2el_coupled_offset
+(
+    // B-spline knots (atom and projectile)
+    constant double2 const * const restrict ta,
+    constant double2 const * const restrict tp,
+    // multipole
+    private int lambda,
+    // angular integral
+    global double  const * const restrict f, private int foffset,
+    // one-electron partial moments (atom)
+    global double2 const * const restrict MiLa,
+    global double2 const * const restrict MimLm1a,
+    // one-electron partial moments (projectile)
+    global double2 const * const restrict MiLp,
+    global double2 const * const restrict MimLm1p,
+    // two-electron diagonal contributions
+    global double2 const * const restrict Rdia,
+    // source and target vector
+    global double2 const * const restrict x,
+    global double2       * const restrict y,
+    // angular block domain
+    private short x_ang_begin,
+    private short y_ang_begin
+)
+{
+    // output vector element index
+    private int i = get_global_id(0) / (2 * ORDER + 1);
+    private int j = get_global_id(0) % (2 * ORDER + 1) + i - ORDER;
+    
+    // auxiliary variables
+    private double2 m_ik, m_jl;
+    private double scale, tx, ty;
+    
+    // pointers to the needed partial integral moments
+    global double2 const * restrict M_ik;
+    global double2 const * restrict M_jl;
+    
+    // for all source vector elements
+    if (i < NSPLINE_ATOM && 0 <= j && j <= NSPLINE_PROJ)
+    for (private int k = i - ORDER; k <= i + ORDER; k++) if (0 <= k && k < NSPLINE_ATOM)
+    for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
+    if (max(i,k) <= min(j,l) + ORDER && max(j,l) <= min(i,k) + ORDER)
+    {
+        // matrix element
+        private double2 elem = 0;
+        
+        // (i,k) ~ (j,l)
+        
+        // retrieve diagonal contribution
+        if (i <= j && i <= k && i <= l)
+            elem += Rdia[((i * (ORDER+1) + (j-i)) * (ORDER+1) + (k-i)) * (ORDER+1) + (l-i)];
+        else if (j <= i && j <= k && j <= l)
+            elem += Rdia[((j * (ORDER+1) + (i-j)) * (ORDER+1) + (l-j)) * (ORDER+1) + (k-j)];
+        else if (k <= i && k <= j && k <= l)
+            elem += Rdia[((k * (ORDER+1) + (j-k)) * (ORDER+1) + (i-k)) * (ORDER+1) + (l-k)];
+        else // (l <= i && l <= j && l <= k)
+            elem += Rdia[((l * (ORDER+1) + (i-l)) * (ORDER+1) + (j-l)) * (ORDER+1) + (k-l)];
+        
+        // ix < iy
+        M_ik = MiLa    + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MimLm1p + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = i; ix < min(i + ORDER + 1, NREKNOT_ATOM - 1); ix++) if (ta[ix + 1].x > 0)
+        {
+            m_ik = M_ik[ix - i]; tx = ta[ix + 1].x;
+            
+            for (private int iy = max(j, ix + 1); iy < min(j + ORDER + 1, NREKNOT_PROJ - 1); iy++)
+            {
+                m_jl = M_jl[iy - j]; ty = tp[iy + 1].x;
+                scale = pow_int(tx/ty,lambda)/ty;
+                elem += cmul(m_ik,m_jl) * scale;
+            }
+        }
+        
+        // ix > iy (by renaming the ix,iy indices)
+        M_ik = MimLm1a + (i * (2*ORDER+1) + k - (i-ORDER)) * (ORDER+1);
+        M_jl = MiLp    + (j * (2*ORDER+1) + l - (j-ORDER)) * (ORDER+1);
+        for (private int ix = j; ix < min(j + ORDER + 1, NREKNOT_PROJ - 1); ix++) if (tp[ix + 1].x > 0)
+        {
+            m_jl = M_jl[ix - j]; tx = tp[ix + 1].x;
+            
+            for (private int iy = max(i, ix + 1); iy < min(i + ORDER + 1, NREKNOT_ATOM - 1); iy++)
+            {
+                m_ik = M_ik[iy - i]; ty = ta[iy + 1].x;
+                scale = pow_int(tx/ty,lambda)/ty;
+                elem += cmul(m_ik,m_jl) * scale;
             }
         }
         
