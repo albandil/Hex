@@ -123,7 +123,7 @@ COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
-HEX_ECS_FILES   = amplitudes ang gauss bspline io main radial slater solver \
+HEX_ECS_FILES   = amplitudes ang gauss bspline io main radial slater solver coupled-solver \
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
                   preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner

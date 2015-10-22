@@ -53,6 +53,7 @@
 #include "parallel.h"
 #include "radial.h"
 #include "solver.h"
+#include "coupled-solver.h"
 
 int main (int argc, char* argv[])
 {
