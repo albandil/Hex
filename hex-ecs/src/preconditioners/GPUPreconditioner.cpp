@@ -127,7 +127,7 @@ void GPUCGPreconditioner::setup ()
     clGetPlatformInfo(platform_, CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
     clGetPlatformInfo(platform_, CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
     
-    std::cout << "\t- platform: " << platform_name << " (" << platform_vendor << ")" << std::endl;
+    std::cout << "\t- platform "<< cmd_.ocl_platform << ": " << platform_name << " (" << platform_vendor << ")" << std::endl;
     std::cout << "\t- available version: " << platform_version << std::endl;
     
     // check that the chosen device is available
@@ -139,7 +139,7 @@ void GPUCGPreconditioner::setup ()
     clGetDeviceInfo(device_, CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
     clGetDeviceInfo(device_, CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
     
-    std::cout << "\t- device: " << device_name << " (" << device_vendor << ")" << std::endl;
+    std::cout << "\t- device " << cmd_.ocl_device << ": " << device_name << " (" << device_vendor << ")" << std::endl;
     
     cl_ulong max_compute_units, max_work_group_size, local_memory_size, global_memory_size;
     clGetDeviceInfo(device_, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_ulong), &max_compute_units, 0);
