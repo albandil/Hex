@@ -38,8 +38,8 @@
 #include "hex-arrays.h"
 #include "hex-ode.h"
 
-#include "potential.h"
-#include "wave_distort.h"
+#include "hex-distorting-potential.h"
+#include "hex-distorted-wave.h"
 
 // -------------------------------------------------------------------------- //
 //                                                                            //
@@ -86,13 +86,13 @@ DistortedWave DistortedWave::operator= (DistortedWave const& W)
 int derivs (double x, const double y[2], double dydx[2], void * data)
 {
     // retype parameter
-    std::tuple<double,int,DistortingPotential const *> *pdata =
-        (std::tuple<double,int,DistortingPotential const *> *)data;
+    std::tuple<double,int,DistortingPotentialBase const *> *pdata =
+        (std::tuple<double,int,DistortingPotentialBase const *> *)data;
     
     // get individual sub-parameters
     double kn = std::get<0>(*pdata);
     int ln = std::get<1>(*pdata);
-    DistortingPotential const & U = *std::get<2>(*pdata);
+    DistortingPotentialBase const & U = *std::get<2>(*pdata);
     
     // compute derivatives
     dydx[0] = y[1];
@@ -104,13 +104,13 @@ int derivs (double x, const double y[2], double dydx[2], void * data)
 int derivs0 (double x, const double y[2], double dydx[2], void * data)
 {
     // retype parameter
-    std::tuple<double,int,DistortingPotential const *> *pdata =
-        (std::tuple<double,int,DistortingPotential const *> *)data;
+    std::tuple<double,int,DistortingPotentialBase const *> *pdata =
+        (std::tuple<double,int,DistortingPotentialBase const *> *)data;
     
     // get individual sub-parameters
     double kn = std::get<0>(*pdata);
     int ln = std::get<1>(*pdata);
-    DistortingPotential const & U = *std::get<2>(*pdata);
+    DistortingPotentialBase const & U = *std::get<2>(*pdata);
     
     // compute derivatives
     dydx[0] = y[1];
@@ -119,12 +119,14 @@ int derivs0 (double x, const double y[2], double dydx[2], void * data)
     return GSL_SUCCESS;
 }
 
-DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U)
-    : Evaluations(0), U(_U), kn(_kn), ln(_ln), r0(sqrt(ln*(ln+1)) / kn), rf(std::max(2*r0,U.getFarRadius()))
+DistortedWave::DistortedWave (double _kn, int _ln, DistortingPotentialBase const & _U)
+    : Evaluations(0), U(const_cast<DistortingPotentialBase*>(&_U)), kn(_kn), ln(_ln),
+      r0(std::sqrt(ln*(ln+1)) / kn), rf(std::max(2*r0,U->getFarRadius()))
 {
     // determine discretization, use at least 1000 samples
     int N = 100;                // N samples per wave length
-    h = std::min (              // grid step
+    h = std::min                // grid step
+    (
         2*M_PI/(N*kn),          //  -> N samples per wave length and
         (rf-r0)/1000            //  -> at least 1000 samples totally
     );
@@ -146,18 +148,16 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         grid0[i] = h0 * i;
     
     // look for relevant data
-    char filename[255], filename0[255];
-    sprintf(filename, "dwr_a-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
-    sprintf(filename0, "dwr_f-N%d-K%g-l%d-k%g.dwf", U.n(), U.k(), ln, kn);
-    if (array.hdfload(filename) and (ln == 0 or array0.hdfload(filename0)))
-    {
+//     char filename[255], filename0[255];
+//     if (array.hdfload(filename) and (ln == 0 or array0.hdfload(filename0)))
+//     {
         // the last element is the phase shift
-        phase = array.pop_back();
-    }
-    else
+//         phase = array.pop_back();
+//     }
+//     else
     {
         // assemble data needed to compute the derivatives
-        std::tuple<double, int, DistortingPotential const *> data = std::make_tuple (kn, ln, &U);
+        std::tuple<double, int, DistortingPotentialBase const *> data = std::make_tuple(kn, ln, U);
         
         //
         // solve in the classically forbidden region (if any)
@@ -176,8 +176,8 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
                 x0g[i] = h0 * i;
             
             // set left boundary conditions (normalized regular wave divided by r^(l+1))
-            y0g[0][0] = 1;
-            y0g[0][1] = -1./(ln+1);
+            y0g[0][0] = gsl_sf_pow_int(kn, ln+1) / gsl_sf_doublefact(ln+1);
+            y0g[0][1] = 0.;
             
             // solve the equation
             solve2(x0g, samples0 + 1, h0, y0g, derivs0, &data, NORMALIZE_ON_OVERFLOW);
@@ -229,13 +229,13 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
         double der = yg[samples-2][1];
         double D = der / val;
         double pilhalf = M_PI * ln / 2.;
-        double tg_delta = (kn * cos(kn*R - pilhalf) - D * sin(kn*R - pilhalf)) /
-                          (kn * sin(kn*R - pilhalf) + D * cos(kn*R - pilhalf));
-        phase = atan(tg_delta);
+        double tg_delta = (kn * std::cos(kn*R - pilhalf) - D * std::sin(kn*R - pilhalf)) /
+                          (kn * std::sin(kn*R - pilhalf) + D * std::cos(kn*R - pilhalf));
+        phase = std::atan(tg_delta);
         
         // normalize ( far away should be η ≈ exp(iδ)sin(kr-πl/2+δ) )
         array = rArray(samples);
-        double inverse_norm = 1./sqrt(val*val + der*der/(kn*kn));
+        double inverse_norm = 1. / std::sqrt(val*val + der*der/(kn*kn));
         for (int ir = 0; ir < samples; ir++)
             array[ir] = yg[ir][0] * inverse_norm;
         
@@ -245,11 +245,11 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
             array0[ir] = y0g[ir][0] * inverse_norm;
         
         // save for recyclation, append last element on tail
-        if (ln > 0)
-            array0.hdfsave(filename0);
-        array.push_back(phase);
-        array.hdfsave(filename);
-        array.pop_back();
+//         if (ln > 0)
+//             array0.hdfsave(filename0);
+//         array.push_back(phase);
+//         array.hdfsave(filename);
+//         array.pop_back();
         
         // release memory
         for (int i = 0; i < samples0; i++)
@@ -273,6 +273,11 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
     }
 }
 
+DistortedWave::DistortedWave (const DistortedWave& W)
+{
+    *this = W;
+}
+
 DistortedWave::~DistortedWave()
 {
     gsl_interp_free(interpolator);
@@ -289,7 +294,7 @@ double DistortedWave::operator() (double x) const
     
     // extrapolate using asymptotic form if far away
     else if (x > grid.back())
-        return sin(kn*x - ln*M_PI*0.5 + phase);
+        return std::sin(kn * x - ln * special::constant::pi_half + phase);
     
     // or interpolate using cspline interpolator in the classically allowed region
     else if (x >= grid.front())
@@ -309,15 +314,26 @@ std::pair<double,int> DistortedWave::getZeroAsymptotic (double x) const
     
     // extrapolate using asymptotic form if far away
     else if (x > grid.back())
-        y = sin(kn*x - ln*M_PI*0.5 + phase) / pow(x, ln + 1);
+        y = std::sin(kn * x - ln * special::constant::pi_half + phase) / gsl_sf_pow_int(x, ln + 1);
     
     // or interpolate using cspline interpolator in the classically allowed region
     else if (x >= grid.front())
-        y = gsl_interp_eval(interpolator, grid.data(), array.data(), x, nullptr) / pow(x, ln + 1);
+        y = gsl_interp_eval(interpolator, grid.data(), array.data(), x, nullptr) / gsl_sf_pow_int(x, ln + 1);
     
     // or interpolate using cspline interpolator in the classically forbidden region
     else
-        y = gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr) / pow(r0,ln+1);
+        y = gsl_interp_eval(interpolator0, grid0.data(), array0.data(), x, nullptr) / gsl_sf_pow_int(r0, ln + 1);
     
     return std::make_pair(y, ln + 1);
+}
+
+void DistortedWave::toFile (const char* filename) const
+{
+    rArray grids = concatenate(grid0, grid);
+    rArray data = concatenate(array0, array);
+    
+    for (std::size_t i = 0; i < grid0.size(); i++)
+        data[i] *= gsl_sf_pow_int(grid0[i] / r0, ln + 1);
+    
+    write_array(grids, data, filename);
 }

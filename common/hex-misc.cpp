@@ -176,3 +176,9 @@ void print_stack_trace ()
     std::free(symbollist);
 #endif
 }
+
+std::string current_time ()
+{
+    std::time_t result = std::time(nullptr);
+    return std::asctime(std::localtime(&result));
+}

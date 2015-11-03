@@ -40,8 +40,11 @@
 #include "hex-arrays.h"
 #include "hex-chebyshev.h"
 #include "hex-clenshawcurtis.h"
+#include "hex-distorted-wave.h"
+#include "hex-distorting-potential.h"
 #include "hex-hydrogen.h"
 #include "hex-matrix.h"
+#include "hex-misc.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
@@ -49,11 +52,41 @@
 #include "bspline.h"
 #include "radial.h"
 
-std::string current_time () 
+// Polarization distorting potential.
+class DistortingPotential : public DistortingPotentialBase
 {
-    std::time_t result = std::time(nullptr);
-    return std::asctime(std::localtime(&result));
-}
+    public:
+    
+        // contructor
+        DistortingPotential (int ni, int li, int mi, double rc, double rmax) : alpha_(4.5), rc_(rc), rmax_(rmax)
+        {
+            // TODO: Calculate polarizability.
+        }
+        
+        // destructor
+        virtual ~DistortingPotential () {}
+        
+        // evaluation of the distorting potential.
+        virtual double operator() (double r) const
+        {
+            double r4 = r*r*r*r;
+            return r4 == 0. ? 0. : alpha_ / (2*r4) * std::expm1(-std::pow(r/rc_,6));
+        }
+        
+        // end of grid
+        virtual double getFarRadius () const { return rmax_; }
+    
+    private:
+    
+        // polarizability
+        double alpha_;
+        
+        // cut-off radius
+        double rc_;
+        
+        // final radius
+        double rmax_;
+};
 
 Amplitudes::Amplitudes
 (
@@ -391,6 +424,17 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
         return;
     
+    // get distorting potential
+    DistortingPotential U (T.nf, T.lf, T.mf, 2, 200);
+    
+    // calculate the radial part of the distorted wave
+    std::vector<DistortedWave*> chi (inp_.maxell);
+    for (int l = 0; l <= inp_.maxell; l++)
+    {
+        chi[l] = new DistortedWave (kf[ie], l, U);
+        chi[l]->toFile(format("%d-%d-%d-%d.dwf", T.nf, T.lf, T.mf, l).c_str());
+    }
+    
     // evaluate radial part for all evaluation radii
     for (int n = 1; n <= samples; n++)
     {
@@ -401,11 +445,20 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         int eval_knot = bspline_proj_.knot(eval_r);
         
         // evaluate j and dj at far radius for all angular momenta up to maxell
-        cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
-        cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
+//         cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
+//         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
+        cArray j_R0 (inp_.maxell + 1), dj_R0 (inp_.maxell + 1);
+        for (int l = 0; l <= inp_.maxell; l++)
+        {
+            double j1 = (*chi[l])(eval_r);
+            double j2 = (*chi[l])(eval_r + 1e-5);
+            
+            j_R0[l] = j1;
+            dj_R0[l] = (j2 - j1) / 1e-5;
+        }
         
         // evaluate B-splines and their derivatives at evaluation radius
-        cArray Bspline_R0(Nspline_proj), Dspline_R0(Nspline_proj);
+        cArray Bspline_R0 (Nspline_proj), Dspline_R0 (Nspline_proj);
         for (int ispline = 0; ispline < Nspline_proj; ispline++)
         {
             // evaluate B-spline
@@ -453,6 +506,10 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 const_cast<BlockArray<Complex>&>(solution)[ill].drop();
         }
     }
+    
+    // delete distorted waves
+    for (int l = 0; l < inp_.maxell; l++)
+        delete chi[l];
 }
 
 void Amplitudes::computeTmat_ (Amplitudes::Transition T)

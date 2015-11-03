@@ -29,10 +29,11 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_DISTORTING_POTENTIAL
-#define HEX_DISTORTING_POTENTIAL
+#ifndef HEX_DWBA_POTENTIAL
+#define HEX_DWBA_POTENTIAL
 
 #include "hex-arrays.h"
+#include "hex-distorting-potential.h"
 #include "hex-hydrogen.h"
 #include "hex-special.h"
 
@@ -83,16 +84,14 @@ extern const rArrays Ucoeffs;
  * for forbidden waves ( ForbiddenWave @f$ \theta_{l_n}(k_n, r) @f$ and HyperbolicWave
  * @f$ \zeta_{l_n}(k_n, r) @f$ ).
  */
-class DistortingPotential : public special::RadialFunction<double>
+class DistortingPotential : public DistortingPotentialBase
 {
 public:
     // constructors
-    // @{
-    DistortingPotential() : n_(0), k_(0.), rmax_(0) {}
-    DistortingPotential(int n, double rmax = 0.) : n_(n), k_(0.), rmax_(rmax) {}
-    DistortingPotential(double k, double rmax = 0.) : n_(0), k_(k), rmax_(rmax) {}
-    DistortingPotential(DistortingPotential const & U) : n_(U.n_), k_(U.k_), rmax_(U.rmax_) {}
-    // @}
+    DistortingPotential () : n_(0), k_(0.), rmax_(0) {}
+    DistortingPotential (int n, double rmax = 0.) : n_(n), k_(0.), rmax_(rmax) {}
+    DistortingPotential (double k, double rmax = 0.) : n_(0), k_(k), rmax_(rmax) {}
+    DistortingPotential (DistortingPotential const & U) : n_(U.n_), k_(U.k_), rmax_(U.rmax_) {}
     
     /**
      * @brief Assignment
@@ -115,7 +114,7 @@ public:
      * @todo Implement runtime generation of distorting potentials.
      * @param x Coordinate where to evaluate.
      */
-    double operator() (double x) const;
+    virtual double operator() (double x) const;
     
     /**
      * @brief Classical turning point.
@@ -144,7 +143,7 @@ public:
      * @f]
      * The function handles correctly the input @f$ r = 0 @f$.
      */
-    double plusMonopole(double x) const;
+    double plusMonopole (double x) const;
     
     /**
      * @brief Return the zero limit.
@@ -154,19 +153,11 @@ public:
      *     a = \lim_{r \rightarrow 0+} \left( \frac{1}{r} + U(r) \right) \ .
      * @f]
      */
-    double getConstant() const;
+    double getConstant () const;
     
-    /**
-     * @brief Return largest evaluated coordinate.
-     * 
-     * Return a radius sufficiently far from the atom. The radial
-     * orbital ought to be small here.
-     */
-    double getFarRadius() const;
-    
-    void toFile(const char * filename) const;
-    int n() const { return n_; }
-    double k() const { return k_; }
+    void toFile (const char * filename) const;
+    int n () const { return n_; }
+    double k () const { return k_; }
     
 private:
     int n_;        // principal quantum number of distorting state

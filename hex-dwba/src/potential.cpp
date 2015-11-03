@@ -121,42 +121,6 @@ double DistortingPotential::getConstant () const
     return Ucoeffs[n_].back();
 }
 
-double DistortingPotential::getFarRadius () const
-{
-    // if the rmax has been overriden, use the supplied value
-    if (rmax_ > 0.)
-        return rmax_;
-    
-    //
-    // otherwise compute rmax using hunt & bisect run
-    //
-    
-    // determine from parameters of the potential
-    #define U_THRESHOLD    1e-100
-    #define U_MAX_ITERS    1000
-    
-    // hunt for low value
-    double far = 1., far_value;
-    while ((far_value = fabs((*this)(far *= 2))) > U_THRESHOLD)
-        /* continue hunting */;
-    
-    // bisect for exact value
-    double near = 1.;
-    for (int i = 0; i < U_MAX_ITERS and near != far; i++)
-    {
-        double middle = (near + far) * 0.5;
-        double middle_val = fabs((*this)(middle));
-        
-        if (U_THRESHOLD > middle_val)
-            far = middle;
-            
-        if (middle_val > U_THRESHOLD)
-            near = middle;
-    }
-    
-    return (near + far) * 0.5;
-}
-
 void DistortingPotential::toFile (const char* filename) const
 {
     // generate evaluation grid

@@ -92,7 +92,7 @@ namespace DWBA1
  */
 Complex computeDirect1e
 (
-    DistortingPotential const& U,
+    DistortingPotential const & U,
     int l, double k
 );
     
@@ -122,7 +122,7 @@ Complex computeDirect1e
  */
 Complex computeDirect2e
 (
-    const DistortingPotential& U, int lambda,
+    DistortingPotential const & U, int lambda,
     int Nf, int Lf, double kf, int lf,
     int Ni, int Li, double ki, int li
 );
@@ -145,7 +145,7 @@ Complex computeDirect2e
  */
 Complex computeExchange1e
 (
-    DistortingPotential const& U,
+    DistortingPotential const & U,
     int Ni, int Li, double ki,
     int Nf, int Lf, double kf
 );

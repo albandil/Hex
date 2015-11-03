@@ -30,20 +30,20 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include "hex-arrays.h"
+#include "hex-distorted-wave.h"
 #include "hex-hydrogen.h"
 #include "hex-gausskronrod.h"
 #include "hex-special.h"
 
 #include "potential.h"
 #include "dwba.h"
-#include "wave_distort.h"
 
 using special::constant::pi;
 
 namespace DWBA1
 {
 
-Complex computeDirect1e (DistortingPotential const& U, int l, double k)
+Complex computeDirect1e (DistortingPotential const & U, int l, double k)
 {
     // get distorted wave
     DistortedWave chi_kl(k,l,U);

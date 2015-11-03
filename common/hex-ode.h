@@ -128,11 +128,11 @@ int solve2
                 std::cerr << "[solve2] Too many steps required (ntrial=" << ntrial << ", x=" << x << ").";
             
             // avoid overflow (normalize)
-            if (fabs(y_row[0]) > DIVERGENCE_THRESHOLD)
+            if (std::fabs(y_row[0]) > DIVERGENCE_THRESHOLD)
             {
                 if (flag == NORMALIZE_ON_OVERFLOW)
                 {
-                    double inverse_norm = 1./fabs(y_row[0]);
+                    double inverse_norm = 1./std::fabs(y_row[0]);
                     for (int j = 0; j <= i; j++)
                     {
                         yg[j][0] *= inverse_norm;

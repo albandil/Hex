@@ -32,11 +32,12 @@
 #ifndef HEX_DISTORTED_WAVE
 #define HEX_DISTORTED_WAVE
 
+#include <memory>
+
 #include <gsl/gsl_interp.h>
 
+#include "hex-distorting-potential.h"
 #include "hex-special.h"
-
-#include "potential.h"
 
 /**
  * \brief Distorted wave information.
@@ -72,83 +73,76 @@
  */
 class DistortedWave : public special::RadialFunction<double>
 {
-public:
-    
-    // constructors
-    // @{
-    DistortedWave(double _kn, int _ln, DistortingPotential const & _U);
-    DistortedWave(DistortedWave const& W) { *this = W; }
-    // @}
-    
-    // destructor
-    ~DistortedWave();
-    
-    // assignment
-    DistortedWave operator= (DistortedWave const& W);
-    
-    /**
-     * Evaluate distorted wave.
-     */
-    double operator() (double x) const;
-    
-    /**
-     * Return the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$.
-     */
-    Complex getPhasef() const { return Complex(cos(phase),sin(phase)); }
-    
-    /**
-     * Return the phase \f$ \delta_{l_n} \f$.
-     */
-    double getPhase() const { return phase; }
-    
-    /// Wavenumber.
-    double k() const { return kn; }
-    
-    /// Angular momentum.
-    int l() const { return ln; }
-    
-    /// Classical turning point.
-    double getTurningPoint () const { return r0; }
-    
-    /// Near-zero asymptotic behaviour.
-    std::pair<double,int> getZeroAsymptotic (double x) const;
-    
-    /// Export data to file using \ref write_array.
-    void toFile(const char * filename) const { write_array(grid, array, filename); }
-    
-    /**
-     * Return radius from which the asymptotic form is used.
-     */
-    double farRadius() const { return rf; }
-    
-    std::size_t sampleCount() const { return grid.size(); }
-    
-    /// (debuging parameter) number of evaluations
-    mutable unsigned Evaluations;
-    
-private:
-    
-    // distorting potential
-    DistortingPotential U;
-    
-    // interpolator
-    gsl_interp *interpolator, *interpolator0;
-    
-    // distorted wave input parameters
-    double kn;      // wavenumber of the distorted wave
-    int ln;         // angular momentum of the distorted wave
-    
-    // classical turning point and far radius
-    double r0, rf;
-    
-    // distorted wave computed attributes
-    int samples, samples0;  // sample count
-    double h, h0;           // discretization step
-    
-    // distorted wave data
-    double phase;           // phase shift
-    rArray grid, grid0;     // grid
-    rArray array, array0;   // samples
+    public:
+        
+        // default contructor
+        DistortedWave (double _kn, int _ln, DistortingPotentialBase const & _U);
+        
+        // copy contructor
+        DistortedWave (DistortedWave const & W);
+        
+        // destructor
+        virtual ~DistortedWave ();
+        
+        // assignment
+        DistortedWave operator= (DistortedWave const & W);
+        
+        /// Evaluate distorted wave.
+        double operator() (double x) const;
+        
+        /// Return the phase factor \f$ \mathrm{e}^{\mathrm{i}\delta_{l_n}} \f$.
+        Complex getPhasef () const { return Complex(cos(phase),sin(phase)); }
+        
+        /// Return the phase \f$ \delta_{l_n} \f$.
+        double getPhase () const { return phase; }
+        
+        /// Wavenumber.
+        double k () const { return kn; }
+        
+        /// Angular momentum.
+        int l () const { return ln; }
+        
+        /// Classical turning point.
+        double getTurningPoint () const { return r0; }
+        
+        /// Near-zero asymptotic behaviour.
+        std::pair<double,int> getZeroAsymptotic (double x) const;
+        
+        /// Export data to file.
+        void toFile (const char * filename) const;
+        
+        /// Return radius from which the asymptotic form is used.
+        double farRadius  () const { return rf; }
+        
+        /// Get evaluation sample count.
+        std::size_t sampleCount () const { return grid.size(); }
+        
+        /// (debuging parameter) number of evaluations
+        mutable unsigned Evaluations;
+        
+    private:
+        
+        // distorting potential
+        DistortingPotentialBase const * U;
+        
+        // interpolator
+        gsl_interp *interpolator, *interpolator0;
+        
+        // distorted wave input parameters
+        double kn;      // wavenumber of the distorted wave
+        int ln;         // angular momentum of the distorted wave
+        
+        // classical turning point and far radius
+        double r0, rf;
+        
+        // distorted wave computed attributes
+        int samples, samples0;  // sample count
+        double h, h0;           // discretization step
+        
+        // distorted wave data
+        double phase;           // phase shift
+        rArray grid, grid0;     // grid
+        rArray array, array0;   // samples
 };
 
 #endif

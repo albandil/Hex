@@ -720,4 +720,7 @@ inline std::string underline (std::string text)
     return text;
 }
 
+/// String with current date and time.
+std::string current_time ();
+
 #endif
