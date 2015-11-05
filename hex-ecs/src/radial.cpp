@@ -412,17 +412,30 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         
         // diagonal contributions to two-electron integrals
         std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
-        if (R_tr_dia_diag_[lambda].hdfload(filename))
+        if (not cmd.shared_scratch or par.isMyWork(lambda))
         {
-            if (verbose_)
-                std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+            if (R_tr_dia_diag_[lambda].hdfload(filename))
+            {
+                if (verbose_)
+                    std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
+            }
+            else
+            {
+                R_tr_dia_diag_[lambda] = diagonalR(lambda);
+                R_tr_dia_diag_[lambda].hdfsave(filename);
+                if (verbose_)
+                    std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+            }
         }
-        else
+    }
+    
+    if (cmd.shared_scratch)
+    {
+        for (int lambda = 0; lambda < (int)Nlambdas_; lambda++) if (not par.isMyWork(lambda))
         {
-            R_tr_dia_diag_[lambda] = diagonalR(lambda);
-            R_tr_dia_diag_[lambda].hdfsave(filename);
-            if (verbose_)
-                std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
+            R_tr_dia_diag_[lambda].hdfload(filename);
+            std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
         }
     }
     
