@@ -125,7 +125,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     {
 #ifdef _OPENMP
         // allow only one factorization at a time when not using SuperLU DIST
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST or not cmd_.parallel_factorization)
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
             omp_set_lock(&lu_lock_);
 #endif
         
@@ -170,7 +170,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
 #ifdef _OPENMP
         // release lock
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST or not cmd_.parallel_factorization)
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
             omp_unset_lock(&lu_lock_);
 #endif
     }
