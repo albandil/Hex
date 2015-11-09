@@ -159,7 +159,7 @@ void GPUCGPreconditioner::setup ()
     std::cout << "\t- matrix multiplication tile size: " << blocksize_ << std::endl;
     
     // determine how many solution segments will fit into the device memory
-    unsigned memseg = global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
+    unsigned memseg = 0.8 * global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
     if (memseg < 2 and cmd_.gpu_multiply)
         HexException("Insufficent OpenCL device memory for lightweight on-device multiplication.");
     
