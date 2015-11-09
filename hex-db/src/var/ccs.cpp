@@ -160,8 +160,8 @@ void hex_complete_cross_section_
     rArray E_arr, sigma_arr, sigmab_arr, EB_arr, sigmaB_arr;
     
     // use mi >= 0; if mi < 0, flip both signs
-    int mi = (mi < 0 ? -(*pmi) : (*pmi));
-    int mf = (mi < 0 ? -(*pmf) : (*pmf));
+    int mi = ((*pmi) < 0 ? -(*pmi) : (*pmi));
+    int mf = ((*pmi) < 0 ? -(*pmf) : (*pmf));
     
     // if there is nothing to compute, return
     if (*N == 0)
