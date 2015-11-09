@@ -89,7 +89,7 @@ class CommandLine
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
-              carry_initial_guess(false), gpu_multiply(false)
+              carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1)
         {
             // get command line options
             parse(argc, argv);
@@ -205,6 +205,18 @@ class CommandLine
         
         /// Do the sparse matrix multiplication on the OpenCL device (memory intensive!).
         bool gpu_multiply;
+        
+        /// Whether to radially extrapolate the extracted T-matrix.
+        bool extract_extrapolate;
+        
+        /// Extraction radius.
+        double extract_rho;
+        
+        /// Radial distance where to start radial averaging/extrapolation of the T-matrix.
+        double extract_rho_begin;
+        
+        /// Extraction averaging/extrapolation sample count.
+        int extract_samples;
 };
 
 /**

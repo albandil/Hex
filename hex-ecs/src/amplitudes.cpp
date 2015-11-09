@@ -49,10 +49,30 @@
 #include "bspline.h"
 #include "radial.h"
 
+// Return formatted string containing current date and time.
 std::string current_time () 
 {
     std::time_t result = std::time(nullptr);
     return std::asctime(std::localtime(&result));
+}
+
+// Extrapolate uniformly sampled function y(x) = a/x + b.
+Complex inv_power_extrapolate (rArray X, cArrayView Y)
+{
+    // invert independent variable
+    for (double & x : X)
+        x = 1.0 / x;
+    
+    // do the regression
+    double avg_x   = sum(X)   / X.size();
+    double avg_xx  = sum(X*X) / X.size();
+    Complex avg_y  = sum(Y)   / double(X.size());
+    Complex avg_xy = sum(X*Y) / double(X.size());
+    Complex a = (avg_xy - avg_x * avg_y) / (avg_xx - avg_x * avg_x);
+    Complex b = avg_y - a * avg_x;
+    
+    // return the limit
+    return b;
 }
 
 Amplitudes::Amplitudes
@@ -378,24 +398,35 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             Lambda_Slp[T][ell].first = Lambda_Slp[T][ell].second = cArray(Nenergy);
     }
     
-    // The cross section oscillates, so we will do some averaging
-    // As recommended by Bartlett, we will compute several amplitudes
-    // separated by π/(n*kf[ie]) near the R₀ turning point.
-    double wavelength = special::constant::pi / kf[ie];
-    char const * HEX_RHO = std::getenv("HEX_RHO");
-    char const * HEX_SAMPLES = std::getenv("HEX_SAMPLES");
-    int samples = (HEX_SAMPLES == nullptr) ? 10 : std::atoi(HEX_SAMPLES);
-    double R0 = (HEX_RHO == nullptr) ? bspline_proj_.t(bspline_proj_.Nreknot() - 1).real() : std::atof(HEX_RHO);
-    
     // skip impact energies with undefined outgoing momentum
     if (not std::isfinite(kf[ie]) or kf[ie] == 0.)
         return;
     
+    // The extracted T-matrix oscillates and slowly radially converges.
+    // If we are far enough and only oscillations are left, we can average several uniformly spaced
+    // extractions and get rid of the oscillations. Otherwise we need to extrapolate also
+    // the trend of the T-matrix.
+    
+    double wavelength = special::constant::two_pi / kf[ie];
+    double Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.t(bspline_proj_.Nreknot() - 1).real();
+    double Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength;
+    int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
+    
+    rArray grid;
+    cArrays singlet_lambda, triplet_lambda;
+    for (int ell = 0; ell <= inp_.maxell; ell++)
+    {
+        // resize arrays
+        singlet_lambda.push_back(cArray(samples));
+        triplet_lambda.push_back(cArray(samples));
+    }
+    
     // evaluate radial part for all evaluation radii
-    for (int n = 1; n <= samples; n++)
+    for (int i = 0; i < samples; i++)
     {
         // this is the evaluation point
-        double eval_r = R0 - wavelength * n / samples;
+        double eval_r = Ra + (i + 1) * (Rb - Ra) / (samples + 1);
+        grid.push_back(eval_r);
         
         // determine knot
         int eval_knot = bspline_proj_.knot(eval_r);
@@ -439,18 +470,34 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             RowMatrixView<Complex> PsiSc (Nspline_atom, Nspline_proj, solution[ill]);
             
             // calculate radial integral
-            Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell])) / double(samples);
+            Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell]));
             
             // update the stored value
             # pragma omp critical
             if (Spin == 0)
-                (Lambda_Slp[T][ell].first)[ie] += lambda;
+                singlet_lambda[ell][i] += lambda;
             else
-                (Lambda_Slp[T][ell].second)[ie] += lambda;
+                triplet_lambda[ell][i] += lambda;
             
             // unload solution block
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution)[ill].drop();
+        }
+    }
+    
+    for (int ell = 0; ell < inp_.maxell; ell++)
+    {
+        if (cmd_.extract_extrapolate)
+        {
+            // radial extrapolation
+            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda[ell]);
+            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda[ell]);
+        }
+        else
+        {
+            // plain averaging
+            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / double(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / double(samples);
         }
     }
 }
