@@ -193,8 +193,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
-                    "\t--extract-rho                    Radius for T-matrix extraction.                                                                                        \n"
                     "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.                                                                 \n"
+                    "\t--extract-rho[-end]              Radius for T-matrix extraction.                                                                                        \n"
                     "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.                                   \n"
                     "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.                                             \n"
                     "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
@@ -526,6 +526,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // beginning of averaging/extrapolation window
                 extract_rho_begin = std::atof(optargs[0].c_str());
+                return true;
+            },
+        "extract-rho-end", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // end of averaging/extrapolation window
+                extract_rho = std::atof(optargs[0].c_str());
                 return true;
             },
         "extract-rho", "", 1, [&](std::vector<std::string> const & optargs) -> bool
