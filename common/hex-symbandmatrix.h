@@ -283,6 +283,11 @@ public:
     /**
      * @brief Dot product with one or more vectors.
      *
+     * Calculates
+     * \f[
+     *     A M A + b B \rightarrow B
+     * \f]
+     * 
      * @param B Set of vectors to multiply as a column-major dense matrix.
      */
     void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B) const

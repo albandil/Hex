@@ -279,19 +279,37 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
     if (n == 0 or d == 0)
         return;
     
-    // auxiliary variables
-    char uplo = 'L';
-    int k = d - 1, inc = 1;
+    // matrix data pointer
+    Complex const * const restrict pM = M.data();
+    
+    // source and destination vector pointers
+    Complex const * restrict pA = A.data();
+    Complex       * restrict pB = B.data();
     
     // for all source vectors (columns)
     for (int j = 0; j < Nvec; j++)
     {
-        zsbmv_
-        (
-            &uplo, &n, &k, &alpha, const_cast<Complex*>(M.data()), &d,
-            const_cast<Complex*>(A.data()) + j * n, &inc, &beta,
-            B.data() + j * n, &inc
-        );
+        // scale the destination vector
+        for (int k = 0; k < n; k++)
+            *(pB + k) *= beta;
+        
+        // for all rows of the matrix (and of the target vector)
+        for (int k = 0; k < n; k++)
+        {
+            // Direct pass
+        
+                for (int l = 0; l < d; l++)
+                    *(pB + k) += *(pM + k * d + l) * alpha * *(pA + k + l);
+        
+            // Mirror pass
+                
+                for (int l = 1; l < d; l++)
+                    *(pB + k + l) += *(pM + k * d + l) * alpha * *(pA + k);
+        }
+        
+        // move on to the next source vector
+        pA += n;
+        pB += n;
     }
     
     return;

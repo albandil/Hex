@@ -66,9 +66,6 @@ extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
 extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
 extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, double*, int*);
 
-// this prototype may be non-standard (?), but OpenBLAS definitely implements it
-extern "C" void zsbmv_ (char*, int*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, Complex*, int*);
-
 // the classes are in separate files
 #include "hex-densematrix.h"
 #include "hex-cscmatrix.h"
