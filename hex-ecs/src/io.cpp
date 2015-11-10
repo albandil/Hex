@@ -212,7 +212,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--ilu-max-blocks                 maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #endif
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
-                    "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
+//                     "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
                     "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
 #ifdef WITH_OPENCL
