@@ -221,7 +221,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     }
     
     // for all segments constituting the RHS
-    # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
+//     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         int l1 = ang_.states()[ill].first;

@@ -293,17 +293,17 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
         for (int k = 0; k < n; k++)
             *(pB + k) *= beta;
         
-        // for all rows of the matrix (and of the target vector)
+        // for all rows/cols of the matrix (and of the target vector)
         for (int k = 0; k < n; k++)
         {
             // Direct pass
         
-                for (int l = 0; l < d; l++)
+                for (int l = 0; l < d and k + l < n; l++)
                     *(pB + k) += *(pM + k * d + l) * alpha * *(pA + k + l);
         
             // Mirror pass
                 
-                for (int l = 1; l < d; l++)
+                for (int l = 1; l < d and k + l < n; l++)
                     *(pB + k + l) += *(pM + k * d + l) * alpha * *(pA + k);
         }
         
