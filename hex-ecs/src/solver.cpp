@@ -150,7 +150,7 @@ void Solver::solve ()
             std::size_t size = reader.check();
             
             // solution has the expected size
-            if (size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
+            if (size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline() and not cmd_.refine_solution)
             {
                 std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") found." << std::endl;
                 continue;
