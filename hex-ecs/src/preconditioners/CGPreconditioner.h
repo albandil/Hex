@@ -73,6 +73,8 @@ class CGPreconditioner : public NoPreconditioner
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
         
+        int solve_block (int ill, const cArrayView r, cArrayView z) const;
+        
         // inner CG callbacks
         virtual void CG_init (int iblock) const;
         virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
