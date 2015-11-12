@@ -675,8 +675,10 @@ void dense_kron_dot
 template <class Base1, class Base2>
 cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> const & B, cArrayView const v)
 {
+    assert(A.cols() * B.cols() == v.size());
+    
     // allocate output array
-    cArray w (v.size());
+    cArray w (A.rows() * B.rows());
     
     // calculate the kronecker contraction
     dense_kron_dot
