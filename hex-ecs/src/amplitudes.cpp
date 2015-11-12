@@ -485,7 +485,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         }
     }
     
-    for (int ell = 0; ell < inp_.maxell; ell++)
+    for (int ell = 0; ell <= inp_.maxell; ell++)
     {
         if (cmd_.extract_extrapolate)
         {
