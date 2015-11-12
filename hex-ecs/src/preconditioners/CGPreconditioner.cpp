@@ -146,22 +146,60 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
 
 void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
-    # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
-    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
+    if (cmd_.ssor > 0)
     {
-        try
+        // working arrays
+        BlockArray<Complex> y = r, x = r;
+        
+        // over-relaxation parameter
+        double kappa = cmd_.ssor;
+        
+        // forward SOR
+        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
         {
-            // load blocks, if necessary
+            // subtract off-diagonals
+            for (int illp = 0; illp < ill; illp++)
+            for (int lambda = 0; lambda <= 1; lambda++)
+            if (ang_.f(ill, illp, lambda) != 0)
+                rad_.R_tr_dia(lambda).dot(ang_.f(ill, illp, lambda), y[illp], 1., y[ill]);
+            
+            // use (preconditioned) conjugate gradients to invert a diagonal block
+            n_[ill] = solve_block(ill, kappa * y[ill], x[ill]);
+        }
+        
+        // normalize
+        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+            this->CG_mmul(ill, (2. - kappa) / kappa * x[ill], y[ill]);
+        
+        // backward SOR
+        for (int ill = (int)ang_.states().size() - 1; ill >= 0; ill--)
+        {
+            // subtract off-diagonals
+            for (int illp = ill + 1; illp < (int)ang_.states().size(); illp++)
+            for (int lambda = 0; lambda <= 1; lambda++)
+            if (ang_.f(ill, illp, lambda) != 0)
+                rad_.R_tr_dia(lambda).dot(ang_.f(ill, illp, lambda), y[illp], 1., y[ill]);
+            
+            // use (preconditioned) conjugate gradients to invert a diagonal block
+            n_[ill] += solve_block(ill, kappa * y[ill], z[ill]);
+        }
+    }
+    else
+    {
+        # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
+        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+        {
+            // load segment, if necessary
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r).hdfload(ill);
                 z.hdfload(ill);
             }
-            
-            // use (preconditioned) conjugate gradients to invert a diagonal block
+
+            // ivert diagonal block
             n_[ill] = solve_block(ill, r[ill], z[ill]);
             
-            // unload blocks
+            // unload segment
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r)[ill].drop();
@@ -169,10 +207,6 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 z.hdfsave(ill);
                 z[ill].drop();
             }
-        }
-        catch (std::exception const & e)
-        {
-            HexException("%s", e.what());
         }
     }
     

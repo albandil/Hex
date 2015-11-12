@@ -189,6 +189,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
                     "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
+                    "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
                     "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
@@ -565,6 +566,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // number of extrapolation/averaging samples
                 extract_samples = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "ssor", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // apply SSOR coupling
+                ssor = std::stod(optargs[0]);
                 return true;
             },
         
