@@ -62,6 +62,8 @@ RadialIntegrals::RadialIntegrals
     Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    S12_(bspline_atom.Nspline(),bspline_proj.Nspline()),
+    S21_(bspline_proj.Nspline(),bspline_atom.Nspline()),
     verbose_(true), Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
@@ -316,6 +318,66 @@ Complex RadialIntegrals::computeM
     return res;
 }
 
+Complex RadialIntegrals::computeS12
+(
+    GaussLegendre const & g,
+    Bspline const & bspline1,
+    Bspline const & bspline2,
+    int i, int j
+) const
+{
+    // skip non-overlapping B-splines
+    if (bspline1.t(i).real() > bspline2.t(j + bspline2.order() + 1).real() or
+        bspline2.t(j).real() > bspline1.t(i + bspline1.order() + 1).real())
+        return 0.;
+    
+    // get all knots that define the B-splines
+    std::vector<Complex> knots;
+    for (int k = 0; k <= bspline1.order(); k++) knots.push_back(bspline1.t(i + k));
+    for (int k = 0; k <= bspline2.order(); k++) knots.push_back(bspline2.t(j + k));
+    
+    // sort the knots, remove duplicates
+    std::sort(knots.begin(), knots.end(), Complex_realpart_less);
+    knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
+    
+    // quadrature degree
+    int points = std::max(bspline1.order() + 1, bspline2.order() + 1);
+    
+    // auxiliary arrays
+    cArray eval1 (points), eval2 (points), nodes (points), weights (points);
+    
+    // the result
+    Complex res = 0;
+    
+    // undergo integration on sub-intervals
+    for (unsigned n = 1; n < knots.size(); n++)
+    {
+        // integrate on knots[n-1] ... knots[n]; check that both B-splines are defined there
+        if (bspline1.t(i).real() <= knots[n-1].real() and knots[n].real() <= bspline1.t(i + bspline1.order() + 1).real() and
+            bspline2.t(j).real() <= knots[n-1].real() and knots[n].real() <= bspline2.t(j + bspline2.order() + 1).real())
+        {
+            // get middle of the integration interval
+            Complex mid = 0.5 * (knots[n-1] + knots[n]);
+            
+            // find to which interval this point belongs in both bases
+            int k1 = bspline1.knot(mid);
+            int k2 = bspline2.knot(mid);
+            
+            // get quadrature data
+            g.scaled_nodes_and_weights(points, knots[n-1], knots[n], nodes.data(), weights.data());
+            
+            // evaluate both B-splines on this interval
+            bspline1.B(i, k1, points, nodes.data(), eval1.data());
+            bspline2.B(j, k2, points, nodes.data(), eval2.data());
+            
+            // sum the evaluations
+            res += sum(eval1 * eval2 * weights);
+        }
+    }
+    
+    return res;
+}
+
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
@@ -345,6 +407,11 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     Mm1_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n                  ); });
     Mm1_tr_proj_.populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n, Nreknot_proj - 1); });
     Mm2_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -2, m, n                  ); });
+    
+    // compute inter-basis overlaps
+    for (int i = 0; i < bspline_atom_.Nspline(); i++)
+    for (int j = 0; j < bspline_proj_.Nspline(); j++)
+        S12_(i,j) = S21_(j,i) = computeS12(g_atom_, bspline_atom_, bspline_proj_, i, j);
     
     // save the matrices to disk
     if (not cmd.shared_scratch or par.IamMaster())

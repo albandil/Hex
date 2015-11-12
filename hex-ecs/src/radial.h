@@ -162,6 +162,15 @@ class RadialIntegrals
             int i, int j, int maxknot = -1
         ) const;
         
+        /// Calculate inter-basis overlap between two B-splines.
+        Complex computeS12
+        (
+            GaussLegendre const & g,
+            Bspline const & bspline1,
+            Bspline const & bspline2,
+            int i, int j
+        ) const;
+        
         /**
          * @brief Partial integral moment.
          * 
@@ -558,6 +567,10 @@ class RadialIntegrals
         SymBandMatrix<Complex> const & S_atom () const { return S_atom_; }
         SymBandMatrix<Complex> const & S_proj () const { return S_proj_; }
         
+        /// Return reference to the inter-basis overlaps.
+        RowMatrix<Complex> const & S12 () const { return S12_; }
+        RowMatrix<Complex> const & S21 () const { return S21_; }
+        
         /// Return reference to the precomputed integral moment matrix of order -1.
         SymBandMatrix<Complex> const & Mm1_atom () const { return Mm1_atom_; }
         SymBandMatrix<Complex> const & Mm1_proj () const { return Mm1_proj_; }
@@ -698,6 +711,9 @@ class RadialIntegrals
         // one-electron moment and overlap matrices
         SymBandMatrix<Complex> D_atom_, S_atom_, Mm1_atom_, Mm1_tr_atom_, Mm2_atom_;
         SymBandMatrix<Complex> D_proj_, S_proj_, Mm1_proj_, Mm1_tr_proj_, Mm2_proj_;
+        
+        // inter-basis overlaps
+        RowMatrix<Complex> S12_, S21_;
         
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_atom_, Mtr_mLm1_atom_;

@@ -218,6 +218,68 @@ int main (int argc, char* argv[])
         std::cout << std::endl;
     
     //
+    // Map solution file between two B-spline bases.
+    //
+    
+        if (not cmd.map_solution.empty())
+        {
+            if (cmd.map_solution_target.empty())
+                HexException("The option --map-solution-target is required.");
+            
+            // read the target basis description
+            std::ifstream ifs (cmd.map_solution_target.c_str());
+            InputFile target (ifs);
+            ifs.close();
+            
+            // compose knot sequence
+            if (not inp.overlap_knots.empty())
+            {
+                rArray overlap_knots = target.rknots.back() + target.overlap_knots.slice(1, target.overlap_knots.size());
+                target.rknots.append(overlap_knots.begin(), overlap_knots.end());
+            }
+            
+            // prepare target basis
+            Bspline bspline_target
+            (
+                target.order,
+                target.rknots,
+                target.ecstheta,
+                target.rknots.back() + target.cknots
+            );
+            
+            // prepare one-electron radial integrals
+            RadialIntegrals rad (bspline_panel.front(), bspline_target, bspline_target, 0);
+            rad.verbose(false);
+            rad.setupOneElectronIntegrals(par, cmd);
+            
+            // load the solution
+            cArray solution;
+            solution.hdfload(cmd.map_solution);
+            
+            // factorize target overlap matrix
+            CsrMatrix<LU_int_t,Complex> tgtS = rad.S_proj().tocoo<LU_int_t>().tocsr();
+            std::shared_ptr<LUft<LU_int_t,Complex>> tgtSlu = tgtS.factorize();
+            
+            // multiply inter-basis overlaps by the inverse target overlap matrix
+            ColMatrix<Complex> matrix (bspline_target.Nspline(), bspline_panel.front().Nspline());
+            ColMatrix<Complex> S21 = rad.S12().T();
+            tgtSlu->solve
+            (
+                S21.data(),
+                matrix.data(),
+                bspline_panel.front().Nspline()
+            );
+            RowMatrix<Complex> rmatrix (matrix);
+            
+            // map the solution
+            kron_dot(rmatrix, rmatrix, solution).hdfsave("mapped-" + cmd.map_solution);
+            
+            std::cout << "Solution mapped to a new basis." << std::endl;
+            
+            return EXIT_SUCCESS;
+        }
+    
+    //
     // Zip solution file into VTK geometry if told so
     //
     

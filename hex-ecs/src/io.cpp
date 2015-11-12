@@ -179,6 +179,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
                     "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
+                    "\t--map-solution <filename>        Convert solution between B-spline bases, requires target basis (--map-solution-target).                                \n"
+                    "\t--map-solution-target <filename> Target B-spline basis in another input file (like ecs.inp).                                                            \n"
 #ifdef WITH_MPI
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
@@ -261,6 +263,18 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // zip bounding box
                 zipmax = std::atof(optargs[0].c_str());
+                return true;
+            },
+        "map-solution", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // solution file to map
+                map_solution = optargs[0];
+                return true;
+            },
+        "map-solution-target", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // solution file to map
+                map_solution_target = optargs[0];
                 return true;
             },
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool

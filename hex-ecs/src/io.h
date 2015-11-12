@@ -90,7 +90,7 @@ class CommandLine
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
-              refine_solution(false)
+              refine_solution(false), map_solution(), map_solution_target()
         {
             // get command line options
             parse(argc, argv);
@@ -221,6 +221,12 @@ class CommandLine
         
         /// Load also existing solutions and check that they are within tolerance.
         bool refine_solution;
+        
+        /// Map solution between different B-spline bases.
+        std::string map_solution;
+        
+        /// target mapping basis.
+        std::string map_solution_target;
 };
 
 /**
