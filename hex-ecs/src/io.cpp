@@ -214,8 +214,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
                     "\t--ilu-max-blocks                 maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #endif
+#ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
-//                     "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
+#endif
                     "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
                     "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
@@ -398,18 +399,14 @@ void CommandLine::parse (int argc, char* argv[])
                 std::cout << std::endl;
                 std::exit(EXIT_SUCCESS);
             },
+#ifndef DISABLE_PARALLEL_PRECONDITION
         "parallel-precondition", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // parallelize preconditioning
                 parallel_precondition = true;
                 return true;
             },
-        "parallel-multiply", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // parallelize multiplication by the super-matrix
-                parallel_multiply = true;
-                return true;
-            },
+#endif
         "lightweight-radial-cache", "l", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not precompute two-electron radial integral matrices but only apply them on the fly

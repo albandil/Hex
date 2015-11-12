@@ -80,7 +80,6 @@ void NoPreconditioner::update (double E)
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     
     // setup diagonal blocks
-    # pragma omp parallel for if (cmd_.parallel_multiply)
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         // angular momenta
@@ -221,7 +220,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     }
     
     // for all segments constituting the RHS
-//     # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         int l1 = ang_.states()[ill].first;
@@ -318,7 +316,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         //
         
         // multiply "p" by the diagonal blocks
-//         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
         for (int ill = 0;  ill < Nang;  ill++)
         if (par_.isMyGroupWork(ill))
         {
@@ -358,7 +355,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 const_cast<BlockSymBandMatrix<Complex>&>(rad_.R_tr_dia(lambda)).hdfload();
             
             // update all blocks with this multipole potential matrix
-//             # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply and not cmd_.outofcore)
             for (int ill = 0;  ill < Nang;  ill++)
             {
                 if (cmd_.outofcore)
@@ -416,7 +412,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             cArray p0 (Nchunk);
             
             // for all source segments that this group owns
-//             # pragma omp parallel for firstprivate(p0) schedule (dynamic,1) if (cmd_.parallel_multiply)
             for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
             {
                 // load the segment, if on disk
@@ -476,7 +471,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         //
         
         // multiply "p" by the diagonal super-blocks
-//         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_multiply)
         for (int ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
         {
             if (cmd_.outofcore)

@@ -186,8 +186,13 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     }
     else
     {
+#ifndef DISABLE_PARALLEL_PRECONDITION
+        // NOTE : If the BLAS is multi-threaded, this will result in nested parallelism.
+        //        Some combinations of system kernel and OpenMP implementation lead to system
+        //        freeze. It can be avoided by using a serial BLAS.
         # pragma omp parallel for schedule (dynamic, 1) if (cmd_.parallel_precondition && cmd_.groupsize == 1)
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+#endif
+        for (int ill = 0; ill < (int)ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
         {
             // load segment, if necessary
             if (cmd_.outofcore)

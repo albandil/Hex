@@ -85,12 +85,8 @@ int main (int argc, char* argv[])
     //
     
         // check some exclusive options
-        if (cmd.parallel_multiply and cmd.lightweight_radial_cache)
-            HexException("The options --parallel-multiply and --lightweight-radial-cache/--lightweight-full can't be used together because of different multiplication scheme.");
         if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
             HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
-        if (cmd.parallel_multiply and not cmd.cache_all_radint)
-            HexException("Please do not use --parallel-multiply together with --out-of-core/--no-radial-cache/--own-radial-cache.");
         
         // setup MPI
         Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);
@@ -109,8 +105,12 @@ int main (int argc, char* argv[])
         # pragma omp parallel
         # pragma omp master
         {
+            int nthreads = omp_get_num_threads();
+            bool nested = omp_get_nested();
+            
             std::cout << "OpenMP environment" << std::endl;
-            std::cout << "\tthreads: " << omp_get_num_threads() << std::endl;
+            std::cout << "\tthreads: " << nthreads << std::endl;
+            std::cout << "\tnesting: " << (nested ? "on" : "off") << std::endl;
         }
 #endif
     
