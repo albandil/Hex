@@ -307,6 +307,12 @@ void KPACGPreconditioner::setup ()
 //                             << "\"" << std::endl;
 //                 }
 //             }
+
+            if (not cmd_.outofcore)
+            {
+                done_atom[l] = prec_atom_[l].hdfload();
+                done_proj[l] = prec_proj_[l].hdfload();
+            }
         }
         
         // if all preconditioners have been loaded, exit this routine
@@ -346,7 +352,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // initialize self
-//     if (cmd_.outofcore)
+    if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = ang_.states()[iblock].first;
@@ -397,8 +403,8 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
 
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
-    if (cmd_.parallel_precondition)
-        HexException("The preconditioner KPA doesn't support the option --parallel_precondition.");
+//     if (cmd_.parallel_precondition)
+//         HexException("The preconditioner KPA doesn't support the option --parallel_precondition.");
     
     // get angular momenta of this block
     int l1 = ang_.states()[iblock].first;
@@ -409,6 +415,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     std::size_t Nspline_proj = bspline_proj_.Nspline();
     
     // multiply by the first Kronecker product
+    # pragma omp critical
     dense_kron_dot
     (
         Nspline_atom, Nspline_atom, prec_atom_[l1].invCl_invsqrtS.data().data(),
@@ -423,6 +430,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         z[i * Nspline_proj + j] /= E_ - prec_atom_[l1].Dl[i] - prec_proj_[l2].Dl[j];
     
     // multiply by the second Kronecker product
+    # pragma omp critical
     dense_kron_dot
     (
         Nspline_atom, Nspline_atom, prec_atom_[l1].invsqrtS_Cl.data().data(),
@@ -434,7 +442,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void KPACGPreconditioner::CG_exit (int iblock) const
 {
     // exit self
-//     if (cmd_.outofcore)
+    if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = ang_.states()[iblock].first;
