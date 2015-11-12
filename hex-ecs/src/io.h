@@ -89,7 +89,8 @@ class CommandLine
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
-              carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1)
+              carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
+              refine_solution(false)
         {
             // get command line options
             parse(argc, argv);
@@ -217,6 +218,9 @@ class CommandLine
         
         /// Extraction averaging/extrapolation sample count.
         int extract_samples;
+        
+        /// Load also existing solutions and check that they are within tolerance.
+        bool refine_solution;
 };
 
 /**

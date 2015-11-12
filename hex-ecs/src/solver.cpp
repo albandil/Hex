@@ -376,6 +376,11 @@ void Solver::solve ()
                 SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie-1], ang_.states());
                 prev_sol_reader.load(psi);
             }
+            if (not cmd_.cont and ipanel_ == 0 and cmd_.refine_solution)
+            {
+                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
+                prev_sol_reader.load(psi);
+            }
             
             // launch the linear system solver
             unsigned max_iter = (inp_.maxell + 1) * Nspline_atom;

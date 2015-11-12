@@ -215,6 +215,7 @@ void CommandLine::parse (int argc, char* argv[])
 //                     "\t--parallel-multiply              Multiply by several super-matrix blocks at the same time.                                                              \n"
                     "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
+                    "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
 #ifdef WITH_OPENCL
                     "\t--cl-list                        List all OpenCL platforms and devices available.                                                                       \n"
                     "\t--cl-platform <index>            Use given OpenCL platform for GPU preconditioner (default is 0, i.e. the first platform found).                        \n"
@@ -514,6 +515,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use previous solution as an initial guess
                 carry_initial_guess = true;
+                return true;
+            },
+        "refine-solution", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // refine solution
+                refine_solution = true;
                 return true;
             },
         "extract-extrapolate", "", 0, [&](std::vector<std::string> const & optargs) -> bool
