@@ -149,39 +149,40 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     if (cmd_.ssor > 0)
     {
         // working arrays
-        BlockArray<Complex> y = r, x = r;
-        
-        // over-relaxation parameter
-        double kappa = cmd_.ssor;
+        cArrays y (r.size()), x (r.size());
         
         // forward SOR
         for (int ill = 0; ill < (int)ang_.states().size(); ill++)
         {
-            // subtract off-diagonals
+            // start with right-hand side
+            y[ill] = r[ill];
+            
+            // subtract lower block diagonals for ill-th block row
             for (int illp = 0; illp < ill; illp++)
-            for (int lambda = 0; lambda <= 1; lambda++)
+            for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
             if (ang_.f(ill, illp, lambda) != 0)
-                rad_.R_tr_dia(lambda).dot(ang_.f(ill, illp, lambda), y[illp], 1., y[ill]);
+                rad_.R_tr_dia(lambda).dot(-ang_.f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
-            n_[ill] = solve_block(ill, kappa * y[ill], x[ill]);
+            x[ill].resize(y[ill].size());
+            n_[ill] = solve_block(ill, cmd_.ssor * y[ill], x[ill]);
         }
         
         // normalize
         for (int ill = 0; ill < (int)ang_.states().size(); ill++)
-            this->CG_mmul(ill, (2. - kappa) / kappa * x[ill], y[ill]);
+            this->CG_mmul(ill, (2. - cmd_.ssor) / cmd_.ssor * x[ill], y[ill]);
         
         // backward SOR
         for (int ill = (int)ang_.states().size() - 1; ill >= 0; ill--)
         {
-            // subtract off-diagonals
+            // subtract upper block diagonals for ill-th block row
             for (int illp = ill + 1; illp < (int)ang_.states().size(); illp++)
-            for (int lambda = 0; lambda <= 1; lambda++)
+            for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
             if (ang_.f(ill, illp, lambda) != 0)
-                rad_.R_tr_dia(lambda).dot(ang_.f(ill, illp, lambda), y[illp], 1., y[ill]);
+                rad_.R_tr_dia(lambda).dot(-ang_.f(ill, illp, lambda), y[illp], 1., y[ill], true);
             
             // use (preconditioned) conjugate gradients to invert a diagonal block
-            n_[ill] += solve_block(ill, kappa * y[ill], z[ill]);
+            n_[ill] += solve_block(ill, cmd_.ssor * y[ill], z[ill]);
         }
     }
     else
