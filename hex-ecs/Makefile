@@ -22,10 +22,10 @@ LFLAGS = -fopenmp -lstdc++
 # BLAS & LAPACK                                                                #
 # ---------------------------------------------------------------------------- #
 
-# BLASLAPACKFLAGS = -DNO_LAPACK
-# BLASLAPACKLIBS = -lblas
+# BLASLAPACKFLAGS = 
+# BLASLAPACKLIBS = -lblas -llapack
 
-BLASLAPACKFLAGS =
+BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
 BLASLAPACKLIBS = -lopenblas
 
 # ---------------------------------------------------------------------------- #
