@@ -227,19 +227,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.          \n"
                     "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).                                          \n"
 #endif
-                    "                                                                                                                                                          \n"
-                    "There are also some environment variables that control the execution.                                                                                     \n"
-                    "                                                                                                                                                          \n"
-                    "\tOMP_NUM_THREADS     Number of OpenMP threads to use.                                                                                                    \n"
-                    "\t                    If empty, the physical number of hardware threads set by system is used.                                                            \n"
-                    "                                                                                                                                                          \n"
-                    "\tHEX_RHO             Scattering amplitude extraction distance (must be on the real part of the grid).                                                    \n"
-                    "\t                    If empty, the end of the real grid is used.                                                                                         \n"
-                    "                                                                                                                                                          \n"
-                    "\tHEX_SAMPLES         How many times to evaluate the amplitude in the vicinity of the evaluation point. The evaluations will be uniformly                 \n"
-                    "\t                    spread over one wave-length of the scattered electron and averaged to suppress numerical errors.                                    \n"
-                    "\t                    If empty, 10 evaluations are used.                                                                                                  \n"
-                    "                                                                                                                                                          \n"
                 ;
                 std::exit(EXIT_SUCCESS);
             },
