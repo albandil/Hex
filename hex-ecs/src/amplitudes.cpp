@@ -119,7 +119,15 @@ void Amplitudes::extract ()
                     // complain only if the solution is allowed
                     // TODO
                     
-                    std::cout << "\t\t\tSolution file(s) for L = " << inp_.L << ", Pi = " << inp_.Pi << ", ni = " << ni << ", li = " << li << ", mi = " << mi << " not found." << std::endl;
+                    std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") not found." << std::endl;
+                    continue;
+                }
+                
+                // check the size
+                if (solution.size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
+                {
+                    std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") have wrong size." << std::endl;
+                    std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution.size() << "." << std::endl;
                     continue;
                 }
                 
