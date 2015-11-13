@@ -20,13 +20,18 @@ LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
+#                                                                              #
+# The macro DISABLE_PARALLEL_PRECONDITION will inhibit nested parallelism      #
+# e.g. when using threaded OpenBLAS. This may (and may not) deliver            #
+# performance benefits in exchange of giving up possibility to precondition    #
+# several blocks concurrently.                                                 #
 # ---------------------------------------------------------------------------- #
 
-# BLASLAPACKFLAGS = 
-# BLASLAPACKLIBS = -lblas -llapack
+BLASLAPACKFLAGS = 
+BLASLAPACKLIBS = -lblas -llapack
 
-BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
-BLASLAPACKLIBS = -lopenblas
+# BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
+# BLASLAPACKLIBS = -lopenblas
 
 # ---------------------------------------------------------------------------- #
 # SuiteSparse/UMFPACK                                                          #
