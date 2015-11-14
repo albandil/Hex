@@ -358,6 +358,20 @@ void KPACGPreconditioner::CG_init (int iblock) const
         if (not prec_proj_[l2].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l2);
     }
+    
+#ifdef _OPENMP
+    // allocate workspace for this thread
+    if (cmd_.parallel_precondition)
+    {
+        unsigned ithread = omp_get_thread_num();
+        # pragma omp critical
+        {
+            while (workspace_.size() <= ithread)
+                workspace_.push_back(nullptr);
+            workspace_[ithread] = new Complex [bspline_atom_.Nspline() * bspline_proj_.Nspline()];
+        }
+    }
+#endif
 }
 
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -405,12 +419,20 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     std::size_t Nspline_atom = bspline_atom_.Nspline();
     std::size_t Nspline_proj = bspline_proj_.Nspline();
     
+    // get workspace
+    Complex * work = nullptr;
+#ifdef _OPENMP
+    unsigned ithread = omp_get_thread_num();
+    if (ithread < workspace_.size())
+        work = workspace_[ithread];
+#endif
+    
     // multiply by the first Kronecker product
     dense_kron_dot
     (
         Nspline_atom, Nspline_atom, prec_atom_[l1].invCl_invsqrtS.data().data(),
         Nspline_proj, Nspline_proj, prec_proj_[l2].invCl_invsqrtS.data().data(),
-        r.data(), z.data()
+        r.data(), z.data(), work
     );
     
     // divide by the diagonal
@@ -424,7 +446,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     (
         Nspline_atom, Nspline_atom, prec_atom_[l1].invsqrtS_Cl.data().data(),
         Nspline_proj, Nspline_proj, prec_proj_[l2].invsqrtS_Cl.data().data(),
-        z.data(), z.data()
+        z.data(), z.data(), work
     );
 }
 
@@ -441,6 +463,16 @@ void KPACGPreconditioner::CG_exit (int iblock) const
         prec_atom_[l1].drop();
         prec_proj_[l2].drop();
     }
+    
+    // release workspace
+#ifdef _OPENMP
+    unsigned ithread = omp_get_thread_num();
+    if (ithread < workspace_.size() and workspace_[ithread] != nullptr)
+    {
+        delete [] workspace_[ithread];
+        workspace_[ithread] = nullptr;
+    }
+#endif
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);

@@ -653,14 +653,16 @@ RowMatrix<Type> operator / (RowMatrix<Type> const & A, Type x)
  * @note This routine avoid reallocating of its intermediate work matrix
  * by making it static and only reallocating if the dimensions change. If you
  * need to free the memory occupied by the work matrix, call this function
- * with zero/nullptr arguments.
+ * with zero/nullptr arguments. Alternatively, supply a workspace
+ * of size B_rows x A_cols.
  */
 void dense_kron_dot
 (
     int A_rows, int A_cols, Complex const * A_data,
     int B_rows, int B_cols, Complex const * B_data,
     Complex const * v_data,
-    Complex       * w_data
+    Complex       * w_data,
+    Complex       * work = nullptr
 );
 
 /**

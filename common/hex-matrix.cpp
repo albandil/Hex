@@ -209,7 +209,8 @@ void dense_kron_dot
     int A_rows, int A_cols, Complex const * A_data,
     int B_rows, int B_cols, Complex const * B_data,
     Complex const * v_data,
-    Complex       * w_data
+    Complex       * w_data,
+    Complex       * work
 )
 {
     // work matrix
@@ -217,10 +218,14 @@ void dense_kron_dot
     static Complex * C_data = nullptr;
     
     // realloc the work matrix if necessary
-    if (B_rows * A_cols != C_rows * C_cols)
+    if (not work)
     {
-        delete [] C_data;
-        C_data = new Complex [B_rows * A_cols];
+        if (B_rows * A_cols != C_rows * C_cols)
+        {
+            delete [] C_data;
+            C_data = new Complex [B_rows * A_cols];
+        }
+        work = C_data;
     }
     
     // update sizes of the intermediate matrix
@@ -244,7 +249,7 @@ void dense_kron_dot
             &norm, &norm, &m, &n, &k,
             &alpha, const_cast<Complex*>(v_data), &m,
             const_cast<Complex*>(A_data), &k,
-            &beta, C_data, &m
+            &beta, work, &m
         );
     }
     
@@ -255,7 +260,7 @@ void dense_kron_dot
         (
             &trans, &norm, &m, &n, &k,
             &alpha, const_cast<Complex*>(B_data), &k,
-            C_data, &k,
+            work, &k,
             &beta, w_data, &m
         );
     }

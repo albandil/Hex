@@ -143,6 +143,9 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         // preconditioner data
         mutable std::vector<Data> prec_atom_;
         mutable std::vector<Data> prec_proj_;
+        
+        // workspace
+        mutable std::vector<Complex*> workspace_;
 };
 
 #endif

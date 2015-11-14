@@ -173,7 +173,7 @@ Complex RadialIntegrals::computeR
     // shorthands
     int order = bspline_atom_.order();
     int Nreknot_atom = bspline_atom_.Nreknot();
-    int Nreknot_proj = bspline_proj_.Nreknot();
+//     int Nreknot_proj = bspline_proj_.Nreknot();
     int Nreknot_proj_full = bspline_proj_full_.Nreknot();
     
     // leading and trailing knots of the B-splines
