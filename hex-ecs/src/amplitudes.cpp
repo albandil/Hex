@@ -124,10 +124,10 @@ void Amplitudes::extract ()
                 }
                 
                 // check the size
-                if (solution.size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
+                if (solution[0].size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
                 {
                     std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") have wrong size." << std::endl;
-                    std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution.size() << "." << std::endl;
+                    std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution[0].size() << "." << std::endl;
                     continue;
                 }
                 
