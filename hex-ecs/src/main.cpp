@@ -252,10 +252,6 @@ int main (int argc, char* argv[])
             rad.verbose(false);
             rad.setupOneElectronIntegrals(par, cmd);
             
-            // load the solution
-            cArray solution;
-            solution.hdfload(cmd.map_solution);
-            
             // factorize target overlap matrix
             CsrMatrix<LU_int_t,Complex> tgtS = rad.S_proj().tocoo<LU_int_t>().tocsr();
             std::shared_ptr<LUft<LU_int_t,Complex>> tgtSlu = tgtS.factorize();
@@ -271,10 +267,17 @@ int main (int argc, char* argv[])
             );
             RowMatrix<Complex> rmatrix (matrix);
             
-            // map the solution
-            kron_dot(rmatrix, rmatrix, solution).hdfsave("mapped-" + cmd.map_solution);
-            
-            std::cout << "Solution mapped to a new basis." << std::endl;
+            // map all solutions
+            for (unsigned i = 0; i < cmd.map_solution.size(); i++)
+            {
+                // load the solution
+                cArray solution;
+                solution.hdfload(cmd.map_solution[i]);
+                
+                // map the solution
+                kron_dot(rmatrix, rmatrix, solution).hdfsave("mapped-" + cmd.map_solution[i]);
+                std::cout << "Solution \"" << cmd.map_solution[i] << "\" mapped to a new basis." << std::endl;
+            }
             
             return EXIT_SUCCESS;
         }

@@ -220,7 +220,7 @@ class CommandLine
         bool refine_solution;
         
         /// Map solution between different B-spline bases.
-        std::string map_solution;
+        std::vector<std::string> map_solution;
         
         /// Target mapping basis.
         std::string map_solution_target;

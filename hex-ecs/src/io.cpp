@@ -254,10 +254,10 @@ void CommandLine::parse (int argc, char* argv[])
                 zipmax = std::atof(optargs[0].c_str());
                 return true;
             },
-        "map-solution", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "map-solution", "", -1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // solution file to map
-                map_solution = optargs[0];
+                map_solution = optargs;
                 return true;
             },
         "map-solution-target", "", 1, [&](std::vector<std::string> const & optargs) -> bool
