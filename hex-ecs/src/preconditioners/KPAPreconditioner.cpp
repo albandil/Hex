@@ -397,9 +397,6 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
 
 void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
-    if (cmd_.parallel_precondition)
-        HexException("The preconditioner KPA doesn't support the option --parallel_precondition.");
-    
     // get angular momenta of this block
     int l1 = ang_.states()[iblock].first;
     int l2 = ang_.states()[iblock].second;
