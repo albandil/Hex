@@ -417,7 +417,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     
     double wavelength = special::constant::two_pi / kf[ie];
     double Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.t(bspline_proj_.Nreknot() - 1).real();
-    double Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength;
+    double Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
