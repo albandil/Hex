@@ -228,6 +228,8 @@ int main (int argc, char* argv[])
             
             // read the target basis description
             std::ifstream ifs (cmd.map_solution_target.c_str());
+            if (not ifs.good())
+                HexException("Failed to open target setup file \"%s\".", cmd.map_solution_target.c_str());
             InputFile target (ifs);
             ifs.close();
             
