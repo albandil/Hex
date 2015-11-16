@@ -726,7 +726,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         };
         
         // solve using the CG solver
-        ConjugateGradients < clArray<Complex>, clArrayView<Complex> > CG;
+        ConjugateGradients < Complex, clArray<Complex>, clArrayView<Complex> > CG;
         n[ill] = CG.solve
         (
             rview,                  // rhs

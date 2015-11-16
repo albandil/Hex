@@ -105,6 +105,8 @@ template <class T> class PlainAllocator
                 
                 HexException("Insufficent memory (unable to allocate next %s).", strsize.c_str());
             }
+            
+            return nullptr;
         }
         
         /**

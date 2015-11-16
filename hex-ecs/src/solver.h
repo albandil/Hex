@@ -117,7 +117,7 @@ class Solver
         int ipanel_;
         
         /// Linear solver (conjugate gradients).
-        ConjugateGradients <cBlockArray, cBlockArray&> CG_;
+        ConjugateGradients <Complex, cBlockArray, cBlockArray&> CG_;
 };
 
 #endif // HEX_ECS_SOLVER_H

@@ -306,6 +306,7 @@ public:
         }
         
         HexException("Unsupported LU factorization method %d.", use_library);
+        return nullptr;
     }
     
     std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (double droptol = 0, void * data = nullptr) const;

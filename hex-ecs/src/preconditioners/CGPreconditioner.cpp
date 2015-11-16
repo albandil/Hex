@@ -121,7 +121,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     this->CG_init(ill);
     
     // solve using the CG solver
-    ConjugateGradients < cArray, cArrayView > CG;
+    ConjugateGradients < Complex, cArray, cArrayView > CG;
     CG.reset();
     int n = CG.solve
     (

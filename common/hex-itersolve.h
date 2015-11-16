@@ -58,15 +58,15 @@ template <class TArrayView> void default_constraint (TArrayView r)
  * by a different method, if necessary; for example when the created array needs
  * to be registered at GPU first.
  */
-inline cArray default_new_complex_array (std::size_t n, std::string name)
+template <class T> NumberArray<T> default_new_array (std::size_t n, std::string name)
 {
-    return cArray(n);
+    return NumberArray<T>(n);
 }
 
 /**
  * @brief Calculate scalar product of two arrays.
  */
-inline Complex default_scalar_product (cArray const & x, cArray const & y)
+template <class T> T default_scalar_product (NumberArray<T> const & x, NumberArray<T> const & y)
 {
     return (x|y);
 }
@@ -77,7 +77,7 @@ inline Complex default_scalar_product (cArray const & x, cArray const & y)
  * This routine is the default way of how to compute a norm of an object. It can be
  * overloaded by some more sophisticated implementation (e.g. BLAS or OpenCL version).
  */
-inline double default_compute_norm (const cArrayView x)
+template <class T> double default_compute_norm (const ArrayView<T> x)
 {
     return x.norm();
 }
@@ -90,14 +90,14 @@ inline double default_compute_norm (const cArrayView x)
  * another, if necessary; for example one could call specialized routine from BLAS
  * or use a GPU kernel.
  */
-inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArrayView y)
+template <class T> void default_axby (T a, ArrayView<T> x, T b, const ArrayView<T> y)
 {
     std::size_t N = x.size();
     assert(N == y.size());
     
     // accelerators
-    Complex       * const restrict px = x.data();
-    Complex const * const restrict py = y.data();
+    T       * const restrict px = x.data();
+    T const * const restrict py = y.data();
     
     // do the axby per element
     for (std::size_t i = 0; i < N; i++)
@@ -174,7 +174,13 @@ inline void default_complex_axby (Complex a, cArrayView x, Complex b, const cArr
  * 
  * @return Iteration count.
  */
-template < class TArray, class TArrayView > class ConjugateGradients
+template
+<
+    class T = double,
+    class TArray = rArray,
+    class TArrayView = rArray&
+>
+class ConjugateGradients
 {
     public:
         
@@ -184,10 +190,10 @@ template < class TArray, class TArrayView > class ConjugateGradients
         <
             class Preconditioner,
             class MatrixMultiplication,
-            class ComputeNorm   = decltype(default_compute_norm),
-            class ScalarProduct = decltype(default_scalar_product),
-            class AxbyOperation = decltype(default_complex_axby),
-            class NewArray      = decltype(default_new_complex_array),
+            class ComputeNorm   = decltype(default_compute_norm<T>),
+            class ScalarProduct = decltype(default_scalar_product<T>),
+            class AxbyOperation = decltype(default_axby<T>),
+            class NewArray      = decltype(default_new_array<T>),
             class Constraint    = decltype(default_constraint<TArrayView>)
         >
         unsigned solve
@@ -200,10 +206,10 @@ template < class TArray, class TArrayView > class ConjugateGradients
             Preconditioner apply_preconditioner,
             MatrixMultiplication matrix_multiply,
             bool verbose                   = true,
-            ComputeNorm compute_norm       = default_compute_norm,
-            ScalarProduct scalar_product   = default_scalar_product,
-            AxbyOperation axby             = default_complex_axby,
-            NewArray new_array             = default_new_complex_array,
+            ComputeNorm compute_norm       = default_compute_norm<T>,
+            ScalarProduct scalar_product   = default_scalar_product<T>,
+            AxbyOperation axby             = default_axby<T>,
+            NewArray new_array             = default_new_array<T>,
             Constraint constrain           = default_constraint<TArrayView>
         )
         {
@@ -339,12 +345,19 @@ template < class TArray, class TArrayView > class ConjugateGradients
         void recover ()
         {
             std::ifstream in ("cg.dat");
-            in >> k;
-            double x;
-            in >> x; rho_old.real(x);
-            in >> x; rho_old.imag(x);
-            in >> time_offset;
-            recovered = true;
+            if (in.is_open())
+            {
+                in >> k;
+                double x;
+                in >> x; rho_old.real(x);
+                in >> x; rho_old.imag(x);
+                in >> time_offset;
+                recovered = true;
+            }
+            else
+            {
+                reset();
+            }
         }
         
         void reset ()
