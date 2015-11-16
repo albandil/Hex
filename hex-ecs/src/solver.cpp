@@ -365,7 +365,7 @@ void Solver::solve ()
             }
             
             // load / reset solver state
-            if (cmd_.cont) CG_.recover(); else CG_.reset();
+            if (cmd_.cont or cmd_.refine_solution) CG_.recover(); else CG_.reset();
             
             // prepare solution vector
             BlockArray<Complex> psi (std::move(new_array(ang_.states().size(),"cg-x")));
@@ -471,8 +471,7 @@ void Solver::solve ()
 void Solver::apply_preconditioner_ (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // save state of the solver for possible restart
-    if (cmd_.outofcore)
-        CG_.dump();
+    CG_.dump();
     
     // MPI-distributed preconditioning
     prec_->precondition(r, z);
