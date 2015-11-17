@@ -579,6 +579,9 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
     char const * HEX_RHO = std::getenv("HEX_RHO");
     double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : std::atof(HEX_RHO);
     
+    // debug output
+    std::ofstream dbg ("debug.log");
+    
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
     auto fLSl1l2k1k2 = [&](double k1) -> Complex
     {
@@ -676,7 +679,7 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
         Q.setEps(1e-6);
         Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
         
-        std::cerr << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
+        dbg << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
         
         return res;
     };
