@@ -50,6 +50,7 @@
 #include <iostream>
 #include <type_traits>
 #include <string>
+#include <vector>
 
 #ifdef __linux__
     #include <unistd.h>
