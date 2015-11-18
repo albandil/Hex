@@ -41,33 +41,327 @@
 
 int func (double t, const double y[12], double dydt[12], void * params)
 {
-    double p1x = y[0], p1y = y[1], p1z = y[2];
-    double p2x = y[3], p2y = y[4], p2z = y[5];
-    double r1x = y[6], r1y = y[7], r1z = y[8];
-    double r2x = y[9], r2y = y[10], r2z = y[11];
-    double r12x = r2x-r1x, r12y = r2y-r1y, r12z = r2z-r1z;
-    double r21x = r1x-r2x, r21y = r1y-r2y, r21z = r1z-r2z;
+    // names for the twelve parameters
+    double const *p1 = y, *p2 = y + 3, *r1 = y + 6, *r2 = y + 9;
     
-    double r1 = std::sqrt(r1x*r1x + r1y*r1y + r1z*r1z);
-    double r2 = std::sqrt(r2x*r2x + r2y*r2y + r2z*r2z);
-    double r12 = std::sqrt(r12x*r12x + r12y*r12y + r12z*r12z);
-    double r21 = r12;
+    // relative particle position
+    double r12[3] = { r2[0] - r1[0], r2[1] - r1[1], r2[2] - r1[2] };
+    double r21[3] = { r1[0] - r2[0], r1[1] - r2[1], r1[2] - r2[2] };
     
-    dydt[0] = -r1x/(r1*r1*r1) + r21x/(r21*r21*r21);
-    dydt[1] = -r1y/(r1*r1*r1) + r21y/(r21*r21*r21);
-    dydt[2] = -r1z/(r1*r1*r1) + r21z/(r21*r21*r21);
-    dydt[3] = -r2x/(r2*r2*r2) + r12x/(r12*r12*r12);
-    dydt[4] = -r2y/(r2*r2*r2) + r12y/(r12*r12*r12);
-    dydt[5] = -r2z/(r2*r2*r2) + r12z/(r12*r12*r12);
-    dydt[6] = p1x; dydt[7] = p1y; dydt[8] = p1z;
-    dydt[9] = p2x; dydt[10] = p2y; dydt[11] = p2z;
+    // distance between a particle and the nucleus
+    double d1 = std::sqrt(r1[0]*r1[0] + r1[1]*r1[1] + r1[2]*r1[2]);
+    double d2 = std::sqrt(r2[0]*r2[0] + r2[1]*r2[1] + r2[2]*r2[2]);
+    
+    // distance between the particles
+    double d12 = std::sqrt(r12[0]*r12[0] + r12[1]*r12[1] + r12[2]*r12[2]);
+    double d21 = d12;
+    
+    // acceleration of the first particle
+    dydt[ 0] = -r1[0]/(d1*d1*d1) + r21[0]/(d21*d21*d21);
+    dydt[ 1] = -r1[1]/(d1*d1*d1) + r21[1]/(d21*d21*d21);
+    dydt[ 2] = -r1[2]/(d1*d1*d1) + r21[2]/(d21*d21*d21);
+    
+    // acceleration of the second particle
+    dydt[ 3] = -r2[0]/(d2*d2*d2) + r12[0]/(d12*d12*d12);
+    dydt[ 4] = -r2[1]/(d2*d2*d2) + r12[1]/(d12*d12*d12);
+    dydt[ 5] = -r2[2]/(d2*d2*d2) + r12[2]/(d12*d12*d12);
+    
+    // velocity of the first particle
+    dydt[ 6] = p1[0];
+    dydt[ 7] = p1[1];
+    dydt[ 8] = p1[2];
+    
+    // velocity of the second particle
+    dydt[ 9] = p2[0];
+    dydt[10] = p2[1];
+    dydt[11] = p2[2];
     
     return GSL_SUCCESS;
 }
 
 int jac (double t, const double y[12], double * dfdy, double dfdt[12], void * params)
 {
-    // TODO
+    // no explicit time dependence
+    std::memset(dfdt, 0, 12 * sizeof(double));
+    
+    // names for the twelve parameters
+    double const *r1 = y + 6, *r2 = y + 9;
+    
+    // relative particle position
+    double r12[3] = { r2[0] - r1[0], r2[1] - r1[1], r2[2] - r1[2] };
+    double r21[3] = { r1[0] - r2[0], r1[1] - r2[1], r1[2] - r2[2] };
+    
+    // distance between a particle and the nucleus
+    double d1 = std::sqrt(r1[0]*r1[0] + r1[1]*r1[1] + r1[2]*r1[2]);
+    double d2 = std::sqrt(r2[0]*r2[0] + r2[1]*r2[1] + r2[2]*r2[2]);
+    
+    // distance between the particles
+    double d12 = std::sqrt(r12[0]*r12[0] + r12[1]*r12[1] + r12[2]*r12[2]);
+    double d21 = d12;
+    
+    // --------------------------------------------------------------- //
+    
+    // da1[0]/dp1
+    dfdy[ 0 * 12 +  0] = 0;
+    dfdy[ 0 * 12 +  1] = 0;
+    dfdy[ 0 * 12 +  2] = 0;
+    
+    // da1[0]/dp2
+    dfdy[ 0 * 12 +  3] = 0;
+    dfdy[ 0 * 12 +  4] = 0;
+    dfdy[ 0 * 12 +  5] = 0;
+    
+    // da1[0]/dr1
+    dfdy[ 0 * 12 +  6] = -(d1*d1 - 3*r1[0]*r1[0])/(d1*d1*d1*d1*d1) + (d21*d21 - 3*r21[0]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 0 * 12 +  7] = -(d1*d1 - 3*r1[0]*r1[1])/(d1*d1*d1*d1*d1) + (        - 3*r21[0]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 0 * 12 +  8] = -(d1*d1 - 3*r1[0]*r1[2])/(d1*d1*d1*d1*d1) + (        - 3*r21[0]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // da1[0]/dr2
+    dfdy[ 0 * 12 +  9] = -(d21*d21 - 3*r21[0]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 0 * 12 + 10] = -(        - 3*r21[0]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 0 * 12 + 11] = -(        - 3*r21[0]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // --------------------------------------------------------------- //
+    
+    // da1[1]/dp1
+    dfdy[ 1 * 12 +  0] = 0;
+    dfdy[ 1 * 12 +  1] = 0;
+    dfdy[ 1 * 12 +  2] = 0;
+    
+    // da1[1]/dp2
+    dfdy[ 1 * 12 +  3] = 0;
+    dfdy[ 1 * 12 +  4] = 0;
+    dfdy[ 1 * 12 +  5] = 0;
+    
+    // da1[1]/dr1
+    dfdy[ 1 * 12 +  6] = -(d1*d1 - 3*r1[1]*r1[0])/(d1*d1*d1*d1*d1) + (        - 3*r21[1]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 1 * 12 +  7] = -(d1*d1 - 3*r1[1]*r1[1])/(d1*d1*d1*d1*d1) + (d21*d21 - 3*r21[1]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 1 * 12 +  8] = -(d1*d1 - 3*r1[1]*r1[2])/(d1*d1*d1*d1*d1) + (        - 3*r21[1]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // da1[1]/dr2
+    dfdy[ 1 * 12 +  9] = -(        - 3*r21[1]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 1 * 12 + 10] = -(d21*d21 - 3*r21[1]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 1 * 12 + 11] = -(        - 3*r21[1]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // --------------------------------------------------------------- //
+    
+    // da1[2]/dp1
+    dfdy[ 2 * 12 +  0] = 0;
+    dfdy[ 2 * 12 +  1] = 0;
+    dfdy[ 2 * 12 +  2] = 0;
+    
+    // da1[2]/dp2
+    dfdy[ 2 * 12 +  3] = 0;
+    dfdy[ 2 * 12 +  4] = 0;
+    dfdy[ 2 * 12 +  5] = 0;
+    
+    // da1[2]/dr1
+    dfdy[ 2 * 12 +  6] = -(d1*d1 - 3*r1[2]*r1[0])/(d1*d1*d1*d1*d1) + (        - 3*r21[2]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 2 * 12 +  7] = -(d1*d1 - 3*r1[2]*r1[1])/(d1*d1*d1*d1*d1) + (        - 3*r21[2]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 2 * 12 +  8] = -(d1*d1 - 3*r1[2]*r1[2])/(d1*d1*d1*d1*d1) + (d21*d21 - 3*r21[2]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // da1[2]/dr2
+    dfdy[ 2 * 12 +  9] = -(        - 3*r21[2]*r21[0])/(d21*d21*d21*d21*d21);
+    dfdy[ 2 * 12 + 10] = -(        - 3*r21[2]*r21[1])/(d21*d21*d21*d21*d21);
+    dfdy[ 2 * 12 + 11] = -(d21*d21 - 3*r21[2]*r21[2])/(d21*d21*d21*d21*d21);
+    
+    // --------------------------------------------------------------- //
+    
+    // da2[0]/dp1
+    dfdy[ 3 * 12 +  0] = 0;
+    dfdy[ 3 * 12 +  1] = 0;
+    dfdy[ 3 * 12 +  2] = 0;
+    
+    // da2[0]/dp2
+    dfdy[ 3 * 12 +  3] = 0;
+    dfdy[ 3 * 12 +  4] = 0;
+    dfdy[ 3 * 12 +  5] = 0;
+    
+    // da2[0]/dr1
+    dfdy[ 3 * 12 +  6] = -(d12*d12 - 3*r12[0]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 3 * 12 +  7] = -(        - 3*r12[0]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 3 * 12 +  8] = -(        - 3*r12[0]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // da2[0]/dr2
+    dfdy[ 3 * 12 +  9] = -(d2*d2 - 3*r2[0]*r2[0])/(d2*d2*d2*d2*d2) + (d12*d12 - 3*r12[0]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 3 * 12 + 10] = -(d2*d2 - 3*r2[0]*r2[1])/(d2*d2*d2*d2*d2) + (        - 3*r12[0]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 3 * 12 + 11] = -(d2*d2 - 3*r2[0]*r2[2])/(d2*d2*d2*d2*d2) + (        - 3*r12[0]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // --------------------------------------------------------------- //
+    
+    // da2[1]/dp1
+    dfdy[ 4 * 12 +  0] = 0;
+    dfdy[ 4 * 12 +  1] = 0;
+    dfdy[ 4 * 12 +  2] = 0;
+    
+    // da2[1]/dp2
+    dfdy[ 4 * 12 +  3] = 0;
+    dfdy[ 4 * 12 +  4] = 0;
+    dfdy[ 4 * 12 +  5] = 0;
+    
+    // da2[1]/dr1
+    dfdy[ 4 * 12 +  6] = -(        - 3*r12[1]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 4 * 12 +  7] = -(d12*d12 - 3*r12[1]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 4 * 12 +  8] = -(        - 3*r12[1]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // da2[1]/dr2
+    dfdy[ 4 * 12 +  9] = -(d2*d2 - 3*r2[1]*r2[0])/(d2*d2*d2*d2*d2) + (        - 3*r12[1]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 4 * 12 + 10] = -(d2*d2 - 3*r2[1]*r2[1])/(d2*d2*d2*d2*d2) + (d12*d12 - 3*r12[1]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 4 * 12 + 11] = -(d2*d2 - 3*r2[1]*r2[2])/(d2*d2*d2*d2*d2) + (        - 3*r12[1]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // --------------------------------------------------------------- //
+    
+    // da2[2]/dp1
+    dfdy[ 5 * 12 +  0] = 0;
+    dfdy[ 5 * 12 +  1] = 0;
+    dfdy[ 5 * 12 +  2] = 0;
+    
+    // da2[2]/dp2
+    dfdy[ 5 * 12 +  3] = 0;
+    dfdy[ 5 * 12 +  4] = 0;
+    dfdy[ 5 * 12 +  5] = 0;
+    
+    // da2[2]/dr1
+    dfdy[ 5 * 12 +  6] = -(        - 3*r12[2]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 5 * 12 +  7] = -(        - 3*r12[2]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 5 * 12 +  8] = -(d12*d12 - 3*r12[2]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // da2[2]/dr2
+    dfdy[ 5 * 12 +  9] = -(d2*d2 - 3*r2[2]*r2[0])/(d2*d2*d2*d2*d2) + (        - 3*r12[2]*r12[0])/(d12*d12*d12*d12*d12);
+    dfdy[ 5 * 12 + 10] = -(d2*d2 - 3*r2[2]*r2[1])/(d2*d2*d2*d2*d2) + (        - 3*r12[2]*r12[1])/(d12*d12*d12*d12*d12);
+    dfdy[ 5 * 12 + 11] = -(d2*d2 - 3*r2[2]*r2[2])/(d2*d2*d2*d2*d2) + (d12*d12 - 3*r12[2]*r12[2])/(d12*d12*d12*d12*d12);
+    
+    // --------------------------------------------------------------- //
+    
+    // dv1[0]/dp1
+    dfdy[ 6 * 12 +  0] = 1;
+    dfdy[ 6 * 12 +  1] = 0;
+    dfdy[ 6 * 12 +  2] = 0;
+    
+    // dv1[0]/dp2
+    dfdy[ 6 * 12 +  3] = 0;
+    dfdy[ 6 * 12 +  4] = 0;
+    dfdy[ 6 * 12 +  5] = 0;
+    
+    // dv1[0]/dr1
+    dfdy[ 6 * 12 +  6] = 0;
+    dfdy[ 6 * 12 +  7] = 0;
+    dfdy[ 6 * 12 +  8] = 0;
+    
+    // dv1[0]/dr2
+    dfdy[ 6 * 12 +  9] = 0;
+    dfdy[ 6 * 12 + 10] = 0;
+    dfdy[ 6 * 12 + 11] = 0;
+    
+    // --------------------------------------------------------------- //
+    
+    // dv1[1]/dp1
+    dfdy[ 7 * 12 +  0] = 0;
+    dfdy[ 7 * 12 +  1] = 1;
+    dfdy[ 7 * 12 +  2] = 0;
+    
+    // dv1[1]/dp2
+    dfdy[ 7 * 12 +  3] = 0;
+    dfdy[ 7 * 12 +  4] = 0;
+    dfdy[ 7 * 12 +  5] = 0;
+    
+    // dv1[1]/dr1
+    dfdy[ 7 * 12 +  6] = 0;
+    dfdy[ 7 * 12 +  7] = 0;
+    dfdy[ 7 * 12 +  8] = 0;
+    
+    // dv1[1]/dr2
+    dfdy[ 7 * 12 +  9] = 0;
+    dfdy[ 7 * 12 + 10] = 0;
+    dfdy[ 7 * 12 + 11] = 0;
+    
+    // --------------------------------------------------------------- //
+    
+    // dv1[2]/dp1
+    dfdy[ 8 * 12 +  0] = 0;
+    dfdy[ 8 * 12 +  1] = 0;
+    dfdy[ 8 * 12 +  2] = 1;
+    
+    // dv1[2]/dp2
+    dfdy[ 8 * 12 +  3] = 0;
+    dfdy[ 8 * 12 +  4] = 0;
+    dfdy[ 8 * 12 +  5] = 0;
+    
+    // dv1[2]/dr1
+    dfdy[ 8 * 12 +  6] = 0;
+    dfdy[ 8 * 12 +  7] = 0;
+    dfdy[ 8 * 12 +  8] = 0;
+    
+    // dv1[2]/dr2
+    dfdy[ 8 * 12 +  9] = 0;
+    dfdy[ 8 * 12 + 10] = 0;
+    dfdy[ 8 * 12 + 11] = 0;
+    
+    // --------------------------------------------------------------- //
+    
+    // dv2[0]/dp1
+    dfdy[ 9 * 12 +  0] = 0;
+    dfdy[ 9 * 12 +  1] = 0;
+    dfdy[ 9 * 12 +  2] = 0;
+    
+    // dv2[0]/dp2
+    dfdy[ 9 * 12 +  3] = 1;
+    dfdy[ 9 * 12 +  4] = 0;
+    dfdy[ 9 * 12 +  5] = 0;
+    
+    // dv2[0]/dr1
+    dfdy[ 9 * 12 +  6] = 0;
+    dfdy[ 9 * 12 +  7] = 0;
+    dfdy[ 9 * 12 +  8] = 0;
+    
+    // dv2[0]/dr2
+    dfdy[ 9 * 12 +  9] = 0;
+    dfdy[ 9 * 12 + 10] = 0;
+    dfdy[ 9 * 12 + 11] = 0;
+    
+    // --------------------------------------------------------------- //
+    
+    // dv2[1]/dp1
+    dfdy[10 * 12 +  0] = 0;
+    dfdy[10 * 12 +  1] = 0;
+    dfdy[10 * 12 +  2] = 0;
+    
+    // dv2[1]/dp2
+    dfdy[10 * 12 +  3] = 0;
+    dfdy[10 * 12 +  4] = 1;
+    dfdy[10 * 12 +  5] = 0;
+    
+    // dv2[1]/dr1
+    dfdy[10 * 12 +  6] = 0;
+    dfdy[10 * 12 +  7] = 0;
+    dfdy[10 * 12 +  8] = 0;
+    
+    // dv2[1]/dr2
+    dfdy[10 * 12 +  9] = 0;
+    dfdy[10 * 12 + 10] = 0;
+    dfdy[10 * 12 + 11] = 0;
+    
+    // --------------------------------------------------------------- //
+    
+    // dv2[2]/dp1
+    dfdy[10 * 12 +  0] = 0;
+    dfdy[10 * 12 +  1] = 0;
+    dfdy[10 * 12 +  2] = 0;
+    
+    // dv2[2]/dp2
+    dfdy[10 * 12 +  3] = 0;
+    dfdy[10 * 12 +  4] = 0;
+    dfdy[10 * 12 +  5] = 1;
+    
+    // dv2[2]/dr1
+    dfdy[10 * 12 +  6] = 0;
+    dfdy[10 * 12 +  7] = 0;
+    dfdy[10 * 12 +  8] = 0;
+    
+    // dv2[2]/dr2
+    dfdy[10 * 12 +  9] = 0;
+    dfdy[10 * 12 + 10] = 0;
+    dfdy[10 * 12 + 11] = 0;
     
     return GSL_SUCCESS;
 }
@@ -117,7 +411,6 @@ int main (int argc, char * argv[])
         
         //- Check if it is bound.
         bound = (0.5*(p1[0]*p1[0]+p1[1]*p1[1]+p1[2]*p1[2])*std::sqrt(r1[0]*r1[0]+r1[1]*r1[1]+r1[2]*r1[2]) < 1);
-    
     }
     while (not bound);
     
@@ -131,16 +424,18 @@ int main (int argc, char * argv[])
     gsl_odeiv2_system sys;
         sys.dimension = 12;
         sys.function = &func;
-        sys.jacobian = nullptr;
+        sys.jacobian = &jac;
         sys.params = nullptr;
     
-    gsl_odeiv2_driver * driver = gsl_odeiv2_driver_alloc_y_new(&sys, gsl_odeiv2_step_rk4, 1e-3, 1e-8, 1e-5);
+    gsl_odeiv2_driver * driver = gsl_odeiv2_driver_alloc_y_new(&sys, /*gsl_odeiv2_step_rk4*/gsl_odeiv2_step_bsimp, 1e-3, 1e-8, 1e-5); // gsl_odeiv2_step_bsimp
+    
+    std::ofstream trajectory ("trajectory.log");
     
     double y[12] = { p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], r1[0], r1[1], r1[2], r2[0], r2[1], r2[2] };
-    std::cout << "0 ";
+    trajectory << "0 ";
     for (int i = 0; i < 12; i++)
-        std::cout << y[i] << " ";
-    std::cout << std::endl;
+        trajectory << y[i] << " ";
+    trajectory << std::endl;
     
     int err = 0;
     double lr1 = 0, lr2 = 0;
@@ -149,16 +444,70 @@ int main (int argc, char * argv[])
     {
         gsl_odeiv2_driver_apply(driver, &t, t + 1, y);
     
-        std::cout << t << " ";
+        trajectory << t << " ";
         for (int i = 0; i < 12; i++)
-            std::cout << y[i] << " ";
-        std::cout << std::endl;
+            trajectory << y[i] << " ";
+        trajectory << std::endl;
         
         lr1 = std::sqrt(y[6]*y[6]+y[7]*y[7]+y[8]*y[8]);
         lr2 = std::sqrt(y[9]*y[9]+y[10]*y[10]+y[11]*y[11]);
     }
     
     gsl_odeiv2_driver_free(driver);
+    
+    // pre-run summary
+    {
+        double L1[3] = { r1[1]*p1[2]-r1[2]*r1[1], r1[2]*p1[0]-r1[0]*p1[2], r1[0]*p1[1]-r1[1]*p1[2] };
+        double L2[3] = { r2[1]*p2[2]-r2[2]*r2[1], r2[2]*p2[0]-r2[0]*p2[2], r2[0]*p2[1]-r2[1]*p2[2] };
+        
+        double d1 = std::sqrt(r1[0]*r1[0]+r1[1]*r1[1]+r1[2]*r1[2]);
+        double d2 = std::sqrt(r2[0]*r2[0]+r2[1]*r2[1]+r2[2]*r2[2]);
+        
+        double T1 = (p1[0]*p1[0]+p1[1]*p1[1]+p1[2]*p1[2]), V1 = - 2./d1;
+        double T2 = (p2[0]*p2[0]+p2[1]*p2[1]+p2[2]*p2[2]), V2 = - 2./d2;
+        
+        std::cout << "Initial state" << std::endl;
+        std::cout << "    atomic electron" << std::endl;
+        std::cout << "        distance [a0]:    " << d1 << std::endl;;
+        std::cout << "        kin. energy [Ry]: " << T1 << std::endl;
+        std::cout << "        tot. energy [Ry]: " << T1 + V1 << std::endl;
+        std::cout << "        ang. mom. [a.u.]: " << std::sqrt(L1[0]*L1[0]+L1[1]*L1[1]+L1[2]*L1[2]) << std::endl;
+        std::cout << "    projectile electron" << std::endl;
+        std::cout << "        distance [a0]:    " << d2<< std::endl;;
+        std::cout << "        kin. energy [Ry]: " << T1 << std::endl;
+        std::cout << "        tot. energy [Ry]: " << T1 + V1 << std::endl;
+        std::cout << "        ang. mom. [a.u.]: " << std::sqrt(L2[0]*L2[0]+L2[1]*L2[1]+L2[2]*L2[2]) << std::endl;
+        std::cout << "    total energy [Ry]:    " << T1 + V1 + T2 + V2 << std::endl;
+        std::cout << std::endl;
+    }
+    
+    // post-run summary
+    {
+        double *p1 = y, *p2 = y + 3, *r1 = y + 6, *r2 = y + 9;
+        
+        double L1[3] = { r1[1]*p1[2]-r1[2]*r1[1], r1[2]*p1[0]-r1[0]*p1[2], r1[0]*p1[1]-r1[1]*p1[2] };
+        double L2[3] = { r2[1]*p2[2]-r2[2]*r2[1], r2[2]*p2[0]-r2[0]*p2[2], r2[0]*p2[1]-r2[1]*p2[2] };
+        
+        double d1 = std::sqrt(r1[0]*r1[0]+r1[1]*r1[1]+r1[2]*r1[2]);
+        double d2 = std::sqrt(r2[0]*r2[0]+r2[1]*r2[1]+r2[2]*r2[2]);
+        
+        double T1 = (p1[0]*p1[0]+p1[1]*p1[1]+p1[2]*p1[2]), V1 = - 2./d1;
+        double T2 = (p2[0]*p2[0]+p2[1]*p2[1]+p2[2]*p2[2]), V2 = - 2./d2;
+        
+        std::cout << "Initial state" << std::endl;
+        std::cout << "    atomic electron" << std::endl;
+        std::cout << "        distance [a0]:    " << d1 << std::endl;;
+        std::cout << "        kin. energy [Ry]: " << T1 << std::endl;
+        std::cout << "        tot. energy [Ry]: " << T1 + V1 << std::endl;
+        std::cout << "        ang. mom. [a.u.]: " << std::sqrt(L1[0]*L1[0]+L1[1]*L1[1]+L1[2]*L1[2]) << std::endl;
+        std::cout << "    projectile electron" << std::endl;
+        std::cout << "        distance [a0]:    " << d2<< std::endl;;
+        std::cout << "        kin. energy [Ry]: " << T1 << std::endl;
+        std::cout << "        tot. energy [Ry]: " << T1 + V1 << std::endl;
+        std::cout << "        ang. mom. [a.u.]: " << std::sqrt(L2[0]*L2[0]+L2[1]*L2[1]+L2[2]*L2[2]) << std::endl;
+        std::cout << "    total energy [Ry]:    " << T1 + V1 + T2 + V2 << std::endl;
+        std::cout << std::endl;
+    }
     
     return EXIT_SUCCESS;
 }
