@@ -227,6 +227,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-use-host-memory             Keep large data in RAM instead of copying everything to the compute device. This will slow down the solution.          \n"
                     "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).                                          \n"
 #endif
+                    "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
             },
