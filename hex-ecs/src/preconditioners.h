@@ -125,6 +125,8 @@ class CGPreconditioner;
 class KPACGPreconditioner;
 class ILUCGPreconditioner;
 class GPUCGPreconditioner;
+class HybCGPreconditioner;
+class CoupledPreconditioner;
 
 #include "preconditioners/NoPreconditioner.h"
 #include "preconditioners/CGPreconditioner.h"
@@ -132,6 +134,7 @@ class GPUCGPreconditioner;
 #include "preconditioners/ILUPreconditioner.h"
 #include "preconditioners/GPUPreconditioner.h"
 #include "preconditioners/HybPreconditioner.h"
+#include "preconditioners/CoupledPreconditioner.h"
 
 /**
  * @brief Preconditioner traits.
@@ -170,12 +173,13 @@ class Preconditioners
             ILUCGPreconditioner         // Solve diagonal blocks by drop-tolerance incomplete LU factorization.
             , NoPreconditioner          // No preconditioner.
             , CGPreconditioner          // Solve diagonal blocks by non-preconditioned CG iterations.
-#ifndef NO_LAPACK
             , KPACGPreconditioner       // Solve diagonal blocks by separate electrons preconditioned CG iterations.
-            , HybCGPreconditioner         // Combine ILU and KPA.
-#endif
+            , HybCGPreconditioner       // Combine ILU and KPA.
 #ifdef WITH_OPENCL
-            , GPUCGPreconditioner         // KPA implemented on GPU.
+            , GPUCGPreconditioner       // KPA implemented on GPU.
+#endif
+#ifdef WITH_MUMPS
+            , CoupledPreconditioner     // Coupled solver.
 #endif
         > AvailableTypes;
         

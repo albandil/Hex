@@ -64,6 +64,13 @@ SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 # SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lmetis_ilp64
 
 # ---------------------------------------------------------------------------- #
+# MUMPS library for the out-of-core coupled solver.                            #
+# ---------------------------------------------------------------------------- #
+
+# MUMPSFLAGS = -DWITH_MUMPS
+# MUMPSLIBS = -lzmumps_seq
+
+# ---------------------------------------------------------------------------- #
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #
 

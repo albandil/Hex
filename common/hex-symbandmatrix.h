@@ -717,6 +717,16 @@ template <class DataT> class BlockSymBandMatrix
         /// Access to the memory buffer (maay be empty if data not in memory).
         NumberArray<DataT> const & data () const { return data_; }
         
+        /**
+         * @brief Access element.
+         * 
+         * Return the element [i * size + j, k * size + l].
+         */
+        DataT operator() (int i, int j, int k, int l) const
+        {
+            return data_[((std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ + std::min(j, l)) * halfbw_ + std::abs(j - l)];
+        }
+        
         /// Access individual blocks.
         NumberArray<DataT> getBlock (int i) const
         {

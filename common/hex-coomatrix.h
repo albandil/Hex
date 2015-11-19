@@ -535,10 +535,10 @@ public:
         
         f << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
         
-        for (IdxT i = 0; i < i_.size(); i++)
+        for (IdxT i = 0; i < (IdxT)i_.size(); i++)
         {
             f << i_[i] << "\t" << j_[i];
-            for (int icmp = 0; icmp < typeinfo<DataT>::ncmpt; icmp++)
+            for (unsigned icmp = 0; icmp < typeinfo<DataT>::ncmpt; icmp++)
                 f << "\t" << typeinfo<DataT>::cmpt(icmp, x_[i]);
             f << "\n";
         }
