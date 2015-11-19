@@ -67,6 +67,8 @@ void CoupledPreconditioner::setup ()
     // number of nonzero elements on and above the diagonal of the full matrix
     std::size_t nz = (nz_matrix - nz_diagonal) / 2 + nz_diagonal;
     
+    std::cout << "Precompute full hamiltonian matrix (" << nz << " non-zeros) ... " << std::flush;
+    
     // the block super-matrix in a single COO matrix
     I.resize(nz);
     J.resize(nz);
@@ -74,7 +76,6 @@ void CoupledPreconditioner::setup ()
     std::size_t pos = 0;
     
     // fill the matrix
-    std::cout << "Precompute full hamiltonian matrix (" << nz << " non-zeros) ... " << std::flush;
     for (unsigned ill  = 0; ill  < Nang; ill ++)
     for (unsigned illp = ill; illp < Nang; illp++)
     for (int i = 0; i < (int)Nspline_atom; i++)
