@@ -429,7 +429,7 @@ void CommandLine::parse (int argc, char* argv[])
         "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not recalculate LU
-                noluupdate = false;
+                noluupdate = true;
                 return true;
             },
         "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
