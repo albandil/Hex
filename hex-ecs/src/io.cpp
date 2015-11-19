@@ -194,6 +194,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
+                    "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
                     "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.                                                                 \n"
@@ -401,7 +402,6 @@ void CommandLine::parse (int argc, char* argv[])
                 lightweight_radial_cache = true;
                 return true;
             },
-#ifndef NO_LAPACK
         "lightweight-full", "L", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not precompute large matrices but only apply them on the fly
@@ -426,7 +426,12 @@ void CommandLine::parse (int argc, char* argv[])
                 ilu_max_blocks = std::atoi(optargs[0].c_str());
                 return true;
             },
-#endif
+        "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // do not recalculate LU
+                noluupdate = false;
+                return true;
+            },
         "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // precompute only the owned subset of radial integrals

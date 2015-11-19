@@ -64,7 +64,7 @@ class NoPreconditioner : public PreconditionerBase
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
             CommandLine const & cmd
-        ) : PreconditionerBase(), cmd_(cmd), par_(par), inp_(inp), ang_(ll),
+        ) : PreconditionerBase(), E_(0), cmd_(cmd), par_(par), inp_(inp), ang_(ll),
             dia_blocks_(ang_.states().size()), bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
             rad_(bspline_atom, bspline_proj, bspline_proj_full, ang_.maxlambda() + 1)
         {

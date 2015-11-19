@@ -87,7 +87,7 @@ void ILUCGPreconditioner::setup ()
 void ILUCGPreconditioner::update (double E)
 {
     // reset data on energy change
-    if (E != E_)
+    if (E != E_ and not cmd_.noluupdate)
     {
         // release outdated LU factorizations
         for (auto & lu : lu_)

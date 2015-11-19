@@ -32,6 +32,10 @@
 #ifndef HEX_ECS_COUPLED_PRECONDITIONER_H
 #define HEX_ECS_COUPLED_PRECONDITIONER_H
 
+#ifdef WITH_MUMPS
+
+#include <mumps/zmumps_c.h>
+
 #include "preconditioners.h"
 
 /**
@@ -63,14 +67,23 @@ class CoupledPreconditioner : public NoPreconditioner
         ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd) {}
         
         // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
-        virtual void finish () { NoPreconditioner::finish(); }
         
         // declare own definitions
+        virtual void setup ();
+        virtual void update (double E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
+        virtual void finish ();
+    
+    protected:
+    
+        mutable ZMUMPS_STRUC_C settings;
+        NumberArray<MUMPS_INT> I, J;
+        cArray A;
+        mutable cArray X;
 };
 
-#endif
+#endif // WITH_MUMPS
+
+#endif // HEX_ECS_COUPLED_PRECONDITIONER_H

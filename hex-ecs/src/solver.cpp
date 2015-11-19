@@ -383,6 +383,7 @@ void Solver::solve ()
             }
             
             // launch the linear system solver
+            Timer t;
             unsigned max_iter = (inp_.maxell + 1) * Nspline_atom;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
@@ -405,7 +406,7 @@ void Solver::solve ()
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
             else
-                std::cout << "\tSolution converged." << std::endl;
+                std::cout << "\tSolution converged after " << t.nice_time() << "." << std::endl;
             
             // update progress
             iterations_done += iterations;

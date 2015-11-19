@@ -40,19 +40,16 @@
 const std::string CoupledPreconditioner::prec_name = "coupled";
 const std::string CoupledPreconditioner::prec_description = "Coupled solver that uses MUMPS OOC.";
 
-void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
+void CoupledPreconditioner::setup ()
 {
+    // update parent
+    NoPreconditioner::setup();
+    
     // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
     std::size_t order = bspline_atom_.order();
     std::size_t Nspline_atom = bspline_atom_.Nspline();
     std::size_t Nspline_proj = bspline_proj_.Nspline();
-    
-    // convert block array to monolithic array
-    cArray X (Nang * Nchunk);
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        X[ill * Nchunk + i] = r[ill][i];
+    std::size_t Nang = ang_.states().size(), Nchunk = Nspline_atom * Nspline_proj;
     
     // number of nonzero elements of atom/projectile basis overlap matrix
     std::size_t nz_atom = Nspline_atom * (1 + 2 * order) - order * (order + 1);
@@ -71,10 +68,13 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     std::size_t nz = (nz_matrix - nz_diagonal) / 2 + nz_diagonal;
     
     // the block super-matrix in a single COO matrix
-    NumberArray<MUMPS_INT> I (nz), J (nz); cArray A (nz);
+    I.resize(nz);
+    J.resize(nz);
+    A.resize(nz);
     std::size_t pos = 0;
     
     // fill the matrix
+    std::cout << "Precompute full hamiltonian matrix (" << nz << " non-zeros) ... " << std::flush;
     for (unsigned ill  = 0; ill  < Nang; ill ++)
     for (unsigned illp = ill; illp < Nang; illp++)
     for (int i = 0; i < (int)Nspline_atom; i++)
@@ -103,7 +103,7 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
         {
             double f = ang_.f(ill, illp, lambda);
             if (f != 0)
-                elem -= f * rad_.R_tr_dia(lambda)(i,j,k,l);
+                elem -= f * rad_.computeR(lambda,i,j,k,l);
         }
         
         I[pos] = irow + 1;
@@ -111,9 +111,9 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
         A[pos] = elem;
         pos++;
     }
+    std::cout << "ok" << std::endl;
     
-    // initialize MUMPS
-    ZMUMPS_STRUC_C settings;
+    // initialize
     settings.sym = 2;
     settings.par = 1;
     settings.job = -1;
@@ -121,6 +121,10 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     
     // analyze
     settings.job = 1;
+    settings.ICNTL(1) = 0; // errors to STDOUT (default: 6)
+    settings.ICNTL(2) = 0; // diagnostics to /dev/null
+    settings.ICNTL(3) = 0; // global info to STDOUT (default: 6)
+    settings.ICNTL(4) = 0; // verbosity level (default: 2)
     settings.ICNTL(5) = 0; // COO format
     settings.ICNTL(22) = 1; // OOC factorization
     std::strcpy(settings.ooc_tmpdir, ".");
@@ -130,27 +134,91 @@ void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockAr
     settings.irn = I.data();
     settings.jcn = J.data();
     settings.a = reinterpret_cast<mumps_double_complex*>(A.data());
+    std::cout << "Analyze the hamiltonian using MUMPS ... " << std::flush;
+    zmumps_c(&settings);
+    std::cout << std::endl << std::endl;
+    
+    // resize also work vector
+    X.resize(Nang * Nchunk);
     settings.nrhs = 1;
     settings.lrhs = Nang * Nchunk;
     settings.rhs = reinterpret_cast<mumps_double_complex*>(X.data());
-    zmumps_c(&settings);
+}
+
+void CoupledPreconditioner::update (double E)
+{
+    // store energy change
+    double dE = E - E_;
     
-    // factorize
-    settings.job = 2;
-    zmumps_c(&settings);
+    // update parent
+    NoPreconditioner::update(E);
+    
+    // useful variables
+    std::size_t Nspline_atom = bspline_atom_.Nspline();
+    std::size_t Nspline_proj = bspline_proj_.Nspline();
+    
+    // update factorization
+    if (settings.job < 2 or not cmd_.noluupdate)
+    {
+        // update matrix
+        std::cout << "\tUpdate matrix (energy change from " << 2 * (E_ - dE) << " to " << 2 * E_ << " Ry) ... " << std::flush;
+        for (std::size_t pos = 0; pos < A.size(); pos++)
+        {
+            // split row multi-index
+            std::size_t ill = I[pos] - 1;
+            std::size_t j = ill % Nspline_proj; ill /= Nspline_proj;
+            std::size_t i = ill % Nspline_atom; ill /= Nspline_atom;
+            
+            // split column multi-index
+            std::size_t illp = J[pos] - 1;
+            std::size_t l = illp % Nspline_proj; illp /= Nspline_proj;
+            std::size_t k = illp % Nspline_atom; illp /= Nspline_atom;
+            
+            // update diagonal blocks to use the new energy
+            if (ill == illp)
+                A[pos] += dE * rad_.S_atom()(i,k) * rad_.S_proj()(j,l);
+        }
+        std::cout << "ok" << std::endl;
+        
+        // factorize updated matrix
+        std::cout << "\tFactorize the hamiltonian using MUMPS (out of core) ... " << std::flush;
+        Timer t;
+        settings.job = 2;
+        zmumps_c(&settings);
+        std::cout << "finished after " << t.nice_time() << std::endl;
+    }
+}
+
+void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
+{
+    // some useful constants
+    std::size_t Nang = r.size(), Nchunk = r[0].size();
+    
+    // convert block array to monolithic array
+    for (unsigned ill = 0; ill < Nang; ill++)
+    for (unsigned i = 0; i < Nchunk; i++)
+        X[ill * Nchunk + i] = r[ill][i];
     
     // solve
     settings.job = 3;
-    zmumps_c(&settings);
-    
-    // destroy MUMPS instance
-    settings.job = -2;
     zmumps_c(&settings);
     
     // copy solution to result
     for (unsigned ill = 0; ill < Nang; ill++)
     for (unsigned i = 0; i < Nchunk; i++)
         z[ill][i] = X[ill * Nchunk + i];
+}
+
+void CoupledPreconditioner::finish ()
+{
+    // destroy MUMPS instance
+    settings.job = -2;
+    zmumps_c(&settings);
+    
+    // release the arrays
+    I.drop();
+    J.drop();
+    A.drop();
 }
 
 #endif // WITH_MUMPS

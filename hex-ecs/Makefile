@@ -104,12 +104,12 @@ OPENMPILIBS  = $(shell mpic++ --showme:link)
 # compiler flags
 CFLAGS += -fPIC -std=c++11 -pedantic-errors -DGIT_COMMIT=\"$(GIT_COMMIT)\" \
           -Isrc -I../common \
-          $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(OPENMPIFLAGS) \
+          $(SUITESPARSEFLAGS) $(SUPERLUFLAGS) $(SUPERLUDISTFLAGS) $(MUMPSFLAGS) $(OPENMPIFLAGS) \
           $(OPENCLFLAGS) $(GSLFLAGS) $(BLASLAPACKFLAGS) $(PNGPPFLAGS) 
 
 # linker flags
 LFLAGS += -fPIC -rdynamic \
-          $(SUITESPARSELIBS) $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(OPENMPILIBS) \
+          $(SUITESPARSELIBS) $(SUPERLULIBS) $(SUPERLUDISTLIBS) $(MUMPSLIBS) $(OPENMPILIBS) \
           $(OPENCLLIBS) $(GSLLIBS) $(BLASLAPACKLIBS) $(PNGPPLIBS)
 
 # git revision number
