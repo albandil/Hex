@@ -83,7 +83,7 @@ void CoupledPreconditioner::setup ()
     // print some diagnostic information
     std::cout << "Setting up coupled preconditioner" << std::endl;
     std::cout << "\t- coupling: " << std::min(cmd_.coupling_limit,rad_.maxlambda()) << " of " << rad_.maxlambda() << " multipole moments" << std::endl;
-    std::cout << "\t- block considered: " << nblocks << " of " << Nang * Nang << std::endl;
+    std::cout << "\t- blocks considered: " << nblocks << " of " << Nang * Nang << std::endl;
     std::cout << "\t- non-zero elements in upper triangle: " << nz << std::endl;
     std::cout << "\t- precomputing chosen subset of the hamiltonian matrix ... " << std::flush;
     
