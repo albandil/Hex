@@ -158,18 +158,28 @@ void GPUCGPreconditioner::setup ()
     blocksize_ = std::min<std::size_t>(blocksize_, std::sqrt(max_work_group_size));
     std::cout << "\t- matrix multiplication tile size: " << blocksize_ << std::endl;
     
-    // determine how many solution segments will fit into the device memory
-    unsigned memseg = 0.8 * global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
-    if (memseg < 2 and cmd_.gpu_multiply)
-        HexException("Insufficent OpenCL device memory for lightweight on-device multiplication.");
-    
-    // calculate how many block rows will fit into the memory and what space will remain
-    unsigned rows_fit = memseg / (ang_.states().size() + 1); rows_fit = std::min<unsigned>(rows_fit, ang_.states().size());
-    unsigned cols_rmn = memseg % (ang_.states().size() + 1);
-    
-    // calculate how many source/destination vector segments will be processed at once
-    nsrcseg_ = (rows_fit > 0 ? ang_.states().size() : cols_rmn);
-    ndstseg_ = (rows_fit > 0 ? rows_fit             : 1       );
+    // get block counts for --cl-multiply
+    if (cmd_.gpu_large_data)
+    {
+        // use all blocks at once if using the host memory
+        nsrcseg_ = ang_.states().size();
+        ndstseg_ = ang_.states().size();
+    }
+    else
+    {
+        // determine how many solution segments will fit into the device memory
+        unsigned memseg = 0.8 * global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
+        if (memseg < 2 and cmd_.gpu_multiply)
+            HexException("Insufficent OpenCL device memory for lightweight on-device multiplication.");
+        
+        // calculate how many block rows will fit into the memory and what space will remain
+        unsigned rows_fit = memseg / (ang_.states().size() + 1); rows_fit = std::min<unsigned>(rows_fit, ang_.states().size());
+        unsigned cols_rmn = memseg % (ang_.states().size() + 1);
+        
+        // calculate how many source/destination vector segments will be processed at once
+        nsrcseg_ = (rows_fit > 0 ? ang_.states().size() : cols_rmn);
+        ndstseg_ = (rows_fit > 0 ? rows_fit             : 1       );
+    }
     
     if (cmd_.gpu_multiply)
         std::cout << "\t- multiply blocks " << ndstseg_ << " × " << nsrcseg_ << std::endl;
@@ -355,8 +365,9 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
         
         // device data handles
-        cl_mem pgpu = clCreateBuffer(context_, CL_MEM_READ_ONLY,  nsrcseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
-        cl_mem qgpu = clCreateBuffer(context_, CL_MEM_READ_WRITE, ndstseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        int location = (cmd_.gpu_large_data ? CL_MEM_ALLOC_HOST_PTR : 0);
+        cl_mem pgpu = clCreateBuffer(context_, location | CL_MEM_READ_ONLY,  nsrcseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
+        cl_mem qgpu = clCreateBuffer(context_, location | CL_MEM_READ_WRITE, ndstseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         
         // copy angular integrals
         clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
