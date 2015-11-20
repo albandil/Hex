@@ -58,8 +58,21 @@ void CoupledPreconditioner::setup ()
     // number of nonzero elements of single angular block
     std::size_t nz_block = nz_atom * nz_proj;
     
+    // calculate participating blocks
+    std::size_t nblocks = 0;
+    for (unsigned ill  = 0; ill  < Nang; ill ++)
+    for (unsigned illp = 0; illp < Nang; illp++)
+    {
+        for (int lambda = 0; lambda <= std::min(cmd_.coupling_limit, rad_.maxlambda()); lambda++)
+        if (ang_.f(ill, illp, lambda) != 0)
+        {
+            nblocks++;
+            break;
+        }
+    }
+    
     // number of nonzero elements of the full matrix
-    std::size_t nz_matrix = Nang * Nang * nz_block;
+    std::size_t nz_matrix = nblocks * nz_block;
     
     // number of elements on the main diagonal of the full matrix
     std::size_t nz_diagonal = Nang * Nspline_atom * Nspline_proj;
@@ -67,7 +80,12 @@ void CoupledPreconditioner::setup ()
     // number of nonzero elements on and above the diagonal of the full matrix
     std::size_t nz = (nz_matrix - nz_diagonal) / 2 + nz_diagonal;
     
-    std::cout << "Precompute full hamiltonian matrix (" << nz << " non-zeros in upper triangle) ... " << std::flush;
+    // print some diagnostic information
+    std::cout << "Setting up coupled preconditioner" << std::endl;
+    std::cout << "\t- coupling: " << std::min(cmd_.coupling_limit,rad_.maxlambda()) << " of " << rad_.maxlambda() << " multipole moments" << std::endl;
+    std::cout << "\t- block considered: " << nblocks << " of " << Nang * Nang << std::endl;
+    std::cout << "\t- non-zero elements in upper triangle: " << nz << std::endl;
+    std::cout << "\t- precomputing chosen subset of the hamiltonian matrix ... " << std::flush;
     
     // the block super-matrix in a single COO matrix
     I.resize(nz);
@@ -83,14 +101,17 @@ void CoupledPreconditioner::setup ()
     for (int k = std::max<int>(0, i - order); k <= std::min<int>(i + order, (int)Nspline_atom - 1); k++)
     for (int l = std::max<int>(0, j - order); l <= std::min<int>(j + order, (int)Nspline_proj - 1); l++)
     {
+        // compose full-matrix row and column index
         std::size_t irow = (ill  * Nspline_atom + i) * Nspline_proj + j;
         std::size_t icol = (illp * Nspline_atom + k) * Nspline_proj + l;
         
+        // skip lower triangle
         if (irow > icol)
             continue;
         
         Complex elem = 0;
         
+        // add one-electron contribution
         if (ill == illp)
         {
             int l1 = ang_.states()[ill].first;
@@ -100,17 +121,22 @@ void CoupledPreconditioner::setup ()
                     - (0.5 * rad_.D_proj()(j,l) + 0.5 * l2 * (l2 + 1) * rad_.Mm2_proj()(j,l) - rad_.Mm1_tr_proj()(j,l)) * rad_.S_atom()(i,k);
         }
         
-        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+        // add two-electron contribution
+        for (int lambda = 0; lambda <= std::min(cmd_.coupling_limit, rad_.maxlambda()); lambda++)
         {
             double f = ang_.f(ill, illp, lambda);
             if (f != 0)
                 elem -= f * rad_.computeR(lambda,i,j,k,l);
         }
         
-        I[pos] = irow + 1;
-        J[pos] = icol + 1;
-        A[pos] = elem;
-        pos++;
+        // insert non-zero element
+        if (elem != 0.)
+        {
+            I[pos] = irow + 1;
+            J[pos] = icol + 1;
+            A[pos] = elem;
+            pos++;
+        }
     }
     std::cout << "ok" << std::endl;
     
@@ -135,9 +161,9 @@ void CoupledPreconditioner::setup ()
     settings.irn = I.data();
     settings.jcn = J.data();
     settings.a = reinterpret_cast<mumps_double_complex*>(A.data());
-    std::cout << "Analyze the hamiltonian using MUMPS ... " << std::flush;
+    std::cout << "\t- analyze the hamiltonian using MUMPS ... " << std::flush;
     zmumps_c(&settings);
-    std::cout << std::endl << std::endl;
+    std::cout << "ok" << std::endl << std::endl;
     
     // resize also work vector
     X.resize(Nang * Nchunk);

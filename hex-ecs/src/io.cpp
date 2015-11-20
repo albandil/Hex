@@ -209,11 +209,12 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).  \n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
-#ifndef NO_LAPACK
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
                     "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
-                    "\t--ilu-max-blocks                 maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
+                    "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
+#ifdef WITH_MUMPS
+                    "\t-coupling-limit                  Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
@@ -432,6 +433,14 @@ void CommandLine::parse (int argc, char* argv[])
                 noluupdate = true;
                 return true;
             },
+#ifdef WITH_MUMPS
+        "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal multipole to be considered by the coupled preconditioner
+                coupling_limit = std::atoi(optargs[0].c_str());
+                return true;
+            },
+#endif
         "shared-scratch", "s", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // precompute only the owned subset of radial integrals
