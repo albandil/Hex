@@ -38,7 +38,7 @@
 #define ICNTL(x) icntl[(x)-1]
 
 const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled solver that uses MUMPS OOC.";
+const std::string CoupledPreconditioner::prec_description = "Coupled solver that uses MUMPS out of core; nevertheles, it still consumes a huge amount of RAM.";
 
 void CoupledPreconditioner::setup ()
 {

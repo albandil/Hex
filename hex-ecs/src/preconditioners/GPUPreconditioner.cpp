@@ -159,7 +159,7 @@ void GPUCGPreconditioner::setup ()
     std::cout << "\t- matrix multiplication tile size: " << blocksize_ << std::endl;
     
     // get block counts for --cl-multiply
-    if (cmd_.gpu_large_data)
+    if (cmd_.gpu_host_multiply)
     {
         // use all blocks at once if using the host memory
         nsrcseg_ = ang_.states().size();
@@ -186,11 +186,9 @@ void GPUCGPreconditioner::setup ()
     
     // compute global memory requirements of the preconditioner
     std::size_t greq = 0;
-    if (not cmd_.gpu_multiply)
-    {
-        // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
+    // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
+    if (not cmd_.gpu_large_data)
         greq += 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
-    }
     // - padded one-electron matrices (S, D, M1, M2)
     greq += 4 * (rad_.S_atom().size() + rad_.S_proj().size());
     // - preconditioner eigenvalues
@@ -203,7 +201,7 @@ void GPUCGPreconditioner::setup ()
     if (bspline_atom_.hash() == bspline_proj_.hash() and not cmd_.gpu_large_data)
         greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
     // - solution vector
-    if (cmd_.gpu_multiply and not cmd_.gpu_large_data)
+    if (cmd_.gpu_multiply and not cmd_.gpu_host_multiply)
         greq = std::max(greq, (std::size_t)nsrcseg_ * ndstseg_ * bspline_atom_.Nspline() * bspline_proj_.Nspline());
     // - all these were complex numbers
     greq *= 16;
@@ -214,7 +212,7 @@ void GPUCGPreconditioner::setup ()
     if (cmd_.gpu_large_data)
     {
         std::size_t host_mem = 16 * 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
-        if (cmd_.gpu_multiply)
+        if (cmd_.gpu_host_multiply)
             host_mem += 16 * nsrcseg_ * ndstseg_ * (std::size_t)bspline_atom_.Nspline() * (std::size_t)bspline_proj_.Nspline();
         std::cout << "\t- data kept in host memory: " << format("%.2f", host_mem/gsl_sf_pow_int(1024,3)) << " GiB " << std::endl;
         std::cout << "\t- WARNING: --ocl-use-host-memory will slow down the solution due to the host-device data transfers." << std::endl;
@@ -365,7 +363,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
         
         // device data handles
-        int location = (cmd_.gpu_large_data ? CL_MEM_ALLOC_HOST_PTR : 0);
+        int location = (cmd_.gpu_host_multiply ? CL_MEM_ALLOC_HOST_PTR : 0);
         cl_mem pgpu = clCreateBuffer(context_, location | CL_MEM_READ_ONLY,  nsrcseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         cl_mem qgpu = clCreateBuffer(context_, location | CL_MEM_READ_WRITE, ndstseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         

@@ -90,7 +90,8 @@ class CommandLine
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
-              refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000)
+              refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
+              gpu_host_multiply(false)
         {
             // get command line options
             parse(argc, argv);
@@ -233,6 +234,9 @@ class CommandLine
         
         /// Maximal multipole considered by the coupled preconditioner.
         int coupling_limit;
+        
+        /// Keep vectors in host memory when doing multiplication on GPU.
+        bool gpu_host_multiply;
 };
 
 /**
