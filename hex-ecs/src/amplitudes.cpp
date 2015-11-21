@@ -91,7 +91,7 @@ void Amplitudes::extract ()
 {
     std::cout << std::endl << "Extracting T-matrices" << std::endl;
     
-    for (unsigned Spin = 0; Spin <= 1; Spin++)
+    for (unsigned Spin : inp_.Spin)
     {
         if (Spin == 0)
             std::cout << "\tSinglet" << std::endl;

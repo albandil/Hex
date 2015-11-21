@@ -288,6 +288,7 @@ class InputFile
         //
         
         int order, ni, L, Pi, levels, maxell;
+        iArray Spin;
         double ecstheta, B;
         rArray rknots, rknots_next, cknots, overlap_knots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;

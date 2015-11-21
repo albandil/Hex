@@ -109,7 +109,7 @@ void Solver::solve ()
         // we may have already computed all solutions for this energy... is it so?
         std::vector<std::pair<int,int>> work;
         for (unsigned instate = 0; instate < inp_.instates.size(); instate++)
-        for (unsigned Spin = 0; Spin <= 1; Spin++)
+        for (unsigned Spin : inp_.Spin)
         {
             // decode initial state
             int ni = std::get<0>(inp_.instates[instate]);

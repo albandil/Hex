@@ -123,8 +123,8 @@ const std::string sample_input =
     "# --------------- Other conditions ----------------\n"
     "\n"
     "# Angular momenta.\n"
-    "# L  Pi limit\n"
-    "  0  0  4\n"
+    "# L  S  Pi limit\n"
+    "  0  *  0  4\n"
     "\n"
     "# Atom + projectile total energies in Rydbergs.\n"
     "# Use any of the following options:\n"
@@ -817,11 +817,22 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
     std::cout << "Angular momentum limits" << std::endl;
     
+    // total angular momentum
     L = ReadNext<int>(inf).val;
+    
+    // spin
+    ReadItem<int> Sp = ReadNext<int>(inf, ReadItem<int>::asterisk);
+    if ((Sp.flags & ReadItem<int>::asterisk) or Sp.val == 0) Spin.push_back(0);
+    if ((Sp.flags & ReadItem<int>::asterisk) or Sp.val == 1) Spin.push_back(1);
+    
+    // parity
     Pi = ReadNext<int>(inf).val % 2;
+    
+    // number of angular momentum pairs per total angular momentum
     levels = ReadNext<int>(inf).val;
     
     std::cout << "\tL = " << L << std::endl;
+    std::cout << "\tS = " << Spin << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
     
