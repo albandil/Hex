@@ -774,11 +774,17 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
         ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
         
         // integrate singlet
-        CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].first, 0., kmax); tail = CB.tail(1e-10); 
-        sigma_S[T].first[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+        if (not Xi_Sl1l2[T][ill * Nenergy + ie].first.empty())
+        {
+            CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].first, 0., kmax); tail = CB.tail(1e-10); 
+            sigma_S[T].first[ie] += integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+        }
         
         // integrate triplet
-        CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].second, 0., kmax); tail = CB.tail(1e-10); 
-        sigma_S[T].second[ie] = integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+        if (not Xi_Sl1l2[T][ill * Nenergy + ie].second.empty())
+        {
+            CB = Chebyshev<double,Complex>(Xi_Sl1l2[T][ill * Nenergy + ie].second, 0., kmax); tail = CB.tail(1e-10); 
+            sigma_S[T].second[ie] = integrator.integrate(0, special::constant::pi_quart, &n) / ki[ie];
+        }
     }
 }
