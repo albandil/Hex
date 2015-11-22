@@ -567,17 +567,16 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
     }
 }
 
-Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & PsiSc, double kmax, int l1, int l2)
+Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double kmax, int l1, int l2)
 {
     // shorthands
-    Complex const * const t = &(bspline.t(0));   // B-spline knots
-    int Nspline = bspline.Nspline();             // number of real knots
-    int Nreknot = bspline.Nreknot();             // number of real knots
-    int order   = bspline.order();               // B-spline order
+    Complex const * const t = &(bspline_atom_.t(0));   // B-spline knots
+    int Nspline = bspline_atom_.Nspline();             // number of real knots
+    int Nreknot = bspline_atom_.Nreknot();             // number of real knots
+    int order   = bspline_atom_.order();               // B-spline order
     
     // determine evaluation radius
-    char const * HEX_RHO = std::getenv("HEX_RHO");
-    double rho = (HEX_RHO == nullptr) ? t[Nreknot-2].real() : std::atof(HEX_RHO);
+    double rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
     
     // debug output
     std::ofstream dbg ("debug.log");
@@ -624,8 +623,8 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
                 ddrho_F1F2 += k2*F1*F2p*sin_alpha;
             
             // get B-spline knots
-            int iknot1 = bspline.knot(r1);
-            int iknot2 = bspline.knot(r2);
+            int iknot1 = bspline_atom_.knot(r1);
+            int iknot2 = bspline_atom_.knot(r2);
             
             // auxiliary variables
             cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
@@ -633,13 +632,13 @@ Chebyshev<double,Complex> fcheb (Bspline const & bspline, cArrayView const & Psi
             // evaluate the B-splines
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             {
-                B1[ispline1]  = bspline.bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1] = bspline.dspline(ispline1,iknot1,order,r1);
+                B1[ispline1]  = bspline_atom_.bspline(ispline1,iknot1,order,r1);
+                dB1[ispline1] = bspline_atom_.dspline(ispline1,iknot1,order,r1);
             }
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = bspline.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = bspline.dspline(ispline2,iknot2,order,r2);
+                B2[ispline2]  = bspline_atom_.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2] = bspline_atom_.dspline(ispline2,iknot2,order,r2);
             }
             
             // evaluate the solution
@@ -731,7 +730,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
             const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
         
         // compute new ionization amplitude
-        Chebyshev<double,Complex> CB = fcheb(bspline_atom_, solution[ill], kmax, l1, l2);
+        Chebyshev<double,Complex> CB = fcheb(solution[ill], kmax, l1, l2);
         if (Spin == 0)
             Xi_Sl1l2[T][ill * inp_.Etot.size() + ie].first = CB.coeffs();
         else

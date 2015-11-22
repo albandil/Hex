@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "hex-arrays.h"
+#include "hex-chebyshev.h"
 
 #include "bspline.h"
 #include "io.h"
@@ -235,6 +236,7 @@ class Amplitudes
          */
         void computeSigma_ (Transition T);
         
+        Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, double kmax, int l1, int l2);
         void computeSigmaIon_ (Transition T);
         
         // B-spline environment
