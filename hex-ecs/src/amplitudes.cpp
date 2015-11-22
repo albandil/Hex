@@ -172,7 +172,7 @@ void Amplitudes::extract ()
                             computeLambda_(transition, solution, ie, Spin);
                         }
                     }
-                    else
+                    else if (inp_.Etot[ie] > 0)
                     {
                         //
                         // Ionization
