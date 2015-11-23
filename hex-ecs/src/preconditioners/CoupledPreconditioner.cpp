@@ -94,6 +94,7 @@ void CoupledPreconditioner::setup ()
     std::size_t pos = 0;
     
     // fill the matrix
+    Timer t1;
     for (unsigned ill  = 0; ill  < Nang; ill ++)
     for (unsigned illp = ill; illp < Nang; illp++)
     for (int i = 0; i < (int)Nspline_atom; i++)
@@ -138,7 +139,7 @@ void CoupledPreconditioner::setup ()
             pos++;
         }
     }
-    std::cout << "ok" << std::endl;
+    std::cout << "done in " << t1.nice_time() << std::endl;
     
     // initialize
     settings.sym = 2;
@@ -161,9 +162,10 @@ void CoupledPreconditioner::setup ()
     settings.irn = I.data();
     settings.jcn = J.data();
     settings.a = reinterpret_cast<mumps_double_complex*>(A.data());
+    Timer t2;
     std::cout << "\t- analyze the hamiltonian using MUMPS ... " << std::flush;
     zmumps_c(&settings);
-    std::cout << "ok" << std::endl << std::endl;
+    std::cout << "done in " << t2.nice_time() << std::endl << std::endl;
     
     // resize also work vector
     X.resize(Nang * Nchunk);
