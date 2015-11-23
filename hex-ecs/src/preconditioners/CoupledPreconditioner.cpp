@@ -191,6 +191,7 @@ void CoupledPreconditioner::update (double E)
     {
         // update matrix
         std::cout << "\tUpdate matrix (energy change from " << 2 * (E_ - dE) << " to " << 2 * E_ << " Ry) ... " << std::flush;
+        Timer t0;
         for (std::size_t pos = 0; pos < A.size(); pos++)
         {
             // split row multi-index
@@ -207,14 +208,14 @@ void CoupledPreconditioner::update (double E)
             if (ill == illp)
                 A[pos] += dE * rad_.S_atom()(i,k) * rad_.S_proj()(j,l);
         }
-        std::cout << "ok" << std::endl;
+        std::cout << "done in " << t0.nice_time() << std::endl;
         
         // factorize updated matrix
-        std::cout << "\tFactorize the hamiltonian using MUMPS (out of core) ... " << std::flush;
+        std::cout << "\tFactorize the hamiltonian using MUMPS " << (cmd_.mumps_outofcore ? "out of core" : "") << " ... " << std::flush;
         Timer t;
         settings.job = 2;
         zmumps_c(&settings);
-        std::cout << "finished after " << t.nice_time() << std::endl;
+        std::cout << "done in " << t.nice_time() << std::endl;
     }
 }
 
