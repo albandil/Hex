@@ -148,10 +148,10 @@ void CoupledPreconditioner::setup ()
     
     // analyze
     settings.job = 1;
-    settings.ICNTL(1) = 0; // errors to STDOUT (default: 6)
+    settings.ICNTL(1) = 6; // errors to STDOUT (default: 6)
     settings.ICNTL(2) = 0; // diagnostics to /dev/null
-    settings.ICNTL(3) = 0; // global info to STDOUT (default: 6)
-    settings.ICNTL(4) = 0; // verbosity level (default: 2)
+    settings.ICNTL(3) = 6; // global info to STDOUT (default: 6)
+    settings.ICNTL(4) = cmd_.mumps_verbose; // verbosity level (default: 2)
     settings.ICNTL(5) = 0; // COO format
     settings.ICNTL(22) = cmd_.mumps_outofcore; // OOC factorization
     std::strcpy(settings.ooc_tmpdir, ".");

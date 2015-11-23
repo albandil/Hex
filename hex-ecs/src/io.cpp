@@ -216,6 +216,7 @@ void CommandLine::parse (int argc, char* argv[])
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
                     "\t--mumps-in-core                  Try to keep all factorization data in memory when using MUMPS.                                                         \n"
+                    "\t--mumps-verbose                  Verbosity level of the MUMPS library.                                                                                  \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
@@ -446,6 +447,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // MUMPS out of core
                 mumps_outofcore = false;
+                return true;
+            },
+        "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal multipole to be considered by the coupled preconditioner
+                mumps_verbose = std::atoi(optargs[0].c_str());
                 return true;
             },
 #endif
