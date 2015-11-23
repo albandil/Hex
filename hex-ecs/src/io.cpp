@@ -214,7 +214,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
                     "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
-                    "\t-coupling-limit                  Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
+                    "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
+                    "\t--mumps-in-core                  Try to keep all factorization data in memory when using MUMPS.                                                         \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
@@ -439,6 +440,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // maximal multipole to be considered by the coupled preconditioner
                 coupling_limit = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "mumps-in-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // MUMPS out of core
+                mumps_outofcore = false;
                 return true;
             },
 #endif

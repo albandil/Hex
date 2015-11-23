@@ -153,7 +153,7 @@ void CoupledPreconditioner::setup ()
     settings.ICNTL(3) = 0; // global info to STDOUT (default: 6)
     settings.ICNTL(4) = 0; // verbosity level (default: 2)
     settings.ICNTL(5) = 0; // COO format
-    settings.ICNTL(22) = 1; // OOC factorization
+    settings.ICNTL(22) = cmd_.mumps_outofcore; // OOC factorization
     std::strcpy(settings.ooc_tmpdir, ".");
     std::strcpy(settings.ooc_prefix, "ooc-");
     settings.n = Nang * Nchunk;
