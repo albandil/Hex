@@ -296,6 +296,9 @@ AddNewVariableClass(IntegralCrossSection)
 /// Create class for complete cross section (ccs)
 AddNewVariableClass(CompleteCrossSection)
 
+/// Create class for spin flip cross section (ccs)
+AddNewVariableClass(SpinFlipCrossSection)
+
 /// Create class for extrapolated cross section (xcs)
 AddNewVariableClass(ExtrapolatedCrossSection)
 
