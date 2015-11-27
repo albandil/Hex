@@ -81,8 +81,8 @@ GSLLIBS = $(shell gsl-config --libs)
 # OpenMPI environment (optional)                                               #
 # ---------------------------------------------------------------------------- #
 
-OPENMPIFLAGS = -DWITH_MPI $(shell mpic++ --showme:compile)
-OPENMPILIBS  = $(shell mpic++ --showme:link)
+OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  = $(shell mpicxx --showme:link)
 
 # ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
