@@ -565,43 +565,27 @@ struct MultipolePotentialPF : MultipolePotential
         double rmax = grid.back();
         rArray V(N);
         
-        // number of Coulomb zeros within the range of grid "x" (initial guess)
-        unsigned nzeros = Kb * rmax / (2 * special::constant::pi);
-        
-        // calculate the Coulomb zeros
-        rArray zeros;
-        do
-        {
-            // double the necessary zero count
-            nzeros = 2 * (1 + nzeros);
-            zeros.resize(nzeros);
-            
-            // for large frequencies 'Kb' the integral will be almost zero, so lets check already here
-            if (nzeros > N / 2)
-                return rArray(N,0.);
-            
-            // compute zeros of the Coulomb function
-            if (special::coulomb_zeros(-1/Kb,Lb,nzeros,zeros.data()) < 0)
-                return V;
-            zeros /= Kb;
-        }
-        while (zeros.back() < rmax);
-        
         // the classical turning point for non-S-waves
         double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
         
-        // Coulomb function scaled by hydrogen orbital
-        rArray PF(N), PFt(N);
+        // Coulomb function scaled by hydrogen orbital and its nodes
+        rArray PF (N), zeros;
         for (unsigned i = 0; i < N; i++)
         {
+            // evaluate the product of P and F
             PF[i]  = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]);
-            PFt[i] = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]) * std::pow(grid[i], -La-Lb-2);
+            
+            // update nodes
+            if (PF[i] == 0.)
+                zeros.push_back(grid[i]);
+            else if (PF[i-1] != 0. and signum(PF[i-1]) != signum(PF[i]))
+                zeros.push_back((grid[i-1] * PF[i] - grid[i] * PF[i-1]) / (PF[i] - PF[i-1]));
         }
         
-        // cubic spline interpolation of the above
-        gsl_spline * spline = gsl_spline_alloc (gsl_interp_cspline, N);
-        gsl_spline_init (spline, grid.data(), PF.data(), N);
-        gsl_interp_accel * acc = gsl_interp_accel_alloc ();
+        // cubic spline interpolation of P*F
+        gsl_spline * spline = gsl_spline_alloc(gsl_interp_cspline, N);
+        gsl_spline_init(spline, grid.data(), PF.data(), N);
+        gsl_interp_accel * acc = gsl_interp_accel_alloc();
         
         // evaluate potential at all grid points 'y'
         for (unsigned i = 1; i < N; i++)
