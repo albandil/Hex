@@ -302,19 +302,15 @@ double F (double k, int l, double r, double sigma)
     int err;
     
     // evaluate the function
-    if ((err = gsl_sf_coulomb_wave_F_array (l, 0, -1./k, k*r, &F, &exp_F)) == GSL_SUCCESS)
+    if ((err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F)) == GSL_SUCCESS)
         return norm * F;
     
-//     // evaluation failed in asymptotic region ?
-//     if (k * r > 1)
-//     {
-//         // probably due to "iteration process out of control" for large radii
-//         return norm * coul_F_asy (l, k, r, (std::isfinite(sigma) ? sigma : coul_F_sigma(l,k)));
-//     }
-//     
-//     // evaluation failed in classically forbidden region
-    // -> use uniform WKB approximation by Michel
-    if ((err = special::coul_F_michel (l, k, r, F, Fp)) == GSL_SUCCESS)
+    // high energies => use asymptotic form
+    if (k * r > 1)
+        return norm * special::coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k)));
+    
+    // low energies => use uniform WKB approximation by Michel
+    if ((err = special::coul_F_michel(l, k, r, F, Fp)) == GSL_SUCCESS)
         return norm * F;
     
     // some other problem
