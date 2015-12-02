@@ -416,7 +416,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     // the trend of the T-matrix.
     
     double wavelength = special::constant::two_pi / kf[ie];
-    double Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.t(bspline_proj_.Nreknot() - 1).real();
+    double Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.R0();
     double Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0., Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
@@ -428,6 +428,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         singlet_lambda.push_back(cArray(samples));
         triplet_lambda.push_back(cArray(samples));
     }
+    
+    if (Ra > Rb)
+        HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
+    
+    if (Rb > bspline_proj_.R0())
+        HexException("Extraction radius too far, %g > %g.", Rb, bspline_proj_.R0());
     
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
@@ -570,10 +576,11 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double kmax, int l1, int l2)
 {
     // shorthands
-    Complex const * const t = &(bspline_atom_.t(0));   // B-spline knots
-    int Nspline = bspline_atom_.Nspline();             // number of real knots
-    int Nreknot = bspline_atom_.Nreknot();             // number of real knots
-    int order   = bspline_atom_.order();               // B-spline order
+    Complex const * const t = &(bspline_atom_.t(0));
+    int Nspline_atom = bspline_atom_.Nspline();
+    int Nspline_proj = bspline_proj_.Nspline();
+    int Nreknot = bspline_atom_.Nreknot();
+    int order   = bspline_atom_.order();
     
     // determine evaluation radius
     double rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
@@ -624,10 +631,10 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
             
             // get B-spline knots
             int iknot1 = bspline_atom_.knot(r1);
-            int iknot2 = bspline_atom_.knot(r2);
+            int iknot2 = bspline_proj_.knot(r2);
             
             // auxiliary variables
-            cArray B1(Nspline), dB1(Nspline), B2(Nspline), dB2(Nspline);
+            cArray B1(Nspline_atom), dB1(Nspline_atom), B2(Nspline_proj), dB2(Nspline_proj);
             
             // evaluate the B-splines
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
@@ -637,8 +644,8 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
             }
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = bspline_atom_.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = bspline_atom_.dspline(ispline2,iknot2,order,r2);
+                B2[ispline2]  = bspline_proj_.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2] = bspline_proj_.dspline(ispline2,iknot2,order,r2);
             }
             
             // evaluate the solution
@@ -646,7 +653,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                int idx = ispline1 * Nspline + ispline2;
+                int idx = ispline1 * Nspline_proj + ispline2;
                 
                 Psi      += PsiSc[idx] *  B1[ispline1] *  B2[ispline2];
                 ddr1_Psi += PsiSc[idx] * dB1[ispline1] *  B2[ispline2];
@@ -686,19 +693,27 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
     // Chebyshev approximation
     Chebyshev<double,Complex> CB;
     
-    // convergence loop
-    for (int N = 4; ; N *= 2)
+    // avoid calculation when the extraction radius is too far
+    if (rho > bspline_atom_.R0())
     {
-        // build the approximation
-        CB.generate(fLSl1l2k1k2, N, 0., kmax);
-        
-        // check tail
-        if (CB.tail(1e-5) != N)
-            break;
-        
-        // limit subdivision
-        if (N > 32768)
-            HexException("ERROR: Non-convergent Chebyshev expansion.");
+        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_atom_.R0() << std::endl;
+    }
+    else   
+    {
+        // convergence loop
+        for (int N = 4; ; N *= 2)
+        {
+            // build the approximation
+            CB.generate(fLSl1l2k1k2, N, 0., kmax);
+            
+            // check tail
+            if (CB.tail(1e-5) != N)
+                break;
+            
+            // limit subdivision
+            if (N > 32768)
+                HexException("ERROR: Non-convergent Chebyshev expansion.");
+        }
     }
     
     return CB;
