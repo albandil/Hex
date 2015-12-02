@@ -36,119 +36,6 @@
 
 #include "hex-arrays.h"
 
-/**
- * @brief Calculate bound-bound intermediate multipole potential.
- * 
- * Evaluate the bound-bound multipole intermediate potential at grid 'x'.
- * The potential is defined in the following way:
- * @f[
- *     V_{ab}^\lambda(r) = \int_0^\infty P_a(r')
- *     \left(
- *         \frac{r_<^\lambda}{r_>^{\lambda+1}}
- *          - \frac{\delta_{\lambda 0}}{r}
- *     \right) P_b(r') \mathrm{d}r' \,,
- * @f]
- * where @f$ P(r) = rR(r) @f$ is the bound hydrogen radial orbital.
- * 
- * The potential is evaluated exactly as the result is sum of gamma-functions.
- * 
- * @param x Evaluation grid.
- * @param lambda Multipole (= angular momentum transfer).
- * @param Na Left state principal quantum number.
- * @param La Left state orbital quantum number.
- * @param Nb Right state principal quantum number.
- * @param Lb Right state orbital quantum number.
- */
-// rArray interpolate_bound_bound_potential
-// (
-//     rArray const & x,
-//     int lambda,
-//     int Na, int La, int Nb, int Lb
-// );
-
-/**
- * @brief Calculate bound-bound intermediate multipole potential.
- * 
- * Evaluate the bound-bound multipole intermediate potential at grid 'x'.
- * The potential is defined in the following way:
- * @f[
- *     V_{ab}^\lambda(r) = \int_0^\infty P_a(r')
- *     \left(
- *         \frac{r_<^\lambda}{r_>^{\lambda+1}}
- *          - \frac{\delta_{\lambda 0}}{r}
- *     \right) F_b(r') \mathrm{d}r' \,,
- * @f]
- * where @f$ P(r) = rR(r) @f$ is the bound hydrogen radial orbital
- * and @f$ F(r) @f$ is the radial part of the continuum hydrogen function
- * defined in @ref Hydrogen::F.
- * 
- * The straightforward evaluation of this potential is a time consuming process
- * due to difficulties with evaluation of the Coulomb functions (see @ref Hydrogen::F).
- * To speed up the calculation, the product @f$ P_a(r') F_b(r') @f$ is evaluated
- * on the grid 'x' and replaced by a cubic spline approximation. The subsequent
- * adaptive integration uses that spline instead of exact evaluation of the product.
- * 
- * @param x Evaluation grid.
- * @param lambda Multipole (= angular momentum transfer).
- * @param Na Left state principal quantum number.
- * @param La Left state orbital quantum number.
- * @param Nb Right state principal quantum number.
- * @param Lb Right state orbital quantum number.
- */
-// rArray interpolate_bound_free_potential
-// (
-//     rArray const & x,
-//     int lambda,
-//     int Na, int La, double Kb, int Lb
-// );
-// 
-// rArray interpolate_free_bound_potential
-// (
-//     rArray const & x,
-//     int lambda,
-//     double Ka, int La, int Nb, int Lb
-// );
-
-// rArray interpolate_riccati_bessel_j
-// (
-//     rArray const & x,
-//     int l, double k
-// );
-// 
-// rArray interpolate_riccati_bessel_y
-// (
-//     rArray const & x,
-//     int l, double k
-// );
-// 
-// rArray interpolate_riccati_bessel_iscaled
-// (
-//     rArray const & x,
-//     int l, double k
-// );
-// 
-// rArray interpolate_riccati_bessel_kscaled
-// (
-//     rArray const & x,
-//     int l, double k
-// );
-
-// Complex Idir_allowed
-// (
-//     rArray const & grid,
-//     rArray const & jf, rArray const & Vfn,
-//     rArray const & jn, rArray const & yn_ji, rArray const & yn_jf,
-//     rArray const & ji, rArray const & Vni
-// );
-
-// double Idir_forbidden
-// (
-//     rArray const & grid,
-//     rArray const & jf, rArray const & Vfn,
-//     rArray const & iscaled_n, rArray const & kscaled_n,
-//     rArray const & ji, rArray const & Vni
-// );
-
 Complex Idir_nBound_allowed
 (
     rArray const & grid, int L,
@@ -167,7 +54,16 @@ double Idir_nBound_forbidden
     std::ostream & log = std::cout
 );
 
-Complex Idir_nFree_allowed
+double Idir_nFree_allowed_re
+(
+    rArray const & grid, int L,
+    int Nf, int Lf, double kf, int lf,
+    double Kn, int Ln, double kn, int ln,
+    int Ni, int Li, double ki, int li,
+    std::ostream & log = std::cout
+);
+
+double Idir_nFree_allowed_im
 (
     rArray const & grid, int L,
     int Nf, int Lf, double kf, int lf,

@@ -38,7 +38,7 @@ do
     echo "$subset" | head -1 >> $DIR/summary
     
     rm -f $DIR/$i-bound.log
-    rm -f $DIR/$i-allowed.log
+    rm -f $DIR/$i-allowed*.log
     rm -f $DIR/$i-forbidden.log
     
     isubs=1
@@ -48,7 +48,7 @@ do
         allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
         forbidden_begin=$(echo "$subset" | grep -n "Forbidden intermediate states" | cut -f1 -d:)
         
-        echo "$bound_begin $allowed_begin $forbidden_begin"
+#        echo "$bound_begin $allowed_begin $forbidden_begin"
         
         if [ "$allowed_begin" ]
         then
@@ -66,14 +66,16 @@ do
             allowed_subset=""
         fi
         
-        echo "$bound_subset"
+#        echo "$bound_subset"
         
-        echo "$bound_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print -1/($10*$10), $20, $21 }' | sort -n | uniq >> $DIR/$i-bound.log
-        echo "$allowed_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  >> $DIR/$i-allowed.log
-        echo "$forbidden_subset" | grep transfer | sed "s/[(,)]/ /g" | awk '{ print $10, $20, $21 }' | sort -n | uniq  >> $DIR/$i-forbidden.log
+        echo "$bound_subset"     | grep transfer             | sed "s/[(,)]/ /g" | awk '{ print -1/($10*$10), $20, $21 }' | sort -g | uniq >> $DIR/$i-bound.log
+        echo "$allowed_subset"   | grep transfer | grep real | sed "s/[(,)]/ /g" | awk '{ print $10, $21 }'               | sort -g | uniq >> $DIR/$i-allowed-real.log
+        echo "$allowed_subset"   | grep transfer | grep imag | sed "s/[(,)]/ /g" | awk '{ print $10, $21 }'               | sort -g | uniq >> $DIR/$i-allowed-imag.log
+        echo "$forbidden_subset" | grep transfer             | sed "s/[(,)]/ /g" | awk '{ print $10, $20 }'               | sort -g | uniq >> $DIR/$i-forbidden.log
         
         echo >> $DIR/$i-bound.log
-        echo >> $DIR/$i-allowed.log
+        echo >> $DIR/$i-allowed-real.log
+        echo >> $DIR/$i-allowed-imag.log
         echo >> $DIR/$i-forbidden.log
     done
 done
@@ -125,7 +127,7 @@ fi # bound
 # Real continuum states (allowed and forbidden)
 #
 
-if [[ $(cat $DIR/*-allowed.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-allowed*.log | wc -c) != "0" ]]; then
 if [[ $(cat $DIR/*-forbidden.log | wc -c) != "0" ]]; then
 # allowed and forbidden
 cat >> "$1-plot.gp" <<EOF
@@ -137,7 +139,7 @@ set origin 0.333,0.5
 set size 0.333,0.5
 set autoscale xfix
 plot [0:] for [i=1:maxL] \\
-    sprintf("$DIR/%d-allowed.log",i) \\
+    sprintf("$DIR/%d-allowed-real.log",i) \\
     using (\$1):(0.5*\$1*\$1*\$2) with lines
 
 Xmin = GPVAL_X_MIN
@@ -176,7 +178,7 @@ set origin 0.333,0.5
 set size 0.333,0.5
 set autoscale xfix
 plot for [i=1:maxL] \\
-    sprintf("$DIR/%d-allowed.log",i) \\
+    sprintf("$DIR/%d-allowed-real.log",i) \\
     using (\$1):(0.5*\$1*\$1*\$2) with lines
 
 EOF
@@ -223,7 +225,7 @@ fi # bound
 # Imag continuum states (allowed only)
 #
 
-if [[ $(cat $DIR/*-allowed.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-allowed*.log | wc -c) != "0" ]]; then
 if [[ $(cat $DIR/*-forbidden.log | wc -c) != "0" ]]; then
 cat >> "$1-plot.gp" <<EOF
 set rmargin 0
@@ -238,8 +240,8 @@ set origin 0.333,0
 set size 0.333,0.5
 set autoscale xfix
 plot [0:] for [i=1:maxL] \\
-    sprintf("$DIR/%d-allowed.log",i) \\
-    using (\$1):(0.5*\$1*\$1*\$3) with lines
+    sprintf("$DIR/%d-allowed-imag.log",i) \\
+    using (\$1):(0.5*\$1*\$1*\$2) with lines
 
 EOF
 fi # allowed
