@@ -814,8 +814,8 @@ template <class DataT> class BlockSymBandMatrix
             
 #ifdef _OPENMP
             // write locks
-            std::vector<omp_lock_t> lock(size_);
-            for (std::size_t i = 0; i < size_; i++)
+            std::vector<omp_lock_t> lock(blockcount_);
+            for (std::size_t i = 0; i < blockcount_; i++)
                 omp_init_lock(&lock[i]);
 #endif
             // workspace
