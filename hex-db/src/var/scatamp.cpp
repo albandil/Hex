@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "hex-interpolate.h"
-#include "hex-born.h"
 #include "hex-chebyshev.h"
 #include "hex-special.h"
 #include "hex-version.h"
@@ -71,124 +70,6 @@ std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
 {
     static const std::vector<std::string> cmd;
     return cmd;
-}
-
-cArray FirstBornFullTMatrix (int ni, int li, int mi, int nf, int lf, int mf, double E, const rArrayView angles)
-{
-    // get result of the symbolic integration
-    auto Wb = Wb_symb_in(ni, li, mi, nf, lf, mf);
-    
-    // evaluate symbolic expression for all angles
-    cArray tmat (angles.size());
-    for (unsigned i = 0; i < angles.size(); i++)
-    {
-        // initial projectile linear momentum
-        geom::vec3d ki = { 0., 0., std::sqrt(E) };
-        
-        // fianl projectile linear momentum
-        double magkf = std::sqrt(E - 1./(ni*ni) + 1./(nf*nf));
-        geom::vec3d kf = { magkf * std::sin(angles[i]), 0., magkf * std::cos(angles[i]) };
-        
-        // evaluate T-matrix
-        tmat[i] = eval_Wb(Wb, 1./ni + 1./nf, kf - ki);
-        
-        // filter nan-s
-        if (not Complex_finite(tmat[i]))
-            tmat[i] = 0.;
-    }
-    
-    return tmat;
-}
-
-void hex_scattering_amplitude_Born_
-(
-    int * ni, int * li, int * pmi,
-    int * nf, int * lf, int * pmf,
-    int * S, double * E, int * N,
-    double * angles, double * result
-)
-{
-    cArrayView results(*N,reinterpret_cast<Complex*>(result));
-    results.fill(0.);
-    
-    // use mi >= 0; if mi < 0, flip both signs
-    int mi = (mi < 0 ? -(*pmi) : (*pmi));
-    int mf = (mi < 0 ? -(*pmf) : (*pmf));
-    
-    // we need cosines, not angles
-    rArray cos_angles = rArray(*N,angles).transform([](double x){ return std::cos(x); });
-    
-    // get lowest and highest partial wave
-    int min_ell, max_ell;
-    sqlitepp::statement st(db);
-    st << "SELECT MIN(ell), MAX(ell) FROM " + TMatrix::Id + " "
-           "WHERE ni = :ni "
-           "  AND li = :li "
-           "  AND mi = :mi "
-           "  AND nf = :nf "
-           "  AND lf = :lf "
-           "  AND mf = :mf "
-           "  AND  S = :S  ",
-        sqlitepp::into(min_ell), sqlitepp::into(max_ell),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
-        sqlitepp::use(*S);
-    st.exec();
-    
-    // resulting T-matrices
-    cArray tmatrices;
-    
-    // loop over all partial waves
-    for (int ell = min_ell; ell <= max_ell; ell++)
-    {
-        Complex Tmat;
-        double Ei, ReT, ImT;
-        
-        // prepare selection statement
-        sqlitepp::statement st1(db);
-        st1 << "SELECT Ei, SUM(Re_TBorn_ell), SUM(Im_TBorn_ell) FROM " + TMatrix::Id + " "
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "  AND nf = :nf "
-            "  AND lf = :lf "
-            "  AND mf = :mf "
-            "  AND  S = :S  "
-            "  AND ell = :ell "
-            "GROUP BY Ei "
-            "ORDER BY Ei ASC ",
-            sqlitepp::into(Ei), sqlitepp::into(ReT), sqlitepp::into(ImT),
-            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
-            sqlitepp::use(*S), sqlitepp::use(ell);
-        
-        // load the data corresponding to the statement
-        rArray energies_ell;
-        cArray tmatrices_ell;
-        while (st1.exec())
-        {
-            energies_ell.push_back(Ei);
-            tmatrices_ell.push_back(Complex(ReT,ImT));
-        }
-        
-        // is the requested energy in the available energy interval?
-        if (energies_ell.size() != 0 and energies_ell.front() <= *E and *E <= energies_ell.back())
-        {
-            // interpolate requested energy
-            tmatrices.push_back(interpolate(energies_ell, tmatrices_ell, { *E })[0]);
-            
-            std::cout << "# " << ell << " " << tmatrices.back() << std::endl;
-        }
-        else
-            break;
-        
-        // update scattering amplitudes¨
-        for (int i = 0; i < *N; i++)
-        {
-            double Y = gsl_sf_legendre_sphPlm(ell,std::abs(mi-mf),cos_angles[i]);
-            results[i] += -tmatrices.back() * Y / special::constant::two_pi;
-        }
-    }
 }
 
 void hex_scattering_amplitude
@@ -240,7 +121,7 @@ void hex_scattering_amplitude_
     st.exec();
     
     // resulting T-matrices
-    cArray tmatrices, tmatricesBorn;
+    cArray tmatrices;
     
     // loop over all partial waves
     for (int ell = min_ell; ; ell++)
@@ -392,20 +273,6 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
         reinterpret_cast<double*>(amplitudes.data())
     );
     
-    int N = angles.size();
-    cArray amplitudesBorn(angles.size());
-    hex_scattering_amplitude_Born_
-    (
-        &ni,&li,&mi,
-        &nf,&lf,&mf,
-        &S, &E,
-        &N,
-        scaled_angles.data(),
-        reinterpret_cast<double*>(amplitudesBorn.data())
-    );
-    
-    cArray bampl = -FirstBornFullTMatrix(ni, li, mi, nf, lf, mf, E, scaled_angles) / special::constant::two_pi;
-    
     // write out
     std::cout << logo("#") <<
         "# Scattering amplitudes in " << unit_name(Lunits) << " for\n"
@@ -417,8 +284,8 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
     OutputTable table;
     table.setWidth(15, 15);
     table.setAlignment(OutputTable::left);
-    table.write("# angle    ", "Re f     ", "Im f     ", "Re f [DB]", "Im f [DB]", "Re f [1B]", "Im f [1B]");
-    table.write("# ---------", "---------", "---------", "---------", "---------", "---------", "---------");
+    table.write("# angle    ", "Re f     ", "Im f     ");
+    table.write("# ---------", "---------", "---------");
     
     for (std::size_t i = 0; i < angles.size(); i++)
     {
@@ -426,11 +293,7 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
         (
             angles[i],
             amplitudes[i].real() * lfactor,
-            amplitudes[i].imag() * lfactor,
-            amplitudesBorn[i].real() * lfactor,
-            amplitudesBorn[i].imag() * lfactor,
-            bampl[i].real() * lfactor,
-            bampl[i].imag() * lfactor
+            amplitudes[i].imag() * lfactor
         );
     }
     

@@ -40,7 +40,6 @@
 VariableList::VariableList () :
     list ({
         new TMatrix,
-        new BornFullTMatrix,
         new ScatteringAmplitude,
         new ScatteringAmplitudeDir,
         new DifferentialCrossSection,

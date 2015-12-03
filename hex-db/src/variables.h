@@ -314,9 +314,6 @@ AddNewVariableClass(TotalCrossSection)
 /// Create class for ionization amplitude radial part (ionf)
 AddNewVariableClass(IonizationF)
 
-/// Create class for the angle dependent full second Born T-matrix (bornf)
-AddNewVariableClass(BornFullTMatrix)
-
 /// Create class for ionization amplitude (ionamp)
 AddNewVariableClass(IonizationAmplitude)
 
@@ -328,9 +325,6 @@ AddNewVariableClass(StokesParameters)
 
 /// Create class for spin asymmetry (asy)
 AddNewVariableClass(SpinAsymmetry)
-
-/// Create class for Born T-matrix (tmatb)
-AddNewVariableClass(TMatrixB)
 
 /// forward declaration of the variable list "vlist"
 extern VariableList vlist;

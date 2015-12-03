@@ -156,8 +156,8 @@ void hex_complete_cross_section_
     double * ccs, int * n
 )
 {
-    double E, sigma, sigmab, sigmaB;
-    rArray E_arr, sigma_arr, sigmab_arr, EB_arr, sigmaB_arr;
+    double E, sigma;
+    rArray E_arr, sigma_arr;
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = ((*pmi) < 0 ? -(*pmi) : (*pmi));
@@ -194,7 +194,7 @@ void hex_complete_cross_section_
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, SUM(sigma), SUM(sigmaB) FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -203,7 +203,7 @@ void hex_complete_cross_section_
             "  AND mf = :mf "
             "GROUP BY Ei "
             "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmab),
+        sqlitepp::into(E), sqlitepp::into(sigma),
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
         sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     
@@ -212,37 +212,11 @@ void hex_complete_cross_section_
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
-        sigmab_arr.push_back(sigmab);
     }
     
     // terminate if no data
     if (E_arr.empty())
         return;
-    
-    //
-    // get the whole Born cross section
-    //
-    
-    // compose query
-    sqlitepp::statement stb(db);
-    stb << "SELECT Ei, sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*borncs(cheb)/39.478418 FROM " + BornFullTMatrix::Id + " " // 4π²
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "  AND nf = :nf "
-            "  AND lf = :lf "
-            "  AND mf = :mf "
-            "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigmaB),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
-    
-    // retrieve data
-    while (stb.exec())
-    {
-        EB_arr.push_back(E);
-        sigmaB_arr.push_back(sigmaB);
-    }
     
     //
     // interpolate
@@ -254,16 +228,11 @@ void hex_complete_cross_section_
     // negative energy indicates output of all available cross sections
     if (*energies < 0.)
     {
-        // interpolate Born cross section to partial waves' energies
-        rArray sigmaBorn = (*energies < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_cspline);
-        
         // correct energies
         rArrayView(*N,energies) = E_arr;
         
-        // correct cross sections by Born
-        rArrayView(*N,ccs) = sigmaBorn + sigma_arr - sigmab_arr;
+        // correct cross sections
+        rArrayView(*N,ccs) = sigma_arr;
     }
     else
     {
@@ -271,15 +240,9 @@ void hex_complete_cross_section_
         rArray ccs0 = (*energies < Eion) ? 
             interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_linear) :
             interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_cspline);
-        rArray ccsb = (*energies < Eion) ? 
-            interpolate_real(E_arr, sigmab_arr, rArray(*N,energies), gsl_interp_linear) :
-            interpolate_real(E_arr, sigmab_arr, rArray(*N,energies), gsl_interp_cspline);
-        rArray ccsB = (*energies < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, rArray(*N,energies), gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, rArray(*N,energies), gsl_interp_cspline);
         
         // corrected cross section
-        rArrayView(*N,ccs) = ccsB + (ccs0 - ccsb);
+        rArrayView(*N,ccs) = ccs0;
     }
 }
 

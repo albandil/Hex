@@ -159,7 +159,6 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
             "S  INTEGER, "
             "Ei DOUBLE PRECISION, "
             "sigma DOUBLE PRECISION, "
-            "sigmaB DOUBLE PRECISION DEFAULT 0, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
         ")"
     };
@@ -175,16 +174,15 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.L, a.S, a.Ei, "
-                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_T_ell    * b.Re_T_ell     + a.Im_T_ell     * b.Im_T_ell    )/157.91367, " // 16π²
-                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_TBorn_ell* b.Re_TBorn_ell + a.Im_TBorn_ell * b.Im_TBorn_ell)/157.91367 " // 16π²
+                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_T_ell    * b.Re_T_ell     + a.Im_T_ell     * b.Im_T_ell    )/157.91367 " // 16π²
                 "FROM "
                 "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
+                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell FROM " + TMatrix::Id + " "
                     "ORDER BY ell"
                 ") AS a "
                 "INNER JOIN "
                 "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell,Re_TBorn_ell,Im_TBorn_ell FROM " + TMatrix::Id + " "
+                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell FROM " + TMatrix::Id + " "
                     "ORDER BY ell"
                 ") AS b "
                 "ON a.ni = b.ni AND a.li = b.li AND a.mi = b.mi AND "
@@ -197,8 +195,7 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
-                "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)), "
-                "0 " // TODO Born T-matrix (to be implemented in future)
+                "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
             "FROM " + IonizationF::Id + " "
             "GROUP BY ni, li, mi, L, S, Ei"
     };
@@ -226,8 +223,8 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     int mf = (mi0 < 0 ? -mf0 : mf0);
     
     // energies and cross sections
-    double E, sigma, sigmaB;
-    rArray energies, E_arr, sigma_arr, sigmaB_arr;
+    double E, sigma;
+    rArray energies, E_arr, sigma_arr;
     
     // get energy / energies
     try {
@@ -243,7 +240,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma, sigmaB FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
@@ -253,7 +250,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
             "  AND  L = :L  "
             "  AND  S = :S  "
             "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmaB),
+        sqlitepp::into(E), sqlitepp::into(sigma),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
         sqlitepp::use(L), sqlitepp::use(S);
@@ -263,7 +260,6 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
-        sigmaB_arr.push_back(sigmaB);
     }
     
     // write header
@@ -277,8 +273,8 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     OutputTable table;
     table.setWidth(15);
     table.setAlignment(OutputTable::left);
-    table.write("# E        ", "sigma    ", "sigmaBorn");
-    table.write("# ---------", "---------", "---------");
+    table.write("# E        ", "sigma    ");
+    table.write("# ---------", "---------");
     
     // terminate if no data
     if (E_arr.empty())
@@ -299,13 +295,10 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         rArray ics = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-        rArray icsB = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigmaB_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigmaB_arr, energies * efactor, gsl_interp_cspline);
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            table.write(energies[i], ics[i] * lfactor * lfactor, icsB[i] * lfactor * lfactor);
+            table.write(energies[i], ics[i] * lfactor * lfactor);
     }
     
     return true;

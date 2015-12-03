@@ -81,8 +81,8 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     int mi = Conv<int>(sdata, "mi", Id);
     
     // energies and cross sections
-    double E, sigma, sigmab, sigmaB;
-    rArray energies, E_arr, EB_arr, sigma_arr, sigmab_arr, sigmaB_arr;
+    double E, sigma;
+    rArray energies, E_arr, sigma_arr;
     
     // get energy / energies
     try {
@@ -102,13 +102,13 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, sum(sigma), sum(sigmaB) FROM " + IntegralCrossSection::Id + " "
+    st << "SELECT Ei, sum(sigma) FROM " + IntegralCrossSection::Id + " "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "
             "GROUP BY Ei "
             "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma), sqlitepp::into(sigmab),
+        sqlitepp::into(E), sqlitepp::into(sigma),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi);
     
     // retrieve data
@@ -116,29 +116,6 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     {
         E_arr.push_back(E);
         sigma_arr.push_back(sigma);
-        sigmab_arr.push_back(sigmab);
-    }
-    
-    //
-    // load Born cross section
-    //
-    
-    // compose query
-    sqlitepp::statement stb(db);
-    stb << "SELECT Ei, SUM(borncs(cheb)) FROM " + BornFullTMatrix::Id + " "
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "GROUP BY Ei "
-            "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigmaB),
-        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi);
-    
-    // retrieve data
-    while (stb.exec())
-    {
-        EB_arr.push_back(E);
-        sigmaB_arr.push_back(sigmaB);
     }
     
     //
@@ -170,14 +147,9 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     // negative energy indicates output of all available cross sections
     if (energies[0] < 0.)
     {
-        // interpolate Born cross section to partial waves' energies
-        rArray sigmaBorn = (efactor * energies.front() < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, E_arr, gsl_interp_cspline);
-        
         // output corrected cross section
         for (std::size_t i = 0; i < E_arr.size(); i++)
-            table.write(E_arr[i] / efactor, (sigmaBorn[i] + (sigma_arr[i] - sigmab_arr[i])) * lfactor * lfactor);
+            table.write(E_arr[i] / efactor, sigma_arr[i] * lfactor * lfactor);
     }
     else
     {
@@ -185,19 +157,10 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
         rArray tcs = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
-        rArray tcsb = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigmab_arr, energies * efactor, gsl_interp_cspline);
-        rArray tcsB = (efactor * energies.front() < Eion) ? 
-            interpolate_real(EB_arr, sigmaB_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(EB_arr, sigmaB_arr, energies * efactor, gsl_interp_cspline);
-        
-        // corrected cross section
-        rArray cs = tcsB + (tcs - tcsb);
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
-            table.write(energies[i], (std::isfinite(cs[i]) ? cs[i] * lfactor * lfactor : 0.));
+            table.write(energies[i], (std::isfinite(tcs[i]) ? tcs[i] * lfactor * lfactor : 0.));
     }
     
     return true;

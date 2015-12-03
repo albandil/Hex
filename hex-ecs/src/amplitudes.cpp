@@ -258,8 +258,7 @@ void Amplitudes::writeSQL_files ()
                         << T.nf << "," << T.lf << "," << T.mf << ","
                         << inp_.L  << "," << 0 << ","
                         << inp_.Etot[i] + 1. / (T.ni * T.ni) << "," << ell << "," 
-                        << T_S0[i].real() << "," << T_S0[i].imag() << ","
-                        << "0,0);" << std::endl;
+                        << T_S0[i].real() << "," << T_S0[i].imag() << ");" << std::endl;
                 }
                 
                 // write triplet value (S = 1)
@@ -270,8 +269,7 @@ void Amplitudes::writeSQL_files ()
                         << T.nf << "," << T.lf << "," << T.mf << ","
                         << inp_.L  << "," << 1 << ","
                         << inp_.Etot[i] + 1. / (T.ni * T.ni) << "," << ell << "," 
-                        << T_S1[i].real() << "," << T_S1[i].imag() << ","
-                        << "0,0);" << std::endl;
+                        << T_S1[i].real() << "," << T_S1[i].imag() << ");" << std::endl;
                 }
             }
         }
