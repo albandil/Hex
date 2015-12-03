@@ -48,9 +48,9 @@ const std::vector<std::pair<std::string,std::string>> CollisionStrength::Depende
     {"nf", "Final atomic principal quantum number."},
     {"lf", "Final atomic orbital quantum number."},
     {"mf", "Final atomic magnetic quantum number."},
-    {"L", "Total orbital momentum of atomic + projectile electron."},
     {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"ell", "Partial wave."}
 };
 const std::vector<std::string> CollisionStrength::VecDependencies = { "Ei" };
 
@@ -84,8 +84,8 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
     int nf = Conv<int>(sdata, "nf", Id);
     int lf = Conv<int>(sdata, "lf", Id);
     int mf0= Conv<int>(sdata, "mf", Id);
-    int  L = Conv<int>(sdata, "L", Id);
     int  S = Conv<int>(sdata, "S", Id);
+    int ell = Conv<int>(sdata, "ell", Id);
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -116,13 +116,13 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
             "  AND nf = :nf "
             "  AND lf = :lf "
             "  AND mf = :mf "
-            "  AND  L = :L  "
+            "  AND ell = :ell  "
             "  AND  S = :S  "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigma),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(L), sqlitepp::use(S);
+        sqlitepp::use(ell), sqlitepp::use(S);
     
     // retrieve data
     while (st.exec())
@@ -136,7 +136,7 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
         "# Collision strength (dimensionless) for\n"
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-        "#     L = " << L << ", S = " << S << "\n" <<
+        "#     ell = " << ell << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n";
     OutputTable table;

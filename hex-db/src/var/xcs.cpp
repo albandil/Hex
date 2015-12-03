@@ -115,7 +115,7 @@ bool ExtrapolatedCrossSection::run (std::map<std::string,std::string> const & sd
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Dat.Ei AS Ei, Lim.L - Dat.L AS Delta, Dat.sigma                    "
+    st << "SELECT Dat.Ei AS Ei, Lim.ell - Dat.ell AS Delta, Dat.sigma                "
           "FROM (                                                                    "
           "  SELECT Ei, L, SUM(sigma) AS sigma FROM " + IntegralCrossSection::Id + " "
           "  WHERE ni = :ni AND li = :li AND mi = :mi                                "
@@ -129,7 +129,7 @@ bool ExtrapolatedCrossSection::run (std::map<std::string,std::string> const & sd
           "  GROUP BY Ei                                                             "
           "  ORDER BY Ei ASC                                                         "
           ") AS Lim ON Dat.Ei = Lim.Ei                                               "
-          "WHERE Dat.L = Lim.L OR Dat.L = Lim.L - 1                                  "
+          "WHERE Dat.ell = Lim.ell OR Dat.ell = Lim.ell - 1                          "
           "ORDER BY Ei ASC, Delta DESC",
         sqlitepp::into(E), sqlitepp::into(delta), sqlitepp::into(sigma),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),

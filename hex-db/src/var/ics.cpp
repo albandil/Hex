@@ -101,9 +101,9 @@ const std::vector<std::pair<std::string,std::string>> IntegralCrossSection::Depe
     {"nf", "Final atomic principal quantum number."},
     {"lf", "Final atomic orbital quantum number."},
     {"mf", "Final atomic magnetic quantum number."},
-    {"L", "Total orbital momentum of atomic + projectile electron."},
     {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
+    {"Ei", "Projectile impact energy (Rydberg)."},
+    {"ell", "Partial wave."}
 };
 const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 
@@ -149,17 +149,17 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
     static const std::vector<std::string> cmd = {
         "CREATE TABLE IF NOT EXISTS '" + IntegralCrossSection::Id + "' "
         "("
-            "ni INTEGER, "
-            "li INTEGER, "
-            "mi INTEGER, "
-            "nf INTEGER, "
-            "lf INTEGER, "
-            "mf INTEGER, "
-            "L  INTEGER, "
-            "S  INTEGER, "
-            "Ei DOUBLE PRECISION, "
+            "ni  INTEGER, "
+            "li  INTEGER, "
+            "mi  INTEGER, "
+            "nf  INTEGER, "
+            "lf  INTEGER, "
+            "mf  INTEGER, "
+            "S   INTEGER, "
+            "Ei  DOUBLE PRECISION, "
+            "ell INTEGER, "
             "sigma DOUBLE PRECISION, "
-            "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei)"
+            "PRIMARY KEY (ni,li,mi,nf,lf,mf,S,Ei,ell)"
         ")"
     };
     
@@ -173,31 +173,23 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         // insert discrete transitions
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-            "SELECT a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.L, a.S, a.Ei, "
-                "sqrt(a.Ei-1./(a.ni*a.ni)+1./(a.nf*a.nf))/sqrt(a.Ei)*(2*a.S+1) * SUM(a.Re_T_ell    * b.Re_T_ell     + a.Im_T_ell     * b.Im_T_ell    )/157.91367 " // 16π²
-                "FROM "
-                "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell FROM " + TMatrix::Id + " "
-                    "ORDER BY ell"
-                ") AS a "
-                "INNER JOIN "
-                "("
-                    "SELECT ni,li,mi,nf,lf,mf,L,S,Ei,ell,Re_T_ell,Im_T_ell FROM " + TMatrix::Id + " "
-                    "ORDER BY ell"
-                ") AS b "
-                "ON a.ni = b.ni AND a.li = b.li AND a.mi = b.mi AND "
-                "   a.nf = b.nf AND a.lf = b.lf AND a.mf = b.mf AND "
-                "   a.S = b.S  AND a.Ei = b.Ei AND a.ell = b.ell "
-                "WHERE a.Ei > 0 AND a.Ei - 1./(a.ni*a.ni) + 1./(a.nf*a.nf) > 0 "
-                "GROUP BY a.ni, a.li, a.mi, a.nf, a.lf, a.mf, a.L, a.S, a.Ei",
+            "SELECT ni, li, mi,  "
+                   "nf, lf, mf,  "
+                   "S,  Ei, ell, "
+                   "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1) * (SUM(Re_T_ell) * SUM(Re_T_ell) + SUM(Im_T_ell) * SUM(Im_T_ell))/157.91367 " // 16π²
+                "FROM " + TMatrix::Id + " "
+                "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
+                "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell",
         
         // insert ionization
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-            "SELECT ni, li, mi, 0, 0, 0, L, S, Ei, "
-                "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
-            "FROM " + IonizationF::Id + " "
-            "GROUP BY ni, li, mi, L, S, Ei"
+            "SELECT ni, li, mi, "
+                   "0,  0,  0,  "
+                   "S,  Ei, L,  "
+                   "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
+                "FROM " + IonizationF::Id + " "
+                "GROUP BY ni, li, mi, S, Ei, L"
     };
     return cmd;
 }
@@ -215,8 +207,8 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     int nf = Conv<int>(sdata, "nf", Id);
     int lf = Conv<int>(sdata, "lf", Id);
     int mf0= Conv<int>(sdata, "mf", Id);
-    int  L = Conv<int>(sdata, "L", Id);
-    int  S = Conv<int>(sdata, "S", Id);
+    int ell= Conv<int>(sdata, "ell",Id);
+    int  S = Conv<int>(sdata, "S",  Id);
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -247,13 +239,13 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
             "  AND nf = :nf "
             "  AND lf = :lf "
             "  AND mf = :mf "
-            "  AND  L = :L  "
+            "  AND ell= :ell"
             "  AND  S = :S  "
             "ORDER BY Ei ASC",
         sqlitepp::into(E), sqlitepp::into(sigma),
         sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
         sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
-        sqlitepp::use(L), sqlitepp::use(S);
+        sqlitepp::use(ell), sqlitepp::use(S);
     
     // retrieve data
     while (st.exec())
@@ -267,7 +259,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         "# Integral cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
-        "#     L = " << L << ", S = " << S << "\n" <<
+        "#     ell = " << ell << ", S = " << S << "\n" <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "#\n";
     OutputTable table;

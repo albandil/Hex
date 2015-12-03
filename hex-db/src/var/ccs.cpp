@@ -45,45 +45,6 @@
 
 // -------------------------------------------------------------------------- //
 
-//
-// custom function for integration of BLOB-represented Chebyshev
-// expansion of the Born T-matrix
-//
-
-void db_bornICS (sqlite3_context* pdb, int n, sqlite3_value** val)
-{
-    // get blob data as text; reinterpret_cast is save as we are using
-    // the low ASCII only
-    std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
-    
-    // convert text data to binary array
-    cArray coeffs;
-    coeffs.fromBlob(blob);
-    
-    // construct Chebyshev approximation object from the data
-    Chebyshev<double,Complex> CB (coeffs, -1., 1.);
-    
-    // integrate
-    //
-    //   1
-    //   ⌠
-    //   ⎮
-    //   ⎮ |T(cos θ)|² dcos θ
-    //   ⎮
-    //   ⌡
-    //  -1
-    //
-    int tail = CB.tail(1e-10);
-    auto fsqr = [&](double cosTheta) -> double { return sqrabs(CB.clenshaw(cosTheta, tail)); };
-    ClenshawCurtis<decltype(fsqr),double> integrator(fsqr);
-    double result = 2 * special::constant::pi * integrator.integrate(-1, 1);
-    
-    // use result of the integration
-    sqlite3_result_double(pdb, result);
-}
-
-// -------------------------------------------------------------------------- //
-
 const std::string CompleteCrossSection::Id = "ccs";
 const std::string CompleteCrossSection::Description = "Complete cross section (L- and S-summed integral cross section).";
 const std::vector<std::pair<std::string,std::string>> CompleteCrossSection::Dependencies = {
@@ -99,22 +60,6 @@ const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
 
 bool CompleteCrossSection::initialize (sqlitepp::session & db) const
 {
-    //
-    // define Gauss-Chebyshev integration of Chebyshev expansion
-    //
-    
-    sqlite3_create_function
-    (
-        db.impl(),
-        "borncs",
-        1,              // pass single argument
-        SQLITE_UTF8,
-        nullptr,
-        &db_bornICS,
-        nullptr,
-        nullptr
-    );
-    
     return true;
 }
 
