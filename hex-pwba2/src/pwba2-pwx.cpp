@@ -148,7 +148,7 @@ cArrays PWBA2::PartialWave_direct
                 
                 Complex allowed_contrib = 0;
                 log << std::endl << "\tAllowed intermediate states" << std::endl;
-                if (integrate_allowed)
+                if (integrate_allowed and Etot > 0)
                 {
                     if (verbose) log << "\t\t(real)" << std::endl;
                     
@@ -229,7 +229,7 @@ cArrays PWBA2::PartialWave_direct
                     GaussKronrod<decltype(forbidden_energy_contribution)> GK (forbidden_energy_contribution);
                     GK.setEpsAbs(1e-8);
                     GK.setEpsRel(1e-5);
-                    GK.integrate(std::sqrt(Etot), std::sqrt(Enmax));
+                    GK.integrate(std::sqrt(std::max(0., Etot)), std::sqrt(Enmax));
                     if (not GK.ok())
                     {
                         # pragma omp critical
