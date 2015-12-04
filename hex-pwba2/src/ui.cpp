@@ -352,6 +352,8 @@ int main (int argc, char* argv[])
     std::cout << "Using " << omp_get_num_threads() << " OpenMP threads for the calculation." << std::endl << std::endl;
 #endif
     
+    Timer t;
+    
     // outgoing electron partial T-matrices
     cArrays Tdir =
         partial_wave ?
@@ -361,6 +363,8 @@ int main (int argc, char* argv[])
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
     std::cout << std::endl;
+    
+    std::cout << "Finished in " << t.nice_time() << std::endl;
     
     return EXIT_SUCCESS;
 }
