@@ -362,7 +362,7 @@ int main (int argc, char* argv[])
     
     std::cout << "Tdir = " << Tdir << std::endl;
     std::cout << "Tdir sums = " << sums(Tdir) << std::endl;
-    std::cout << "Partial cross sections = " << sqrabs(sums(Tdir)) << std::endl;
+    std::cout << "Partial cross sections = " << sqrabs(sums(Tdir)) / (16 * special::constant::pi * special::constant::pi) << std::endl;
     std::cout << std::endl;
     
     std::cout << "Finished in " << t.nice_time() << std::endl;
