@@ -181,6 +181,71 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
                 "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
                 "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell",
         
+        // temporary table with merged available energies from all total angular momenta for every discrete transition
+        
+        /*"CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",*/
+        
+        // interpolate discrete transition partial cross sections
+        
+        /*"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 AS sigma " // 16π²
+        "FROM "
+        "( "
+            "SELECT Low.ni  AS ni, "
+                   "Low.li  AS li, "
+                   "Low.mi  AS mi, "
+                   "Low.nf  AS nf, "
+                   "Low.lf  AS lf, "
+                   "Low.mf  AS mf, "
+                   "Low.S   AS S,  "
+                   "Low.ell AS ell, "
+                   "Low.EiReq AS Ei, "
+                   "SUM "
+                   "( "
+                       "CASE WHEN Low.EiLow > Low.EiReq OR Upp.EiReq > Upp.EiUpp THEN 0 "
+                       "ELSE "
+                       "( "
+                           "CASE WHEN Low.EiLow = Upp.EiUpp THEN Low.Re_T_ell "
+                           "ELSE (Low.Re_T_ell * (Upp.EiUpp - Upp.EiReq) + Upp.Re_T_ell * (Low.EiReq - Low.EiLow)) / (Upp.EiUpp - Low.EiLow) "
+                           "END "
+                       ") "
+                       "END "
+                   ") AS ReT, "
+                   "SUM "
+                   "( "
+                       "CASE WHEN Low.EiLow > Low.EiReq OR Upp.EiReq > Upp.EiUpp THEN 0 "
+                       "ELSE "
+                       "( "
+                           "CASE WHEN Low.EiLow = Upp.EiUpp THEN Low.Im_T_ell "
+                           "ELSE (Low.Im_T_ell * (Upp.EiUpp - Upp.EiReq) + Upp.Im_T_ell * (Low.EiReq - Low.EiLow)) / (Upp.EiUpp - Low.EiLow) "
+                           "END "
+                       ") "
+                       "END "
+                   ") AS ImT "
+            "FROM "
+            "( "
+                "SELECT * FROM tmat NATURAL JOIN "
+                "( "
+                    "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MAX(tmat.Ei) AS EiLow, T.Ei AS EiReq "
+                        "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
+                        "WHERE tmat.Ei <= T.Ei "
+                        "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
+                ") AS tmp WHERE tmat.Ei = tmp.EiLow "
+            ") AS Low "
+            "NATURAL JOIN "
+            "( "
+                "SELECT * FROM tmat NATURAL JOIN "
+                "( "
+                    "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MIN(tmat.Ei) AS EiUpp, T.Ei AS EiReq "
+                        "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
+                        "WHERE T.Ei <= tmat.Ei "
+                        "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
+                ") AS tmp WHERE tmat.Ei = tmp.EiUpp "
+            ") AS Upp "
+            "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell "
+        ")",*/
+
+        
         // insert ionization
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "

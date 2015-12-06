@@ -219,6 +219,11 @@ int main (int argc, char* argv[])
             
             return true;
         },
+        "pwlimit", "", 1, [ & ](Args opts) -> bool
+        {
+            sdata["pwlimit"] = std::string(opts[0]);
+            return true;
+        },
         /* default*/ [ & ](std::string arg, Args opts) -> bool
         {
             // try to find it in the variable ids

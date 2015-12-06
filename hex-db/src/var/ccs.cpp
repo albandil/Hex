@@ -82,14 +82,14 @@ void hex_complete_cross_section
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int N, double * energies,
-    double * ccs, int * Nall
+    double * ccs, int * Nall, int * pwlimit
 )
 {
     hex_complete_cross_section_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &N, energies, ccs, Nall
+        &N, energies, ccs, Nall, pwlimit
     );
 }
 
@@ -98,7 +98,7 @@ void hex_complete_cross_section_
     int * ni, int * li, int * pmi,
     int * nf, int * lf, int * pmf,
     int * N, double * energies,
-    double * ccs, int * n
+    double * ccs, int * n, int * pwlimit
 )
 {
     double E, sigma;
@@ -139,18 +139,38 @@ void hex_complete_cross_section_
     
     // compose query
     sqlitepp::statement st(db);
-    st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
-            "WHERE ni = :ni "
-            "  AND li = :li "
-            "  AND mi = :mi "
-            "  AND nf = :nf "
-            "  AND lf = :lf "
-            "  AND mf = :mf "
-            "GROUP BY Ei "
-            "ORDER BY Ei ASC",
-        sqlitepp::into(E), sqlitepp::into(sigma),
-        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
+    if (*pwlimit >= 0)
+    {
+        st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
+                "WHERE ni = :ni "
+                "  AND li = :li "
+                "  AND mi = :mi "
+                "  AND nf = :nf "
+                "  AND lf = :lf "
+                "  AND mf = :mf "
+                "  AND ell <= :pwlimit "
+                "GROUP BY Ei "
+                "ORDER BY Ei ASC",
+            sqlitepp::into(E), sqlitepp::into(sigma),
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
+            sqlitepp::use(*pwlimit);
+    }
+    else
+    {
+        st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
+                "WHERE ni = :ni "
+                "  AND li = :li "
+                "  AND mi = :mi "
+                "  AND nf = :nf "
+                "  AND lf = :lf "
+                "  AND mf = :mf "
+                "GROUP BY Ei "
+                "ORDER BY Ei ASC",
+            sqlitepp::into(E), sqlitepp::into(sigma),
+            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
+    }
     
     // retrieve data
     while (st.exec())
@@ -205,6 +225,11 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     int lf = Conv<int>(sdata, "lf", Id);
     int mf = Conv<int>(sdata, "mf", Id);
     
+    // check if we have the optional pwlimit
+    int pwlimit = -1;
+    if (sdata.find("pwlimit") != sdata.end())
+        pwlimit = std::stoi(sdata.at("pwlimit"));
+    
     // energies and cross sections
     rArray energies;
     
@@ -232,7 +257,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         int N;
         
         // get number of energies
-        hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N);
+        hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, &pwlimit);
         
         // resize
         scaled_energies.resize(N);
@@ -243,13 +268,19 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     
     // retrieve requested energies
     if (scaled_energies.size() > 0)
-        hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr);
+        hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, &pwlimit);
     
     // write header
     std::cout << logo("#") <<
         "# Complete cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
-        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n" <<
+        "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n";
+    if (pwlimit >= 0)
+    {
+        std::cout <<
+        "#     limited to partial waves ell <= " << pwlimit << "\n";
+    }
+        std::cout <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
         "# \n";
     OutputTable table;
