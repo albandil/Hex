@@ -133,51 +133,48 @@ void hex_complete_cross_section_
             return;
     }
     
-    //
-    // get contributions from the partial wave expansion
-    //
+    // get number of partial waves stored in the database
+    int max_ell, max_available_ell;
+    sqlitepp::statement ell_st(db);
+    ell_st << "SELECT MAX(ell) FROM " + IntegralCrossSection::Id + " "
+              "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf",
+        sqlitepp::into(max_available_ell),
+        sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+        sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
+    ell_st.exec();
+    max_ell = (*pwlimit < 0 ? max_available_ell : std::min(max_available_ell, *pwlimit));
     
-    // compose query
-    sqlitepp::statement st(db);
-    if (*pwlimit >= 0)
+    // retrieve cross sections for all requested (and available) partial waves
+    rArrays E_data, sigma_data;
+    for (int ell = 0; ell <= max_ell; ell++)
     {
+        // compose query
+        sqlitepp::statement st(db);
         st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
-                "WHERE ni = :ni "
-                "  AND li = :li "
-                "  AND mi = :mi "
-                "  AND nf = :nf "
-                "  AND lf = :lf "
-                "  AND mf = :mf "
-                "  AND ell <= :pwlimit "
-                "GROUP BY Ei "
-                "ORDER BY Ei ASC",
+              "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND ell = :ell "
+              "GROUP BY Ei "
+              "ORDER BY Ei ASC",
             sqlitepp::into(E), sqlitepp::into(sigma),
             sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf),
-            sqlitepp::use(*pwlimit);
-    }
-    else
-    {
-        st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
-                "WHERE ni = :ni "
-                "  AND li = :li "
-                "  AND mi = :mi "
-                "  AND nf = :nf "
-                "  AND lf = :lf "
-                "  AND mf = :mf "
-                "GROUP BY Ei "
-                "ORDER BY Ei ASC",
-            sqlitepp::into(E), sqlitepp::into(sigma),
-            sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
-            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
+            sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf), sqlitepp::use(ell);
+        
+        // prepare storage
+        E_data.push_back(rArray());
+        sigma_data.push_back(rArray());
+        
+        // retrieve data
+        while (st.exec())
+        {
+            E_data.back().push_back(E);
+            sigma_data.back().push_back(sigma);
+        }
     }
     
-    // retrieve data
-    while (st.exec())
-    {
-        E_arr.push_back(E);
-        sigma_arr.push_back(sigma);
-    }
+    // merge energies of all datasets
+    E_arr = join(E_data);
+    std::sort(E_arr.begin(), E_arr.end());
+    double* ptr = std::unique(E_arr.begin(), E_arr.end());
+    E_arr.resize(ptr - E_arr.begin());
     
     // terminate if no data
     if (E_arr.empty())
@@ -193,21 +190,26 @@ void hex_complete_cross_section_
     // negative energy indicates output of all available cross sections
     if (*energies < 0.)
     {
-        // correct energies
         rArrayView(*N,energies) = E_arr;
-        
-        // correct cross sections
-        rArrayView(*N,ccs) = sigma_arr;
+        rArrayView(*N,ccs).fill(0);
+        for (int ell = 0; ell <= max_ell; ell++)
+        {
+            if (*energies < Eion)
+                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_linear);
+            else
+                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_cspline);
+        }
     }
     else
     {
-        // interpolate for given 'energies'
-        rArray ccs0 = (*energies < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, rArray(*N,energies), gsl_interp_cspline);
-        
-        // corrected cross section
-        rArrayView(*N,ccs) = ccs0;
+        rArrayView(*N,ccs).fill(0);
+        for (int ell = 0; ell <= max_ell; ell++)
+        {
+            if (*energies < Eion)
+                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_linear);
+            else
+                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_cspline);
+        }
     }
 }
 
