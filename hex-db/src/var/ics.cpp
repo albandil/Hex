@@ -172,23 +172,24 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         // insert discrete transitions
         
-        "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+        /*"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi,  "
                    "nf, lf, mf,  "
                    "S,  Ei, ell, "
                    "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1) * (SUM(Re_T_ell) * SUM(Re_T_ell) + SUM(Im_T_ell) * SUM(Im_T_ell))/157.91367 " // 16π²
                 "FROM " + TMatrix::Id + " "
                 "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
-                "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell",
+                "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell",*/
         
         // temporary table with merged available energies from all total angular momenta for every discrete transition
         
-        /*"CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",*/
+        "CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",
+        "CREATE INDEX i1 ON T (ni,li,mi,nf,lf,mf,S,Ei,ell)",
         
         // interpolate discrete transition partial cross sections
         
-        /*"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 AS sigma " // 16π²
+        "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, sqrt(Ei - 1./(ni*ni) + 1./(nf*nf)) * (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 / sqrt(Ei) AS sigma " // 16π²
         "FROM "
         "( "
             "SELECT Low.ni  AS ni, "
@@ -242,9 +243,9 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
                         "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
                 ") AS tmp WHERE tmat.Ei = tmp.EiUpp "
             ") AS Upp "
+            "WHERE Ei - 1./(ni*ni) + 1./(nf*nf) >= 0 "
             "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell "
-        ")",*/
-
+        ")",
         
         // insert ionization
         

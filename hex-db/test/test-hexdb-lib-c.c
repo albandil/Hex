@@ -39,7 +39,9 @@ int main (void)
         3,          // number of energies
         energy,     // energy list
         ccs,        // cross sections
-        NULL        // auxiliary pointer
+        NULL,       // auxiliary pointer
+        -1,         // partial wave count (all)
+        NULL        // partial wave list (all)
     );
     
     // print the cross section

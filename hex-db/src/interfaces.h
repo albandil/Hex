@@ -356,14 +356,16 @@ void hex_differential_cross_section
    @param energies Real array of impact energies in Rydbergs.
    @param ccs Real array of length N to contain the cross sections.
    @param Nall Number of energies available in database; will be set if @c ccs is set to null pointer.
-   @param pwlimit Maximal angular momentum of partial wave to include in summation. Can be "-1"; then all available partial waves will be used.
+   @param pws List of requested partial waves (or null pointer for all).
+   @param npws Size of @c pws.
 */
 void hex_complete_cross_section_
 (
     int * ni, int * li, int * mi,
     int * nf, int * lf, int * mf,
     int * N, double * energies,
-    double * ccs, int * Nall, int * pwlimit
+    double * ccs, int * Nall,
+    int * npws, int * pws
 );
 
 /**
@@ -381,14 +383,16 @@ void hex_complete_cross_section_
    @param energies Real array of impact energies in Rydbergs.
    @param ccs Real array of length N to contain the cross sections.
    @param Nall Number of energies available in database; will be set if @c ccs is set to null pointer.
-   @param pwlimit Maximal angular momentum of partial wave to include in summation. Can be "-1"; then all available partial waves will be used.
+   @param pws List of requested partial waves (or null pointer for all).
+   @param npws Size of @c pws.
 */
 void hex_complete_cross_section
 (
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int N, double * energies,
-    double * ccs, int * Nall, int * pwlimit
+    double * ccs, int * Nall,
+    int npws, int * pws
 );
 
 #ifdef __cplusplus

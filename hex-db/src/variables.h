@@ -109,6 +109,46 @@ inline std::istream & operator >> (std::istream & is, std::pair<geom::vec3d,geom
 }
 
 /**
+ * Read in std::vector&lt;int&gt;.
+ * Allowed are comma-separated values and integer ranges.
+ */
+inline std::istream & operator >> (std::istream & is, iArray & p)
+{
+    std::string token;
+    p.resize(0);
+    while (std::getline(is, token, ','))
+    {
+        std::size_t idx, idx1, idx2;
+        int value = std::stoi(token, &idx);
+        
+        // convert token to integer
+        if (idx == token.size())
+        {
+            p.push_back(value);
+        }
+        
+        // convert token to range
+        else
+        {
+            std::size_t pos = token.find('-', 1);
+            if (pos == std::string::npos)
+                HexException("Failed to parse \"%s\"", token.c_str());
+            
+            std::string str_a = token.substr(0, pos);
+            std::string str_b = token.substr(pos + 1);
+            int a = std::stoi(str_a, &idx1);
+            int b = std::stoi(str_b, &idx2);
+            if (idx1 != str_a.size() or idx2 != str_b.size())
+                HexException("Failed to parse \"%s\"", token.c_str());
+            
+            iArray values = linspace(a, b, b - a + 1);
+            p.append(values.begin(), values.end());
+        }
+    }
+    return is;
+}
+
+/**
  * Read data from standard input.
  */
 template<typename T> std::vector<T> readStandardInput ()

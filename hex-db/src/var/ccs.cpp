@@ -82,14 +82,16 @@ void hex_complete_cross_section
     int ni, int li, int mi,
     int nf, int lf, int mf,
     int N, double * energies,
-    double * ccs, int * Nall, int * pwlimit
+    double * ccs, int * Nall,
+    int npws, int * pws
 )
 {
     hex_complete_cross_section_
     (
         &ni, &li, &mi,
         &nf, &lf, &mf,
-        &N, energies, ccs, Nall, pwlimit
+        &N, energies, ccs, Nall,
+        &npws, pws
     );
 }
 
@@ -98,7 +100,8 @@ void hex_complete_cross_section_
     int * ni, int * li, int * pmi,
     int * nf, int * lf, int * pmf,
     int * N, double * energies,
-    double * ccs, int * n, int * pwlimit
+    double * ccs, int * n,
+    int * npws, int * pws
 )
 {
     double E, sigma;
@@ -129,12 +132,36 @@ void hex_complete_cross_section_
         st.exec();
         
         // if a reallocation is needed, return
-        if (*N != *n or ccs == nullptr)
+        if (*N != *n)
+            return;
+        
+        // fill the available energies
+        if (*N >= *n)
+        {
+            double E;
+            sqlitepp::statement st(db);
+            st << "SELECT DISTINCT Ei FROM " + IntegralCrossSection::Id + " "
+                    "WHERE ni = :ni "
+                    "  AND li = :li "
+                    "  AND mi = :mi "
+                    "  AND nf = :nf "
+                    "  AND lf = :lf "
+                    "  AND mf = :mf "
+                    "ORDER BY Ei ASC",
+                sqlitepp::into(E),
+                sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
+                sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
+            for (int i = 0; i < *N and st.exec(); i++)
+                *(energies + i) = E;
+        }
+        
+        // if no space for cross section has been given, return
+        if (ccs == nullptr)
             return;
     }
     
     // get number of partial waves stored in the database
-    int max_ell, max_available_ell;
+    int max_available_ell;
     sqlitepp::statement ell_st(db);
     ell_st << "SELECT MAX(ell) FROM " + IntegralCrossSection::Id + " "
               "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf",
@@ -142,11 +169,10 @@ void hex_complete_cross_section_
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
         sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     ell_st.exec();
-    max_ell = (*pwlimit < 0 ? max_available_ell : std::min(max_available_ell, *pwlimit));
     
     // retrieve cross sections for all requested (and available) partial waves
     rArrays E_data, sigma_data;
-    for (int ell = 0; ell <= max_ell; ell++)
+    for (int ell = 0; ell <= max_available_ell; ell++)
     {
         // compose query
         sqlitepp::statement st(db);
@@ -162,11 +188,14 @@ void hex_complete_cross_section_
         E_data.push_back(rArray());
         sigma_data.push_back(rArray());
         
-        // retrieve data
-        while (st.exec())
+        // retrieve data (if requested)
+        if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
-            E_data.back().push_back(E);
-            sigma_data.back().push_back(sigma);
+            while (st.exec())
+            {
+                E_data.back().push_back(E);
+                sigma_data.back().push_back(sigma);
+            }
         }
     }
     
@@ -192,7 +221,8 @@ void hex_complete_cross_section_
     {
         rArrayView(*N,energies) = E_arr;
         rArrayView(*N,ccs).fill(0);
-        for (int ell = 0; ell <= max_ell; ell++)
+        for (int ell = 0; ell <= max_available_ell; ell++)
+        if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
             if (*energies < Eion)
                 rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_linear);
@@ -203,7 +233,8 @@ void hex_complete_cross_section_
     else
     {
         rArrayView(*N,ccs).fill(0);
-        for (int ell = 0; ell <= max_ell; ell++)
+        for (int ell = 0; ell <= max_available_ell; ell++)
+        if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
             if (*energies < Eion)
                 rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_linear);
@@ -225,24 +256,28 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     int mi = Conv<int>(sdata, "mi", Id);
     int nf = Conv<int>(sdata, "nf", Id);
     int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
+    int mf = 0; bool all_mf = false;
+    if (sdata.find("mf") != sdata.end() and sdata.at("mf") == "*")
+        all_mf = true;
+    else
+        mf = Conv<int>(sdata, "mf", Id);
     
-    // check if we have the optional pwlimit
-    int pwlimit = -1;
-    if (sdata.find("pwlimit") != sdata.end())
-        pwlimit = std::stoi(sdata.at("pwlimit"));
+    // check if we have the optional pw list
+    iArray pws;
+    if (sdata.find("pws") != sdata.end())
+        pws = Conv<iArray>(sdata, "pws", Id);
     
     // energies and cross sections
     rArray energies;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
         energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
@@ -251,7 +286,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     rArray scaled_energies = energies * efactor;
     
     // complete cross section array
-    rArray ccs(energies.size());
+    rArray ccs (energies.size()), sum_ccs (energies.size());
     
     // resize arrays if all energies are requested
     if (energies[0] < 0)
@@ -259,28 +294,48 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
         int N;
         
         // get number of energies
-        hex_complete_cross_section (ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, &pwlimit);
+        hex_complete_cross_section(ni, li, mi, nf, lf, mf, energies.size(), energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
         
         // resize
         scaled_energies.resize(N);
         ccs.resize(N);
         if (N > 0)
             scaled_energies[0] = -1;
+        
+        // get list of energies
+        hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), nullptr, &N, pws.size(), pws.empty() ? nullptr : pws.data());
     }
     
     // retrieve requested energies
     if (scaled_energies.size() > 0)
-        hex_complete_cross_section (ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, &pwlimit);
+    {
+        if (all_mf)
+        {
+            // sum all cross sections from the initial state to all final magnetic sub-levels
+            sum_ccs.resize(ccs.size());
+            for (mf = -lf; mf <= lf; mf++)
+            {
+                hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
+                sum_ccs += ccs;
+                ccs.fill(0);
+            }
+            ccs = sum_ccs;
+        }
+        else
+        {
+            hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
+        }
+    }
     
     // write header
     std::cout << logo("#") <<
         "# Complete cross section in " << unit_name(Lunits) << " for\n" <<
         "#     ni = " << ni << ", li = " << li << ", mi = " << mi << ",\n" <<
         "#     nf = " << nf << ", lf = " << lf << ", mf = " << mf << ",\n";
-    if (pwlimit >= 0)
+    if (not pws.empty())
     {
         std::cout <<
-        "#     limited to partial waves ell <= " << pwlimit << "\n";
+        "#     limited to partial waves ell = " << pws << "\n";
     }
         std::cout <<
         "# ordered by energy in " << unit_name(Eunits) << "\n" <<
