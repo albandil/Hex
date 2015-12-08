@@ -150,6 +150,13 @@ int main (int argc, char* argv[])
         // B-spline bases for all panels
         std::vector<Bspline> bspline_panel, bspline_full;
         
+        // check that we have next panel knots for multi-panel calculation
+        if (cmd.panels > 1)
+        {
+            if (inp.rknots_next.empty())
+                HexException("No B-spline knots specified for next panels.");
+        }
+        
         // create all panels' bases
         rArrays rknots_panel, rknots_full;
         for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
