@@ -89,7 +89,18 @@ Amplitudes::Amplitudes
 
 void Amplitudes::extract ()
 {
-    std::cout << std::endl << "Extracting T-matrices" << std::endl;
+    std::cout << std::endl;
+    if (cmd_.extract_extrapolate)
+        std::cout << "Extrapolating T-matrices ";
+    else
+        std::cout << "Averaging T-matrices ";
+    if (cmd_.extract_rho_begin > 0)
+        std::cout << "from " << cmd_.extract_rho_begin << " ";
+    if (cmd_.extract_rho > 0)
+        std::cout << "to " << cmd_.extract_rho << " ";
+    if (cmd_.extract_samples > 0)
+        std::cout << "using " << cmd_.extract_samples << " samples";
+    std::cout << std::endl;
     
     for (unsigned Spin : inp_.Spin)
     {
