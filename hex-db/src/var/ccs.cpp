@@ -115,6 +115,18 @@ void hex_complete_cross_section_
     if (*N == 0)
         return;
     
+    // compose the list of wanted partial waves
+    std::string pwlimit;
+    if (npws != nullptr and pws != nullptr)
+    {
+        std::ostringstream oss;
+        oss << iArrayView(*npws, pws);
+        pwlimit = oss.str();
+        pwlimit.front() = '(';
+        pwlimit.back() = ')';
+        pwlimit = " AND ell IN " + pwlimit;
+    }
+    
     // get number of all energies
     if (*energies < 0 and n != nullptr)
     {
@@ -125,7 +137,7 @@ void hex_complete_cross_section_
                 "  AND mi = :mi "
                 "  AND nf = :nf "
                 "  AND lf = :lf "
-                "  AND mf = :mf ",
+                "  AND mf = :mf " + pwlimit,
             sqlitepp::into(*n),
             sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
             sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
@@ -146,7 +158,7 @@ void hex_complete_cross_section_
                     "  AND mi = :mi "
                     "  AND nf = :nf "
                     "  AND lf = :lf "
-                    "  AND mf = :mf "
+                    "  AND mf = :mf " + pwlimit +
                     "ORDER BY Ei ASC",
                 sqlitepp::into(E),
                 sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
