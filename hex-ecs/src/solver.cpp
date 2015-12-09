@@ -365,7 +365,7 @@ void Solver::solve ()
             }
             
             // load / reset solver state
-            if (cmd_.cont or cmd_.refine_solution) CG_.recover(); else CG_.reset();
+            if (cmd_.cont /*or cmd_.refine_solution*/) CG_.recover(); else CG_.reset();
             
             // prepare solution vector
             BlockArray<Complex> psi (std::move(new_array(ang_.states().size(),"cg-x")));
