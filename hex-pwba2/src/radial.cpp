@@ -576,7 +576,9 @@ struct MultipolePotentialPF : MultipolePotential
             PF[i]  = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]);
             
             // update nodes
-            if (PF[i] == 0.)
+            if (i == 0)
+                continue;
+            else if (PF[i] == 0.)
                 zeros.push_back(grid[i]);
             else if (PF[i-1] != 0. and signum(PF[i-1]) != signum(PF[i]))
                 zeros.push_back((grid[i-1] * PF[i] - grid[i] * PF[i-1]) / (PF[i] - PF[i-1]));
@@ -926,18 +928,18 @@ double Idir_allowed_im
         gsl_spline_init(spline, grid.data(), jf_Vfn_jn.data(), N);
         double integ_fn = gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
         
+        static const double EPS = 1e-8;
+        
         // Add asymptotic multipole contribution = integral of
         //     jf jn A / r^(lambda' + 1)
         // for r = grid.back() .. inf.
         if (Vfn.power != 0)
         {
-            double U_phi = -special::constant::pi_half * (jn.l - jf.l);
             Complex U_k (0., -(jn.k - jf.k));
-            Complex U = (U_k.imag() == 0. ? 0. : special::cis(U_phi) * std::pow(U_k, Vfn.power) * special::cfgamma(-Vfn.power, U_k * grid.back()));
+            Complex U = std::pow(Complex(0.,1.), jn.l - jf.l) * (std::abs(U_k.imag()) < EPS ? std::pow(grid.back(),-Vfn.power) / Vfn.power : std::pow(U_k, Vfn.power) * special::cfgamma(-Vfn.power, U_k * grid.back()));
             
-            double V_phi = -special::constant::pi_half * (jn.l + jf.l);
             Complex V_k (0., -(jn.k + jf.k));
-            Complex V = special::cis(V_phi) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
+            Complex V = std::pow(Complex(0.,1.), jn.l + jf.l) * std::pow(V_k, Vfn.power) * special::cfgamma(-Vfn.power, V_k * grid.back());
             
             integ_fn += 0.5 * Vfn.asy_factor * (U.real() - V.real());
         }
@@ -950,13 +952,12 @@ double Idir_allowed_im
         // for r = grid.back() .. inf.
         if (Vni.power != 0)
         {
-            double U_phi = -special::constant::pi_half * (jn.l - ji.l);
             Complex U_k (0., -(jn.k - ji.k));
-            Complex U = (U_k.imag() == 0. ? 0. : special::cis(U_phi) * std::pow(U_k, Vni.power) * special::cfgamma(-Vni.power, U_k * grid.back()));
+            Complex U = std::pow(Complex(0.,1.), jn.l - ji.l) * (std::abs(U_k.imag()) < EPS ? std::pow(grid.back(),-Vni.power) / Vni.power : std::pow(U_k, Vni.power) * special::cfgamma(-Vni.power, U_k * grid.back()));
             
-            double V_phi = -special::constant::pi_half * (jn.l + ji.l);
             Complex V_k (0., -(jn.k + ji.k));
-            Complex V = special::cis(V_phi) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
+            Complex V = std::pow(Complex(0.,1.), jn.l + ji.l) * std::pow(V_k, Vni.power) * special::cfgamma(-Vni.power, V_k * grid.back());
+            
             integ_ni += 0.5 * Vni.asy_factor * (U.real() - V.real());
         }
         
