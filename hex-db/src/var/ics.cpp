@@ -183,8 +183,8 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
         
         // temporary table with merged available energies from all total angular momenta for every discrete transition
         
+        "PRAGMA temp_store = MEMORY",
         "CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",
-        "CREATE INDEX i1 ON T (ni,li,mi,nf,lf,mf,S,Ei,ell)",
         
         // interpolate discrete transition partial cross sections
         
