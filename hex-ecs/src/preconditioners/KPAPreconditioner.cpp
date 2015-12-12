@@ -241,103 +241,91 @@ void KPACGPreconditioner::setup ()
                 comp_l.insert(l);
         }
         
+    //
+    // Check presence of the atomic electron preconditioner
+    //
+        
         // status array indicating necessity to calculate the preconditioner matrix for given 'l'
-        Array<bool> done_atom (inp_.maxell + 1, true), done_proj (inp_.maxell + 1, true);
+        Array<bool> done_atom (inp_.maxell + 1, true);
         
         // "to compute matrices": link them to scratch disk files and check presence
         for (int l : comp_l)
         {
             prec_atom_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_atom().hash()).c_str());
-            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_proj().hash()).c_str());
-            
             done_atom[l] = prec_atom_[l].hdfcheck();
-            done_proj[l] = prec_proj_[l].hdfcheck();
         }
         
         // "needed matrices": link them to scratch disk files and check presence, load if present
         for (int l : needed_l)
         {
             prec_atom_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_atom().hash()).c_str());
-            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_proj().hash()).c_str());
-            
             done_atom[l] = prec_atom_[l].hdfcheck();
-            done_proj[l] = prec_proj_[l].hdfcheck();
             
-//             if (cmd_.outofcore)
+            if (done_atom[l])
             {
-                if (done_atom[l] and not done_proj[l])
-                {
-                    std::cout << "\t- atomic preconditioner data for l = " << l
-                            << " present in \"" << prec_atom_[l].filename << "\"" << std::endl;
-                }
-                if (not done_atom[l] and done_proj[l])
-                {
-                    std::cout << "\t- projectile preconditioner data for l = " << l
-                            << " present in \"" << prec_proj_[l].filename << "\"" << std::endl;
-                }
-                if (done_atom[l] and done_proj[l])
-                {
-                    std::cout << "\t- preconditioner data for l = " << l
-                            << " present in \"" << prec_atom_[l].filename
-                            << "\" and \"" << prec_proj_[l].filename << std::endl;
-                }
+                std::cout << "\t- atomic preconditioner data for l = " << l
+                           << " present in \"" << prec_atom_[l].filename << "\"" << std::endl;
             }
-//             else
-//             {
-//                 done_atom[l] = prec_atom_[l].hdfload();
-//                 done_proj[l] = prec_proj_[l].hdfload();
-//                 
-//                 if (done_atom[l] and not done_proj[l])
-//                 {
-//                     std::cout << "\t- atomic preconditioner data for l = " << l
-//                             << " loaded from \"" << prec_atom_[l].filename
-//                             << "\"" << std::endl;
-//                 }
-//                 if (not done_atom[l] and done_proj[l])
-//                 {
-//                     std::cout << "\t- projectile preconditioner data for l = " << l
-//                             << " loaded from \"" << prec_proj_[l].filename
-//                             << "\"" << std::endl;
-//                 }
-//                 if (done_atom[l] and done_proj[l])
-//                 {
-//                     std::cout << "\t- preconditioner data for l = " << l
-//                             << " loaded from \"" << prec_atom_[l].filename
-//                             << "\" and \"" << prec_proj_[l].filename
-//                             << "\"" << std::endl;
-//                 }
-//             }
         }
-        
-        // if all preconditioners have been loaded, exit this routine
-        if (all(done_atom) and all(done_proj))
-            std::cout << std::endl;
     
     //
     // Calculation of the preconditioner for atomic basis.
     //
         
-        // prepare preconditioner for atomic basis
         if (not all(done_atom))
+        {
             std::cout << std::endl << "\tPrepare preconditioner matrices for atomic grid" << std::endl;
-        prepare
-        (
-            prec_atom_, bspline_atom_.Nspline(),
-            rad_.S_atom(), rad_.D_atom(), rad_.Mm1_tr_atom(), rad_.Mm2_atom(),
-            done_atom, comp_l, needed_l
-        );
+            prepare
+            (
+                prec_atom_, bspline_atom_.Nspline(),
+                rad_.S_atom(), rad_.D_atom(), rad_.Mm1_tr_atom(), rad_.Mm2_atom(),
+                done_atom, comp_l, needed_l
+            );
+        }
         
-        // prepare preconditioner for projectile basis
+    //
+    // Check presence of the projectile electron preconditioner
+    //
+        
+        // status array indicating necessity to calculate the preconditioner matrix for given 'l'
+        Array<bool> done_proj (inp_.maxell + 1, true);
+        
+        // "to compute matrices": link them to scratch disk files and check presence
+        for (int l : comp_l)
+        {
+            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_proj().hash()).c_str());
+            done_proj[l] = prec_proj_[l].hdfcheck();
+        }
+        
+        // "needed matrices": link them to scratch disk files and check presence, load if present
+        for (int l : needed_l)
+        {
+            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_atom().hash()).c_str());
+            done_proj[l] = prec_proj_[l].hdfcheck();
+            
+            if (done_proj[l])
+            {
+                std::cout << "\t- projectile preconditioner data for l = " << l
+                           << " present in \"" << prec_proj_[l].filename << "\"" << std::endl;
+            }
+        }
+    
+    //
+    // Calculation of the preconditioner for atomic basis.
+    //
+    
         if (not all(done_proj))
+        {
             std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
-        prepare
-        (
-            prec_proj_, bspline_proj_.Nspline(),
-            rad_.S_proj(), rad_.D_proj(), rad_.Mm1_tr_proj(), rad_.Mm2_proj(),
-            done_proj, comp_l, needed_l
-        );
+            prepare
+            (
+                prec_proj_, bspline_proj_.Nspline(),
+                rad_.S_proj(), rad_.D_proj(), rad_.Mm1_tr_proj(), rad_.Mm2_proj(),
+                done_proj, comp_l, needed_l
+            );
+        }
         
-        std::cout << std::endl;
+    std::cout << std::endl;
 }
 
 void KPACGPreconditioner::CG_init (int iblock) const
@@ -346,7 +334,6 @@ void KPACGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // initialize self
-//     if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = ang_.states()[iblock].first;
@@ -453,7 +440,6 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void KPACGPreconditioner::CG_exit (int iblock) const
 {
     // exit self
-//     if (cmd_.outofcore)
     {
         // get block angular momenta
         int l1 = ang_.states()[iblock].first;
