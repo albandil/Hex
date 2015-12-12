@@ -1,0 +1,50 @@
+/* Load the B-spline evaluation function. */
+load("bspline.mac");
+
+/*
+ * Evaluate two-electron integral.
+ *
+ * Parameters:
+ * - lam : Multipole moment.
+ * - k : Order of the B-splines, k >= 0.
+ * - t : B-spline knot sequence.
+ * - a,b,c,d : Indices of the B-splines, >= 1.
+ */
+twoel_integral(lam, k, t, a, b, c, d) := block([],
+    res : 0,
+    forget(facts()),
+    for ix : max(a,c) thru min(a,c) + k do if (t[ix] # t[ix+1]) then 
+    (
+        for iy : max(b,d) thru min(b,d) + k do if (t[iy] # t[iy+1]) then
+        (
+            /* Get formula for x-dependent B-splines. */
+            assume(t[ix] <= x, x < t[ix+1]),
+            Bx : ratsimp(bspline(k,t,a,x)*bspline(k,t,c,x)),
+            
+            /* Get Formula for y-dependent B-splines. */
+            assume(t[iy] <= y, y < t[iy+1]),
+            By : ratsimp(bspline(k,t,b,y)*bspline(k,t,d,y)),
+            
+            /* Calculate the integral. */
+            if (ix = iy) then
+            (
+                res : res
+                    + integrate(integrate(Bx * By * x^lam / y^(lam+1), y, x, t[iy+1]), x, t[ix], t[ix+1])
+                    + integrate(integrate(Bx * By * y^lam / x^(lam+1), y, t[iy], x), x, t[ix], t[ix+1])
+            ),
+            if (ix < iy) then
+            (
+                res : res + integrate(Bx * x^lam, x, t[ix], t[ix+1]) * integrate(By / y^(lam + 1), y, t[iy], t[iy+1])
+            ),
+            if (iy < ix) then
+            (
+                res : res + integrate(Bx / x^(lam+1), x, t[ix], t[ix+1]) * integrate(By * y^lam, y, t[iy], t[iy+1])
+            ),
+            
+            /* Clear all assumptions. */
+            forget(facts())
+        )
+    ),
+    return ( res )
+);
+

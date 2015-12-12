@@ -1,0 +1,51 @@
+/*
+ * Numerical calculation of a triangle integral.
+ *
+ * Uses a two-dimensional trapezoidal rule with Richardson extrapolation.
+ *
+ * Parameters:
+ * - F : A two-dimensional function.
+ * - a : Lower bound.
+ * - b : Upper bound.
+ * - epsabs : Absolute tolerance.
+ * - epsrel : Relative tolerance.
+ */
+triangle_integral(F,a,b,epsabs,epsrel) := block(
+    /* Local variables. */
+    [intervals, h, sums, oldsums, accsums, oldaccsums],
+    
+    /* Zero-th iteration. */
+    intervals : 1,
+    h : b - a, 
+    sums : bfloat(ratsimp(F(a,a) + F(b,a) + F(b,b)) / 3),
+    accsums : sums,
+    
+    /* Next iterations. */
+    do
+    (
+        intervals : 2 * intervals,
+        h : h / 2,
+        oldsums : sums,
+        oldaccsums : accsums,
+        
+        /* Evaluate the function in new points. */
+        for ix : 0 thru intervals do
+        for iy : 0 thru ix do
+        (
+            if (mod(ix,2) # 0 or mod(iy,2) # 0) then
+            (
+                if (ix = iy or ix = intervals or iy = 0) then
+                    sums : sums + bfloat(ratsimp(F(a + ix * h, a + iy * h)))
+                else
+                    sums : sums + bfloat(ratsimp(F(a + ix * h, a + iy * h) * 2))
+            )
+        ),
+        
+        /* Richardson extrapolation. */
+        accsums : (4 * sums - 4 * oldsums) / 3,
+        
+        /* Check convergence. */
+        if (abs(accsums - 4 * oldaccsums) * h^2 / 2 <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums)) then
+            return ( float(accsums * h^2 / 2) )
+    )
+);

@@ -1,0 +1,29 @@
+/*
+ * Evaluate single B-spline.
+ *
+ * Parameters:
+ * - k : Order of the B-spline, k >= 0.
+ * - t : Sequence of knots.
+ * - i : Index of the B-spline, i >= 1.
+ * - x : Evaluation point. The B-spline is trivially zero when x < t(i) and t(i+k+1) < x.
+ */
+bspline(k, t, i, x) := block([],
+    /* Zero-order seeds. */
+    for id : 0 thru k do
+    (
+        B[0,id] : if (realpart(t[i+id]) <= x and x < realpart(t[i+id+1])) then 1 else 0
+    ),
+    
+    /* Combine to higher orders. */
+    for ord : 1 thru k do
+    (
+        for id : 0 thru k - ord do
+        (
+            term1 : if (t[i+id+ord] = t[i+id]) then 0 else (x - t[i+id]) * B[ord-1,id] / (t[i+id+ord] - t[i+id]),
+            term2 : if (t[i+id+ord+1] = t[i+id+1]) then 0 else (t[i+id+ord+1] - x) * B[ord-1,id+1] / (t[i+id+ord+1] - t[i+id+1]),
+            B[ord,id] : term1 + term2
+        )
+    ),
+    
+    return ( B[k,0] )
+);
