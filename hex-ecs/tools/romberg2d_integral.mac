@@ -1,0 +1,53 @@
+/*
+ * Numerical calculation of a double integral.
+ *
+ * Uses a two-dimensional trapezoidal rule with Richardson extrapolation.
+ *
+ * Parameters:
+ * - F : A two-dimensional function.
+ * - x0,y0 : Lower bound.
+ * - x1,y1 : Upper bound.
+ * - epsabs : Absolute tolerance.
+ * - epsrel : Relative tolerance.
+ */
+romberg2d_integral(F,x0,y0,x1,y1,epsabs,epsrel) := block(
+    /* Local variables. */
+    [intervals, hx, hy, sums, oldsums, accsums, oldaccsums],
+    
+    /* Zero-th iteration. */
+    intervals : 1,
+    hx : x1 - x0,
+    hy : y1 - y0,
+    sums : bfloat(ratsimp(F(x0,y0) + F(x0,y1) + F(x1,y0) + F(x1,y1)) / 4),
+    accsums : sums,
+    
+    /* Next iterations. */
+    do
+    (
+        intervals : 2 * intervals,
+        hx : hx / 2,
+        hy : hy / 2,
+        oldsums : sums,
+        oldaccsums : accsums,
+        
+        /* Evaluate the function in new points. */
+        for ix : 0 thru intervals do
+        for iy : 0 thru intervals do
+        (
+            if (mod(ix,2) # 0 or mod(iy,2) # 0) then
+            (
+                if (ix = 0 or iy = 0 or ix = intervals or iy = intervals) then
+                    sums : sums + bfloat(ratsimp(F(x0 + ix * hx, y0 + iy * hy) / 2))
+                else
+                    sums : sums + bfloat(ratsimp(F(x0 + ix * hx, y0 + iy * hy)))
+            )
+        ),
+        
+        /* Richardson extrapolation. */
+        accsums : (4 * sums - 4 * oldsums) / 3,
+        
+        /* Check convergence. */
+        if (abs(accsums - 4 * oldaccsums) * hx * hy <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums)) then
+            return(float(accsums * hx * hy))
+    )
+);
