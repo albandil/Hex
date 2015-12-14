@@ -126,11 +126,10 @@ void Solver::solve ()
             
             // check if the right hand side will be zero for this instate
             bool allowed = false;
-            for (int l = std::abs(li - inp_.L); l <= li + inp_.L; l++)
+            for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (ang_.states()[ill].first == li)
             {
-                // does this combination conserve parity?
-                if ((inp_.L + li + l) % 2 != inp_.Pi)
-                    continue;
+                // get partia wave
+                int l = ang_.states()[ill].second;
                 
                 // does this combination have valid 'mi' for this partial wave?
                 if (special::ClebschGordan(li,mi,l,0,inp_.L,mi) != 0)
