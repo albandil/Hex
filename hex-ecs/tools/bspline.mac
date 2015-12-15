@@ -11,7 +11,7 @@ bspline(k, t, i, x) := block([],
     /* Zero-order seeds. */
     for id : 0 thru k do
     (
-        B[0,id] : if (realpart(t[i+id]) <= x and x < realpart(t[i+id+1])) then 1 else 0
+        B[0,id] : if realpart(t[i+id]) <= x and x < realpart(t[i+id+1]) then 1 else 0
     ),
     
     /* Combine to higher orders. */
@@ -19,8 +19,8 @@ bspline(k, t, i, x) := block([],
     (
         for id : 0 thru k - ord do
         (
-            term1 : if (t[i+id+ord] = t[i+id]) then 0 else (x - t[i+id]) * B[ord-1,id] / (t[i+id+ord] - t[i+id]),
-            term2 : if (t[i+id+ord+1] = t[i+id+1]) then 0 else (t[i+id+ord+1] - x) * B[ord-1,id+1] / (t[i+id+ord+1] - t[i+id+1]),
+            term1 : if t[i+id+ord] = t[i+id] then 0 else (x - t[i+id]) * B[ord-1,id] / (t[i+id+ord] - t[i+id]),
+            term2 : if t[i+id+ord+1] = t[i+id+1] then 0 else (t[i+id+ord+1] - x) * B[ord-1,id+1] / (t[i+id+ord+1] - t[i+id+1]),
             B[ord,id] : term1 + term2
         )
     ),

@@ -34,9 +34,9 @@ romberg2d_integral(F,x0,y0,x1,y1,epsabs,epsrel) := block(
         for ix : 0 thru intervals do
         for iy : 0 thru intervals do
         (
-            if (mod(ix,2) # 0 or mod(iy,2) # 0) then
+            if mod(ix,2) # 0 or mod(iy,2) # 0 then
             (
-                if (ix = 0 or iy = 0 or ix = intervals or iy = intervals) then
+                if ix = 0 or iy = 0 or ix = intervals or iy = intervals then
                     sums : sums + bfloat(ratsimp(F(x0 + ix * hx, y0 + iy * hy) / 2))
                 else
                     sums : sums + bfloat(ratsimp(F(x0 + ix * hx, y0 + iy * hy)))
@@ -47,7 +47,7 @@ romberg2d_integral(F,x0,y0,x1,y1,epsabs,epsrel) := block(
         accsums : (4 * sums - 4 * oldsums) / 3,
         
         /* Check convergence. */
-        if (abs(accsums - 4 * oldaccsums) * hx * hy <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums)) then
+        if abs(accsums - 4 * oldaccsums) * hx * hy <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums) then
             return(float(accsums * hx * hy))
     )
 );

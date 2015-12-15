@@ -226,8 +226,11 @@ class NodeIntegrator
                 // integrate and check success
                 if (not Q_.integrate(rmin,rmax))
                 {
+                    std::cout << "failed integration" << std::endl;
+                    std::cout << "integrating on " << inode << ": " << rmin << " - " << rmax << std::endl;
+                    std::cout << "prevR = " << prevR << ", a = " << a << ", b = " << b << ", rt = " << rt << std::endl;
                     ok_ = false;
-                    status_ = format("Node integrator failed on <%g,%g>: %s", rmin, rmax, Q_.status().c_str());
+                    status_ = format("Node integrator failed on node %d <%g,%g>: %s", inode, rmin, rmax, Q_.status().c_str());
                     return ok_;
                 }
                 

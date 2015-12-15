@@ -48,7 +48,7 @@ do
         allowed_begin=$(echo "$subset" | grep -n "Allowed intermediate states" | cut -f1 -d:)
         forbidden_begin=$(echo "$subset" | grep -n "Forbidden intermediate states" | cut -f1 -d:)
         
-#        echo "$bound_begin $allowed_begin $forbidden_begin"
+#         echo "$bound_begin $allowed_begin $forbidden_begin"
         
         if [ "$allowed_begin" ]
         then
@@ -109,7 +109,7 @@ EOF
 # Real bound states
 #
 
-if [[ $(cat $DIR/*-bound.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-bound.log | grep -v ^$ | wc -c) -gt 0 ]]; then
 cat >> "$1-plot.gp" <<EOF
 set title "Re T - bound"
 set xlabel "E [Ry]"
@@ -127,8 +127,8 @@ fi # bound
 # Real continuum states (allowed and forbidden)
 #
 
-if [[ $(cat $DIR/*-allowed*.log | wc -c) != "0" ]]; then
-if [[ $(cat $DIR/*-forbidden.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-allowed*.log | grep -v ^$ | wc -c) -gt 0 ]]; then
+if [[ $(cat $DIR/*-forbidden.log | grep -v ^$ | wc -c) -gt 0 ]]; then
 # allowed and forbidden
 cat >> "$1-plot.gp" <<EOF
 set rmargin 0
@@ -185,7 +185,7 @@ EOF
 fi
 else
 # not allowed and forbidden
-if [[ $(cat $DIR/*-forbidden.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-forbidden.log | grep -v ^$ | wc -c) -gt 0 ]]; then
 cat >> "$1-plot.gp" <<EOF
 set title "Re T - forbidden"
 set xlabel "E [Ry]"
@@ -206,7 +206,7 @@ fi
 # Imag bound states
 #
 
-if [[ $(cat $DIR/*-bound.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-bound.log | grep -v ^$ | wc -c) -gt 0 ]]; then
 cat >> "$1-plot.gp" <<EOF
 unset tmargin
 set title "Im T - bound"
@@ -225,8 +225,8 @@ fi # bound
 # Imag continuum states (allowed only)
 #
 
-if [[ $(cat $DIR/*-allowed*.log | wc -c) != "0" ]]; then
-if [[ $(cat $DIR/*-forbidden.log | wc -c) != "0" ]]; then
+if [[ $(cat $DIR/*-allowed*.log | grep -v ^$ | wc -c) -gt 0 ]]; then
+if [[ $(cat $DIR/*-forbidden.log | grep -v ^$ | wc -c) -gt 0 ]]; then
 cat >> "$1-plot.gp" <<EOF
 set rmargin 0
 EOF

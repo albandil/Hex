@@ -32,9 +32,9 @@ triangle_integral(F,a,b,epsabs,epsrel) := block(
         for ix : 0 thru intervals do
         for iy : 0 thru ix do
         (
-            if (mod(ix,2) # 0 or mod(iy,2) # 0) then
+            if mod(ix,2) # 0 or mod(iy,2) # 0 then
             (
-                if (ix = iy or ix = intervals or iy = 0) then
+                if ix = iy or ix = intervals or iy = 0 then
                     sums : sums + bfloat(ratsimp(F(a + ix * h, a + iy * h)))
                 else
                     sums : sums + bfloat(ratsimp(F(a + ix * h, a + iy * h) * 2))
@@ -45,7 +45,7 @@ triangle_integral(F,a,b,epsabs,epsrel) := block(
         accsums : (4 * sums - 4 * oldsums) / 3,
         
         /* Check convergence. */
-        if (abs(accsums - 4 * oldaccsums) * h^2 / 2 <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums)) then
+        if abs(accsums - 4 * oldaccsums) * h^2 / 2 <= epsabs or abs(accsums - 4 * oldaccsums) <= epsrel * abs(accsums) then
             return ( float(accsums * h^2 / 2) )
     )
 );
