@@ -498,6 +498,10 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     
     if (cmd.shared_scratch)
     {
+        // wait for all processes, so that the work sharing works
+        par.wait();
+        
+        // this process will load all necessary data that were calculated by other processes
         for (int lambda = 0; lambda < (int)Nlambdas_; lambda++) if (not par.isMyWork(lambda))
         {
             std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
