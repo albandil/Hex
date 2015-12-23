@@ -58,6 +58,12 @@ std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
 }
 
 template<>
+double LUft_UMFPACK<LU_int_t,Complex>::cond () const
+{
+    return info_[UMFPACK_RCOND];
+}
+
+template<>
 void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // check sizes

@@ -342,6 +342,9 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     Control[UMFPACK_STRATEGY] = UMFPACK_STRATEGY_SYMMETRIC;
     Control[UMFPACK_DROPTOL] = droptol;
     
+    // diagnostic information
+    rArray Info (UMFPACK_INFO);
+    
     // analyze the sparse structure
     status = UMFPACK_SYMBOLIC_F
     (
@@ -362,7 +365,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     (
         p_.data(), i_.data(),    // column and row indices
         reinterpret_cast<const double*>(x_.data()), 0,    // matrix data
-        Symbolic, &Numeric, Control, nullptr    // UMFPACK internals
+        Symbolic, &Numeric, Control, &Info[0]    // UMFPACK internals
     );
     if (status != 0)
     {
@@ -375,7 +378,8 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     UMFPACK_FREE_SYMBOLIC_F(&Symbolic);
     
     // create a new LU factorization container
-    LUft<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(this, Numeric);
+    LUft_UMFPACK<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(this, Numeric);
+    lu_ptr->info_ = Info;
     
     // wrap the pointer into smart pointer
     return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);

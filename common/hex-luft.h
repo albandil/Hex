@@ -86,6 +86,13 @@ class LUft
         virtual std::size_t size () const { return 0; }
         
         /**
+         * @brief Estimation of the condition number.
+         * 
+         * Note: Currently implemented only for UMFPACK backend.
+         */
+        virtual double cond () const { return 0; }
+        
+        /**
          * @brief Solve equations.
          * 
          * The parameter "b" is assumed to contain several right hand
@@ -225,6 +232,9 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Return LU byte size.
         virtual std::size_t size () const;
         
+        /// Return condition number.
+        virtual double cond () const;
+        
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
@@ -245,8 +255,12 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
         CsrMatrix<IdxT,DataT> const * matrix_;
         
+    public:
+        
         /// Set of status flags produced by UMFPACK.
         mutable rArray info_;
+        
+    private:
         
         // Disable bitwise copy
         LUft_UMFPACK const & operator= (LUft_UMFPACK const &);

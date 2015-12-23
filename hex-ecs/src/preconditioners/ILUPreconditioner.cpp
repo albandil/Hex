@@ -153,10 +153,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         # pragma omp critical
         std::cout << std::endl << std::setw(37) << format
         (
-            "\tLU #%d (%d,%d) in %d:%02d (%d MiB)",
+            "\tLU #%d (%d,%d) in %d:%02d (%d MiB, kappa ~ %g)",
             iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
             timer.seconds() / 60, timer.seconds() % 60,             // factorization time
-            lu_[iblock]->size() / 1048576                           // final memory size
+            lu_[iblock]->size() / 1048576,                          // final memory size
+            lu_[iblock]->cond()
         );
         
         // save the diagonal block's CSR representation and its factorization
