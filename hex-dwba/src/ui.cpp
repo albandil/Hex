@@ -83,11 +83,12 @@ int main (int argc, char *argv[])
     std::vector<const char*> params;
     for (int iarg = 1; iarg < argc; iarg++)
     {
+        std::string param = argv[iarg];
+        
         // dashes introduce options
-        if (argv[iarg][0] == '-')
+        if (param.substr(0,2) == "--")
         {
             // erase all leading dashes
-            std::string param = argv[iarg];
             while (param.size() != 0 and param.front() == '-')
                 param.erase(param.begin());
             
@@ -119,11 +120,11 @@ int main (int argc, char *argv[])
             }
             else
             {
-                throw exception ("Unknown option \"%s\".", argv[iarg]);
+                HexException("Unknown option \"%s\".", argv[iarg]);
             }
         }
         
-        // otherwise it is a number paramater
+        // otherwise it is a number parameter
         else
         {
             params.push_back(argv[iarg]);
