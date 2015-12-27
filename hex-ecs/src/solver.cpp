@@ -85,7 +85,7 @@ void Solver::solve ()
     int Nspline_proj = bspline_[ipanel_].Nspline();
     
     // print some information on the Hamiltonian
-    std::cout << "Hamiltonian size: " << Nspline_atom * Nspline_proj * ang_.states().size() << std::endl;
+    std::cout << "Hamiltonian size: " << (std::size_t)Nspline_atom * (std::size_t)Nspline_proj * ang_.states().size() << std::endl;
     
     // wrap member functions to lambda-functions for use in the CG solver
     auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void { this->apply_preconditioner_(r,z); };
@@ -167,7 +167,7 @@ void Solver::solve ()
                 {
                     // inform user that there is already some incompatible solution file
                     std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                            << " found, but has a smaller block size (" << size << " < " << Nspline_atom * bspline_full_[ipanel_-1].Nspline() << ") and will be recomputed." << std::endl;
+                            << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * bspline_full_[ipanel_-1].Nspline() << ") and will be recomputed." << std::endl;
                 }
             }
             
@@ -191,7 +191,7 @@ void Solver::solve ()
                 
                 // inform user that there is already some incompatible solution file
                 std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                          << " found, but has a larger block size (" << size << " > " << Nspline_atom * Nspline_proj << ") and will be recomputed." << std::endl;
+                          << " found, but has a larger block size (" << size << " > " << (std::size_t)Nspline_atom * Nspline_proj << ") and will be recomputed." << std::endl;
             }
             
             // add work
@@ -383,7 +383,7 @@ void Solver::solve ()
             
             // launch the linear system solver
             Timer t;
-            unsigned max_iter = (inp_.maxell + 1) * Nspline_atom;
+            unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_atom;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             unsigned iterations = CG_.solve
