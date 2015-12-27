@@ -163,11 +163,17 @@ void Solver::solve ()
                 {
                     // use that older solution in construction of the new one (later)
                 }
-                else
+                else if (ipanel_ > 0)
                 {
                     // inform user that there is already some incompatible solution file
                     std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                            << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * bspline_full_[ipanel_-1].Nspline() << ") and will be recomputed." << std::endl;
+                              << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * bspline_full_[ipanel_-1].Nspline() << ") and will be recomputed." << std::endl;
+                }
+                else
+                {
+                    // the same for first panel
+                    std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
+                              << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline() << ") and will be recomputed." << std::endl;
                 }
             }
             
