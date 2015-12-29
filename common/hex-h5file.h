@@ -139,6 +139,9 @@ private:
 template<> bool H5File::read<int> (std::string dataset, int * buffer, std::size_t length, std::size_t offset) const;
 template<> bool H5File::write<int> (std::string dataset, int const * buffer, std::size_t length, std::size_t offset);
 
+template<> bool H5File::read<unsigned> (std::string dataset, unsigned * buffer, std::size_t length, std::size_t offset) const;
+template<> bool H5File::write<unsigned> (std::string dataset, unsigned const * buffer, std::size_t length, std::size_t offset);
+
 template<> bool H5File::read<std::int64_t> (std::string dataset, std::int64_t * buffer, std::size_t length, std::size_t offset) const;
 template<> bool H5File::write<std::int64_t> (std::string dataset, std::int64_t const * buffer, std::size_t length, std::size_t offset);
 

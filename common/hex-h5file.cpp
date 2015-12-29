@@ -281,6 +281,16 @@ template<> bool H5File::write<int> (std::string dataset, int const * buffer, std
     return write_(dataset, buffer, length, offset, H5T_NATIVE_INT);
 }
 
+template<> bool H5File::read<unsigned> (std::string dataset, unsigned * buffer, std::size_t length, std::size_t offset) const
+{
+    return read_(dataset, buffer, length, offset, H5T_NATIVE_UINT);
+}
+
+template<> bool H5File::write<unsigned> (std::string dataset, unsigned const * buffer, std::size_t length, std::size_t offset)
+{
+    return write_(dataset, buffer, length, offset, H5T_NATIVE_UINT);
+}
+
 template<> bool H5File::read<std::int64_t> (std::string dataset, std::int64_t * buffer, std::size_t length, std::size_t offset) const
 {
     return read_(dataset, buffer, length, offset, H5T_NATIVE_INT64);
