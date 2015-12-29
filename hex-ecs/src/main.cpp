@@ -329,9 +329,11 @@ int main (int argc, char* argv[])
             std::cout << std::endl;
             std::cout << "Bspline basis summary for panel " << ipanel + 1 << std::endl;
             std::cout << "\t- atomic basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_panel[0].Nspline() << std::endl;
             std::cout << "\t\t- real knots : " << bspline_panel[0].rknots().front() << " to " << bspline_panel[0].rknots().back() << std::endl;
             std::cout << "\t\t- complex knots : " << bspline_panel[0].cknots().front() << " to " << bspline_panel[0].cknots().back() << std::endl;
             std::cout << "\t- projectile basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_panel[ipanel].Nspline() << std::endl;
             std::cout << "\t\t- real knots : " << bspline_panel[ipanel].rknots().front() << " to " << bspline_panel[ipanel].rknots().back() << std::endl;
             std::cout << "\t\t- complex knots : " << bspline_panel[ipanel].cknots().front() << " to " << bspline_panel[ipanel].cknots().back() << std::endl;
             if (ipanel > 0 and not inp.overlap_knots.empty())
