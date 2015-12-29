@@ -563,7 +563,7 @@ struct MultipolePotentialPF : MultipolePotential
         // array of bound-free potential evaluations
         unsigned N = grid.size();
         double rmax = grid.back();
-        rArray V(N);
+        rArray V (N);
         
         // the classical turning point for non-S-waves
         double rt = (std::sqrt(1 + Kb*Kb*Lb*(Lb+1))-1)/(Kb*Kb);
@@ -576,12 +576,15 @@ struct MultipolePotentialPF : MultipolePotential
             PF[i]  = Hydrogen::P(Na,La,grid[i]) * Hydrogen::F(Kb,Lb,grid[i]);
             
             // update nodes
-            if (i == 0)
-                continue;
-            else if (PF[i] == 0.)
-                zeros.push_back(grid[i]);
-            else if (PF[i-1] != 0. and signum(PF[i-1]) != signum(PF[i]))
-                zeros.push_back((grid[i-1] * PF[i] - grid[i] * PF[i-1]) / (PF[i] - PF[i-1]));
+            if (grid[i] > rt)
+            {
+                if (i == 0)
+                    continue;
+                else if (PF[i] == 0.)
+                    zeros.push_back(grid[i]);
+                else if (PF[i-1] != 0. and signum(PF[i-1]) != signum(PF[i]))
+                    zeros.push_back((grid[i-1] * PF[i] - grid[i] * PF[i-1]) / (PF[i] - PF[i-1]));
+            }
         }
         
         // cubic spline interpolation of P*F
