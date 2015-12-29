@@ -294,6 +294,9 @@ double F (double k, int l, double r, double sigma)
     if (r == 0.)
         return 0.;
     
+    // classical turning point
+    double rt = (std::sqrt(1 + k*k*l*(l+1))-1)/(k*k);
+    
     // normalization
     double norm = special::constant::sqrt_two / (k * special::constant::sqrt_pi);
     
@@ -305,8 +308,8 @@ double F (double k, int l, double r, double sigma)
     if ((err = gsl_sf_coulomb_wave_F_array(l, 0, -1./k, k*r, &F, &exp_F)) == GSL_SUCCESS)
         return norm * F;
     
-    // high energies => use asymptotic form
-    if (k * r > 1)
+    // high distances => use asymptotic form
+    if (r > rt)
         return norm * special::coul_F_asy(l, k, r, (std::isfinite(sigma) ? sigma : special::coul_F_sigma(l,k)));
     
     // low energies => use uniform WKB approximation by Michel
