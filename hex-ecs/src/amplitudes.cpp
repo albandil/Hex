@@ -448,7 +448,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     for (int i = 0; i < samples; i++)
     {
         // this is the evaluation point
-        double eval_r = Ra + (i + 1) * (Rb - Ra) / (samples + 1);
+        double eval_r = (samples == 1 ? Rb : Ra + (i + 1) * (Rb - Ra) / (samples + 1));
         grid.push_back(eval_r);
         
         // determine knot
