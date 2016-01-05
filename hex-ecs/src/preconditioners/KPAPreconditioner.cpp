@@ -178,6 +178,20 @@ void KPACGPreconditioner::prepare
         tHl.diagonalize(D, nullptr, &CR);
         CR.invert(invCR);
         
+        // analyze bound states
+        int maxn = 0;
+        for (unsigned i = 0; i < Nspline; i++)
+        {
+            Complex E = D[i];
+            if (E.real() < 0)
+            {
+                int n = std::floor(0.5 + 1.0 / std::sqrt(-2.0 * E.real()));
+                double E0 = -0.5 / (n * n);
+                if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                    maxn = std::max(maxn, n);
+            }
+        }
+        
         // store the preconditioner data
         prec[l].Dl = D;
         prec[l].invsqrtS_Cl = std::move(RowMatrix<Complex>(invsqrtS * CR));
@@ -190,6 +204,7 @@ void KPACGPreconditioner::prepare
         for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
         std::cout << "\t\t\t- residual: " << (tHl - CR * invCR).data().norm() << std::endl;
+        std::cout << "\t\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
     }
     
     // wait for completition of diagonalization on other nodes
