@@ -553,9 +553,6 @@ struct MultipolePotentialPF : MultipolePotential
         
         // FIXME : Safely handle origin.
         eval = interpolate_bound_free_potential(grid, lambda, Na, La, Kb, Lb);
-        
-        // FIXME : evaluate asymptotic potential
-        asy_factor = 0;
     }
     
     rArray interpolate_bound_free_potential (rArray const & grid, int lambda, int Na, int La, double Kb, int Lb)
@@ -615,6 +612,13 @@ struct MultipolePotentialPF : MultipolePotential
             // return sum
             V[i] = (Q1.result() + Q2.result()) / y;
         }
+        
+        // now calculate the asymptotic overlap factor (integral of P * F * r^lambda
+        // TODO: Analytically.
+        for (unsigned i = 0; i < N; i++)
+            PF[i] *= gsl_sf_pow_int(grid[i], lambda);
+        gsl_spline_init(spline, grid.data(), PF.data(), N);
+        asy_factor = gsl_spline_eval_integ(spline, grid.front(), grid.back(), acc);
         
         // free allocated memory
         gsl_interp_accel_free(acc);
