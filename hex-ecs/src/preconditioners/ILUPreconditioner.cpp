@@ -157,7 +157,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         # pragma omp critical
         std::cout << std::endl << std::setw(37) << format
         (
-            "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0f)",
+            "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
             iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
             timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
             nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
