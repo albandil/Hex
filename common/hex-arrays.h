@@ -1826,9 +1826,9 @@ typedef Array<cArray>             cArrays;
  * Variadic template recurrence starter. For documentation of the function
  * itself see the other "concatenate".
  */
-inline rArray concatenate ()
+template <class T> NumberArray<T> concatenate ()
 {
-    return rArray();
+    return NumberArray<T>();
 }
 
 /**
@@ -1840,7 +1840,7 @@ inline rArray concatenate ()
  * @param v1 First array.
  * @param ...p All other arrays.
  */
-template <typename ...Params> rArray concatenate (rArray const & v1, Params ...p)
+template <class T, class ...Params> NumberArray<T> concatenate (NumberArray<T> const & v1, Params ...p)
 {
     if (sizeof...(p) == 0)
     {
@@ -1848,8 +1848,8 @@ template <typename ...Params> rArray concatenate (rArray const & v1, Params ...p
     }
     else
     {
-        rArray v2 = concatenate (p...);
-        rArray v (v1.size() + v2.size());
+        NumberArray<T> v2 = concatenate<T>(p...);
+        NumberArray<T> v (v1.size() + v2.size());
         for (std::size_t i = 0; i < v1.size(); i++)
             v[i] = v1[i];
         for (std::size_t i = 0; i < v2.size(); i++)
