@@ -721,4 +721,11 @@ inline std::string underline (std::string text)
     return text;
 }
 
+/**
+ * @brief Format byte size.
+ * 
+ * Format byte size into kiB, MiB GiB or TiB.
+ */
+std::string nice_size (std::size_t bytes);
+
 #endif

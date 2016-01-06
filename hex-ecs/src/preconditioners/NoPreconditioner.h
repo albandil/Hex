@@ -76,7 +76,7 @@ class NoPreconditioner : public PreconditionerBase
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { z = r; }
+        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
     protected:
         

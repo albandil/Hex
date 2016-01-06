@@ -175,9 +175,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--example                  (-e)  Create sample input file.                                                                                              \n"
                     "\t--help                     (-h)  Display this help.                                                                                                     \n"
                     "\t--input <filename>         (-i)  Use custom input file (other than \"ecs.inp\").                                                                        \n"
-                    "\t--zipfile <filename>       (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
-                    "\t--zipcount <number>        (-n)  Zip sample count (how many points along r1 and r2).                                                                    \n"
-                    "\t--zipmax <number>          (-R)  Maximal radius to use for solution zipping.                                                                            \n"
+                    "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
+                    "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.                                      \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
                     "\t--map-solution <filename>        Convert solution between B-spline bases, requires target basis (--map-solution-target).                                \n"
                     "\t--map-solution-target <filename> Target B-spline basis in another input file (like ecs.inp).                                                            \n"
@@ -242,22 +241,16 @@ void CommandLine::parse (int argc, char* argv[])
                 writegrid = true;
                 return true;
             },
-        "zipfile", "z", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "zip", "z", 7, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // zip B-spline expansion file
-                zipfile = optargs[0];
-                return true;
-            },
-        "zipcount", "n", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // zip samples
-                zipcount = std::atol(optargs[0].c_str());
-                return true;
-            },
-        "zipmax", "R", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // zip bounding box
-                zipmax = std::atof(optargs[0].c_str());
+                zipdata.file = optargs[0];
+                zipdata.Xmin = std::stod(optargs[1]);
+                zipdata.Ymin = std::stod(optargs[2]);
+                zipdata.Xmax = std::stod(optargs[3]);
+                zipdata.Ymax = std::stod(optargs[4]);
+                zipdata.nX = std::stoi(optargs[5]);
+                zipdata.nY = std::stoi(optargs[6]);
                 return true;
             },
         "map-solution", "", -1, [&](std::vector<std::string> const & optargs) -> bool
@@ -881,11 +874,11 @@ void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std:
     rArray grid_x;  // real evaluation grid (atomic electron)
     rArray grid_y;  // real evaluation grid (projectile electron)
     
-    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipfile << "\"" << std::endl;
+    std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipdata.file << "\"" << std::endl;
     
     // load the requested file
-    if (not sol.hdfload(cmd.zipfile.c_str()))
-        HexException("Cannot load file %s.", cmd.zipfile.c_str());
+    if (not sol.hdfload(cmd.zipdata.file.c_str()))
+        HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
     
     // determine which B-spline basis to use
     unsigned i;
@@ -895,18 +888,20 @@ void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std:
             break;
     }
     
-    // was some bases appropriate?
+    // was some basis appropriate?
     if (i == bspline.size())
         HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
     
     // evaluation grid
-    double Rx = cmd.zipmax < 0 ? bspline[0].Rmax() : cmd.zipmax;
-    double Ry = cmd.zipmax < 0 ? bspline[i].Rmax() : cmd.zipmax;
-    grid_x = linspace(0., Rx, Rx * cmd.zipcount / std::max(Rx, Ry));
-    grid_y = linspace(0., Ry, Ry * cmd.zipcount / std::max(Rx, Ry));
+    double Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
+    double Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
+    double Xmax = cmd.zipdata.Xmax < 0 ? bspline[0].Rmax() : cmd.zipdata.Xmax;
+    double Ymax = cmd.zipdata.Ymax < 0 ? bspline[i].Rmax() : cmd.zipdata.Ymax;
+    grid_x = linspace(Xmin, Xmax, cmd.zipdata.nX);
+    grid_y = linspace(Ymin, Ymax, cmd.zipdata.nY);
     
     // write to file
-    std::ofstream out ((cmd.zipfile + ".vtk").c_str());
+    std::ofstream out ((cmd.zipdata.file + ".vtk").c_str());
     writeVTK_points
     (
         out,                                // output file stream

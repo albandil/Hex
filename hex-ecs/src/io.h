@@ -83,7 +83,7 @@ class CommandLine
         
         // constructor
         CommandLine (int argc, char* argv[])
-            : writegrid(false), zipcount(0), zipmax(-1), parallel(false), preconditioner(0),
+            : writegrid(false), zipdata({ "", -1, -1, -1, -1, -1, -1 }), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
@@ -115,13 +115,13 @@ class CommandLine
         bool writegrid;
         
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
-        std::string zipfile;
-        
-        /// How many equidistant samples on each axis to use.
-        int  zipcount;
-        
-        /// Radial cutoff for solution zipping useful if one is interested only in the near-origin behaviour.
-        double zipmax;
+        struct
+        {
+            std::string file;
+            double Xmin, Ymin, Xmax, Ymax;
+            int nX, nY;
+        }
+        zipdata;
         
         /// Whether to use MPI.
         bool parallel;

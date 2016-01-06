@@ -176,3 +176,20 @@ void print_stack_trace ()
     std::free(symbollist);
 #endif
 }
+
+std::string nice_size (std::size_t bytes)
+{
+    if (bytes < 1024) return format("%d B", bytes);
+    
+    bytes /= 1024;
+    if (bytes < 1204) return format("%d kiB", bytes);
+    
+    bytes /= 1024;
+    if (bytes < 1204) return format("%d MiB", bytes);
+    
+    bytes /= 1024;
+    if (bytes < 1204) return format("%d GiB", bytes);
+    
+    bytes /= 1024;
+    return format("%d TiB", bytes);
+}

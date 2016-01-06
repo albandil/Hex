@@ -295,7 +295,7 @@ int main (int argc, char* argv[])
     // Zip solution file into VTK geometry if told so
     //
     
-        if (cmd.zipfile.size() != 0 and par.IamMaster())
+        if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
             zip_solution(cmd, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;

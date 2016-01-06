@@ -335,7 +335,7 @@ void Solver::solve ()
                                     }
                                     
                                     // update the right-hand side
-                                    chi[ill][i * Nspline_proj + j] -= A_ijkl * x_kl;
+                                    chi[ill][i * (std::size_t)Nspline_proj + j] -= A_ijkl * x_kl;
                                 }
                             }
                         }

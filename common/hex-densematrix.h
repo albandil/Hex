@@ -377,7 +377,7 @@ template <class Type, class Base> class RowMatrix : public Base
          * Return transposed matrix. The result is of the type ColMatrix,
          * so that no reordering of the entries is necessary.
          */
-        ColMatrix<Type> T() const
+        ColMatrix<Type> T () const
         {
             return ColMatrix<Type>
             (
@@ -705,7 +705,7 @@ cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> co
 template <class Type, class Base>
 NumberArray<Type> operator * (RowMatrix<Type,Base> const & A, const ArrayView<Type> v)
 {
-    HexException("Don't know how to multipy matrix times vector of type %s.", typeid(Type).name());
+    HexException("Don't know how to multipy row matrix times vector of type %s.", typeid(Type).name());
 }
 
 /**
@@ -752,6 +752,74 @@ cArray operator * (RowMatrix<Complex,Base> const & A, const cArrayView v)
     
     // auxiliary variables
     char trans = 'T';
+    int m = A.rows(), n = A.cols(), inc = 1;
+    Complex alpha = 1, beta = 0;
+    
+    // calculate the product
+    zgemv_
+    (
+        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
+        const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
+    );
+    
+    // return the result
+    return w;
+}
+
+template <class Base>
+cArray operator * (const cArrayView v, RowMatrix<Complex,Base> const & A)
+{
+    assert(A.cols() == (int)v.size());
+    
+    // output array
+    cArray w (A.rows());
+    
+    // auxiliary variables
+    char trans = 'N';
+    int m = A.rows(), n = A.cols(), inc = 1;
+    Complex alpha = 1, beta = 0;
+    
+    // calculate the product
+    zgemv_
+    (
+        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
+        const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
+    );
+    
+    // return the result
+    return w;
+}
+
+/**
+ * @brief Matrix-vector multiplication.
+ * 
+ * Multiplies row-major matrix times colum vector, producing a column vector.
+ * Internally, the xGEMV BLAS function is used.
+ * 
+ * @note This is a general template, which fails. However, it is overloaded with supported type combinations.
+ */
+template <class Type, class Base>
+NumberArray<Type> operator * (ColMatrix<Type,Base> const & A, const ArrayView<Type> v)
+{
+    HexException("Don't know how to multipy column matrix times vector of type %s.", typeid(Type).name());
+}
+
+/**
+ * @brief Matrix-vector multiplication.
+ * 
+ * Multiplies complex row-major matrix times complex colum vector, producing a complex column vector.
+ * Internally, the ZGEMV BLAS function is used.
+ */
+template <class Base>
+cArray operator * (ColMatrix<Complex,Base> const & A, const cArrayView v)
+{
+    assert(A.cols() == (int)v.size());
+    
+    // output array
+    cArray w (A.rows());
+    
+    // auxiliary variables
+    char trans = 'N';
     int m = A.rows(), n = A.cols(), inc = 1;
     Complex alpha = 1, beta = 0;
     

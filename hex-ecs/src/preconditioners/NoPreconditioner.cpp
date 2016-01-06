@@ -576,6 +576,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     OMP_clean;
 }
 
+void NoPreconditioner::precondition (const BlockArray< Complex >& r, BlockArray< Complex >& z) const
+{
+    z = r;
+}
+
 void NoPreconditioner::finish ()
 {
     dia_blocks_.resize(0);

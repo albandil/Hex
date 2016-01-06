@@ -662,6 +662,9 @@ private:
     std::string name_;
 };
 
+template <class DataT> NumberArray<DataT> operator | (SymBandMatrix<DataT> const & A, const ArrayView<DataT> v) { return A.dot(v); }
+template <class DataT> NumberArray<DataT> operator | (const ArrayView<DataT> v, SymBandMatrix<DataT> const & A) { return A.dot(v); }
+
 template <class DataT> class BlockSymBandMatrix
 {
     private:
@@ -716,6 +719,25 @@ template <class DataT> class BlockSymBandMatrix
         
         /// Access to the memory buffer (maay be empty if data not in memory).
         NumberArray<DataT> const & data () const { return data_; }
+        
+        /**
+         * @brief Access block.
+         * 
+         * Return the block [i, k].
+         */
+        SymBandMatrix<DataT> operator() (int i, int k) const
+        {
+            return SymBandMatrix<Complex>
+            (
+                size_, halfbw_,
+                cArrayView
+                (
+                    data_,
+                    (std::min(i, k) * blockhalfbw_ + std::abs(i - k)) * size_ * halfbw_,
+                    size_ * halfbw_
+                )
+            );
+        }
         
         /**
          * @brief Access element.

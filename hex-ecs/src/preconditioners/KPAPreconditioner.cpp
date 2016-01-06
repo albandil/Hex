@@ -145,10 +145,10 @@ void KPACGPreconditioner::prepare
         CR.invert(invCR);
         
         // Now S = CR * (D * CR⁻¹)
-        std::cout << "\t\t\ttime: " << timer.nice_time() << std::endl;
+        std::cout << "\t\t\t- time: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] *= D[i % Nspline];
-        std::cout << "\t\t\tresidual: " << (S - CR * invCR).data().norm() << std::endl;
+        std::cout << "\t\t\t- residual: " << (S - CR * invCR).data().norm() << std::endl;
         S = ColMatrix<Complex>();
         
         // compute √S⁻¹
@@ -186,9 +186,13 @@ void KPACGPreconditioner::prepare
             if (E.real() < 0)
             {
                 int n = std::floor(0.5 + 1.0 / std::sqrt(-2.0 * E.real()));
-                double E0 = -0.5 / (n * n);
-                if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
-                    maxn = std::max(maxn, n);
+                std::cout << E << " " << n << std::endl;
+                if (n > 0)
+                {
+                    double E0 = -0.5 / (n * n);
+                    if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                        maxn = std::max(maxn, n);
+                }
             }
         }
         
