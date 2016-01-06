@@ -179,17 +179,15 @@ void print_stack_trace ()
 
 std::string nice_size (std::size_t bytes)
 {
-    if (bytes < 1024) return format("%d B", bytes);
+    std::size_t kiB = 1024;
+    std::size_t MiB = kiB * kiB;
+    std::size_t GiB = kiB * kiB * kiB;
+    std::size_t TiB = kiB * kiB * kiB * kiB;
     
-    bytes /= 1024;
-    if (bytes < 1204) return format("%d kiB", bytes);
+    if (bytes < kiB) return format("%d B", bytes);
+    if (bytes < MiB) return format("%.1g kiB", bytes / double(kiB));
+    if (bytes < GiB) return format("%.1g MiB", bytes / double(MiB));
+    if (bytes < TiB) return format("%.1g GiB", bytes / double(GiB));
     
-    bytes /= 1024;
-    if (bytes < 1204) return format("%d MiB", bytes);
-    
-    bytes /= 1024;
-    if (bytes < 1204) return format("%d GiB", bytes);
-    
-    bytes /= 1024;
-    return format("%d TiB", bytes);
+    return format("%.1g TiB", bytes / double(TiB));
 }

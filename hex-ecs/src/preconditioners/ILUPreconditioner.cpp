@@ -46,6 +46,10 @@ void ILUCGPreconditioner::setup ()
     // setup parent
     CGPreconditioner::setup();
     
+    // check compatibility with the command line setup
+    if (cmd_.lightweight_full)
+        HexException("ILU preconditioner is not compatible with --lightweight-full. But you can still try --lightweight-radial-cache.");
+    
     // setup attributes
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
@@ -154,10 +158,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         std::cout << std::endl << std::setw(37) << format
         (
             "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0f)",
-            iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,    // block identification (id, ℓ₁, ℓ₂)
-            timer.seconds() / 60, timer.seconds() % 60,             // factorization time
-            nice_size(lu_[iblock]->size()),                          // final memory size
-            lu_[iblock]->cond()
+            iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+            timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
+            nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
+            lu_[iblock]->cond()                                                     // estimation of the condition number
         );
         
         // save the diagonal block's CSR representation and its factorization
