@@ -83,7 +83,7 @@ class CommandLine
         
         // constructor
         CommandLine (int argc, char* argv[])
-            : writegrid(false), zipdata({ "", -1, -1, -1, -1, -1, -1 }), parallel(false), preconditioner(0),
+            : writegrid(false), zipdata(), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
@@ -115,8 +115,11 @@ class CommandLine
         bool writegrid;
         
         /// A B-spline expansion of a solution to "zip". See \ref Bspline::zip .
-        struct
+        struct s_zipdata
         {
+            // default constructor
+            s_zipdata () : file(), Xmin(-1), Ymin(-1), Xmax(-1), Ymax(-1), nX(-1), nY(-1) {}
+            
             std::string file;
             double Xmin, Ymin, Xmax, Ymax;
             int nX, nY;

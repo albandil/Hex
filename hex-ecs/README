@@ -13,8 +13,9 @@ Dependencies
 The program is written in C++11 and can be successfully compiled by the
 following compilers:
 
- * GCC 5.1.1 (also MinGW-w64 based on this GCC)
- * LLVM/clang 3.5.0
+ * GCC 5.2.0 (also MinGW-w64 based on this GCC)
+ * LLVM/clang 3.7.1
+ * Intel C++ Compiler 16.0.0
  
 There are several external libraries that are being used for some partial tasks.
 Some of them can be avoided if a correct compiler flag is added to CFLAGS in the
@@ -30,7 +31,7 @@ Here is the list of the libraries with versions that were used:
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 
- * OpenBLAS 0.2.14
+ * OpenBLAS 0.2.15
             OpenBLAS is one of the best open-source implementations. Obtainable from
                 http://www.openblas.net/
 

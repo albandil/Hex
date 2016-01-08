@@ -32,10 +32,6 @@
 #ifndef HEX_CSCMATRIX_H
 #define HEX_CSCMATRIX_H
 
-#ifndef NO_UMFPACK
-    #include <umfpack.h>
-#endif
-
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 

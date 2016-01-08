@@ -263,12 +263,14 @@ void ProjCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
         }
     );
     CooMatrix<LU_int_t,Complex> W_coo = W.tocoo<LU_int_t>();
+    NumberArray<LU_int_t> I_arr = concatenate(U_coo.i(), W_coo.i(), W_coo.i() + m * Nspline_atom, V_coo.i() + m * Nspline_atom);
+    NumberArray<LU_int_t> J_arr = concatenate(U_coo.j(), W_coo.j() + m * Nspline_atom, W_coo.j(), V_coo.j() + m * Nspline_atom);
+    NumberArray<Complex>  V_arr = concatenate(U_coo.v(), W_coo.v(), W_coo.v(), V_coo.v());
     CooMatrix<LU_int_t,Complex> A_coo
     (
-        2 * m * Nspline_atom, 2 * m * Nspline_proj,
-        concatenate(U_coo.i(), W_coo.i(), W_coo.i() + m * Nspline_atom, V_coo.i() + m * Nspline_atom),
-        concatenate(U_coo.j(), W_coo.j() + m * Nspline_atom, W_coo.j(), V_coo.j() + m * Nspline_atom),
-        concatenate(U_coo.v(), W_coo.v(), W_coo.v(), V_coo.v())
+        2 * m * Nspline_atom,
+        2 * m * Nspline_proj,
+        I_arr, J_arr, V_arr
     );
     CsrMatrix<LU_int_t,Complex> A_csr = A_coo.tocsr();
     
