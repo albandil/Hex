@@ -186,7 +186,6 @@ void KPACGPreconditioner::prepare
             if (E.real() < 0)
             {
                 int n = std::floor(0.5 + 1.0 / std::sqrt(-2.0 * E.real()));
-                std::cout << E << " " << n << std::endl;
                 if (n > 0)
                 {
                     double E0 = -0.5 / (n * n);
