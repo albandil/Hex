@@ -112,22 +112,32 @@ void CoupledPreconditioner::setup ()
         
         Complex elem = 0;
         
-        // add one-electron contribution
         if (ill == illp)
         {
+            // add one-electron contribution
             int l1 = ang_.states()[ill].first;
             int l2 = ang_.states()[ill].second;
             elem = E_ * rad_.S_atom()(i,k) * rad_.S_proj()(j,l)
                     - (0.5 * rad_.D_atom()(i,k) + 0.5 * l1 * (l1 + 1) * rad_.Mm2_atom()(i,k) - rad_.Mm1_tr_atom()(i,k)) * rad_.S_proj()(j,l)
                     - (0.5 * rad_.D_proj()(j,l) + 0.5 * l2 * (l2 + 1) * rad_.Mm2_proj()(j,l) - rad_.Mm1_tr_proj()(j,l)) * rad_.S_atom()(i,k);
+            
+            // add full two-electron contribution
+            for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+            {
+                double f = ang_.f(ill, illp, lambda);
+                if (f != 0)
+                    elem -= f * rad_.computeR(lambda,i,j,k,l);
+            }
         }
-        
-        // add two-electron contribution
-        for (int lambda = 0; lambda <= std::min(cmd_.coupling_limit, rad_.maxlambda()); lambda++)
+        else
         {
-            double f = ang_.f(ill, illp, lambda);
-            if (f != 0)
-                elem -= f * rad_.computeR(lambda,i,j,k,l);
+            // add limited two-electron contribution
+            for (int lambda = 0; lambda <= std::min(cmd_.coupling_limit, rad_.maxlambda()); lambda++)
+            {
+                double f = ang_.f(ill, illp, lambda);
+                if (f != 0)
+                    elem -= f * rad_.computeR(lambda,i,j,k,l);
+            }
         }
         
         // insert non-zero element
