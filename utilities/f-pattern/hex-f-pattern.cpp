@@ -19,8 +19,7 @@ int main (int argc, char * argv[])
     int Pi = std::atoi(argv[2]);
     int nL = std::atoi(argv[3]);
 
-    int maxell = L + nL;
-    int maxlambda = 2 * maxell;
+    int maxlambda = 2 * nL + L + Pi;
     
     // coupled angular momentum pairs
     std::vector<std::pair<int,int>> coupled_states;
