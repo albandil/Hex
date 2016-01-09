@@ -303,11 +303,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     OMP_prepare;
     
     // shorthands
-    int order = rad_.bspline_atom().order();
-    int Nspline_atom = rad_.bspline_atom().Nspline();
-    int Nspline_proj = rad_.bspline_proj().Nspline();
-    int Nang = ang_.states().size();
-    int Nchunk = Nspline_atom * Nspline_proj;
+    unsigned order = rad_.bspline_atom().order();
+    unsigned Nspline_atom = rad_.bspline_atom().Nspline();
+    unsigned Nspline_proj = rad_.bspline_proj().Nspline();
+    unsigned Nang = ang_.states().size();
+    unsigned Nchunk = Nspline_atom * Nspline_proj;
+    
+    cArray chunk (Nchunk);
     
     if (not cmd_.lightweight_radial_cache)
     {
@@ -316,7 +318,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         //
         
         // multiply "p" by the diagonal blocks
-        for (int ill = 0;  ill < Nang;  ill++)
+        for (unsigned ill = 0;  ill < Nang;  ill++)
         if (par_.isMyGroupWork(ill))
         {
             // load data from scratch disk
@@ -348,45 +350,44 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         // multiply "p" by the off-diagonal blocks - single proces
         if (par_.Nproc() == 1)
-        for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
         {
-            // load data from scratch disk
+            // load off-diagonal block from scratch disk
             if (not cmd_.cache_own_radint and cmd_.wholematrix)
                 const_cast<BlockSymBandMatrix<Complex>&>(rad_.R_tr_dia(lambda)).hdfload();
             
-            // update all blocks with this multipole potential matrix
-            for (int ill = 0;  ill < Nang;  ill++)
+            // for all source vector segments
+            for (unsigned illp = 0;  illp < Nang;  illp++)
             {
+                // load source segment, if needed
                 if (cmd_.outofcore)
-                    q.hdfload(ill);
+                    const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                 
-                for (int illp = 0; illp < Nang; illp++)
+                // multiply by the off-diagonal block
+                rad_.R_tr_dia(lambda).dot(1., p[illp], 0., chunk, true);
+                
+                // update all destination vector segments
+                for (unsigned ill = 0; ill < Nang; ill++)
                 {
-                    // skip diagonal
-                    if (ill == illp)
+                    // skip diagonal and non-contributing transfers
+                    if (ill == illp or ang_.f(ill,illp,lambda) == 0.)
                         continue;
                     
-                    // check non-zero
-                    if (ang_.f(ill,illp,lambda) == 0.)
-                        continue;
-                    
-                    // load data
+                    // load destination segment, if needed
                     if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p).hdfload(illp);
+                        q.hdfload(ill);
                     
-                    // calculate product
-                    rad_.R_tr_dia(lambda).dot(-ang_.f(ill,illp,lambda), p[illp], 1., q[ill], true);
+                    // update destination segment
+                    q[ill] -= ang_.f(ill,illp,lambda) * chunk;
                     
-                    // unload data
+                    // save and unload destination segment, if needed
                     if (cmd_.outofcore)
-                        const_cast<BlockArray<Complex>&>(p)[illp].drop();
+                        q.hdfsave(ill), q[ill].drop();
                 }
                 
+                // uload the source segment
                 if (cmd_.outofcore)
-                {
-                    q.hdfsave(ill);
-                    q[ill].drop();
-                }
+                    const_cast<BlockArray<Complex>&>(p)[illp].drop();
             }
             
             // release radial integrals
@@ -396,71 +397,77 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         
         // multiply "p" by the off-diagonal blocks (multi-process)
         if (par_.Nproc() > 1)
-        for (int ill = 0;  ill < Nang;  ill++)
+        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) 
         {
-            // product of line of blocks with the source vector (-> one segment of destination vector)
-            cArray product (Nchunk);
+            // Every group of MPI processes cares for several angular momentum segments of the vectors 'p' and 'q'.
+            // There are at most N segments per group, where N = ceil(A / G). Here A is the total number of blocks
+            // and G is the number of groups.
+            unsigned N = (ang_.states().size() + par_.Ngroup() - 1) / par_.Ngroup();
             
-            // load data
-            if (cmd_.outofcore and par_.isMyGroupWork(ill))
-                q.hdfload(ill);
+            // There are M processes per group, so we can process all segments in P = ceil(N / M) passes.
+            unsigned P = (N + par_.groupsize() - 1) / par_.groupsize();
             
-            // maximal multipole
-            int maxlambda = rad_.maxlambda();
+            // Working array.
+            cArray work (Nchunk);
             
-            // work array
-            cArray p0 (Nchunk);
-            
-            // for all source segments that this group owns
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp))
+            // for all source segments
+            for (unsigned pass = 0; pass < P; pass++)
             {
-                // load the segment, if on disk
-                if (cmd_.outofcore)
+                // get angular momentum state index
+                unsigned illp = (pass * par_.groupsize() + par_.igroupproc()) * par_.Ngroup() + par_.igroup();
+                
+                // load the source segment, if needed
+                if (illp < ang_.states().size() and cmd_.outofcore and par_.isMyGroupWork(illp))
                     const_cast<BlockArray<Complex>&>(p).hdfload(illp);
                 
-                // for all multipoles (each group's process has a different work)
-                for (int lambda = 0; lambda <= maxlambda; lambda++) if (lambda % par_.groupsize() == par_.igroupproc())
+                // calculate product, if applicable
+                if (illp < ang_.states().size())
+                    rad_.R_tr_dia(lambda).dot(1., p[illp], 0., work, true);
+                
+                // for all destination segments
+                for (unsigned ill = 0; ill < Nang; ill++)
                 {
-                    // skip diagonal
-                    if (ill == illp)
-                        continue;
+                    // calculate this process' contribution
+                    if (illp >= ang_.states().size() or ill == illp)
+                        chunk.fill(0.);
+                    else
+                        chunk = -ang_.f(ill,illp,lambda) * work;
                     
-                    // check non-zero
-                    if (ang_.f(ill,illp,lambda) == 0.)
-                        continue;
+                    // sum results of all group's processes to the group master proccess
+                    par_.sum_g(chunk.data(), chunk.size(), 0);
                     
-                    // calculate product
-                    rad_.R_tr_dia(lambda).dot(-ang_.f(ill,illp,lambda), p[illp], 0., p0, true);
+                    // sum all masters' segments to the master of the group that owns the destination segment
+                    par_.mastersum(chunk.data(), chunk.size(), ill % par_.Ngroup());
                     
-                    // update collected product
-                    OMP_exclusive_in;
-                    product += p0;
-                    OMP_exclusive_out;
+                    // redistribute the summed segment over the whole owning group
+                    par_.bcast_g(ill % par_.Ngroup(), 0, &chunk[0], chunk.size());
+                    
+                    // finally, owning group will update the segment
+                    if (par_.isMyGroupWork(ill))
+                    {
+                        // load destination segment, if needed
+                        if (cmd_.outofcore)
+                            q.hdfload(ill);
+                        
+                        // update the destination vector segment
+                        q[ill] += chunk;
+                        
+                        // write to disk, if needed
+                        if (cmd_.outofcore)
+                        {
+                            // only the group master process will write the chunk in case of shared scratch
+                            if (not cmd_.shared_scratch or par_.IamGroupMaster())
+                                q.hdfsave(ill);
+                            
+                            // unload from memory
+                            q[ill].drop();
+                        }
+                    }
                 }
                 
-                if (cmd_.outofcore)
+                // unload the source segment
+                if (illp < ang_.states().size() and cmd_.outofcore and par_.isMyGroupWork(illp))
                     const_cast<BlockArray<Complex>&>(p)[illp].drop();
-            }
-            
-            // sum all group processes contributions on that group master process
-            par_.sum_g(product.data(), product.size(), 0);
-            
-            // sum all master segments to the master of the group that owns the destination segment
-            par_.mastersum(product.data(), product.size(), ill % par_.Ngroup());
-            
-            // redistribute the summed segment over the whole owning group
-            par_.bcast_g(ill % par_.Ngroup(), 0, &product[0], product.size());
-            
-            // finally, owner will update its segment (and move back to disk, if OOC)
-            if (par_.isMyGroupWork(ill))
-            {
-                q[ill] += product;
-                
-                if (cmd_.outofcore)
-                {
-                    q.hdfsave(ill);
-                    q[ill].drop();
-                }
             }
         }
     }
@@ -471,13 +478,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         //
         
         // multiply "p" by the diagonal super-blocks
-        for (int ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
+        for (unsigned ill = 0;  ill < Nang;  ill++) if (par_.isMyGroupWork(ill))
         {
             if (cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex>&>(p).hdfload(ill);
-                q.hdfload(ill);
-            }
+                const_cast<BlockArray<Complex>&>(p).hdfload(ill), q.hdfload(ill);
             
             // get block angular momemnta
             int l1 = ang_.states()[ill].first;
@@ -489,28 +493,17 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             kron_dot(1., q[ill], -1., p[ill], rad_.S_atom(), Complex(0.5) * rad_.D_proj() - rad_.Mm1_tr_proj() + Complex(0.5*l2*(l2+1)) * rad_.Mm2_proj());
             
             if (cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex>&>(p)[ill].drop();
-                q.hdfsave(ill);
-                q[ill].drop();
-            }
+                const_cast<BlockArray<Complex>&>(p)[ill].drop(), q.hdfsave(ill), q[ill].drop();
         }
         
         // auxiliary buffers
-        cArray buffer (Nang * Nspline_proj);
-        
-#ifdef _OPENMP
-        // I/O access locks
-        std::vector<omp_lock_t> locks(Nang);
-        for (omp_lock_t & lock : locks)
-            omp_init_lock(&lock);
-#endif
+        cArray buffer (Nang * Nspline_proj), products (Nang * Nspline_proj), updates (Nang * Nspline_proj);
         
         // for all source vector sub-segments
-        for (int k = 0; k < Nspline_atom; k++)
+        for (unsigned k = 0; k < Nspline_atom; k++)
         {
             // copy owned sub-segments to the buffer
-            for (int illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp) and par_.IamGroupMaster())
+            for (unsigned illp = 0; illp < Nang; illp++) if (par_.isMyGroupWork(illp) and par_.IamGroupMaster())
             {
                 std::memcpy
                 (
@@ -526,51 +519,47 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             // broadcast buffer to all members of the group
             par_.bcast_g(par_.igroup(), 0, &buffer[0], Nang * Nspline_proj);
             
-            // auxiliary variables
-            int min_i = std::max(0, k - order);
-            int max_i = std::min(k + order, Nspline_atom - 1);
-            int maxlambda = rad_.maxlambda();
-            
-            // for all destination sub-blocks
-            #pragma omp parallel for collapse (2)
-            for (int i = min_i; i <= max_i; i++)
+            // for all destination sub-segments
+            for (unsigned i = (k > order ? k - order : 0); i <= k + order and i < Nspline_atom; i++)
             {
                 // for all potential multipoles
-                for (int lambda = 0; lambda <= maxlambda; lambda++)
+                for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
                 {
                     // calculate the radial sub-block
                     SymBandMatrix<Complex> R_block_ik = rad_.calc_R_tr_dia_block(lambda, i, k);
                     
-                    // apply all superblocks
-                    for (int ill = 0; ill  < Nang; ill ++) if (par_.isMyGroupWork(ill))
+                    // calculate all sub-products of R * p
+                    # pragma omp parallel for
+                    for (unsigned illp = 0; illp < Nang; illp++)
+                        cArrayView(products, illp * Nspline_proj, Nspline_proj) = R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
+                    
+                    // clear updates
+                    std::memset(&updates[0], 0, updates.size() * sizeof(Complex));
+                    
+                    // sum with angular integrals -> f * R * p
+                    # pragma omp parallel for
+                    for (unsigned ill = 0; ill < Nang; ill++)
+                    for (unsigned illp = 0; illp < Nang; illp++)
+                    if (ang_.f(ill,illp,lambda) != 0.)
+                        cArrayView(updates, ill * Nspline_proj, Nspline_proj) += ang_.f(ill,illp,lambda) * cArrayView(products, illp * Nspline_proj, Nspline_proj);
+                    
+                    // update the owned sub-segment
+                    # pragma omp parallel for
+                    for (unsigned ill = 0; ill < Nang; ill++)
+                    if (par_.isMyGroupWork(ill))
                     {
-                        // collected products of superblocks in this row
-                        cArray product (Nspline_proj);
+                        // get i-th section of ill-th segment (load it from disk, if needed)
+                        TmpNumberArray<Complex> q_section = q.segment(ill, i * Nspline_proj, Nspline_proj);
                         
-                        // for all superblocks in this row
-                        for (int illp = 0; illp < Nang; illp++) if (ang_.f(ill,illp,lambda) != 0.)
-                        {
-                            // multiply sub-segment by the R block
-                            product += ang_.f(ill,illp,lambda) * R_block_ik.dot(cArrayView(buffer, illp * Nspline_proj, Nspline_proj));
-                        }
+                        // update section
+                        cArray section = std::move(q_section() - cArrayView(updates, ill * Nspline_proj, Nspline_proj));
                         
-                        // atomic update of the owned sub-segment
-#ifdef _OPENMP
-                        omp_set_lock(&locks[ill]);
-#endif
-                        q.setSegment(ill, i * Nspline_proj, Nspline_proj, q.segment(ill, i * Nspline_proj, Nspline_proj)() - product);
-#ifdef _OPENMP
-                        omp_unset_lock(&locks[ill]);
-#endif
+                        // store section (save to disk, if needed)
+                        q.setSegment(ill, i * Nspline_proj, Nspline_proj, section);
                     }
                 }
-            }
-        }
-        
-#ifdef _OPENMP
-        for (omp_lock_t & lock : locks)
-            omp_destroy_lock(&lock);
-#endif
+            } // for all destination sub-segments
+        } // for all source vector sub-segments
     } // if not cmd_.lightweight_radial_cache
     
     OMP_clean;
