@@ -300,8 +300,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
 
 void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const
 {
-    OMP_prepare;
-    
     // shorthands
     unsigned order = rad_.bspline_atom().order();
     unsigned Nspline_atom = rad_.bspline_atom().Nspline();
@@ -561,8 +559,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             } // for all destination sub-segments
         } // for all source vector sub-segments
     } // if not cmd_.lightweight_radial_cache
-    
-    OMP_clean;
 }
 
 void NoPreconditioner::precondition (const BlockArray< Complex >& r, BlockArray< Complex >& z) const
