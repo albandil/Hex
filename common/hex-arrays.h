@@ -1317,7 +1317,7 @@ template <class T> class TmpNumberArray
             : owner_(true), array_(array)
         {}
         
-        ArrayView<T> operator() () const
+        ArrayView<T> view () const
         {
             return owner_ ? array_ : view_;
         }

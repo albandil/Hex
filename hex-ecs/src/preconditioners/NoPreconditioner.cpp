@@ -550,7 +550,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                         TmpNumberArray<Complex> q_section = q.segment(ill, i * Nspline_proj, Nspline_proj);
                         
                         // update section
-                        cArray section = std::move(q_section() - cArrayView(updates, ill * Nspline_proj, Nspline_proj));
+                        cArray section = std::move(q_section.view() - cArrayView(updates, ill * Nspline_proj, Nspline_proj));
                         
                         // store section (save to disk, if needed)
                         q.setSegment(ill, i * Nspline_proj, Nspline_proj, section);
