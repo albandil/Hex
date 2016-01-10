@@ -185,9 +185,9 @@ std::string nice_size (std::size_t bytes)
     std::size_t TiB = kiB * kiB * kiB * kiB;
     
     if (bytes < kiB) return format("%d B", bytes);
-    if (bytes < MiB) return format("%.1g kiB", bytes / double(kiB));
-    if (bytes < GiB) return format("%.1g MiB", bytes / double(MiB));
-    if (bytes < TiB) return format("%.1g GiB", bytes / double(GiB));
+    if (bytes < MiB) return format("%d kiB", bytes / kiB);
+    if (bytes < GiB) return format("%d MiB", bytes / MiB);
+    if (bytes < TiB) return format("%d GiB", bytes / GiB);
     
-    return format("%.1g TiB", bytes / double(TiB));
+    return format("%d TiB", bytes / TiB);
 }
