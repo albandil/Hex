@@ -76,6 +76,8 @@
 		<Unit filename="../common/hex-version.h" />
 		<Unit filename="src/amplitudes.cpp" />
 		<Unit filename="src/amplitudes.h" />
+		<Unit filename="src/ang.cpp" />
+		<Unit filename="src/ang.h" />
 		<Unit filename="src/bspline.cpp" />
 		<Unit filename="src/bspline.h" />
 		<Unit filename="src/clarrays.h" />
@@ -99,6 +101,10 @@
 		<Unit filename="src/preconditioners/KPAPreconditioner.h" />
 		<Unit filename="src/preconditioners/NoPreconditioner.cpp" />
 		<Unit filename="src/preconditioners/NoPreconditioner.h" />
+		<Unit filename="src/preconditioners/CoupledPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/CouplexPreconditioner.h" />
+		<Unit filename="src/preconditioners/ProjPreconditioner.cpp" />
+		<Unit filename="src/preconditioners/ProjPreconditioner.h" />
 		<Unit filename="src/radial.cpp" />
 		<Unit filename="src/radial.h" />
 		<Unit filename="src/slater.cpp" />

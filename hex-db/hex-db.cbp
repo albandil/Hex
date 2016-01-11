@@ -28,8 +28,6 @@
 				<Linker>
 					<Add library="..\Win64\lib\libgsl.dll.a" />
 					<Add library="..\Win64\lib\libsqlite3.dll.a" />
-					<Add library="..\Win64\lib\libginac.dll.a" />
-					<Add library="..\Win64\lib\libcln.dll.a" />
 				</Linker>
 			</Target>
 			<Target title="exe">
@@ -46,7 +44,7 @@
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
 					<Add option="-DNO_MPI" />
-					<Add directory="libs" />
+					<Add directory="../libs" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
@@ -89,12 +87,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="../common/hex-arrithm.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="../common/hex-born.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="../common/hex-born.h">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="../common/hex-chebyshev.h">
@@ -149,9 +141,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="../common/hex-special.h">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="../common/hex-symbolic.cpp">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="../common/hex-symbolic.h">
@@ -244,9 +233,6 @@
 		<Unit filename="src/var/asy.cpp">
 			<Option target="lib" />
 		</Unit>
-		<Unit filename="src/var/bornf.cpp">
-			<Option target="lib" />
-		</Unit>
 		<Unit filename="src/var/ccs.cpp">
 			<Option target="lib" />
 		</Unit>
@@ -274,6 +260,9 @@
 		<Unit filename="src/var/scatamp.cpp">
 			<Option target="lib" />
 		</Unit>
+		<Unit filename="src/var/spflip.cpp">
+			<Option target="lib" />
+		</Unit>
 		<Unit filename="src/var/stokes.cpp">
 			<Option target="lib" />
 		</Unit>
@@ -284,9 +273,6 @@
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/tmat.cpp">
-			<Option target="lib" />
-		</Unit>
-		<Unit filename="src/var/tmatb.cpp">
 			<Option target="lib" />
 		</Unit>
 		<Unit filename="src/var/xcs.cpp">
