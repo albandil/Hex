@@ -291,6 +291,12 @@ class ConjugateGradients
                 else
                 {
                     beta = rho_new / rho_old;
+                    if (not std::isfinite(std::abs(beta)))
+                    {
+                        std::cout << "\t    Warning: Iterative method breakdown: (r|z) -> 0." << std::endl;
+                        ok = false;
+                        return k;
+                    }
                     axby(beta, p, 1, z); // p = beta p + z
                 }
                 
@@ -299,6 +305,12 @@ class ConjugateGradients
                 
                 // compute projection ratio α
                 alpha = rho_new / scalar_product(p, z);
+                if (not std::isfinite(std::abs(alpha)))
+                {
+                    std::cout << "\t    Warning: Iterative method breakdown: (p|z) -> 0." << std::endl;
+                    ok = false;
+                    return k;
+                }
                 
                 // update the solution and the residual
                 axby(1., x, alpha, p); // x = x + α p

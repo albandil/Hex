@@ -91,7 +91,7 @@ class CommandLine
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
-              gpu_host_multiply(false), mumps_outofcore(true), mumps_verbose(0)
+              gpu_host_multiply(false), mumps_outofcore(true), mumps_verbose(0), kpa_drop(-1)
         {
             // get command line options
             parse(argc, argv);
@@ -246,6 +246,9 @@ class CommandLine
         
         /// MUMPS diagnostic information
         int mumps_verbose;
+        
+        /// Whether to use drop tolerance for KPA preconditioner.
+        double kpa_drop;
 };
 
 /**

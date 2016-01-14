@@ -211,6 +211,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
                     "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
+                    "\t--kpa-drop [<number>]            If given a number, use it as a threshold knot; the B-spline components beyond this knot will be assumed zero.          \n"
+                    "\t                                 If no number given, use the drop tolerance to find the knot as a distance where largest open bound channel decays      \n"
+                    "\t                                 below the drop tolerance. This option works only below ionization and generally requires softer --prec-tolerance.      \n"
                     "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
@@ -415,6 +418,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // number of KPA preconditioner iterations to trigger ILU preconditioning
                 kpa_max_iter = std::atoi(optargs[0].c_str());
+                return true;
+            },
+        "kpa-drop", "", -1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use drop tolerance
+                kpa_drop = (optargs.empty() ? 0. : std::stod(optargs[0]));
                 return true;
             },
         "ilu-max-blocks", "", 1, [&](std::vector<std::string> const & optargs) -> bool

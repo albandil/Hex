@@ -91,6 +91,10 @@ template <class T> class DenseMatrixView
             data_.reset(rows * cols, elems.data());
         }
         
+        // get element
+        virtual T & operator () (std::size_t i, std::size_t j) = 0;
+        virtual T operator () (std::size_t i, std::size_t j) const = 0;
+        
         // get number of elements
         std::size_t size () const { return rows_ * cols_; }
         
@@ -349,8 +353,8 @@ template <class Type, class Base> class ColMatrix : public Base
         
         /// Element access.
         //@{
-        Type operator() (int i, int j) const { return col(j)[i]; }
-        Type & operator() (int i, int j) { return col(j)[i]; }
+        virtual Type operator() (std::size_t i, std::size_t j) const { return col(j)[i]; }
+        virtual Type & operator() (std::size_t i, std::size_t j) { return col(j)[i]; }
         //@}
         
         /// Inversion.
@@ -369,6 +373,34 @@ template <class Type, class Base> class ColMatrix : public Base
         
         /// Leading dimension.
         virtual std::size_t ld () const { return ld_; }
+        
+        void write (std::ostream & out, std::string const & pre = "", std::string const & pos = "") const
+        {
+            // data pointer
+            Type const * ptr = this->data().begin();
+            
+            for (int irow = 0; irow < this->rows(); irow++)
+            {
+                out << pre;
+                for (int icol = 0; icol < this->cols(); icol++)
+                {
+                    Type x = *(ptr + icol * ld_ + irow);
+                    
+                    if (x == std::abs(x))
+                    {
+                        // positive entry
+                        out << " " << std::abs(x) << " ";
+                    }
+                    else
+                    {
+                        // negative entry
+                        out << x << " ";
+                    }
+                }
+                
+                out << pos << "\n";
+            }
+        }
     
     private:
         
@@ -501,8 +533,8 @@ template <class Type, class Base> class RowMatrix : public Base
         
         /// Element access.
         //@{
-        Type operator() (int i, int j) const { return row(i)[j]; }
-        Type & operator() (int i, int j) { return row(i)[j]; }
+        virtual Type operator() (std::size_t i, std::size_t j) const { return row(i)[j]; }
+        virtual Type & operator() (std::size_t i, std::size_t j) { return row(i)[j]; }
         //@}
         
         /**
