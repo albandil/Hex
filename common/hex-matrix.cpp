@@ -39,8 +39,15 @@
 
 #include "hex-arrays.h"
 #include "hex-hdffile.h"
-#include "hex-matrix.h"
+#include "hex-densematrix.h"
+#include "hex-luft.h"
 #include "hex-misc.h"
+#include "hex-symbandmatrix.h"
+
+// some used Lapack prototypes (Fortran convention!)
+extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
+extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
+extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, double*, int*);
 
 // -------------------------------------------------------------------------------------
 // Dense matrix routines
@@ -204,7 +211,7 @@ void ColMatrix<Complex>::diagonalize
 #endif
 }
 
-void dense_kron_dot
+void dense_kron_dot_full
 (
     int A_rows, int A_cols, Complex const * A_data,
     int B_rows, int B_cols, Complex const * B_data,
@@ -213,23 +220,23 @@ void dense_kron_dot
     Complex       * work
 )
 {
-    // work matrix
+    /*// work matrix
     static int C_rows = 0, C_cols = 0;
     static Complex * C_data = nullptr;
     
     // realloc the work matrix if necessary
     if (not work)
     {
-        if (B_rows * A_cols != C_rows * C_cols)
+        if (A_rows * B_cols != C_rows * C_cols)
         {
             delete [] C_data;
-            C_data = new Complex [B_rows * A_cols];
+            C_data = new Complex [A_rows * B_cols];
         }
         work = C_data;
     }
     
     // update sizes of the intermediate matrix
-    C_rows = B_rows; C_cols = A_cols;
+    C_rows = A_rows; C_cols = B_cols;
     
     // skip invalid inputs (used to dealloc the work matrix)
     if (A_rows == 0 or A_cols == 0 or A_data == nullptr or
@@ -241,7 +248,9 @@ void dense_kron_dot
     Complex alpha = 1, beta = 0;
     char norm = 'N', trans = 'T';
     
-    // C = V * A^T
+    // Let C = V' * A'. Then C is V_cols-by-A_rows.
+    // The matrices A and V are already transposed in the storage, so all we need
+    // to do is to swap the dimensions.
     {
         int m = B_cols, k = A_cols, n = A_rows;
         zgemm_
@@ -253,9 +262,10 @@ void dense_kron_dot
         );
     }
     
-    // W = B * C
+    // Let W' = B * C. Then W' is B_rows-by-A_rows.
+    // The matrix B is in row-major storage, so we need to tell BLAS that it is actually transposed.
     {
-        int m = B_rows, k = B_cols, n = A_rows;
+        int m = B_rows, k = B_cols, n = C_cols;
         zgemm_
         (
             &trans, &norm, &m, &n, &k,
@@ -263,7 +273,133 @@ void dense_kron_dot
             work, &k,
             &beta, w_data, &m
         );
+    }*/
+}
+
+void dense_kron_dot
+(
+    int A_rows, int A_cols, Complex const * A_data,
+    int B_rows, int B_cols, Complex const * B_data,
+    Complex const * v_data,
+    Complex       * w_data,
+    Complex       * work,
+    int limit
+)
+{
+    /*if (limit <= 0)
+    {
+        // use full routine if no limit requested
+        dense_kron_dot_full
+        (
+            A_rows, A_cols, A_data,
+            B_rows, B_cols, B_data,
+            v_data, w_data, work
+        );
+        
+        return;
     }
+    
+    // work matrix
+    static std::size_t worksize = 0;
+    static Complex * workspace = nullptr;
+    
+    // realloc the work matrix if necessary
+    if (not work)
+    {
+        std::size_t needed = (std::size_t)(A_rows + B_rows) * limit;
+        if (needed > worksize)
+        {
+            delete [] workspace;
+            worksize = needed;
+            workspace = new Complex [worksize];
+        }
+        work = workspace;
+    }
+    
+    // work pointers
+    Complex * AVT = work;
+    Complex * BVT = work + limit * A_rows;
+    
+    // skip invalid inputs (used to dealloc the work matrix)
+    if (A_rows == 0 or A_cols == 0 or A_data == nullptr or
+        B_rows == 0 or B_cols == 0 or B_data == nullptr or
+        v_data == nullptr or w_data == nullptr)
+        return;
+    
+    // auxiliary variables
+    Complex one = 1, zero = 0;
+    char norm = 'N', trans = 'T';
+    int s;
+    
+    // ----
+    
+        // AV₁' = V₁' * A'
+        zgemm_
+        (
+            &norm, &norm, &limit, &A_rows, &A_cols,
+            &one, const_cast<Complex*>(v_data), &B_cols,
+            const_cast<Complex*>(A_data), &A_cols,
+            &zero, AVT, &limit
+        );
+        
+        // BV₂' = B * V₂'
+        s = B_cols - limit;
+        zgemm_
+        (
+            &trans, &norm, &B_rows, &limit, &s,
+            &one, const_cast<Complex*>(B_data) + limit, &B_cols,
+            const_cast<Complex*>(v_data) + limit, &B_cols,
+            &zero, BVT, &B_rows
+        );
+        
+    // ----
+    
+    // clear W's data (needed to wait for this moment, because 'v' might be the same pointer as 'w')
+    std::memset(w_data, 0, A_rows * B_rows * sizeof(Complex));
+    
+    // ----
+    
+        // W' = B * AV₁'(corner)
+        zgemm_
+        (
+            &trans, &norm, &B_rows, &limit, &limit,
+            &one, const_cast<Complex*>(B_data), &B_cols,
+            AVT, &limit,
+            &zero, w_data, &B_rows
+        );
+        
+        // W' = W' + B * AV₁'(rest)
+        s = A_rows - limit;
+        zgemm_
+        (
+            &trans, &norm, &limit, &s, &limit,
+            &one, const_cast<Complex*>(B_data), &B_cols,
+            AVT + limit * limit, &limit,
+            &one, w_data + limit * B_rows, &B_rows
+        );
+    
+    // ----
+    
+        // W' = W' + BV₂' * A'(corner)
+        zgemm_
+        (
+            &norm, &norm, &B_rows, &limit, &limit,
+            &one, BVT, &B_rows,
+            const_cast<Complex*>(A_data), &A_cols,
+            &one, w_data, &B_rows
+        );
+        
+        // W'= W + BV₂' * A'(rest)
+        s = A_rows - limit;
+        zgemm_
+        (
+            &norm, &norm, &limit, &s, &limit,
+            &one, BVT, &B_rows,
+            const_cast<Complex*>(A_data) + limit * A_cols, &A_cols,
+            &one, w_data + limit * B_rows, &B_rows
+        );
+    
+    // ----*/
 }
 
 // -------------------------------------------------------------------------------------

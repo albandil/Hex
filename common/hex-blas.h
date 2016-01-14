@@ -29,68 +29,58 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_CGPRECONDITIONER_H
-#define HEX_CGPRECONDITIONER_H
+#ifndef HEX_BLAS_H
+#define HEX_BLAS_H
 
-#include "preconditioners.h"
+#include "hex-arrays.h"
+#include "hex-numbers.h"
+#include "hex-matrix.h"
 
-/**
- * @brief CG iteration-based preconditioner.
- * 
- * This class adds some preconditioning capabilities to its base class
- * NoPreconditioner. The preconditioning is done by diagonal block solution
- * using the conjugate gradients solver (which itself is non-preconditioned).
- */
-class CGPreconditioner : public NoPreconditioner
+/// BLAS wrapper
+namespace blas
 {
-    public:
-        
-        static const std::string prec_name;
-        static const std::string prec_description;
-        
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
-        
-        CGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
-            CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            n_(ang_.states().size(), -1) {}
-        
-        // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
-        
-        // declare own definitions
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
-        virtual void finish ();
-        
-        int solve_block (int ill, const cArrayView r, cArrayView z) const;
-        
-        // inner CG driver
-        virtual void CG_init (int iblock) const;
-        virtual void CG_mmul (int iblock, const cArrayView p, cArrayView q) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
-        
-        // inner CG callback routines
-        virtual double CG_compute_norm (const cArrayView a) const;
-        virtual Complex CG_scalar_product (const cArrayView a, const cArrayView b) const;
-        virtual void CG_axby_operation (Complex a, cArrayView x, Complex b, const cArrayView y) const;
-        virtual void CG_constrain (cArrayView r) const;
+    // integer type used by BLAS (32 or 64 bits)
+#ifdef BLAS64
+    typedef int64_t Int;
+#else
+    typedef int Int;
+#endif
     
-    protected:
-        
-        // last iterations
-        mutable iArray n_;
-};
+    void gemm
+    (
+        Complex a,
+            DenseMatrixView<Complex> const & A,
+            DenseMatrixView<Complex> const & B,
+        Complex b,
+            ColMatrixView<Complex> C
+    );
+    
+    void gemm
+    (
+        Complex a,
+            DenseMatrixView<Complex> const & A,
+            DenseMatrixView<Complex> const & B,
+        Complex b,
+            RowMatrixView<Complex> C
+    );
+    
+    void gemv
+    (
+        double a,
+            DenseMatrixView<double> const & A,
+            const rArrayView v,
+        double b,
+            rArrayView w
+    );
+    
+    void gemv
+    (
+        Complex a,
+            DenseMatrixView<Complex> const & A,
+            const cArrayView v,
+        Complex b,
+            cArrayView w
+    );
+}
 
 #endif

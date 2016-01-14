@@ -55,22 +55,4 @@ template <class T, class Base = DenseMatrix<T>> class ColMatrix;
 template <typename T> using RowMatrixView = RowMatrix<T,DenseMatrixView<T>>;
 template <typename T> using ColMatrixView = ColMatrix<T,DenseMatrixView<T>>;
 
-// some used Blas prototypes (Fortran convention!)
-extern "C" void dgemv_ (char*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void zgemv_ (char*, int*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, Complex*, int*);
-extern "C" void dgemm_ (char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void zgemm_ (char*, char*, int*, int*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, Complex*, int*);
-
-// some used Lapack prototypes (Fortran convention!)
-extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
-extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
-extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, double*, int*);
-
-// the classes are in separate files
-#include "hex-densematrix.h"
-#include "hex-cscmatrix.h"
-#include "hex-csrmatrix.h"
-#include "hex-coomatrix.h"
-#include "hex-symbandmatrix.h"
-
 #endif // HEX_MATRIX

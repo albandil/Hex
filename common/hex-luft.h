@@ -48,7 +48,10 @@ template <class IdxT, class DataT> class LUft_SUPERLU;
 template <class IdxT, class DataT> class LUft_SUPERLU_DIST;
 
 // Load available matrices.
+#include "hex-arrays.h"
 #include "hex-matrix.h"
+#include "hex-csrmatrix.h"
+#include "hex-densematrix.h"
 
 /**
  * @brief LU factorization object

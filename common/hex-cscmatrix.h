@@ -33,6 +33,7 @@
 #define HEX_CSCMATRIX_H
 
 #include "hex-arrays.h"
+#include "hex-matrix.h"
 #include "hex-coomatrix.h"
 
 /**

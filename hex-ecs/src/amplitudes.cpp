@@ -493,7 +493,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             RowMatrixView<Complex> PsiSc (Nspline_atom, Nspline_proj, solution[ill]);
             
             // calculate radial integral
-            Complex lambda = (Pf_overlaps | (PsiSc * Wj[ell]));
+            Complex lambda = (Pf_overlaps | PsiSc | Wj[ell]);
             
             // update the stored value
             # pragma omp critical

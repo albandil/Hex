@@ -126,7 +126,7 @@ class KPACGPreconditioner;
 class ILUCGPreconditioner;
 class GPUCGPreconditioner;
 class HybCGPreconditioner;
-class ProjCGPreconditioner;
+// class ProjCGPreconditioner;
 class CoupledPreconditioner;
 
 #include "preconditioners/NoPreconditioner.h"
@@ -135,7 +135,7 @@ class CoupledPreconditioner;
 #include "preconditioners/ILUPreconditioner.h"
 #include "preconditioners/GPUPreconditioner.h"
 #include "preconditioners/HybPreconditioner.h"
-#include "preconditioners/ProjPreconditioner.h"
+// #include "preconditioners/ProjPreconditioner.h"
 #include "preconditioners/CoupledPreconditioner.h"
 
 /**
@@ -180,7 +180,7 @@ class Preconditioners
 #ifdef WITH_OPENCL
             , GPUCGPreconditioner       // KPA implemented on GPU.
 #endif
-            , ProjCGPreconditioner        // Channel projection preconditioner.
+//             , ProjCGPreconditioner        // Channel projection preconditioner.
 #ifdef WITH_MUMPS
             , CoupledPreconditioner     // Coupled solver.
 #endif

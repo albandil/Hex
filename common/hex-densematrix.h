@@ -37,6 +37,8 @@
 #endif
 
 #include "hex-arrays.h"
+#include "hex-blas.h"
+#include "hex-matrix.h"
 #include "hex-misc.h"
 
 /**
@@ -53,25 +55,70 @@ template <class T> class DenseMatrixView
 {
     public:
         
-        // constructors
-        DenseMatrixView()
-            : rows_(0), cols_(0), data_() {}
-        DenseMatrixView(std::size_t rows, std::size_t cols)
-            : rows_(rows), cols_(cols), data_(rows * cols) {}
-        DenseMatrixView(std::size_t rows, std::size_t cols, const ArrayView<T> data)
-            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
+        // default constructor
+        DenseMatrixView () : rows_(0), cols_(0), data_()
+        {
+            // do nothing
+        }
         
-        // explicit conversion to cArrayView
+        // size constructor
+        DenseMatrixView (std::size_t rows, std::size_t cols) : rows_(rows), cols_(cols), data_()
+        {
+            // do nothing
+        }
+        
+        // view constructor
+        DenseMatrixView (std::size_t rows, std::size_t cols, const ArrayView<T> data) : rows_(rows), cols_(cols), data_(data)
+        {
+            // check that the sizes match
+            assert(data.size() == rows * cols);
+        }
+        
+        // get elements array (read-write access)
         ArrayView<T> data () { return data_; }
+        
+        // get elements array (read-only access)
         const ArrayView<T> data () const { return data_; }
         
-        // getters
-        void drop () { rows_ = cols_ = 0; data_.drop(); }
+        // throw away all data
+        void drop () { rows_ = cols_ = 0; }
+        
+        // use new data
+        virtual void update (std::size_t rows, std::size_t cols, const ArrayView<T> elems)
+        {
+            rows_ = rows;
+            cols_ = cols;
+            data_.reset(rows * cols, elems.data());
+        }
+        
+        // get number of elements
         std::size_t size () const { return rows_ * cols_; }
+        
+        // get number of columns
         int cols () const { return cols_; }
+        
+        // get number of rows
         int rows () const { return rows_; }
+        
+        // get pointer to the beginning of the elements array (read-write access)
         T * begin () { return data_.begin(); }
+        
+        // get pointer to the beginning of the elements array (read-only access)
         T const * begin () const { return data_.begin(); }
+        
+        // layout (row- or column- major)
+        virtual char layout () const
+        {
+            HexException("General DenseMatrix has undefined layout type.");
+            return 0;
+        }
+        
+        // leading dimension
+        virtual std::size_t ld () const
+        {
+            HexException("General DenseMatrix has undefined leading dimension.");
+            return 0;
+        }
         
     protected:
         
@@ -95,40 +142,109 @@ template <class T> class DenseMatrixView
  * RowMatrix and ColMatrix. It is recommended to use the latter
  * two when working with dense matrices.
  */
-template <class T> class DenseMatrix
+template <class T> class DenseMatrix : public DenseMatrixView<T>
 {
     public:
         
-        // constructors
-        DenseMatrix()
-            : rows_(0), cols_(0), data_() {}
-        DenseMatrix(std::size_t rows, std::size_t cols)
-            : rows_(rows), cols_(cols), data_(rows * cols) {}
-        DenseMatrix(std::size_t rows, std::size_t cols, const ArrayView<T> data)
-            : rows_(rows), cols_(cols), data_(data) { assert(data.size() == rows * cols); }
+        enum Layouts
+        {
+            RowMajorLayout = 'T',
+            ColumnMajorLayout = 'N'
+        };
         
-        // explicit conversion to cArrayView
-        ArrayView<T> data () { return data_; }
-        const ArrayView<T> data () const { return data_; }
+        // default constructor
+        DenseMatrix () : DenseMatrixView<T>(), storage_()
+        {
+            // does nothing
+        }
         
-        // getters
-        void drop () { rows_ = cols_ = 0; data_.drop(); }
-        std::size_t size () const { return rows_ * cols_; }
-        int cols () const { return cols_; }
-        int rows () const { return rows_; }
-        T * begin () { return data_.begin(); }
-        T const * begin () const { return data_.begin(); }
+        // size constructor
+        DenseMatrix (std::size_t rows, std::size_t cols) : DenseMatrixView<T>(rows, cols), storage_(rows * cols)
+        {
+            // let the view point to the storage
+            DenseMatrixView<T>::data_.reset(rows * cols, storage_.data());
+        }
+        
+        DenseMatrix (std::size_t rows, std::size_t cols, const ArrayView<T> data) : DenseMatrixView<T>(rows, cols), storage_(data)
+        {
+            // check that the sizes match
+            assert(data.size() == rows * cols);
+            
+            // let the view point to the storage
+            DenseMatrixView<T>::data_.reset(rows * cols, storage_.data());
+        }
+        
+        // get matrix elements array (read-write access)
+        ArrayView<T> data ()
+        {
+            return DenseMatrixView<T>::data();
+        }
+        
+        // get matrix elements array (read-only access)
+        const ArrayView<T> data () const
+        {
+            return DenseMatrixView<T>::data();
+        }
+        
+        // use new data
+        virtual void update (std::size_t rows, std::size_t cols, const ArrayView<T> elems)
+        {
+            assert(rows * cols == elems.size());
+            storage_ = elems;
+            DenseMatrixView<T>::update(rows, cols, storage_);
+        }
+        
+        // use new data
+        virtual void update (std::size_t rows, std::size_t cols, NumberArray<T> && elems)
+        {
+            assert(rows * cols == elems.size());
+            storage_ = std::move(elems);
+            DenseMatrixView<T>::update(rows, cols, storage_);
+        }
+        
+        // throw away all data
+        void drop ()
+        {
+            DenseMatrixView<T>::drop();
+            storage_.drop();
+        }
+        
+        // retrieve size of the matrix (number of elements)
+        std::size_t size () const
+        {
+            return DenseMatrixView<T>::rows() * DenseMatrixView<T>::cols();
+        }
+        
+        // get number of columns
+        int cols () const { return DenseMatrixView<T>::cols_; }
+        
+        // get number of rows
+        int rows () const { return DenseMatrixView<T>::rows_; }
+        
+        // get pointer to the beginning of the elements array (read-write access)
+        T * begin () { return DenseMatrixView<T>::data_.begin(); }
+        
+        // get pointer to the beginning of the elements array (read-only access)
+        T const * begin () const { return DenseMatrixView<T>::data_.begin(); }
+        
+        // layout (row- or column- major)
+        virtual char layout () const
+        {
+            HexException("General DenseMatrix has undefined layout type.");
+            return 0;
+        }
+        
+        // leading dimension
+        virtual std::size_t ld () const
+        {
+            HexException("General DenseMatrix has undefined leading dimension.");
+            return 0;
+        }
         
     protected:
         
-        /// Row count.
-        int rows_;
-        
-        /// Column count.
-        int cols_;
-        
         /// Matrix elements, consecutive rows joined to one array.
-        NumberArray<T> data_;
+        NumberArray<T> storage_;
 };
 
 /**
@@ -144,26 +260,25 @@ template <class Type, class Base> class ColMatrix : public Base
         
         // constructor
         ColMatrix ()
-            : Base() {}
+            : Base(), ld_(0) {}
         ColMatrix (int size)
-            : Base(size, size) {}
+            : Base(size, size), ld_(size) {}
         ColMatrix (int rows, int cols)
-            : Base(rows, cols) {}
-        ColMatrix (int rows, int cols, const ArrayView<Type> data)
-            : Base(rows, cols, data) {}
+            : Base(rows, cols), ld_(rows) {}
+        ColMatrix (int rows, int cols, const ArrayView<Type> data, int ld = -1)
+            : Base(rows, cols, data), ld_(ld < 0 ? rows : ld) {}
         ColMatrix (ColMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()) { }
-        ColMatrix (RowMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()) { reorder_(); }
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
+        explicit ColMatrix (RowMatrix<Type> const & m)
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.cols()) { reorder_(); }
         
         /**
          * @brief Assignment operator.
          */
         ColMatrix<Type> & operator = (ColMatrix<Type> const & A)
         {
-            this->rows_ = A.rows_;
-            this->cols_ = A.cols_;
-            this->data_ = A.data_;
+            this->update(A.rows_, A.cols_, A.data_);
+            ld_   = A.ld_;
             return *this;
         }
         
@@ -172,9 +287,8 @@ template <class Type, class Base> class ColMatrix : public Base
          */
         ColMatrix<Type> & operator = (ColMatrix<Type> const && A)
         {
-            this->rows_ = std::move(A.rows_);
-            this->cols_ = std::move(A.cols_);
-            this->data_ = std::move(A.data_);
+            this->update(A.rows_, A.cols_, std::move(A.data_));
+            ld_   = A.ld_;
             return *this;
         }
         
@@ -187,12 +301,12 @@ template <class Type, class Base> class ColMatrix : public Base
         template <class Function> void populate (Function f)
         {
             // pointer to data
-            Type * ptr = this->begin();
+            Type * p = this->begin();
             
             // fill the matrix
             for (int icol = 0; icol < this->cols(); icol++)
             for (int irow = 0; irow < this->rows(); irow++)
-                *(ptr++) = f(irow,icol);
+                *(p + icol * ld_ + irow) = f(irow,icol);
         }
         
         /**
@@ -203,12 +317,7 @@ template <class Type, class Base> class ColMatrix : public Base
          */
         RowMatrix<Type> T () const
         {
-            return RowMatrix<Type>
-            (
-                this->cols(),
-                this->rows(),
-                this->data()
-            );
+            return RowMatrix<Type> (this->cols(), this->rows(), this->data(), ld_);
         }
         
         /**
@@ -219,12 +328,7 @@ template <class Type, class Base> class ColMatrix : public Base
          */
         RowMatrix<Type> H () const
         {
-            return RowMatrix<Type>
-            (
-                this->cols(),
-                this->rows(),
-                NumberArray<Type>(this->data()).conj()
-            );
+            return RowMatrix<Type> (this->cols(), this->rows(), NumberArray<Type>(this->data()).conj(), ld_);
         }
         
         /**
@@ -235,21 +339,11 @@ template <class Type, class Base> class ColMatrix : public Base
         //@{
         ArrayView<Type> col (int i)
         {
-            return ArrayView<Type>
-            (
-                this->data(),
-                i * this->rows(),
-                this->rows()
-            );
+            return ArrayView<Type> (this->data(), i * ld_, this->rows());
         }
         const ArrayView<Type> col (int i) const
         {
-            return ArrayView<Type>
-            (
-                this->data(),
-                i * this->rows(),
-                this->rows()
-            );
+            return ArrayView<Type> (this->data(), i * ld_, this->rows());
         }
         //@}
         
@@ -269,20 +363,29 @@ template <class Type, class Base> class ColMatrix : public Base
             ColMatrix<Type> * eigvecL = nullptr,
             ColMatrix<Type> * eigvecR = nullptr
         ) const;
+        
+        /// Storage layout.
+        virtual char layout () const { return DenseMatrix<Type>::ColumnMajorLayout; }
+        
+        /// Leading dimension.
+        virtual std::size_t ld () const { return ld_; }
     
     private:
         
         /// Change "data" from row-oriented to column-oriented.
         void reorder_ ()
         {
-            NumberArray<Type> new_data (this->data().size());
+            NumberArray<Type> new_data (this->rows() * this->cols());
             
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
-                new_data[icol * this->rows() + irow] = this->data()[irow * this->cols() + icol];
+                new_data[icol * this->rows() + irow] = this->data_[irow * ld_ + icol];
             
-            this->data() = new_data;
+            this->data_ = new_data;
         }
+        
+        /// Leading dimension.
+        std::size_t ld_;
 };
 
 /**
@@ -297,26 +400,25 @@ template <class Type, class Base> class RowMatrix : public Base
         
         // constructor
         RowMatrix ()
-            : Base() {}
+            : Base(), ld_(0) {}
         RowMatrix (int size)
-            : Base(size, size) {}
+            : Base(size, size), ld_(size) {}
         RowMatrix (int rows, int cols)
-            : Base(rows, cols) {}
-        RowMatrix (int rows, int cols, const ArrayView<Type> data)
-            : Base(rows, cols, data) {}
+            : Base(rows, cols), ld_(cols) {}
+        RowMatrix (int rows, int cols, const ArrayView<Type> data, int ld = -1)
+            : Base(rows, cols, data), ld_(ld < 0 ? cols : ld) {}
         RowMatrix (RowMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()) { }
-        RowMatrix (ColMatrix<Type> const & m)
-            : Base(m.rows(), m.cols(), m.data()) { reorder_(); }
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.ld()) { }
+        explicit RowMatrix (ColMatrix<Type> const & m)
+            : Base(m.rows(), m.cols(), m.data()), ld_(m.rows()) { reorder_(); }
         
         /**
          * @brief Assignment operator.
          */
         RowMatrix<Type> & operator = (RowMatrix<Type> const & A)
         {
-            this->rows_ = A.rows_;
-            this->cols_ = A.cols_;
-            this->data_ = A.data_;
+            this->update(A.rows_, A.cols_, A.data_);
+            ld_  = A.ld_;
             return *this;
         }
         
@@ -325,9 +427,8 @@ template <class Type, class Base> class RowMatrix : public Base
          */
         RowMatrix<Type> & operator = (RowMatrix<Type> const && A)
         {
-            this->rows_ = std::move(A.rows_);
-            this->cols_ = std::move(A.cols_);
-            this->data_ = std::move(A.data_);
+            this->update(A.rows_, A.cols_, std::move(A.data_));
+            ld_  = A.ld_;
             return *this;
         }
         
@@ -343,12 +444,12 @@ template <class Type, class Base> class RowMatrix : public Base
         template <class Function> void populate (Function f)
         {
             // pointer to data
-            Type * ptr = this->begin();
+            Type * p = this->begin();
             
             // fill the matrix
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
-                *(ptr++) = f(irow,icol);
+                *(p + irow * ld_ + icol) = f(irow,icol);
         }
         
         /**
@@ -363,12 +464,12 @@ template <class Type, class Base> class RowMatrix : public Base
         template <class Function> void transform (Function f)
         {
             // pointer to data
-            Type * ptr = this->begin();
+            Type * p = this->begin();
             
             // transform the matrix
             for (int irow = 0; irow < this->rows(); irow++)
             for (int icol = 0; icol < this->cols(); icol++)
-                f(irow,icol,*(ptr++));
+                f(irow,icol,*(p + irow * ld_ + icol));
         }
         
         /**
@@ -379,12 +480,7 @@ template <class Type, class Base> class RowMatrix : public Base
          */
         ColMatrix<Type> T () const
         {
-            return ColMatrix<Type>
-            (
-                this->cols(),
-                this->rows(),
-                this->data()
-            );
+            return ColMatrix<Type> (this->cols(), this->rows(), this->data(), ld_);
         }
         
         /**
@@ -395,21 +491,11 @@ template <class Type, class Base> class RowMatrix : public Base
         //@{
         ArrayView<Type> row (int i)
         {
-            return ArrayView<Type>
-            (
-                this->data(),
-                i * this->cols(),
-                this->cols()
-            );
+            return ArrayView<Type> (this->data(), i * ld_, this->cols());
         }
         const ArrayView<Type> row (int i) const
         {
-            return ArrayView<Type>
-            (
-                this->data(),
-                i * this->cols(),
-                this->cols()
-            );
+            return ArrayView<Type> (this->data(), i * ld_, this->cols());
         }
         //@}
         
@@ -442,10 +528,16 @@ template <class Type, class Base> class RowMatrix : public Base
             // for all elements
             for (int i = 0; i < this->rows(); i++)
             for (int j = 0; j < this->cols(); j++)
-                sum += pu[i] * (*(pA++)) * pv[j];
+                sum += pu[i] * (*(pA + i * ld_ + j)) * pv[j];
             
             return sum;
         }
+        
+        /// Storage layout.
+        virtual char layout () const { return DenseMatrix<Type>::RowMajorLayout; }
+        
+        /// Leading dimension.
+        virtual std::size_t ld () const { return ld_; }
         
         /// Identity matrix.
         static RowMatrix<Type> Eye (int size)
@@ -461,25 +553,25 @@ template <class Type, class Base> class RowMatrix : public Base
         // arithmetic operators
         RowMatrix<Type> const & operator += (DenseMatrix<Type> const & A)
         {
-            assert (this->rows() == A.rows());
-            assert (this->cols() == A.cols());
+            assert(rows_ == A.rows());
+            assert(cols_ == A.cols());
             
-            this->data() += A.data();
+            this->data_ += A.data();
             
             return *this;
         }
         RowMatrix<Type> const & operator -= (DenseMatrix<Type> const & A)
         {
-            assert (this->rows() == A.rows());
-            assert (this->cols() == A.cols());
+            assert(rows_ == A.rows());
+            assert(cols_ == A.cols());
             
-            this->data() -= A.data();
+            this->data_ -= A.data();
             
             return *this;
         }
         RowMatrix<Type> const & operator *= (Type x)
         {
-            this->data() *= x;
+            this->data_ *= x;
             return *this;
         }
         
@@ -512,15 +604,17 @@ template <class Type, class Base> class RowMatrix : public Base
                 out << pre;
                 for (int icol = 0; icol < this->cols(); icol++)
                 {
-                    if (*ptr == std::abs(*ptr))
+                    Type x = *(ptr + irow * ld_ + icol);
+                    
+                    if (x == std::abs(x))
                     {
                         // positive entry
-                        out << " " << std::abs(*ptr++) << " ";
+                        out << " " << std::abs(x) << " ";
                     }
                     else
                     {
                         // negative entry
-                        out << *ptr++ << " ";
+                        out << x << " ";
                     }
                 }
                 
@@ -542,14 +636,14 @@ template <class Type, class Base> class RowMatrix : public Base
         void plot_abs (std::ofstream & out) const
         {
             // create empty gray-scale 1-bit image
-            png::image<png::gray_pixel_16> image (this->cols(), this->rows());
+            png::image<png::gray_pixel_16> image (this->cols_, this->rows_);
             
             // skip empty matrix
-            if (this->data().size() > 0)
+            if (this->data_.size() > 0)
             {
                 // find minimal and maximal value
-                double min = std::abs(this->data()[0]), max = std::abs(this->data()[0]);
-                for (Type const & x : this->data())
+                double min = std::abs(this->data_[0]), max = std::abs(this->data_[0]);
+                for (Type const & x : this->data_)
                 {
                     double absx = std::abs(x);
                     if (absx < min) min = absx;
@@ -561,7 +655,7 @@ template <class Type, class Base> class RowMatrix : public Base
                 {
                     for (int x = 0; x < this->cols(); x++)
                     {
-                        double fraction = 1. - (std::abs(this->data()[y * this->cols() + x]) - min) / (max - min);
+                        double fraction = 1. - (std::abs(this->data_[y * ld_ + x]) - min) / (max - min);
                         image.set_pixel(x, y, std::ceil(65535 * fraction));
                     }
                 }
@@ -574,16 +668,19 @@ template <class Type, class Base> class RowMatrix : public Base
         
     private:
         
+        /// Leading dimension.
+        std::size_t ld_;
+        
         /// Change "data" from column-oriented to row-oriented.
         void reorder_ ()
         {
-            NumberArray<Type> new_data (this->data().size());
+            NumberArray<Type> new_data (this->rows_ * this->cols_);
             
-            for (int irow = 0; irow < this->rows(); irow++)
-            for (int icol = 0; icol < this->cols(); icol++)
-                new_data[irow * this->cols() + icol] = this->data()[icol * this->rows() + irow];
+            for (int irow = 0; irow < this->rows_; irow++)
+            for (int icol = 0; icol < this->cols_; icol++)
+                new_data[irow * this->cols_ + icol] = this->data_[icol * ld_ + irow];
             
-            this->data() = new_data;
+            this->data_ = new_data;
         }
 };
 
@@ -649,361 +746,57 @@ RowMatrix<Type> operator / (RowMatrix<Type> const & A, Type x)
  *     \mathbf{w} = (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,,
  * @f]
  * witnout the need of evaluating (and storing) the Kronecker product.
- * 
- * @note This routine avoid reallocating of its intermediate work matrix
- * by making it static and only reallocating if the dimensions change. If you
- * need to free the memory occupied by the work matrix, call this function
- * with zero/nullptr arguments. Alternatively, supply a workspace
- * of size B_rows x A_cols.
- */
-void dense_kron_dot
-(
-    int A_rows, int A_cols, Complex const * A_data,
-    int B_rows, int B_cols, Complex const * B_data,
-    Complex const * v_data,
-    Complex       * w_data,
-    Complex       * work = nullptr
-);
-
-/**
- * @brief Dot product of kronecker product and a vector
- * 
- * This function will compute the following expression, given two matrices and a vector,
- * @f[
- *     \mathbf{w} = (\mathsf{A} \otimes \mathsf{B}) \cdot \mathbf{v} \,,
- * @f]
- * witnout the need of evaluating (and storing) the Kronecker product.
  */
 template <class Base1, class Base2>
 cArray kron_dot (RowMatrix<Complex,Base1> const & A, RowMatrix<Complex,Base2> const & B, cArrayView const v)
 {
-    assert(A.cols() * B.cols() == v.size());
-    
-    // allocate output array
+    // allocate output array and a temporary array
     cArray w (A.rows() * B.rows());
+    cArray z (A.rows() * B.cols());
     
-    // calculate the kronecker contraction
-    dense_kron_dot
-    (
-        A.rows(), A.cols(), A.data().data(),
-        B.rows(), B.cols(), B.data().data(),
-        v.data(), w.data()
-    );
+    // reshape vectors
+    RowMatrixView<Complex> V (A.cols(), B.cols(), v);
+    RowMatrixView<Complex> W (A.rows(), B.rows(), w);
+    RowMatrixView<Complex> Z (A.rows(), B.cols(), z);
+    
+    // calculate the contraction
+    blas::gemm(1., A, V, 0., Z);
+    blas::gemm(1., Z, B.T(), 0., W);
     
     // return result
     return w;
 }
 
-/**
- * @brief Matrix-vector multiplication.
- * 
- * Multiplies row-major matrix times colum vector, producing a column vector.
- * Internally, the xGEMV BLAS function is used.
- * 
- * @note This is a general template, which fails. However, it is overloaded with supported type combinations.
- */
-template <class Type, class Base>
-NumberArray<Type> operator * (RowMatrix<Type,Base> const & A, const ArrayView<Type> v)
+template <class Type>
+NumberArray<Type> operator | (DenseMatrixView<Type> const & A, ArrayView<Type> v)
 {
-    HexException("Don't know how to multipy row matrix times vector of type %s.", typeid(Type).name());
-}
-
-/**
- * @brief Matrix-vector multiplication.
- * 
- * Multiplies complex row-major matrix times complex colum vector, producing a complex column vector.
- * Internally, the ZGEMV BLAS function is used.
- */
-template <class Base>
-rArray operator * (RowMatrix<double,Base> const & A, const rArrayView v)
-{
-    // output array
-    rArray w (v.size());
-    
-    // auxiliary variables
-    char trans = 'T';
-    int m = A.rows(), n = A.cols(), inc = 1;
-    double alpha = 1, beta = 0;
-    
-    // calculate the product
-    dgemv_
-    (
-        &trans, &m, &n, &alpha, const_cast<double*>(A.data().data()), &m,
-        const_cast<double*>(v.data()), &inc, &beta, w.data(), &inc
-    );
-    
-    // return the result
+    NumberArray<Type> w (A.rows());
+    blas::gemv(1., A, v, 0., w);
     return w;
 }
 
-/**
- * @brief Matrix-vector multiplication.
- * 
- * Multiplies complex row-major matrix times complex colum vector, producing a complex column vector.
- * Internally, the ZGEMV BLAS function is used.
- */
-template <class Base>
-cArray operator * (RowMatrix<Complex,Base> const & A, const cArrayView v)
+template <class Type>
+NumberArray<Type> operator * (DenseMatrixView<Type> const & A, ArrayView<Type> v)
 {
-    assert(A.cols() == (int)v.size());
-    
-    // output array
-    cArray w (A.rows());
-    
-    // auxiliary variables
-    char trans = 'T';
-    int m = A.rows(), n = A.cols(), inc = 1;
-    Complex alpha = 1, beta = 0;
-    
-    // calculate the product
-    zgemv_
-    (
-        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
-        const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
-    );
-    
-    // return the result
+    NumberArray<Type> w (A.rows());
+    blas::gemv(1., A, v, 0., w);
     return w;
 }
 
-template <class Base>
-cArray operator * (const cArrayView v, RowMatrix<Complex,Base> const & A)
+template <class Type>
+NumberArray<Type> operator | (ArrayView<Type> v, RowMatrixView<Type> const & A)
 {
-    assert(A.cols() == (int)v.size());
-    
-    // output array
-    cArray w (A.rows());
-    
-    // auxiliary variables
-    char trans = 'N';
-    int m = A.rows(), n = A.cols(), inc = 1;
-    Complex alpha = 1, beta = 0;
-    
-    // calculate the product
-    zgemv_
-    (
-        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
-        const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
-    );
-    
-    // return the result
+    NumberArray<Type> w (A.cols());
+    blas::gemv(1., A.T(), v, 0., w);
     return w;
 }
 
-/**
- * @brief Matrix-vector multiplication.
- * 
- * Multiplies row-major matrix times colum vector, producing a column vector.
- * Internally, the xGEMV BLAS function is used.
- * 
- * @note This is a general template, which fails. However, it is overloaded with supported type combinations.
- */
-template <class Type, class Base>
-NumberArray<Type> operator * (ColMatrix<Type,Base> const & A, const ArrayView<Type> v)
+template <class Type>
+NumberArray<Type> operator * (ArrayView<Complex> v, RowMatrixView<Complex> const & A)
 {
-    HexException("Don't know how to multipy column matrix times vector of type %s.", typeid(Type).name());
-}
-
-/**
- * @brief Matrix-vector multiplication.
- * 
- * Multiplies complex row-major matrix times complex colum vector, producing a complex column vector.
- * Internally, the ZGEMV BLAS function is used.
- */
-template <class Base>
-cArray operator * (ColMatrix<Complex,Base> const & A, const cArrayView v)
-{
-    assert(A.cols() == (int)v.size());
-    
-    // output array
-    cArray w (A.rows());
-    
-    // auxiliary variables
-    char trans = 'N';
-    int m = A.rows(), n = A.cols(), inc = 1;
-    Complex alpha = 1, beta = 0;
-    
-    // calculate the product
-    zgemv_
-    (
-        &trans, &n, &m, &alpha, const_cast<Complex*>(A.data().data()), &n,
-        const_cast<Complex*>(v.data()), &inc, &beta, w.data(), &inc
-    );
-    
-    // return the result
+    NumberArray<Type> w (A.cols());
+    blas::gemv(1., A.T(), v, 0., w);
     return w;
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies row-major matrix times colum-major matrix, producing a row-major matrix.
- * Internally, the xGEMM BLAS function is used.
- * 
- * @note This is a general template, which fails. However, it is overloaded with supported type combinations.
- */
-template <class Type, class Base1, class Base2>
-RowMatrix<Type,DenseMatrix<Type>> operator * (RowMatrix<Type,Base1> const & A, ColMatrix<Type,Base2> const & B)
-{
-    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name());
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies real row-major matrix times real colum-major matrix, producing a row-major matrix.
- * Internally, the DGEMM BLAS function is used.
- */
-template <class Base1, class Base2>
-RowMatrix<double> operator * (RowMatrix<double,Base1> const & A, ColMatrix<double,Base2> const & B)
-{
-    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
-    // =>
-    // C(col) = (A'(col) B(col))' = B'(col) A(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = B.cols(), n = A.cols(), k = A.rows();
-    
-    // create output matrix
-    RowMatrix<double> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'T', transB = 'N';
-    double alpha = 1, beta = 0;
-    dgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<double*>(B.data().data()), &k,
-                const_cast<double*>(A.data().data()), &k,
-        &beta, C.data().data(), &m
-    );
-
-    // return result
-    return C;
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies complex row-major matrix times complex colum-major matrix, producing a row-major matrix.
- * Internally, the ZGEMM BLAS function is used.
- */
-template <class Base1, class Base2>
-RowMatrix<Complex> operator * (RowMatrix<Complex,Base1> const & A, ColMatrix<Complex,Base2> const & B)
-{
-    // C(row) = A(row) B(col) = C'(col) = A'(col) B(col)
-    // =>
-    // C(col) = (A'(col) B(col))' = B'(col) A(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = B.cols(), n = A.cols(), k = B.rows();
-    
-    // output matrix
-    RowMatrix<Complex> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'T', transB = 'N';
-    Complex alpha = 1, beta = 0;
-    zgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<Complex*>(B.data().data()), &k,
-                const_cast<Complex*>(A.data().data()), &k,
-        &beta, C.data().data(), &m
-    );
-    
-    // return resulting matrix
-    return C;
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies column-major matrix times colum-major matrix, producing a column-major matrix.
- * Internally, the xGEMM BLAS function is used.
- * 
- * @note This is a general template, which fails. However, it is overloaded with supported type combinations.
- */
-template <class Type, class Base1, class Base2>
-ColMatrix<Type> operator * (ColMatrix<Type> const & A, ColMatrix<Type> const & B)
-{
-    HexException("Don't know how to multipy matrices of type %s.", typeid(Type).name());
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies real column-major matrix times real colum-major matrix, producing a real column-major matrix.
- * Internally, the ZGEMM BLAS function is used.
- */
-template <class Base1, class Base2>
-ColMatrix<double> operator * (ColMatrix<double,Base1> const & A, ColMatrix<double,Base2> const & B)
-{
-    // C(col) = A(col) B(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = A.rows(), n = B.cols(), k = A.cols();
-    
-    // output matrix
-    ColMatrix<double> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'N', transB = 'N';
-    double alpha = 1, beta = 0;
-    dgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<double*>(A.data().data()), &k, // FIXME: Not sure about the indices in
-                const_cast<double*>(B.data().data()), &k, //        the non-square matrix case.
-        &beta, C.data().data(), &m
-    );
-    
-    // return resulting matrix
-    return C;
-}
-
-/**
- * @brief Matrix-matrix multiplication.
- * 
- * Multiplies complex column-major matrix times complex colum-major matrix, producing a column-major matrix.
- * Internally, the ZGEMM BLAS function is used.
- */
-template <class Base1, class Base2>
-ColMatrix<Complex> operator * (ColMatrix<Complex,Base1> const & A, ColMatrix<Complex,Base2> const & B)
-{
-    // C(col) = A(col) B(col)
-    
-    if (A.cols() != B.rows())
-        HexException("Matrix multiplication requires A.cols() == B.rows(), but %d != %d.", A.cols(), B.rows());
-    
-    // dimensions
-    int m = A.rows(), n = B.cols(), k = A.cols();
-    
-    // output matrix
-    ColMatrix<Complex> C (A.rows(), B.cols());
-    
-    // use the BLAS-3 routine
-    char transA = 'N', transB = 'N';
-    Complex alpha = 1, beta = 0;
-    zgemm_
-    (
-        &transA, &transB, &m, &n, &k,
-        &alpha, const_cast<Complex*>(A.data().data()), &k,  // FIXME: Not sure about the indices in
-                const_cast<Complex*>(B.data().data()), &k,  //        the non-square matrix case.
-        &beta, C.data().data(), &m
-    );
-    
-    // return resulting matrix
-    return C;
 }
 
 #endif // HEX_DENSEMATRIX_H

@@ -33,9 +33,7 @@
 #define HEX_COOMATRIX_H
 
 #include "hex-arrays.h"
-#include "hex-cscmatrix.h"
-#include "hex-csrmatrix.h"
-#include "hex-densematrix.h"
+#include "hex-matrix.h"
 
 /**
  * @brief Complex COO matrix.

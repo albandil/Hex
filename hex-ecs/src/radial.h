@@ -36,7 +36,7 @@
 #include <vector>
 
 #include "hex-arrays.h"
-#include "hex-matrix.h"
+#include "hex-symbandmatrix.h"
 #include "hex-special.h"
 
 #include "bspline.h"

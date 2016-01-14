@@ -99,7 +99,6 @@ void ProjCGPreconditioner::setup ()
                     // add this bound state to the data
                     if ((int)bound_states_[l].size() < n - l)
                         bound_states_[l].resize(n - l);
-                    std::cout << E << " " << bound_states_[l].size() << " " << n - l - 1 << std::endl;
                     bound_states_[l][n - l - 1] = invsqrtS * CR.col(i);
                     
                     // if the energy is close enough to the theoretical value, raise number of well-represented bound states
@@ -134,7 +133,7 @@ void ProjCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
     int Nspline_proj = rad_.bspline_proj().Nspline();
     int order = rad_.bspline_atom().order();
     
-    // number of opened channels
+    // number of opened bound state channels
     int m = 0;
     for (unsigned n = 1; n <= bound_states_[0].size(); n++)
     {
@@ -151,7 +150,7 @@ void ProjCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
     }*/
     /// ----
     
-    // 1. Project the residual 'r' to the bound state channels,
+    // 1. Project the residual 'r' onto the bound state channels,
     //        r = sum_(l,i) a_(l,i) phi_(l,i) + sum_(l',j) phi_(l',j) b_(l',j) 
     
     RowMatrixView<Complex> R (Nspline_atom, Nspline_proj, r);
@@ -169,11 +168,11 @@ void ProjCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
         // orthogonalize projections to the bound orbitals
         for (int j = 0; j < m; j++)
         {
-            // a = ( 1 - a S psi ) a
-            ai -= (ai | rad_.S_atom() | bound_states_[0][i]) * ai;
+            // a = a - (a S psi) psi
+            ai -= (ai | rad_.S_atom() | bound_states_[0][i]) * bound_states_[0][i];
             
-            // b = ( 1 - b S psi ) b
-            bi -= (bi | rad_.S_proj() | bound_states_[0][i]) * bi;
+            // b = b - ( b S psi ) psi
+            bi -= (bi | rad_.S_proj() | bound_states_[0][i]) * bound_states_[0][i];
         }
     }
     
@@ -292,7 +291,7 @@ void ProjCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z
         z += outer_product(bound_states_[0][i], vi);
     }
     
-//     std::exit(0);
+    std::exit(0);
 }
 
 void ProjCGPreconditioner::CG_exit (int iblock) const
