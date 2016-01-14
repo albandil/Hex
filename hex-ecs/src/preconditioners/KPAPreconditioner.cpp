@@ -354,6 +354,16 @@ void KPACGPreconditioner::setup ()
         }
         
     std::cout << std::endl;
+    
+    // get maximal number of threads that will run the preconditioning routines concurrently
+    unsigned n = 1;
+#ifdef _OPENMP
+    n = omp_get_max_threads();
+#endif
+    
+    // allocate workspaces
+    rnorms_.resize(n);
+    workspace_.resize(n);
 }
 
 void KPACGPreconditioner::update (double E)
@@ -371,6 +381,9 @@ void KPACGPreconditioner::update (double E)
     {
         // get knot from user-supplied distance
         maxknot_  = rad_.bspline_atom().knot(cmd_.kpa_drop);
+        
+        std::cout << "\tKPA: dropping splines beyond " << cmd_.kpa_drop << " a.u.; B-spline index "
+                  << maxknot_ << " and up (of " << rad_.bspline_atom().Nspline() << ")" << std::endl;
     }
     else
     {
@@ -421,29 +434,14 @@ void KPACGPreconditioner::CG_init (int iblock) const
     // calculate workspace size
     std::size_t size = bspline_atom_.Nspline() * bspline_proj_.Nspline();
     if (maxknot_ > 0)
-        size += std::max(bspline_atom_.Nspline(), bspline_proj_.Nspline()) * maxknot_;
+        size *= 2;
     
-    // prepare workspaces
+    // allocate thread workspace
+    unsigned ithread = 0;
 #ifdef _OPENMP
-    if (cmd_.parallel_precondition)
-    {
-        // allocate workspace for this thread in parallel case
-        unsigned ithread = omp_get_thread_num();
-        # pragma omp critical
-        {
-            while (workspace_.size() <= ithread)
-                workspace_.push_back(nullptr);
-            workspace_[ithread] = new Complex [size];
-        }
-    }
-    else
+    ithread = omp_get_thread_num();
 #endif
-    {
-        // allocate workspace also for serial case
-        if (workspace_.empty())
-            workspace_.push_back(nullptr);
-        workspace_[0] = new Complex [size];
-    }
+    workspace_[ithread].resize(size);
 }
 
 void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -492,12 +490,33 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     std::size_t Nspline_proj = bspline_proj_.Nspline();
     
     // get workspace
-    Complex * work = workspace_.front();
+    int ithread = 0;
 #ifdef _OPENMP
-    unsigned ithread = omp_get_thread_num();
-    if (ithread < workspace_.size())
-        work = workspace_[ithread];
+    ithread = omp_get_thread_num();
 #endif
+    Complex * work = workspace_[ithread].data();
+    
+    // First of all calculate norm of 'r'. If it stays stable for more than 10 iterations, something is wrong
+    // and most likely it is the drop limit "maxknot".
+    rnorms_[ithread].push_back(r.norm());
+    if (rnorms_[ithread].size() > 10)
+    {
+        rnorms_[ithread].pop_front();
+        
+        double avg = std::accumulate(rnorms_[ithread].begin(), rnorms_[ithread].end(), 0.) / rnorms_[ithread].size();
+        double dev = std::sqrt(std::accumulate(rnorms_[ithread].begin(), rnorms_[ithread].end(), 0., [=](double s, double x) { return s + sqrabs(x - avg); }) / rnorms_[ithread].size());
+        
+        if (dev < 0.01 * avg)
+        {
+            HexException
+            (
+                "Bad convergence of the thresholded KPA preconditioner. Please do some of the following:\n"
+                "  a) increase the --kpa-drop threshold knot\n"
+                "  b) tighten your --drop-tolerance\n"
+                "  c) soften the --prec-tolerance\n"
+            );
+        }
+    }
     
     // encapsulated memory regions
     cArrayView U_data (Nspline_atom * Nspline_proj, work);
@@ -644,16 +663,6 @@ void KPACGPreconditioner::CG_exit (int iblock) const
         prec_atom_[l1].drop();
         prec_proj_[l2].drop();
     }
-    
-    // release workspace
-#ifdef _OPENMP
-    unsigned ithread = omp_get_thread_num();
-    if (ithread < workspace_.size() and workspace_[ithread] != nullptr)
-    {
-        delete [] workspace_[ithread];
-        workspace_[ithread] = nullptr;
-    }
-#endif
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);

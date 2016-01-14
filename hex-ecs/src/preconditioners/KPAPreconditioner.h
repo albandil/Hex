@@ -32,6 +32,7 @@
 #ifndef HEX_KPAPRECONDITIONER_H
 #define HEX_KPAPRECONDITIONER_H
 
+#include <deque>
 #include <set>
 #include <string>
 #include <vector>
@@ -145,10 +146,13 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         mutable std::vector<Data> prec_proj_;
         
         // workspace
-        mutable std::vector<Complex*> workspace_;
+        mutable cArrays workspace_;
         
         // drop tolerance knot for matrix multiplication
         mutable int maxknot_;
+        
+        // auxiliary variables
+        mutable std::vector<std::deque<double>> rnorms_;
 };
 
 #endif
