@@ -84,8 +84,17 @@ void Solver::solve ()
     int Nspline_atom = bspline_[0].Nspline();
     int Nspline_proj = bspline_[ipanel_].Nspline();
     
-    // print some information on the Hamiltonian
+    
+    // print Hamiltonian size as a number with thousands separator (apostroph used)
+    class MyNumPunct : public std::numpunct<char>
+    {
+        protected:
+            virtual char do_thousands_sep() const { return '\''; }
+            virtual std::string do_grouping() const { return "\03"; }
+    };
+    std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
     std::cout << "Hamiltonian size: " << (std::size_t)Nspline_atom * (std::size_t)Nspline_proj * ang_.states().size() << std::endl;
+    std::cout.imbue(std::locale::classic());
     
     // wrap member functions to lambda-functions for use in the CG solver
     auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void { this->apply_preconditioner_(r,z); };
