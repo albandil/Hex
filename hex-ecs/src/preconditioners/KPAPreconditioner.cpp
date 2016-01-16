@@ -362,7 +362,6 @@ void KPACGPreconditioner::setup ()
 #endif
     
     // allocate workspaces
-    rnorms_.resize(n);
     workspace_.resize(n);
 }
 
@@ -410,6 +409,24 @@ void KPACGPreconditioner::update (double E)
         
         std::cout << "\tKPA: dropping splines beyond " << r2 << " a.u. (" << n << "s's " << cmd_.droptol << " threshold); B-spline index "
                   << maxknot_ << " and up (of " << rad_.bspline_atom().Nspline() << ")" << std::endl;
+    }
+}
+
+void KPACGPreconditioner::rhs (BlockArray<Complex>& chi, int ienergy, int instate) const
+{
+    // let parent bake the right-hand side
+    CGPreconditioner::rhs(chi, ienergy, instate);
+    
+    // constrain all blocks from the very beginning
+    for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
+    {
+        if (cmd_.outofcore)
+            chi[iblock].hdfload();
+        
+        this->CG_constrain(chi[iblock]);
+        
+        if (cmd_.outofcore)
+            chi[iblock].hdfsave(), chi[iblock].drop();
     }
 }
 
@@ -495,28 +512,6 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     ithread = omp_get_thread_num();
 #endif
     Complex * work = workspace_[ithread].data();
-    
-    // First of all calculate norm of 'r'. If it stays stable for more than 10 iterations, something is wrong
-    // and most likely it is the drop limit "maxknot".
-    rnorms_[ithread].push_back(r.norm());
-    if (rnorms_[ithread].size() > 10)
-    {
-        rnorms_[ithread].pop_front();
-        
-        double avg = std::accumulate(rnorms_[ithread].begin(), rnorms_[ithread].end(), 0.) / rnorms_[ithread].size();
-        double dev = std::sqrt(std::accumulate(rnorms_[ithread].begin(), rnorms_[ithread].end(), 0., [=](double s, double x) { return s + sqrabs(x - avg); }) / rnorms_[ithread].size());
-        
-        if (dev < 0.01 * avg)
-        {
-            HexException
-            (
-                "Bad convergence of the thresholded KPA preconditioner. Please do some of the following:\n"
-                "  a) increase the --kpa-drop threshold knot\n"
-                "  b) tighten your --drop-tolerance\n"
-                "  c) soften the --prec-tolerance\n"
-            );
-        }
-    }
     
     // encapsulated memory regions
     cArrayView U_data (Nspline_atom * Nspline_proj, work);
@@ -673,6 +668,20 @@ void KPACGPreconditioner::finish ()
     prec_atom_.clear();
     prec_proj_.clear();
     CGPreconditioner::finish();
+}
+
+void KPACGPreconditioner::CG_constrain (cArrayView r) const
+{
+    if (maxknot_ > 0)
+    {
+        std::size_t Nspline_atom = bspline_atom_.Nspline();
+        std::size_t Nspline_proj = bspline_proj_.Nspline();
+        
+        # pragma omp parallel for
+        for (std::size_t i = maxknot_; i < Nspline_atom; i++) 
+        for (std::size_t j = maxknot_; j < Nspline_proj; j++)
+            r[i * Nspline_proj + j] = 0.;
+    }
 }
 
 #endif

@@ -111,19 +111,20 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
         
         // declare own definitions
         virtual void setup ();
         virtual void update (double E);
+        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void finish ();
         
         // inner CG callback (needed by parent)
         virtual void CG_init (int iblock) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
+        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
+        virtual void CG_constrain (cArrayView r) const;
         
     protected:
         
@@ -150,9 +151,6 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // drop tolerance knot for matrix multiplication
         mutable int maxknot_;
-        
-        // auxiliary variables
-        mutable std::vector<std::deque<double>> rnorms_;
 };
 
 #endif
