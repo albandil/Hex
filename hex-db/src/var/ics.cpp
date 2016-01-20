@@ -50,6 +50,7 @@
 
 void db_sqrt (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
+    assert(n == 1);
     sqlite3_result_double(pdb, std::sqrt(sqlite3_value_double(*val)));
 }
 
@@ -60,6 +61,8 @@ void db_sqrt (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
 {
+    assert(n == 1);
+    
     // get blob data as text; reinterpret_cast is save as we are using
     // the low ASCII only
     std::string blob = reinterpret_cast<const char*>(sqlite3_value_text(*val));
@@ -90,6 +93,37 @@ void db_ioncs (sqlite3_context* pdb, int n, sqlite3_value** val)
     sqlite3_result_double(pdb, result);
 }
 
+//
+// custom function for linear interpolation of two points
+//
+
+void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
+{
+    assert(n == 5);
+    
+    // extract parameters
+    double x1 = sqlite3_value_double(*(val + 0));
+    double y1 = sqlite3_value_double(*(val + 1));
+    double x2 = sqlite3_value_double(*(val + 2));
+    double y2 = sqlite3_value_double(*(val + 3));
+    double x  = sqlite3_value_double(*(val + 4));
+    
+    // handle degenerate case
+    if (x1 == x2)
+    {
+        if (x == x1)
+            sqlite3_result_double(pdb, y1);
+        else
+            sqlite3_result_double(pdb, special::constant::Nan);
+    }
+    
+    // interpolate
+    else
+    {
+        sqlite3_result_double(pdb, ((x - x1) * y2 + (x2 - x) * y1) / (x2 - x1));
+    }
+}
+
 // -------------------------------------------------------------------------- //
 
 const std::string IntegralCrossSection::Id = "ics";
@@ -109,37 +143,14 @@ const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
 
 bool IntegralCrossSection::initialize (sqlitepp::session & db) const
 {
-    //
-    // define SQRT function
-    //
+    // define square root function
+    sqlite3_create_function(db.impl(), "SQRT", 1, SQLITE_UTF8, nullptr, &db_sqrt, nullptr, nullptr);
     
-    sqlite3_create_function
-    (
-        db.impl(),
-        "sqrt",
-        1,              // pass single argument
-        SQLITE_UTF8,
-        nullptr,
-        &db_sqrt,
-        nullptr,
-        nullptr
-    );
-    
-    //
     // define Gauss-Chebyshev integration of squared Chebyshev expansion
-    //
+    sqlite3_create_function(db.impl(), "IONCS", 1, SQLITE_UTF8, nullptr, &db_ioncs, nullptr, nullptr);
     
-    sqlite3_create_function
-    (
-        db.impl(),
-        "ioncs",
-        1,              // pass single argument
-        SQLITE_UTF8,
-        nullptr,
-        &db_ioncs,
-        nullptr,
-        nullptr
-    );
+    // define linear interpolation of two data points (5 arguments: x1, y1, x2, y2, x)
+    sqlite3_create_function(db.impl(), "INTERPOLATE", 5, SQLITE_UTF8, nullptr, &db_interpolate, nullptr, nullptr);
     
     return true;
 }
@@ -170,90 +181,65 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
 {
     static const std::vector<std::string> cmd = {
         
-        // insert discrete transitions
-        
-        /*"INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-            "SELECT ni, li, mi,  "
-                   "nf, lf, mf,  "
-                   "S,  Ei, ell, "
-                   "sqrt(Ei-1./(ni*ni)+1./(nf*nf))/sqrt(Ei)*(2*S+1) * (SUM(Re_T_ell) * SUM(Re_T_ell) + SUM(Im_T_ell) * SUM(Im_T_ell))/157.91367 " // 16π²
-                "FROM " + TMatrix::Id + " "
-                "WHERE Ei > 0 AND Ei - 1./(ni*ni) + 1./(nf*nf) > 0 "
-                "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell",*/
-        
-        // temporary table with merged available energies from all total angular momenta for every discrete transition
+        // Avoid disk operations.
+        //   The SQLite program does normally all operations using a backou journal disk file, which
+        // slows down the calculation of the cross sections.
         
         "PRAGMA temp_store = MEMORY",
+        
+        // Temporary table with merged available energies from all total angular momenta for every discrete transition and partial wave.
+        
         "CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",
         
-        // interpolate discrete transition partial cross sections
+        // Temporary table where every transition, spin, total L, partial wave and required energy from 'T' contains also the highest lower-or-equal energy.
+        
+        "CREATE TEMP TABLE Low AS SELECT P.ni, P.li, P.mi, P.nf, P.lf, P.mf, P.L, P.S, P.ell, Q.EiReq, Q.EiLow, P.Re_T_ell AS ReTLow, P.Im_T_ell AS ImTLow "
+        "FROM tmat AS P NATURAL JOIN "
+        "("
+            "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MAX(tmat.Ei) AS EiLow, T.Ei AS EiReq "
+            "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
+            "WHERE tmat.Ei <= T.Ei "
+            "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
+        ") AS Q WHERE P.Ei = Q.EiLow",
+        
+        "DELETE FROM Low WHERE EiLow > EiReq ",
+        
+        // temporary table where every transition, spin, total L, partial wave and required energy from 'T' contains also the lowest higher-or-equal energy.
+        
+        "CREATE TABLE Upp AS SELECT P.ni, P.li, P.mi, P.nf, P.lf, P.mf, P.L, P.S, P.ell, Q.EiReq, Q.EiUpp, P.Re_T_ell AS ReTUpp, P.Im_T_ell AS ImTUpp "
+        "FROM tmat AS P NATURAL JOIN "
+        "( "
+            "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MIN(tmat.Ei) AS EiUpp, T.Ei AS EiReq "
+            "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
+            "WHERE T.Ei <= tmat.Ei "
+            "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
+        ") AS Q WHERE P.Ei = Q.EiUpp",
+        
+        "DELETE FROM Upp WHERE EiUpp < EiReq ",
+        
+        // Interpolate partial cross sections for discrete transition.
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
-        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, sqrt(Ei - 1./(ni*ni) + 1./(nf*nf)) * (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 / sqrt(Ei) AS sigma " // 16π²
+        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, SQRT(Ei - 1./(ni*ni) + 1./(nf*nf)) * (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 / SQRT(Ei) AS sigma " // 16π²
         "FROM "
         "( "
-            "SELECT Low.ni  AS ni, "
-                   "Low.li  AS li, "
-                   "Low.mi  AS mi, "
-                   "Low.nf  AS nf, "
-                   "Low.lf  AS lf, "
-                   "Low.mf  AS mf, "
-                   "Low.S   AS S,  "
-                   "Low.ell AS ell, "
-                   "Low.EiReq AS Ei, "
-                   "SUM "
-                   "( "
-                       "CASE WHEN Low.EiLow > Low.EiReq OR Upp.EiReq > Upp.EiUpp THEN 0 "
-                       "ELSE "
-                       "( "
-                           "CASE WHEN Low.EiLow = Upp.EiUpp THEN Low.Re_T_ell "
-                           "ELSE (Low.Re_T_ell * (Upp.EiUpp - Upp.EiReq) + Upp.Re_T_ell * (Low.EiReq - Low.EiLow)) / (Upp.EiUpp - Low.EiLow) "
-                           "END "
-                       ") "
-                       "END "
-                   ") AS ReT, "
-                   "SUM "
-                   "( "
-                       "CASE WHEN Low.EiLow > Low.EiReq OR Upp.EiReq > Upp.EiUpp THEN 0 "
-                       "ELSE "
-                       "( "
-                           "CASE WHEN Low.EiLow = Upp.EiUpp THEN Low.Im_T_ell "
-                           "ELSE (Low.Im_T_ell * (Upp.EiUpp - Upp.EiReq) + Upp.Im_T_ell * (Low.EiReq - Low.EiLow)) / (Upp.EiUpp - Low.EiLow) "
-                           "END "
-                       ") "
-                       "END "
-                   ") AS ImT "
-            "FROM "
-            "( "
-                "SELECT * FROM tmat NATURAL JOIN "
-                "( "
-                    "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MAX(tmat.Ei) AS EiLow, T.Ei AS EiReq "
-                        "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
-                        "WHERE tmat.Ei <= T.Ei "
-                        "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
-                ") AS tmp WHERE tmat.Ei = tmp.EiLow "
-            ") AS Low "
-            "NATURAL JOIN "
-            "( "
-                "SELECT * FROM tmat NATURAL JOIN "
-                "( "
-                    "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MIN(tmat.Ei) AS EiUpp, T.Ei AS EiReq "
-                        "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
-                        "WHERE T.Ei <= tmat.Ei "
-                        "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
-                ") AS tmp WHERE tmat.Ei = tmp.EiUpp "
-            ") AS Upp "
+            "SELECT Low.ni  AS ni, Low.li  AS li,  Low.mi  AS mi, "
+                   "Low.nf  AS nf, Low.lf  AS lf,  Low.mf  AS mf, "
+                   "Low.S   AS S,  Low.ell AS ell, Low.EiReq AS Ei, "
+                   "SUM(INTERPOLATE(Low.EiLow, Low.ReTLow, Upp.EiUpp, Upp.ReTUpp, Low.EiReq)) AS ReT, "
+                   "SUM(INTERPOLATE(Low.EiLow, Low.ImTLow, Upp.EiUpp, Upp.ImTUpp, Low.EiReq)) AS ImT "
+            "FROM Low NATURAL JOIN Upp "
             "WHERE Ei - 1./(ni*ni) + 1./(nf*nf) >= 0 "
             "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell "
         ")",
         
-        // insert ionization
+        // Insert ionization (no interpolation needed: L is used as the partial wave number here).
         
         "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
             "SELECT ni, li, mi, "
                    "0,  0,  0,  "
                    "S,  Ei, L,  "
-                   "SUM(0.25*(2*S+1)*ioncs(QUOTE(cheb))/sqrt(Ei)) "
+                   "SUM(0.25*(2*S+1)*IONCS(QUOTE(cheb))/SQRT(Ei)) "
                 "FROM " + IonizationF::Id + " "
                 "GROUP BY ni, li, mi, S, Ei, L"
     };
