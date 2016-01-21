@@ -616,6 +616,12 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             double begin = ReadNext<double>(inf).val;
             double end = ReadNext<double>(inf).val;
             int samples = ReadNext<int>(inf).val;
+            
+            if (begin > end)
+                HexException("Start of linear sequence is larger than its end (%g > %g).", begin, end);
+            if (samples < 0)
+                HexException("Invalid number of samples for linear sequence: %d.", samples);
+            
             arr.append(linspace(begin, end, samples));
         }
         else if (type[0] == 'G')
@@ -625,6 +631,14 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
             double d = ReadNext<double>(inf).val;
             double quotient = ReadNext<double>(inf).val;
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
+            
+            if (begin > end)
+                HexException("Start of geometric sequence is larger than its end (%g > %g).", begin, end);
+            if (d <= 0)
+                HexException("Initial interval size must be larger than zero (given: %g).", d);
+            if (quotient <= 0)
+                HexException("Quotient must be positive (given: %g).", quotient);
+            
             arr.append(geomspace(begin, end, samples, quotient));
         }
         else if (type[0] == 'E')
