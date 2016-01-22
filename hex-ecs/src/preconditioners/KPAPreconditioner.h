@@ -104,7 +104,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_proj_full,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            prec_atom_(inp.maxell+1), prec_proj_(inp.maxell+1)
+            prec_atom_(inp.maxell+1), prec_proj_(inp.maxell+1), maxknot_(-1)
         {
             // nothing more to do
         }
