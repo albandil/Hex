@@ -62,8 +62,6 @@ RadialIntegrals::RadialIntegrals
     Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    S12_(bspline_atom.Nspline(),bspline_proj.Nspline()),
-    S21_(bspline_proj.Nspline(),bspline_atom.Nspline()),
     verbose_(true), Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
@@ -381,6 +379,7 @@ Complex RadialIntegrals::computeS12
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
+    int Nspline_atom = bspline_atom_.Nspline(); int Nspline_proj = bspline_proj_.Nspline();
     int Nknot_atom   = bspline_atom_.Nknot();   int Nknot_proj   = bspline_proj_.Nknot();
     int Nreknot_atom = bspline_atom_.Nreknot(); int Nreknot_proj = bspline_proj_.Nreknot();
     
@@ -409,9 +408,14 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     Mm2_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -2, m, n                  ); });
     
     // compute inter-basis overlaps
-    for (int i = 0; i < bspline_atom_.Nspline(); i++)
-    for (int j = 0; j < bspline_proj_.Nspline(); j++)
-        S12_(i,j) = S21_(j,i) = computeS12(g_atom_, bspline_atom_, bspline_proj_, i, j);
+    if (not cmd.map_solution.empty())
+    {
+        S12_ = RowMatrix<Complex>(Nspline_atom, Nspline_proj);
+        S21_ = RowMatrix<Complex>(Nspline_proj, Nspline_atom);
+        for (int i = 0; i < Nspline_atom; i++)
+        for (int j = 0; j < Nspline_proj; j++)
+            S12_(i,j) = S21_(j,i) = computeS12(g_atom_, bspline_atom_, bspline_proj_, i, j);
+    }
     
     // save the matrices to disk
     if (not cmd.shared_scratch or par.IamMaster())
