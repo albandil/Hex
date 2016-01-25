@@ -585,8 +585,8 @@ template <class Type, class Base> class RowMatrix : public Base
         // arithmetic operators
         RowMatrix<Type> const & operator += (DenseMatrix<Type> const & A)
         {
-            assert(rows_ == A.rows());
-            assert(cols_ == A.cols());
+            assert(this->rows() == A.rows());
+            assert(this->cols() == A.cols());
             
             this->data_ += A.data();
             
@@ -594,8 +594,8 @@ template <class Type, class Base> class RowMatrix : public Base
         }
         RowMatrix<Type> const & operator -= (DenseMatrix<Type> const & A)
         {
-            assert(rows_ == A.rows());
-            assert(cols_ == A.cols());
+            assert(this->rows() == A.rows());
+            assert(this->cols() == A.cols());
             
             this->data_ -= A.data();
             
