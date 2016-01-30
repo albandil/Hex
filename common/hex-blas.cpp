@@ -51,9 +51,11 @@ extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, 
 
 void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<Complex> const & B, Complex b, ColMatrixView<Complex> C)
 {
+#ifndef NDEBUG
     // verify compatibility of dimensions
     if (A.cols() != B.rows() or A.rows() != C.rows() or B.cols() != C.cols())
         HexException("Incompatible dimensions: [%d x %d] [%d x %d] != [%d x %d].", A.rows(), A.cols(), B.rows(), B.cols(), C.rows(), C.cols());
+#endif
     
     // get matrix layouts
     char layout_A = A.layout(), layout_B = B.layout();
@@ -75,9 +77,11 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
 
 void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<Complex> const & B, Complex b, RowMatrixView<Complex> C)
 {
+#ifndef NDEBUG
     // verify compatibility of dimensions
     if (A.cols() != B.rows() or A.rows() != C.rows() or B.cols() != C.cols())
         HexException("Incompatible dimensions: [%d x %d] [%d x %d] != [%d x %d].", A.rows(), A.cols(), B.rows(), B.cols(), C.rows(), C.cols());
+#endif
     
     // NOTE: To obtain row-major C, we need to multiply transpose: C' = B' A'
     
@@ -102,9 +106,11 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
 
 void blas::gemv (double a, DenseMatrixView<double> const & A, const rArrayView v, double b, rArrayView w)
 {
+#ifndef NDEBUG
     // verify compatibility of dimensions
-    if (A.cols() != v.size() or A.rows() != w.size())
+    if (A.cols() != (int)v.size() or A.rows() != (int)w.size())
         HexException("Incompatible dimensions: [%d x %d] [%d x 1] != [%d x 1].", A.rows(), A.cols(), v.size(), w.size());
+#endif
     
     // get matrix data
     char layout_A = A.layout();
@@ -124,9 +130,11 @@ void blas::gemv (double a, DenseMatrixView<double> const & A, const rArrayView v
 
 void blas::gemv (Complex a, DenseMatrixView<Complex> const & A, const cArrayView v, Complex b, cArrayView w)
 {
+#ifndef NDEBUG
     // verify compatibility of dimensions
-    if (A.cols() != v.size() or A.rows() != w.size())
+    if (A.cols() != (int)v.size() or A.rows() != (int)w.size())
         HexException("Incompatible dimensions: [%d x %d] [%d x 1] != [%d x 1].", A.rows(), A.cols(), v.size(), w.size());
+#endif
     
     // get matrix data
     char layout_A = A.layout();
@@ -142,4 +150,25 @@ void blas::gemv (Complex a, DenseMatrixView<Complex> const & A, const cArrayView
     
     // call the dedicated BLAS routine
     zgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
+}
+
+void blas::xpby (cArrayView x, Complex b, const cArrayView y)
+{
+#ifndef NDEBUG
+    // verify compatibility of dimensions
+    if (x.size() != y.size())
+        HexException("Incompatible dimensions: %d != %d", x.size(), y.size());
+#endif
+    
+    // get length of the arrays
+    std::size_t N = x.size();
+    
+    // get pointers to the data
+    Complex       * const restrict px = x.data();
+    Complex const * const restrict py = y.data();
+    
+    // run the vectorized loop
+    # pragma omp simd
+    for (std::size_t i = 0; i < N; i++)
+        px[i] += b * py[i];
 }

@@ -535,11 +535,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     std::memset(&updates[0], 0, updates.size() * sizeof(Complex));
                     
                     // sum with angular integrals -> f * R * p
-                    # pragma omp parallel for
+                    # pragma omp parallel for schedule (dynamic, 1) // !! no collapse !!
                     for (unsigned ill = 0; ill < Nang; ill++)
                     for (unsigned illp = 0; illp < Nang; illp++)
                     if (ang_.f(ill,illp,lambda) != 0.)
-                        cArrayView(updates, ill * Nspline_proj, Nspline_proj) += ang_.f(ill,illp,lambda) * cArrayView(products, illp * Nspline_proj, Nspline_proj);
+                        blas::xpby(cArrayView(updates, ill * Nspline_proj, Nspline_proj), ang_.f(ill,illp,lambda), cArrayView(products, illp * Nspline_proj, Nspline_proj)); // (not threaded)
                     
                     // update the owned sub-segment
                     # pragma omp parallel for

@@ -41,7 +41,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     for (int ell = 0; ell <= inp.levels; ell++)
     {
-        std::cout << "\t-> [" << ell << "] ";
+        std::cout << "\t- [" << ell << "] ";
         
         // get sum of the angular momenta for this angular level
         int sum = 2 * ell + inp.L + inp.Pi;
@@ -60,6 +60,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
     }
     
     // precompute angular integrals
+    std::cout << "\t- calculating angular integrals ... " << std::flush;
     for (int lambda = 0; lambda <= maxlambda_; lambda++)
     for (unsigned ill = 0; ill < states_.size(); ill++)
     for (unsigned illp = 0; illp < states_.size(); illp++)
@@ -81,7 +82,7 @@ AngularBasis::AngularBasis (InputFile const & inp)
         {
             HexException
             (
-                "Failed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).",
+                "\nFailed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).",
                 lambda,
                 states_[ill].first,
                 states_[ill].second,
@@ -91,4 +92,5 @@ AngularBasis::AngularBasis (InputFile const & inp)
             );
         }
     }
+    std::cout << "ok" << std::endl;
 }

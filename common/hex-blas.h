@@ -81,6 +81,13 @@ namespace blas
         Complex b,
             cArrayView w
     );
+    
+    void xpby
+    (
+        cArrayView x,
+        Complex b,
+        const cArrayView y
+    );
 }
 
 #endif
