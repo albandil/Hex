@@ -432,7 +432,7 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
     {
         // scale the destination vector
         for (int k = 0; k < n; k++)
-            *(pB + k) *= beta;
+            pB[k] *= beta;
         
         // for all rows/cols of the matrix (and of the target vector)
         for (int k = 0; k < n; k++)
@@ -440,12 +440,12 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
             // Direct pass
         
                 for (int l = 0; l < d and k + l < n; l++)
-                    *(pB + k) += *(pM + k * d + l) * alpha * *(pA + k + l);
+                    pB[k] += pM[k * d + l] * alpha * pA[k + l];
         
             // Mirror pass
                 
                 for (int l = 1; l < d and k + l < n; l++)
-                    *(pB + k + l) += *(pM + k * d + l) * alpha * *(pA + k);
+                    pB[k + l] += pM[k * d + l] * alpha * pA[k];
         }
         
         // move on to the next source vector
