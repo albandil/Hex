@@ -137,7 +137,7 @@ template <class T> class ArrayView
             
             return *this;
         }
-    
+        
         /// Element-wise access (non-const).
         T & operator[] (std::size_t i)
         {
@@ -173,7 +173,7 @@ template <class T> class ArrayView
         virtual T * data () { return array_; }
         virtual T const * data () const { return array_; }
         //@}
-    
+        
         //
         // STL-like iterator interface
         //
@@ -206,6 +206,12 @@ template <class T> class ArrayView
         template <class = typename std::enable_if<is_scalar<T>::value>> double norm () const
         {
             return std::sqrt(sqrnorm());
+        }
+        
+        /// Return sub-view.
+        ArrayView<T> slice (std::size_t i, std::size_t j) const
+        {
+            return ArrayView<T>(begin() + i, begin() + j);
         }
 };
 

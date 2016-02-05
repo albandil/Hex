@@ -61,6 +61,12 @@
 // shorthand for std::complex<double>
 typedef std::complex<double> Complex;
 
+// imaginary number literal
+inline Complex operator "" _i (long double x)
+{
+    return Complex(0.,x);
+}
+
 /// Squared modulus of a complex number.
 inline double sqrabs (Complex z)
 {

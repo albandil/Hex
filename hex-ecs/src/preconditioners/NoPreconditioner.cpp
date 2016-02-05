@@ -239,7 +239,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(Complex(0.,1.),l)
+            Complex prefactor = std::pow(1.0_i,l)
                               * std::sqrt(special::constant::two_pi * (2 * l + 1))
                               * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / ki[0];
             
