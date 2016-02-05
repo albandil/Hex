@@ -5,7 +5,7 @@
 
 # ---------------------------------------------------------------------------- #
 # Compiler and linker + flags                                                  #
-#  - Hex-ecs requires compiler with C++11 support (GCC >= 4.8, ICC >= 2015)    #
+#  - Hex-pecs requires compiler with C++11 support (GCC >= 5, ICC >= 2016)     #
 # ---------------------------------------------------------------------------- #
 
 # C++ compiler (g++, clang, ...)
@@ -127,18 +127,18 @@ COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
-# source files specific to hex-ecs
-HEX_ECS_FILES   = ang io main matops numerov os radial
-HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
-HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
-HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))
+# source files specific to hex-pecs
+HEX_PECS_FILES   = ang io main matops numerov os radial
+HEX_PECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
+HEX_PECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-pecs/%.o,$(HEX_PECS_FILES))
+HEX_PECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-pecs/%.dep,$(HEX_PECS_FILES))
 
 # OpenCL kernels
 OCLSOURCES = 
 OCLKERNELS = 
 
 # build all targets
-all: pollversion bin/hex-ecs.$(BASECXX)
+all: pollversion bin/hex-pecs.$(BASECXX)
 
 # dummy target to force update of git revision
 pollversion:
@@ -154,16 +154,16 @@ docclean:
 
 # remove build files
 clean:
-	rm -f bin/hex-ecs bin/hex-ecs.$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_ECS_OBJECTS) $(HEX_ECS_DEPS)
+	rm -f bin/hex-pecs bin/hex-pecs.$(BASECXX) $(COMMON_OBJECTS) $(COMMON_DEPS) $(HEX_PECS_OBJECTS) $(HEX_PECS_DEPS)
 
 # remove everything (build files, documentation and distribution files)
 allclean: clean docclean
 
 # main program target
-bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
+bin/hex-pecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_PECS_OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $(HEX_ECS_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
-	@ln -fs hex-ecs.$(BASECXX) bin/hex-ecs
+	$(CXX) $(HEX_PECS_OBJECTS) $(COMMON_OBJECTS) $(LFLAGS) -o $@
+	@ln -fs hex-pecs.$(BASECXX) bin/hex-pecs
 
 # CL -> INC rule (convert OpenCL sources to C byte array)
 %.inc: %.cl
@@ -173,9 +173,9 @@ bin/hex-ecs.$(BASECXX): $(OCLKERNELS) $(COMMON_OBJECTS) $(HEX_ECS_OBJECTS)
 obj/$(BASECXX)/common/%.o: ../common/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
-obj/$(BASECXX)/hex-ecs/%.o: src/%.cpp
+obj/$(BASECXX)/hex-pecs/%.o: src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 # include generated source dependencied
--include $(COMMON_DEPS) $(HEX_ECS_DEPS)
+-include $(COMMON_DEPS) $(HEX_PECS_DEPS)
