@@ -41,7 +41,7 @@ CommandLine::CommandLine (int argc, char* argv[])
     inputfile = "pecs.inp";
 }
 
-InputFile::InputFile(const CommandLine& cmd)
+InputFile::InputFile (const CommandLine& cmd)
 {
     istates.push_back(HState({ 1, 0, 0 }));
     fstates.push_back(HState({ 1, 0, 0 }));
@@ -51,16 +51,16 @@ InputFile::InputFile(const CommandLine& cmd)
     ecstheta = special::constant::pi_quart;
     rgrid = concatenate
     (
-//         linspace(0.00, 0.20, 21),
-//         linspace(0.26, 2.00, 30),
-//         linspace(2.20, 20.0, 90),
-//         linspace(20.4, 200., 450)
-        linspace(0.,3.,4)
+        linspace(0.00, 0.20, 21),
+        linspace(0.26, 2.00, 30),
+        linspace(2.20, 20.0, 90),
+        linspace(20.4, 200., 450)
+//         linspace(0.,3.,4)
     );
     cgrid = concatenate
     (
-//         linspace(0.1, 2.0, 20),
-//         linspace(2.5, 20.0, 36)
-        linspace(0.,3.,4)
+        linspace(0.1, 2.0, 20),
+        linspace(2.5, 20.0, 36)
+//         linspace(0.,3.,4)
     );
 }

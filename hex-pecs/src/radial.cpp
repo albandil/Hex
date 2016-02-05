@@ -32,14 +32,16 @@
 #include "radial.h"
 
 RadialBasis::RadialBasis (InputFile const & inp)
-
 {
     Complex rotation (std::cos(inp.ecstheta), std::sin(inp.ecstheta));
     
     rgrid = inp.rgrid;
     cgrid = inp.cgrid * rotation;
     
-    std::cout << "Complex rotation: angle = " << inp.ecstheta << ", factor = " << rotation << std::endl;
+    std::cout << "Complex rotation" << std::endl;
+    std::cout << "\tangle = " << inp.ecstheta << " (" << inp.ecstheta * 57.29578 << "°)" << std::endl;
+    std::cout << "\tfactor = " << rotation << std::endl;
+    std::cout << std::endl;
     
     Npts = rgrid.size() + cgrid.size() - 1;
     grid.resize(Npts);

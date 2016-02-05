@@ -145,13 +145,19 @@ namespace matops
     // definition of 'dense_mul_vector' template
     template <class T> void dense_mul_vector (std::size_t M, std::size_t N, T const * restrict A, T const * restrict v, T * restrict w)
     {
+        // erase destination vector
         for (std::size_t i = 0; i < M; i++)
-        {
             w[i] = 0;
-            T const * restrict pA = A + i * N;
+        
+        // for all columns of the dense matrix
+        for (std::size_t j = 0; j < N; j++)
+        {
+            // get column pointer
+            T const * restrict pA = A + j * M;
             
-            for (std::size_t j = 0; j < N; j++)
-                w[i] += pA[j] * v[j];
+            // for all elements of the column: update elements of the destination vector
+            for (std::size_t i = 0; i < M; i++)
+                w[i] += pA[i] * v[j];
         }
     }
 

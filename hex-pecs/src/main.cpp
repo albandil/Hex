@@ -59,7 +59,7 @@ namespace debug
             for (unsigned j = 0; j < cols; j++)
             {
                 if (std::max(i,j) - std::min(i,j) <= Ndiag)
-                    os << M[i * (2*Ndiag + 1) + j + Ndiag - i].real() << " ";
+                    os << M[i * (2*Ndiag + 1) + j + Ndiag - i] << " ";
                 else
                     os << "0 ";
             }
@@ -76,7 +76,7 @@ namespace debug
         {
             os << "    [ ";
             for (unsigned j = 0; j < cols; j++)
-                os << M[i * cols + j].real() << " ";
+                os << M[i * cols + j] << " ";
             os << "]" << std::endl;
         }
     }
@@ -90,7 +90,7 @@ namespace debug
         {
             os << "    [ ";
             for (unsigned j = 0; j < cols; j++)
-                os << M[i + j * rows].real() << " ";
+                os << M[i + j * rows] << " ";
             os << "]" << std::endl;
         }
     }
@@ -180,15 +180,12 @@ int main (int argc, char * argv[])
             // calculate the Numerov matrices
             std::cout << "  - calculate A-matrix" << std::endl;
             num.A(icol, A); // dim: Nang*i x Nang*(i-1)
-//             debug::write_banded(std::cout, icol, icol - 1, 1, A);
             
             std::cout << "  - calculate B-matrix" << std::endl;
             num.B(icol, B); // dim: Nang*i x Nang*i
-//             debug::write_banded(std::cout, icol, icol, 1, B);
             
             std::cout << "  - calculate C-matrix" << std::endl;
             num.C(icol, C); // dim: Nang*i x Nang*(i+1)
-//             debug::write_banded(std::cout, icol, icol + 1, 1, C);
             
             // check that [iknot]/BLU.bin exists
             if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
@@ -197,17 +194,14 @@ int main (int argc, char * argv[])
                 // A * D -> M, dim: Nang*i x Nang*i
                 std::cout << "  - multiply A * D -> M" << std::endl;
                 matops::blockband_mul_dense(Nang, icol, icol - 1, icol, 1, A, D, BLU);
-//                 debug::write_dense_rows(std::cout, icol, icol, BLU);
                 
                 // M + B -> M
                 std::cout << "  - add (A * D) + B -> M" << std::endl;
                 matops::dense_add_blockband(Nang, icol, 1, BLU, B);
-//                 debug::write_dense_rows(std::cout, icol, icol, BLU);
                 
                 // LU-factorize M -> BLU
                 std::cout << "  - LU-factorization of M" << std::endl;
                 matops::dense_LU_factor(Nang * icol, BLU, pivots);
-//                 debug::write_dense_rows(std::cout, icol, icol, BLU);
                 
                 // save factorization to disk
                 std::cout << "  - save LU to disk" << std::endl;
@@ -218,16 +212,11 @@ int main (int argc, char * argv[])
             // update D, = -B^{-1} C
             std::cout << "  - solve B D = C for D" << std::endl;
             matops::dense_LU_solve_blockband(Nang, icol, icol + 1, 1, BLU, pivots, C, D, V);
-//             debug::write_dense_cols(std::cout, icol, icol + 1, D);
             
             std::cout << "  - flip sign of D" << std::endl;
             matops::flip_sign(Nang * icol * Nang * (icol + 1), D);
-//             debug::write_dense_cols(std::cout, icol, icol + 1, D);
             
             std::cout << std::endl;
-            
-//             if (icol == 10)
-//                 std::exit(0);
         }
     }
     
@@ -244,7 +233,6 @@ int main (int argc, char * argv[])
             // calculate the Numerov matrices
             std::cout << "  - calculate A-matrix" << std::endl;
             num.A(icol, A);
-//             debug::write_banded(std::cout, icol, icol - 1, 1, A);
             
             // load inverted B
             if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
@@ -258,32 +246,25 @@ int main (int argc, char * argv[])
                 // calculate the constant vector
                 std::cout << "  - calculate F-vector" << std::endl;
                 num.F(icol, F, istate);
-//                 debug::write_dense_rows(std::cout, 1, Nang * icol, F);
                 matops::save(F, Nang * icol, format("%d/F-%d.bin", icol, istate));
                 
                 // A * E -> V
                 std::cout << "  - multiply A * E -> V" << std::endl;
                 matops::blockband_mul_vector(Nang, icol, icol - 1, 1, A, E, V);
-//                 debug::write_dense_rows(std::cout, 1, Nang * icol, V);
                 
                 // F - (A * E)  ->  V
                 std::cout << "  - subtract F - V -> V" << std::endl;
                 matops::subtract(Nang * icol, F, V, V);
-//                 debug::write_dense_rows(std::cout, 1, Nang * icol, V);
                 
                 // B^{-1} (F - (A * E))  ->  E
                 std::cout << "  - solve B^{-1} V -> E" << std::endl;
                 matops::dense_LU_solve_vector(Nang * icol, BLU, pivots, V, E);
-//                 debug::write_dense_rows(std::cout, 1, Nang * icol, E);
                 
                 // save to disk
                 matops::save(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
             }
             
             std::cout << std::endl;
-            
-//             if (icol == 10)
-//                 std::exit(0);
         }
     }
     
@@ -308,7 +289,6 @@ int main (int argc, char * argv[])
             // update D, = -B^{-1} C
             std::cout << "  - solve B D = C for D" << std::endl;
             matops::dense_LU_solve_blockband(Nang, icol, icol + 1, 1, BLU, pivots, C, D, V);
-//             debug::write_dense_cols(std::cout, Nang * icol, Nang * (icol + 1), D);
             
             std::cout << "  - flip sign of D" << std::endl;
             matops::flip_sign(Nang * icol * Nang * (icol + 1), D);
@@ -329,12 +309,10 @@ int main (int argc, char * argv[])
                 // D * psi  ->  V
                 std::cout << "  - multiply D * psi -> V" << std::endl;
                 matops::dense_mul_vector(Nang * icol, Nang * (icol + 1), D, psi, V);
-//                 std::cout << "V = " << cArrayView(Nang * (icol + 1), V) << std::endl;
                 
                 // (D * psi) + E  ->  psi
                 std::cout << "  - add V + E -> psi" << std::endl;
                 matops::sum(Nang * icol, V, E, psi);
-//                 std::cout << "psi = " << cArrayView(Nang * icol, psi) << std::endl;
                 
                 // save psi
                 matops::save(psi, Nang * icol, format("%d/psi-%d.bin", icol, istate));

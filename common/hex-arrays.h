@@ -1702,7 +1702,7 @@ template <typename T> NumberArray<T> geomspace (T x0, T x1, std::size_t samples,
 template <class T> void write_array
 (
     const ArrayView<T> array,
-    const char* filename
+    std::string filename
 );
 
 /**
@@ -1716,7 +1716,7 @@ template <class T1, class T2> void write_array
 (
     const ArrayView<T1> grid,
     const ArrayView<T2> array,
-    const char* filename
+    std::string filename
 );
 
 /**
@@ -1725,7 +1725,7 @@ template <class T1, class T2> void write_array
  * For all integers from 0 to m-1 call fetch(i) and save the results to
  * a text file as a single column.
  */
-template <typename Fetcher> bool write_1D_data (std::size_t m, const char* filename, Fetcher fetch)
+template <typename Fetcher> bool write_1D_data (std::size_t m, std::string filename, Fetcher fetch)
 {
     std::ofstream f(filename);
     
@@ -1753,7 +1753,7 @@ template <typename Fetcher> bool write_1D_data (std::size_t m, const char* filen
           @endcode
  * @return Write success indicator (@c false for failure).
  */
-template <class Fetcher> bool write_2D_data (std::size_t m, std::size_t n, const char* filename, Fetcher fetch)
+template <class Fetcher> bool write_2D_data (std::size_t m, std::size_t n, std::string filename, Fetcher fetch)
 {
     std::ofstream f(filename);
     

@@ -30,6 +30,7 @@
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
 #include <iostream>
+#include <vector>
 
 #include "hex-arrays.h"
 #include "hex-hdffile.h"
@@ -38,7 +39,8 @@
 int main (int argc, char *argv[])
 {
     bool cpx = false;    // whether to write complex expansion
-    std::string hdf;
+    std::string dataset; // which dataset
+    std::string filename;
     
     for (int iarg = 1; iarg < argc; iarg++)
     {
@@ -46,26 +48,63 @@ int main (int argc, char *argv[])
         {
             cpx = true;
         }
-        else if (hdf.empty())
+        if (strcmp(argv[iarg],"--dataset") == 0)
         {
-            hdf = std::string(argv[iarg]);
+            dataset = argv[++iarg];
+        }
+        else if (filename.empty())
+        {
+            filename = std::string(argv[iarg]);
         }
         else
             break;
     }
     
-    if (argc < 2 or hdf.empty())
+    if (argc < 2 or filename.empty())
     {
-        std::cout << "\nUsage:\n\t./hdf2txt [--complex] <HDFfile>\n\n";
+        std::cout << "\nUsage:\n\t./hdf2txt [--complex] <datafile>\n\n";
         std::exit(EXIT_SUCCESS);
+    }
+    
+    if (not dataset.empty())
+    {
+        HDFFile hdf (filename, HDFFile::readonly);
+        if (not hdf.valid())
+            HexException("Invalid filename \"%s\".", filename.c_str());
+        
+        std::vector<HDFFile::DatasetInfo>::const_iterator iter = std::find_if
+        (
+            hdf.datasets().begin(),
+            hdf.datasets().end(),
+            [&](HDFFile::DatasetInfo const & info) { return info.name == dataset; }
+        );
+        
+        if (iter == hdf.datasets().end())
+            HexException("No dataset \"%s\" in \"%s\".", dataset.c_str(), filename.c_str());
+        
+        if (iter->datatype == DataDouble64 and not cpx)
+        {
+            rArray array (iter->elements);
+            hdf.read(dataset, &array[0], array.size());
+            write_array(array, filename + ".txt");
+        }
+        
+        if (iter->datatype == DataDouble64 and cpx)
+        {
+            cArray array (iter->elements / 2);
+            hdf.read(dataset, &array[0], array.size());
+            write_array(array, filename + ".txt");
+        }
+        
+        return EXIT_SUCCESS;
     }
     
     if (cpx)
     {
         // read HDF file
         cArray a;
-        a.hdfload(hdf);
-    
+        a.hdfload(filename);
+        
         // write raw data
         for (int i = 0; i < a.size(); i++)
             std::cout << a[i] << "\n";
@@ -74,8 +113,8 @@ int main (int argc, char *argv[])
     {
         // read HDF file
         rArray a;
-        a.hdfload(hdf);
-    
+        a.hdfload(filename);
+        
         // write raw data
         for (int i = 0; i < a.size(); i++)
             std::cout << a[i] << "\n";

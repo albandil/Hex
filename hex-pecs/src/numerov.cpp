@@ -67,19 +67,15 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
             v[m * i + (j - 1)] = 0.;
             
             // get mesh parameters
-            double h = rad_.rgrid[i] - rad_.rgrid[i-1];
-            double t = rad_.rgrid[j] - rad_.rgrid[j-1];
-            double alpha = (rad_.rgrid[i+1] - rad_.rgrid[i]) / h;
-            double beta  = (rad_.rgrid[j+1] - rad_.rgrid[j]) / t;
+            Complex h = rad_.grid[i] - rad_.grid[i-1];
+            Complex t = rad_.grid[j] - rad_.grid[j-1];
+            Complex alpha = (rad_.grid[i+1] - rad_.grid[i]) / h;
+            Complex beta  = (rad_.grid[j+1] - rad_.grid[j]) / t;
             
             // for all neighbours to sum
-            for (std::size_t k = std::max<std::size_t>(1, i - 1); k <= i + 1 and k < rad_.rgrid.size(); k++)
-            for (std::size_t l = std::max<std::size_t>(1, j - 1); l <= j + 1 and l < rad_.rgrid.size(); l++)
+            for (std::size_t k = std::max<std::size_t>(1, i - 1); k <= i + 1 and k + 1 < rad_.rgrid.size(); k++)
+            for (std::size_t l = std::max<std::size_t>(1, j - 1); l <= j + 1 and l + 1 < rad_.rgrid.size(); l++)
             {
-                // get Numerov discretization coefficients
-                double Bik = coef_B(i, k, h, alpha, l1);
-                double Djl = coef_B(j, l, t, beta,  l2);
-                
                 // radial coordinates
                 double r1 = rad_.rgrid[k];
                 double r2 = rad_.rgrid[l];
@@ -87,6 +83,12 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                 // smaller and larger radial coordinate (sorted by real part)
                 double rmin = std::min(r1, r2, Complex_realpart_less);
                 double rmax = std::max(r1, r2, Complex_realpart_less);
+                
+                // get Numerov discretization coefficients
+                Complex Bik = coef_B(i, k, h, alpha, l1);
+                Complex Djl = coef_B(j, l, t, beta,  l2);
+                
+//                 std::cout << "i = " << i << ", j = " << j << ", k = " << k << ", l = " << l << ", alpha = " << alpha << ", Bik = " << Bik << ", Djl = " << Djl << std::endl;
                 
                 // evaluate the right-hand side at (r1,r2)
                 for (unsigned ell = 0; ell <= ang_.maxell(); ell++)
@@ -138,8 +140,10 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                     // add prefactor
                     chikl *= std::sqrt(special::constant::two_pi * (2*ell+1)) / ki * special::ClebschGordan(li,mi,ell,0,L,mi) * special::pow_int(1.0_i, ell);
                     
+//                     std::cout << "chikl[" << k << "," << l << "] = " << chikl << std::endl;
+                    
                     // update the vector
-                    v[m * i + (j - 1)] += h*h*t*t*Bik*Djl*chikl;
+                    v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl;
                 }
             }
         }
