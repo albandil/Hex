@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 20156 Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -88,22 +88,20 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                 Complex Bik = coef_B(i, k, h, alpha, l1);
                 Complex Djl = coef_B(j, l, t, beta,  l2);
                 
-//                 std::cout << "i = " << i << ", j = " << j << ", k = " << k << ", l = " << l << ", alpha = " << alpha << ", Bik = " << Bik << ", Djl = " << Djl << std::endl;
-                
                 // evaluate the right-hand side at (r1,r2)
                 for (unsigned ell = 0; ell <= ang_.maxell(); ell++)
                 {
                     // initial state quantum numbers
-                    unsigned ni = inp_.istates[istate].ni;
-                    unsigned li = inp_.istates[istate].li;
-                    int      mi = inp_.istates[istate].mi;
+                    unsigned ni = inp_.istates[istate].n;
+                    unsigned li = inp_.istates[istate].l;
+                    int      mi = inp_.istates[istate].m;
                     
                     // impact momentum
                     double ki = std::sqrt(inp_.Etot + 1./(ni*ni));
                     
                     // total angular parameters
-                    int S  = inp_.S;
                     int L  = inp_.L;
+                    int S  = inp_.S;
                     int Pi = inp_.Pi;
                     
                     // symmetry sign
@@ -140,13 +138,113 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                     // add prefactor
                     chikl *= std::sqrt(special::constant::two_pi * (2*ell+1)) / ki * special::ClebschGordan(li,mi,ell,0,L,mi) * special::pow_int(1.0_i, ell);
                     
-//                     std::cout << "chikl[" << k << "," << l << "] = " << chikl << std::endl;
-                    
                     // update the vector
                     v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl;
                 }
             }
         }
+    }
+}
+
+void Numerov2d::mask
+(
+    int term, int s,
+    unsigned int l1, unsigned int l2, std::size_t i, std::size_t j,
+    std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> & mask
+) const
+{
+    // erase the mask
+    std::fill(mask.begin(), mask.end(), std::make_tuple(0,0,0,0,0));
+    
+    // are we far enough from the i = j diagonal?
+    if (i > j + 1)
+    {
+        //   A  B  C
+        //   A  B  C
+        //   A  B  C
+        
+        if (term == -1) // A
+        {
+            mask[0] = std::make_tuple(1,l1,l2,i-1,j-1);
+            mask[1] = std::make_tuple(1,l1,l2,i-1,j  );
+            mask[2] = std::make_tuple(1,l1,l2,i-1,j+1);
+        }
+        else if (term == 0) // B
+        {
+            mask[3] = std::make_tuple(1,l1,l2,i  ,j-1);
+            mask[4] = std::make_tuple(1,l1,l2,i  ,j  );
+            mask[5] = std::make_tuple(1,l1,l2,i  ,j+1);
+        }
+        else if (term == +1) // C
+        {
+            mask[6] = std::make_tuple(1,l1,l2,i+1,j-1);
+            mask[7] = std::make_tuple(1,l1,l2,i+1,j  );
+            mask[8] = std::make_tuple(1,l1,l2,i+1,j+1);
+        }
+    }
+    
+    // are just below the i = j diagonal?
+    else if (i == j + 1)
+    {
+        //   B* B  C
+        //   A  B  C
+        //   A  B  C
+        
+        if (term == -1) // A
+        {
+            mask[0] = std::make_tuple(1,l1,l2,i-1,j-1);
+            mask[1] = std::make_tuple(1,l1,l2,i-1,j  );
+        }
+        else if (term == 0) // B
+        {
+            mask[2] = std::make_tuple(s,l2,l1,i  ,j  ); // symmetry
+            
+            mask[3] = std::make_tuple(1,l1,l2,i  ,j-1);
+            mask[4] = std::make_tuple(1,l1,l2,i  ,j  );
+            mask[5] = std::make_tuple(1,l1,l2,i  ,j+1);
+        }
+        else if (term == +1) // C
+        {
+            mask[6] = std::make_tuple(1,l1,l2,i+1,j-1);
+            mask[7] = std::make_tuple(1,l1,l2,i+1,j  );
+            mask[8] = std::make_tuple(1,l1,l2,i+1,j+1);
+        }
+    }
+    
+    // are we right at the i = j diagonal?
+    else if (i == j)
+    {
+        //   C* C* C
+        //   B* B  C
+        //   A  B  C
+        
+        if (term == -1) // A
+        {
+            mask[0] = std::make_tuple(1,l1,l2,i-1,j-1);
+        }
+        else if (term == 0) // B
+        {
+            mask[1] = std::make_tuple(s,l2,l1,i  ,j-1); // symmetry
+            
+            mask[3] = std::make_tuple(1,l1,l2,i  ,j-1);
+            mask[4] = std::make_tuple(1,l1,l2,i  ,j  );
+        }
+        else if (term == +1) // C
+        {
+            mask[2] = std::make_tuple(s,l2,l1,i+1,j-1); // symmetry
+            
+            mask[5] = std::make_tuple(s,l2,l1,i+1,j  ); // symmetry
+            
+            mask[6] = std::make_tuple(1,l1,l2,i+1,j-1);
+            mask[7] = std::make_tuple(1,l1,l2,i+1,j  );
+            mask[8] = std::make_tuple(1,l1,l2,i+1,j+1);
+        }
+    }
+    
+    // there is no other option...
+    else
+    {
+        HexException("Runtime error.");
     }
 }
 
@@ -156,87 +254,98 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
     if (i == 0 and term < 0)
         return;
     
-    // number of blocks
+    // number of blocks and their volume
     std::size_t Nang = ang_.size();
+    std::size_t block_vol = i * 3;
     
-    // number of rows and columns of a block in this matrix
-    std::size_t Nrows = i;
-    std::size_t Ncols = i + term;
+    // erase output array
+    std::memset(M, 0, Nang * Nang * block_vol * sizeof(Complex));
     
-    // expand the other index
-    std::size_t k = i + term;
+    // discretization scheme mask
+    std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> msk;
     
-    // number of elements in every block
-    std::size_t block_vol = Nrows * 3;
+    // symmetry factor
+    int s = ((inp_.S + inp_.Pi) % 2 == 0 ? 1 : -1);
     
-    // for all blocks
+    // for all angular momentum blocks
     for (std::size_t m = 0; m < Nang; m++)
     for (std::size_t n = 0; n < Nang; n++)
     {
-        // get block pointer
-        Complex * pM = M + (m * Nang + n) * block_vol;
-        
-        // get row angular momenta
+        // get angular momenta
         unsigned l1 = ang_.state(m).first;
         unsigned l2 = ang_.state(m).second;
+        unsigned l1p= ang_.state(n).first;
+        unsigned l2p= ang_.state(n).second;
         
-        // for all elements in the block
-        for (std::size_t j = 1; j <= Nrows and j < rad_.Npts; j++)
+        // for all grid points in the current (i-th) grid column, skip j = 0 (zero bc)
+        for (std::size_t j = 1; j <= i; j++)
         {
-        for (std::size_t l = std::max<std::size_t>(1, j - 1); l <= j + 1 and l <= Ncols and l < rad_.Npts; l++)
-        {
-            // erase any previous elements
-            pM[(j - 1) * 3 + (l + 1 - j)] = 0;
-            
-            // skip the rest if out of grid
-            if (k >= rad_.Npts)
-                continue;
-            
-            // get mesh parameters
+            // get mesh parameters for this central point (i,j)
             Complex h = rad_.grid[i] - rad_.grid[i-1];
             Complex t = rad_.grid[j] - rad_.grid[j-1];
             Complex alpha = (rad_.grid[i+1] - rad_.grid[i]) / h;
             Complex beta  = (rad_.grid[j+1] - rad_.grid[j]) / t;
             
-            // get Numerov discretization coefficients
-            Complex Aik = coef_A(i, k, h, alpha, l1);
-            Complex Bik = coef_B(i, k, h, alpha, l1);
-            Complex Cjl = coef_A(j, l, t, beta,  l2);
-            Complex Djl = coef_B(j, l, t, beta,  l2);
+            // get discretization scheme mask for this central point (i,j)
+            mask(term, s, l1p, l2p, i, j, msk);
             
-//             std::cout << "i = " << i << ", j = " << j << ", k = " << k << ", l = " << l << std::endl;
-//             std::cout << "    r[" << i << "] = " << rad_.grid[i] << ", r[" << j << "] = " << rad_.grid[j] << ", r[" << k << "] = " << rad_.grid[k] << ", r[" << l << "] = " << rad_.grid[l] << std::endl;
-//             std::cout << "    h = " << h << ", alpha = " << alpha << ", t = " << t << ", beta = " << beta << std::endl;
-//             std::cout << "    Aik = " << Aik << ", Bik = " << Bik << ", Cjl = " << Cjl << ", Djl = " << Djl << std::endl;
-            
-            // calculate two-electron part
-            for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0.)
+            // for all nine points in neighbourhood
+            for (int ip = -1; ip <= 1; ip++)
+            for (int jp = -1; jp <= 1; jp++)
             {
-                double rmin = std::min(rad_.grid[k].real(), rad_.grid[l].real());
-                double rmax = std::max(rad_.grid[k].real(), rad_.grid[l].real());
-                pM[(j - 1) * 3 + (l + 1 - j)] -= h*h*t*t*Bik*Djl * ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda) / rmax;
-            }
-            
-//             std::cout << "    E = " << inp_.Etot << std::endl;
-//             std::cout << "    tD1: " << 0.5*h*h*Bik*Cjl << std::endl;
-//             std::cout << "    tD2: " << 0.5*t*t*Aik*Djl << std::endl;
-//             std::cout << "    tE : " << h*h*t*t*Bik*Djl*inp_.Etot << std::endl;
-            
-            // calculate one-electron (diagoanl) part, if any
-            if (m == n)
-            {
-                // calculate potential
-                Complex Vkl = 0.;
-                if (k > 0) Vkl += 0.5 * l1 * (l1 + 1) / (rad_.grid[k].real() * rad_.grid[k].real()) - inp_.Z / rad_.grid[k].real();
-                if (l > 0) Vkl += 0.5 * l2 * (l2 + 1) / (rad_.grid[l].real() * rad_.grid[l].real()) - inp_.Z / rad_.grid[l].real();
+                // get point position
+                std::size_t k = i + ip;
+                std::size_t l = j + jp;
                 
-                // update element
-                pM[(j - 1) * 3 + (l + 1 - j)] += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*(inp_.Etot - Vkl);
+                // get (k,l) neighbour symmetry info ('ks' is always just 'i + term')
+                int signs; unsigned l1s, l2s; std::size_t ks, ls;
+                std::tie(signs,l1s,l2s,ks,ls) = msk[(ip + 1) * 3 + (jp + 1)];
+                unsigned ns = ang_.index(l1p,l2p);
+                
+                // skip this neighbour point (k,l) if it is not coupled to the current central element (i,j) through the matrix selected by 'term'
+                if (signs == 0)
+                    continue;
+                
+                // skip this neighbour point if it lies on the (zero) boundary
+                if (k == 0 or l == 0 or /* k == rad_.Npts - 1 or */ l == rad_.Npts - 1)
+                    continue;
+                
+                // get Numerov discretization coefficients for the position (i,j,k,l)
+                Complex Aik = coef_A(i, k, h, alpha, l1);
+                Complex Bik = coef_B(i, k, h, alpha, l1);
+                Complex Cjl = coef_A(j, l, t, beta,  l2);
+                Complex Djl = coef_B(j, l, t, beta,  l2);
+                
+//                 std::cout << "i = " << i << ", j = " << j << ", k = " << k << ", l = " << l << "; ks = " << ks << ", ls = " << ls << std::endl;
+//                 std::cout << "\th = " << h << ", t = " << t << ", alpha = " << alpha << ", beta = " << beta << std::endl;
+//                 std::cout << "\tAik = " << Aik << ", Bik = " << Bik << ", Cjl = " << Cjl << ", Djl = " << Djl << std::endl;
+                
+                // matrix element
+                Complex el = 0;
+                
+                // calculate two-electron part
+                for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0.)
+                {
+                    double rmin = std::min(rad_.grid[k].real(), rad_.grid[l].real());
+                    double rmax = std::max(rad_.grid[k].real(), rad_.grid[l].real());
+                    el -= h*h*t*t*Bik*Djl * ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda) / rmax;
+                }
+                
+                // calculate one-electron (diagoanl) part, if any
+                if (m == n)
+                {
+                    // calculate potential
+                    Complex Vkl = 0.;
+                    if (k > 0) Vkl += 0.5 * l1 * (l1 + 1) / (rad_.grid[k].real() * rad_.grid[k].real()) - inp_.Z / rad_.grid[k].real();
+                    if (l > 0) Vkl += 0.5 * l2 * (l2 + 1) / (rad_.grid[l].real() * rad_.grid[l].real()) - inp_.Z / rad_.grid[l].real();
+                    
+                    // update element
+                    el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*(0.5*inp_.Etot - Vkl);
+                }
+                
+                // update matrix element
+                M[(m * Nang + ns) * block_vol + (j - 1) * 3 + (ls + 1 - j)] += double(signs) * el;
             }
-            
-        }
-//             std::cout << pM[0] << " " << pM[1] << " " << pM[2] << std::endl;
-//             std::exit(0);
         }
     }
 }

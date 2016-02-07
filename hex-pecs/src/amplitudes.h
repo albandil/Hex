@@ -29,86 +29,20 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
+#ifndef HEX_PECS_AMPLITUDES_H
+#define HEX_PECS_AMPLITUDES_H
+
 #include "ang.h"
+#include "io.h"
+#include "radial.h"
 
-AngularBasis::AngularBasis (InputFile const & inp)
-    : L_(inp.L), S_(0), Pi_(inp.Pi), nL_(inp.nL), maxlambda_(inp.L + 2 * inp.nL), maxell_(nL_ + L_ + Pi_)
-{
-    std::cout << "Setting up the coupled angular states..." << std::endl;
-    
-    // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
-    for (int ell = 0; ell <= inp.nL; ell++)
-    {
-        std::cout << "\t- [" << ell << "] ";
-        
-        // get sum of the angular momenta for this angular level
-        int sum = 2 * ell + inp.L + inp.Pi;
-        
-        // for all angular momentum pairs that do compose L
-        for (int l1 = ell; l1 <= sum - ell; l1++)
-        {
-            int l2 = sum - l1;
-            if (std::abs(l1 - l2) <= inp.L and inp.L <= l1 + l2)
-            {
-                std::cout << "(" << l1 << "," << l2 << ") ";
-                states_.push_back(std::make_pair(l1, l2));
-            }
-        }
-        std::cout << std::endl;
-    }
-    
-    // precompute angular integrals
-    std::cout << "\t- calculating angular integrals ... " << std::flush;
-    for (unsigned lambda = 0; lambda <= maxlambda_; lambda++)
-    for (unsigned ill = 0; ill < states_.size(); ill++)
-    for (unsigned illp = 0; illp < states_.size(); illp++)
-    {
-        f_.push_back
-        (
-            special::computef
-            (
-                lambda,
-                states_[ill].first,
-                states_[ill].second,
-                states_[illp].first,
-                states_[illp].second,
-                L_
-            )
-        );
-        
-        if (not std::isfinite(f_.back()))
-        {
-            HexException
-            (
-                "\nFailed to evaluate the angular integral f[%d](%d,%d,%d,%d;%d).",
-                lambda,
-                states_[ill].first,
-                states_[ill].second,
-                states_[illp].first,
-                states_[illp].second,
-                L_
-            );
-        }
-    }
-    std::cout << "ok" << std::endl << std::endl;;
-}
+void extract
+(
+    CommandLine const & cmd,
+    InputFile const & inp,
+    AngularBasis const & ang,
+    RadialBasis const & rad,
+    Complex const * psi
+);
 
-double AngularBasis::f (int lambda, int ill, int illp) const
-{
-    return f_[(lambda * states_.size() + ill) * states_.size() + illp];
-}
-
-unsigned AngularBasis::index (int l1, int l2) const
-{
-    return std::find(states_.begin(), states_.end(), std::make_pair(l1,l2)) - states_.begin();
-}
-
-double AngularBasis::f (int lambda, int l1, int l2, int l1p, int l2p) const
-{
-    // find the matching angular states
-    unsigned m = index(l1,l2);
-    unsigned n = index(l1p,l2p);
-    
-    // call the other getter
-    return f(lambda, m, n);
-}
+#endif

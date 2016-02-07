@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -52,6 +52,9 @@ class AngularBasis
         /// Angular integrals.
         double f (int lambda, int ill, int illp) const;
         double f (int lambda, int l1, int l2, int l1p, int l2p) const;
+        
+        /// Get index of a specific angular momentum state.
+        unsigned index (int l1, int l2) const;
         
         /// Highest multipole.
         unsigned maxlambda () const { return maxlambda_; }

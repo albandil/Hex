@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -172,28 +172,28 @@ void writeVTK_points
     out << "Z_COORDINATES " << nz << " float" << std::endl;
     out << to_string(zgrid) << std::endl;
     
-    if (ev.size() == N)
+    for (std::size_t iblock = 0; (iblock + 1) * N <= ev.size(); iblock++)
     {
         out << "POINT_DATA " << N << std::endl;
         out << "FIELD wavefunction 2" << std::endl;
         
         // save real part
-        out << "Re 1 " << N << " float" << std::endl;
+        out << "block_" << iblock << "_re 1 " << N << " float" << std::endl;
         for (unsigned i = 0; i < nx; i++)
         {
             for (unsigned j = 0; j < ny; j++)
             for (unsigned k = 0; k < nz; k++)
-                out << ev[(i * ny + j) * nz + k].real() << " ";
+                out << ev[((iblock * nx + i) * ny + j) * nz + k].real() << " ";
             out << std::endl;
         }
         
         // save imaginary part
-        out << "Im 1 " << N << " float" << std::endl;
+        out << "block_" << iblock << "_im 1 " << N << " float" << std::endl;
         for (unsigned i = 0; i < nx; i++)
         {
             for (unsigned j = 0; j < ny; j++)
             for (unsigned k = 0; k < nz; k++)
-                out << ev[(i * ny + j) * nz + k].imag() << " ";
+                out << ev[((iblock * nx + i) * ny + j) * nz + k].imag() << " ";
             out << std::endl;
         }
     }

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -258,7 +258,7 @@ double getSturmFar (int n, int l, double lambda, double eps, int max_steps)
     return 0.5 * (near + far);
 }
 
-double P (unsigned n, unsigned l, double r)
+double P (unsigned n, unsigned l, double r, double Z)
 {
     // bound orbital is a regular solution
     if (r == 0.)
@@ -266,7 +266,7 @@ double P (unsigned n, unsigned l, double r)
     
     // compute the radial function by GSL
     gsl_sf_result R;
-    int err = gsl_sf_hydrogenicR_e(n, l, 1, r, &R);
+    int err = gsl_sf_hydrogenicR_e(n, l, Z, r, &R);
     
     // silent underflows -> zero
     if (err == GSL_EUNDRFLW)
@@ -279,8 +279,8 @@ double P (unsigned n, unsigned l, double r)
     {
         HexException
         (
-            "Unable to evaluate the hydrogen radial function for n = %d, l = %d, r = %g (\"%s\").",
-            n, l, r, gsl_strerror(err)
+            "Unable to evaluate the hydrogen radial function for Z = %g, n = %d, l = %d, r = %g (\"%s\").",
+            Z, n, l, r, gsl_strerror(err)
         );
     }
     

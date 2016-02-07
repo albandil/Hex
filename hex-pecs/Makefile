@@ -28,40 +28,10 @@ LFLAGS = -fopenmp -lstdc++
 # ---------------------------------------------------------------------------- #
 
 BLASLAPACKFLAGS = 
-BLASLAPACKLIBS = -lblas -llapack
+BLASLAPACKLIBS = -llapack
 
 # BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
 # BLASLAPACKLIBS = -lopenblas
-
-# ---------------------------------------------------------------------------- #
-# SuiteSparse/UMFPACK                                                          #
-#  - needed for sparse matrix manipulation                                     #
-#  - default choice for LU factorization (e.g. in ILU preconditioner)          #
-#  - supports both LP64 (32-bit integer) and ILP64 (64-bit integer)            #
-#  - already the factorization of moderate matrices requires ILP64, so         #
-#    the flag -D_LONGINT is included by default                                #
-# ---------------------------------------------------------------------------- #
-
-SUITESPARSEFLAGS = -DWITH_UMFPACK -D_LONGINT
-SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
-
-# ---------------------------------------------------------------------------- #
-# Other LU factorization libraries                                             #
-#  - these are optional                                                        #
-#  - use only one at a time                                                    #
-# ---------------------------------------------------------------------------- #
-
-# - sequential SuperLU with only 32-bit integer support
-# SUPERLUFLAGS = -DWITH_SUPERLU -U_LONGINT
-# SUPERLULIBS = -lsuperlu
-
-# - distributed SuperLU + Metis compiled with 32-bit integer (LP64 mode)
-# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -U_LONGINT
-# SUPERLUDISTLIBS = -lsuperlu_dist_lp64 -lmetis_lp64
-
-# - distributed SuperLU + Metis compiled with 64-bit integer (ILP64 mode)
-# SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -D_LONGINT
-# SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lmetis_ilp64
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
@@ -121,14 +91,14 @@ endif
 BASECXX = $(shell basename $(CXX))
 
 # common source files
-COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-luft hex-matrix \
+COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen \
                  hex-misc hex-special hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-pecs
-HEX_PECS_FILES   = ang io main matops numerov os radial
+HEX_PECS_FILES   = amplitudes ang io main matops numerov os radial
 HEX_PECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
 HEX_PECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-pecs/%.o,$(HEX_PECS_FILES))
 HEX_PECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-pecs/%.dep,$(HEX_PECS_FILES))

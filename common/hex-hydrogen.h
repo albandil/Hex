@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -133,7 +133,7 @@ std::string stateRName (int n, int l, int two_j, int two_m);
  *     P_{nl}(r) = r R_{nl}(r) \ .
  * @f]
  */
-double P (unsigned n, unsigned l, double r);
+double P (unsigned n, unsigned l, double r, double Z = 1);
 
 /**
  * @brief Get last node of the bound radial wave function.

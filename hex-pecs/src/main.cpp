@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -37,6 +37,7 @@
 #include "hex-special.h"
 #include "hex-version.h"
 
+#include "amplitudes.h"
 #include "ang.h"
 #include "io.h"
 #include "matops.h"
@@ -165,7 +166,7 @@ int main (int argc, char * argv[])
         int * pivots = new int [Nang * Npts];
     
     //
-    // Forward pass : construction of propagation matrices.
+    // Forward pass A : construction of propagation matrices.
     //
     
     if (cmd.forward_grid)
@@ -180,12 +181,15 @@ int main (int argc, char * argv[])
             // calculate the Numerov matrices
             std::cout << "  - calculate A-matrix" << std::endl;
             num.A(icol, A); // dim: Nang*i x Nang*(i-1)
+//             debug::write_banded(std::cout, icol, icol-1, 1, A);
             
             std::cout << "  - calculate B-matrix" << std::endl;
             num.B(icol, B); // dim: Nang*i x Nang*i
+//             debug::write_banded(std::cout, icol, icol, 1, B);
             
             std::cout << "  - calculate C-matrix" << std::endl;
             num.C(icol, C); // dim: Nang*i x Nang*(i+1)
+//             debug::write_banded(std::cout, icol, icol+1, 1, C);
             
             // check that [iknot]/BLU.bin exists
             if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
@@ -221,7 +225,7 @@ int main (int argc, char * argv[])
     }
     
     //
-    // Forward pass : construction of constant vectors.
+    // Forward pass B : construction of constant vectors.
     //
     
     if (cmd.forward_states)
@@ -247,6 +251,7 @@ int main (int argc, char * argv[])
                 std::cout << "  - calculate F-vector" << std::endl;
                 num.F(icol, F, istate);
                 matops::save(F, Nang * icol, format("%d/F-%d.bin", icol, istate));
+//                 std::cout << "F = " << cArrayView(icol, F) << std::endl;
                 
                 // A * E -> V
                 std::cout << "  - multiply A * E -> V" << std::endl;
@@ -262,6 +267,7 @@ int main (int argc, char * argv[])
                 
                 // save to disk
                 matops::save(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
+//                 std::cout << "E = " << cArrayView(icol, E) << std::endl;
             }
             
             std::cout << std::endl;
@@ -323,11 +329,47 @@ int main (int argc, char * argv[])
     }
     
     //
+    // Collect the solutions and store as VTK.
+    //
+    
+    for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+    {
+        // clean the solution
+        std::memset(psi, 0, Nang * Npts * Npts * sizeof(Complex));
+        
+        // set other elements than the boundaries
+        for (std::size_t icol = 1; icol < Npts - 1; icol++)
+        {
+            // load the column
+            matops::load(V, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
+            
+            // copy it to the solution (both symmetries)
+            for (std::size_t iblock = 0; iblock < Nang; iblock++)
+            for (std::size_t irow = 0; irow <= icol; irow++)
+            {
+                psi[(iblock * Npts + icol + 1) * Npts + irow + 1] = V[iblock * Npts + irow];
+                psi[(iblock * Npts + irow + 1) * Npts + icol + 1] = V[iblock * Npts + irow] * ((inp.S + inp.Pi) % 2 == 0 ? +1. : -1.);
+            }
+        }
+        
+        // get the unrotated grid
+        rArray grid = concatenate(inp.rgrid, inp.cgrid.slice(1, inp.cgrid.size()) + inp.rgrid.back());
+        
+        // save the solution for visualization
+        std::ofstream out (format("psi-%d.vtk", istate));
+        writeVTK_points
+        (
+            out,
+            cArrayView(Nang * Npts * Npts, psi),
+            grid, grid, rArray({0.})
+        );
+    }
+    
+    //
     // Extract the amplitudes.
     //
     
-        // TODO
-    
+    extract(cmd, inp, ang, rad, psi);
     
     return EXIT_SUCCESS;
 }

@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -39,7 +39,7 @@
 
 typedef struct
 {
-    int ni, li, mi;
+    int n, l, m;
 }
 HState;
 
@@ -64,5 +64,13 @@ class InputFile
         rArray rgrid, cgrid;
         std::vector<HState> istates, fstates;
 };
+
+void write_VTK
+(
+    const rArrayView grid,
+    unsigned num_datasets,
+    Complex const * data,
+    std::string filename
+);
 
 #endif

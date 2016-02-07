@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -445,6 +445,9 @@ template <class T> ReadItem<T> ReadNext (std::ifstream & f, unsigned allowed_spe
         // otherwise exit the loop (a valid entry was found)
         break;
     }
+    
+    if (s.empty())
+        HexException("Failed to read entry.");
     
     // check for asterisk
     if (s == "*")
