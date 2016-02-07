@@ -154,7 +154,7 @@ int main (int argc, char * argv[])
         
         // allocate all dense matrices (column-major)
         Complex * D   = new Complex [Nang * Npts * Nang * Npts];
-        Complex * BLU = new Complex [Nang * Npts * Nang * Npts];
+        Complex * invB= new Complex [Nang * Npts * Nang * Npts];
         Complex * psi = new Complex [Nang * Npts *        Npts];
         
         // allocate all vectors
@@ -162,7 +162,7 @@ int main (int argc, char * argv[])
         Complex * F = new Complex [Nang * Npts];
         Complex * V = new Complex [Nang * Npts];
         
-        // allocate pivots
+        // LU pivots
         int * pivots = new int [Nang * Npts];
     
     //
@@ -181,41 +181,36 @@ int main (int argc, char * argv[])
             // calculate the Numerov matrices
             std::cout << "  - calculate A-matrix" << std::endl;
             num.A(icol, A); // dim: Nang*i x Nang*(i-1)
-//             debug::write_banded(std::cout, icol, icol-1, 1, A);
             
             std::cout << "  - calculate B-matrix" << std::endl;
             num.B(icol, B); // dim: Nang*i x Nang*i
-//             debug::write_banded(std::cout, icol, icol, 1, B);
             
             std::cout << "  - calculate C-matrix" << std::endl;
             num.C(icol, C); // dim: Nang*i x Nang*(i+1)
-//             debug::write_banded(std::cout, icol, icol+1, 1, C);
             
-            // check that [iknot]/BLU.bin exists
-            if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
-                not matops::load(pivots, Nang * icol, format("%d/pivots.bin", icol)))
+            // check that [iknot]/invB.bin exists
+            if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
             {
                 // A * D -> M, dim: Nang*i x Nang*i
                 std::cout << "  - multiply A * D -> M" << std::endl;
-                matops::blockband_mul_dense(Nang, icol, icol - 1, icol, 1, A, D, BLU);
+                matops::blockband_mul_dense(Nang, icol, icol - 1, icol, 1, A, D, invB);
                 
                 // M + B -> M
                 std::cout << "  - add (A * D) + B -> M" << std::endl;
-                matops::dense_add_blockband(Nang, icol, 1, BLU, B);
+                matops::dense_add_blockband(Nang, icol, 1, invB, B);
                 
-                // LU-factorize M -> BLU
-                std::cout << "  - LU-factorization of M" << std::endl;
-                matops::dense_LU_factor(Nang * icol, BLU, pivots);
+                // invert M -> invB
+                std::cout << "  - inversion of M" << std::endl;
+                matops::dense_invert(Nang * icol, invB, pivots, D);
                 
-                // save factorization to disk
-                std::cout << "  - save LU to disk" << std::endl;
-                matops::save(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol));
-                matops::save(pivots, Nang * icol, format("%d/pivots.bin", icol));
+                // save inverse matrix to disk
+                std::cout << "  - save inverse matrix to disk" << std::endl;
+                matops::save(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol));
             }
             
             // update D, = -B^{-1} C
             std::cout << "  - solve B D = C for D" << std::endl;
-            matops::dense_LU_solve_blockband(Nang, icol, icol + 1, 1, BLU, pivots, C, D, V);
+            matops::dense_mul_blockband(Nang, icol, icol, icol + 1, 1, invB, C, D);
             
             std::cout << "  - flip sign of D" << std::endl;
             matops::flip_sign(Nang * icol * Nang * (icol + 1), D);
@@ -239,9 +234,8 @@ int main (int argc, char * argv[])
             num.A(icol, A);
             
             // load inverted B
-            if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
-                not matops::load(pivots, Nang * icol, format("%d/pivots.bin", icol)))
-                HexException("Missing precomputed LU-factorization for grid point %ld.", icol);
+            if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
+                HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             
             // for all initial states
             std::cout << "  - prepare constant vectors" << std::endl;
@@ -251,7 +245,6 @@ int main (int argc, char * argv[])
                 std::cout << "  - calculate F-vector" << std::endl;
                 num.F(icol, F, istate);
                 matops::save(F, Nang * icol, format("%d/F-%d.bin", icol, istate));
-//                 std::cout << "F = " << cArrayView(icol, F) << std::endl;
                 
                 // A * E -> V
                 std::cout << "  - multiply A * E -> V" << std::endl;
@@ -263,11 +256,10 @@ int main (int argc, char * argv[])
                 
                 // B^{-1} (F - (A * E))  ->  E
                 std::cout << "  - solve B^{-1} V -> E" << std::endl;
-                matops::dense_LU_solve_vector(Nang * icol, BLU, pivots, V, E);
+                matops::dense_mul_vector(Nang * icol, Nang * icol, invB, V, E);
                 
                 // save to disk
                 matops::save(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
-//                 std::cout << "E = " << cArrayView(icol, E) << std::endl;
             }
             
             std::cout << std::endl;
@@ -288,13 +280,12 @@ int main (int argc, char * argv[])
             num.C(icol, C);
             
             // load inverted B
-            if (not matops::load(BLU, Nang * icol * Nang * icol, format("%d/BLU.bin", icol)) or
-                not matops::load(pivots, Nang * icol, format("%d/pivots.bin", icol)))
-                HexException("Missing precomputed LU-factorization for grid point %ld.", icol);
+            if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
+                HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             
             // update D, = -B^{-1} C
             std::cout << "  - solve B D = C for D" << std::endl;
-            matops::dense_LU_solve_blockband(Nang, icol, icol + 1, 1, BLU, pivots, C, D, V);
+            matops::dense_mul_blockband(Nang, icol, icol, icol + 1, 1, invB, C, D);
             
             std::cout << "  - flip sign of D" << std::endl;
             matops::flip_sign(Nang * icol * Nang * (icol + 1), D);

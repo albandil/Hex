@@ -44,13 +44,12 @@ extern "C" void dgetrf_
     int * pivots, int * Info
 );
 
-// Standard LAPACK routine for dense LU backsubstitution (real variant).
-extern "C" void dgetrs_
+// Standard LAPACK routine for dense inversion (real variant).
+extern "C" void dgetri_
 (
-    char * trans,
-    int * N, int * nrhs,
-    double * A, int * lda, int * pivots,
-    double * B, int * ldb, int *info
+    int * n,
+    double * A, int * lda, int * ipiv,
+    double * work, int * lwork, int * info
 );
 
 // Standard LAPACK routine for dense LU factorization (complex variant).
@@ -61,13 +60,12 @@ extern "C" void zgetrf_
     int * pivots, int * Info
 );
 
-// Standard LAPACK routine for dense LU backsubstitution (complex variant).
-extern "C" void zgetrs_
+// Standard LAPACK routine for dense inversion (complex variant).
+extern "C" void zgetri_
 (
-    char * trans,
-    int * N, int * nrhs,
-    Complex * A, int * lda, int * pivots,
-    Complex * B, int * ldb, int *info
+    int * n,
+    Complex * A, int * lda, int * ipiv,
+    Complex * work, int * lwork, int * info
 );
 
 // --------------------------------------------------------------------------------- //
@@ -188,13 +186,11 @@ namespace matops
                 std::size_t jcol = jblock * N + j;
                 
                 // update element of the dense matrix
-                D[irow * Nblocks * N + jcol] += B[((iblock * Nblocks + jblock) * N + i) * (2 * Ndiag + 1) + j + Ndiag - i];
-//                 std::cout << "B's contribution from " << i << " " << j << " (@ " << ((iblock * Nblocks + jblock) * N + i) * (2 * Ndiag + 1) + j + Ndiag - i << "): " << B[((iblock * Nblocks + jblock) * N + i) * (2 * Ndiag + 1) + j + Ndiag - i] << std::endl;
-//                 std::cout << "new D's value (@ " << irow * Nblocks * N + jcol << "): " << D[irow * Nblocks * N + jcol] << std::endl;
+                D[jcol * Nblocks * N + irow] += B[((iblock * Nblocks + jblock) * N + i) * (2 * Ndiag + 1) + j + Ndiag - i];
             }
         }
     }
-
+    
     template void dense_add_blockband<double> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, double * restrict D, double const * restrict B);
     template void dense_add_blockband<Complex> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, Complex * restrict D, Complex const * restrict B);
 }
@@ -203,48 +199,35 @@ namespace matops
 
 namespace matops
 {
-    template<class T> void dense_LU_factor (std::size_t N, T * A, int * pivots)
+    template<class T> void dense_invert (std::size_t N, T * A, int * pivots, T * work)
     {
         HexException("Unsupported type.");
     }
     
-    template<> void dense_LU_factor<double> (std::size_t N, double * A, int * pivots)
+    template<> void dense_invert<double> (std::size_t N, double * A, int * pivots, double * work)
     {
-        int m = N, n = N, lda = N, info;
-        dgetrf_(&m, &n, A, &lda, pivots, &info);
+        int n = N, lda = N, lwork = N * N, info;
+        
+        dgetrf_(&n, &n, A, &lda, pivots, &info);
+        if (info != 0)
+            HexException("DGETRF failed with error code %d.", info);
+        
+        dgetri_(&n, A, &lda, pivots, work, &lwork, &info);
+        if (info != 0)
+            HexException("DGETRI failed with error code %d.", info);
     }
     
-    template<> void dense_LU_factor<Complex> (std::size_t N, Complex * A, int * pivots)
+    template<> void dense_invert<Complex> (std::size_t N, Complex * A, int * pivots, Complex * work)
     {
-        int m = N, n = N, lda = N, info;
-        zgetrf_(&m, &n, A, &lda, pivots, &info);
-    }
-}
-
-// --------------------------------------------------------------------------------- //
-
-namespace matops
-{
-    template<> void dense_LU_solve_vector<double> (std::size_t N, double const * restrict M, int const * restrict pivots, double const * restrict v, double * restrict w)
-    {
-        // copy v to w
-        for (std::size_t i = 0; i < N; i++)
-            w[i] = v[i];
+        int n = N, lda = N, lwork = N * N, info;
         
-        char trans = 'T';
-        int n = N, nrhs = 1, lda = N, ldb = N, info;
-        dgetrs_(&trans, &n, &nrhs, const_cast<double*>(M), &lda, const_cast<int*>(pivots), w, &ldb, &info);
-    }
-
-    template<> void dense_LU_solve_vector<Complex> (std::size_t N, Complex const * restrict M, int const * restrict pivots, Complex const * restrict v, Complex * restrict w)
-    {
-        // copy v to w
-        for (std::size_t i = 0; i < N; i++)
-            w[i] = v[i];
+        zgetrf_(&n, &n, A, &lda, pivots, &info);
+        if (info != 0)
+            HexException("ZGETRF failed with error code %d.", info);
         
-        char trans = 'T';
-        int n = N, nrhs = 1, lda = N, ldb = N, info;
-        zgetrs_(&trans, &n, &nrhs, const_cast<Complex*>(M), &lda, const_cast<int*>(pivots), w, &ldb, &info);
+        zgetri_(&n, A, &lda, pivots, work, &lwork, &info);
+        if (info != 0)
+            HexException("ZGETRI failed with error code %d.", info);
     }
 }
 
@@ -253,34 +236,30 @@ namespace matops
 namespace matops
 {
     template <class T>
-    void dense_LU_solve_blockband (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, T const * LU, const int* pivots, T const * B, T * C, T * w)
+    void dense_mul_blockband (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, T const * D, T const * B, T * C)
     {
-        // The LU is for transposed matrix, so instead of x = U⁻¹L⁻¹Py we need x = P⁻¹L'⁻¹U'⁻¹y.
-        
-        // FIXME : Avoid calls to dense_LU_solve_vector, which is O(N^2), making this routine O(N^3).
-        
-//         std::cout << "LU.norm = " << ArrayView<T>(Nblocks * M * Nblocks * M, const_cast<T*>(LU)).norm() << std::endl;
-        for (std::size_t n = 0; n < Nblocks; n++)
-        for (std::size_t icol = 0; icol < N; icol++)
+        // for all rows of the dense matrix
+        for (std::size_t drow = 0; drow < Nblocks * M; drow++)
         {
-            for (std::size_t m = 0; m < Nblocks; m++)
-            for (std::size_t irow = 0; irow < M; irow++)
+            // for all columns of the block-band matrix
+            for (std::size_t col_block = 0; col_block < Nblocks; col_block++)
+            for (std::size_t icol = 0; icol < N; icol++)
             {
-                if (std::max(irow,icol) - std::min(irow,icol) <= Ndiag)
-                    w[m * M + irow] = B[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + icol + Ndiag - irow];
-                else
-                    w[m * M + irow] = 0.;
+                // erase the output element
+                C[(col_block * N + icol) * Nblocks * M + drow] = 0.;
+                
+                // for all rows of the block-band matrix (and columns of the matrix 'D')
+                for (std::size_t row_block = 0; row_block < Nblocks; row_block++)
+                for (std::size_t irow = (icol < Ndiag ? 0 : icol - Ndiag); irow <= icol + 1 and irow < K; irow++)
+                {
+                    C[(col_block * N + icol) * Nblocks * M + drow] += D[(row_block * K + irow) * Nblocks * M + drow] * B[((row_block * Nblocks + col_block) * K + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)];
+                }
             }
-            
-//             std::cout << ArrayView<T>(Nblocks * M, w) << " ";
-            dense_LU_solve_vector(Nblocks * M, LU, pivots, w, C + (n * Nblocks + icol) * M);
-//             std::cout << ArrayView<T>(Nblocks * M, C + (n * Nblocks + icol) * M).norm() << " | ";
         }
-//         std::cout << std::endl;
     }
     
-    template void dense_LU_solve_blockband<double> (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, double const * LU, int const * pivots, double const * B, double * C, double * workspace);
-    template void dense_LU_solve_blockband<Complex> (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, Complex const * LU, int const * pivots, Complex const * B, Complex * C, Complex * workspace);
+    template void dense_mul_blockband<double> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, double const * D, double const * B, double * C);
+    template void dense_mul_blockband<Complex> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, Complex const * D, Complex const * B, Complex * C);
 }
 
 // --------------------------------------------------------------------------------- //
@@ -317,30 +296,9 @@ namespace matops
     
     template <class T> void blockband_mul_dense (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, T const * restrict A, T const * restrict D, T * restrict B)
     {
-        // for all blocks of the block-band matrix
-        for (std::size_t m = 0; m < Nblocks; m++)
-        for (std::size_t n = 0; n < Nblocks; n++)
-        {
-            // for all columns of the dense matrix
-            for (std::size_t dcol = 0; dcol < Nblocks * N; dcol++)
-            {
-                // for all rows of the block
-                for (std::size_t irow = 0; irow < M; irow++)
-                {
-                    // erase the output element
-                    B[(m * M + irow) * (Nblocks * N) + dcol] = 0.;
-                    
-                    // for all structurally non-zero column entries in this block's row
-                    for (std::size_t icol = (irow < Ndiag ? 0 : irow - Ndiag); icol <= irow + Ndiag and icol < K; icol++)
-                    {
-//                         std::cout << "dcol = " << dcol << ", irow = " << irow << ", icol = " << icol << std::endl;
-//                         std::cout << "A[" << ((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow) << "] = " << A[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)] << std::endl;
-//                         std::cout << "D[" << (dcol * Nblocks + n) * K + icol << "] = " << D[(dcol * Nblocks + n) * K + icol] << std::endl;
-                        B[(m * M + irow) * (Nblocks * N) + dcol] += A[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)] * D[(dcol * Nblocks + n) * K + icol];
-                    }
-                }
-            }
-        }
+        // multiply all columns independently
+        for (std::size_t dcol = 0; dcol < Nblocks * N; dcol++)
+            blockband_mul_vector(Nblocks, M, K, Ndiag, A, D + dcol * Nblocks * K, B + dcol * Nblocks * M);
     }
     
     template void blockband_mul_dense<double> (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, double const * restrict A, double const * restrict D, double * restrict B);

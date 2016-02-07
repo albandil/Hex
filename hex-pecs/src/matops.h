@@ -58,22 +58,29 @@ namespace matops
     void dense_mul_vector (std::size_t M, std::size_t N, T const * restrict A, T const * restrict v, T * restrict w);
     
     /**
-     * @brief Multiply block-band matrix by an inverse matrix (given the LU decomposition of the dense matrix).
+     * @brief Multiply banded matrix by a dense column-matrix.
      * 
-     * The LU decomposition is assumed to come from @ref dense_LU_factor, i.e. it is expected to be of a transposed matrix.
-     * The solution then needs to be rephrased from common LUx = Py to (P⁻¹LU)'x = y, i.e.
-     * @f[
-     *         x = P^{-1} L^{-\top} U^{-\top} y \,.
-     * @f]
-     * 
-     * @param Ndiag Number of upper diagonals.
-     * @param workspace Workspave of size Nblocks * N.
+     * The dense matrix 'D' is Nblocks*M-by-Nblocks*K, the block-band matrix 'B' has Nblocks blocks on the diagonal
+     * and each of them is K-by-N. The block-band matrix has Ndiag upper and lower diagonals. The resulting
+     * matrix is Nblocks*M-by-Nblocks*N.
      */
     template <class T>
-    void dense_LU_solve_blockband
+    void dense_mul_blockband
     (
-        std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag,
-        T const * restrict LU, int const * restrict pivots, T const * restrict B, T * restrict C, T * restrict workspace
+        std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag,
+        T const * restrict D, T const * restrict B, T * restrict R
+    );
+    
+    /**
+     * @brief Multiply block-band matrix by a dense matrix.
+     * 
+     * Row-major storage assumed for the dense matrix.
+     */
+    template <class T>
+    void dense_mul_blockband
+    (
+        std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag,
+        T const * restrict D, T const * restrict B, T * restrict C
     );
     
     /// Add a block-band matrix to dense matrix; 'Ndiag' is the number of upper diagonals.
@@ -81,25 +88,13 @@ namespace matops
     void dense_add_blockband (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, T * restrict D, T const * restrict B);
     
     /**
-     * @brief A simple Wrapper around xGETRF.
+     * @brief A simple Wrapper around xGETRF + xGETRI.
      * 
-     * The LAPACK routine for LU factorization assumes the column-major storage. However, we are passing in a row-major stored matrix A.
-     * In such a case it will be
-     * @f[
-     *         PA^T = LU \,.
-     * @f]
+     * Inverts the dense matrix, overwriting the input array. The parameter 'pivots' is a workspace of N integers.
+     * The parameter 'work' is another workspace of N*N matrix elements.
      */
     template <class T>
-    void dense_LU_factor (std::size_t N, T * A, int * pivots);
-    
-    /**
-     * @brief A simple Wrapper around xGETRS.
-     * 
-     * This routine expects to receive LU factorization of a transposed column-matrix, or of a non-transposed row-matrix,
-     * which is exactly what the routine @ref dense_LU_factor does.
-     */
-    template <class T>
-    void dense_LU_solve_vector (std::size_t N, T const * restrict M, int const * restrict pivots, T const * restrict v, T * restrict w);
+    void dense_invert (std::size_t N, T * A, int * pivots, T * work);
     
     /// Multiply vector by a block-band matrix.
     template <class T>
@@ -112,7 +107,7 @@ namespace matops
      * where M' = Nblocks * M, K' = Nblocks * K and N' = Nblocks = N.
      * The matrix A is block-banded. It has Nblock x Nblock blocks, every one of them
      * is M-by-K and has one main diagonal and Ndiag upper diagonals and Ndiag lower diagonals.
-     * The storage scheme of D has to be column-major. The storage of B will be row-major.
+     * The storage scheme of D has to be column-major, as will be the storage scheme of B.
      */
     template <class T>
     void blockband_mul_dense
