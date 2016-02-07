@@ -118,20 +118,20 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                         {
                             // direct
                             if (ang_.f(lambda, l1, l2, li, ell) != 0. and r1 > r2)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * (1./r1 - 1./r2) * Hydrogen::P(ni,li,r1) * special::ric_j(ell,ki*r2);
+                                chikl += ang_.f(lambda, l1, l2, li, ell) * (1./r1 - 1./r2) * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
                             // exchange
                             if (ang_.f(lambda, l1, l2, ell, li) != 0. and r2 > r1)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * (1./r2 - 1./r1) * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2) * sign;
+                                chikl += ang_.f(lambda, l1, l2, ell, li) * (1./r2 - 1./r1) * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                         }
                         // higher multipoles
                         else
                         {
                             // direct
                             if (ang_.f(lambda, l1, l2, li, ell) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1) * special::ric_j(ell,ki*r2);
+                                chikl += ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
                             // exchange
                             if (ang_.f(lambda, l1, l2, ell, li) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2) * sign;
+                                chikl += ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                         }
                     }
                     
