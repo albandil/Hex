@@ -86,8 +86,6 @@ class Numerov2d
         
         template <class T> T coef_A (int i, int k, T h, T a, unsigned l) const
         {
-//             std::cout << "coef_A " << i << " " << k << " " << h << " " << a << " " << l << std::endl;
-            
             if (i > 1)
             {
                 if (k  < i) return  12.0 * a;
@@ -115,8 +113,6 @@ class Numerov2d
         
         template <class T> T coef_B (int i, int k, T h, T a, unsigned l) const
         {
-//             std::cout << "coef_B " << i << " " << k << " " << h << " " << a << " " << l << std::endl;
-            
             if (i > 1)
             {
                 if (k  < i) return -a*a*a + a*a + a;

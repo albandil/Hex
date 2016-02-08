@@ -234,6 +234,7 @@ int main (int argc, char * argv[])
             num.A(icol, A);
             
             // load inverted B
+            std::cout << "  - load inverse B frm disk" << std::endl;
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
                 HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             
@@ -280,6 +281,7 @@ int main (int argc, char * argv[])
             num.C(icol, C);
             
             // load inverted B
+            std::cout << "  - load inverse B frm disk" << std::endl;
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
                 HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             

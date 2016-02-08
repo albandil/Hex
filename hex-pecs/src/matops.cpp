@@ -78,12 +78,12 @@ namespace matops
         HDFFile hdf (filename, HDFFile::overwrite);
         return hdf.valid() and hdf.write("size", &N, 1) and hdf.write("data", data, N);
     }
-
+    
     // explicit instantiation of 'save' for needed types
     template bool save<int> (int const * data, std::size_t N, std::string filename);
     template bool save<double> (double const * data, std::size_t N, std::string filename);
     template bool save<Complex> (Complex const * data, std::size_t N, std::string filename);
-
+    
     // definition of 'load' template
     template <class T> bool load (T * data, std::size_t N, std::string filename)
     {
@@ -91,7 +91,7 @@ namespace matops
         std::size_t M;
         return hdf.valid() and hdf.read("size", &M, 1) and M == N and hdf.read("data", data, N);
     }
-
+    
     // explicit instantiation of 'load' for needed types
     template bool load<int> (int * data, std::size_t N, std::string filename);
     template bool load<double> (double * data, std::size_t N, std::string filename);
@@ -108,29 +108,29 @@ namespace matops
         for (std::size_t i = 0; i < N; i++)
             z[i] = x[i] + y[i];
     }
-
+    
     // explicit instantiation of 'sum' for needed types
     template void sum<double> (std::size_t N, double const * restrict x, double const * restrict y, double * restrict z);
     template void sum<Complex> (std::size_t N, Complex const * restrict x, Complex const * restrict y, Complex * restrict z);
-
+    
     // definition of 'subtract' template
     template <class T> void subtract (std::size_t N, T const * restrict x, T const * restrict y, T * restrict z)
     {
         for (std::size_t i = 0; i < N; i++)
             z[i] = x[i] - y[i];
     }
-
+    
     // explicit instantiation of 'subtract' for needed types
     template void subtract<double> (std::size_t N, double const * restrict x, double const * restrict y, double * restrict z);
     template void subtract<Complex> (std::size_t N, Complex const * restrict x, Complex const * restrict y, Complex * restrict z);
-
+    
     // definition of 'flip_sign' template
     template <class T> void flip_sign (std::size_t N, T * restrict x)
     {
         for (std::size_t i = 0; i < N; i++)
             x[i] = -x[i];
     }
-
+    
     // explicit instantiation of 'flip_sign' for needed types
     template void flip_sign<double> (std::size_t N, double * restrict x);
     template void flip_sign<Complex> (std::size_t N, Complex * restrict x);
@@ -158,7 +158,7 @@ namespace matops
                 w[i] += pA[i] * v[j];
         }
     }
-
+    
     // explicit instantiation of 'dense_mul_vector' for needed types
     template void dense_mul_vector<double> (std::size_t M, std::size_t N, double const * restrict A, double const * restrict v, double * restrict w);
     template void dense_mul_vector<Complex> (std::size_t M, std::size_t N, Complex const * restrict A, Complex const * restrict v, Complex * restrict w);

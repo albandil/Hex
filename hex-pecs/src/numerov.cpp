@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 20156 Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -49,9 +49,16 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
 {
     // 'i' is fixed, 'j' is the free index, 'k' and 'l' are summed
     
-    // skip empty vectors
-    if (i == 0)
-        return;
+    // initial state quantum numbers
+    unsigned ni = inp_.istates[istate].n;
+    unsigned li = inp_.istates[istate].l;
+    int      mi = inp_.istates[istate].m;
+    
+    // impact momentum
+    double ki = std::sqrt(inp_.Etot + 1./(ni*ni));
+    
+    // symmetry sign
+    double sign = ((inp_.S + inp_.Pi) % 2 == 0 ? +1. : -1.);
     
     // for all angular momentum states
     for (std::size_t m = 0; m < ang_.size(); m++)
@@ -84,6 +91,13 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                 double rmin = std::min(r1, r2, Complex_realpart_less);
                 double rmax = std::max(r1, r2, Complex_realpart_less);
                 
+                // hyperradius
+                double R = std::hypot(r1,r2);
+                double R0 = rad_.rgrid.back();
+                
+                // potential damp factor
+                double damp = (R > R0 ? 0. : std::exp(-std::pow(R/R0,R0/3)));
+                
                 // get Numerov discretization coefficients
                 Complex Bik = coef_B(i, k, h, alpha, l1);
                 Complex Djl = coef_B(j, l, t, beta,  l2);
@@ -91,22 +105,6 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                 // evaluate the right-hand side at (r1,r2)
                 for (unsigned ell = 0; ell <= ang_.maxell(); ell++)
                 {
-                    // initial state quantum numbers
-                    unsigned ni = inp_.istates[istate].n;
-                    unsigned li = inp_.istates[istate].l;
-                    int      mi = inp_.istates[istate].m;
-                    
-                    // impact momentum
-                    double ki = std::sqrt(inp_.Etot + 1./(ni*ni));
-                    
-                    // total angular parameters
-                    int L  = inp_.L;
-                    int S  = inp_.S;
-                    int Pi = inp_.Pi;
-                    
-                    // symmetry sign
-                    double sign = ((S + Pi) % 2 == 0 ? +1. : -1.);
-                    
                     // contribution to the right-hand side
                     Complex chikl = 0;
                     
@@ -118,10 +116,10 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                         {
                             // direct
                             if (ang_.f(lambda, l1, l2, li, ell) != 0. and r1 > r2)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * (1./r1 - 1./r2) * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
+                                chikl += ang_.f(lambda, l1, l2, li, ell) * (1./r1 - inp_.Z/r2) * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
                             // exchange
                             if (ang_.f(lambda, l1, l2, ell, li) != 0. and r2 > r1)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * (1./r2 - 1./r1) * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
+                                chikl += ang_.f(lambda, l1, l2, ell, li) * (1./r2 - inp_.Z/r1) * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                         }
                         // higher multipoles
                         else
@@ -136,10 +134,10 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                     }
                     
                     // add prefactor
-                    chikl *= std::sqrt(special::constant::two_pi * (2*ell+1)) / ki * special::ClebschGordan(li,mi,ell,0,L,mi) * special::pow_int(1.0_i, ell);
+                    chikl *= std::sqrt(special::constant::two_pi * (2*ell+1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
                     
                     // update the vector
-                    v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl;
+                    v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl * damp;
                 }
             }
         }
@@ -250,10 +248,6 @@ void Numerov2d::mask
 
 void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
 {
-    // skip empty matrices
-    if (i == 0 and term < 0)
-        return;
-    
     // number of blocks and their volume
     std::size_t Nang = ang_.size();
     std::size_t block_vol = i * 3;
@@ -261,11 +255,11 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
     // erase output array
     std::memset(M, 0, Nang * Nang * block_vol * sizeof(Complex));
     
-    // discretization scheme mask
+    // discretization scheme mask (to be used in function 'mask')
     std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> msk;
     
     // symmetry factor
-    int s = ((inp_.S + inp_.Pi) % 2 == 0 ? 1 : -1);
+    int s = ((inp_.S + inp_.Pi) % 2 == 0 ? +1 : -1);
     
     // for all angular momentum blocks
     for (std::size_t m = 0; m < Nang; m++)
@@ -316,31 +310,36 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
                 Complex Cjl = coef_A(j, l, t, beta,  l2);
                 Complex Djl = coef_B(j, l, t, beta,  l2);
                 
-//                 std::cout << "i = " << i << ", j = " << j << ", k = " << k << ", l = " << l << "; ks = " << ks << ", ls = " << ls << std::endl;
-//                 std::cout << "\th = " << h << ", t = " << t << ", alpha = " << alpha << ", beta = " << beta << std::endl;
-//                 std::cout << "\tAik = " << Aik << ", Bik = " << Bik << ", Cjl = " << Cjl << ", Djl = " << Djl << std::endl;
+                // smaller and larger radius
+                Complex rmin = std::min(rad_.grid[k], rad_.grid[l], Complex_realpart_less);
+                Complex rmax = std::max(rad_.grid[k], rad_.grid[l], Complex_realpart_less);
                 
-                // matrix element
-                Complex el = 0;
-                
-                // calculate two-electron part
-                for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0.)
+                // calculate the potential
+                Complex Vkl = 0;
+                for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0. and rmin != 0.)
                 {
-                    double rmin = std::min(rad_.grid[k].real(), rad_.grid[l].real());
-                    double rmax = std::max(rad_.grid[k].real(), rad_.grid[l].real());
-                    el -= h*h*t*t*Bik*Djl * ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda) / rmax;
+                    // one-electron part
+                    if (lambda == 0)
+                        Vkl += 1. / rmax - inp_.Z / rad_.grid[k] - inp_.Z / rad_.grid[l];
+                    
+                    // two-electron part
+                    else
+                        Vkl += ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda) / rmax;
                 }
                 
-                // calculate one-electron (diagoanl) part, if any
+                // matrix element
+                Complex el = h*h*t*t*Bik*Djl * (-Vkl);
+                
+                // add remaining terms
                 if (m == n)
                 {
-                    // calculate potential
-                    Complex Vkl = 0.;
-                    if (k > 0) Vkl += 0.5 * l1 * (l1 + 1) / (rad_.grid[k].real() * rad_.grid[k].real()) - inp_.Z / rad_.grid[k].real();
-                    if (l > 0) Vkl += 0.5 * l2 * (l2 + 1) / (rad_.grid[l].real() * rad_.grid[l].real()) - inp_.Z / rad_.grid[l].real();
+                    // centrifugal "potential"
+                    Complex H = 0.;
+                    if (k > 0) H += 0.5 * l1 * (l1 + 1) / (rad_.grid[k] * rad_.grid[k]);
+                    if (l > 0) H += 0.5 * l2 * (l2 + 1) / (rad_.grid[l] * rad_.grid[l]);
                     
                     // update element
-                    el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*(0.5*inp_.Etot - Vkl);
+                    el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*0.5*(inp_.Etot - H);
                 }
                 
                 // update matrix element
