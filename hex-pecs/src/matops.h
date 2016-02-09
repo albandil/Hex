@@ -104,7 +104,7 @@ namespace matops
      * @brief Multiply dense matrix by a block-band matrix.
      * 
      * Multiply AD -> B, where A is M'-by-K' and D is K'-by-N' and B is M'-by-N' matrix,
-     * where M' = Nblocks * M, K' = Nblocks * K and N' = Nblocks = N.
+     * where M' = Nblocks * M, K' = Nblocks * K and N' = Nblocks * N.
      * The matrix A is block-banded. It has Nblock x Nblock blocks, every one of them
      * is M-by-K and has one main diagonal and Ndiag upper diagonals and Ndiag lower diagonals.
      * The storage scheme of D has to be column-major, as will be the storage scheme of B.

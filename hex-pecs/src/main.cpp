@@ -199,7 +199,7 @@ int main (int argc, char * argv[])
                 std::cout << "  - add (A * D) + B -> M" << std::endl;
                 matops::dense_add_blockband(Nang, icol, 1, invB, B);
                 
-                // invert M -> invB
+                // invert M -> invB ('pivots' and 'D' are workspaces)
                 std::cout << "  - inversion of M" << std::endl;
                 matops::dense_invert(Nang * icol, invB, pivots, D);
                 
@@ -234,7 +234,7 @@ int main (int argc, char * argv[])
             num.A(icol, A);
             
             // load inverted B
-            std::cout << "  - load inverse B frm disk" << std::endl;
+            std::cout << "  - load inverse B from disk" << std::endl;
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
                 HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             
@@ -281,7 +281,7 @@ int main (int argc, char * argv[])
             num.C(icol, C);
             
             // load inverted B
-            std::cout << "  - load inverse B frm disk" << std::endl;
+            std::cout << "  - load inverse B from disk" << std::endl;
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
                 HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
             
@@ -300,7 +300,7 @@ int main (int argc, char * argv[])
                 matops::load(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
                 
                 // load or initialize psi
-                if (icol == rad.Npts - 1)
+                if (icol == rad.Npts - 2)
                     std::memset(psi, 0, Nang * (icol + 1) * sizeof(Complex));
                 else
                     matops::load(psi, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
@@ -325,6 +325,8 @@ int main (int argc, char * argv[])
     // Collect the solutions and store as VTK.
     //
     
+    double symfactor =  ((inp.S + inp.Pi) % 2 == 0 ? +1. : -1.);
+    
     for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
     {
         // clean the solution
@@ -341,7 +343,7 @@ int main (int argc, char * argv[])
             for (std::size_t irow = 0; irow <= icol; irow++)
             {
                 psi[(iblock * Npts + icol + 1) * Npts + irow + 1] = V[iblock * Npts + irow];
-                psi[(iblock * Npts + irow + 1) * Npts + icol + 1] = V[iblock * Npts + irow] * ((inp.S + inp.Pi) % 2 == 0 ? +1. : -1.);
+                psi[(iblock * Npts + irow + 1) * Npts + icol + 1] = V[iblock * Npts + irow] * symfactor;
             }
         }
         

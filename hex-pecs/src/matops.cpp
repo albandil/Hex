@@ -36,6 +36,26 @@
 
 // --------------------------------------------------------------------------------- //
 
+/// Standard BLAS routine for matrix-vector multiplocation (real variant).
+extern "C" void dgemv_
+(
+    char * trans, int * m, int * n,
+    double * alpha, double * A, int * lda,
+    double * X, int * incX,
+    double * beta, double * Y, int * incY
+);
+
+/// Standard BLAS routine for matrix-vector multiplocation (complex variant).
+extern "C" void zgemv_
+(
+    char * trans, int * m, int * n,
+    Complex * alpha, Complex * A, int * lda,
+    Complex * X, int * incX,
+    Complex * beta, Complex * Y, int * incY
+);
+
+// --------------------------------------------------------------------------------- //
+
 // Standard LAPACK routine for dense LU factorization (real variant).
 extern "C" void dgetrf_
 (
@@ -140,59 +160,26 @@ namespace matops
 
 namespace matops
 {
-    // definition of 'dense_mul_vector' template
     template <class T> void dense_mul_vector (std::size_t M, std::size_t N, T const * restrict A, T const * restrict v, T * restrict w)
     {
-        // erase destination vector
-        for (std::size_t i = 0; i < M; i++)
-            w[i] = 0;
-        
-        // for all columns of the dense matrix
-        for (std::size_t j = 0; j < N; j++)
-        {
-            // get column pointer
-            T const * restrict pA = A + j * M;
-            
-            // for all elements of the column: update elements of the destination vector
-            for (std::size_t i = 0; i < M; i++)
-                w[i] += pA[i] * v[j];
-        }
+        HexException("Unsupported type.");
     }
     
-    // explicit instantiation of 'dense_mul_vector' for needed types
-    template void dense_mul_vector<double> (std::size_t M, std::size_t N, double const * restrict A, double const * restrict v, double * restrict w);
-    template void dense_mul_vector<Complex> (std::size_t M, std::size_t N, Complex const * restrict A, Complex const * restrict v, Complex * restrict w);
-}
-
-// --------------------------------------------------------------------------------- //
-
-namespace matops
-{
-    template <class T>
-    void dense_add_blockband (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, T * restrict D, T const * restrict B)
+    template<> void dense_mul_vector<double> (std::size_t M, std::size_t N, double const * restrict A, double const * restrict v, double * restrict w)
     {
-        // for all rows
-        for (std::size_t iblock = 0; iblock < Nblocks; iblock++)
-        for (std::size_t i = 0; i < N; i++)
-        {
-            // calculate row index
-            std::size_t irow = iblock * N + i;
-            
-            // for all structurally nonzero elements of B in this row
-            for (std::size_t jblock = 0; jblock < Nblocks; jblock++)
-            for (std::size_t j = (i < Ndiag ? 0 : i - Ndiag); j <= i + Ndiag and j < N; j++)
-            {
-                // dense column
-                std::size_t jcol = jblock * N + j;
-                
-                // update element of the dense matrix
-                D[jcol * Nblocks * N + irow] += B[((iblock * Nblocks + jblock) * N + i) * (2 * Ndiag + 1) + j + Ndiag - i];
-            }
-        }
+        char trans = 'N';
+        int m = M, n = N, lda = M, incX = 1, incY = 1;
+        double alpha = 1, beta = 0;
+        dgemv_(&trans, &m, &n, &alpha, const_cast<double*>(A), &lda, const_cast<double*>(v), &incX, &beta, w, &incY);
     }
     
-    template void dense_add_blockband<double> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, double * restrict D, double const * restrict B);
-    template void dense_add_blockband<Complex> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, Complex * restrict D, Complex const * restrict B);
+    template<> void dense_mul_vector<Complex> (std::size_t M, std::size_t N, Complex const * restrict A, Complex const * restrict v, Complex * restrict w)
+    {
+        char trans = 'N';
+        int m = M, n = N, lda = M, incX = 1, incY = 1;
+        Complex alpha = 1, beta = 0;
+        zgemv_(&trans, &m, &n, &alpha, const_cast<Complex*>(A), &lda, const_cast<Complex*>(v), &incX, &beta, w, &incY);
+    }
 }
 
 // --------------------------------------------------------------------------------- //
@@ -236,25 +223,46 @@ namespace matops
 namespace matops
 {
     template <class T>
+    void dense_add_blockband (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, T * restrict D, T const * restrict B)
+    {
+        // for all blocks
+        for (std::size_t m = 0; m < Nblocks; m++)
+        for (std::size_t n = 0; n < Nblocks; n++)
+        {
+            // for all structurally nonzero elements of B in this block
+            for (std::size_t irow = 0; irow < N; irow++)
+            for (std::size_t icol = (irow < Ndiag ? 0 : irow - Ndiag); icol <= irow + Ndiag and icol < N; icol++)
+            {
+                // update element of the dense column-matrix
+                D[((n * N + icol) * Nblocks + m) * N + irow] += B[((m * Nblocks + n) * N + irow) * (2 * Ndiag + 1) + icol + Ndiag - irow];
+            }
+        }
+    }
+    
+    template void dense_add_blockband<double> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, double * restrict D, double const * restrict B);
+    template void dense_add_blockband<Complex> (std::size_t Nblocks, std::size_t N, std::size_t Ndiag, Complex * restrict D, Complex const * restrict B);
+}
+
+// --------------------------------------------------------------------------------- //
+
+namespace matops
+{
+    template <class T>
     void dense_mul_blockband (std::size_t Nblocks, std::size_t M, std::size_t K, std::size_t N, std::size_t Ndiag, T const * D, T const * B, T * C)
     {
-        // for all rows of the dense matrix
-        for (std::size_t drow = 0; drow < Nblocks * M; drow++)
+        // erase output
+        std::memset(C, 0, Nblocks * M * Nblocks * N * sizeof(T));
+        
+        // for all block combinations
+        for (std::size_t m = 0; m < Nblocks; m++)
+        for (std::size_t k = 0; k < Nblocks; k++)
+        for (std::size_t n = 0; n < Nblocks; n++)
         {
-            // for all columns of the block-band matrix
-            for (std::size_t col_block = 0; col_block < Nblocks; col_block++)
-            for (std::size_t icol = 0; icol < N; icol++)
-            {
-                // erase the output element
-                C[(col_block * N + icol) * Nblocks * M + drow] = 0.;
-                
-                // for all rows of the block-band matrix (and columns of the matrix 'D')
-                for (std::size_t row_block = 0; row_block < Nblocks; row_block++)
-                for (std::size_t irow = (icol < Ndiag ? 0 : icol - Ndiag); irow <= icol + 1 and irow < K; irow++)
-                {
-                    C[(col_block * N + icol) * Nblocks * M + drow] += D[(row_block * K + irow) * Nblocks * M + drow] * B[((row_block * Nblocks + col_block) * K + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)];
-                }
-            }
+            // for all element combinations
+            for (std::size_t r = 0; r < M; r++)
+            for (std::size_t s = 0; s < K; s++)
+            for (std::size_t t = (s < Ndiag ? 0 : s - Ndiag); t <= s + Ndiag and t < N; t++)
+                C[((n * N + t) * Nblocks + m) * M + r] += D[((k * K + s) * Nblocks + m) * M + r] * B[(((k * Nblocks + n) * K) + s) * (2 * Ndiag + 1) + t + Ndiag - s];
         }
     }
     
@@ -268,26 +276,17 @@ namespace matops
 {
     template <class T> void blockband_mul_vector (std::size_t Nblocks, std::size_t M, std::size_t N, std::size_t Ndiag, T const * restrict A, T const * restrict v, T * restrict w)
     {
-        // for all row blocks
+        // erase output vector
+        std::memset(w, 0, Nblocks * M * sizeof(T));
+        
+        // for all blocks
         for (std::size_t m = 0; m < Nblocks; m++)
+        for (std::size_t n = 0; n < Nblocks; n++)
         {
-            // for all column blocks
-            for (std::size_t n = 0; n < Nblocks; n++)
-            {
-                // Multiply n-the segment of the source vector by current block,
-                // store to m-th segment of destination vector.
-                
-                // for all rows of the block
-                for (std::size_t irow = 0; irow < M; irow++)
-                {
-                    // erase the output element
-                    w[m * M + irow] = 0.;
-                    
-                    // for all structurally non-zero column entries in this row
-                    for (std::size_t icol = (irow < Ndiag ? 0 : irow - Ndiag); icol <= irow + Ndiag and icol < N; icol++)
-                        w[m * M + irow] += A[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)] * v[n * N + icol];
-                }
-            }
+            // for all structurally non-zero entries in this block
+            for (std::size_t irow = 0; irow < M; irow++)
+            for (std::size_t icol = (irow < Ndiag ? 0 : irow - Ndiag); icol <= irow + Ndiag and icol < N; icol++)
+                w[m * M + irow] += A[((m * Nblocks + n) * M + irow) * (2*Ndiag + 1) + (icol + Ndiag - irow)] * v[n * N + icol];
         }
     }
     

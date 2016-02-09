@@ -110,8 +110,6 @@ void extract
                     Jre[i] = gsl_interp_eval_integ(spline, inp.rgrid.data(), jre.data(), 0, rad.rgrid.back(), acc);
                     gsl_interp_init(spline, inp.rgrid.data(), jim.data(), rad.rgrid.size());
                     Jim[i] = gsl_interp_eval_integ(spline, inp.rgrid.data(), jim.data(), 0, rad.rgrid.back(), acc);
-                    
-                    std::cout << rad.rgrid[i] << " " << Jre[i] << " " << Jim[i] << std::endl;
                 }
                 
                 // value of the projectile function

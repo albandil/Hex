@@ -134,7 +134,7 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                     }
                     
                     // add prefactor
-                    chikl *= std::sqrt(special::constant::two_pi * (2*ell+1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
+                    chikl *= std::sqrt(special::constant::two_pi * (2 * ell + 1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
                     
                     // update the vector
                     v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl * damp;
@@ -231,7 +231,7 @@ void Numerov2d::mask
         {
             mask[2] = std::make_tuple(s,l2,l1,i+1,j-1); // symmetry
             
-            mask[5] = std::make_tuple(s,l2,l1,i+1,j  ); // symmetry
+            mask[5] = std::make_tuple(s,l2,l1,i+1,j  ); // symmetry  
             
             mask[6] = std::make_tuple(1,l1,l2,i+1,j-1);
             mask[7] = std::make_tuple(1,l1,l2,i+1,j  );
@@ -250,10 +250,9 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
 {
     // number of blocks and their volume
     std::size_t Nang = ang_.size();
-    std::size_t block_vol = i * 3;
     
     // erase output array
-    std::memset(M, 0, Nang * Nang * block_vol * sizeof(Complex));
+    std::memset(M, 0, Nang * Nang * i * 3 * sizeof(Complex));
     
     // discretization scheme mask (to be used in function 'mask')
     std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> msk;
@@ -294,14 +293,10 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
                 // get (k,l) neighbour symmetry info ('ks' is always just 'i + term')
                 int signs; unsigned l1s, l2s; std::size_t ks, ls;
                 std::tie(signs,l1s,l2s,ks,ls) = msk[(ip + 1) * 3 + (jp + 1)];
-                unsigned ns = ang_.index(l1p,l2p);
+                unsigned ns = ang_.index(l1s,l2s);
                 
                 // skip this neighbour point (k,l) if it is not coupled to the current central element (i,j) through the matrix selected by 'term'
                 if (signs == 0)
-                    continue;
-                
-                // skip this neighbour point if it lies on the (zero) boundary
-                if (k == 0 or l == 0 or /* k == rad_.Npts - 1 or */ l == rad_.Npts - 1)
                     continue;
                 
                 // get Numerov discretization coefficients for the position (i,j,k,l)
@@ -314,15 +309,12 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
                 Complex rmin = std::min(rad_.grid[k], rad_.grid[l], Complex_realpart_less);
                 Complex rmax = std::max(rad_.grid[k], rad_.grid[l], Complex_realpart_less);
                 
-                // calculate the potential
+                // calculate the electrostatic potential
                 Complex Vkl = 0;
-                for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0. and rmin != 0.)
+                for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0. and k > 0 and l > 0)
                 {
-                    // one-electron part
                     if (lambda == 0)
                         Vkl += 1. / rmax - inp_.Z / rad_.grid[k] - inp_.Z / rad_.grid[l];
-                    
-                    // two-electron part
                     else
                         Vkl += ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda) / rmax;
                 }
@@ -339,11 +331,11 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
                     if (l > 0) H += 0.5 * l2 * (l2 + 1) / (rad_.grid[l] * rad_.grid[l]);
                     
                     // update element
-                    el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*0.5*(inp_.Etot - H);
+                    el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*(0.5*inp_.Etot - H);
                 }
                 
                 // update matrix element
-                M[(m * Nang + ns) * block_vol + (j - 1) * 3 + (ls + 1 - j)] += double(signs) * el;
+                M[((m * Nang + ns) * i + (j - 1)) * 3 + (ls + 1 - j)] += double(signs) * el;
             }
         }
     }

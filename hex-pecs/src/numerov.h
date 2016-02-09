@@ -103,7 +103,7 @@ class Numerov2d
             else
             {
                 double u = 2. * inp_.Z;
-                double v = l * (l + 1);
+                double v = -l * (l + 1);
                 
                 if (k  < i) return 0.;
                 if (k == i) return special::pow_int(1.+a,2+l) * (a*(2.+l)*(l*l+l+v+u*h) - 6. - 9.*l + v - 3.*l*l + u*h);

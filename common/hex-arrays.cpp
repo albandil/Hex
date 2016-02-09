@@ -171,12 +171,11 @@ void writeVTK_points
     out << to_string(ygrid) << std::endl;
     out << "Z_COORDINATES " << nz << " float" << std::endl;
     out << to_string(zgrid) << std::endl;
+    out << "POINT_DATA " << N << std::endl;
+    out << "FIELD wavefunction " << 2 * ev.size() / N << std::endl;
     
     for (std::size_t iblock = 0; (iblock + 1) * N <= ev.size(); iblock++)
     {
-        out << "POINT_DATA " << N << std::endl;
-        out << "FIELD wavefunction 2" << std::endl;
-        
         // save real part
         out << "block_" << iblock << "_re 1 " << N << " float" << std::endl;
         for (unsigned i = 0; i < nx; i++)
