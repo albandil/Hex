@@ -36,7 +36,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-/// Standard BLAS routine for matrix-vector multiplocation (real variant).
+/// Standard BLAS routine for matrix-vector multiplication (real variant).
 extern "C" void dgemv_
 (
     char * trans, int * m, int * n,
@@ -45,7 +45,7 @@ extern "C" void dgemv_
     double * beta, double * Y, int * incY
 );
 
-/// Standard BLAS routine for matrix-vector multiplocation (complex variant).
+/// Standard BLAS routine for matrix-vector multiplication (complex variant).
 extern "C" void zgemv_
 (
     char * trans, int * m, int * n,
