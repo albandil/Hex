@@ -42,19 +42,13 @@
 #include "hex-clenshawcurtis.h"
 #include "hex-hydrogen.h"
 #include "hex-matrix.h"
+#include "hex-misc.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
 #include "amplitudes.h"
 #include "bspline.h"
 #include "radial.h"
-
-// Return formatted string containing current date and time.
-std::string current_time () 
-{
-    std::time_t result = std::time(nullptr);
-    return std::asctime(std::localtime(&result));
-}
 
 // Extrapolate uniformly sampled function y(x) = a/x + b.
 Complex inv_power_extrapolate (rArray X, cArrayView Y)
@@ -231,10 +225,10 @@ void Amplitudes::writeSQL_files ()
     
     // Create SQL batch file
     std::ofstream fsql(ossfile.str().c_str());
-        
+    
     // set exponential format for floating point output
     fsql.setf(std::ios_base::scientific);
-        
+    
     // write header
     fsql << logo("--");
     fsql << "-- File generated on " << current_time();
@@ -244,7 +238,7 @@ void Amplitudes::writeSQL_files ()
     fsql << "--    > hex-db --new --database hex.db --import " << ossfile.str().c_str() << " --update" << std::endl;
     fsql << "--" << std::endl;
     fsql << "BEGIN TRANSACTION;" << std::endl;
-        
+    
     // for all discrete transitions data
     for (auto Tmat : Tmat_Slp)
     {

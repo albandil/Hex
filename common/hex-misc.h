@@ -731,4 +731,7 @@ inline std::string underline (std::string text)
  */
 std::string nice_size (std::size_t bytes);
 
+/// Return formatted string containing current date and time.
+std::string current_time ();
+
 #endif

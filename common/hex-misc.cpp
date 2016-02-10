@@ -191,3 +191,9 @@ std::string nice_size (std::size_t bytes)
     
     return format("%d TiB", bytes / TiB);
 }
+
+std::string current_time ()
+{
+    std::time_t result = std::time(nullptr);
+    return std::asctime(std::localtime(&result));
+}

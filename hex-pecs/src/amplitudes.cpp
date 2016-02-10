@@ -32,6 +32,7 @@
 #include <gsl/gsl_interp.h>
 
 #include "hex-hydrogen.h"
+#include "hex-version.h"
 
 #include "amplitudes.h"
 
@@ -140,24 +141,71 @@ void extract
     gsl_interp_free(spline);
     gsl_interp_accel_free(acc);
     
-    std::ofstream Tmfile ("tmat.txt");
+    //
+    // Write T-matrices to SQL batch file (for use in hex-db).
+    //
+    
+    std::ofstream Tmfile (format("tmat-%d-%d-%d.sql", inp.L, inp.S, inp.Pi));
+    
+    // set exponential format for floating point output
+    Tmfile.setf(std::ios_base::scientific);
+    
+    // write header
+    Tmfile << logo("--");
+    Tmfile << "-- File generated on " << current_time();
+    Tmfile << "--" << std::endl;
+    Tmfile << "-- Partial T-matrices for use in the database interface program \"hex-db\"." << std::endl;
+    Tmfile << "-- Use for example:" << std::endl;
+    Tmfile << "--    > hex-db --new --database hex.db --import <sqlfile> --update" << std::endl;
+    Tmfile << "--" << std::endl;
+    Tmfile << "BEGIN TRANSACTION;" << std::endl;
+    
     for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
     {
         for (std::size_t fstate = 0; fstate < inp.fstates.size(); fstate++)
         {
             for (std::size_t ell = 0; ell <= ang.maxell(); ell++)
             {
-                Tmfile << T_matrices[istate * inp.fstates.size() + fstate][ell] << std::endl;
+                int ni = inp.istates[istate].n, li = inp.istates[istate].l, mi = inp.istates[istate].m;
+                int nf = inp.fstates[fstate].n, lf = inp.fstates[fstate].l, mf = inp.fstates[fstate].m;
+                
+                Complex T = T_matrices[istate * inp.fstates.size() + fstate][ell];
+                
+                if (Complex_finite(T) and T != 0.)
+                {
+                    Tmfile  << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
+                            << ni << "," << li << "," << mi << ","
+                            << nf << "," << lf << "," << mf << ","
+                            << inp.L  << "," << 0 << ","
+                            << inp.Etot + 1. / (ni * ni) << "," << ell << "," 
+                            << T.real() << "," << T.imag() << ");" << std::endl;
+                }
             }
         }
     }
     
+    Tmfile << "COMMIT;" << std::endl;
+    
+    //
+    // Write cross sections to text file.
+    //
+    
     std::ofstream csfile ("cs.txt");
+    csfile << logo("#");
+    csfile << "# File generated on " << current_time() << "#" << std::endl;
+    csfile << "# " << (inp.S == 0 ? "Singlet" : "Triplet") << " partial cross sections." << std::endl;
+    csfile << "# istate / fstate / cross section" << std::endl;
+    
     for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
     {
         for (std::size_t fstate = 0; fstate < inp.fstates.size(); fstate++)
         {
-            csfile << cross_sections[istate * inp.fstates.size() + fstate] << std::endl;
+            int ni = inp.istates[istate].n, li = inp.istates[istate].l, mi = inp.istates[istate].m;
+            int nf = inp.fstates[fstate].n, lf = inp.fstates[fstate].l, mf = inp.fstates[fstate].m;
+            
+            double cs = cross_sections[istate * inp.fstates.size() + fstate];
+            
+            csfile << Hydrogen::stateName(ni,li,mi) << "\t" << Hydrogen::stateName(nf,lf,mf) << "\t" << cs << std::endl;
         }
     }
 }
