@@ -47,14 +47,14 @@ class AngularBasis
         AngularBasis (InputFile const & inp);
         
         /// Get particular state.
-        std::pair<int,int> const & state (unsigned ill) const { return states_[ill]; }
+        std::pair<unsigned,unsigned> const & state (unsigned ill) const { return states_[ill]; }
         
         /// Angular integrals.
-        double f (int lambda, int ill, int illp) const;
-        double f (int lambda, int l1, int l2, int l1p, int l2p) const;
+        double f (unsigned lambda, unsigned ill, unsigned illp) const;
+        double f (unsigned lambda, unsigned l1, unsigned l2, unsigned l1p, unsigned l2p) const;
         
         /// Get index of a specific angular momentum state.
-        unsigned index (int l1, int l2) const;
+        unsigned index (unsigned l1, unsigned l2) const;
         
         /// Highest multipole.
         unsigned maxlambda () const { return maxlambda_; }
@@ -77,7 +77,7 @@ class AngularBasis
         unsigned maxell_;
         
         // List of coupled angular states.
-        std::vector<std::pair<int,int>> states_;
+        std::vector<std::pair<unsigned,unsigned>> states_;
         
         // Angular integrals.
         rArray f_;

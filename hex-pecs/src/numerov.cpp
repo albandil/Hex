@@ -50,9 +50,9 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
     // 'i' is fixed, 'j' is the free index, 'k' and 'l' are summed
     
     // initial state quantum numbers
-    unsigned ni = inp_.istates[istate].n;
-    unsigned li = inp_.istates[istate].l;
-    int      mi = inp_.istates[istate].m;
+    int ni = inp_.istates[istate].n;
+    int li = inp_.istates[istate].l;
+    int mi = inp_.istates[istate].m;
     
     // impact momentum
     double ki = std::sqrt(inp_.Etot + 1./(ni*ni));
@@ -64,8 +64,8 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
     for (std::size_t m = 0; m < ang_.size(); m++)
     {
         // get angular momenta
-        unsigned l1 = ang_.state(m).first;
-        unsigned l2 = ang_.state(m).second;
+        int l1 = ang_.state(m).first;
+        int l2 = ang_.state(m).second;
         
         // for all elements of the right-hand side
         for (std::size_t j = 1; j <= i; j++)
@@ -103,41 +103,36 @@ void Numerov2d::F (std::size_t i, Complex * v, unsigned istate) const
                 Complex Djl = coef_B(j, l, t, beta,  l2);
                 
                 // evaluate the right-hand side at (r1,r2)
-                for (unsigned ell = 0; ell <= ang_.maxell(); ell++)
+                for (int ell = std::abs(li - inp_.L); ell <= ang_.maxell() and ell <= li + inp_.L; ell++)
                 {
                     // contribution to the right-hand side
                     Complex chikl = 0;
                     
-                    // for all multipoles
-                    for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++)
+                    // calculate prefactor
+                    Complex prefactor = std::sqrt(special::constant::two_pi * (2 * ell + 1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
+                    
+                    // nuclear potential (direct)
+                    if (l1 == li and l2 == ell)
+                        chikl -= inp_.Z/r2 * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
+                    
+                    // nuclear potential (exchange)
+                    if (l1 == ell and l2 == li)
+                        chikl -= inp_.Z/r1 * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
+                    
+                    // electron-electron potential (multipoles)
+                    for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
                     {
-                        // monopole
-                        if (lambda == 0)
-                        {
-                            // direct
-                            if (ang_.f(lambda, l1, l2, li, ell) != 0. and r1 > r2)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * (1./r1 - inp_.Z/r2) * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
-                            // exchange
-                            if (ang_.f(lambda, l1, l2, ell, li) != 0. and r2 > r1)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * (1./r2 - inp_.Z/r1) * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
-                        }
-                        // higher multipoles
-                        else
-                        {
-                            // direct
-                            if (ang_.f(lambda, l1, l2, li, ell) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
-                            // exchange
-                            if (ang_.f(lambda, l1, l2, ell, li) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
-                        }
+                        // direct
+                        if (ang_.f(lambda, l1, l2, li, ell) != 0.)
+                            chikl += ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
+                        
+                        // exchange
+                        if (ang_.f(lambda, l1, l2, ell, li) != 0.)
+                            chikl += ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                     }
                     
-                    // add prefactor
-                    chikl *= std::sqrt(special::constant::two_pi * (2 * ell + 1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
-                    
                     // update the vector
-                    v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*chikl * damp;
+                    v[m * i + (j - 1)] += -h*h*t*t*Bik*Djl*prefactor*chikl;
                 }
             }
         }
@@ -231,7 +226,7 @@ void Numerov2d::mask
         {
             mask[2] = std::make_tuple(s,l2,l1,i+1,j-1); // symmetry
             
-            mask[5] = std::make_tuple(s,l2,l1,i+1,j  ); // symmetry  
+            mask[5] = std::make_tuple(s,l2,l1,i+1,j  ); // symmetry
             
             mask[6] = std::make_tuple(1,l1,l2,i+1,j-1);
             mask[7] = std::make_tuple(1,l1,l2,i+1,j  );
@@ -327,8 +322,8 @@ void Numerov2d::calc_mat (std::size_t i, int term, Complex * M) const
                 {
                     // centrifugal "potential"
                     Complex H = 0.;
-                    if (k > 0) H += 0.5 * l1 * (l1 + 1) / (rad_.grid[k] * rad_.grid[k]);
-                    if (l > 0) H += 0.5 * l2 * (l2 + 1) / (rad_.grid[l] * rad_.grid[l]);
+                    if (k > 0 and l1 > 0) H += 0.5 * l1 * (l1 + 1) / (rad_.grid[k] * rad_.grid[k]);
+                    if (l > 0 and l2 > 0) H += 0.5 * l2 * (l2 + 1) / (rad_.grid[l] * rad_.grid[l]);
                     
                     // update element
                     el += 0.5*h*h*Bik*Cjl + 0.5*t*t*Aik*Djl + h*h*t*t*Bik*Djl*(0.5*inp_.Etot - H);

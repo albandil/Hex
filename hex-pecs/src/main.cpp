@@ -49,18 +49,20 @@ namespace debug
 {
     const bool enabled = true;
     
-    void write_banded (std::ostream & os, std::size_t rows, std::size_t cols, std::size_t Ndiag, Complex const * M)
+    void write_banded (std::ostream & os, std::size_t Nblocks, std::size_t rows, std::size_t cols, std::size_t Ndiag, Complex const * M)
     {
         if (not enabled)
             return;
         
-        for (unsigned i = 0; i < rows; i++)
+        for (unsigned block_row = 0; block_row < Nblocks; block_row++)
+        for (unsigned row = 0; row < rows; row++)
         {
             os << "    [ ";
-            for (unsigned j = 0; j < cols; j++)
+            for (unsigned block_col = 0; block_col < Nblocks; block_col++)
+            for (unsigned col = 0; col < cols; col++)
             {
-                if (std::max(i,j) - std::min(i,j) <= Ndiag)
-                    os << M[i * (2*Ndiag + 1) + j + Ndiag - i] << " ";
+                if (std::max(row,col) - std::min(row,col) <= Ndiag)
+                    os << M[((block_row * Nblocks + block_col) * rows + row) * (2*Ndiag + 1) + col + Ndiag - row] << " ";
                 else
                     os << "0 ";
             }
@@ -333,17 +335,17 @@ int main (int argc, char * argv[])
         std::memset(psi, 0, Nang * Npts * Npts * sizeof(Complex));
         
         // set other elements than the boundaries
-        for (std::size_t icol = 1; icol < Npts - 1; icol++)
+        for (std::size_t icol = 1; icol < Npts - 2; icol++)
         {
             // load the column
-            matops::load(V, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
+            matops::load(V, Nang * icol, format("%d/psi-%d.bin", icol, istate));
             
             // copy it to the solution (both symmetries)
             for (std::size_t iblock = 0; iblock < Nang; iblock++)
-            for (std::size_t irow = 0; irow <= icol; irow++)
+            for (std::size_t irow = 1; irow <= icol; irow++)
             {
-                psi[(iblock * Npts + icol + 1) * Npts + irow + 1] = V[iblock * Npts + irow];
-                psi[(iblock * Npts + irow + 1) * Npts + icol + 1] = V[iblock * Npts + irow] * symfactor;
+                psi[(iblock * Npts + icol) * Npts + irow] = V[iblock * icol + irow - 1];
+                psi[(iblock * Npts + irow) * Npts + icol] = V[iblock * icol + irow - 1] * symfactor;
             }
         }
         

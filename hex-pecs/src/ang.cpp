@@ -93,17 +93,17 @@ AngularBasis::AngularBasis (InputFile const & inp)
     std::cout << "ok" << std::endl << std::endl;;
 }
 
-double AngularBasis::f (int lambda, int ill, int illp) const
+double AngularBasis::f (unsigned lambda, unsigned ill, unsigned illp) const
 {
-    return f_[(lambda * states_.size() + ill) * states_.size() + illp];
+    return std::max(ill,illp) < states_.size() ? f_[(lambda * states_.size() + ill) * states_.size() + illp] : 0.;
 }
 
-unsigned AngularBasis::index (int l1, int l2) const
+unsigned AngularBasis::index (unsigned l1, unsigned l2) const
 {
     return std::find(states_.begin(), states_.end(), std::make_pair(l1,l2)) - states_.begin();
 }
 
-double AngularBasis::f (int lambda, int l1, int l2, int l1p, int l2p) const
+double AngularBasis::f (unsigned lambda, unsigned l1, unsigned l2, unsigned l1p, unsigned l2p) const
 {
     // find the matching angular states
     unsigned m = index(l1,l2);

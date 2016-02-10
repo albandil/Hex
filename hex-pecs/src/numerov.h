@@ -81,7 +81,7 @@ class Numerov2d
             std::size_t i, std::size_t j,
             std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> & mask
         ) const;
-    
+        
         void calc_mat (std::size_t i, int term, Complex * M) const;
         
         template <class T> T coef_A (int i, int k, T h, T a, unsigned l) const
@@ -103,11 +103,11 @@ class Numerov2d
             else
             {
                 double u = 2. * inp_.Z;
-                double v = -l * (l + 1);
+                double v = -(l * (l + 1.)); // do not remove the outer bracket!
                 
                 if (k  < i) return 0.;
                 if (k == i) return special::pow_int(1.+a,2+l) * (a*(2.+l)*(l*l+l+v+u*h) - 6. - 9.*l + v - 3.*l*l + u*h);
-                if (k  > i) return a*a*u*h*(l+1.) + a*(l*l*l + 6.*l*l + (u*h + v + 11.)*l + v + 6.) + 9*l + 6. - u*h - v + 3.*l*l;
+                if (k  > i) return a*a*u*h*(l+1.) + a*(l*l*l + 6.*l*l + (u*h + v + 11.)*l + v + 6.) + 9.*l + 6. - u*h - v + 3.*l*l;
             }
         }
         
