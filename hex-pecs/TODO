@@ -1,0 +1,8 @@
+This program is far from feature complete. Here are some notes on what should be added:
+
+- Double check the formulas, so that we get exactly the same numbers as Philip Bartlett.
+- Optimize the "matops" routines.
+- Use real routines for real operations (not complex everywhere).
+- Implement ScaLAPACK parallelization.
+- Implement energy perturbation.
+- Implement iterative coupling.
