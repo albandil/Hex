@@ -147,7 +147,7 @@ int main (int argc, char * argv[])
         
         // info
         std::cout << "Number of grid points: " << Npts << std::endl << std::endl;
-        std::cout << "Matrix size: up to " << Nang * Npts - 2 << std::endl << std::endl;
+        std::cout << "Matrix size: up to " << Nang * (Npts - 2) << std::endl << std::endl;
         
         // allocate all banded matrices (row-major blocks, row-major bands)
         Complex * A = new Complex [Nang * Npts * 3 * Nang];
