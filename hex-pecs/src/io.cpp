@@ -72,10 +72,11 @@ const std::string sample_input =
     "\n"
     "# Angular momenta.\n"
     "# L  S  Pi limit\n"
-    "  0  *  0  4\n"
+    "  0  0  0  4\n"
     "\n"
     "# Atom + projectile total energy in Rydbergs.\n"
     "  1\n"
+    "\n"
     "# Nuclear charge.\n"
     "  1\n"
     ;
@@ -83,10 +84,13 @@ const std::string sample_input =
 CommandLine::CommandLine (int argc, char* argv[])
 {
     // default values
-    forward_grid = true;
-    forward_states = true;
-    backward = true;
+    fully_coupled = false;
+    group_coupled = false;
+    prepare_grid = true;
+    propagate_states = true;
+    max_iter = 100;
     inputfile = "pecs.inp";
+    itertol = 1e-8;
     
     // custom values
     ParseCommandLine
@@ -118,6 +122,10 @@ CommandLine::CommandLine (int argc, char* argv[])
                     "\t--input <filename>         (-i)  Use custom input file (other than \"pecs.inp\").                       \n"
                     "\t--propagate-only           (-p)  Skip preparation of propagation matrices and only propagate solutions. \n"
                     "\t--extract-only             (-x)  Only extract T-matrices and cross sections.                            \n"
+                    "\t--fully-coupled            (-c)  Solve fully angularly coupled system.                                  \n"
+                    "\t--group-coupled            (-g)  Solve partially coupled system (group by nL).                          \n"
+                    "\t--max-iter <number>              Maximal number of iterative coupling iterations.                       \n"
+                    "\t--tolerance                      Iterative coupling relative tolerance.                                 \n"
                     "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
@@ -132,14 +140,34 @@ CommandLine::CommandLine (int argc, char* argv[])
             },
         "propagate-only", "p", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                forward_grid = false;
+                prepare_grid = false;
                 return true;
             },
         "extract-only", "x", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
-                forward_grid = false;
-                forward_states = false;
-                backward = false;
+                prepare_grid = false;
+                propagate_states = false;
+                return true;
+            },
+        "fully-coupled", "c", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                fully_coupled = true;
+                max_iter = 1;
+                return true;
+            },
+        "group-coupled", "g", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                group_coupled = true;
+                return true;
+            },
+        "max-iter", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                max_iter = std::stoi(optargs[0]);
+                return true;
+            },
+        "tolerance", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                itertol = std::stod(optargs[0]);
                 return true;
             },
         
@@ -202,27 +230,6 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
 
 InputFile::InputFile (const CommandLine& cmd)
 {
-    /*istates.push_back(HState({ 1, 0, 0 }));
-    fstates.push_back(HState({ 1, 0, 0 }));
-    Etot = 1;
-    Z = 1;
-    L = Pi = S = nL = 0;
-    ecstheta = special::constant::pi_quart;
-    rgrid = concatenate
-    (
-        linspace(0.00, 0.20, 21),
-        linspace(0.26, 2.00, 30),
-        linspace(2.20, 20.0, 90),
-        linspace(20.4, 200., 450)
-//         linspace(0.,3.,4)
-    );
-    cgrid = concatenate
-    (
-        linspace(0.1, 2.0, 20),
-        linspace(2.5, 20.0, 36)
-//         linspace(0.,3.,4)
-    );*/
-    
     std::ifstream inf (cmd.inputfile);
     
     if (not inf.good())

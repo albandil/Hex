@@ -49,7 +49,10 @@ class CommandLine
         
         CommandLine (int argc, char* argv[]);
         
-        bool forward_grid, forward_states, backward;
+        bool prepare_grid, propagate_states;
+        bool fully_coupled, group_coupled;
+        unsigned max_iter;
+        double itertol;
         std::string inputfile;
 };
 

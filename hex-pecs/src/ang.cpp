@@ -31,10 +31,10 @@
 
 #include "ang.h"
 
-AngularBasis::AngularBasis (InputFile const & inp)
+AngularBasis::AngularBasis (CommandLine const & cmd, InputFile const & inp)
     : L_(inp.L), S_(0), Pi_(inp.Pi), nL_(inp.nL), maxlambda_(inp.L + 2 * inp.nL), maxell_(nL_ + L_ + Pi_)
 {
-    std::cout << "Setting up the coupled angular states..." << std::endl;
+    std::cout << "Setting up the angular states..." << std::endl;
     
     // for given L, Π and levels list all available (ℓ₁ℓ₂) pairs
     for (int ell = 0; ell <= inp.nL; ell++)
@@ -55,6 +55,25 @@ AngularBasis::AngularBasis (InputFile const & inp)
             }
         }
         std::cout << std::endl;
+    }
+    
+    // set coupled groups
+    if (cmd.fully_coupled)
+    {
+        std::cout << "- using 1 fully coupled group" << std::endl;
+        groups_.push_back(linspace(0, states_.size() - 1, states_.size()));
+    }
+    else if (cmd.group_coupled)
+    {
+        std::cout << "- using " << inp.nL + 1 << " independently coupled groups" << std::endl;
+        for (unsigned igroup = 0; igroup <= inp.nL; igroup++)
+            groups_.push_back(linspace(igroup * (L_ + Pi_ + 1), (igroup + 1) * (L_ + Pi_ + 1) - 1, L_ + Pi_ + 1));
+    }
+    else
+    {
+        std::cout << "- using fully decoupled system" << std::endl;
+        for (unsigned iang = 0; iang <= states_.size(); iang++)
+            groups_.push_back(iang);
     }
     
     // precompute angular integrals

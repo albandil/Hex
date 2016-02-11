@@ -63,7 +63,13 @@ class AngularBasis
         unsigned maxell () const { return maxell_; }
         
         /// Number of angular momentum states.
-        std::size_t size () const { return states_.size(); }
+        unsigned size () const { return states_.size(); }
+        
+        /// Number of coupled angular groups.
+        unsigned Ngroups () const { return groups_.size(); }
+        
+        /// Number of angular momentum states in a group.
+        unsigned groupsize () const { return states_.size() / groups_.size(); }
         
     private:
         
@@ -76,8 +82,11 @@ class AngularBasis
         // Largest angular momentum.
         unsigned maxell_;
         
-        // List of coupled angular states.
+        // List of angular states.
         std::vector<std::pair<unsigned,unsigned>> states_;
+        
+        // Coupled groups.
+        std::vector<std::vector<unsigned>> groups_;
         
         // Angular integrals.
         rArray f_;

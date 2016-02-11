@@ -53,6 +53,10 @@ namespace matops
     template <class T>
     void flip_sign (std::size_t N, T * restrict x);
     
+    /// Calclate 2-norm of the array.
+    template <class T>
+    double norm (std::size_t N, T * restrict x);
+    
     /// Multiply vector by a dense column-matrix.
     template <class T>
     void dense_mul_vector (std::size_t M, std::size_t N, T const * restrict A, T const * restrict v, T * restrict w);

@@ -143,6 +143,8 @@ int main (int argc, char * argv[])
         
         // shorthands
         std::size_t Nang = ang.size();
+        std::size_t Ngrp = ang.Ngroups();
+        std::size_t gsize= ang.groupsize();
         std::size_t Npts = rad.Npts;
         
         // info
@@ -150,14 +152,14 @@ int main (int argc, char * argv[])
         std::cout << "Matrix size: up to " << Nang * (Npts - 2) << std::endl << std::endl;
         
         // allocate all banded matrices (row-major blocks, row-major bands)
-        Complex * A = new Complex [Nang * Npts * 3 * Nang];
-        Complex * B = new Complex [Nang * Npts * 3 * Nang];
-        Complex * C = new Complex [Nang * Npts * 3 * Nang];
+        Complex * A = new Complex [Ngrp * gsize * gsize * Npts * 3];
+        Complex * B = new Complex [Ngrp * gsize * gsize * Npts * 3];
+        Complex * C = new Complex [Ngrp * gsize * gsize * Npts * 3];
         
         // allocate all dense matrices (column-major)
-        Complex * D   = new Complex [Nang * Npts * Nang * Npts];
-        Complex * invB= new Complex [Nang * Npts * Nang * Npts];
-        Complex * psi = new Complex [Nang * Npts *        Npts];
+        Complex * D   = new Complex [Ngrp * gsize * gsize * Npts * Npts];
+        Complex * invB= new Complex [Ngrp * gsize * gsize * Npts * Npts];
+        Complex * psi = new Complex [Nang *                 Npts * Npts];
         
         // allocate all vectors
         Complex * E = new Complex [Nang * Npts];
@@ -168,10 +170,10 @@ int main (int argc, char * argv[])
         int * pivots = new int [Nang * Npts];
     
     //
-    // Forward pass A : construction of propagation matrices.
+    // Forward pass: construction of propagation matrices.
     //
     
-    if (cmd.forward_grid)
+    if (cmd.prepare_grid)
     {
         for (std::size_t icol = 1; icol < Npts - 1; icol++)
         {
@@ -180,89 +182,91 @@ int main (int argc, char * argv[])
             // create output directory
             os::mkdirp(format("%d", icol));
             
-            // calculate the Numerov matrices
+            // calculate the Numerov matrices for all tightly coupled groups
             std::cout << "  - calculate A-matrix" << std::endl;
-            num.A(icol, A); // dim: Nang*i x Nang*(i-1)
-            
+            for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                num.A(icol, igrp, A + igrp * gsize * gsize * Npts * 3); // dim: Nang*i x Nang*(i-1)
             std::cout << "  - calculate B-matrix" << std::endl;
-            num.B(icol, B); // dim: Nang*i x Nang*i
-            
+            for (unsigned igrp = 0; igrp < ang.Ngroups(); igrp++)
+                num.B(icol, igrp, B + igrp * gsize * gsize * Npts * 3); // dim: Nang*i x Nang*i
             std::cout << "  - calculate C-matrix" << std::endl;
-            num.C(icol, C); // dim: Nang*i x Nang*(i+1)
+            for (unsigned igrp = 0; igrp < Ngrp; igroup++)
+                num.C(icol, igrp, C + igrp * gsize * gsize * Npts * 3); // dim: Nang*i x Nang*(i+1)
             
             // check that [iknot]/invB.bin exists
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
             {
                 // A * D -> M, dim: Nang*i x Nang*i
                 std::cout << "  - multiply A * D -> M" << std::endl;
-                matops::blockband_mul_dense(Nang, icol, icol - 1, icol, 1, A, D, invB);
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::blockband_mul_dense
+                    (
+                        gsize, icol, icol - 1, icol, 1,
+                        A + igrp * gsize * gsize * Npts * 3,
+                        D + igrp * gsize * gsize * Npts * Npts,
+                        invB + igrp * gsize * gsize * Npts * Npts
+                    );
+                }
                 
                 // M + B -> M
                 std::cout << "  - add (A * D) + B -> M" << std::endl;
-                matops::dense_add_blockband(Nang, icol, 1, invB, B);
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::dense_add_blockband
+                    (
+                        gsize, icol, 1,
+                        invB + igrp * gsize * gsize * Npts * Npts,
+                        B + igrp * gsize * gsize * Npts * Npts
+                    );
+                }
                 
-                // invert M -> invB ('pivots' and 'D' are workspaces)
+                // invert M -> invB
                 std::cout << "  - inversion of M" << std::endl;
-                matops::dense_invert(Nang * icol, invB, pivots, D);
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::dense_invert
+                    (
+                        gsize * icol,
+                        invB + igrp * gsize * gsize * Npts * Npts,
+                        pivots, D   // 'pivots' and 'D' are workspaces
+                    );
+                }
                 
                 // save inverse matrix to disk
                 std::cout << "  - save inverse matrix to disk" << std::endl;
-                matops::save(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol));
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::save
+                    (
+                        invB + igrp * gsize * gsize * Npts * Npts,
+                        gsize * icol * gsize * icol,
+                        format("%d/invB-%d.bin", icol, igrp)
+                    );
+                }
             }
             
             // update D, = -B^{-1} C
             std::cout << "  - solve B D = C for D" << std::endl;
-            matops::dense_mul_blockband(Nang, icol, icol, icol + 1, 1, invB, C, D);
+            for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+            {
+                matops::dense_mul_blockband
+                (
+                    gsize, icol, icol, icol + 1, 1,
+                    invB + igrp * gsize * gsize * Npts * Npts,
+                    C + igrp * gsize * gsize * Npts * 3,
+                    D + igrp * gsize * gsize * Npts * Npts
+                );
+            }
             
             std::cout << "  - flip sign of D" << std::endl;
-            matops::flip_sign(Nang * icol * Nang * (icol + 1), D);
-            
-            std::cout << std::endl;
-        }
-    }
-    
-    //
-    // Forward pass B : construction of constant vectors.
-    //
-    
-    if (cmd.forward_states)
-    {
-        for (std::size_t icol = 1; icol < Npts - 1; icol++)
-        {
-            std::cout << "Forward states: column " << icol << " / " << Npts - 2 << std::endl;
-            
-            // calculate the Numerov matrices
-            std::cout << "  - calculate A-matrix" << std::endl;
-            num.A(icol, A);
-            
-            // load inverted B
-            std::cout << "  - load inverse B from disk" << std::endl;
-            if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
-                HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
-            
-            // for all initial states
-            std::cout << "  - prepare constant vectors" << std::endl;
-            for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+            for (unsigned igrp = 0; igrp < Ngrp; igrp++)
             {
-                // calculate the constant vector
-                std::cout << "  - calculate F-vector" << std::endl;
-                num.F(icol, F, istate);
-                matops::save(F, Nang * icol, format("%d/F-%d.bin", icol, istate));
-                
-                // A * E -> V
-                std::cout << "  - multiply A * E -> V" << std::endl;
-                matops::blockband_mul_vector(Nang, icol, icol - 1, 1, A, E, V);
-                
-                // F - (A * E)  ->  V
-                std::cout << "  - subtract F - V -> V" << std::endl;
-                matops::subtract(Nang * icol, F, V, V);
-                
-                // B^{-1} (F - (A * E))  ->  E
-                std::cout << "  - solve B^{-1} V -> E" << std::endl;
-                matops::dense_mul_vector(Nang * icol, Nang * icol, invB, V, E);
-                
-                // save to disk
-                matops::save(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
+                matops::flip_sign
+                (
+                    gsize * icol * gsize * (icol + 1),
+                    D + igrp * gsize * gsize * Npts * Npts
+                );
             }
             
             std::cout << std::endl;
@@ -270,56 +274,212 @@ int main (int argc, char * argv[])
     }
     
     //
-    // Backward pass : solution of constant vectors.
+    // Propagation of states.
     //
     
-    if (cmd.backward)
+    if (cmd.propagate_states)
     {
-        for (std::size_t icol = Npts - 2; icol >= 1; icol--)
+        for (unsigned iter = 0; iter < cmd.max_iter; iter++)
         {
-            std::cout << "Backward states: column " << icol << " / " << Npts - 2 << std::endl;
+            //
+            // Forward pass : calculation of constant vectors.
+            //
             
-            // calculate the Numerov matrices
-            num.C(icol, C);
-            
-            // load inverted B
-            std::cout << "  - load inverse B from disk" << std::endl;
-            if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
-                HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
-            
-            // update D, = -B^{-1} C
-            std::cout << "  - solve B D = C for D" << std::endl;
-            matops::dense_mul_blockband(Nang, icol, icol, icol + 1, 1, invB, C, D);
-            
-            std::cout << "  - flip sign of D" << std::endl;
-            matops::flip_sign(Nang * icol * Nang * (icol + 1), D);
-            
-            // for all initial states
-            std::cout << "  - propagate states" << std::endl;
-            for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+            for (std::size_t icol = 1; icol < Npts - 1; icol++)
             {
-                // load E
-                matops::load(E, Nang * icol, format("%d/E-%d.bin", icol, istate));
+                std::cout << "Forward states: column " << icol << " / " << Npts - 2 << std::endl;
                 
-                // load or initialize psi
-                if (icol == rad.Npts - 2)
-                    std::memset(psi, 0, Nang * (icol + 1) * sizeof(Complex));
-                else
-                    matops::load(psi, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
+                // calculate the Numerov matrices
+                std::cout << "  - calculate A-matrix" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    num.A(icol, igrp, A + igrp * gsize * gsize * Npts * 3);
                 
-                // D * psi  ->  V
-                std::cout << "  - multiply D * psi -> V" << std::endl;
-                matops::dense_mul_vector(Nang * icol, Nang * (icol + 1), D, psi, V);
+                // load inverted B
+                std::cout << "  - load inverse B from disk" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    if (not matops::load(invB + igrp * gsize * gsize * Npts * Npts, gsize * icol * gsize * icol, format("%d/invB-%d.bin", icol, igrp)))
+                        HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
+                }
                 
-                // (D * psi) + E  ->  psi
-                std::cout << "  - add V + E -> psi" << std::endl;
-                matops::sum(Nang * icol, V, E, psi);
+                // for all initial states
+                std::cout << "  - prepare constant vectors" << std::endl;
+                for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+                {
+                    // get solutions for surrounding columns calculated up to now
+                    for (std::size_t inbr = std::max<std::size_t>(1, icol - 1); inbr < icol + 1 and inbr < Npts - 1; inbr++)
+                        matops::load(psi + Nang * inbr * icol, Nang * inbr, format("%d/psi-%d.bin", inbr, istate)) or std::memset(psi + Nang * inbr * icol, 0, Nang * inbr * sizeof(Complex));
+                    
+                    // calculate the constant vector
+                    std::cout << "  - [" << iter << "] calculate F-vector" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                        num.F(icol, igrp, psi, F + igrp * gsize * Npts, istate);
+                    
+                    // A * E -> V
+                    std::cout << "  - multiply A * E -> V" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::blockband_mul_vector
+                        (
+                            gsize, icol, icol - 1, 1,
+                            A + igrp * gsize * gsize * Npts * 3,
+                            E + igrp * gsize * Npts,
+                            V + igrp * gsize * Npts
+                        );
+                    }
+                    
+                    // F - (A * E)  ->  V
+                    std::cout << "  - subtract F - V -> V" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::subtract
+                        (
+                            gsize * icol,
+                            F + igrp * gsize * Npts,
+                            V + igrp * gsize * Npts,
+                            V + igrp * gsize * Npts
+                        );
+                    }
+                    
+                    // B^{-1} (F - (A * E))  ->  E
+                    std::cout << "  - solve B^{-1} V -> E" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::dense_mul_vector
+                        (
+                            gsize * icol, gsize * icol,
+                            invB + igrp * gsize * Npts * gsize * Npts,
+                            V + igrp * gsize * Npts,
+                            E + igrp * gsize * Npts
+                        );
+                    }
+                    
+                    // save to disk
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::save
+                        (
+                            E + igrp * gsize * Npts,
+                            gsize * icol,
+                            format("%d/E-%d-%d.bin", icol, istate, igrp)
+                        );
+                    }
+                }
                 
-                // save psi
-                matops::save(psi, Nang * icol, format("%d/psi-%d.bin", icol, istate));
+                std::cout << std::endl;
             }
             
-            std::cout << std::endl;
+            //
+            // Backward pass : reverse propagation of the solution.
+            //
+            
+            double diffnorm = 0, solnorm = 0;
+            
+            for (std::size_t icol = Npts - 2; icol >= 1; icol--)
+            {
+                std::cout << "Backward states: column " << icol << " / " << Npts - 2 << std::endl;
+                
+                // calculate the Numerov matrices
+                std::cout << "  - calculate C-matrix" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    num.C(icol, igrp, C + igrp * gsize * gsize * Npts * 3);
+                
+                // load inverted B
+                std::cout << "  - load inverse B from disk" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    if (not matops::load(invB + igrp * gsize * gsize * Npts * Npts, gsize * icol * gsize * icol, format("%d/invB-%d.bin", icol, igrp)))
+                        HexException("Missing precomputed propagation matrix for grid point %ld.", icol);
+                }
+                
+                // update D, = -B^{-1} C
+                std::cout << "  - solve B D = C for D" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::dense_mul_blockband
+                    (
+                        gsize, icol, icol, icol + 1, 1,
+                        invB + igrp * gsize * Npts * gsize * Npts,
+                        C + igrp * gsize * gsize * Npts * 3,
+                        D + igrp * gsize * Npts * gsize * Npts
+                    );
+                }
+                
+                std::cout << "  - flip sign of D" << std::endl;
+                for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                {
+                    matops::flip_sign
+                    (
+                        gsize * icol * gsize * (icol + 1),
+                        D + igrp * gsize * Npts * gsize * Npts
+                    );
+                }
+                
+                // for all initial states
+                std::cout << "  - propagate states" << std::endl;
+                for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+                {
+                    // load E
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::load
+                        (
+                            E + igrp * gsize * Npts,
+                            gsize * icol,
+                            format("%d/E-%d-%d.bin", icol, istate, igrp)
+                        );
+                    }
+                    
+                    // load or initialize psi
+                    if (icol == rad.Npts - 2)
+                        std::memset(psi, 0, Nang * (icol + 1) * sizeof(Complex));
+                    else
+                        matops::load(psi, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
+                    
+                    // D * psi  ->  V
+                    std::cout << "  - multiply D * psi -> V" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::dense_mul_vector
+                        (
+                            gsize * icol, gsize * (icol + 1),
+                            D + igrp * gsize * Npts * gsize * Npts,
+                            psi + igrp * gsize * Npts,
+                            V + igrp * gsize * Npts
+                        );
+                    }
+                    
+                    // (D * psi) + E  ->  psi
+                    std::cout << "  - add V + E -> psi" << std::endl;
+                    for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                    {
+                        matops::sum
+                        (
+                            gsize * icol, 
+                            V + igrp * gsize * Npts,
+                            E + igrp * gsize * Npts,
+                            psi + igrp * gsize * Npts
+                        );
+                    }
+                    
+                    // load solution obtained from the previous iteration
+                    matops::load(V, Nang * icol, format("%d/psi-%d.bin", icol, istate)) or std::memset(V, 0, Nang * icol * sizeof(Complex));
+                    
+                    // calculate norm of difference
+                    matops::subtract(Nang * icol, psi, V, V);
+                    diffnorm += matops::norm(Nang * icol, V);
+                    solnorm += matops::norm(Nang * icol, psi);
+                    
+                    // save psi
+                    matops::save(psi, Nang * icol, format("%d/psi-%d.bin", icol, istate));
+                }
+                
+                std::cout << std::endl;
+            }
+            
+            // exit the iterations if the solution changed just a little
+            if (iter > 0 and diffnorm < cmd.itertol * solnorm)
+                break;
         }
     }
     

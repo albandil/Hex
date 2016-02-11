@@ -154,6 +154,18 @@ namespace matops
     // explicit instantiation of 'flip_sign' for needed types
     template void flip_sign<double> (std::size_t N, double * restrict x);
     template void flip_sign<Complex> (std::size_t N, Complex * restrict x);
+    
+    // norm
+    template <class T> double norm (std::size_t N, T * restrict x)
+    {
+        double nrm = 0;
+        for (std::size_t i = 0; i < N; i++)
+            nrm += sqrabs(x[i]);
+        return std::sqrt(nrm);
+    }
+    
+    template double norm<double> (std::size_t N, double * restrict x);
+    template double norm<Complex> (std::size_t N, Complex * restrict x);
 }
 
 // --------------------------------------------------------------------------------- //
