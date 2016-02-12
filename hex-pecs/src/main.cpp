@@ -133,7 +133,7 @@ int main (int argc, char * argv[])
         InputFile inp (cmd);
         
         // construct angular basis
-        AngularBasis ang (inp);
+        AngularBasis ang (cmd, inp);
         
         // construct radial basis
         RadialBasis rad (inp);
@@ -175,6 +175,7 @@ int main (int argc, char * argv[])
     
     if (cmd.prepare_grid)
     {
+        // for all columns of the solution
         for (std::size_t icol = 1; icol < Npts - 1; icol++)
         {
             std::cout << "Forward grid: column " << icol << " / " << Npts - 2 << std::endl;
@@ -190,10 +191,10 @@ int main (int argc, char * argv[])
             for (unsigned igrp = 0; igrp < ang.Ngroups(); igrp++)
                 num.B(icol, igrp, B + igrp * gsize * gsize * Npts * 3); // dim: Nang*i x Nang*i
             std::cout << "  - calculate C-matrix" << std::endl;
-            for (unsigned igrp = 0; igrp < Ngrp; igroup++)
+            for (unsigned igrp = 0; igrp < Ngrp; igrp++)
                 num.C(icol, igrp, C + igrp * gsize * gsize * Npts * 3); // dim: Nang*i x Nang*(i+1)
             
-            // check that [iknot]/invB.bin exists
+            // calculate invB if not available
             if (not matops::load(invB, Nang * icol * Nang * icol, format("%d/invB.bin", icol)))
             {
                 // A * D -> M, dim: Nang*i x Nang*i
@@ -225,6 +226,7 @@ int main (int argc, char * argv[])
                 std::cout << "  - inversion of M" << std::endl;
                 for (unsigned igrp = 0; igrp < Ngrp; igrp++)
                 {
+                    std::cout << igrp << " " << gsize * icol << std::endl;
                     matops::dense_invert
                     (
                         gsize * icol,
@@ -279,6 +281,7 @@ int main (int argc, char * argv[])
     
     if (cmd.propagate_states)
     {
+        for (double Epert : cmd.Epert)
         for (unsigned iter = 0; iter < cmd.max_iter; iter++)
         {
             //
@@ -287,7 +290,7 @@ int main (int argc, char * argv[])
             
             for (std::size_t icol = 1; icol < Npts - 1; icol++)
             {
-                std::cout << "Forward states: column " << icol << " / " << Npts - 2 << std::endl;
+                std::cout << "Forward iteration " << iter << ": column " << icol << " / " << Npts - 2 << std::endl;
                 
                 // calculate the Numerov matrices
                 std::cout << "  - calculate A-matrix" << std::endl;
@@ -308,12 +311,12 @@ int main (int argc, char * argv[])
                 {
                     // get solutions for surrounding columns calculated up to now
                     for (std::size_t inbr = std::max<std::size_t>(1, icol - 1); inbr < icol + 1 and inbr < Npts - 1; inbr++)
-                        matops::load(psi + Nang * inbr * icol, Nang * inbr, format("%d/psi-%d.bin", inbr, istate)) or std::memset(psi + Nang * inbr * icol, 0, Nang * inbr * sizeof(Complex));
+                        matops::load(psi + Nang * inbr * icol, Nang * inbr, format("%d/psi-%d-E%g.bin", inbr, istate, Epert)) or std::memset(psi + Nang * inbr * icol, 0, Nang * inbr * sizeof(Complex));
                     
                     // calculate the constant vector
                     std::cout << "  - [" << iter << "] calculate F-vector" << std::endl;
                     for (unsigned igrp = 0; igrp < Ngrp; igrp++)
-                        num.F(icol, igrp, psi, F + igrp * gsize * Npts, istate);
+                        num.F(icol, igrp, psi, Epert, F + igrp * gsize * Npts, istate);
                     
                     // A * E -> V
                     std::cout << "  - multiply A * E -> V" << std::endl;
@@ -361,7 +364,7 @@ int main (int argc, char * argv[])
                         (
                             E + igrp * gsize * Npts,
                             gsize * icol,
-                            format("%d/E-%d-%d.bin", icol, istate, igrp)
+                            format("%d/E-%d-g%d-E%g.bin", icol, istate, igrp, Epert)
                         );
                     }
                 }
@@ -426,7 +429,7 @@ int main (int argc, char * argv[])
                         (
                             E + igrp * gsize * Npts,
                             gsize * icol,
-                            format("%d/E-%d-%d.bin", icol, istate, igrp)
+                            format("%d/E-%d-g%d-E%g.bin", icol, istate, igrp, Epert)
                         );
                     }
                     
@@ -434,7 +437,7 @@ int main (int argc, char * argv[])
                     if (icol == rad.Npts - 2)
                         std::memset(psi, 0, Nang * (icol + 1) * sizeof(Complex));
                     else
-                        matops::load(psi, Nang * (icol + 1), format("%d/psi-%d.bin", icol + 1, istate));
+                        matops::load(psi, Nang * (icol + 1), format("%d/psi-%d-E%g.bin", icol + 1, istate, Epert));
                     
                     // D * psi  ->  V
                     std::cout << "  - multiply D * psi -> V" << std::endl;
@@ -463,7 +466,7 @@ int main (int argc, char * argv[])
                     }
                     
                     // load solution obtained from the previous iteration
-                    matops::load(V, Nang * icol, format("%d/psi-%d.bin", icol, istate)) or std::memset(V, 0, Nang * icol * sizeof(Complex));
+                    matops::load(V, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, Epert)) or std::memset(V, 0, Nang * icol * sizeof(Complex));
                     
                     // calculate norm of difference
                     matops::subtract(Nang * icol, psi, V, V);
@@ -471,7 +474,7 @@ int main (int argc, char * argv[])
                     solnorm += matops::norm(Nang * icol, psi);
                     
                     // save psi
-                    matops::save(psi, Nang * icol, format("%d/psi-%d.bin", icol, istate));
+                    matops::save(psi, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, Epert));
                 }
                 
                 std::cout << std::endl;
@@ -480,53 +483,63 @@ int main (int argc, char * argv[])
             // exit the iterations if the solution changed just a little
             if (iter > 0 and diffnorm < cmd.itertol * solnorm)
                 break;
+            
+            // exit if maximal number of iterations has been reached
+            if (iter != 0 and iter + 1 == cmd.max_iter)
+            {
+                std::cout << "Warning: Maximal number of iterations reached. The iterative coupling does not converge fast enough." << std::endl;
+                break;
+            }
         }
     }
-    
-    //
-    // Collect the solutions and store as VTK.
-    //
     
     double symfactor =  ((inp.S + inp.Pi) % 2 == 0 ? +1. : -1.);
     
-    for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
+    for (double Epert : cmd.Epert)
     {
-        // clean the solution
-        std::memset(psi, 0, Nang * Npts * Npts * sizeof(Complex));
+        //
+        // Collect the solutions and store as VTK.
+        //
         
-        // set other elements than the boundaries
-        for (std::size_t icol = 1; icol < Npts - 2; icol++)
+        for (std::size_t istate = 0; istate < inp.istates.size(); istate++)
         {
-            // load the column
-            matops::load(V, Nang * icol, format("%d/psi-%d.bin", icol, istate));
+            // clean the solution
+            std::memset(psi, 0, Nang * Npts * Npts * sizeof(Complex));
             
-            // copy it to the solution (both symmetries)
-            for (std::size_t iblock = 0; iblock < Nang; iblock++)
-            for (std::size_t irow = 1; irow <= icol; irow++)
+            // set other elements than the boundaries
+            for (std::size_t icol = 1; icol < Npts - 2; icol++)
             {
-                psi[(iblock * Npts + icol) * Npts + irow] = V[iblock * icol + irow - 1];
-                psi[(iblock * Npts + irow) * Npts + icol] = V[iblock * icol + irow - 1] * symfactor;
+                // load the column
+                matops::load(V, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, Epert));
+                
+                // copy it to the solution (both symmetries)
+                for (std::size_t iblock = 0; iblock < Nang; iblock++)
+                for (std::size_t irow = 1; irow <= icol; irow++)
+                {
+                    psi[(iblock * Npts + icol) * Npts + irow] = V[iblock * icol + irow - 1];
+                    psi[(iblock * Npts + irow) * Npts + icol] = V[iblock * icol + irow - 1] * symfactor;
+                }
             }
+            
+            // get the unrotated grid
+            rArray grid = concatenate(inp.rgrid, inp.cgrid.slice(1, inp.cgrid.size()) + inp.rgrid.back());
+            
+            // save the solution for visualization
+            std::ofstream out (format("psi-%d.vtk", istate));
+            writeVTK_points
+            (
+                out,
+                cArrayView(Nang * Npts * Npts, psi),
+                grid, grid, rArray({0.})
+            );
         }
         
-        // get the unrotated grid
-        rArray grid = concatenate(inp.rgrid, inp.cgrid.slice(1, inp.cgrid.size()) + inp.rgrid.back());
+        //
+        // Extract the amplitudes.
+        //
         
-        // save the solution for visualization
-        std::ofstream out (format("psi-%d.vtk", istate));
-        writeVTK_points
-        (
-            out,
-            cArrayView(Nang * Npts * Npts, psi),
-            grid, grid, rArray({0.})
-        );
+        extract(cmd, inp, ang, rad, psi);
     }
-    
-    //
-    // Extract the amplitudes.
-    //
-    
-    extract(cmd, inp, ang, rad, psi);
     
     return EXIT_SUCCESS;
 }

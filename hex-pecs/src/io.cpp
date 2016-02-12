@@ -91,6 +91,7 @@ CommandLine::CommandLine (int argc, char* argv[])
     max_iter = 100;
     inputfile = "pecs.inp";
     itertol = 1e-8;
+    Epert.push_back(0.);
     
     // custom values
     ParseCommandLine
@@ -115,17 +116,19 @@ CommandLine::CommandLine (int argc, char* argv[])
             {
                 // print usage information
                 std::cout << "\n"
-                    "Available switches (short forms in parentheses):                                                          \n"
-                    "                                                                                                          \n"
-                    "\t--example                  (-e)  Create sample input file.                                              \n"
-                    "\t--help                     (-h)  Display this help.                                                     \n"
-                    "\t--input <filename>         (-i)  Use custom input file (other than \"pecs.inp\").                       \n"
-                    "\t--propagate-only           (-p)  Skip preparation of propagation matrices and only propagate solutions. \n"
-                    "\t--extract-only             (-x)  Only extract T-matrices and cross sections.                            \n"
-                    "\t--fully-coupled            (-c)  Solve fully angularly coupled system.                                  \n"
-                    "\t--group-coupled            (-g)  Solve partially coupled system (group by nL).                          \n"
-                    "\t--max-iter <number>              Maximal number of iterative coupling iterations.                       \n"
-                    "\t--tolerance                      Iterative coupling relative tolerance.                                 \n"
+                    "Available switches (short forms in parentheses):                                                                        \n"
+                    "                                                                                                                        \n"
+                    "\t--example                  (-e)  Create sample input file.                                                            \n"
+                    "\t--help                     (-h)  Display this help.                                                                   \n"
+                    "\t--input <filename>         (-i)  Use custom input file (other than \"pecs.inp\").                                     \n"
+                    "\t--propagate-only           (-p)  Skip preparation of propagation matrices and only propagate solutions.               \n"
+                    "\t--extract-only             (-x)  Only extract T-matrices and cross sections.                                          \n"
+                    "\t--fully-coupled            (-c)  Solve fully angularly coupled system.                                                \n"
+                    "\t--group-coupled            (-g)  Solve partially coupled system (group by nL).                                        \n"
+                    "\t--max-iter <number>              Maximal number of iterative coupling iterations.                                     \n"
+                    "\t--tolerance                      Iterative coupling relative tolerance.                                               \n"
+                    "\t--energy-pert <list>       (-E)  Solve several close energie in one run. Perturbations are in Ry, separated by spaces.\n"
+                    "\t                                 If no perturbation is given, they will be read from the standard input.              \n"
                     "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
@@ -168,6 +171,23 @@ CommandLine::CommandLine (int argc, char* argv[])
         "tolerance", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 itertol = std::stod(optargs[0]);
+                return true;
+            },
+        "energy-pert", "E", -1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                if (optargs.size() == 0)
+                {
+                    // read from STDIN
+                    double e;
+                    while (std::cin >> e)
+                        Epert.push_back(e);
+                }
+                else
+                {
+                    // read from given list
+                    for (std::string const & e : optargs)
+                        Epert.push_back(std::stod(e));
+                }
                 return true;
             },
         

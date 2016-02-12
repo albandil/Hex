@@ -53,6 +53,7 @@ class CommandLine
         bool fully_coupled, group_coupled;
         unsigned max_iter;
         double itertol;
+        rArray Epert;
         std::string inputfile;
 };
 

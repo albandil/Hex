@@ -44,7 +44,7 @@ class AngularBasis
 {
     public:
         
-        AngularBasis (InputFile const & inp);
+        AngularBasis (CommandLine const & cmd, InputFile const & inp);
         
         /// Get particular state.
         std::pair<unsigned,unsigned> const & state (unsigned ill) const { return states_[ill]; }
@@ -86,7 +86,7 @@ class AngularBasis
         std::vector<std::pair<unsigned,unsigned>> states_;
         
         // Coupled groups.
-        std::vector<std::vector<unsigned>> groups_;
+        std::vector<NumberArray<unsigned>> groups_;
         
         // Angular integrals.
         rArray f_;

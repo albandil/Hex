@@ -44,11 +44,11 @@ class Numerov2d
         
         Numerov2d (InputFile const & inp, AngularBasis const & ang, RadialBasis const & rad);
         
-        void A (std::size_t i, Complex * M) const;
-        void B (std::size_t i, Complex * M) const;
-        void C (std::size_t i, Complex * M) const;
+        void A (std::size_t i, unsigned igroup, Complex * M) const;
+        void B (std::size_t i, unsigned igroup, Complex * M) const;
+        void C (std::size_t i, unsigned igroup, Complex * M) const;
         
-        void F (std::size_t i, Complex * v, unsigned istate) const;
+        void F (std::size_t i, unsigned igroup, Complex * psi, double Epert, Complex * v, unsigned istate) const;
         
     private:
         
@@ -82,7 +82,7 @@ class Numerov2d
             std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> & mask
         ) const;
         
-        void calc_mat (std::size_t i, int term, Complex * M) const;
+        void calc_mat (std::size_t i, int term, unsigned igroup, Complex * M) const;
         
         template <class T> T coef_A (int i, int k, T h, T a, unsigned l) const
         {

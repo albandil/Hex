@@ -60,20 +60,20 @@ AngularBasis::AngularBasis (CommandLine const & cmd, InputFile const & inp)
     // set coupled groups
     if (cmd.fully_coupled)
     {
-        std::cout << "- using 1 fully coupled group" << std::endl;
-        groups_.push_back(linspace(0, states_.size() - 1, states_.size()));
+        std::cout << "\t- using fully coupled system" << std::endl;
+        groups_.push_back(linspace<unsigned>(0, states_.size() - 1, states_.size()));
     }
     else if (cmd.group_coupled)
     {
-        std::cout << "- using " << inp.nL + 1 << " independently coupled groups" << std::endl;
+        std::cout << "\t- using " << inp.nL + 1 << " independently coupled groups (" << L_ + Pi_ + 1 << " states each)" << std::endl;
         for (unsigned igroup = 0; igroup <= inp.nL; igroup++)
             groups_.push_back(linspace(igroup * (L_ + Pi_ + 1), (igroup + 1) * (L_ + Pi_ + 1) - 1, L_ + Pi_ + 1));
     }
     else
     {
-        std::cout << "- using fully decoupled system" << std::endl;
+        std::cout << "\t- using fully decoupled system" << std::endl;
         for (unsigned iang = 0; iang <= states_.size(); iang++)
-            groups_.push_back(iang);
+            groups_.push_back(NumberArray<unsigned>(1, iang));
     }
     
     // precompute angular integrals
