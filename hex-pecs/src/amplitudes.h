@@ -32,18 +32,52 @@
 #ifndef HEX_PECS_AMPLITUDES_H
 #define HEX_PECS_AMPLITUDES_H
 
+#include <vector>
+
 #include "ang.h"
 #include "io.h"
 #include "radial.h"
 
-void extract
-(
-    CommandLine const & cmd,
-    InputFile const & inp,
-    AngularBasis const & ang,
-    RadialBasis const & rad,
-    double Epert,
-    Complex const * psi
-);
+class Amplitudes
+{
+    public:
+        
+        /// Constructor - allocates the arrays.
+        Amplitudes
+        (
+            CommandLine const & cmd,
+            InputFile const & inp,
+            AngularBasis const & ang,
+            RadialBasis const & rad
+        );
+        
+        /// Extract amplitudes from a given wave function.
+        void extract
+        (
+            unsigned istate,
+            unsigned iEpert,
+            Complex const * psi
+        );
+        
+        /// Write all extracted data to the data files.
+        void write ();
+    
+    private:
+        
+        /// Command line parameters.
+        CommandLine const & cmd_;
+        
+        /// Input file contents.
+        InputFile const & inp_;
+        
+        /// Angular basis states.
+        AngularBasis const & ang_;
+        
+        /// Radial grid data.
+        RadialBasis const & rad_;
+        
+        /// Partial T-matrices for every transition, shape: Nenergy × istates × fstates × (maxell + 1).
+        Array<Array<Array<cArray>>> T_matrices;
+};
 
 #endif

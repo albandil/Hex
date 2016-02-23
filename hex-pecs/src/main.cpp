@@ -312,15 +312,18 @@ int main (int argc, char * argv[])
                             matops::load(psi + (inbr + 1 - icol) * Nang * (icol + 1), Nang * inbr, format("%d/psi-%d-E%g.bin", inbr, istate, Epert));
                     }
                     
+                    // load E for previous column
+                    if (icol > 1)
+                    {
+                        for (unsigned igrp = 0; igrp < Ngrp; igrp++)
+                            matops::load(E + igrp * gsize * Npts, gsize * (icol - 1), format("%d/E-%d-g%d-E%g.bin", icol - 1, istate, igrp, Epert));
+                    }
+                    
                     // calculate the constant vector
                     std::cout << "  - [" << iter << "] calculate F-vector" << std::endl;
                     std::memset(F, 0, Nang * Npts * sizeof(Complex));
                     for (unsigned igrp = 0; igrp < Ngrp; igrp++)
-                    {
                         num.F(icol, igrp, psi, Epert, F + igrp * gsize * Npts, istate);
-                        matops::save(F + igrp * gsize * Npts, gsize * icol, format("%d/F-%d-E%g.bin", icol, igrp, Epert));
-                    }
-                    matops::save(F, Nang * icol, format("%d/F-E%g.bin", icol, Epert));
                     
                     // A * E -> V
                     std::cout << "  - multiply A * E -> V" << std::endl;
@@ -476,16 +479,16 @@ int main (int argc, char * argv[])
                     // save psi
                     matops::save(psi, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, Epert));
                     
-                    if (icol == 500)
-                    {
-                        for (std::size_t ll = 0; ll < Nang; ll++)
-                        {
-                            std::ofstream ofs (format("psi-%d-at-50-iter-%d.txt", ll, iter));
-                            ofs << "0 0 0" << std::endl;
-                            for (std::size_t i = 0; i < icol; i++)
-                                ofs << rad.nrgrid[i + 1] << " " << psi[ll * icol + i].real() << " " << psi[ll * icol + i].imag() << std::endl;
-                        }
-                    }
+//                     if (icol == 500)
+//                     {
+//                         for (std::size_t ll = 0; ll < Nang; ll++)
+//                         {
+//                             std::ofstream ofs (format("psi-%d-at-50-iter-%d.txt", ll, iter));
+//                             ofs << "0 0 0" << std::endl;
+//                             for (std::size_t i = 0; i < icol; i++)
+//                                 ofs << rad.nrgrid[i + 1] << " " << psi[ll * icol + i].real() << " " << psi[ll * icol + i].imag() << std::endl;
+//                         }
+//                     }
                 }
                 
                 std::cout << std::endl;
@@ -512,7 +515,9 @@ int main (int argc, char * argv[])
     
     double symfactor =  ((inp.S + inp.Pi) % 2 == 0 ? +1. : -1.);
     
-    for (double Epert : cmd.Epert)
+    Amplitudes amplitudes (cmd, inp, ang, rad);
+    
+    for (unsigned iEpert = 0; iEpert < cmd.Epert.size(); iEpert++)
     {
         //
         // Collect the solutions and store as VTK.
@@ -527,7 +532,7 @@ int main (int argc, char * argv[])
             for (std::size_t icol = 1; icol < Npts - 2; icol++)
             {
                 // load the column
-                matops::load(V, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, Epert));
+                matops::load(V, Nang * icol, format("%d/psi-%d-E%g.bin", icol, istate, cmd.Epert[iEpert]));
                 
                 // copy it to the solution (both symmetries)
                 for (std::size_t iblock = 0; iblock < Nang; iblock++)
@@ -542,21 +547,20 @@ int main (int argc, char * argv[])
             rArray grid = concatenate(inp.rgrid, inp.cgrid.slice(1, inp.cgrid.size()) + inp.rgrid.back());
             
             // save the solution for visualization
-            std::ofstream out (format("psi-%d-E%g.vtk", istate, Epert));
+            std::ofstream out (format("psi-%d-E%g.vtk", istate, iEpert));
             writeVTK_points
             (
                 out,
                 cArrayView(Nang * Npts * Npts, psi),
                 grid, grid, rArray({0.})
             );
+            
+            // extract amplitudes from this wave function
+            amplitudes.extract(istate, iEpert, psi);
         }
-        
-        //
-        // Extract the amplitudes.
-        //
-        
-        extract(cmd, inp, ang, rad, Epert, psi);
     }
+    
+    amplitudes.write();
     
     return EXIT_SUCCESS;
 }
