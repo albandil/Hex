@@ -42,6 +42,7 @@ void extract
     InputFile const & inp,
     AngularBasis const & ang,
     RadialBasis const & rad,
+    double Epert,
     Complex const * psi
 )
 {
@@ -55,11 +56,11 @@ void extract
     {
         // initial state quantum numbers
         int ni = inp.fstates[istate].n;
-        int li = inp.fstates[istate].l;
+        //int li = inp.fstates[istate].l; // - not used
         int mi = inp.fstates[istate].m;
         
         // initial projectile  momentum
-        double ki = std::sqrt(inp.Etot + 1./(ni*ni));
+        double ki = std::sqrt(inp.Etot + Epert + 1./(ni*ni));
         
         for (std::size_t fstate = 0; fstate < inp.fstates.size(); fstate++)
         {
@@ -69,10 +70,10 @@ void extract
             int mf = inp.fstates[fstate].m;
             
             // final projectile momentum
-            double kf = std::sqrt(inp.Etot + 1./(nf*nf));
+            double kf = std::sqrt(inp.Etot + Epert + 1./(nf*nf));
             
             // partial T-matrices
-            T_matrices[istate * inp.fstates.size()] = cArray(ang.maxell() + 1);
+            T_matrices[istate * inp.fstates.size() + fstate] = cArray(ang.maxell() + 1);
             
             // skip in-accessible states
             if (not std::isfinite(kf))
@@ -85,7 +86,7 @@ void extract
             
             // for all contributing angular blocks
             for (std::size_t iblock = 0; iblock < ang.size(); iblock++)
-            if (inp.fstates[fstate].l == ang.state(iblock).first)
+            if ((unsigned)inp.fstates[fstate].l == ang.state(iblock).first)
             {
                 rArray jre (rad.rgrid.size()), jim (rad.rgrid.size()), Jre (rad.rgrid.size()), Jim (rad.rgrid.size());
                 
@@ -145,7 +146,7 @@ void extract
     // Write T-matrices to SQL batch file (for use in hex-db).
     //
     
-    std::ofstream Tmfile (format("tmat-%d-%d-%d.sql", inp.L, inp.S, inp.Pi));
+    std::ofstream Tmfile (format("tmat-E%g-%d-%d-%d.sql", inp.Etot + Epert, inp.L, inp.S, inp.Pi));
     
     // set exponential format for floating point output
     Tmfile.setf(std::ios_base::scientific);
@@ -177,7 +178,7 @@ void extract
                             << ni << "," << li << "," << mi << ","
                             << nf << "," << lf << "," << mf << ","
                             << inp.L  << "," << 0 << ","
-                            << inp.Etot + 1. / (ni * ni) << "," << ell << "," 
+                            << inp.Etot + Epert + 1. / (ni * ni) << "," << ell << "," 
                             << T.real() << "," << T.imag() << ");" << std::endl;
                 }
             }
@@ -190,10 +191,11 @@ void extract
     // Write cross sections to text file.
     //
     
-    std::ofstream csfile ("cs.txt");
+    std::ofstream csfile (format("cs-%g.txt", inp.Etot + Epert));
     csfile << logo("#");
     csfile << "# File generated on " << current_time() << "#" << std::endl;
     csfile << "# " << (inp.S == 0 ? "Singlet" : "Triplet") << " partial cross sections." << std::endl;
+    csfile << "#" << std::endl;
     csfile << "# istate / fstate / cross section" << std::endl;
     
     for (std::size_t istate = 0; istate < inp.istates.size(); istate++)

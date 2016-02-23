@@ -45,13 +45,20 @@ RadialBasis::RadialBasis (InputFile const & inp)
     
     Npts = rgrid.size() + cgrid.size() - 1;
     grid.resize(Npts);
+    nrgrid.resize(Npts);
     
     for (std::size_t i = 0; i < Npts; i++)
     {
         if (i < rgrid.size())
+        {
+            nrgrid[i] = inp.rgrid[i];
             grid[i] = rgrid[i];
+        }
         else
+        {
+            grid[i] = inp.cgrid[i - rgrid.size() + 1] + inp.rgrid.back();
             grid[i] = cgrid[i - rgrid.size() + 1] + rgrid.back();
+        }
     }
     
     std::cout << "Real grid points: " << std::endl;

@@ -205,28 +205,34 @@ namespace matops
     
     template<> void dense_invert<double> (std::size_t N, double * A, int * pivots, double * work)
     {
-        int n = N, lda = N, lwork = N * N, info;
-        
-        dgetrf_(&n, &n, A, &lda, pivots, &info);
-        if (info != 0)
-            HexException("DGETRF failed with error code %d.", info);
-        
-        dgetri_(&n, A, &lda, pivots, work, &lwork, &info);
-        if (info != 0)
-            HexException("DGETRI failed with error code %d.", info);
+        if (N != 0)
+        {
+            int n = N, lda = N, lwork = N * N, info;
+            
+            dgetrf_(&n, &n, A, &lda, pivots, &info);
+            if (info != 0)
+                HexException("DGETRF failed with error code %d.", info);
+            
+            dgetri_(&n, A, &lda, pivots, work, &lwork, &info);
+            if (info != 0)
+                HexException("DGETRI failed with error code %d.", info);
+        }
     }
     
     template<> void dense_invert<Complex> (std::size_t N, Complex * A, int * pivots, Complex * work)
     {
-        int n = N, lda = N, lwork = N * N, info;
-        
-        zgetrf_(&n, &n, A, &lda, pivots, &info);
-        if (info != 0)
-            HexException("ZGETRF failed with error code %d.", info);
-        
-        zgetri_(&n, A, &lda, pivots, work, &lwork, &info);
-        if (info != 0)
-            HexException("ZGETRI failed with error code %d.", info);
+        if (N != 0)
+        {
+            int n = N, lda = N, lwork = N * N, info;
+            
+            zgetrf_(&n, &n, A, &lda, pivots, &info);
+            if (info != 0)
+                HexException("ZGETRF failed with error code %d.", info);
+            
+            zgetri_(&n, A, &lda, pivots, work, &lwork, &info);
+            if (info != 0)
+                HexException("ZGETRI failed with error code %d.", info);
+        }
     }
 }
 

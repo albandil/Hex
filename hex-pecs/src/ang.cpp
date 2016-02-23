@@ -66,13 +66,13 @@ AngularBasis::AngularBasis (CommandLine const & cmd, InputFile const & inp)
     else if (cmd.group_coupled)
     {
         std::cout << "\t- using " << inp.nL + 1 << " independently coupled groups (" << L_ + Pi_ + 1 << " states each)" << std::endl;
-        for (unsigned igroup = 0; igroup <= inp.nL; igroup++)
+        for (int igroup = 0; igroup <= inp.nL; igroup++)
             groups_.push_back(linspace(igroup * (L_ + Pi_ + 1), (igroup + 1) * (L_ + Pi_ + 1) - 1, L_ + Pi_ + 1));
     }
     else
     {
         std::cout << "\t- using fully decoupled system" << std::endl;
-        for (unsigned iang = 0; iang <= states_.size(); iang++)
+        for (unsigned iang = 0; iang < states_.size(); iang++)
             groups_.push_back(NumberArray<unsigned>(1, iang));
     }
     

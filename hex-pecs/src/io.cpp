@@ -88,7 +88,7 @@ CommandLine::CommandLine (int argc, char* argv[])
     group_coupled = false;
     prepare_grid = true;
     propagate_states = true;
-    max_iter = 100;
+    max_iter = 1000;
     inputfile = "pecs.inp";
     itertol = 1e-8;
     Epert.push_back(0.);
@@ -121,12 +121,13 @@ CommandLine::CommandLine (int argc, char* argv[])
                     "\t--example                  (-e)  Create sample input file.                                                            \n"
                     "\t--help                     (-h)  Display this help.                                                                   \n"
                     "\t--input <filename>         (-i)  Use custom input file (other than \"pecs.inp\").                                     \n"
+                    "\t--grid-only                (-g)  Prepare only the propagation matrices.                                               \n"
                     "\t--propagate-only           (-p)  Skip preparation of propagation matrices and only propagate solutions.               \n"
                     "\t--extract-only             (-x)  Only extract T-matrices and cross sections.                                          \n"
                     "\t--fully-coupled            (-c)  Solve fully angularly coupled system.                                                \n"
                     "\t--group-coupled            (-g)  Solve partially coupled system (group by nL).                                        \n"
                     "\t--max-iter <number>              Maximal number of iterative coupling iterations.                                     \n"
-                    "\t--tolerance                      Iterative coupling relative tolerance.                                               \n"
+                    "\t--tolerance                (-t)  Iterative coupling relative tolerance.                                               \n"
                     "\t--energy-pert <list>       (-E)  Solve several close energie in one run. Perturbations are in Ry, separated by spaces.\n"
                     "\t                                 If no perturbation is given, they will be read from the standard input.              \n"
                     "\n"
@@ -141,9 +142,16 @@ CommandLine::CommandLine (int argc, char* argv[])
                 inputfile = optargs[0];
                 return true;
             },
+        "grid-only", "g", 0,  [&](std::vector<std::string> const & optargs) -> bool
+            {
+                prepare_grid = true;
+                propagate_states = false;
+                return true;
+            },
         "propagate-only", "p", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 prepare_grid = false;
+                propagate_states = true;
                 return true;
             },
         "extract-only", "x", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -155,7 +163,6 @@ CommandLine::CommandLine (int argc, char* argv[])
         "fully-coupled", "c", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 fully_coupled = true;
-                max_iter = 1;
                 return true;
             },
         "group-coupled", "g", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -168,7 +175,7 @@ CommandLine::CommandLine (int argc, char* argv[])
                 max_iter = std::stoi(optargs[0]);
                 return true;
             },
-        "tolerance", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+        "tolerance", "t", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 itertol = std::stod(optargs[0]);
                 return true;

@@ -60,8 +60,12 @@ void Numerov2d::F (std::size_t i, unsigned igroup, Complex * psi, double Epert, 
     // symmetry sign
     double sign = ((inp_.S + inp_.Pi) % 2 == 0 ? +1. : -1.);
     
+    // get angular states range for this angular group
+    std::size_t m_min = igroup * ang_.groupsize();
+    std::size_t m_max = (igroup + 1) * ang_.groupsize() - 1;
+    
     // for all angular momentum states
-    for (std::size_t m = igroup * ang_.groupsize(); m < (igroup + 1) * ang_.groupsize(); m++)
+    for (std::size_t m = m_min; m <= m_max; m++)
     {
         // get angular momenta
         int l1 = ang_.state(m).first;
@@ -71,7 +75,7 @@ void Numerov2d::F (std::size_t i, unsigned igroup, Complex * psi, double Epert, 
         for (std::size_t j = 1; j <= i; j++)
         {
             // clear the element
-            v[m * i + (j - 1)] = 0.;
+            v[(m - m_min) * i + (j - 1)] = 0.;
             
             // get mesh parameters
             Complex h = rad_.grid[i] - rad_.grid[i-1];
@@ -84,8 +88,8 @@ void Numerov2d::F (std::size_t i, unsigned igroup, Complex * psi, double Epert, 
             for (std::size_t l = std::max<std::size_t>(1, j - 1); l <= j + 1 and l + 1 < rad_.grid.size(); l++)
             {
                 // radial coordinates
-                double r1 = rad_.rgrid[k];
-                double r2 = rad_.rgrid[l];
+                double r1 = rad_.rgrid[std::min(k, rad_.rgrid.size() - 1)];
+                double r2 = rad_.rgrid[std::min(l, rad_.rgrid.size() - 1)];
                 
                 // smaller and larger radial coordinate (sorted by real part)
                 double rmin = std::min(r1, r2);
@@ -103,62 +107,40 @@ void Numerov2d::F (std::size_t i, unsigned igroup, Complex * psi, double Epert, 
                 Complex Djl = coef_B(j, l, t, beta,  l2);
                 
                 // evaluate the right-hand side at (r1,r2), if it contributes at all
-                if (k < rad_.rgrid.size() and l < rad_.rgrid.size())
+                if (k + 1 < rad_.rgrid.size() and l + 1 < rad_.rgrid.size())
                 {
+                    // right-hand side element
+                    Complex chikl = 0;
+                    
                     // all impact partial waves
                     for (int ell = std::abs(li - inp_.L); ell <= (int)ang_.maxell() and ell <= li + inp_.L; ell++)
                     {
-                        // contribution to the right-hand side
-                        Complex chikl = 0;
-                        
                         // calculate prefactor
                         Complex prefactor = std::sqrt(special::constant::two_pi * (2 * ell + 1)) / ki * special::ClebschGordan(li,mi,ell,0,inp_.L,mi) * special::pow_int(1.0_i, ell);
                         
                         // nuclear potential (direct)
                         if (l1 == li and l2 == ell)
-                            chikl -= inp_.Z/r2 * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
+                            chikl -= prefactor * inp_.Z/r2 * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
                         
                         // nuclear potential (exchange)
                         if (l1 == ell and l2 == li)
-                            chikl -= inp_.Z/r1 * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
+                            chikl -= prefactor * inp_.Z/r1 * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                         
                         // electron-electron potential (multipoles)
                         for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++)
                         {
                             // direct
                             if (ang_.f(lambda, l1, l2, li, ell) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
+                                chikl += prefactor * ang_.f(lambda, l1, l2, li, ell) * special::pow_int(rmin/rmax, lambda)/rmax * Hydrogen::P(ni,li,r1,inp_.Z) * special::ric_j(ell,ki*r2);
                             
                             // exchange
                             if (ang_.f(lambda, l1, l2, ell, li) != 0.)
-                                chikl += ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
+                                chikl += prefactor * ang_.f(lambda, l1, l2, ell, li) * special::pow_int(rmin/rmax, lambda)/rmax * special::ric_j(ell,ki*r1) * Hydrogen::P(ni,li,r2,inp_.Z) * sign;
                         }
-                        
-                        // update the vector
-                        v[m * i + (j - 1)] += prefactor * chikl * damp;
                     }
-                }
-                
-                // iterative coupling : add out-of-group coupling to the existing solution
-                for (std::size_t n = 0; n < ang_.size(); n++)
-                {
-                    // skip members of current group
-                    if (igroup * ang_.groupsize() <= n or n < (igroup + 1) * ang_.groupsize())
-                        continue;
                     
-                    // get mirror angular state index
-                    std::size_t ns = igroup * ang_.groupsize() + ang_.groupsize() - (m % ang_.groupsize()) - 1; // mirror angular state index
-                    
-                    // get element of the solution
-                    Complex psinkl = (
-                        k > l ?
-                        psi[((k + 1 - i) * ang_.size() + n)  * i + l + 1 - j] :
-                        psi[((l + 1 - i) * ang_.size() + ns) * i + k + 1 - j] * sign
-                    );
-                    
-                    // add all multipole couplings
-                    for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0.)
-                        v[m * i + (j - 1)] += ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda)/rmax * psinkl;
+                    // update the vector
+                    v[(m - m_min) * i + (j - 1)] += -h*h*t*t*Bik*Djl * chikl * damp;
                 }
                 
                 // energy perturbation
@@ -168,17 +150,39 @@ void Numerov2d::F (std::size_t i, unsigned igroup, Complex * psi, double Epert, 
                     
                     // get element of the solution
                     Complex psimkl = (
-                        k > l ?
-                        psi[((k + 1 - i) * ang_.size() + m)  * i + l + 1 - j] :
-                        psi[((l + 1 - i) * ang_.size() + ms) * i + k + 1 - j] * sign
+                        k >= l ?
+                        psi[((k + 1 - i) * ang_.size() + m ) * (i + 1) + l - 1] :
+                        psi[((l + 1 - i) * ang_.size() + ms) * (i + 1) + k - 1] * sign
                     );
                     
                     // update the element of F
-                    v[m * i + (j - 1)] += -0.8 * Epert * psimkl;
+                    v[(m - m_min) * i + (j - 1)] += -h*h*t*t*Bik*Djl * ( -0.5 * Epert * psimkl );
                 }
                 
-                // finalize the element
-                v[m * i + (j - 1)] *= -h*h*t*t*Bik*Djl;
+                // iterative coupling : add out-of-group coupling to the existing solution
+                if (k + 1 < rad_.rgrid.size() and l + 1 < rad_.rgrid.size())
+                {
+                    for (std::size_t n = 0; n < ang_.size(); n++)
+                    {
+                        // skip members of current group
+                        if (m_min <= n and n <= m_max)
+                            continue;
+                        
+                        // get mirror angular state index
+                        std::size_t ns = igroup * ang_.groupsize() + ang_.groupsize() - (n % ang_.groupsize()) - 1;
+                        
+                        // get element of the solution
+                        Complex psinkl = (
+                            k >= l ?
+                            psi[((k + 1 - i) * ang_.size() + n ) * (i + 1) + l - 1] :
+                            psi[((l + 1 - i) * ang_.size() + ns) * (i + 1) + k - 1] * sign
+                        );
+                        
+                        // add all multipole couplings
+                        for (unsigned lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(lambda, m, n) != 0.)
+                            v[(m - m_min) * i + (j - 1)] += h*h*t*t*Bik*Djl * ang_.f(lambda, m, n) * special::pow_int(rmin/rmax, lambda)/rmax * psinkl;
+                    }
+                }
             }
         }
     }
@@ -288,11 +292,11 @@ void Numerov2d::mask
 
 void Numerov2d::calc_mat (std::size_t i, int term, unsigned igroup, Complex * M) const
 {
-    // number of blocks and their volume
-    std::size_t Nang = ang_.size();
+    // number of blocks
+    std::size_t gsize = ang_.groupsize();
     
     // erase output array
-    std::memset(M, 0, Nang * Nang * i * 3 * sizeof(Complex));
+    std::memset(M, 0, gsize * gsize * i * 3 * sizeof(Complex));
     
     // discretization scheme mask (to be used in function 'mask')
     std::array<std::tuple<int,unsigned,unsigned,std::size_t,std::size_t>, 9> msk;
@@ -300,9 +304,13 @@ void Numerov2d::calc_mat (std::size_t i, int term, unsigned igroup, Complex * M)
     // symmetry factor
     int s = ((inp_.S + inp_.Pi) % 2 == 0 ? +1 : -1);
     
+    // get angular states range for this angular group
+    std::size_t m_min = igroup * ang_.groupsize();
+    std::size_t m_max = (igroup + 1) * ang_.groupsize() - 1;
+    
     // for all angular momentum blocks
-    for (std::size_t m = igroup * ang_.groupsize(); m < (igroup + 1) * ang_.groupsize(); m++)
-    for (std::size_t n = igroup * ang_.groupsize(); n < (igroup + 1) * ang_.groupsize(); n++)
+    for (std::size_t m = m_min; m <= m_max; m++)
+    for (std::size_t n = m_min; n <= m_max; n++)
     {
         // get angular momenta
         unsigned l1 = ang_.state(m).first;
@@ -375,7 +383,7 @@ void Numerov2d::calc_mat (std::size_t i, int term, unsigned igroup, Complex * M)
                 }
                 
                 // update matrix element
-                M[((m * Nang + ns) * i + (j - 1)) * 3 + (ls + 1 - j)] += double(signs) * el;
+                M[(((m - m_min) * gsize + (ns - m_min)) * i + (j - 1)) * 3 + (ls + 1 - j)] += double(signs) * el;
             }
         }
     }

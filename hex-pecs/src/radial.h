@@ -42,12 +42,22 @@ class RadialBasis
 {
     public:
         
+        /// COnstructor from input file.
         RadialBasis (InputFile const & inp);
         
+        /// Real part of the grid.
         rArray rgrid;
+        
+        /// Complex part of the grid.
         cArray cgrid;
+        
+        /// Full grid.
         cArray grid;
         
+        /// Full grid, non-rotated.
+        rArray nrgrid;
+        
+        /// Number of full grid points.
         std::size_t Npts;
 };
 
