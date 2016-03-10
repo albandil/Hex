@@ -27,11 +27,11 @@ LFLAGS = -fopenmp -lstdc++
 # several blocks concurrently.                                                 #
 # ---------------------------------------------------------------------------- #
 
-BLASLAPACKFLAGS = 
-BLASLAPACKLIBS = -lblas -llapack
+# BLASLAPACKFLAGS = 
+# BLASLAPACKLIBS = -lblas -llapack
 
-# BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
-# BLASLAPACKLIBS = -lopenblas
+BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
+BLASLAPACKLIBS = -lopenblas
 
 # ---------------------------------------------------------------------------- #
 # SuiteSparse/UMFPACK                                                          #

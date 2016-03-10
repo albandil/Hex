@@ -35,7 +35,7 @@
 /**
   @mainpage
   @author Jakub Benda, MFF UK
-  @date 17. 5. 2014
+  @date 10. 3. 2016
   @section ecs Hex-ecs
   
   <b>Hex-ecs</b> computes partial T-matrices for elastic, excitation and ionization
@@ -48,8 +48,8 @@
   Hex is written in C++11 to make use of comfort of the modern C++ extensions,
   so one may need a newer compiler. Tested compilers are:
   
-  - GCC 4.8.1
-  - Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
+  - GCC 5.2.0
+  - Intel C++ Composer XE 16.0.0 (tested with GCC 4.8.1 headers)
   
   Both worked with the same Makefile, just by setting the variable CPP to "g++"
   or "icpc". The program also uses following external packages (tested versions
@@ -59,8 +59,6 @@
     for Wigner coupling coefficients and some other special functions.
   - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
     for sparse matrix manipulation and for a direct sparse system solver.
-  - <a href="http://www.fftw.org/">FFTW</a> (3.3.3):
-    for fast evaluation of %Chebyshev expansions by Fast Fourier Transform.
   - OpenMP (2.1): for parallelization at single machine.
   - MPI (OpenMPI 1.6): for parallelization at cluster.
   
@@ -70,10 +68,6 @@
     CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
     OpenBLAS is optional because SuiteSparse can be configured to use
     a different BLAS implementation.
-  - <a href="http://www.nongnu.org/pngpp/">png++</a> (0.2.5, requires libpng-1.5.x or <b>older</b>):
-    PNG read/write interface, for debugging purposes. The code that references
-    png++ can be excluded from compilation by the option -DNO_PNG.
-    For convenience, this library is directly included in the source code of Hex-ecs.
   
   All listed libraries are open-source and easily obtainable on the internet
   and/or in the repositories of some Linux distributions.
@@ -81,8 +75,8 @@
   Equations in this documentation use MathJax, which should work in every
   up-to-date JavaScript-enabled web browser. Tested browsers are:
   
-  - Mozilla Firefox 24.0
-  - Konqueror 4.10.5
+  - Mozilla Firefox 44.0.2
+  - Konqueror 4.14.17
   
   @subsection usage Usage
   
@@ -99,53 +93,59 @@
   of high partial waves a lot of memory is necessary, so one often uses the out-of-core functionality
   (i.e. possibility of storing temporary data on disc), together with parallelization
   <pre>
-  mpirun -np 8 hex-ecs --mpi --input ecs-L30.inp --out-of-core --preconditioner ILU --drop-tolerance 1e-7
+  mpiexec -n 8 hex-ecs --mpi --input ecs-L30.inp --out-of-core --preconditioner ILU --drop-tolerance 1e-7
   </pre>
   The last option will weaken the ILU preconditioner (entries smaller than 1e-7 will be discarded),
   so that less memory (and disk space) is consumed.
   
   The input file is expected to be something like
   @verbatim
-    # B-spline parameters 
-    # order      θ
-          4   0.63
+  # B-spline order.
+    4
 
-    # real knot sequences
-      0.0  0.1   3   -1
-      0.0  2.0  60
-        4   20  58
+  # ECS rotation angle in radians.
+    0.63
 
-    # complex knot sequences
-      60    -1
-      100
-      41
+  # B-spline knots.
+  # a) Real knots of the basis that is common to atomic and projectile electron.
+    L  0.0  0.0   4
+    G  0.1 10.0  0.1  1.1
+    L   11   60  50
+   -1
+  # b) Real knots of the panel overlap, if any. (Starts from zero.)
+   -1
+  # c) Complex region knots (Starts from zero.)
+    G    0   50   1  1.02
+   -1
+  # d) Knots of other panels (propagator projectile basis). (Starts from zero.)
+   -1
 
-    # initial atomic states
-    # ni
-      1
-    # angular states (li, mi)
-      0  -1
-      0
+  # Initial atomic states (ni, li, mi).
+    1 -1
+    *
+    *
 
-    # final atomic states (nf, lf)
-      1  -1
-      0
+  # Final atomic states (nf, lf).
+    1  -1
+    *
 
-    # angular momenta
-    # L  S  Pi limit
-      0  0  0  4
+  # L  Pi limit
+    0  0  4
 
-    # initial energies in Rydbergs
-      0.65   -1
-      0.95
-         3
+  # Atom + projectile total energies in Rydbergs.
+    E  -0.35  -0.20  -0.05   -1
+   -1
 
-    # magnetic field
-       0
+  # Weak magnetic field in atomic units.
+    0
   @endverbatim
-  The file is not formatted (only the order matters), hash-introduced lines are comments. All sequences
-  are given in the form of set of columns of three numbers (first value, last value and sample count between,
-  including first and last value). Last column has to be terminated by "-1" on the first line.
+  The file is not formatted (only the order matters), hash-introduced lines are comments. Initial and final states
+  are given in the form of a set of columns of two or three numbers, terminated by -1 on the first line.
+  The asterisk symbol stands for all possible values of the specific quantum number. The other (knot and energy)
+  sequances are either linear (L), geometric (G) or explicitely listed (E). A linear sequence is specified by first value,
+  last value and number of values. The geometric sequence is specified by first value, last value, length of the interval
+  between the first and second value and the quotient for the interval expansion. The explicitely listed sequence is given
+  by the list of values terminated by -1. B-spline knot specification consists of several sequences. The last one is terminated by -1.
   
   @subsection theory Theory
   
@@ -432,7 +432,7 @@
     is used whenever the switch --mpi is present on the command line. The number of
     processes (= "communicator rank") is given as an argument to the MPI launcher. E.g.
      @verbatim
-         mpirun -np 4 hex-ecs --mpi
+         mpiexec -n 4 hex-ecs --mpi
      @endverbatim
   - Note that the parallelization by OpenMP is used always and does not use any classes,
     nor does it depend on MPI in any way. The number of OpenMP threads is completely independent
@@ -452,7 +452,7 @@
     all preconditioners. The radial integrals are managed by the class RadialIntegrals.
   - For all impact energies:
       - The preconditioner for the set of equations is updated for this energy (method "update").
-      - For all initial states:
+      - For all initial states and spins:
           - Check that at least some allowed angular states contribute to this combination
             of @f$ L @f$, @f$ \Pi @f$, @f$ n_L @f$ and @f$ l_i @f$. If not, skip this inital state.
           - Check that the solution for this initial state and this impact energy hasn't been

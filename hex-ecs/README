@@ -31,39 +31,86 @@ Here is the list of the libraries with versions that were used:
                 http://www.cise.ufl.edu/research/sparse/SuiteSparse/
             Used for solution of sparse linear systems.
 
- * OpenBLAS 0.2.15
-            OpenBLAS is one of the best open-source implementations. Obtainable from
+ * OpenBLAS 0.2.15 (or other BLAS + LAPACK distribution)
+            OpenBLAS is one of the best open-source implementations of BLAS/LAPACK.
+            Obtainable from
                 http://www.openblas.net/
+            The program hex-ecs has the best performance with OpenMP-enabled version of
+            OpenBLAS. This can be compiled by setting USE_THREAD=1 and USE_OPENMP=1
+            in Makefile.rule in OpenBLAS source.
 
  * GSL 1.16
             Needed, obtainable from
                 http://www.gnu.org/software/gsl/
-            Used for special functions and some others.
+            Used for special functions, Fourier transform and some other routines.
 
 Some or all of the libraries may be present in precompiled form in the repositories
-of the Linux distribution used.
+of the Linux distribution used. For Windows we provide compiled binaries at the SourceForge
+web page where the current code is located: https://sourceforge.net/projects/hecs/
 
--------------
-Build and run
--------------
-
-Use Unix-like system (or Cygwin tools on Windows) for compilation.
+----------------------------
+Building (Unix-like systems)
+----------------------------
 
 Once the needed libraries are present in the system include and library paths,
 all that is necessary to build the program is running "make" from this directory.
 
 > make
 
-This should create an executable "hex-ecs" in the subdirectory "bin/". A simple
-test run can be executed in the following way:
-
-> mkdir test ; cd test                 # create a subdirectory for the test run
-> ../bin/hex-ecs --example             # generate a sample input file
-> ../bin/hex-ecs --input example.inp   # use the input file
-
+This should create an executable "hex-ecs" in the subdirectory "bin/". 
 If the libraries are installed in non-standard locations, one needs to edit the
 Makefile accordingly.
+
+--------------------------
+Building (Windows systems)
+--------------------------
+
+The program can be compiled on Windows at least by the freely available compiler MinGW-w64, but
+as it is carefully written in a platform-independent and standard-adhering way,
+we expect that also other compilers should be able to compile it.
+
+We provide a project file for the freely available IDE "Code::Blocks". It assumes
+that the needed include files and libraries are available on the system
+(it may be necessary to adjust the location).
+
+Even though the building of hex-ecs on Windows is simple, the compilation of the dependent
+libraries is much more challenging and we recommend usage of the prebuilt binaries
+available at https://sourceforge.net/projects/hecs/
+
+-------
+Running
+-------
+
+A simple test run can be executed in the following way:
+
+> mkdir test ; cd test                 # create a subdirectory for the test run
+> ../bin/hex-ecs --example             # generate a sample input file "example.inp"
+> ../bin/hex-ecs --input example.inp   # use the input file
+
+A more complex test that uses also the tool "hex-db" can be run in the
+directory "test-run". There is a variant of the same test run for
+several available preconditioners. The GPU preconditioner assumes that
+hex-ecs has been compiled with support for OpenCL, which is not default setup and
+requires additional (generally CPU/GPU-vendor-specific) libraries. The tests
+assume that both programs hex-ecs and hex-db are in PATH. The tests
+can be run as:
+
+> cd test-run
+> ./test-run-ILU.sh
+> ./test-run-KPA.sh
+> ./test-run-GPU.sh     # will work only if hex-ecs is compiled with OpenCL support
+
+Each of these scripts will create a separate subdirectory containing the calculation
+input, intermediate and output data. The resulting cross sections are in the files
+"singlet.dat" and "triplet.dat" and they can be compared with the sample output data
+located in "test-run-output". They will be also automatically plotted in Gnuplot,
+if available.
 
 The HTML documentation can be extracted from the code by the program Doxygen:
 
 > doxygen
+
+The program has large amount of tuning options, which can be displayed by running
+
+> hex-ecs --help
+
