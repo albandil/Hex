@@ -128,7 +128,7 @@ endif
 BASECXX = $(shell basename $(CXX))
 
 # common source files
-COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-luft hex-matrix \
+COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen hex-luft hex-matrix \
                  hex-misc hex-special hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
@@ -139,7 +139,7 @@ HEX_ECS_FILES   = amplitudes ang gauss bspline io main radial slater solver \
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
                   preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \
-                  preconditioners/CoupledPreconditioner preconditioners/ProjPreconditioner
+                  preconditioners/CoupledPreconditioner
 HEX_ECS_SOURCES = $(patsubst %,src/%.cpp,$(HEX_ECS_FILES))
 HEX_ECS_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.o,$(HEX_ECS_FILES))
 HEX_ECS_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-ecs/%.dep,$(HEX_ECS_FILES))

@@ -293,7 +293,7 @@ int main (int argc, char *argv[])
                             out << format
                             (
                                 "INSERT OR REPLACE INTO \"tmat\" "
-                                "VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                                "VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
                                 Ni, Li, Mi, Nf, Lf, Mf, L, 0, Ei, lf, T_singlet.real(), T_singlet.imag()
                             );
                         }
@@ -317,7 +317,7 @@ int main (int argc, char *argv[])
                         {
                             out << format
                             (
-                                "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e, 0, 0);\n",
+                                "INSERT OR REPLACE INTO \"tmat\" VALUES (%d,%d,%d, %d,%d,%d, %d,%d, %e, %d, %e, %e);\n",
                                 Ni, Li, Mi, Nf, Lf, Mf, L, 1, Ei, lf, T_triplet.real(), T_triplet.imag()
                             );
                         }

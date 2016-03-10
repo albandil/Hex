@@ -245,11 +245,11 @@ DistortedWave::DistortedWave(double _kn, int _ln, DistortingPotential const & _U
             array0[ir] = y0g[ir][0] * inverse_norm;
         
         // save for recyclation, append last element on tail
-        if (ln > 0)
-            array0.hdfsave(filename0);
-        array.push_back(phase);
-        array.hdfsave(filename);
-        array.pop_back();
+//         if (ln > 0)
+//             array0.hdfsave(filename0);
+//         array.push_back(phase);
+//         array.hdfsave(filename);
+//         array.pop_back();
         
         // release memory
         for (int i = 0; i < samples0; i++)

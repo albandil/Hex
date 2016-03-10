@@ -18,7 +18,7 @@ LFLAGS = -lstdc++
 # ---------------------------------------------------------------------------- #
 
 GINACFLAGS =
-GINACLIBS = -lcln -lginac
+GINACLIBS = -lginac -lcln
 
 # ---------------------------------------------------------------------------- #
 # SQLite3                                                                      #
@@ -26,13 +26,6 @@ GINACLIBS = -lcln -lginac
 
 SQLITEFLAGS =
 SQLITELIBS = -lsqlite3
-
-# ---------------------------------------------------------------------------- #
-# SQLite++ (bundled)                                                           #
-# ---------------------------------------------------------------------------- #
-
-SQLITEPPFLAGS = -I../libs
-SQLITEPPLIBS = -L../libs -lsqlitepp
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
@@ -44,13 +37,13 @@ GSLLIBS = -lgsl -lgslcblas
 ################################################################################
 
 
-CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(SQLITEPPFLAGS) $(GSLFLAGS)
-LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(SQLITEPPLIBS) $(GSLLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
+CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(GSLFLAGS)
+LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(GSLLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
 
-CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -DNO_HDF -DNO_MPI -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
-CXXDEBUG = $(CFLAGS) -DNO_HDF -DNO_LAPACK -DNO_MPI -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXRILIS = $(CFLAGS) -DNDEBUG -DNO_LAPACK -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+CXXDEBUG = $(CFLAGS) -DNO_LAPACK -g -O2 -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 # CXXFLAGS = $(CXXDEBUG)
 CXXFLAGS = $(CXXRILIS)
@@ -59,10 +52,12 @@ CXXFLAGS = $(CXXRILIS)
 BASECXX = $(shell basename $(CXX))
 
 # SQLite++ library
-SQLITEPP_LIBRARY = lib/libsqlitepp-$(BASECXX).a
+SQLITEPP_LIBRARY = obj/$(BASECXX)/libsqlitepp.a
 SQLITEPP_FILES   = binders exception query session statement string transaction
 SQLITEPP_SOURCES = $(patsubst %,../libs/sqlitepp/%.cpp,$(SQLITEPP_FILES))
 SQLITEPP_OBJECTS = $(patsubst %,obj/$(BASECXX)/sqlitepp/%.o,$(SQLITEPP_FILES))
+CFLAGS += -I../libs
+LFLAGS += -Lobj/$(BASECXX) -lsqlitepp
 
 # Common source files
 COMMON_FILES   = hex-arrays hex-misc hex-special hex-vec3d hex-version
@@ -78,10 +73,11 @@ HEX_DB_SOURCES = $(patsubst %,src/%.cpp,$(HEX_DB_FILES))
 HEX_DB_OBJECTS = $(patsubst %,obj/$(BASECXX)/hex-db/%.o,$(HEX_DB_FILES))
 HEX_DB_DEPS    = $(patsubst %,obj/$(BASECXX)/hex-db/%.dep,$(HEX_DB_FILES))
 
-HEX_DB_LIB = libhex-db.so
-HEX_DB_EXE = hex-db
+HEX_DB_NAME = hex-db-$(BASECXX)
+HEX_DB_LIB  = lib$(HEX_DB_NAME).so
+HEX_DB_EXE  = hex-db
 
-all: pollversion lib exe test
+all: pollversion lib exe
 
 pollversion:
 	@touch ../common/hex-version.cpp
@@ -93,12 +89,8 @@ docclean:
 	rm -rf html
 
 clean:
-	+make -C test $(MAKECMDGOALS)
 	rm -rf obj/$(BASECXX)
-	rm -f bin/$(HEX_DB_EXE) bin/$(HEX_DB_EXE).$(BASECXX)
-
-distclean:
-	rm -rf hex-db hex-db-*.tar.gz
+	rm -f bin/$(HEX_DB_EXE) bin/$(HEX_DB_EXE).$(BASECXX) lib/$(HEX_DB_LIB)*
 
 allclean: clean docclean
 
@@ -106,15 +98,12 @@ exe: bin/$(HEX_DB_EXE)
 
 lib: lib/$(HEX_DB_LIB)
 
-test: lib/$(HEX_DB_LIB)
-	+make -C $@ $(MAKECMDGOALS)
-
 bin/$(HEX_DB_EXE): bin/$(HEX_DB_EXE).$(BASECXX)
 	@ln -fs $(HEX_DB_EXE).$(BASECXX) bin/$(HEX_DB_EXE)
 
 bin/$(HEX_DB_EXE).$(BASECXX): obj/$(BASECXX)/hex-db/ui.o lib/$(HEX_DB_LIB).0
 	@mkdir -p $(@D)
-	$(CXX) $^ -Llib -lhex-db $(LFLAGS) -o $@
+	$(CXX) $^ -Llib -l$(HEX_DB_NAME) $(LFLAGS) -o $@
 
 lib/$(HEX_DB_LIB).0: lib/$(HEX_DB_LIB)
 
