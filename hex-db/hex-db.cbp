@@ -15,8 +15,8 @@
 				<Option createStaticLib="1" />
 				<Compiler>
 					<Add option="-O2" />
-					<Add option="-std=c++11" />
 					<Add option="-Wall" />
+					<Add option="-std=c++11" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_LAPACK" />
 					<Add option="-DNO_HDF" />
@@ -26,8 +26,8 @@
 					<Add directory="src" />
 				</Compiler>
 				<Linker>
-					<Add library="..\Win64\lib\libgsl.dll.a" />
-					<Add library="..\Win64\lib\libsqlite3.dll.a" />
+					<Add library="../Win64/lib/libgsl-2.1.dll.a" />
+					<Add library="../Win64/lib/libsqlite3-3.11.1.dll.a" />
 				</Linker>
 			</Target>
 			<Target title="exe">
@@ -48,7 +48,7 @@
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add library="lib\libhex-db.a" />
+					<Add library="lib/libhex-db.a" />
 				</Linker>
 			</Target>
 			<Target title="test-c">
@@ -59,7 +59,7 @@
 				<Option use_console_runner="0" />
 				<Linker>
 					<Add option="-lgfortran" />
-					<Add library="lib\libhex-db.a" />
+					<Add library="lib/libhex-db.a" />
 				</Linker>
 			</Target>
 			<Target title="test-f">
@@ -70,7 +70,7 @@
 				<Option use_console_runner="0" />
 				<Linker>
 					<Add option="-lgfortran" />
-					<Add library="lib\libhex-db.a" />
+					<Add library="lib/libhex-db.a" />
 				</Linker>
 			</Target>
 		</Build>
@@ -78,6 +78,7 @@
 			<Add alias="All" targets="lib;exe;test-c;test-f;" />
 		</VirtualTargets>
 		<Compiler>
+			<Add option="-Wno-deprecated-declarations" />
 			<Add directory="../common" />
 		</Compiler>
 		<Unit filename="../common/hex-arrays.cpp">

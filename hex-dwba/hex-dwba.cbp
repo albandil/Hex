@@ -13,9 +13,11 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
-					<Add option="-std=c++11" />
 					<Add option="-Wall" />
+					<Add option="-std=c++11" />
 					<Add option="-fexceptions" />
+					<Add option="-Wno-deprecated-declarations" />
+					<Add option="-Wno-unused-local-typedefs" />
 					<Add option="-DNDEBUG" />
 					<Add option="-DNO_HDF" />
 					<Add option="-DNO_MPI" />
@@ -27,10 +29,9 @@
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
-					<Add library="..\Win64\lib\libgsl.dll.a" />
-					<Add library="..\Win64\lib\libgslcblas.dll.a" />
-					<Add library="..\Win64\lib\libcln.dll.a" />
-					<Add library="..\Win64\lib\libginac.dll.a" />
+					<Add library="../Win64/lib/libgsl-2.1.dll.a" />
+					<Add library="../Win64/lib/libcln-1.3.4.dll.a" />
+					<Add library="../Win64/lib/libginac-1.6.7.dll.a" />
 				</Linker>
 			</Target>
 		</Build>
