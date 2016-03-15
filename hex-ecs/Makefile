@@ -15,7 +15,7 @@ CXX = g++
 TARGET = release
 
 # global compiler flags
-CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range
+CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unknown-pragmas
 LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
@@ -128,7 +128,7 @@ endif
 BASECXX = $(shell basename $(CXX))
 
 # common source files
-COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen hex-luft hex-matrix \
+COMMON_FILES   = hex-arrays hex-hdffile hex-hydrogen hex-luft hex-matrix \
                  hex-misc hex-special hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
