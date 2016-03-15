@@ -33,6 +33,7 @@
 #define HEX_ODE
 
 #include <gsl/gsl_odeiv2.h>
+#include <gsl/gsl_errno.h>
 
 #define DIVERGENCE_THRESHOLD    100
 
