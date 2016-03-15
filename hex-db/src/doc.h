@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -34,8 +34,8 @@
 
 /**
   @mainpage
-  @author Jakub Benda, MFF UK
-  @date 17. 5. 2014
+  @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
+  @date 15. 3. 2016
   @section db Hex-db
   
   Hex-db is the interface program that can be used to access data precomputed
@@ -48,19 +48,16 @@
   The whole package is written in C++11, which is supported by most of the
   up-to-date compilers. The following have been tested:
   
-  - GCC 4.8.1
-  - Intel C++ Composer XE 14.0 SP1 Update 1 (with GCC 4.8.1 headers)
+  - GCC 5.3.0
+  - Intel C++ Composer XE 16.0.0
   
   There are several external libraries that are being used for some partial tasks.
   Here is the list of the libraries with versions that were used:
  
-  - GSL 1.15<br/>
+  - GSL 2.1<br/>
            Obtainable from http://www.gnu.org/software/gsl/<br/>
            Used for special functions and some others.
-  - FFTW 3.3.3<br/>
-           Obtainable from http://www.fftw.org/download.html<br/>
-           Used for %Chebyshev expansion and Gauss-Chebyshev quadrature.
-  - SQLite 3.7.14<br/>
+  - SQLite 3.11.1<br/>
            Obtainable from http://www.sqlite.org/download.html<br/>
            Used for access to the database files.
  
@@ -106,17 +103,14 @@
   
   @subsubsection installWindows Building on Windows
  
-  The program has been successfully tested on Windows 8 (and most probably will work
+  The program has been successfully tested on Windows 10 (and most probably will work
   exactly the same in older versions). The compilation has been done in the
   Code::Blocks IDE (the project file *.cbp is included with
-  the source code). It is necessary to install a full-featured MinGW compiler, though;
+  the source code). It is necessary to install a full-featured MinGW-w64 compiler, though;
   the compiler bundled with Code::Blocks lacks all necessary features.
  
-  -# Download MinGW installer from SourceForge:<br/>
-    http://sourceforge.net/projects/mingw/files/Installer/mingw-get-setup.exe/download
-  -# Install C++ and Fortran compilers, OpenMP and Posix threads implementations.
-  -# Download and install latest Code::Blocks (tested version was 13.12).
-  -# In Code::Blocks IDE, set the full MinGW installation as the compiler to use.
+  -# Download MinGW-w64 installer from SourceForge (tested 5.3.0 x86_64 posix seh).
+  -# Download and install latest Code::Blocks (tested version was 16.01), configure to use MinGW-w64 binaries.
   
   @subsection theory Theory
   
@@ -197,10 +191,9 @@
   <tr><td>L</td> <td>INTEGER</td> <td>Conserved total angular momentum of a partial wave.</td></tr>
   <tr><td>S</td> <td>INTEGER</td> <td>Conserved total spin of the system.</td></tr>
   <tr><td>Ei</td> <td>DOUBLE PRECISION</td> <td>Projectile impact energy.</td></tr>
+  <tr><td>ell</td> <td>INTEGER</td> <td>Out-going partial wave.</td></tr>
   <tr><td>Re_T_ell</td> <td>DOUBLE PRECISION</td> <td>%Real part of @f$ T_\ell @f$.</td></tr>
   <tr><td>Im_T_ell</td> <td>DOUBLE PRECISION</td> <td>Imaginary part of @f$ T_\ell @f$.</td></tr>
-  <tr><td>Re_TBorn_ell</td> <td>DOUBLE PRECISION</td> <td>%Real part of @f$ T_{\mathrm{Born},\ell} @f$.</td></tr>
-  <tr><td>Im_TBorn_ell</td> <td>DOUBLE PRECISION</td> <td>Imaginary part of @f$ T_{\mathrm{Born},\ell} @f$.</td></tr>
   </table></center>
   However, there are more tables (currently also "bornf" for angle-dependent Born T-matrices,
   "ics" for integral cross section, "ccs" for complete cross section, and "ionf" for radial part
@@ -216,8 +209,7 @@
      ni INTEGER, li INTEGER, mi INTEGER,
      nf INTEGER, lf INTEGER, mf INTEGER,
      L INTEGER, S INTEGER, Ei DOUBLE PRECISION, ell INTEGER,
-     Re_T_ell DOUBLE PRECISION, Im_T_ell DOUBLE PRECISION,
-     Re_TBorn_ell DOUBLE PRECISION, Im_TBorn_ell DOUBLE PRECISION,
+     Re_T_ell DOUBLE PRECISION, Im_T_ell DOUBLE PRECISION
      PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)
   )'
   </pre>
@@ -278,10 +270,10 @@
   <tr><td>Differential cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, S, E_i @f$</td> <td>angles [deg]</td></tr>
   <tr><td>Spin asymmetry</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, E_i @f$</td> <td>angles [deg]</td></tr>
   <tr><td>Momentum transfer</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, L, S @f$</td> <td>energies [Ry]</td></tr>
-  <tr><td>Integral cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, L, S @f$</td> <td>energies [Ry]</td></tr>
+  <tr><td>Integral cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, ell @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Complete cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Extrapolated cross section</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f @f$</td> <td>energies [Ry]</td></tr>
-  <tr><td>Collision strength</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, L, S @f$</td> <td>energies [Ry]</td></tr>
+  <tr><td>Collision strength</td> <td>@f$ n_i, l_i, m_i, n_f, l_f, m_f, ell @f$</td> <td>energies [Ry]</td></tr>
   <tr><td>Total cross section</td> <td>@f$ n_i, l_i, m_i @f$</td> <td>energies [Ry]</td></tr>
   </table></center>
   
@@ -302,18 +294,6 @@
   \# differential cross section
   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --dcs        --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
   
-  \# momentum transfer
-  seq 0.650 0.001 0.850 | hex-db --database="hex.db" --momtransf  --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-  
-  \# integral cross section
-  seq 0.650 0.001 0.850 | hex-db --database="hex.db" --integcs    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-  
-  \# sum integral cross section
-  seq 0.650 0.001 0.850 | hex-db --database="hex.db" --sumintegcs --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0
-  
-  \# collision strength
-  seq 0.650 0.001 0.850 | hex-db --database="hex.db" --collstr    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --L=0 --S=0
-  
   \# total cross section
   seq 0.650 0.001 0.850 | hex-db --database="hex.db" --tcs        --ni=1 --li=0 --mi=0
   </pre>
@@ -323,7 +303,7 @@
   
   <pre>
   \# [Czech locale] avoid commas by changing locale
-  export LC_NUMERIC=en_GB.utf8
+  export LC_ALL=C
   seq 0.01 0.01 3.14    | hex-db --database="hex.db" --scatamp    --ni=1 --li=0 --mi=0 --nf=3 --lf=0 --mf=0 --S=0
    
   \# [Czech locale] avoid commas by substitution

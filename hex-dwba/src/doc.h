@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -34,8 +34,8 @@
 
 /**
  * @mainpage
- * @author Jakub Benda, MFF UK
- * @date 17. 5. 2014
+ * @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
+ * @date 15. 3. 2016
  * @section dwba Hex-dwba
  * 
  * Hex-dwba is a high-energy computational module of the Hex package. It
@@ -207,17 +207,16 @@
  * 
  * You will need a modern C++ compiler to compile the program as for example
  * 
- * - GCC 4.8.1 or 
- * - Intel C++ Composer XE 14.0 SP1 Update 1 (tested with GCC 4.8.1 headers)
+ * - GCC 5.3.0 or 
+ * - Intel C++ Composer XE 16.0.0
  * 
  * DWBA uses some free external libraries
  * 
- * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.16):
+ * - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (2.1):
  *   for Wigner coupling coefficients, numerical integration and some other special functions.
- * - <a href="http://www.fftw.org/">FFTW</a> (3.3.3):
- *   for fast evaluation of %Chebyshev expansions by Fast Fourier Transform.
- * - CLN (<a href="http://www.ginac.de/CLN/">http://www.ginac.de/CLN/</a>): for arbitrary-precision
+ * - CLN (<a href="http://www.ginac.de/CLN/">http://www.ginac.de/CLN/</a>, 1.3.4): for arbitrary-precision
  *   rational arithmetic used in the plane wave method.
+ * - GiNaC (<a href="http://www.ginac.de/CLN/">http://www.ginac.de/</a>, 1.6.7): for symbolic operations
  *
  * The libraries are mostly present in the repositories of all major Linux distributions. They
  * can be also compiled from source code in Windows -- this has been tested in the Code::Blocks

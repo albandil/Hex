@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -34,7 +34,7 @@
 
 /**
   @mainpage
-  @author Jakub Benda, MFF UK
+  @author Jakub Benda, MFF UK, jakub.benda&at;seznam.cz
   @date 10. 3. 2016
   @section ecs Hex-ecs
   
@@ -48,22 +48,22 @@
   Hex is written in C++11 to make use of comfort of the modern C++ extensions,
   so one may need a newer compiler. Tested compilers are:
   
-  - GCC 5.2.0
-  - Intel C++ Composer XE 16.0.0 (tested with GCC 4.8.1 headers)
+  - GCC 5.3.0
+  - Intel C++ Composer XE 16.0.0
   
   Both worked with the same Makefile, just by setting the variable CPP to "g++"
   or "icpc". The program also uses following external packages (tested versions
   are given in parentheses):
   
-  - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (1.16):
+  - <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a> (2.1):
     for Wigner coupling coefficients and some other special functions.
-  - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.2.1/5.6.2):
+  - <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">SuiteSparse/UMFPACK</a> (4.5.1/5.7.4):
     for sparse matrix manipulation and for a direct sparse system solver.
   - OpenMP (2.1): for parallelization at single machine.
-  - MPI (OpenMPI 1.6): for parallelization at cluster.
+  - MPI (OpenMPI 1.8, MSMPI 7): for parallelization at cluster.
   
   The next libraries are optional:
-  - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.8):
+  - <a href="http://www.openblas.net/">OpenBLAS</a> (0.2.15):
     Free BLAS implementation that can be compiled for a specific
     CPU. OpenBLAS is able to run in parallel using pthreads or OpenMP.
     OpenBLAS is optional because SuiteSparse can be configured to use
