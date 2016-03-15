@@ -9,6 +9,12 @@
 # Note that the database has been slightly changed since that time and it no
 # longer implements the Born subtraction algorithm.
 
+if [ "$(which hex-dwba 2> /dev/null)" == "" ] || [ "$(which hex-db 2> /dev/null)" == "" ]
+then
+    echo "Programs \"hex-dwba\" and \"hex-db\" need to be in PATH for this test run."
+    exit 1
+fi
+
 # remove old data
 rm -f hex.db *.log *.sql *.dcs
 
