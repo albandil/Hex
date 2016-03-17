@@ -37,7 +37,7 @@ GSLLIBS = -lgsl -lgslcblas
 ################################################################################
 
 
-CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(GSLFLAGS)
+CFLAGS += $(SQLITEFLAGS) $(GINACFLAGS) $(GSLFLAGS) -I../libs
 LFLAGS += $(SQLITELIBS) $(GINACLIBS) $(GSLLIBS) -Wl,-rpath,'$$ORIGIN/../lib'
 
 GIT_COMMIT = $(shell git rev-parse HEAD | cut -c -8)
