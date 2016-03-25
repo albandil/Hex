@@ -31,6 +31,31 @@
 
 #include "hex-luft.h"
 
+template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::New (int factorizer)
+{
+    switch (factorizer)
+    {
+        case LUFT_ANY:
+#ifdef WITH_UMFPACK
+        case LUFT_UMFPACK:
+            return new LUft_UMFPACK<LU_int_t,Complex>();
+            break;
+#endif
+#ifdef WITH_SUPERLU
+        case LUFT_SUPERLU:
+            return new LUft_SUPERLU<LU_int_t,Complex>();
+            break;
+#endif
+#ifdef WITH_SUPERLU_DIST
+        case LUFT_SUPERLU_DIST:
+            return new LUft_SUPERLU_DIST<LU_int_t,Complex>();
+            break;
+#endif
+        default:
+            HexException("No LU factorizer %d.", factorizer);
+    }
+}
+
 // ------------------------------------------------------------------------------------
 // UMFPACK-dependent functions.
 //

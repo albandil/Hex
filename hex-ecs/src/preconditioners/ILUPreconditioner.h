@@ -68,20 +68,9 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            csr_blocks_(ll.states().size()), lu_(ll.states().size())
-        {
-#ifdef _OPENMP
-            omp_init_lock(&lu_lock_);
-#endif
-        }
+        );
         
-        ~ILUCGPreconditioner ()
-        {
-#ifdef _OPENMP
-            omp_destroy_lock(&lu_lock_);
-#endif
-        }
+        ~ILUCGPreconditioner ();
         
         // reuse parent definitions
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }

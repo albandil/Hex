@@ -32,6 +32,7 @@
 #include <iostream>
 
 #include "hex-arrays.h"
+#include "hex-luft.h"
 #include "hex-misc.h"
 
 #include "preconditioners.h"
@@ -40,6 +41,29 @@ const std::string ILUCGPreconditioner::prec_name = "ILU";
 const std::string ILUCGPreconditioner::prec_description = 
     "Block inversion using conjugate gradients preconditioned by Incomplete LU. "
     "The drop tolerance can be given as the --droptol parameter.";
+
+ILUCGPreconditioner::ILUCGPreconditioner
+(
+    Parallel const & par,
+    InputFile const & inp,
+    AngularBasis const & ll,
+    Bspline const & bspline_atom,
+    Bspline const & bspline_proj,
+    Bspline const & bspline_proj_full,
+    CommandLine const & cmd
+) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd), csr_blocks_(ll.states().size()), lu_(ll.states().size())
+{
+#ifdef _OPENMP
+    omp_init_lock(&lu_lock_);
+#endif
+}
+
+ILUCGPreconditioner::~ILUCGPreconditioner ()
+{
+#ifdef _OPENMP
+    omp_destroy_lock(&lu_lock_);
+#endif
+}
 
 void ILUCGPreconditioner::setup ()
 {
@@ -54,14 +78,16 @@ void ILUCGPreconditioner::setup ()
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
         // prepare initial (empty) factorization data
-        lu_[iblock].reset(new LUft<LU_int_t,Complex>());
+        lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
+        
+        // associate the matrix pointer
+        LUft_UMFPACK<LU_int_t,Complex> * ptr = dynamic_cast<LUft_UMFPACK<LU_int_t,Complex>*>(lu_[iblock].get());
+        if (ptr)
+            ptr->matrix(&csr_blocks_[iblock]);
         
         // associate existing disk files
-        if (cmd_.cont)
-        {
-            lu_[iblock]->link(format("lu-%d.ooc", iblock));
-            csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
-        }
+        lu_[iblock]->link(format("lu-%d.bin", iblock));
+        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -95,17 +121,11 @@ void ILUCGPreconditioner::update (double E)
     {
         // release outdated LU factorizations
         for (auto & lu : lu_)
-        {
             lu->drop();
-            lu->unlink();
-        }
         
         // release outdated CSR diagonal blocks
         for (auto & csr : csr_blocks_)
-        {
             csr.drop();
-            csr.unlink();
-        }
     }
     
     // update parent
@@ -118,14 +138,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // load data from linked disk files
-    if (cmd_.outofcore)
-    {
-        csr_blocks_[iblock].hdfload();
-        lu_[iblock]->silent_load();
-    }
+    csr_blocks_[iblock].hdfload();
+    lu_[iblock]->silent_load();
     
     // check that the factorization is loaded
-    if (lu_[iblock]->size() == 0)
+    if (lu_[iblock]->size() == 0 or csr_blocks_[iblock].size() == 0)
     {
 #ifdef _OPENMP
         // allow only one factorization at a time when not using SuperLU DIST
@@ -165,13 +182,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         );
         
         // save the diagonal block's CSR representation and its factorization
-        if (cmd_.outofcore)
-        {
-            csr_blocks_[iblock].hdflink(format("csr-%d.ooc", iblock));
-            csr_blocks_[iblock].hdfsave();
-            lu_[iblock]->link(format("lu-%d.ooc", iblock));
-            lu_[iblock]->save();
-        }
+        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
+        csr_blocks_[iblock].hdfsave();
+        lu_[iblock]->link(format("lu-%d.bin", iblock));
+        lu_[iblock]->save();
         
 #ifdef _OPENMP
         // release lock
@@ -190,11 +204,8 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
     // release memory
-    if (cmd_.outofcore)
-    {
-        csr_blocks_[iblock].drop();
-        lu_[iblock]->drop();
-    }
+    csr_blocks_[iblock].drop();
+    lu_[iblock]->drop();
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);

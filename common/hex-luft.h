@@ -70,6 +70,9 @@ class LUft
         /// Default constructor.
         LUft () : filename_() {}
         
+        /// Get new empty factorization object.
+        static LUft * New (int factorizer);
+        
         /// Destructor.
         virtual ~LUft () {}
         
@@ -231,6 +234,9 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         
         /// Return factorization information.
         rArray const & info () const { return info_; }
+        
+        /// Use this matrix pointer.
+        void matrix (CsrMatrix<IdxT,DataT> const * ptr) { matrix_ = ptr; }
         
         /// Return LU byte size.
         virtual std::size_t size () const;
