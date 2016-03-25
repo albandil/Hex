@@ -138,8 +138,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // load data from linked disk files
-    csr_blocks_[iblock].hdfload();
-    lu_[iblock]->silent_load();
+    if (lu_[iblock]->size() == 0 or csr_blocks_[iblock].size() == 0)
+    {
+        csr_blocks_[iblock].hdfload();
+        lu_[iblock]->silent_load();
+    }
     
     // check that the factorization is loaded
     if (lu_[iblock]->size() == 0 or csr_blocks_[iblock].size() == 0)
@@ -204,8 +207,11 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
     // release memory
-    csr_blocks_[iblock].drop();
-    lu_[iblock]->drop();
+    if (cmd_.outofcore)
+    {
+        csr_blocks_[iblock].drop();
+        lu_[iblock]->drop();
+    }
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);

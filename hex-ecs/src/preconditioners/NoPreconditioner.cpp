@@ -47,7 +47,6 @@
 #include "hex-arrays.h"
 #include "hex-misc.h"
 
-#include "dwave.h"
 #include "gauss.h"
 #include "parallel.h"
 #include "preconditioners.h"
