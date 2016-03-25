@@ -701,3 +701,189 @@ void RadialIntegrals::apply_R_matrix
         }
     }
 }
+
+cArray RadialIntegrals::overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<double(Complex)> weightf) const
+{
+    // result
+    cArray res (bspline.Nspline());
+    
+    // per interval
+    int points = EXPANSION_QUADRATURE_POINTS;
+    
+    // evaluated B-spline and function
+    cArray evalB (points), evalF (points);
+    
+    // quadrature nodes and weights
+    cArray xs (points), ws (points);
+    
+    // for all knots
+    for (int iknot = 0; iknot < bspline.Nknot() - 1; iknot++)
+    {
+        // skip zero length intervals
+        if (bspline.t(iknot) == bspline.t(iknot+1))
+            continue;
+        
+        // which points are to be used here?
+        g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
+        
+        // evaluate the function
+        std::transform(xs.begin(), xs.end(), evalF.begin(), funct);
+        
+        // for all relevant B-splines
+        for (int ispline = std::max(iknot - bspline.order(),0); ispline < bspline.Nspline() and ispline <= iknot; ispline++)
+        {
+            // evaluate the B-spline
+            bspline.B(ispline, iknot, points, xs.data(), evalB.data());
+            
+            // sum with weights
+            Complex sum = 0.;
+            for (int ipoint = 0; ipoint < points; ipoint++)
+                sum += ws[ipoint] * evalF[ipoint] * evalB[ipoint];
+            
+            // store the overlap
+            res[ispline] += sum;
+        }
+    }
+    
+    return res;
+}
+
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<double(Complex)> weightf) const
+{
+    // result
+    cArray res (bspline.Nspline());
+    
+    // per interval
+    int points = EXPANSION_QUADRATURE_POINTS;
+    
+    // evaluated B-spline and hydrogenic functions
+    cArray evalB (points), evalP (points);
+    
+    // quadrature nodes and weights
+    cArray xs (points), ws (points);
+    
+    // for all knots
+    for (int iknot = 0; iknot < bspline.Nknot() - 1; iknot++)
+    {
+        // skip zero length intervals
+        if (bspline.t(iknot) == bspline.t(iknot+1))
+            continue;
+        
+        // which points are to be used here?
+        g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
+        
+        // evaluate the hydrogenic function
+        std::transform
+        (
+            xs.begin(), xs.end(), evalP.begin(),
+            [ = ](Complex x) -> Complex
+            {
+                gsl_sf_result R;
+                if (gsl_sf_hydrogenicR_e(n, l, 1., x.real(), &R) == GSL_EUNDRFLW)
+                    return 0.;
+                else
+                    return weightf(x) * x * R.val;
+            }
+        );
+        
+        // for all relevant B-splines
+        for (int ispline = std::max(iknot-bspline.order(),0); ispline < bspline.Nspline() and ispline <= iknot; ispline++)
+        {
+            // evaluate the B-spline
+            bspline.B(ispline, iknot, points, xs.data(), evalB.data());
+            
+            // sum with weights
+            Complex sum = 0.;
+            for (int ipoint = 0; ipoint < points; ipoint++)
+                sum += ws[ipoint] * evalP[ipoint] * evalB[ipoint];
+            
+            // store the overlap
+            res[ispline] += sum;
+        }
+    }
+    
+    return res;
+}
+
+cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<double(Complex)> weightf) const
+{
+    // shorthands
+    int Nenergy = vk.size();
+    int Nspline = bspline.Nspline();
+    int Nknot = bspline.Nknot();
+    int order = bspline.order();
+    
+    // reserve space for the output array
+    std::size_t size = Nspline * Nenergy * (maxell + 1);
+    cArray res (size);
+    
+    // per interval
+    int points = EXPANSION_QUADRATURE_POINTS;
+    
+    // quadrature weights and nodes
+    cArray xs (points), ws (points);
+    
+    // for all knots
+    # pragma omp parallel for firstprivate (xs,ws)
+    for (int iknot = 0; iknot < Nknot - 1; iknot++)
+    {
+        // skip zero length intervals
+        if (bspline.t(iknot) == bspline.t(iknot+1))
+            continue;
+        
+        // which points are to be used here?
+        g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
+        
+        // evaluate relevant B-splines on this knot
+        cArrays evalB(Nspline);
+        for (int ispline = std::max(iknot-order,0); ispline < Nspline and ispline <= iknot; ispline++)
+        {
+            evalB[ispline] = cArray(points);
+            bspline.B(ispline, iknot, points, xs.data(), evalB[ispline].data());
+        }
+        
+        // for all linear momenta (= energies)
+        for (int ie = 0; ie < Nenergy; ie++)
+        {
+            // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
+            cArrays evalj(points);
+            for (int ipoint = 0; ipoint < points; ipoint++)
+            {
+                // compute the damping factor
+                double damp = weightf(xs[ipoint]);
+                
+                // if the factor is numerical zero, do not evaluate the function, just allocate zeros
+                if (damp == 0)
+                {
+                    evalj[ipoint] = cArray(maxell + 1);
+                    continue;
+                }
+                
+                // evaluate all Riccati-Bessel functions in point
+                evalj[ipoint] = damp * special::ric_jv(maxell, vk[ie] * xs[ipoint]);
+                
+                // clear all possible NaN entries (these may occur for far radii, where should be zero)
+                for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint][l]))
+                    evalj[ipoint][l] = 0.;
+            }
+            
+            // for all angular momenta
+            for (int l = 0; l <= maxell; l++)
+            {
+                // for all relevant B-splines
+                for (int ispline = std::max(iknot-order,0); ispline < Nspline and ispline <= iknot; ispline++)
+                {
+                    // sum with weights
+                    Complex sum = 0.;
+                    for (int ipoint = 0; ipoint < points; ipoint++)
+                        sum += ws[ipoint] * evalj[ipoint][l] * evalB[ispline][ipoint];
+                    
+                    // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
+                    res[(ie * (maxell + 1) + l) * Nspline + ispline] += sum;
+                }
+            }
+        }
+    }
+    
+    return res;
+}

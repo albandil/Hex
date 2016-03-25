@@ -186,6 +186,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ                (-a)  Only calculate needed radial integrals.                                                                                \n"
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
+                    "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
                     "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
                     "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
@@ -595,6 +596,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // apply SSOR coupling
                 ssor = std::stod(optargs[0]);
+                return true;
+            },
+        "exact-rhs", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use exact RHS
+                exact_rhs = true;
                 return true;
             },
         

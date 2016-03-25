@@ -416,6 +416,11 @@ kernel void mmul_2el
     }
 }
 
+/**
+ * @brief Multiplication by two-electron Hamiltonian matrix (off-diagonal part).
+ * 
+ * This applies off-diagonal contribution from @ref mmul_2el.
+ */
 kernel void mmul_2el_decoupled
 (
     // B-spline knots (atom and projectile)
@@ -474,6 +479,11 @@ kernel void mmul_2el_decoupled
     }
 }
 
+/**
+ * @brief Multiplication by two-electron Hamiltonian matrix (diagonal part).
+ * 
+ * This applies diagonal contribution from @ref mmul_2el.
+ */
 kernel void mmul_2el_coupled
 (
     // B-spline knots (atom and projectile)
@@ -722,6 +732,11 @@ kernel void mmul_2el_offset
     }
 }
 
+/**
+ * @brief Multiplication by two-electron Hamiltonian matrix (off-diagonal part).
+ * 
+ * This applies off-diagonal contribution from @ref mmul_2el_offset.
+ */
 kernel void mmul_2el_decoupled_offset
 (
     // B-spline knots (atom and projectile)
@@ -795,6 +810,11 @@ kernel void mmul_2el_decoupled_offset
     }
 }
 
+/**
+ * @brief Multiplication by two-electron Hamiltonian matrix (off-diagonal part).
+ * 
+ * This applies off-diagonal contribution from @ref mmul_2el_offset.
+ */
 kernel void mmul_2el_coupled_offset
 (
     // B-spline knots (atom and projectile)
