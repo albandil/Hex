@@ -73,10 +73,10 @@ Amplitudes::Amplitudes
 (
     Bspline const & bspline_atom, Bspline const & bspline_proj,
     InputFile const & inp, Parallel const & par, CommandLine const & cmd,
-    std::vector<std::pair<int,int>> const & ang
+    AngularBasis const & ang
 ) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-    rad_(bspline_atom_,bspline_proj,bspline_proj,0),
-    inp_(inp), par_(par), cmd_(cmd), ang_(ang)
+    rad_(bspline_atom_,bspline_proj,bspline_proj,ang.maxell() + 1,0),
+    inp_(inp), par_(par), cmd_(cmd), ang_(ang.states())
 {
     // nothing to do
 }

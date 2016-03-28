@@ -59,6 +59,7 @@ void NoPreconditioner::setup ()
 {
     rad_.setupOneElectronIntegrals(par_, cmd_);
     rad_.setupTwoElectronIntegrals(par_, cmd_);
+    rad_.setupRadialEigenstates(par_, cmd_);
 }
 
 void NoPreconditioner::update (double E)
@@ -175,8 +176,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     // impact momentum
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
     
-    // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
-    RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj_full(), rad_.bspline_proj_full(), 0);
+    // radial information for full projectile B-spline basis (used only to expand Riccati-Bessel function)
+    RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj_full(), rad_.bspline_proj_full(), 0, 0);
     radf.verbose(false);
     radf.setupOneElectronIntegrals(par_, cmd_);
     
@@ -186,32 +187,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_atom = S_csr_atom.factorize();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
     
-    // setup polarization potential
-    /*double r0 = special::constant::two_pi / ki[0];
-    std::cout << "r0 = " << r0 << std::endl;
-    auto polarization_potential = [r0](double r) { return +120/(2*special::pow_int(r, 4)) * std::expm1(-special::pow_int(r/r0,6)); };
-    cArrays dwi_overlaps (inp_.maxell + 1), dwi_expansion (inp_.maxell + 1);
-    for (int ell = 0; ell <= inp_.maxell; ell++)
-    {
-        // calculate distorted wave for this incoming partial wave
-        DistortedWave dwi (ki[0], ell, polarization_potential, bspline_proj_.R0() * 10);
-        
-        // calculate overlap of the wave function with the B-spline basis
-        dwi_overlaps[ell] = rad_.overlap(rad_.bspline_proj(), radf.gaussleg_proj(), dwi, weightEdgeDamp(radf.bspline_proj()));
-        
-        // calculate the B-spline expansion coefficients
-        dwi_expansion[ell] = lu_S_proj->solve(dwi_overlaps[ell]);
-        
-        // DEBUG
-        rArray grid = linspace(0., bspline_atom_.Rmax(), 1001);
-        write_array(grid, bspline_atom_.zip(dwi_expansion[ell], grid), format("dwi-%d.dat", ell));
-        std::ofstream ofs (format("dwi-comp-%d.dat", ell));
-        for (int i = 0; i < 10001; i++)
-        {
-            double r = i * bspline_atom_.Rmax() / 1001;
-            ofs << r << " " << special::ric_j(ell, ki[0]*r) << " " << dwi(r) << " " << polarization_potential(r) << std::endl;
-        }
-    }*/
+    // factorize one-electron hamiltonian
+    
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_atom()));

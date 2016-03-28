@@ -134,90 +134,26 @@ void KPACGPreconditioner::prepare
     std::set<int> needed_l
 )
 {
-    Timer timer;
-    cArray D;
-    ColMatrix<Complex> S = mS.torow().T(), CR, invCR, invsqrtS(Nspline,Nspline);
+    // get reference to √S⁻¹
+    ColMatrix<Complex> const & invsqrtS = rad_.inveigenstates(ang_.maxell() + 1);
     
-    // diagonalize overlap matrix
-    if (not all(done))
-    {
-        std::cout << "\t\t- overlap matrix factorization" << std::endl;
-        
-        S.diagonalize(D, nullptr, &CR);
-        CR.invert(invCR);
-        
-        // Now S = CR * (D * CR⁻¹)
-        std::cout << "\t\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] *= D[i % Nspline];
-        
-        // S = S - CR * invCR
-        blas::gemm(-1., CR, invCR, 1., S);
-        std::cout << "\t\t\t- residual: " << S.data().norm() << std::endl;
-        
-        // compute √S⁻¹
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
-        blas::gemm(1., CR, invCR, 0., invsqrtS);
-    }
-    
-    // diagonalize one-electron hamiltonians for all angular momenta
+    // for all angular momenta
     for (int l : comp_l)
     {
         // skip loaded
         if (done[l])
             continue;
         
-        // reset timer
-        std::cout << "\t\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
-        timer.reset();
-        
-        // compose the symmetrical one-electron hamiltonian
-        ColMatrix<Complex> tHl = (Complex(0.5) * mD - mMm1_tr + Complex(0.5*l*(l+1)) * mMm2).torow().T();
-        
-        // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
-        blas::gemm(1., invsqrtS, tHl, 0., S);
-        blas::gemm(1., S, invsqrtS, 0., tHl);
-        
-        // diagonalize the transformed matrix
-        tHl.diagonalize(D, nullptr, &CR);
-        CR.invert(invCR);
-        
-        // analyze bound states
-        int maxn = 0;
-        for (unsigned i = 0; i < Nspline; i++)
-        {
-            Complex E = D[i];
-            if (E.real() < 0)
-            {
-                int n = std::floor(0.5 + 1.0 / std::sqrt(-2.0 * E.real()));
-                if (n > 0)
-                {
-                    double E0 = -0.5 / (n * n);
-                    if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
-                        maxn = std::max(maxn, n);
-                }
-            }
-        }
+        std::cout << "\t- compose preconditioner for l = " << l << std::endl;
         
         // store the preconditioner data
-        prec[l].Dl = D;
+        prec[l].Dl = rad_.eigenenergies(l);
         prec[l].invsqrtS_Cl = RowMatrix<Complex>(Nspline,Nspline);
         prec[l].invCl_invsqrtS = RowMatrix<Complex>(Nspline,Nspline);
-        blas::gemm(1., invsqrtS, CR, 0., prec[l].invsqrtS_Cl);
-        blas::gemm(1., invCR, invsqrtS, 0., prec[l].invCl_invsqrtS);
+        blas::gemm(1., invsqrtS, rad_.eigenstates(l), 0., prec[l].invsqrtS_Cl);
+        blas::gemm(1., rad_.inveigenstates(l), invsqrtS, 0., prec[l].invCl_invsqrtS);
         prec[l].hdfsave();
         prec[l].drop();
-        
-        // Now Hl = ClR * D * ClR⁻¹
-        std::cout << "\t\t\t- time: " << timer.nice_time() << std::endl;
-        for (std::size_t i = 0; i < Nspline * Nspline; i++)
-            invCR.data()[i] *= D[i % Nspline];
-        
-        // Hl <- Hl - CR * invCR
-        blas::gemm(-1., CR, invCR, 1., tHl);
-        std::cout << "\t\t\t- residual: " << tHl.data().norm() << std::endl;
-        std::cout << "\t\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
     }
     
     // wait for completition of diagonalization on other nodes
@@ -310,6 +246,8 @@ void KPACGPreconditioner::setup ()
                 done_atom, comp_l, needed_l
             );
         }
+        
+        std::cout << std::endl;
         
     //
     // Check presence of the projectile electron preconditioner

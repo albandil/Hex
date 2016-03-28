@@ -254,7 +254,7 @@ void Solver::solve ()
                     std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
                     
                     // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], ang_.maxlambda() + 1);
+                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], ang_.maxell() + 1, ang_.maxlambda() + 1);
                     rad.verbose(false);
                     rad.setupOneElectronIntegrals(par_, cmd_);
                     rad.setupTwoElectronIntegrals(par_, cmd_);

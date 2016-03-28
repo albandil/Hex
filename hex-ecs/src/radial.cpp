@@ -48,7 +48,7 @@ RadialIntegrals::RadialIntegrals
     Bspline const & bspline_atom,
     Bspline const & bspline_proj,
     Bspline const & bspline_proj_full,
-    int Nlambdas
+    int Nell, int Nlambdas
 )
   : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj), bspline_proj_full_(bspline_proj_full),
     g_atom_(bspline_atom), g_proj_(bspline_proj),
@@ -62,10 +62,10 @@ RadialIntegrals::RadialIntegrals
     Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    verbose_(true), Nlambdas_(Nlambdas)
+    verbose_(true), Nell_(Nell), Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
-    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas + 1);
+    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas_ + 1);
     
     // get projectile basis shift
     proj_basis_shift_ = std::find(bspline_atom_.t().begin(), bspline_atom_.t().end(), bspline_proj_.t().front()) - bspline_atom_.t().begin();
@@ -886,4 +886,118 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
     }
     
     return res;
+}
+
+void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine const & cmd)
+{
+    if (Nell_ == 0)
+        return;
+    
+    // shorthands
+    int Nspline = bspline_atom_.Nspline();
+    
+    // resize arrays
+    Eigenenergies.resize(Nell_ + 1);
+    Eigenstates.resize(Nell_ + 1);
+    invEigenstates.resize(Nell_ + 1);
+    BoundStates.resize(Nell_);
+    
+    std::cout << "Setting up unperturbed one-electron eigenstates (l = 0 .. " << Nell_ - 1 << ")" << std::endl;
+    
+    // use alias for the last elements of the arrays
+    cArray & D = Eigenenergies[Nell_];
+    ColMatrix<Complex> & invsqrtS = invEigenstates[Nell_];
+    D.resize(Nspline);
+    invsqrtS = std::move(ColMatrix<Complex>(Nspline,Nspline));
+    
+    // other variables
+    Timer timer;
+    ColMatrix<Complex> S = S_atom_.torow().T(), CR, invCR;
+    
+    // diagonalize the overlap matrix
+    std::cout << "\t- overlap matrix factorization" << std::endl;
+    S.diagonalize(D, nullptr, &CR);
+    CR.invert(invCR);
+    
+    // Now S = CR * (D * CR⁻¹)
+    std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+    for (std::size_t i = 0; i < Nspline * Nspline; i++)
+        invCR.data()[i] *= D[i % Nspline];
+    
+    // S = S - CR * invCR
+    blas::gemm(-1., CR, invCR, 1., S);
+    std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
+    
+    // compute √S⁻¹
+    for (std::size_t i = 0; i < Nspline * Nspline; i++)
+        invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
+    blas::gemm(1., CR, invCR, 0., invsqrtS);
+    CR.drop();
+    
+    // for all angular momenta
+    for (int l = 0; l < Nell_; l++)
+    {
+        // reset timer
+        std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
+        timer.reset();
+        
+        // calculate the one-electron hamiltonian
+        ColMatrix<Complex> tHl = (Complex(0.5) * D_atom_ - Mm1_tr_atom_ + Complex(0.5*l*(l+1)) * Mm2_atom_).torow().T();
+        
+        // symmetrically transform by inverse square root of the overlap matrix, tHl <- invsqrtS * tHl * invsqrtS
+        blas::gemm(1., invsqrtS, tHl, 0., S);
+        blas::gemm(1., S, invsqrtS, 0., tHl);
+        
+        // diagonalize the transformed matrix
+        Eigenstates[l] = std::move(ColMatrix<Complex>(Nspline, Nspline));
+        invEigenstates[l] = std::move(ColMatrix<Complex>(Nspline, Nspline));
+        tHl.diagonalize(Eigenenergies[l], nullptr, &Eigenstates[l]);
+        Eigenstates[l].invert(invEigenstates[l]);
+        
+        // get eigenstate permutation (sort by real part of the energy)
+        iArray indices (Nspline);
+        std::iota(indices.begin(), indices.end(), 0);
+        std::sort
+        (
+            indices.begin(), indices.end(),
+            [&](int const & i, int const & j)
+            {
+                return Eigenenergies[l][i].real() < Eigenenergies[l][j].real();
+            }
+        );
+        
+        // inspect the bound state energies in ascending order
+        int maxn = 0;
+        for (int n = l + 1; n < Nspline + l + 1; n++)
+        {
+            // get eigenenergy
+            double E = Eigenenergies[l][indices[n - l - 1]].real();
+            if (E < 0)
+            {
+                // calculate expected (exact) energy and compare
+                double E0 = -0.5 / (n * n);
+                if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
+                {
+                    // use energies accurate within 0.1 %
+                    maxn = n;
+                    BoundStates[l].resize(maxn - l);
+                    BoundStates[l][n - l - 1] = indices[n - l - 1];
+                    continue;
+                }
+            }
+            break;
+        }
+        
+        // now Hl = ClR * D * ClR⁻¹
+        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        for (std::size_t i = 0; i < Nspline * Nspline; i++)
+            invCR.data()[i] = invEigenstates[l].data()[i] * Eigenenergies[l][i % Nspline];
+        
+        // Hl <- Hl - CR * invCR
+        blas::gemm(-1., Eigenstates[l], invCR, 1., tHl);
+        std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+        std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
+    }
+    
+    std::cout << std::endl;
 }

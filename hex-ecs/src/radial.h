@@ -124,12 +124,13 @@ class RadialIntegrals
             Bspline const & bspline_atom,
             Bspline const & bspline_proj,
             Bspline const & bspline_proj_full,
-            int Nlambdas
+            int Nell, int Nlambda
         );
         
         // public callable members
         void setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd);
         void setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd);
+        void setupRadialEigenstates (Parallel const & par, CommandLine const & cmd);
         
         // verbosity control
         void verbose (bool v) { verbose_ = v; }
@@ -565,6 +566,10 @@ class RadialIntegrals
         /// Return maximal multipole, for which there are precomputed two-electron integrals.
         int maxlambda () const { return Nlambdas_ - 1; }
         
+        cArray const & eigenenergies (int l) const { return Eigenenergies[l]; }
+        ColMatrix<Complex> const & eigenstates (int l) const { return Eigenstates[l]; }
+        ColMatrix<Complex> const & inveigenstates (int l) const { return invEigenstates[l]; }
+        
     private:
         
         // B-spline environment
@@ -603,11 +608,21 @@ class RadialIntegrals
         // verbose output
         bool verbose_;
         
+        // number of angular momenta
+        int Nell_;
+        
         // number of multipole matrices
         int Nlambdas_;
         
         // projectile basis shift
         int proj_basis_shift_;
+        
+        // radial eigenstates and eigenenergies for all angular momenta
+        std::vector<ColMatrix<Complex>> Eigenstates, invEigenstates;
+        std::vector<cArray> Eigenenergies;
+        
+        // column indices of the bound eigenstates
+        std::vector<iArray> BoundStates;
 };
 
 #endif

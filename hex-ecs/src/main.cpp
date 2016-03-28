@@ -257,7 +257,7 @@ int main (int argc, char* argv[])
             );
             
             // prepare one-electron radial integrals
-            RadialIntegrals rad (bspline_panel.front(), bspline_target, bspline_target, 0);
+            RadialIntegrals rad (bspline_panel.front(), bspline_target, bspline_target, 0, 0);
             rad.verbose(false);
             rad.setupOneElectronIntegrals(par, cmd);
             
@@ -370,7 +370,7 @@ int main (int argc, char* argv[])
         if (cmd.itinerary & CommandLine::StgExtract)
         {
             // extract amplitudes
-            Amplitudes ampl (bspline_full.front(), bspline_full.back(), inp, par, cmd, ang.states());
+            Amplitudes ampl (bspline_full.front(), bspline_full.back(), inp, par, cmd, ang);
             ampl.extract();
             
             // write T-matrices to a text file as SQL statements 

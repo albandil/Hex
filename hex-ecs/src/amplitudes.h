@@ -37,6 +37,7 @@
 #include "hex-arrays.h"
 #include "hex-chebyshev.h"
 
+#include "ang.h"
 #include "bspline.h"
 #include "io.h"
 #include "parallel.h"
@@ -65,7 +66,7 @@ class Amplitudes
         (
             Bspline const & bspline_atom, Bspline const & bspline_proj,
             InputFile const & inp, Parallel const & par, CommandLine const & cmd,
-            std::vector<std::pair<int,int>> const & ang
+            AngularBasis const & ang
         );
         
         /**
