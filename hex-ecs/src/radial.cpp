@@ -901,8 +901,9 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
     Eigenstates.resize(Nell_ + 1);
     invEigenstates.resize(Nell_ + 1);
     BoundStates.resize(Nell_);
+    Indices.resize(Nell_);
     
-    std::cout << "Setting up unperturbed one-electron eigenstates (l = 0 .. " << Nell_ - 1 << ")" << std::endl;
+    if (verbose_) std::cout << "Setting up unperturbed one-electron eigenstates (l = 0 .. " << Nell_ - 1 << ")" << std::endl;
     
     // use alias for the last elements of the arrays
     cArray & D = Eigenenergies[Nell_];
@@ -915,18 +916,18 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
     ColMatrix<Complex> S = S_atom_.torow().T(), CR, invCR;
     
     // diagonalize the overlap matrix
-    std::cout << "\t- overlap matrix factorization" << std::endl;
+    if (verbose_) std::cout << "\t- overlap matrix factorization" << std::endl;
     S.diagonalize(D, nullptr, &CR);
     CR.invert(invCR);
     
     // Now S = CR * (D * CR⁻¹)
-    std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+    if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
     for (std::size_t i = 0; i < Nspline * Nspline; i++)
         invCR.data()[i] *= D[i % Nspline];
     
     // S = S - CR * invCR
     blas::gemm(-1., CR, invCR, 1., S);
-    std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
+    if (verbose_) std::cout << "\t\t- residual: " << S.data().norm() << std::endl;
     
     // compute √S⁻¹
     for (std::size_t i = 0; i < Nspline * Nspline; i++)
@@ -938,7 +939,7 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
     for (int l = 0; l < Nell_; l++)
     {
         // reset timer
-        std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
+        if (verbose_) std::cout << "\t- one-electron Hamiltonian factorization (l = " << l << ")" << std::endl;
         timer.reset();
         
         // calculate the one-electron hamiltonian
@@ -955,11 +956,11 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
         Eigenstates[l].invert(invEigenstates[l]);
         
         // get eigenstate permutation (sort by real part of the energy)
-        iArray indices (Nspline);
-        std::iota(indices.begin(), indices.end(), 0);
+        Indices[l].resize(Nspline);
+        std::iota(Indices[l].begin(), Indices[l].end(), 0);
         std::sort
         (
-            indices.begin(), indices.end(),
+            Indices[l].begin(), Indices[l].end(),
             [&](int const & i, int const & j)
             {
                 return Eigenenergies[l][i].real() < Eigenenergies[l][j].real();
@@ -971,7 +972,7 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
         for (int n = l + 1; n < Nspline + l + 1; n++)
         {
             // get eigenenergy
-            double E = Eigenenergies[l][indices[n - l - 1]].real();
+            double E = Eigenenergies[l][Indices[l][n - l - 1]].real();
             if (E < 0)
             {
                 // calculate expected (exact) energy and compare
@@ -981,7 +982,11 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
                     // use energies accurate within 0.1 %
                     maxn = n;
                     BoundStates[l].resize(maxn - l);
-                    BoundStates[l][n - l - 1] = indices[n - l - 1];
+                    BoundStates[l][n - l - 1] = Indices[l][n - l - 1];
+                    
+                    rArray grid = linspace(0., bspline_atom_.R0(), 1000);
+                    write_array(grid, bspline_atom_.zip(boundstate(n,l), grid), format("bound-%d-%d", n, l));
+                    
                     continue;
                 }
             }
@@ -989,15 +994,15 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
         }
         
         // now Hl = ClR * D * ClR⁻¹
-        std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
+        if (verbose_) std::cout << "\t\t- time: " << timer.nice_time() << std::endl;
         for (std::size_t i = 0; i < Nspline * Nspline; i++)
             invCR.data()[i] = invEigenstates[l].data()[i] * Eigenenergies[l][i % Nspline];
         
         // Hl <- Hl - CR * invCR
         blas::gemm(-1., Eigenstates[l], invCR, 1., tHl);
-        std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
-        std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
+        if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
+        if (verbose_) std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
     }
     
-    std::cout << std::endl;
+    if (verbose_) std::cout << std::endl;
 }

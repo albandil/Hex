@@ -187,9 +187,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_atom = S_csr_atom.factorize();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
     
-    // factorize one-electron hamiltonian
-    
-    
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_atom()));
     cArray ji_overlaps_proj = radf.overlapj(radf.bspline_proj(), radf.gaussleg_proj(), inp_.maxell, ki, weightEdgeDamp(radf.bspline_proj()));
@@ -203,12 +200,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
-    cArray Pi_overlaps_atom = rad_.overlapP(rad_.bspline_atom(), rad_.gaussleg_atom(), ni, li, weightEndDamp(rad_.bspline_atom()));
-    cArray Pi_overlaps_proj = radf.overlapP(radf.bspline_proj(), radf.gaussleg_proj(), ni, li, weightEndDamp(radf.bspline_proj()));
-    cArray Pi_expansion_atom = lu_S_atom->solve(Pi_overlaps_atom);
-    cArray Pi_expansion_proj = lu_S_proj->solve(Pi_overlaps_proj);
-    if (not std::isfinite(Pi_expansion_atom.norm()) or not std::isfinite(Pi_expansion_proj.norm()))
-        HexException("Unable to expand hydrogen bound orbital in B-splines!");
+    cArray Pi_expansion_atom = rad_.boundstate(ni,li);
+    cArray Pi_expansion_proj = rad_.boundstate(ni,li); // FIXME : Proj
     
     // truncate the projectile expansions for non-origin panels
     if (rad_.bspline_proj().Nspline() != radf.bspline_proj().Nspline())

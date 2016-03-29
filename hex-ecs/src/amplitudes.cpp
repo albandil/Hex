@@ -78,7 +78,10 @@ Amplitudes::Amplitudes
     rad_(bspline_atom_,bspline_proj,bspline_proj,ang.maxell() + 1,0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang.states())
 {
-    // nothing to do
+    rad_.verbose(false);
+    rad_.setupOneElectronIntegrals(par, cmd);
+    rad_.setupTwoElectronIntegrals(par, cmd);
+    rad_.setupRadialEigenstates(par, cmd);
 }
 
 void Amplitudes::extract ()
@@ -396,7 +399,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     int Nspline_proj = bspline_proj_.Nspline(); // B-spline count (projectile basis)
     
     // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_overlaps = rad_.overlapP(bspline_atom_, rad_.gaussleg_atom(), T.nf, T.lf, weightEndDamp(bspline_atom_));
+    cArray Pf_expansion = rad_.boundstate(T.nf, T.lf);
+    cArray Pf_overlaps = rad_.S_atom().dot(Pf_expansion);
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())

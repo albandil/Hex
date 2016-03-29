@@ -566,9 +566,43 @@ class RadialIntegrals
         /// Return maximal multipole, for which there are precomputed two-electron integrals.
         int maxlambda () const { return Nlambdas_ - 1; }
         
+        /// Returns array of one-electron hamiltonian eigen-energies in B-spline basis.
         cArray const & eigenenergies (int l) const { return Eigenenergies[l]; }
+        
+        /**
+         * @brief Return one-electron eigenstates.
+         * 
+         * Returns the matrix of eigen-states solving
+         * \f[
+         *     S^{-1/2} H S^{-1/2} \xi = E \xi \,,
+         * \f]
+         * which are related to the generalized eigen-states (solutions of @f$ H\psi = ES\psi @f$
+         * through
+         * \f[
+         *     \psi = S^{-1/2} \xi \,.
+         * \f]
+         */
         ColMatrix<Complex> const & eigenstates (int l) const { return Eigenstates[l]; }
+        
+        /**
+         * @brief Returns matrix that is inverse to the matrix of eigenvectors.
+         * 
+         * Returns the inverse of the matrix returned by @ref eigenstates.
+         */
         ColMatrix<Complex> const & inveigenstates (int l) const { return invEigenstates[l]; }
+        
+        /**
+         * @brief Return one-electron hamiltonian eigenstate B-spline expansion.
+         * 
+         * Returns properly normalized eigenstate of the one-electron hamiltonian
+         * as an array of B-spline expansion coefficients.
+         */
+        cArray boundstate (int n, int l) const
+        {
+            ColMatrix<Complex> const & invsqrtS = invEigenstates[Nell_];
+            cArray eig = Eigenstates[l].col(Indices[l][n - l - 1]);
+            return invsqrtS * eig;
+        }
         
     private:
         
@@ -621,8 +655,8 @@ class RadialIntegrals
         std::vector<ColMatrix<Complex>> Eigenstates, invEigenstates;
         std::vector<cArray> Eigenenergies;
         
-        // column indices of the bound eigenstates
-        std::vector<iArray> BoundStates;
+        // column indices of the eigenstates
+        std::vector<iArray> BoundStates, Indices;
 };
 
 #endif
