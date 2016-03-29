@@ -84,10 +84,6 @@ void ILUCGPreconditioner::setup ()
         LUft_UMFPACK<LU_int_t,Complex> * ptr = dynamic_cast<LUft_UMFPACK<LU_int_t,Complex>*>(lu_[iblock].get());
         if (ptr)
             ptr->matrix(&csr_blocks_[iblock]);
-        
-        // associate existing disk files
-        lu_[iblock]->link(format("lu-%d.bin", iblock));
-        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -120,12 +116,18 @@ void ILUCGPreconditioner::update (double E)
     if (E != E_ and not cmd_.noluupdate)
     {
         // release outdated LU factorizations
-        for (auto & lu : lu_)
-            lu->drop();
+        for (unsigned i = 0; i < lu_.size(); i++)
+        {
+            lu_[i]->drop();
+            lu_[i]->link(format("lu-%g-%d.bin", E, i));
+        }
         
         // release outdated CSR diagonal blocks
-        for (auto & csr : csr_blocks_)
-            csr.drop();
+        for (unsigned i = 0; i < csr_blocks_.size(); i++)
+        {
+            csr_blocks_[i].drop();
+            csr_blocks_[i].hdflink(format("csr-%g-%d.hdf", E, i));
+        }
     }
     
     // update parent
@@ -185,9 +187,9 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         );
         
         // save the diagonal block's CSR representation and its factorization
-        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
+        csr_blocks_[iblock].hdflink(format("csr-%g-%d.hdf", E_, iblock));
         csr_blocks_[iblock].hdfsave();
-        lu_[iblock]->link(format("lu-%d.bin", iblock));
+        lu_[iblock]->link(format("lu-%g-%d.bin", E_, iblock));
         lu_[iblock]->save();
         
 #ifdef _OPENMP
