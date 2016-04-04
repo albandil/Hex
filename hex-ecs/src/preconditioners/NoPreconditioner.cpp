@@ -305,7 +305,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                     
                     // hydrogen orbital polarization
-                    else if (n == 2)
+                    else
                     {
                         cArray BState1 = rad_.boundstate(n, l1p);
                         Complex r_elem1 = (Pi_expansion_atom | rad_.M1_atom() | BState1);
