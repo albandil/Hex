@@ -49,71 +49,24 @@
 
 /**
  * Potential suppressing factor. 
- * @param y Radial coordinate of some electron.
- * @param x Radial coordinate of the other electron.
+ * @param r Radial distance.
  * @param R Truncation radius.
  */
-inline double damp (Complex y, Complex x, Complex R)
-{
-    // compute hyperradius
-    double r = std::hypot(x.real(), y.real());
-    
-    // if sufficiently far, return clean zero
-    if (r > R.real())
-        return 0.;
-    
-    // else damp using tanh(x) distribution
-    return std::tanh(0.125 * (R.real() - r));
-}
+double damp (double r, double R);
 
-class weightEdgeDamp
-{
-    public:
-        
-        // constructor
-        weightEdgeDamp(Bspline const & bspline)
-            : bspline_(bspline) {}
-        
-        // weight function
-        double operator() (Complex z) const
-        {
-            double R0 = bspline_.R0();
-            
-            // this will suppress function value from R0-5 onwards
-            // which is useful for expanding (divergent) Ricatti-Bessel function
-            return (z.imag() == 0.) ? (1 + std::tanh(R0 - 5 - z.real()))/2 : 0.;
-        }
-    
-    private:
-        
-        /// B-spline environment
-        Bspline const & bspline_;
-};
+/**
+ * Potential suppressing factor. 
+ * @param x Radial coordinate of some electron.
+ * @param y Radial coordinate of the other electron.
+ * @param R Truncation radius.
+ */
+double damp (double x, double y, double R);
 
-class weightEndDamp
-{
-    public:
-        
-        // constructor
-        weightEndDamp (Bspline const & bspline)
-            : bspline_(bspline) {}
-        
-        // weight function
-        double operator() (Complex z) const
-        {
-            double Rmax = bspline_.Rmax();
-            
-            // whis will suppress function value at Rmax
-            // which is useful for expanding everywhere-nonzero hydrogenic function
-            return std::tanh(Rmax - z.real());
-        }
-        
-    private:
-        
-        /// B-spline environment
-        Bspline const & bspline_;
-};
-
+/**
+ * @brief Radial integrals
+ * 
+ * This class contains the B-spline matrix elements for various radial functions.
+ */
 class RadialIntegrals
 {
     public:
@@ -147,7 +100,7 @@ class RadialIntegrals
         Complex computeD_iknot
         (
             Bspline const & bspline, GaussLegendre const & g,
-            int i, int j, int iknot
+            int i, int j, int iknot, std::function<Complex(Complex)> weight
         ) const;
         
         /**
@@ -161,7 +114,7 @@ class RadialIntegrals
         Complex computeD
         (
             Bspline const & bspline, GaussLegendre const & g,
-            int i, int j, int maxknot = -1
+            int i, int j, std::function<Complex(Complex)> weight
         ) const;
         
         /// Calculate inter-basis overlap between two B-splines.
@@ -192,6 +145,13 @@ class RadialIntegrals
             int iknot, Complex R, double scale
         ) const;
         
+        Complex computeS_iknot
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int i, int j, int iknot,
+            std::function<Complex(Complex)> weight
+        ) const;
+        
         /**
          * @brief Integral moments.
          * 
@@ -207,6 +167,13 @@ class RadialIntegrals
             Bspline const & bspline, GaussLegendre const & g,
             int a, int i, int j,
             int maxknot = -1, bool scale = false
+        ) const;
+        
+        Complex computeS
+        (
+            Bspline const & bspline, GaussLegendre const & g,
+            int i, int j,
+            std::function<Complex(Complex)> weight
         ) const;
         
         /**
@@ -439,9 +406,15 @@ class RadialIntegrals
         SymBandMatrix<Complex> const & S_atom () const { return S_atom_; }
         SymBandMatrix<Complex> const & S_proj () const { return S_proj_; }
         
+        SymBandMatrix<Complex> const & Xi () const { return Xi_; }
+        
         /// Return reference to the inter-basis overlaps.
         RowMatrix<Complex> const & S12 () const { return S12_; }
         RowMatrix<Complex> const & S21 () const { return S21_; }
+        
+        /// Return reference to the precomputed integral moment matrix of order +1.
+        SymBandMatrix<Complex> const & M1_atom () const { return M1_atom_; }
+        SymBandMatrix<Complex> const & M1_proj () const { return M1_proj_; }
         
         /// Return reference to the precomputed integral moment matrix of order -1.
         SymBandMatrix<Complex> const & Mm1_atom () const { return Mm1_atom_; }
@@ -569,6 +542,9 @@ class RadialIntegrals
         /// Returns array of one-electron hamiltonian eigen-energies in B-spline basis.
         cArray const & eigenenergies (int l) const { return Eigenenergies[l]; }
         
+        /// Returns array of one-electron hamiltonian eigen-energies in B-spline basis.
+        Complex eigenenergy (int n, int l) const { return Eigenenergies[l][Indices[l][n - l - 1]]; }
+        
         /**
          * @brief Return one-electron eigenstates.
          * 
@@ -599,9 +575,10 @@ class RadialIntegrals
          */
         cArray boundstate (int n, int l) const
         {
-            ColMatrix<Complex> const & invsqrtS = invEigenstates[Nell_];
-            cArray eig = Eigenstates[l].col(Indices[l][n - l - 1]);
-            return invsqrtS * eig;
+//             ColMatrix<Complex> const & invsqrtS = invEigenstates[Nell_];
+//             cArray eig = Eigenstates[l].col(Indices[l][n - l - 1]);
+//             return invsqrtS * eig;
+            return Eigenstates[l].col(Indices[l][n - l - 1]);
         }
         
     private:
@@ -619,8 +596,8 @@ class RadialIntegrals
         int lastscaled_;
         
         // one-electron moment and overlap matrices
-        SymBandMatrix<Complex> D_atom_, S_atom_, Mm1_atom_, Mm1_tr_atom_, Mm2_atom_;
-        SymBandMatrix<Complex> D_proj_, S_proj_, Mm1_proj_, Mm1_tr_proj_, Mm2_proj_;
+        SymBandMatrix<Complex> D_atom_, S_atom_, M1_atom_, Mm1_atom_, Mm1_tr_atom_, Mm2_atom_, Xi_;
+        SymBandMatrix<Complex> D_proj_, S_proj_, M1_proj_, Mm1_proj_, Mm1_tr_proj_, Mm2_proj_;
         
         // inter-basis overlaps
         RowMatrix<Complex> S12_, S21_;

@@ -134,9 +134,6 @@ void KPACGPreconditioner::prepare
     std::set<int> needed_l
 )
 {
-    // get reference to √S⁻¹
-    ColMatrix<Complex> const & invsqrtS = rad_.inveigenstates(ang_.maxell() + 1);
-    
     // for all angular momenta
     for (int l : comp_l)
     {
@@ -148,10 +145,8 @@ void KPACGPreconditioner::prepare
         
         // store the preconditioner data
         prec[l].Dl = rad_.eigenenergies(l);
-        prec[l].invsqrtS_Cl = RowMatrix<Complex>(Nspline,Nspline);
-        prec[l].invCl_invsqrtS = RowMatrix<Complex>(Nspline,Nspline);
-        blas::gemm(1., invsqrtS, rad_.eigenstates(l), 0., prec[l].invsqrtS_Cl);
-        blas::gemm(1., rad_.inveigenstates(l), invsqrtS, 0., prec[l].invCl_invsqrtS);
+        prec[l].invsqrtS_Cl = RowMatrix<Complex>(rad_.eigenstates(l));
+        prec[l].invCl_invsqrtS = RowMatrix<Complex>(rad_.inveigenstates(l));
         prec[l].hdfsave();
         prec[l].drop();
     }

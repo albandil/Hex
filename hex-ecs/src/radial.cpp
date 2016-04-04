@@ -43,6 +43,25 @@
 #include "parallel.h"
 #include "radial.h"
 
+double damp (double r, double R)
+{
+    // damp factor
+    const double a = 0.125;
+    
+    // if sufficiently far, return clean zero
+    if (r >= R)
+        return 0.;
+    
+    // else damp using tanh(x) distribution
+    double x = a * (R - r);
+    return 0.5 * (1. + std::tanh(x - 1. / x));
+}
+
+double damp (double x, double y, double R)
+{
+    return damp(std::hypot(x,y), R);
+}
+
 RadialIntegrals::RadialIntegrals
 (
     Bspline const & bspline_atom,
@@ -54,11 +73,14 @@ RadialIntegrals::RadialIntegrals
     g_atom_(bspline_atom), g_proj_(bspline_proj),
     D_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
     S_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    M1_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
     Mm1_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
     Mm1_tr_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
     Mm2_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
+    Xi_(bspline_atom.Nspline(),bspline_atom.order()+1),
     D_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     S_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
+    M1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
     Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
@@ -103,7 +125,7 @@ void RadialIntegrals::Mi_integrand
     {
         // use damping
         for (int k = 0; k < n; k++)
-            out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(scalef*in[k],a) * damp(in[k],0.,R);
+            out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(scalef*in[k],a) * damp(in[k].real(),R.real());
     }
     else
     {
@@ -185,7 +207,7 @@ cArray RadialIntegrals::computeMi (Bspline const & bspline, GaussLegendre const 
 Complex RadialIntegrals::computeD_iknot
 (
     Bspline const & bspline, GaussLegendre const & g,
-    int i, int j, int iknot
+    int i, int j, int iknot, std::function<Complex(Complex)> weight
 ) const
 {
     if (iknot < 0)
@@ -215,7 +237,7 @@ Complex RadialIntegrals::computeD_iknot
     
     // accumulate the result
     for (int k = 0; k < points; k++)
-        res += values_i[k] * values_j[k] * ws[k];
+        res += values_i[k] * values_j[k] * weight(xs[k]) * ws[k];
     
     return res;
 }
@@ -223,23 +245,19 @@ Complex RadialIntegrals::computeD_iknot
 Complex RadialIntegrals::computeD
 (
     Bspline const & bspline, GaussLegendre const & g,
-    int i, int j, int maxknot
+    int i, int j, std::function<Complex(Complex)> weight
 ) const
 {
     // get boundary iknots
     int left = std::max(i, j);
     int right = std::min(i, j) + bspline.order();
     
-    // cut at maxknot
-    if (right > maxknot)
-        right = maxknot;
-    
     // the result
     Complex res = 0;
     
     // undergo integration on sub-intervals
     for (int iknot = left; iknot <= right; iknot++)
-        res += computeD_iknot(bspline, g, i, j, iknot);
+        res += computeD_iknot(bspline, g, i, j, iknot, weight);
         
     return res;
 }
@@ -277,13 +295,48 @@ Complex RadialIntegrals::computeM_iknot
     if (R != 0.)
     {
         for (int k = 0; k < points; k++)
-            res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k] * damp(xs[k], 0., R);
+            res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k] * damp(xs[k].real(), R.real());
     }
     else
     {
         for (int k = 0; k < points; k++)
             res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k];
     }
+    
+    return res;
+}
+
+Complex RadialIntegrals::computeS_iknot
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int i, int j, int iknot, std::function<Complex(Complex)> weight
+) const
+{
+    // get interval boundaries
+    Complex x1 = bspline.t(iknot);
+    Complex x2 = bspline.t(iknot + 1);
+    
+    // throw away zero-length intervals
+    if (x1 == x2)
+        return 0;
+    
+    // get Gauss-Legendre nodes and weights for the interval [-1, 1]
+    // - use at least 2nd order
+    int points = std::max(2, bspline.order() + 5 + 1);
+    cArray xs(points), ws(points);
+    g.scaled_nodes_and_weights(points, x1, x2, xs.data(), ws.data());
+    
+    // evaluate B-splines at Gauss-Legendre nodes
+    cArray values_i(points), values_j(points);
+    bspline.B(i, iknot, points, xs.data(), values_i.data());
+    bspline.B(j, iknot, points, xs.data(), values_j.data());
+    
+    // result
+    Complex res = 0;
+    
+    // accumulate the (damped) result
+    for (int k = 0; k < points; k++)
+        res += values_i[k] * values_j[k] * weight(xs[k]) * ws[k];
     
     return res;
 }
@@ -312,6 +365,26 @@ Complex RadialIntegrals::computeM
     // undergo integration on sub-intervals
     for (int iknot = left; iknot < right; iknot++)
         res += computeM_iknot(bspline, g, a, i, j, iknot, maxknot >= 0 ? bspline.t(maxknot) : 0., scale);
+    
+    return res;
+}
+
+Complex RadialIntegrals::computeS
+(
+    Bspline const & bspline, GaussLegendre const & g,
+    int i, int j, std::function<Complex(Complex)> weight
+) const
+{
+    // get boundary iknots
+    int left = std::max(i, j);
+    int right = std::min(i, j) + bspline.order() + 1;
+    
+    // the result
+    Complex res = 0;
+    
+    // undergo integration on sub-intervals
+    for (int iknot = left; iknot < right; iknot++)
+        res += computeS_iknot(bspline, g, i, j, iknot, weight);
     
     return res;
 }
@@ -386,6 +459,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     // create file names for these radial integrals
     D_atom_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_atom_.hash()));  D_proj_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_proj_.hash()));
     S_atom_     .hdflink(format("rad-S-%.4lx.hdf",      bspline_atom_.hash()));  S_proj_     .hdflink(format("rad-S-%.4lx.hdf",      bspline_proj_.hash()));
+    M1_atom_    .hdflink(format("rad-M1-%.4lx.hdf",     bspline_atom_.hash()));  M1_proj_    .hdflink(format("rad-M1-%.4lx.hdf",     bspline_proj_.hash()));
     Mm1_atom_   .hdflink(format("rad-Mm1-%.4lx.hdf",    bspline_atom_.hash()));  Mm1_proj_   .hdflink(format("rad-Mm1-%.4lx.hdf",    bspline_proj_.hash()));
     Mm1_tr_atom_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", bspline_atom_.hash()));  Mm1_tr_proj_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", bspline_proj_.hash()));
     Mm2_atom_   .hdflink(format("rad-Mm2-%.4lx.hdf",    bspline_atom_.hash()));  Mm2_proj_   .hdflink(format("rad-Mm2-%.4lx.hdf",    bspline_proj_.hash()));
@@ -393,19 +467,27 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     if (verbose_)
         std::cout << "Precomputing one-electron integrals ... " << std::flush;
     
+    // compute matrix elements of the screened dipole potential
+    double Rp = 50;
+    double R0 = bspline_atom_.R0();
+    auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+    Xi_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return pol_pot(r.real()) * damp(r.real(), R0); }); });
+    
     // compute one-electron matrices (atom basis)
-    D_atom_     .populate([=](int m, int n) -> Complex { return computeD(bspline_atom_, g_atom_,     m, n, Nknot_atom - 1  ); });
-    S_atom_     .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_,  0, m, n                  ); });
-    Mm1_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n                  ); });
-    Mm1_tr_atom_.populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n, Nreknot_atom - 1); });
-    Mm2_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -2, m, n                  ); });
+    D_atom_     .populate([=](int m, int n) { return computeD(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
+    S_atom_     .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
+    M1_atom_    .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return r;                            }); });
+    Mm1_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
+    Mm1_tr_atom_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
+    Mm2_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });
     
     // compute one-electron matrices (projectile basis)
-    D_proj_     .populate([=](int m, int n) -> Complex { return computeD(bspline_proj_, g_proj_,     m, n, Nknot_proj - 1  ); });
-    S_proj_     .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_,  0, m, n                  ); });
-    Mm1_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n                  ); });
-    Mm1_tr_proj_.populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n, Nreknot_proj - 1); });
-    Mm2_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -2, m, n                  ); });
+    D_proj_     .populate([=](int m, int n) { return computeD(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
+    S_proj_     .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
+    M1_proj_    .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return r;                            }); });
+    Mm1_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
+    Mm1_tr_proj_.populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
+    Mm2_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });
     
     // compute inter-basis overlaps
     if (not cmd.map_solution.empty())
@@ -422,6 +504,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     {
         D_atom_     .hdfsave();  D_proj_     .hdfsave();
         S_atom_     .hdfsave();  S_proj_     .hdfsave();
+        M1_atom_    .hdfsave();  M1_proj_    .hdfsave();
         Mm1_atom_   .hdfsave();  Mm1_proj_   .hdfsave();
         Mm1_tr_atom_.hdfsave();  Mm1_tr_proj_.hdfsave();
         Mm2_atom_   .hdfsave();  Mm2_proj_   .hdfsave();
@@ -468,14 +551,14 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         // atomic basis
         cArrayView(Mitr_L_atom_,    lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,   lambda,   Nreknot_atom - 1);
         cArrayView(Mitr_mLm1_atom_, lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,  -lambda-1, Nreknot_atom - 1);
-        Mtr_L_atom_[lambda]    = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_,  lambda,   i, j, Nreknot_atom - 1, true); });
-        Mtr_mLm1_atom_[lambda] = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_, -lambda-1, i, j, Nreknot_atom - 1, true); });
+        Mtr_L_atom_[lambda]    = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) { return computeM(bspline_atom_, g_atom_,  lambda,   i, j, Nreknot_atom - 1, true); });
+        Mtr_mLm1_atom_[lambda] = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) { return computeM(bspline_atom_, g_atom_, -lambda-1, i, j, Nreknot_atom - 1, true); });
         
         // projectile basis
         cArrayView(Mitr_L_proj_,    lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_,  lambda,   Nreknot_proj - 1);
         cArrayView(Mitr_mLm1_proj_, lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_, -lambda-1, Nreknot_proj - 1);
-        Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
-        Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
+        Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
+        Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
         
         // no need to do anything else for non-identical B-spline bases
 //         if (bspline_atom_.hash() != bspline_proj_.hash())
@@ -933,7 +1016,6 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
     for (std::size_t i = 0; i < Nspline * Nspline; i++)
         invCR.data()[i] /= std::pow(D.data()[i % Nspline], 1.5);
     blas::gemm(1., CR, invCR, 0., invsqrtS);
-    CR.drop();
     
     // for all angular momenta
     for (int l = 0; l < Nell_; l++)
@@ -983,10 +1065,6 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
                     maxn = n;
                     BoundStates[l].resize(maxn - l);
                     BoundStates[l][n - l - 1] = Indices[l][n - l - 1];
-                    
-                    rArray grid = linspace(0., bspline_atom_.R0(), 1000);
-                    write_array(grid, bspline_atom_.zip(boundstate(n,l), grid), format("bound-%d-%d", n, l));
-                    
                     continue;
                 }
             }
@@ -1002,6 +1080,11 @@ void RadialIntegrals::setupRadialEigenstates (Parallel const & par, CommandLine 
         blas::gemm(-1., Eigenstates[l], invCR, 1., tHl);
         if (verbose_) std::cout << "\t\t- residual: " << tHl.data().norm() << std::endl;
         if (verbose_) std::cout << "\t\t- bound states with energy within 0.1 % from exact value: " << l + 1 << " <= n <= " << maxn << std::endl;
+        
+        CR = Eigenstates[l];
+        blas::gemm(1., invsqrtS, CR, 0., Eigenstates[l]);
+        invCR = invEigenstates[l];
+        blas::gemm(1., invCR, invsqrtS, 0., invEigenstates[l]);
     }
     
     if (verbose_) std::cout << std::endl;

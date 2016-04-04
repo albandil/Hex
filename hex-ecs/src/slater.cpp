@@ -61,7 +61,7 @@ void RadialIntegrals::R_inner_integrand
     
     // fill output array
     for (int k = 0; k < n; k++)
-        out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(in[k]/x,L) * damp(in[k], 0, R);
+        out[k] = values_i[k] * values_j[k] * special::pow_int<Complex>(in[k]/x,L) * damp(in[k].real(), R.real());
 }
 
 void RadialIntegrals::R_outer_integrand
@@ -86,7 +86,7 @@ void RadialIntegrals::R_outer_integrand
     // evaluate inner integral, fill output array
     for (int u = 0; u < n; u++)
     {
-        out[u] = values_i[u] * values_j[u] / in[u] * damp(0., in[u], R) * g_atom_.quadMFP
+        out[u] = values_i[u] * values_j[u] / in[u] * damp(in[u].real(), R.real()) * g_atom_.quadMFP
         (
             this, &RadialIntegrals::R_inner_integrand,      // integrand pointers
             points2, iknot, bspline_atom_.t(iknot), in[u],     // integrator parameters

@@ -187,21 +187,31 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_atom = S_csr_atom.factorize();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
     
+    // weight functions
+    double Rp = 50;
+    double R0 = bspline_atom_.R0();
+    auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+    auto w_edge = [R0] (Complex z) { return damp(z.real(), R0); };
+    auto w_polar = [R0,&w_edge,&pol_pot] (Complex z) { double r = z.real(); return w_edge(z) * pol_pot(r); };
+    
     // j-overlaps of shape [Nangmom × Nspline]
-    cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_atom()));
-    cArray ji_overlaps_proj = radf.overlapj(radf.bspline_proj(), radf.gaussleg_proj(), inp_.maxell, ki, weightEdgeDamp(radf.bspline_proj()));
+    cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, w_edge);
+    cArray ji_overlaps_proj = radf.overlapj(radf.bspline_proj(), radf.gaussleg_proj(), inp_.maxell, ki, w_edge);
+    cArray ji_overlaps_polar = rad_.overlapj(rad_.bspline_proj(), rad_.gaussleg_proj(), inp_.maxell, ki, w_polar);
     if (not std::isfinite(ji_overlaps_atom.norm()) or not std::isfinite(ji_overlaps_proj.norm()))
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     
     // j-expansions
     cArray ji_expansion_atom = lu_S_atom->solve(ji_overlaps_atom, inp_.maxell + 1);
     cArray ji_expansion_proj = lu_S_proj->solve(ji_overlaps_proj, inp_.maxell + 1);
-    if (not std::isfinite(ji_expansion_atom.norm()) or not std::isfinite(ji_expansion_proj.norm()))
+    cArray ji_expansion_polar = lu_S_atom->solve(ji_overlaps_polar, inp_.maxell + 1);
+    if (not std::isfinite(ji_expansion_atom.norm()) or not std::isfinite(ji_expansion_proj.norm()) or not std::isfinite(ji_expansion_polar.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
     cArray Pi_expansion_atom = rad_.boundstate(ni,li);
     cArray Pi_expansion_proj = rad_.boundstate(ni,li); // FIXME : Proj
+    double Eni = rad_.eigenenergy(ni, li).real();
     
     // truncate the projectile expansions for non-origin panels
     if (rad_.bspline_proj().Nspline() != radf.bspline_proj().Nspline())
@@ -216,270 +226,138 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         Pi_expansion_proj = Pi_expansion_proj.slice(Pi_expansion_proj.size() - Nspline_proj, Pi_expansion_proj.size());
     }
     
+    // (anti)symmetrization
+    double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
+    
     // for all segments constituting the RHS
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         int l1 = ang_.states()[ill].first;
         int l2 = ang_.states()[ill].second;
         
-        // setup storage
         cArray chi_block (Nspline_atom * Nspline_proj);
         
-        // for all allowed angular momenta (by momentum composition) of the projectile
-        for (int l = std::abs(li - ang_.L()); l <= li + ang_.L(); l++)
+        for (unsigned illp = 0; illp < ang_.states().size(); illp++)
         {
-            // skip wrong parity
-            if ((ang_.L() + li + l) % 2 != ang_.Pi())
-                continue;
+            int l1p = ang_.states()[illp].first;
+            int l2p = ang_.states()[illp].second;
             
-            // (anti)symmetrization
-            double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
+            // calculate Clebsch-Gordan coeddifients
+            std::map<int,double> CG;
+            CG[l2p]     = special::ClebschGordan(li, mi, l2p,     0, ang_.L(), mi);
+            CG[l2p - 1] = special::ClebschGordan(li, mi, l2p - 1, 0, ang_.L(), mi);
+            CG[l2p + 1] = special::ClebschGordan(li, mi, l2p + 1, 0, ang_.L(), mi);
             
-            // compute energy- and angular momentum-dependent prefactor
-            Complex prefactor = std::pow(1.0_i,l)
-                              * std::sqrt(special::constant::two_pi * (2 * l + 1))
-                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / ki[0];
-            
-            // skip non-contributing terms
-            if (prefactor == 0.)
-                continue;
-            
-            // calculate angular integrals
+            // calculate other angular integrals
             rArray f1 (rad_.maxlambda() + 1), f2 (rad_.maxlambda() + 1);
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
             {
-                f1[lambda] = special::computef(lambda, l1, l2, li, l, inp_.L);
-                f2[lambda] = special::computef(lambda, l1, l2, l, li, inp_.L);
+                f1[lambda] = special::computef(lambda, l1, l2, l1p, l2p, inp_.L);
+                f2[lambda] = special::computef(lambda, l1, l2, l2p, l1p, inp_.L);
                 
                 // abort if any of the coefficients is non-number (factorial overflow etc.)
                 if (not std::isfinite(f1[lambda]))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,li,l,inp_.L);
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l1p,l2p,inp_.L);
                 if (not std::isfinite(f2[lambda]))
-                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l,li,inp_.L);
+                    HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l2p,l1p,inp_.L);
             }
             
-            // calculate the right-hand side
-            if (cmd_.exact_rhs)
+            // for all eigenstates
+            for (int i = 0; i < Nspline_atom; i++)
             {
-                // quadrature degree
-                int points = bspline_atom_.order() + li + l + 1;
+                // get "pricipal quantum number"
+                int n = l1p + i + 1;
                 
-                // precompute quadrature nodes and weights
-                cArray xs ((bspline_atom_.Nreknot() - 1) * points), xws ((bspline_atom_.Nreknot() - 1) * points);
-                cArray ys ((bspline_proj_.Nreknot() - 1) * points), yws ((bspline_atom_.Nreknot() - 1) * points);
-                # pragma omp parallel for
-                for (int ixknot = 0; ixknot < bspline_atom_.Nreknot() - 1; ixknot++)
-                    rad_.gaussleg_atom().scaled_nodes_and_weights(points, bspline_atom_.t(ixknot), bspline_atom_.t(ixknot + 1), &xs[ixknot * points], &xws[ixknot * points]);
-                # pragma omp parallel for
-                for (int iyknot = 0; iyknot < bspline_proj_.Nreknot() - 1; iyknot++)
-                    rad_.gaussleg_proj().scaled_nodes_and_weights(points, bspline_proj_.t(iyknot), bspline_proj_.t(iyknot + 1), &ys[iyknot * points], &yws[iyknot * points]);
-                
-                // precompute B-splines
-                cArray B_x (bspline_atom_.Nspline() * (bspline_atom_.order() + 1) * points);
-                cArray B_y (bspline_proj_.Nspline() * (bspline_proj_.order() + 1) * points);
-                # pragma omp parallel for
-                for (int ixspline = 0; ixspline < bspline_atom_.Nspline(); ixspline++)
-                for (int ixknot = ixspline; ixknot <= ixspline + bspline_atom_.order() and ixknot < bspline_atom_.Nreknot() - 1; ixknot++)
-                    bspline_atom_.B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points]);
-                # pragma omp parallel for
-                for (int iyspline = 0; iyspline < bspline_proj_.Nspline(); iyspline++)
-                for (int iyknot = iyspline; iyknot <= iyspline + bspline_proj_.order() and iyknot < bspline_proj_.Nreknot() - 1; iyknot++)
-                    bspline_proj_.B(iyspline, iyknot, points, &ys[iyknot * points], &B_y[(iyspline * (bspline_proj_.order() + 1) + iyknot - iyspline) * points]);
-                
-                // precompute radial functions and Riccati-Bessel functions
-                rArray Pi_x ((bspline_atom_.Nreknot() - 1) * points), Pi_y ((bspline_proj_.Nreknot() - 1) * points);
-                rArray ji_x ((bspline_atom_.Nreknot() - 1) * points), ji_y ((bspline_proj_.Nreknot() - 1) * points);
-                # pragma omp parallel for
-                for (unsigned ix = 0; ix < xs.size(); ix++)
+                // for all multipoles
+                for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
                 {
-                    gsl_sf_result Pi;
-                    Pi_x[ix] = (gsl_sf_hydrogenicR_e(ni, li, 1., xs[ix].real(), &Pi) == GSL_EUNDRFLW ? 0. : xs[ix].real() * Pi.val);
-                    ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
-                }
-                # pragma omp parallel for
-                for (unsigned iy = 0; iy < xs.size(); iy++)
-                {
-                    gsl_sf_result Pi;
-                    Pi_y[iy] = (gsl_sf_hydrogenicR_e(ni, li, 1., ys[iy].real(), &Pi) == GSL_EUNDRFLW ? 0. : ys[iy].real() * Pi.val);
-                    ji_y[iy] = special::ric_j(l, ki[0] * ys[iy].real());
-                }
-                
-                // damping distance
-                double distance = bspline_atom_.R0();
-                
-                // for all B-spline pairs
-                # pragma omp parallel for collapse (2)
-                for (int ixspline = 0; ixspline < bspline_atom_.Nspline(); ixspline++)
-                for (int iyspline = 0; iyspline < bspline_proj_.Nspline(); iyspline++)
-                {
-                    // contributions to the element of the right-hand side
-                    Complex contrib_direct = 0, contrib_exchange = 0;
-                    
-                    // for all knots
-                    for (int ixknot = ixspline; ixknot <= ixspline + bspline_atom_.order() and ixknot < bspline_atom_.Nreknot() - 1; ixknot++) if (bspline_atom_.t(ixknot).real() != bspline_atom_.t(ixknot + 1).real())
-                    for (int iyknot = iyspline; iyknot <= iyspline + bspline_proj_.order() and iyknot < bspline_proj_.Nreknot() - 1; iyknot++) if (bspline_proj_.t(iyknot).real() != bspline_proj_.t(iyknot + 1).real())
+                    // hydrogen orbital
+                    if (n == ni)
                     {
-                        // off-diagonal contribution
-                        if (ixknot != iyknot) // FIXME : Wrong condition for higher panels!
+                        if (l1p == li and f1[lambda] != 0)
                         {
-                            // for all quadrature points
-                            for (int ix = 0; ix < points; ix++)
-                            for (int iy = 0; iy < points; iy++)
-                            {
-                                // radii
-                                double rx = xs[ixknot * points + ix].real(), ry = ys[iyknot * points + iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                
-                                // evaluated functions
-                                Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
-                                Complex By = B_y[(iyspline * (bspline_proj_.order() + 1) + iyknot - iyspline) * points + iy];
-                                double Pix = Pi_x[ixknot * points + ix];
-                                double Piy = Pi_y[iyknot * points + iy];
-                                double jix = ji_x[ixknot * points + ix];
-                                double jiy = ji_y[iyknot * points + iy];
-                                Complex wx = xws[ixknot * points + ix];
-                                Complex wy = yws[iyknot * points + iy];
-                                
-                                // damp factor
-                                double dampfactor = damp(rx, ry, distance);
-                                
-                                // monopole contribution
-                                if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
-                                
-                                // higher multipoles contribution
-                                for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
-                                {
-                                    double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
-                                    if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                    if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
-                                }
-                            }
-                        }
-                        // diagonal contribution: needs to be integrated more carefully
-                        else if (ixknot < bspline_atom_.Nreknot() - 1) // FIXME : Works only for the first panel!
-                        {
-                            // for all quadrature points from the triangle x < y
-                            for (int ix = 0; ix < points; ix++)
-                            {
-                                cArray ys (points), yws (points), B_y (points);
-                                rad_.gaussleg_proj().scaled_nodes_and_weights(points, xs[ixknot * points + ix], bspline_proj_.t(iyknot + 1), &ys[0], &yws[0]);
-                                bspline_proj_.B(iyspline, iyknot, points, &ys[0], &B_y[0]);
-                                
-                                for (int iy = 0; iy < points; iy++)
-                                {
-                                    // radii
-                                    double rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                    
-                                    // evaluated functions
-                                    Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
-                                    Complex By = B_y[iy];
-                                    double Pix = Pi_x[ixknot * points + ix];
-                                    gsl_sf_result piy;
-                                    double Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
-                                    double jix = ji_x[ixknot * points + ix];
-                                    double jiy = special::ric_j(l, ki[0] * ry);
-                                    Complex wx = xws[ixknot * points + ix];
-                                    Complex wy = yws[iy];
-                                    
-                                    // damp factor
-                                    double dampfactor = damp(rx, ry, distance);
-                                    
-                                    // monopole contribution
-                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
-                                    
-                                    // higher multipoles contribution
-                                    for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
-                                    {
-                                        double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
-                                        if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                        if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
-                                    }
-                                }
-                            }
+                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l2p) * std::sqrt((2*l2p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
+                            cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l2p * Nspline_atom, (l2p + 1) * Nspline_atom);
+                            cArray Pj1 = outer_product(Pi_expansion_atom, Ji_expansion);
                             
-                            // for all quadrature points from the triangle x > y
-                            for (int ix = 0; ix < points; ix++)
-                            {
-                                cArray ys (points), yws (points), B_y (points);
-                                rad_.gaussleg_proj().scaled_nodes_and_weights(points, bspline_proj_.t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
-                                bspline_proj_.B(iyspline, iyknot, points, &ys[0], &B_y[0]);
-                                
-                                for (int iy = 0; iy < points; iy++)
-                                {
-                                    // radii
-                                    double rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                    
-                                    // evaluated functions
-                                    Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
-                                    Complex By = B_y[iy];
-                                    double Pix = Pi_x[ixknot * points + ix];
-                                    gsl_sf_result piy;
-                                    double Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
-                                    double jix = ji_x[ixknot * points + ix];
-                                    double jiy = special::ric_j(l, ki[0] * ry);
-                                    Complex wx = xws[ixknot * points + ix];
-                                    Complex wy = yws[iy];
-                                    
-                                    // damp factor
-                                    double dampfactor = damp(rx, ry, distance);
-                                    
-                                    // monopole contribution
-                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
-                                    
-                                    // higher multipoles contribution
-                                    for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
-                                    {
-                                        double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
-                                        if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                        if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
-                                    }
-                                }
-                            }
+                            rad_.R_tr_dia(lambda).dot(CG[l2p] * f1[lambda], Pj1, 1., chi_block, true);
+                            
+                            if (lambda == 0)
+                                kron_dot(1., chi_block, -CG[l2p], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                            
+                            if (lambda == 1)
+                                kron_dot(1., chi_block, -CG[l2p], Pj1, rad_.M1_atom(), rad_.Xi());
+                        }
+                        if (l2p == li and f2[lambda] != 0)
+                        {
+                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l1p) * std::sqrt((2*l1p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
+                            cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l1p * Nspline_atom, (l1p + 1) * Nspline_atom);
+                            cArray Pj2 = outer_product(Ji_expansion, Pi_expansion_atom);
+                            
+                            rad_.R_tr_dia(lambda).dot(Sign * CG[l2p] * f2[lambda], Pj2, 1., chi_block, true);
+                            
+                            if (lambda == 0)
+                                kron_dot(1., chi_block, -CG[l2p] * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                            
+                            if (lambda == 1)
+                                kron_dot(1., chi_block, -CG[l2p] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
                     
-                    // update element of the right-hand side
-                    chi_block[ixspline * bspline_proj_.Nspline() + iyspline] += prefactor * (contrib_direct + Sign * contrib_exchange);
-                }
-            }
-            else
-            {
-                // pick the correct Bessel function expansion
-                cArrayView Ji_expansion_atom (ji_expansion_atom, l * Nspline_atom, Nspline_atom);
-                cArrayView Ji_expansion_proj (ji_expansion_proj, l * Nspline_proj, Nspline_proj);
-                
-                // compute outer products of B-spline expansions
-                cArray Pj1 = outer_product(Pi_expansion_atom, Ji_expansion_proj);
-                cArray Pj2 = outer_product(Ji_expansion_atom, Pi_expansion_proj);
-                
-                // for all contributing multipoles
-                for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-                {
-                    // add multipole terms (direct/exchange)
-                    if (not cmd_.lightweight_radial_cache)
+                    // hydrogen orbital polarization
+                    else if (n == 2)
                     {
-                        if (f1[lambda] != 0.) rad_.R_tr_dia(lambda).dot(       prefactor * f1[lambda], Pj1, 1., chi_block, true);
-                        if (f2[lambda] != 0.) rad_.R_tr_dia(lambda).dot(Sign * prefactor * f2[lambda], Pj2, 1., chi_block, true);
-                    }
-                    else
-                    {
-                        if (f1[lambda] != 0.) rad_.apply_R_matrix(lambda,        prefactor * f1[lambda], Pj1, 1., chi_block);
-                        if (f2[lambda] != 0.) rad_.apply_R_matrix(lambda, Sign * prefactor * f2[lambda], Pj2, 1., chi_block);
+                        cArray BState1 = rad_.boundstate(n, l1p);
+                        Complex r_elem1 = (Pi_expansion_atom | rad_.M1_atom() | BState1);
+                        double En1 = rad_.eigenenergy(n, l1p).real();
+                        BState1 *=  r_elem1 / (En1 - Eni);
+                        for (int ell : std::vector<int>{ l2p - 1, l2p + 1 }) if (ell >= 0 and f1[lambda] != 0)
+                        {
+                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, ell) * std::sqrt((2*ell + 1) / (4 * special::constant::pi)) * special::computef(lambda, l1p, l2p, li, ell, ang_.L()) / special::constant::sqrt_two;
+                            if (prefactor == 0.)
+                                continue;
+                            
+                            cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
+                            cArray Pj1 = outer_product(-BState1, prefactor * Ji_expansion);
+                            
+                            rad_.R_tr_dia(lambda).dot(CG[ell] * f1[lambda], Pj1, 1., chi_block, true);
+                            
+                            if (lambda == 0)
+                                kron_dot(1., chi_block, -CG[ell], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                            
+                            if (lambda == 1)
+                                kron_dot(1., chi_block, -CG[ell], Pj1, rad_.M1_atom(), rad_.Xi());
+                        }
+                        
+                        cArray BState2 = rad_.boundstate(n, l2p);
+                        Complex r_elem2 = (Pi_expansion_atom | rad_.M1_atom() | BState2);
+                        double En2 = rad_.eigenenergy(n, l2p).real();
+                        BState2 *=  r_elem2 / (En2 - Eni);
+                        for (int ell : std::vector<int>{ l1p - 1, l1p + 1 }) if (ell >= 0 and f2[lambda] != 0)
+                        {
+                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, ell) * std::sqrt((2*ell + 1) / (4 * special::constant::pi)) * special::computef(lambda, l1p, l2p, ell, li, ang_.L()) / special::constant::sqrt_two;
+                            if (prefactor == 0.)
+                                continue;
+                            
+                            cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
+                            cArray Pj2 = outer_product(prefactor * Ji_expansion, -BState2);
+                            
+                            rad_.R_tr_dia(lambda).dot(CG[ell] * f2[lambda] * -Sign, Pj2, 1., chi_block, true);
+                            
+                            if (lambda == 0)
+                                kron_dot(1., chi_block, -CG[ell] * -Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                            
+                            if (lambda == 1)
+                                kron_dot(1., chi_block, -CG[ell] * -Sign, Pj2, rad_.Xi(), rad_.M1_atom());
+                        }
                     }
                 }
-                
-                // add monopole terms (direct/exchange)
-                if (li == l1 and l == l2)
-                    chi_block += (-prefactor       ) * outer_product(rad_.S_atom().dot(Pi_expansion_atom), rad_.Mm1_tr_proj().dot(Ji_expansion_proj));
-                if (li == l2 and l == l1)
-                    chi_block += (-prefactor * Sign) * outer_product(rad_.Mm1_tr_atom().dot(Ji_expansion_atom), rad_.S_proj().dot(Pi_expansion_proj));
             }
         }
         
         // update the right-hand side
         chi[ill] = chi_block;
+        chi[ill].hdfsave(format("chi-%d-%d.hdf", ang_.S(), ill));
         if (not chi.inmemory())
         {
             chi.hdfsave(ill);

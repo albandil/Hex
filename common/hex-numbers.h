@@ -61,6 +61,12 @@
 // shorthand for std::complex<double>
 typedef std::complex<double> Complex;
 
+// complex number literal
+inline Complex operator "" _z (long double x)
+{
+    return Complex(x,0.);
+}
+
 // imaginary number literal
 inline Complex operator "" _i (long double x)
 {
