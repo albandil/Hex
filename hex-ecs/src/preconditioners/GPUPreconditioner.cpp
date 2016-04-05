@@ -371,10 +371,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
         fgpu.connect(context_, smallDataFlags_);
         
-        //
         // one-electron contribution
-        //
-        
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             // decode angular momenta
