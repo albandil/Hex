@@ -102,7 +102,7 @@ template <class ...Params> [[noreturn]] void TerminateWithException (const char*
     std::cerr << "Program unsuccessfully terminated (in " << file << ":" << line << ", function \"" << func << "\")" << std::endl;
     
     // POSIX terminal allows colours
-#if (_POSIX_C_SOURCE >= 200112L)
+#if _POSIX_C_SOURCE >= 200112L
     if (isatty(fileno(stderr)))
         std::cerr << "\033[1;31m *** " << format(p...) << "\033[0m" << std::endl;
     else

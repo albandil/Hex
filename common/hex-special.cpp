@@ -942,3 +942,24 @@ std::vector<std::vector<int>> special::FdB_partition (int n)
     
     return partgs;
 }
+
+double special::integral::xJJ (unsigned lambda, double nu, double alpha, double mu, double beta)
+{
+    if (lambda == 0)
+        HexException("xJJ integral implemented only for lambda > 0");
+    
+    if (alpha == beta)
+    {
+        return std::pow(alpha, lambda - 1)  * gsl_sf_gamma(lambda) * gsl_sf_gamma(0.5 * (nu + mu - lambda + 1)) /
+        (std::pow(2,lambda) * gsl_sf_gamma(0.5 * (-nu + mu + lambda + 1)) * gsl_sf_gamma(0.5 * (nu + mu + lambda + 1)) * gsl_sf_gamma(0.5 * (nu - mu + lambda + 1)));
+    }
+    else if (alpha > beta)
+    {
+        return xJJ(lambda, mu, beta, nu, alpha);
+    }
+    else
+    {
+        return std::pow(alpha,nu) * gsl_sf_gamma(0.5 * (nu + mu - lambda + 1)) * gsl_sf_hyperg_2F1(0.5 * (nu + mu - lambda + 1), 0.5 * (nu - mu - lambda + 1), nu + 1, std::pow(alpha/beta, 2)) /
+        (std::pow(2,lambda) * std::pow(beta, nu - lambda + 1) * gsl_sf_gamma(0.5 * (-nu + mu + lambda + 1)) * gsl_sf_gamma(nu + 1));
+    }
+}

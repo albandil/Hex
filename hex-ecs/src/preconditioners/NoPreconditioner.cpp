@@ -209,8 +209,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
     // compute P-overlaps and P-expansion
-    cArray Pi_expansion_atom = rad_.boundstate(ni,li);
-    cArray Pi_expansion_proj = rad_.boundstate(ni,li); // FIXME : Proj
+    cArray Pi_expansion_atom = rad_.getstate(ni,li,rad_.eigenstates(li));
+    cArray Pi_expansion_proj = rad_.getstate(ni,li,rad_.eigenstates(li)); // FIXME : Proj
     double Eni = rad_.eigenenergy(ni, li).real();
     
     // truncate the projectile expansions for non-origin panels
@@ -285,7 +285,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             if (lambda == 0)
                                 kron_dot(1., chi_block, -CG[l2p], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
                             
-                            if (lambda == 1)
+                            if (lambda == 1 and cmd_.polarization)
                                 kron_dot(1., chi_block, -CG[l2p], Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         if (l2p == li and f2[lambda] != 0)
@@ -299,21 +299,21 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             if (lambda == 0)
                                 kron_dot(1., chi_block, -CG[l2p] * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
                             
-                            if (lambda == 1)
+                            if (lambda == 1 and cmd_.polarization)
                                 kron_dot(1., chi_block, -CG[l2p] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
                     
                     // hydrogen orbital polarization
-                    else
+                    else if (cmd_.polarization)
                     {
-                        cArray BState1 = rad_.boundstate(n, l1p);
+                        cArray BState1 = rad_.getstate(n, l1p, rad_.eigenstates(l1p));
                         Complex r_elem1 = (Pi_expansion_atom | rad_.M1_atom() | BState1);
                         double En1 = rad_.eigenenergy(n, l1p).real();
                         BState1 *=  r_elem1 / (En1 - Eni);
                         for (int ell : std::vector<int>{ l2p - 1, l2p + 1 }) if (ell >= 0 and f1[lambda] != 0)
                         {
-                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, ell) * std::sqrt((2*ell + 1) / (4 * special::constant::pi)) * special::computef(lambda, l1p, l2p, li, ell, ang_.L()) / special::constant::sqrt_two;
+                            Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, li, ell, ang_.L());
                             if (prefactor == 0.)
                                 continue;
                             
@@ -329,13 +329,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 kron_dot(1., chi_block, -CG[ell], Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         
-                        cArray BState2 = rad_.boundstate(n, l2p);
+                        cArray BState2 = rad_.getstate(n, l2p, rad_.eigenstates(l2p));
                         Complex r_elem2 = (Pi_expansion_atom | rad_.M1_atom() | BState2);
                         double En2 = rad_.eigenenergy(n, l2p).real();
                         BState2 *=  r_elem2 / (En2 - Eni);
                         for (int ell : std::vector<int>{ l1p - 1, l1p + 1 }) if (ell >= 0 and f2[lambda] != 0)
                         {
-                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, ell) * std::sqrt((2*ell + 1) / (4 * special::constant::pi)) * special::computef(lambda, l1p, l2p, ell, li, ang_.L()) / special::constant::sqrt_two;
+                            Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, ell, li, ang_.L());
                             if (prefactor == 0.)
                                 continue;
                             

@@ -1510,7 +1510,7 @@ typedef BlockArray<Complex> cBlockArray;
 #include "hex-arrithm.h"
 
 /// Scalar product of two arrays.
-template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const & b)
+template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
 {
     // get size; check if sizes match
     std::size_t N = a.size();
@@ -1520,8 +1520,8 @@ template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const 
     T result = 0;
     
     // iterators
-    T const * const restrict pa = (T const *)assume_aligned(a.data(), NumberArray<T>::Alloc::alignment);
-    T const * const restrict pb = (T const *)assume_aligned(b.data(), NumberArray<T>::Alloc::alignment);
+    T const * const restrict pa = a.data();
+    T const * const restrict pb = b.data();
     
     // sum the products
     for (std::size_t i = 0; i < N; i++)

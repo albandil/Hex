@@ -187,6 +187,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
+                    "\t--polarization                   Take into account polarization of the target orbitals.                                                                 \n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
                     "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
                     "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
@@ -285,7 +286,7 @@ void CommandLine::parse (int argc, char* argv[])
         "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // set the groupsize
-                groupsize = std::atoi(optargs[0].c_str());
+                groupsize = std::stoi(optargs[0]);
                 return true;
             },
 #ifdef WITH_MPI
@@ -355,19 +356,19 @@ void CommandLine::parse (int argc, char* argv[])
         "drop-tolerance", "d", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // drop tolerance for iLU-factorization
-                droptol = std::atof(optargs[0].c_str());
+                droptol = std::stod(optargs[0]);
                 return true;
             },
         "tolerance", "T", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // iteration tolerance for terminating iteration solution
-                itertol = std::atof(optargs[0].c_str());
+                itertol = std::stod(optargs[0]);
                 return true;
             },
         "prec-tolerance", "t", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // iteration tolerance for terminating iteration solution
-                prec_itertol = std::atof(optargs[0].c_str());
+                prec_itertol = std::stod(optargs[0]);
                 return true;
             },
         "preconditioner", "p", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -418,7 +419,7 @@ void CommandLine::parse (int argc, char* argv[])
         "kpa-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // number of KPA preconditioner iterations to trigger ILU preconditioning
-                kpa_max_iter = std::atoi(optargs[0].c_str());
+                kpa_max_iter = std::stoi(optargs[0]);
                 return true;
             },
         "kpa-drop", "", -1, [&](std::vector<std::string> const & optargs) -> bool
@@ -430,7 +431,7 @@ void CommandLine::parse (int argc, char* argv[])
         "ilu-max-blocks", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // maximal number of ILU preconditioned blocks for hybrid preconditioner
-                ilu_max_blocks = std::atoi(optargs[0].c_str());
+                ilu_max_blocks = std::stoi(optargs[0]);
                 return true;
             },
         "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -443,7 +444,7 @@ void CommandLine::parse (int argc, char* argv[])
         "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // maximal multipole to be considered by the coupled preconditioner
-                coupling_limit = std::atoi(optargs[0].c_str());
+                coupling_limit = std::stoi(optargs[0]);
                 return true;
             },
         "mumps-in-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -455,7 +456,7 @@ void CommandLine::parse (int argc, char* argv[])
         "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // maximal multipole to be considered by the coupled preconditioner
-                mumps_verbose = std::atoi(optargs[0].c_str());
+                mumps_verbose = std::stoi(optargs[0]);
                 return true;
             },
 #endif
@@ -502,13 +503,13 @@ void CommandLine::parse (int argc, char* argv[])
         "cl-platform", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use given OpenCL platform
-                ocl_platform = std::atol(optargs[0].c_str());
+                ocl_platform = std::stoi(optargs[0]);
                 return true;
             },
         "cl-device", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // use given OpenCL device
-                ocl_device = std::atol(optargs[0].c_str());
+                ocl_device = std::stoi(optargs[0]);
                 return true;
             },
         "cl-use-host-memory", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -535,7 +536,7 @@ void CommandLine::parse (int argc, char* argv[])
         "panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // propagate solution along the projectile axis
-                panels = std::atoi(optargs[0].c_str());
+                panels = std::stoi(optargs[0]);
                 return true;
             },
         "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -571,25 +572,25 @@ void CommandLine::parse (int argc, char* argv[])
         "extract-rho-begin", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // beginning of averaging/extrapolation window
-                extract_rho_begin = std::atof(optargs[0].c_str());
+                extract_rho_begin = std::stod(optargs[0]);
                 return true;
             },
         "extract-rho-end", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // end of averaging/extrapolation window
-                extract_rho = std::atof(optargs[0].c_str());
+                extract_rho = std::stod(optargs[0]);
                 return true;
             },
         "extract-rho", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // end of averaging/extrapolation window
-                extract_rho = std::atof(optargs[0].c_str());
+                extract_rho = std::stod(optargs[0]);
                 return true;
             },
         "extract-samples", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // number of extrapolation/averaging samples
-                extract_samples = std::atoi(optargs[0].c_str());
+                extract_samples = std::stoi(optargs[0]);
                 return true;
             },
         "ssor", "", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -602,6 +603,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use exact RHS
                 exact_rhs = true;
+                return true;
+            },
+        "polarization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // take into account polarization of the target orbitals
+                polarization = true;
                 return true;
             },
         

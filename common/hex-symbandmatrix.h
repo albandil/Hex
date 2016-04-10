@@ -285,7 +285,7 @@ public:
      *
      * Calculates
      * \f[
-     *     A M A + b B \rightarrow B
+     *     a M A + b B \rightarrow B
      * \f]
      * 
      * @param B Set of vectors to multiply as a column-major dense matrix.

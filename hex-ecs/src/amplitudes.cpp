@@ -390,6 +390,7 @@ void Amplitudes::writeICS_files ()
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {
     // final projectile momenta
+    rArray ki = sqrt(inp_.Etot);
     rArray kf = sqrt(inp_.Etot + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
     // shorthands
@@ -398,9 +399,19 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     int Nspline_atom = bspline_atom_.Nspline(); // B-spline count (atomic basis)
     int Nspline_proj = bspline_proj_.Nspline(); // B-spline count (projectile basis)
     
-    // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_expansion = rad_.boundstate(T.nf, T.lf);
-    cArray Pf_overlaps = rad_.S_atom().dot(Pf_expansion);
+    // compute hydrogen orbital overlaps with B-spline basis (use precomputed expansions)
+    std::vector<ColMatrix<Complex>> Pf_overlaps;
+    for (int l = 0; l <= inp_.maxell; l++)
+    {
+        // resize the matrix
+        Pf_overlaps.push_back(ColMatrix<Complex>(Nspline_atom, Nspline_atom));
+        
+        // multiply all expansions by overlap matrix -> B-spline overlaps
+        rad_.S_atom().dot(1., rad_.eigenstates(l).data(), 0., Pf_overlaps.back().data());
+        
+        write_array(Pf_overlaps.back().col(0), format("Pf-%d.txt", l));
+    }
+    
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -428,12 +439,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
-    cArrays singlet_lambda, triplet_lambda;
+    cArrays Lambda[2];
     for (int ell = 0; ell <= inp_.maxell; ell++)
     {
         // resize arrays
-        singlet_lambda.push_back(cArray(samples));
-        triplet_lambda.push_back(cArray(samples));
+        Lambda[0].push_back(cArray(samples));
+        Lambda[1].push_back(cArray(samples));
     }
     
     if (Ra > Rb)
@@ -455,6 +466,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         // evaluate j and dj at far radius for all angular momenta up to maxell
         cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
+        cArray xi_R0 = j_R0 / (eval_r * eval_r);
+        cArray dxi_R0 = dj_R0 / (eval_r * eval_r) - j_R0 / (eval_r * eval_r * eval_r);
         
         // evaluate B-splines and their derivatives at evaluation radius
         cArray Bspline_R0(Nspline_proj), Dspline_R0(Nspline_proj);
@@ -468,21 +481,16 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         }
         
         // evaluate Wronskians
-        cArrays Wj (inp_.maxell + 1);
+        cArrays Wj (inp_.maxell + 1), Wxi (inp_.maxell + 1);
         for (int l = 0; l <= inp_.maxell; l++)
+        {
             Wj[l] = dj_R0[l] * Bspline_R0 - j_R0[l] * Dspline_R0;
+            Wxi[l] = dxi_R0[l] * Bspline_R0 - xi_R0[l] * Dspline_R0;
+        }
         
         // compute radial factor
-        # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
         for (unsigned ill = 0; ill < ang_.size(); ill++)
         {
-            // skip blocks that do not contribute to (l1 = ) lf
-            if (ang_[ill].first != T.lf)
-                continue;
-            
-            // get angular momentum
-            int ell = ang_[ill].second;
-            
             // load solution block
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
@@ -490,15 +498,72 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             // change view to row-major dense matrix
             RowMatrixView<Complex> PsiSc (Nspline_atom, Nspline_proj, solution[ill]);
             
-            // calculate radial integral
-            Complex lambda = (Pf_overlaps | PsiSc | Wj[ell]);
+            // electron angular momenta;
+            int l1 = ang_[ill].first;
+            int l2 = ang_[ill].second;
             
-            // update the stored value
-            # pragma omp critical
-            if (Spin == 0)
-                singlet_lambda[ell][i] += lambda;
-            else
-                triplet_lambda[ell][i] += lambda;
+            // initial-final state r-overlap
+            cArrayView Pf = rad_.getstate(T.nf, T.lf, Pf_overlaps[T.lf]);
+            cArrayView Pi = rad_.getstate(T.ni, T.li, Pf_overlaps[T.li]);
+            Complex rover_fi = (Pi | rad_.M1_atom() | Pf);
+            
+            // for all partial waves
+            for (int ell = 0; ell <= inp_.maxell; ell++)
+            {
+                // unperturbed contribution
+                if (l1 == T.lf and l2 == ell)
+                {
+                    cArrayView Pf = rad_.getstate(T.nf, T.lf, Pf_overlaps[T.lf]);
+                    
+                    Lambda[Spin][ell][i] += (Pf | PsiSc | Wj[ell]);
+                }
+                
+                // polarization contribution
+                else if (cmd_.polarization)
+                {
+                    double f = special::computef(1, T.lf, ell, l1, l2, inp_.L);
+                    for (int n = l1 + 1; n < bspline_atom_.Nspline() + l1 + 1; n++) if (n != T.nf)
+                    {
+                        cArrayView P = rad_.getstate(n, l1, Pf_overlaps[l1]);
+                        
+                        Complex rover = (P | rad_.M1_atom() | Pf);
+                        Complex Ediff = rad_.eigenenergy(n,l1) - rad_.eigenenergy(T.nf,T.lf);
+                        
+                        Lambda[Spin][ell][i] -= (Pf | PsiSc | Wxi[ell]) * rover / Ediff * f;
+                    }
+                }
+                
+                // two-potential formula correction
+                if (l1 == T.lf and cmd_.polarization)
+                {
+                    double f = special::computef(1, T.li, l2, T.lf, ell, inp_.L);
+                    double C = special::ClebschGordan(T.li, T.mi, l2, 0, inp_.L, T.mi);
+                    if (f != 0 and C != 0)
+                    {
+                        std::cout << "(" << T.li << "," << l2 << ")-(" << T.lf << "," << ell << "): f = " << f << ", C = " << C << std::endl;
+                        Complex prefactor = rover_fi * std::sqrt(special::constant::pi * (2*l2+1)) / ki[ie] * special::pow_int(1.0_i, l2);
+                        Complex jjxi1 = special::constant::pi_half * std::sqrt(ki[ie] * kf[ie]) * special::integral::xJJ(1, ell+0.5, kf[ie], l2+0.5, ki[ie]);
+                        Complex jjxi2 = 0;
+                        for (int interval = 0; interval < bspline_atom_.Nreknot() - 1; interval++) if (bspline_atom_.t(interval) != bspline_atom_.t(interval + 1))
+                        {
+                            const int points = EXPANSION_QUADRATURE_POINTS;
+                            Complex xs[points], ws[points];
+                            rad_.gaussleg_atom().scaled_nodes_and_weights(points, bspline_atom_.t(interval), bspline_atom_.t(interval + 1), xs, ws);
+                            for (int pt = 0; pt < points; pt++)
+                            {
+                                double r = xs[pt].real();
+                                double Rp = 50;
+                                jjxi2 += gsl_sf_bessel_jl(ell, kf[ie] * r) * gsl_sf_bessel_jl(l2, ki[ie] * r) * std::exp(-special::pow_int(r/Rp,4)) * ws[pt];
+                            }
+                        }
+                        std::cout << "prefactor = " << prefactor << std::endl;
+                        std::cout << "jjxi1 = " << jjxi1 << std::endl;
+                        std::cout << "jjxi2 = " << ki[ie] * kf[ie] * jjxi2 << std::endl;
+                        std::cout << "rover = " << rover_fi << std::endl;
+                        Lambda[Spin][ell][i] += prefactor * f * C * (jjxi1 - ki[ie] * kf[ie] * jjxi2) * rover_fi;
+                    }
+                }
+            }
             
             // unload solution block
             if (not solution.inmemory())
@@ -511,14 +576,14 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         if (cmd_.extract_extrapolate)
         {
             // radial extrapolation
-            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, singlet_lambda[ell]);
-            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, triplet_lambda[ell]);
+            Lambda_Slp[T][ell].first[ie] += inv_power_extrapolate(grid, Lambda[0][ell]);
+            Lambda_Slp[T][ell].second[ie] += inv_power_extrapolate(grid, Lambda[1][ell]);
         }
         else
         {
             // plain averaging
-            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / double(samples);
-            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / double(samples);
+            Lambda_Slp[T][ell].first[ie] += sum(Lambda[0][ell]) / double(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(Lambda[1][ell]) / double(samples);
         }
     }
 }

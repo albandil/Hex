@@ -568,17 +568,15 @@ class RadialIntegrals
         ColMatrix<Complex> const & inveigenstates (int l) const { return invEigenstates[l]; }
         
         /**
-         * @brief Return one-electron hamiltonian eigenstate B-spline expansion.
+         * @brief Return one-electron hamiltonian eigenstate according to the users choice.
          * 
-         * Returns properly normalized eigenstate of the one-electron hamiltonian
-         * as an array of B-spline expansion coefficients.
+         * Returns the correct eigenstate. The third parameter is assumed to be a matrix with
+         * columns ordered in the same way as the matrix returned by RadialIntegrals::eigenstates
+         * or RadialIntegrals::inveigenstates.
          */
-        cArray boundstate (int n, int l) const
+        template <class T> ArrayView<T> getstate (int n, int l, ColMatrix<T> const & states) const
         {
-//             ColMatrix<Complex> const & invsqrtS = invEigenstates[Nell_];
-//             cArray eig = Eigenstates[l].col(Indices[l][n - l - 1]);
-//             return invsqrtS * eig;
-            return Eigenstates[l].col(Indices[l][n - l - 1]);
+            return states.col(Indices[l][n - l - 1]);
         }
         
     private:

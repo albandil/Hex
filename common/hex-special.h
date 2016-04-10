@@ -157,6 +157,15 @@ template <class T> NumberArray<T> romberg (const ArrayView<T> y)
     return z;
 }
 
+/**
+ * @brief Calculate integrat of a product of two Bessel functions and a negative integer power.
+ * @f[
+ *     \int_0^\infty x^{-\lambda} J_\nu(\alpha x) J_\mu(\beta x) \mathrm{d}x
+ * @f]
+ * Uses the formulas from Gradsteyn & Ryzhik.
+ */
+double xJJ (unsigned lambda, double nu, double alpha, double mu, double beta);
+
 } // end of namespace "special::integral"
 
 /**
