@@ -84,7 +84,7 @@ obj/$(BASECXX)/hex-pwba2/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -I../common -Isrc -c $< -o $@ -MMD -MF $(patsubst %.o,%.dep,$@)
 
 clean:
-	rm -f $(OBJECTS) $(DEPENDENCIES) bin/pwba2
+	rm -f $(COMMON_OBJECTS) $(HEX_PWBA2_OBJECTS) $(DEPENDENCIES) bin/pwba2
 
 doc:
 	doxygen

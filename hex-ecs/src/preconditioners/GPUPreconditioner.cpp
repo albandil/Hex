@@ -87,13 +87,13 @@ void GPUCGPreconditioner::setup ()
             clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(platform_name), platform_name, nullptr);
             clGetPlatformInfo(platforms[i], CL_PLATFORM_VENDOR, sizeof(platform_vendor), platform_vendor, nullptr);
             clGetPlatformInfo(platforms[i], CL_PLATFORM_VERSION, sizeof(platform_version), platform_version, nullptr);
-#if _POSIX_C_SOURCE >= 200112L
-                if (i == cmd_.ocl_platform and isatty(fileno(stdout)))
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
                     std::cout << "\x1B[1;37m";
 #endif
             std::cout << "\t- Platform " << i << ": " << platform_name << " (" << platform_vendor << ", " << platform_version << ")" << std::endl;
-#if _POSIX_C_SOURCE >= 200112L
-                if (i == cmd_.ocl_platform and isatty(fileno(stdout)))
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and isatty(STDOUT_FILENO))
                     std::cout << "\x1B[0m";
 #endif
             clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 10, devices, &ndevices);
@@ -101,13 +101,13 @@ void GPUCGPreconditioner::setup ()
             {
                 clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(device_name), device_name, nullptr);
                 clGetDeviceInfo(devices[j], CL_DEVICE_VENDOR, sizeof(device_vendor), device_vendor, nullptr);
-#if _POSIX_C_SOURCE >= 200112L
-                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(fileno(stdout)))
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
                     std::cout << "\x1B[1;37m";
 #endif
                 std::cout << "\t\t- Device " << j << ": " << device_name << " (" << device_vendor << ")" << std::endl;
-#if _POSIX_C_SOURCE >= 200112L
-                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(fileno(stdout)))
+#ifdef __linux__
+                if (i == cmd_.ocl_platform and j == cmd_.ocl_device and isatty(STDOUT_FILENO))
                     std::cout << "\x1B[0m";
 #endif
             }
@@ -371,7 +371,10 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
         fgpu.connect(context_, smallDataFlags_);
         
+        //
         // one-electron contribution
+        //
+        
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             // decode angular momenta

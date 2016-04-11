@@ -519,7 +519,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 }
                 
                 // polarization contribution
-                else if (cmd_.polarization)
+                else if (cmd_.polarization > 0)
                 {
                     double f = special::computef(1, T.lf, ell, l1, l2, inp_.L);
                     for (int n = l1 + 1; n < bspline_atom_.Nspline() + l1 + 1; n++) if (n != T.nf)
@@ -534,7 +534,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 }
                 
                 // two-potential formula correction
-                if (l1 == T.lf and cmd_.polarization)
+                if (l1 == T.lf and cmd_.polarization > 0)
                 {
                     double f = special::computef(1, T.li, l2, T.lf, ell, inp_.L);
                     double C = special::ClebschGordan(T.li, T.mi, l2, 0, inp_.L, T.mi);
@@ -552,7 +552,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                             for (int pt = 0; pt < points; pt++)
                             {
                                 double r = xs[pt].real();
-                                double Rp = 50;
+                                double Rp = cmd_.polarization;
                                 jjxi2 += gsl_sf_bessel_jl(ell, kf[ie] * r) * gsl_sf_bessel_jl(l2, ki[ie] * r) * std::exp(-special::pow_int(r/Rp,4)) * ws[pt];
                             }
                         }

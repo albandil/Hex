@@ -187,7 +187,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
-                    "\t--polarization                   Take into account polarization of the target orbitals.                                                                 \n"
+                    "\t--polarization <number>          Take into account polarization of the target orbitals (projectile radius > number).                                    \n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
                     "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
                     "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
@@ -605,10 +605,10 @@ void CommandLine::parse (int argc, char* argv[])
                 exact_rhs = true;
                 return true;
             },
-        "polarization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+        "polarization", "", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // take into account polarization of the target orbitals
-                polarization = true;
+                polarization = std::stod(optargs[0]);
                 return true;
             },
         

@@ -452,9 +452,8 @@ Complex RadialIntegrals::computeS12
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
-    int Nspline_atom = bspline_atom_.Nspline(); int Nspline_proj = bspline_proj_.Nspline();
-    int Nknot_atom   = bspline_atom_.Nknot();   int Nknot_proj   = bspline_proj_.Nknot();
-    int Nreknot_atom = bspline_atom_.Nreknot(); int Nreknot_proj = bspline_proj_.Nreknot();
+    int Nspline_atom = bspline_atom_.Nspline();
+    int Nspline_proj = bspline_proj_.Nspline();
     
     // create file names for these radial integrals
     D_atom_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_atom_.hash()));  D_proj_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_proj_.hash()));
