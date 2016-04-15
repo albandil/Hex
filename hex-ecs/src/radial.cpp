@@ -522,15 +522,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     int Nspline_proj = bspline_proj_.Nspline();
     int Nreknot_proj = bspline_proj_.Nreknot();
     
-    // get knot that terminates (x^lambda)-scaled region
-    for (int i = 0; i < bspline_atom_.Nknot(); i++)
-    {
-        if (bspline_atom_.t(i).real() < 1)
-            lastscaled_ = i;
-        else
-            break;
-    }
-    
     // set number of two-electron integrals
     R_tr_dia_.resize(Nlambdas_);
     
@@ -558,10 +549,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         cArrayView(Mitr_mLm1_proj_, lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_, -lambda-1, Nreknot_proj - 1);
         Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
         Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
-        
-        // no need to do anything else for non-identical B-spline bases
-//         if (bspline_atom_.hash() != bspline_proj_.hash())
-//             continue;
         
         // diagonal contributions to two-electron integrals
         std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
