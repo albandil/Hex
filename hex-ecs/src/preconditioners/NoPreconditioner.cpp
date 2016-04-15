@@ -242,12 +242,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             int l1p = ang_.states()[illp].first;
             int l2p = ang_.states()[illp].second;
             
-            // calculate Clebsch-Gordan coeddifients
-            std::map<int,double> CG;
-            CG[l2p]     = special::ClebschGordan(li, mi, l2p,     0, ang_.L(), mi);
-            CG[l2p - 1] = special::ClebschGordan(li, mi, l2p - 1, 0, ang_.L(), mi);
-            CG[l2p + 1] = special::ClebschGordan(li, mi, l2p + 1, 0, ang_.L(), mi);
-            
             // calculate other angular integrals
             rArray f1 (rad_.maxlambda() + 1), f2 (rad_.maxlambda() + 1);
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -280,16 +274,18 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l2p * Nspline_atom, (l2p + 1) * Nspline_atom);
                             cArray Pj1 = outer_product(Pi_expansion_atom, Ji_expansion);
                             
+                            double CG = special::ClebschGordan(li, mi, l2p, 0, ang_.L(), mi);
+                            
                             if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG[l2p] * f1[lambda], Pj1, 1., chi_block);
+                                rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
                             else
-                                rad_.R_tr_dia(lambda).dot(CG[l2p] * f1[lambda], Pj1, 1., chi_block, true);
+                                rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG[l2p] * f1[lambda], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
                             
                             if (lambda == 1 and cmd_.polarization > 0)
-                                kron_dot(1., chi_block, -CG[l2p], Pj1, rad_.M1_atom(), rad_.Xi());
+                                kron_dot(1., chi_block, -CG, Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         if (l2p == li and f2[lambda] != 0)
                         {
@@ -297,16 +293,18 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l1p * Nspline_atom, (l1p + 1) * Nspline_atom);
                             cArray Pj2 = outer_product(Ji_expansion, Pi_expansion_atom);
                             
+                            double CG = special::ClebschGordan(l1p, 0, li, mi, ang_.L(), mi);
+                            
                             if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, Sign * CG[l2p] * f2[lambda], Pj2, 1., chi_block);
+                                rad_.apply_R_matrix(lambda, Sign * CG * f2[lambda], Pj2, 1., chi_block);
                             else
-                                rad_.R_tr_dia(lambda).dot(Sign * CG[l2p] * f2[lambda], Pj2, 1., chi_block, true);
+                                rad_.R_tr_dia(lambda).dot(Sign * CG * f2[lambda], Pj2, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG[l2p] * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                                kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
                             
                             if (lambda == 1 and cmd_.polarization > 0)
-                                kron_dot(1., chi_block, -CG[l2p] * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
+                                kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
                     
@@ -326,16 +324,18 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
                             cArray Pj1 = outer_product(-BState1, prefactor * Ji_expansion);
                             
+                            double CG = special::ClebschGordan(li, mi, ell, 0, ang_.L(), mi);
+                            
                             if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG[ell] * f1[lambda], Pj1, 1., chi_block);
+                                rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
                             else
-                                rad_.R_tr_dia(lambda).dot(CG[ell] * f1[lambda], Pj1, 1., chi_block, true);
+                                rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG[ell], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                                kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
                             
                             if (lambda == 1)
-                                kron_dot(1., chi_block, -CG[ell] * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
+                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         
                         cArray BState2 = rad_.getstate(n, l2p, rad_.eigenstates(l2p));
@@ -351,16 +351,18 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
                             cArray Pj2 = outer_product(prefactor * Ji_expansion, -BState2);
                             
+                            double CG = special::ClebschGordan(ell, 0, li, mi, ang_.L(), mi);
+                            
                             if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG[ell] * f2[lambda] * -Sign, Pj2, 1., chi_block);
+                                rad_.apply_R_matrix(lambda, CG * f2[lambda] * -Sign, Pj2, 1., chi_block);
                             else
-                                rad_.R_tr_dia(lambda).dot(CG[ell] * f2[lambda] * -Sign, Pj2, 1., chi_block, true);
+                                rad_.R_tr_dia(lambda).dot(CG * f2[lambda] * -Sign, Pj2, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG[ell] * -Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                                kron_dot(1., chi_block, -CG * -Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
                             
                             if (lambda == 1)
-                                kron_dot(1., chi_block, -CG[ell] * f2[lambda] * -Sign, Pj2, rad_.Xi(), rad_.M1_atom());
+                                kron_dot(1., chi_block, -CG * f2[lambda] * -Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
                 }
