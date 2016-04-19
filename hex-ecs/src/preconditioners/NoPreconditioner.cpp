@@ -226,8 +226,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         Pi_expansion_proj = Pi_expansion_proj.slice(Pi_expansion_proj.size() - Nspline_proj, Pi_expansion_proj.size());
     }
     
-    // (anti)symmetrization
-    double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
+    // (anti)symmetrization w.r.t. spin multiplet
+    double Sign = special::pow_int(-1, ang_.S());
     
     // for all segments constituting the RHS
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
@@ -282,10 +282,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                                kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
                             
-                            if (lambda == 1 and cmd_.polarization > 0)
-                                kron_dot(1., chi_block, -CG, Pj1, rad_.M1_atom(), rad_.Xi());
+                            if (lambda == 1 and cmd_.polarization > 0 and f1[lambda] != 0)
+                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         if (l2p == li and f2[lambda] != 0)
                         {
@@ -303,7 +303,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             if (lambda == 0)
                                 kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
                             
-                            if (lambda == 1 and cmd_.polarization > 0)
+                            if (lambda == 1 and cmd_.polarization > 0 and f2[lambda] != 0)
                                 kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
@@ -334,7 +334,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             if (lambda == 0)
                                 kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
                             
-                            if (lambda == 1)
+                            if (lambda == 1 and f1[lambda] != 0)
                                 kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
                         }
                         
@@ -354,15 +354,15 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             double CG = special::ClebschGordan(ell, 0, li, mi, ang_.L(), mi);
                             
                             if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG * f2[lambda] * -Sign, Pj2, 1., chi_block);
+                                rad_.apply_R_matrix(lambda, CG * f2[lambda] * Sign, Pj2, 1., chi_block);
                             else
-                                rad_.R_tr_dia(lambda).dot(CG * f2[lambda] * -Sign, Pj2, 1., chi_block, true);
+                                rad_.R_tr_dia(lambda).dot(CG * f2[lambda] * Sign, Pj2, 1., chi_block, true);
                             
                             if (lambda == 0)
-                                kron_dot(1., chi_block, -CG * -Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                                kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
                             
-                            if (lambda == 1)
-                                kron_dot(1., chi_block, -CG * f2[lambda] * -Sign, Pj2, rad_.Xi(), rad_.M1_atom());
+                            if (lambda == 1 and f2[lambda] != 0)
+                                kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                         }
                     }
                 }

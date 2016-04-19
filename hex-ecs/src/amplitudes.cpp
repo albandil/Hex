@@ -408,10 +408,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         
         // multiply all expansions by overlap matrix -> B-spline overlaps
         rad_.S_atom().dot(1., rad_.eigenstates(l).data(), 0., Pf_overlaps.back().data());
-        
-        write_array(Pf_overlaps.back().col(0), format("Pf-%d.txt", l));
     }
-    
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -529,7 +526,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                         Complex rover = (P | rad_.M1_atom() | Pf);
                         Complex Ediff = rad_.eigenenergy(n,l1) - rad_.eigenenergy(T.nf,T.lf);
                         
-                        Lambda[Spin][ell][i] -= (Pf | PsiSc | Wxi[ell]) * rover / Ediff * f;
+                        Lambda[Spin][ell][i] -= (P | PsiSc | Wxi[ell]) * rover / Ediff * f;
                     }
                 }
                 
