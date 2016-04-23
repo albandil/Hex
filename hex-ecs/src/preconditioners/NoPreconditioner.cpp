@@ -208,6 +208,21 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     if (not std::isfinite(ji_expansion_atom.norm()) or not std::isfinite(ji_expansion_proj.norm()) or not std::isfinite(ji_expansion_polar.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
+    rArray grid = linspace(0., bspline_atom_.Rmax(), 10000);
+    for (int ell = 0; ell <= inp_.maxell; ell++)
+    {
+        write_array
+        (
+            grid,
+            bspline_atom_.zip
+            (
+                ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom),
+                grid
+            ),
+            format("ji-%d.dat", ell)
+        );
+    }
+    
     // compute P-overlaps and P-expansion
     cArray Pi_expansion_atom = rad_.getstate(ni,li,rad_.eigenstates(li));
     cArray Pi_expansion_proj = rad_.getstate(ni,li,rad_.eigenstates(li)); // FIXME : Proj
@@ -312,7 +327,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     else if (cmd_.polarization > 0)
                     {
                         cArray BState1 = rad_.getstate(n, l1p, rad_.eigenstates(l1p));
-                        Complex r_elem1 = (Pi_expansion_atom | rad_.M1_atom() | BState1);
+                        Complex r_elem1 = (Pi_expansion_atom.conj() | rad_.M1_atom() | BState1);
                         double En1 = rad_.eigenenergy(n, l1p).real();
                         BState1 *=  r_elem1 / (En1 - Eni);
                         for (int ell : std::vector<int>{ l2p - 1, l2p + 1 }) if (ell >= 0 and f1[lambda] != 0)
@@ -339,7 +354,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         }
                         
                         cArray BState2 = rad_.getstate(n, l2p, rad_.eigenstates(l2p));
-                        Complex r_elem2 = (Pi_expansion_atom | rad_.M1_atom() | BState2);
+                        Complex r_elem2 = (Pi_expansion_atom.conj() | rad_.M1_atom() | BState2);
                         double En2 = rad_.eigenenergy(n, l2p).real();
                         BState2 *=  r_elem2 / (En2 - Eni);
                         for (int ell : std::vector<int>{ l1p - 1, l1p + 1 }) if (ell >= 0 and f2[lambda] != 0)

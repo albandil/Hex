@@ -1946,6 +1946,8 @@ NumberArray<double> sqrabs (NumberArray<Complex> const & A);
 NumberArray<double> realpart (NumberArray<Complex> const & A);
 /// Return per-element imag part.
 NumberArray<double> imagpart (NumberArray<Complex> const & A);
+/// Return per-element conjugate.
+NumberArray<Complex> conjugate (NumberArray<Complex> const & A);
 
 /// Sum elements in array.
 template <typename T> T sum (const ArrayView<T> v)

@@ -149,7 +149,8 @@ class RadialIntegrals
         (
             Bspline const & bspline, GaussLegendre const & g,
             int i, int j, int iknot,
-            std::function<Complex(Complex)> weight
+            std::function<Complex(Complex)> weight,
+            bool conjug = false
         ) const;
         
         /**
@@ -173,7 +174,8 @@ class RadialIntegrals
         (
             Bspline const & bspline, GaussLegendre const & g,
             int i, int j,
-            std::function<Complex(Complex)> weight
+            std::function<Complex(Complex)> weight,
+            bool conjug = false
         ) const;
         
         /**

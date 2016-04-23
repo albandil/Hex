@@ -309,7 +309,8 @@ Complex RadialIntegrals::computeM_iknot
 Complex RadialIntegrals::computeS_iknot
 (
     Bspline const & bspline, GaussLegendre const & g,
-    int i, int j, int iknot, std::function<Complex(Complex)> weight
+    int i, int j, int iknot, std::function<Complex(Complex)> weight,
+    bool conjug
 ) const
 {
     // get interval boundaries
@@ -335,8 +336,16 @@ Complex RadialIntegrals::computeS_iknot
     Complex res = 0;
     
     // accumulate the (damped) result
-    for (int k = 0; k < points; k++)
-        res += values_i[k] * values_j[k] * weight(xs[k]) * ws[k];
+    if (conjug)
+    {
+        for (int k = 0; k < points; k++)
+            res += std::conj(values_i[k]) * values_j[k] * weight(xs[k]) * ws[k];
+    }
+    else
+    {
+        for (int k = 0; k < points; k++)
+            res += values_i[k] * values_j[k] * weight(xs[k]) * ws[k];
+    }
     
     return res;
 }
@@ -372,7 +381,8 @@ Complex RadialIntegrals::computeM
 Complex RadialIntegrals::computeS
 (
     Bspline const & bspline, GaussLegendre const & g,
-    int i, int j, std::function<Complex(Complex)> weight
+    int i, int j, std::function<Complex(Complex)> weight,
+    bool conjug
 ) const
 {
     // get boundary iknots
@@ -384,7 +394,7 @@ Complex RadialIntegrals::computeS
     
     // undergo integration on sub-intervals
     for (int iknot = left; iknot < right; iknot++)
-        res += computeS_iknot(bspline, g, i, j, iknot, weight);
+        res += computeS_iknot(bspline, g, i, j, iknot, weight, conjug);
     
     return res;
 }
@@ -467,7 +477,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
         std::cout << "Precomputing one-electron integrals ... " << std::flush;
     
     // compute matrix elements of the screened dipole potential
-    double Rp = 50;
+    double Rp = cmd.polarization;
     double R0 = bspline_atom_.R0();
     auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
     Xi_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return pol_pot(r.real()) * damp(r.real(), R0); }); });
@@ -475,7 +485,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     // compute one-electron matrices (atom basis)
     D_atom_     .populate([=](int m, int n) { return computeD(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
     S_atom_     .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
-    M1_atom_    .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return r;                            }); });
+    M1_atom_    .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return r;                            }, true); });
     Mm1_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
     Mm1_tr_atom_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
     Mm2_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });
@@ -483,7 +493,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     // compute one-electron matrices (projectile basis)
     D_proj_     .populate([=](int m, int n) { return computeD(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
     S_proj_     .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
-    M1_proj_    .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return r;                            }); });
+    M1_proj_    .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return r;                            }, true); });
     Mm1_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
     Mm1_tr_proj_.populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
     Mm2_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });

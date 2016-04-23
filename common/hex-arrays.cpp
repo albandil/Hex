@@ -106,6 +106,11 @@ NumberArray<double> imagpart (NumberArray<Complex> const & A)
     return B;
 }
 
+NumberArray<Complex> conjugate (NumberArray<Complex> const & A)
+{
+    return A.conj();
+}
+
 template<> void write_array (const ArrayView<double> array, std::string filename)
 {
     std::ofstream fout(filename);
