@@ -415,9 +415,13 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         return;
     
     // weight functions
+//     double beta = 0.125;
     double Rp = cmd_.polarization;
     double R0 = bspline_atom_.R0();
-    auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp,beta] (double r) { return 1.0 / (1.0 + std::exp(beta * (Rp - r))) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return 1.0 / gsl_sf_pow_int(std::max(r,Rp), 2); };
+    auto pol_pot = [Rp] (double r) { return r >= Rp ? 1.0 / (r*r) : 0.0; };
     auto w_edge = [R0] (Complex z) { return damp(z.real(), R0); };
     auto w_polar = [R0,&w_edge,&pol_pot] (Complex z) { double r = z.real(); return w_edge(z) * pol_pot(r); };
     
@@ -435,30 +439,9 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         Pf_overlaps.push_back(ColMatrix<Complex>(Nspline_atom, Nspline_atom));
         Pf_expansions.push_back(rad_.eigenstates(l));
         
-//         std::ofstream png (format("%d.png", l));
-//         rad_.eigenstates(l).T().plot_abs(png);
-//         png.close();
-//         
-//         rArray grid = linspace(0., bspline_atom_.Rmax(), 1000);
-//         for (int j = 0; j < Nspline_atom; j++)
-//         {
-//             write_array
-//             (
-//                 grid,
-//                 bspline_atom_.zip
-//                 (
-//                     rad_.getstate(j + l + 1, l, Pf_expansions[l]),
-//                     grid
-//                 ),
-//                 format("eig-%d-%d-%g.dat", l, j + l + 1, rad_.eigenenergy(j + l + 1, l))
-//             );
-//         }
-        
         // multiply all expansions by overlap matrix -> B-spline overlaps
         rad_.S_atom().dot(1., rad_.eigenstates(l).data(), 0., Pf_overlaps.back().data());
     }
-    
-//     std::exit(0);
     
     // The extracted T-matrix oscillates and slowly radially converges.
     // If we are far enough and only oscillations are left, we can average several uniformly spaced
@@ -538,7 +521,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             // initial-final state r-overlap
             cArrayView Pf = rad_.getstate(T.nf, T.lf, Pf_expansions[T.lf]);
             cArrayView Pi = rad_.getstate(T.ni, T.li, Pf_expansions[T.li]);
-            Complex rover_fi = (conjugate(Pi) | rad_.M1_atom() | Pf);
             
             // for all partial waves
             for (int ell = 0; ell <= inp_.maxell; ell++)
@@ -548,11 +530,11 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 {
                     cArrayView Sp = rad_.getstate(T.nf, T.lf, Pf_overlaps[T.lf]);
                     
-                    Lambda[Spin][ell][i] += (Sp | PsiSc | Wj[ell]);
+                    Lambda[Spin][ell][i] += (Sp | PsiSc | Wj[ell]); // TODO conj
                 }
                 
                 // polarization contribution
-                else if (cmd_.polarization > 0)
+                /*else if (cmd_.polarization > 0)
                 {
                     double f = special::computef(1, T.lf, ell, l1, l2, inp_.L);
                     if (f != 0) for (int n = l1 + 1; n < bspline_atom_.Nspline() + l1 + 1; n++) if (n != T.nf)
@@ -568,12 +550,12 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                         Complex ovl1 = (Sp | PsiSc | Wxi[ell]);
                         Complex ovl2 = (Wp | PsiSc | Sxi[ell]);
                         
-//                         if (T.ni == 2 and T.nf == 2)
-//                             std::cout << n << " " << ovl1 << " " << ovl2 << " " << Wp.norm() << " " << Sxi[ell].norm() << " " << rover << " " << 1./Ediff << std::endl;
+                        if (T.ni == 2 and T.nf == 2)
+                            std::cout << n << " " << ovl1 << " " << ovl2 << " " << Wp.norm() << " " << Sxi[ell].norm() << " " << rover << " " << 1./Ediff << std::endl;
                         
                         Lambda[Spin][ell][i] -= (ovl1 + ovl2) * rover / Ediff * f;
                     }
-                }
+                }*/
                 
                 // two-potential formula correction
                 /*if (l1 == T.lf and cmd_.polarization > 0)

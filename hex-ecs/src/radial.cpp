@@ -477,15 +477,19 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
         std::cout << "Precomputing one-electron integrals ... " << std::flush;
     
     // compute matrix elements of the screened dipole potential
+//     double beta = 0.125;
     double Rp = cmd.polarization;
     double R0 = bspline_atom_.R0();
-    auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp,beta] (double r) { return 1.0 / (1.0 + std::exp(beta * (Rp - r))) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return 1.0 / gsl_sf_pow_int(std::max(r,Rp), 2); };
+    auto pol_pot = [Rp] (double r) { return r >= Rp ? 1.0 / (r*r) : 0.0; };
     Xi_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return pol_pot(r.real()) * damp(r.real(), R0); }); });
     
     // compute one-electron matrices (atom basis)
     D_atom_     .populate([=](int m, int n) { return computeD(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
     S_atom_     .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0_z;                        }); });
-    M1_atom_    .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return r;                            }, true); });
+    M1_atom_    .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return r;                            }); });
     Mm1_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
     Mm1_tr_atom_.populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
     Mm2_atom_   .populate([=](int m, int n) { return computeS(bspline_atom_, g_atom_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });
@@ -493,7 +497,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     // compute one-electron matrices (projectile basis)
     D_proj_     .populate([=](int m, int n) { return computeD(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
     S_proj_     .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0_z;                        }); });
-    M1_proj_    .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return r;                            }, true); });
+    M1_proj_    .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return r;                            }); });
     Mm1_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r;                      }); });
     Mm1_tr_proj_.populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / r * damp(r.real(), R0); }); });
     Mm2_proj_   .populate([=](int m, int n) { return computeS(bspline_proj_, g_proj_, m, n, [=](Complex r) { return 1.0 / (r*r);                  }); });

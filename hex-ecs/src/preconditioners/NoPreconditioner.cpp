@@ -188,9 +188,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
     
     // weight functions
+//     double beta = 0.125;
     double Rp = cmd_.polarization;
     double R0 = bspline_atom_.R0();
-    auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return -std::expm1(-special::pow_int(r/Rp,4)) / (r*r); };
+//     auto pol_pot = [Rp,beta] (double r) { return 1.0 / (1.0 + std::exp(beta * (Rp - r))) / (r*r); };
+//     auto pol_pot = [Rp] (double r) { return 1.0 / gsl_sf_pow_int(std::max(r,Rp), 2); };
+    auto pol_pot = [Rp] (double r) { return r >= Rp ? 1.0 / (r*r) : 0.0; };
     auto w_edge = [R0] (Complex z) { return damp(z.real(), R0); };
     auto w_polar = [R0,&w_edge,&pol_pot] (Complex z) { double r = z.real(); return w_edge(z) * pol_pot(r); };
     
@@ -208,7 +212,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     if (not std::isfinite(ji_expansion_atom.norm()) or not std::isfinite(ji_expansion_proj.norm()) or not std::isfinite(ji_expansion_polar.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
-    rArray grid = linspace(0., bspline_atom_.Rmax(), 10000);
+    /*rArray grid = linspace(0., bspline_atom_.Rmax(), 10000);
     for (int ell = 0; ell <= inp_.maxell; ell++)
     {
         write_array
@@ -221,12 +225,11 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             ),
             format("ji-%d.dat", ell)
         );
-    }
+    }*/
     
     // compute P-overlaps and P-expansion
     cArray Pi_expansion_atom = rad_.getstate(ni,li,rad_.eigenstates(li));
     cArray Pi_expansion_proj = rad_.getstate(ni,li,rad_.eigenstates(li)); // FIXME : Proj
-    double Eni = rad_.eigenenergy(ni, li).real();
     
     // truncate the projectile expansions for non-origin panels
     if (rad_.bspline_proj().Nspline() != radf.bspline_proj().Nspline())
@@ -243,6 +246,11 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     
     // (anti)symmetrization w.r.t. spin multiplet
     double Sign = special::pow_int(-1, ang_.S());
+    
+    // polarization orbital
+    auto PP = [](Complex r){ return 0.5*r*r*(30.0-r*r)*std::exp(-r/2.0)/std::sqrt(2.0); };
+    cArray BOverlap = rad_.overlap(rad_.bspline_atom(), rad_.gaussleg_atom(), PP, w_edge);
+    cArray BState = lu_S_atom->solve(BOverlap);
     
     // for all segments constituting the RHS
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
@@ -271,114 +279,100 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d)\n", lambda,l1,l2,l2p,l1p,inp_.L);
             }
             
-            // for all eigenstates
-            for (int i = 0; i < Nspline_atom; i++)
+            // for all multipoles
+            for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
             {
-                // get "pricipal quantum number"
-                int n = l1p + i + 1;
-                
-                // for all multipoles
-                for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++)
+                // hydrogen orbital : direct contribution
+                if (l1p == li and f1[lambda] != 0)
                 {
-                    // hydrogen orbital
-                    if (n == ni)
+                    Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l2p) * std::sqrt((2*l2p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
+                    cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l2p * Nspline_atom, (l2p + 1) * Nspline_atom);
+                    cArray Pj1 = outer_product(Pi_expansion_atom, Ji_expansion);
+                    
+                    double CG = special::ClebschGordan(li, mi, l2p, 0, ang_.L(), mi);
+                    
+                    if (cmd_.lightweight_radial_cache)
+                        rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
+                    else
+                        rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
+                    
+                    if (lambda == 0)
+                        kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                    
+                    if (lambda == 1 and cmd_.polarization > 0 and f1[lambda] != 0)
+                        kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
+                }
+                
+                // hydrogen orbital : exchange contribution
+                if (l2p == li and f2[lambda] != 0)
+                {
+                    Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l1p) * std::sqrt((2*l1p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
+                    cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l1p * Nspline_atom, (l1p + 1) * Nspline_atom);
+                    cArray Pj2 = outer_product(Ji_expansion, Pi_expansion_atom);
+                    
+                    double CG = special::ClebschGordan(l1p, 0, li, mi, ang_.L(), mi);
+                    
+                    if (cmd_.lightweight_radial_cache)
+                        rad_.apply_R_matrix(lambda, Sign * CG * f2[lambda], Pj2, 1., chi_block);
+                    else
+                        rad_.R_tr_dia(lambda).dot(Sign * CG * f2[lambda], Pj2, 1., chi_block, true);
+                    
+                    if (lambda == 0)
+                        kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                    
+                    if (lambda == 1 and cmd_.polarization > 0 and f2[lambda] != 0)
+                        kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
+                }
+                
+                // hydrogen orbital polarization
+                if (cmd_.polarization > 0)
+                {
+                    // direct contribution
+                    for (int ell : std::vector<int>{ l2p - 1, l2p + 1 }) if (ell >= 0 and f1[lambda] != 0)
                     {
-                        if (l1p == li and f1[lambda] != 0)
-                        {
-                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l2p) * std::sqrt((2*l2p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
-                            cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l2p * Nspline_atom, (l2p + 1) * Nspline_atom);
-                            cArray Pj1 = outer_product(Pi_expansion_atom, Ji_expansion);
-                            
-                            double CG = special::ClebschGordan(li, mi, l2p, 0, ang_.L(), mi);
-                            
-                            if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
-                            else
-                                rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
-                            
-                            if (lambda == 0)
-                                kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
-                            
-                            if (lambda == 1 and cmd_.polarization > 0 and f1[lambda] != 0)
-                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
-                        }
-                        if (l2p == li and f2[lambda] != 0)
-                        {
-                            Complex prefactor = 4 * special::constant::pi / ki[0] * special::pow_int(1.0_i, l1p) * std::sqrt((2*l1p + 1) / (4 * special::constant::pi)) / special::constant::sqrt_two;
-                            cArray Ji_expansion = prefactor * ji_expansion_atom.slice(l1p * Nspline_atom, (l1p + 1) * Nspline_atom);
-                            cArray Pj2 = outer_product(Ji_expansion, Pi_expansion_atom);
-                            
-                            double CG = special::ClebschGordan(l1p, 0, li, mi, ang_.L(), mi);
-                            
-                            if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, Sign * CG * f2[lambda], Pj2, 1., chi_block);
-                            else
-                                rad_.R_tr_dia(lambda).dot(Sign * CG * f2[lambda], Pj2, 1., chi_block, true);
-                            
-                            if (lambda == 0)
-                                kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
-                            
-                            if (lambda == 1 and cmd_.polarization > 0 and f2[lambda] != 0)
-                                kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
-                        }
+                        Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, li, ell, ang_.L());
+                        if (prefactor == 0.)
+                            continue;
+                        
+                        cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
+                        cArray Pj1 = outer_product(-BState, prefactor * Ji_expansion);
+                        
+                        double CG = special::ClebschGordan(li, mi, ell, 0, ang_.L(), mi);
+                        
+                        if (cmd_.lightweight_radial_cache)
+                            rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
+                        else
+                            rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
+                        
+                        if (lambda == 0)
+                            kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
+                        
+                        if (lambda == 1 and f1[lambda] != 0)
+                            kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
                     }
                     
-                    // hydrogen orbital polarization
-                    else if (cmd_.polarization > 0)
+                    // exchange contribution
+                    for (int ell : std::vector<int>{ l1p - 1, l1p + 1 }) if (ell >= 0 and f2[lambda] != 0)
                     {
-                        cArray BState1 = rad_.getstate(n, l1p, rad_.eigenstates(l1p));
-                        Complex r_elem1 = (Pi_expansion_atom.conj() | rad_.M1_atom() | BState1);
-                        double En1 = rad_.eigenenergy(n, l1p).real();
-                        BState1 *=  r_elem1 / (En1 - Eni);
-                        for (int ell : std::vector<int>{ l2p - 1, l2p + 1 }) if (ell >= 0 and f1[lambda] != 0)
-                        {
-                            Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, li, ell, ang_.L());
-                            if (prefactor == 0.)
-                                continue;
-                            
-                            cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
-                            cArray Pj1 = outer_product(-BState1, prefactor * Ji_expansion);
-                            
-                            double CG = special::ClebschGordan(li, mi, ell, 0, ang_.L(), mi);
-                            
-                            if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG * f1[lambda], Pj1, 1., chi_block);
-                            else
-                                rad_.R_tr_dia(lambda).dot(CG * f1[lambda], Pj1, 1., chi_block, true);
-                            
-                            if (lambda == 0)
-                                kron_dot(1., chi_block, -CG, Pj1, rad_.S_atom(), rad_.Mm1_tr_proj());
-                            
-                            if (lambda == 1 and f1[lambda] != 0)
-                                kron_dot(1., chi_block, -CG * f1[lambda], Pj1, rad_.M1_atom(), rad_.Xi());
-                        }
+                        Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, ell, li, ang_.L());
+                        if (prefactor == 0.)
+                            continue;
                         
-                        cArray BState2 = rad_.getstate(n, l2p, rad_.eigenstates(l2p));
-                        Complex r_elem2 = (Pi_expansion_atom.conj() | rad_.M1_atom() | BState2);
-                        double En2 = rad_.eigenenergy(n, l2p).real();
-                        BState2 *=  r_elem2 / (En2 - Eni);
-                        for (int ell : std::vector<int>{ l1p - 1, l1p + 1 }) if (ell >= 0 and f2[lambda] != 0)
-                        {
-                            Complex prefactor = std::sqrt(2 * special::constant::pi * (2*ell + 1)) / ki[0] * special::pow_int(1.0_i, ell) * special::computef(lambda, l1p, l2p, ell, li, ang_.L());
-                            if (prefactor == 0.)
-                                continue;
-                            
-                            cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
-                            cArray Pj2 = outer_product(prefactor * Ji_expansion, -BState2);
-                            
-                            double CG = special::ClebschGordan(ell, 0, li, mi, ang_.L(), mi);
-                            
-                            if (cmd_.lightweight_radial_cache)
-                                rad_.apply_R_matrix(lambda, CG * f2[lambda] * Sign, Pj2, 1., chi_block);
-                            else
-                                rad_.R_tr_dia(lambda).dot(CG * f2[lambda] * Sign, Pj2, 1., chi_block, true);
-                            
-                            if (lambda == 0)
-                                kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
-                            
-                            if (lambda == 1 and f2[lambda] != 0)
-                                kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
-                        }
+                        cArray Ji_expansion = ji_expansion_polar.slice(ell * Nspline_atom, (ell + 1) * Nspline_atom);
+                        cArray Pj2 = outer_product(prefactor * Ji_expansion, -BState);
+                        
+                        double CG = special::ClebschGordan(ell, 0, li, mi, ang_.L(), mi);
+                        
+                        if (cmd_.lightweight_radial_cache)
+                            rad_.apply_R_matrix(lambda, CG * f2[lambda] * Sign, Pj2, 1., chi_block);
+                        else
+                            rad_.R_tr_dia(lambda).dot(CG * f2[lambda] * Sign, Pj2, 1., chi_block, true);
+                        
+                        if (lambda == 0)
+                            kron_dot(1., chi_block, -CG * Sign, Pj2, rad_.Mm1_tr_proj(), rad_.S_atom());
+                        
+                        if (lambda == 1 and f2[lambda] != 0)
+                            kron_dot(1., chi_block, -CG * f2[lambda] * Sign, Pj2, rad_.Xi(), rad_.M1_atom());
                     }
                 }
             }
