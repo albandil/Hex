@@ -258,8 +258,8 @@ kernel void mmul_1el
         
         // calculate the one-electron part of the hamiltonian matrix element Hijkl
         private Complex elem = E * cmul(Spa[ik],Spp[jl]);
-        elem -= 0.5 * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
-        elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2pa[ik],Spp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Spa[ik],M2pp[jl]);
+        elem -= (Real)(0.5) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
+        elem -= (Real)(0.5) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
         elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
         
         // multiply right-hand side by that matrix element
