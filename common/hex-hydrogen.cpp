@@ -58,12 +58,12 @@ CarthesianBoundWaveFunction::CarthesianBoundWaveFunction (int N, int L, int M)
     // for all terms of the Laguerre polynomial
     for (int i = 0; i <= N - L - 1; i++)
     {
-        double Nfactor = (i % 2 == 0 ? 1. : -1.) * std::pow(2./N,i) * gsl_sf_choose(N+L,N-L-1-i) / gsl_sf_fact(i);
+        Real Nfactor = (i % 2 == 0 ? 1. : -1.) * std::pow(2./N,i) * gsl_sf_choose(N+L,N-L-1-i) / gsl_sf_fact(i);
         
         // for all terms of the z-dependent angular factor
         for (int k = 0; k <= (L - std::abs(M))/2; k++)
         {
-            double Lfactor = (k % 2 == 0 ? 1. : -1.) * gsl_sf_choose(L,k) * gsl_sf_choose(2*L-2*k,L)
+            Real Lfactor = (k % 2 == 0 ? 1. : -1.) * gsl_sf_choose(L,k) * gsl_sf_choose(2*L-2*k,L)
                                 * gsl_sf_fact(L-2*k) / gsl_sf_fact(L-2*k-M);
             
             // for all terms of the x,y-dependent angular factor
@@ -73,7 +73,7 @@ CarthesianBoundWaveFunction::CarthesianBoundWaveFunction (int N, int L, int M)
                 
                 if (M > 0) // (-1)^m * (Am + i*Bm)
                 {
-                    Mfactor *= (std::abs(M) % 2 == 0 ? 1. : -1.) * std::pow(Complex(0.,1.),std::abs(M)-p);
+                    Mfactor *= (std::abs(M) % 2 == 0 ? 1.0_r : -1.0_r) * std::pow(Complex(0.,1.),std::abs(M)-p);
                 }
                 
                 if (M < 0) // Am - i * Bm
@@ -104,7 +104,7 @@ CarthesianBoundWaveFunction::~CarthesianBoundWaveFunction ()
 Complex CarthesianBoundWaveFunction::operator() (double x, double y, double z) const
 {
     Complex result = 0;
-    double r = std::sqrt(x*x+y*y+z*z);
+    Real r = std::sqrt(x*x+y*y+z*z);
     
     for (Term const & T : terms_)
     {

@@ -154,7 +154,11 @@ void GPUCGPreconditioner::setup ()
     Nlocal_ = std::min<std::size_t>(64, max_work_group_size);
     
     // choose block size for "mul_ABt" kernel, aim at 4 concurrent threads
-    blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 16/*double*/ * 2/*arrays*/));
+#ifdef SINGLE
+    blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 8/*float2*/ * 2/*arrays*/));
+#else
+    blocksize_ = std::sqrt(local_memory_size / (4/*threads*/ * 16/*double2*/ * 2/*arrays*/));
+#endif
     blocksize_ = std::min<std::size_t>(blocksize_, std::sqrt(max_work_group_size));
     std::cout << "\t- matrix multiplication tile size: " << blocksize_ << std::endl;
     
@@ -223,7 +227,11 @@ void GPUCGPreconditioner::setup ()
     // - either Complex per default Nlocal_
     lreq = Nlocal_;
     // - or the requirements of mul_ABt
-    lreq = std::max<std::size_t>(lreq, 2/*array*/ * 16/*double*/ * blocksize_);
+#ifdef SINGLE
+    lreq = std::max<std::size_t>(lreq, 2/*array*/ * 8/*float2*/ * blocksize_);
+#else
+    lreq = std::max<std::size_t>(lreq, 2/*array*/ * 16/*double2*/ * blocksize_);
+#endif
     // - all these were complex numbers
     lreq *= 16;
     
@@ -251,6 +259,11 @@ void GPUCGPreconditioner::setup ()
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_.states().size() << " ";
     flags << " -D NSRCSEG="      << nsrcseg_     << " ";
     flags << " -D NDSTSEG="      << ndstseg_     << " ";
+#ifdef SINGLE
+    flags << " -D Real=float -D Complex=float2 ";
+#else
+    flags << " -D Real=double -D Complex=double2 ";
+#endif
     
     // build program
     const char * source_ptr = source.data();
@@ -368,7 +381,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
         cl_mem qgpu = clCreateBuffer(context_, location | CL_MEM_READ_WRITE, ndstseg_ * Nsegsiz * sizeof(Complex), nullptr, nullptr);
         
         // copy angular integrals
-        clArrayView<double> fgpu (ang_.f().size(), ang_.f().data());
+        clArrayView<Real> fgpu (ang_.f().size(), ang_.f().data());
         fgpu.connect(context_, smallDataFlags_);
         
         //
@@ -386,7 +399,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clFinish(queue_);
             
             // multiply by diagonal block (one-electron contribution)
-            clSetKernelArg(mml1_, 0, sizeof(double), &E_);
+            clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
             clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
@@ -551,7 +564,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Timer timer;
             
             // one-electron contribution
-            clSetKernelArg(mml1_, 0, sizeof(double), &E_);
+            clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
             clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
@@ -572,12 +585,12 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // two-electron contribution
             for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0)
             {
-                double f = ang_.f(ill,ill,lambda);
+                Real f = ang_.f(ill,ill,lambda);
                 
                 clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_atom_.handle());
                 clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_proj_.handle());
                 clSetKernelArg(mml2_dcpl_, 2, sizeof(int),    &lambda);
-                clSetKernelArg(mml2_dcpl_, 3, sizeof(double), &f);
+                clSetKernelArg(mml2_dcpl_, 3, sizeof(Real), &f);
                 clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_atom_[lambda].handle());
                 clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_atom_[lambda].handle());
                 clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_proj_[lambda].handle());
@@ -592,7 +605,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_cpld_, 0, sizeof(cl_mem), &t_atom_.handle());
                 clSetKernelArg(mml2_cpld_, 1, sizeof(cl_mem), &t_proj_.handle());
                 clSetKernelArg(mml2_cpld_, 2, sizeof(int),    &lambda);
-                clSetKernelArg(mml2_cpld_, 3, sizeof(double), &f);
+                clSetKernelArg(mml2_cpld_, 3, sizeof(Real), &f);
                 clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &Mi_L_atom_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &Mi_mLm1_atom_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 6, sizeof(cl_mem), &Mi_L_proj_[lambda].handle());
@@ -676,7 +689,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         };
         
         // computes norm of the vector
-        auto compute_norm = [&](const clArrayView<Complex> x) -> double
+        auto compute_norm = [&](const clArrayView<Complex> x) -> Real
         {
             // multiply
             //     |x|² -> nrm

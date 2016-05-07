@@ -574,7 +574,7 @@ public:
             if (i + d < (IdxT)n_)
             {
                 // skip zero elements
-                if (*el == 0.)
+                if (*el == 0.0_r)
                 {
                     el++;
                     continue;
@@ -1138,8 +1138,8 @@ SymBandMatrix<DataT> operator * (DataT z, SymBandMatrix<DataT> const & A)
  */
 template <class DataT> void kron_dot
 (
-    double a,       ArrayView<DataT> w,
-    double b, const ArrayView<DataT> v,
+    Real a,       ArrayView<DataT> w,
+    Real b, const ArrayView<DataT> v,
     SymBandMatrix<DataT> const & A,
     SymBandMatrix<DataT> const & B
 )

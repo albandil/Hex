@@ -49,10 +49,10 @@
  *
  * The bisection count will be written into *n if non-null.
  */
-template <class Functor, typename FType> FType lim (Functor F, double x, int * n = nullptr)
+template <class Functor, typename FType> FType lim (Functor F, Real x, int * n = nullptr)
 {
     // initial position
-    double x0 = 0;
+    Real x0 = 0;
     if (x > 0.) x0 = std::isfinite(x) ? 0.5 * x :  1.;
     if (x < 0.) x0 = std::isfinite(x) ? 0.5 * x : -1.;
 
@@ -96,10 +96,10 @@ template <typename FType> class ICompactification
 {
 public:
     virtual ~ICompactification() {}
-    virtual double scale (double x) const = 0;
-    virtual double unscale (double t) const = 0;
-    virtual double Jacobian (double t) const = 0;
-    virtual FType operator() (double t) const = 0;
+    virtual Real scale (Real x) const = 0;
+    virtual Real unscale (Real t) const = 0;
+    virtual Real Jacobian (Real t) const = 0;
+    virtual FType operator() (Real t) const = 0;
 };
 
 /**
@@ -125,8 +125,8 @@ public:
      */
     CompactificationF (
         Functor f,
-        double a,
-        double b
+        Real a,
+        Real b
     ) : F(f), A(a), B(b), M(0.5*(b+a)), D(0.5*(b-a))
     {
         if (not std::isfinite(a) or not std::isfinite(b))
@@ -134,21 +134,21 @@ public:
     }
 
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
-    double scale (double x) const
+    Real scale (Real x) const
     {
         assert(A <= x and x <= B);
         return (x - M) / D;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
-    double unscale (double t) const
+    Real unscale (Real t) const
     {
         assert(std::abs(t) <= 1.);
         return M + t * D;
     }
 
     /// Evaluate Jacobian of the transformation.
-    double Jacobian(double t) const
+    Real Jacobian (Real t) const
     {
         assert(std::abs(t) <= 1.);
         return D;
@@ -158,14 +158,14 @@ public:
      * @brief Evaluate the compactified function.
      * @param t Value from the compactified interval [-1,1].
      */
-    FType operator() (double t) const
+    FType operator() (Real t) const
     {
         return F(M + t * D);
     }
 
 private:
     Functor F;
-    double A, B, M, D;
+    Real A, B, M, D;
 };
 
 /**
@@ -192,27 +192,27 @@ public:
      */
     CompactificationL (
         Functor f,
-        double b = 0.,
+        Real b = 0.,
         bool limit = true,
-        double L = 1.0
+        Real L = 1.0
     ) : F(f), B(b), L(L), Limit(limit) {}
 
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
-    double scale (double x) const
+    Real scale (Real x) const
     {
         assert (x <= B);
         return std::isfinite(x) ? (x - B + L) / (x - B - L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
-    double unscale (double t) const
+    Real unscale (Real t) const
     {
         assert(std::abs(t) <= 1.);
         return (t == 1.) ? special::constant::Inf : B - L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
-    double Jacobian(double t) const
+    Real Jacobian(Real t) const
     {
         assert(std::abs(t) <= 1.);
         return -2 * L / ((1. - t) * (1. - t));
@@ -222,7 +222,7 @@ public:
      * Evaluate the compactified function.
      * @param t Value from the compactified interval [-1,1].
      */
-    FType operator() (double t) const
+    FType operator() (Real t) const
     {
         if (t == 1.)
         {
@@ -239,7 +239,7 @@ public:
 
 private:
     Functor F;
-    double B, L;
+    Real B, L;
     bool Limit;
 };
 
@@ -268,27 +268,27 @@ public:
      */
     CompactificationR (
         Functor f,
-        double a = 0.,
+        Real a = 0.,
         bool limit = true,
-        double L = 1.0
+        Real L = 1.0
     ) : F(f), A(a), L(L), Limit(limit) {}
 
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
-    double scale (double x) const
+    Real scale (Real x) const
     {
         assert (x >= A);
         return std::isfinite(x) ? (x - A - L) / (x - A + L) : 1.;
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
-    double unscale (double t) const
+    Real unscale (Real t) const
     {
         assert(std::abs(t) <= 1.);
         return (t == 1.) ? special::constant::Inf : A + L * (1. + t) / (1. - t);
     }
 
     /// Evaluate Jacobian of the transformation.
-    double Jacobian(double t) const
+    Real Jacobian (Real t) const
     {
         assert(std::abs(t) <= 1.);
         return 2 * L / ((1. - t) * (1. - t));
@@ -298,7 +298,7 @@ public:
      * Evaluate the compactified function.
      * @param t Value from the compactified interval [-1,1].
      */
-    FType operator() (double t) const
+    FType operator() (Real t) const
     {
         if (t == 1.)
         {
@@ -315,7 +315,7 @@ public:
 
 private:
     Functor F;
-    double A, L;
+    Real A, L;
     bool Limit;
 };
 
@@ -338,10 +338,10 @@ public:
      */
     CompactIntegrand (
         Functor f,
-        double a = 0.,
-        double b = special::constant::Inf,
+        Real a = 0.,
+        Real b = special::constant::Inf,
         bool limit = true,
-        double L = 1.0
+        Real L = 1.0
     ) : Compactification(nullptr) {
         if (std::isfinite(a) and std::isfinite(b))
             Compactification = new CompactificationF<Functor,FType> (f, a, b);
@@ -365,7 +365,7 @@ public:
      * @note Whenever the function value is zero, the Jacobian is not evaluated
      *       and a clean zero is returned.
      */
-    inline FType operator() (double t) const
+    inline FType operator() (Real t) const
     {
         // evaluate function
         FType ft = Compactification->operator()(t);
@@ -383,13 +383,13 @@ public:
     }
 
     /// Scale value from the original interval [a,b] into compactified interval [-1,1].
-    inline double scale (double x) const
+    inline Real scale (Real x) const
     {
         return Compactification->scale(x);
     }
 
     /// Unscale value from the compactified interval [-1,1] into the original interval [a,b].
-    inline double unscale (double t) const
+    inline Real unscale (Real t) const
     {
         return Compactification->unscale(t);
     }

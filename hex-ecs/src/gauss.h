@@ -49,7 +49,7 @@ class GaussLegendreData
          * @param vx     On return, the Gauss-Legendre nodes (nonnegative half of them).
          * @param vw     On return, the corresponding Gauss-Legendre weights.
          */
-        void gauss_nodes_and_weights (int points, const double*& vx, const double*& vw) const;
+        void gauss_nodes_and_weights (int points, const Real*& vx, const Real*& vw) const;
         
         /**
          * @brief Precalculate nodes and weights so that the retrieval is fast and thread-safe.
@@ -61,7 +61,7 @@ class GaussLegendreData
     private:
         
         // precomputed nodes and weights, common to all instances
-        static std::vector<std::pair<double*,double*>> data_;
+        static std::vector<std::pair<Real*,Real*>> data_;
 };
 
 /**

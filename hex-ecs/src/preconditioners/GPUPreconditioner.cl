@@ -42,7 +42,7 @@
 // -D NSRCSEG=...
 // -D NDSTSEG=...
 
-// Enable double precision (redundant in OpenCL 2.0).
+// Enable Real precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
@@ -53,9 +53,9 @@
  * 
  * Multiplies two complex numbers and returns the product.
  */
-double2 cmul (private double2 a, private double2 b)
+Complex cmul (private Complex a, private Complex b)
 {
-    private double2 c;
+    private Complex c;
     
     c.x = a.x * b.x - a.y * b.y;
     c.y = a.x * b.y + a.y * b.x;
@@ -69,10 +69,10 @@ double2 cmul (private double2 a, private double2 b)
  * Divides two complex numbers and returns the fraction. No overflow
  * checking is done.
  */
-double2 cdiv (private double2 a, private double2 b)
+Complex cdiv (private Complex a, private Complex b)
 {
-    private double2 c;
-    private double b2 = b.x * b.x + b.y * b.y;
+    private Complex c;
+    private Real b2 = b.x * b.x + b.y * b.y;
     
     c.x = (a.x * b.x + a.y * b.y) / b2;
     c.y = (a.y * b.x - a.x * b.y) / b2;
@@ -88,9 +88,9 @@ double2 cdiv (private double2 a, private double2 b)
  * 
  * This is faster than "pown" when all workitems have the same exponent.
  */
-double pow_int (private double x, private int n)
+Real pow_int (private Real x, private int n)
 {
-    private double value = 1; // = x^0
+    private Real value = 1; // = x^0
     
     do
     {
@@ -118,7 +118,7 @@ double pow_int (private double x, private int n)
  * @param b Complex factor.
  * @param y Source vector.
  */
-kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b, global double2 *y)
+kernel void a_vec_b_vec (private Complex a, global Complex *x, private Complex b, global Complex *y)
 {
     private int i = get_global_id(0);
     
@@ -135,15 +135,15 @@ kernel void a_vec_b_vec (private double2 a, global double2 *x, private double2 b
  * @param v Source vector.
  * @param z Output vector for intermediate segment scalar products.
  */
-kernel void scalar_product (global double2 *u, global double2 *v, global double2 *z)
+kernel void scalar_product (global Complex *u, global Complex *v, global Complex *z)
 {
     // position of this thread among other threads
     private int iglobal = get_global_id(0);
     private int ilocal = get_local_id(0);
     
     // calculate product of array elements
-    local double2 uv[NLOCAL];
-    uv[ilocal] = (iglobal < NROW ? cmul(u[iglobal],v[iglobal]) : (double2)(0.,0.));
+    local Complex uv[NLOCAL];
+    uv[ilocal] = (iglobal < NROW ? cmul(u[iglobal],v[iglobal]) : (Complex)(0.,0.));
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // reduce the per-element products
@@ -169,17 +169,17 @@ kernel void scalar_product (global double2 *u, global double2 *v, global double2
  * @param v Source vector.
  * @param z Output vector for intermediate segment norms.
  */
-kernel void norm (global double2 *v, global double *z)
+kernel void norm (global Complex *v, global Real *z)
 {
     // position of this thread among other threads
     private int iglobal = get_global_id(0);
     private int ilocal = get_local_id(0);
     
     // get element to process by this thread
-    private double2 vi = v[iglobal];
+    private Complex vi = v[iglobal];
     
     // calculate squared modulus of an array element
-    local double vv[NLOCAL];
+    local Real vv[NLOCAL];
     vv[ilocal] = (iglobal < NROW ? vi.x * vi.x + vi.y * vi.y : 0.);
     barrier(CLK_LOCAL_MEM_FENCE);
     
@@ -221,23 +221,23 @@ kernel void norm (global double2 *v, global double *z)
 kernel void mmul_1el
 (
     // energy
-    private double E,
+    private Real E,
     // row-padded one-electron matrices (atom)
-    global double2 const * const restrict Spa,
-    global double2 const * const restrict Dpa,
-    global double2 const * const restrict M1pa,
-    global double2 const * const restrict M2pa,
+    global Complex const * const restrict Spa,
+    global Complex const * const restrict Dpa,
+    global Complex const * const restrict M1pa,
+    global Complex const * const restrict M2pa,
     // row-padded one-electron matrices (projectile)
-    global double2 const * const restrict Spp,
-    global double2 const * const restrict Dpp,
-    global double2 const * const restrict M1pp,
-    global double2 const * const restrict M2pp,
+    global Complex const * const restrict Spp,
+    global Complex const * const restrict Dpp,
+    global Complex const * const restrict M1pp,
+    global Complex const * const restrict M2pp,
     // angular momenta
     private int l1,
     private int l2,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global Complex const * const restrict x,
+    global Complex       * const restrict y
 )
 {
     // output vector element index
@@ -257,7 +257,7 @@ kernel void mmul_1el
         private int jl = min(j,l) * (ORDER + 1) + abs(l - j);
         
         // calculate the one-electron part of the hamiltonian matrix element Hijkl
-        private double2 elem = E * cmul(Spa[ik],Spp[jl]);
+        private Complex elem = E * cmul(Spa[ik],Spp[jl]);
         elem -= 0.5 * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
         elem -= 0.5 * l1 * (l1 + 1.) * cmul(M2pa[ik],Spp[jl]) + 0.5 * l2 * (l2 + 1.) * cmul(Spa[ik],M2pp[jl]);
         elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
@@ -285,27 +285,27 @@ kernel void mmul_1el
 kernel void mmul_2el
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    private double f,
+    private Real f,
     // one-electron full and partial moments (atom)
-    global double2 const * const restrict MLa,
-    global double2 const * const restrict MmLm1a,
-    global double2 const * const restrict MiLa,
-    global double2 const * const restrict MimLm1a,
+    global Complex const * const restrict MLa,
+    global Complex const * const restrict MmLm1a,
+    global Complex const * const restrict MiLa,
+    global Complex const * const restrict MimLm1a,
     // one-electron full and partial moments (projectile)
-    global double2 const * const restrict MLp,
-    global double2 const * const restrict MmLm1p,
-    global double2 const * const restrict MiLp,
-    global double2 const * const restrict MimLm1p,
+    global Complex const * const restrict MLp,
+    global Complex const * const restrict MmLm1p,
+    global Complex const * const restrict MiLp,
+    global Complex const * const restrict MimLm1p,
     // two-electron diagonal contributions
-    global double2 const * const restrict Rdia,
+    global Complex const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global Complex const * const restrict x,
+    global Complex       * const restrict y
 )
 {
     // output vector element index
@@ -313,12 +313,12 @@ kernel void mmul_2el
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // auxiliary variables
-    private double2 m_ik, m_jl;
-    private double scale, tx, ty;
+    private Complex m_ik, m_jl;
+    private Real scale, tx, ty;
     
     // pointers to the needed partial integral moments
-    global double2 const * restrict M_ik;
-    global double2 const * restrict M_jl;
+    global Complex const * restrict M_ik;
+    global Complex const * restrict M_jl;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
@@ -326,13 +326,13 @@ kernel void mmul_2el
     for (private int l = max(0, j - ORDER); l <= min(j + ORDER, NSPLINE_PROJ - 1); l++)
     {
         // matrix element
-        private double2 elem = 0;
+        private Complex elem = 0;
         
         // boundary knots of the participating B-splines
-        private double ti1 = ta[i].x, ti2 = ta[i + ORDER + 1].x;
-        private double tj1 = tp[j].x, tj2 = tp[j + ORDER + 1].x;
-        private double tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
-        private double tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
+        private Real ti1 = ta[i].x, ti2 = ta[i + ORDER + 1].x;
+        private Real tj1 = tp[j].x, tj2 = tp[j + ORDER + 1].x;
+        private Real tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
+        private Real tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
         
         // Are the integral moments completely decoupled, i.e. is there no overlap between Ba, Bb, Bc and Bd?
         // In such cases we can compute the off-diagonal contribution just as a product of the two
@@ -424,20 +424,20 @@ kernel void mmul_2el
 kernel void mmul_2el_decoupled
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    private double f,
+    private Real f,
     // one-electron moments
-    global double2 const * const restrict MLa,
-    global double2 const * const restrict MmLm1a,
-    global double2 const * const restrict MLp,
-    global double2 const * const restrict MmLm1p,
+    global Complex const * const restrict MLa,
+    global Complex const * const restrict MmLm1a,
+    global Complex const * const restrict MLp,
+    global Complex const * const restrict MmLm1p,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global Complex const * const restrict x,
+    global Complex       * const restrict y
 )
 {
     // output vector element index
@@ -445,8 +445,8 @@ kernel void mmul_2el_decoupled
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // auxiliary variables
-    private double scale, tx, ty;
-    private double2 elem;
+    private Real scale, tx, ty;
+    private Complex elem;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
@@ -487,23 +487,23 @@ kernel void mmul_2el_decoupled
 kernel void mmul_2el_coupled
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    private double f,
+    private Real f,
     // one-electron partial moments (atom)
-    global double2 const * const restrict MiLa,
-    global double2 const * const restrict MimLm1a,
+    global Complex const * const restrict MiLa,
+    global Complex const * const restrict MimLm1a,
     // one-electron partial moments (projectile)
-    global double2 const * const restrict MiLp,
-    global double2 const * const restrict MimLm1p,
+    global Complex const * const restrict MiLp,
+    global Complex const * const restrict MimLm1p,
     // two-electron diagonal contributions
-    global double2 const * const restrict Rdia,
+    global Complex const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y
+    global Complex const * const restrict x,
+    global Complex       * const restrict y
 )
 {
     // output vector element index
@@ -511,12 +511,12 @@ kernel void mmul_2el_coupled
     private int j = get_global_id(0) % (2 * ORDER + 1) + i - ORDER;
     
     // auxiliary variables
-    private double2 elem, m_ik, m_jl;
-    private double scale, tx, ty;
+    private Complex elem, m_ik, m_jl;
+    private Real scale, tx, ty;
     
     // pointers to the needed partial integral moments
-    global double2 const * restrict M_ik;
-    global double2 const * restrict M_jl;
+    global Complex const * restrict M_ik;
+    global Complex const * restrict M_jl;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM && 0 <= j && j <= NSPLINE_PROJ)
@@ -592,27 +592,27 @@ kernel void mmul_2el_coupled
 kernel void mmul_2el_offset
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    global double  const * const restrict f, private int foffset,
+    global Real  const * const restrict f, private int foffset,
     // one-electron full and partial moments (atom)
-    global double2 const * const restrict MLa,
-    global double2 const * const restrict MmLm1a,
-    global double2 const * const restrict MiLa,
-    global double2 const * const restrict MimLm1a,
+    global Complex const * const restrict MLa,
+    global Complex const * const restrict MmLm1a,
+    global Complex const * const restrict MiLa,
+    global Complex const * const restrict MimLm1a,
     // one-electron full and partial moments (projectile)
-    global double2 const * const restrict MLp,
-    global double2 const * const restrict MmLm1p,
-    global double2 const * const restrict MiLp,
-    global double2 const * const restrict MimLm1p,
+    global Complex const * const restrict MLp,
+    global Complex const * const restrict MmLm1p,
+    global Complex const * const restrict MiLp,
+    global Complex const * const restrict MimLm1p,
     // two-electron diagonal contributions
-    global double2 const * const restrict Rdia,
+    global Complex const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y,
+    global Complex const * const restrict x,
+    global Complex       * const restrict y,
     // angular block domain
     private short x_ang_begin,
     private short y_ang_begin
@@ -623,12 +623,12 @@ kernel void mmul_2el_offset
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // auxiliary variables
-    private double2 m_ik, m_jl;
-    private double scale, tx, ty;
+    private Complex m_ik, m_jl;
+    private Real scale, tx, ty;
     
     // pointers to the needed partial integral moments
-    global double2 const * restrict M_ik;
-    global double2 const * restrict M_jl;
+    global Complex const * restrict M_ik;
+    global Complex const * restrict M_jl;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
@@ -636,13 +636,13 @@ kernel void mmul_2el_offset
     for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // matrix element
-        private double2 elem = 0;
+        private Complex elem = 0;
         
         // boundary knots of the participating B-splines
-        private double ti1 = ta[i].x, ti2 = ta[i + ORDER + 1].x;
-        private double tj1 = tp[j].x, tj2 = tp[j + ORDER + 1].x;
-        private double tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
-        private double tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
+        private Real ti1 = ta[i].x, ti2 = ta[i + ORDER + 1].x;
+        private Real tj1 = tp[j].x, tj2 = tp[j + ORDER + 1].x;
+        private Real tk1 = ta[k].x, tk2 = ta[k + ORDER + 1].x;
+        private Real tl1 = tp[l].x, tl2 = tp[l + ORDER + 1].x;
         
         // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
         // In such cases we can compute the off-diagonal contribution just as a product of the two
@@ -740,21 +740,21 @@ kernel void mmul_2el_offset
 kernel void mmul_2el_decoupled_offset
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    global double  const * const restrict f, private int foffset,
+    global Real  const * const restrict f, private int foffset,
     // one-electron moments (atom)
-    global double2 const * const restrict MLa,
-    global double2 const * const restrict MmLm1a,
+    global Complex const * const restrict MLa,
+    global Complex const * const restrict MmLm1a,
     // one-electron moments (projectile)
-    global double2 const * const restrict MLp,
-    global double2 const * const restrict MmLm1p,
+    global Complex const * const restrict MLp,
+    global Complex const * const restrict MmLm1p,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y,
+    global Complex const * const restrict x,
+    global Complex       * const restrict y,
     // angular block domain
     private short x_ang_begin,
     private short y_ang_begin
@@ -765,7 +765,7 @@ kernel void mmul_2el_decoupled_offset
     private int j = get_global_id(0) % NSPLINE_PROJ;
     
     // auxiliary variables
-    private double scale, tx, ty;
+    private Real scale, tx, ty;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM)
@@ -773,7 +773,7 @@ kernel void mmul_2el_decoupled_offset
     for (private int l = j - ORDER; l <= j + ORDER; l++) if (0 <= l && l < NSPLINE_PROJ)
     {
         // matrix element
-        private double2 elem = 0;
+        private Complex elem = 0;
         
         // Are the integral moments completely decoupled, i.e. there is there no overlap between Ba, Bb, Bc and Bd?
         // In such cases we can compute the off-diagonal contribution just as a product of the two
@@ -818,23 +818,23 @@ kernel void mmul_2el_decoupled_offset
 kernel void mmul_2el_coupled_offset
 (
     // B-spline knots (atom and projectile)
-    constant double2 const * const restrict ta,
-    constant double2 const * const restrict tp,
+    constant Complex const * const restrict ta,
+    constant Complex const * const restrict tp,
     // multipole
     private int lambda,
     // angular integral
-    global double  const * const restrict f, private int foffset,
+    global Real  const * const restrict f, private int foffset,
     // one-electron partial moments (atom)
-    global double2 const * const restrict MiLa,
-    global double2 const * const restrict MimLm1a,
+    global Complex const * const restrict MiLa,
+    global Complex const * const restrict MimLm1a,
     // one-electron partial moments (projectile)
-    global double2 const * const restrict MiLp,
-    global double2 const * const restrict MimLm1p,
+    global Complex const * const restrict MiLp,
+    global Complex const * const restrict MimLm1p,
     // two-electron diagonal contributions
-    global double2 const * const restrict Rdia,
+    global Complex const * const restrict Rdia,
     // source and target vector
-    global double2 const * const restrict x,
-    global double2       * const restrict y,
+    global Complex const * const restrict x,
+    global Complex       * const restrict y,
     // angular block domain
     private short x_ang_begin,
     private short y_ang_begin
@@ -845,12 +845,12 @@ kernel void mmul_2el_coupled_offset
     private int j = get_global_id(0) % (2 * ORDER + 1) + i - ORDER;
     
     // auxiliary variables
-    private double2 m_ik, m_jl;
-    private double scale, tx, ty;
+    private Complex m_ik, m_jl;
+    private Real scale, tx, ty;
     
     // pointers to the needed partial integral moments
-    global double2 const * restrict M_ik;
-    global double2 const * restrict M_jl;
+    global Complex const * restrict M_ik;
+    global Complex const * restrict M_jl;
     
     // for all source vector elements
     if (i < NSPLINE_ATOM && 0 <= j && j <= NSPLINE_PROJ)
@@ -859,7 +859,7 @@ kernel void mmul_2el_coupled_offset
     if (max(i,k) <= min(j,l) + ORDER && max(j,l) <= min(i,k) + ORDER)
     {
         // matrix element
-        private double2 elem = 0;
+        private Complex elem = 0;
         
         // (i,k) ~ (j,l)
         
@@ -931,9 +931,9 @@ kernel void mmul_2el_coupled_offset
 kernel void mul_ABt
 (
     private int m, private int n, private int k,
-    global double2 const * const restrict A,
-    global double2 const * const restrict B,
-    global double2       * const restrict C
+    global Complex const * const restrict A,
+    global Complex const * const restrict B,
+    global Complex       * const restrict C
 )
 {
     // destination block indices
@@ -949,11 +949,11 @@ kernel void mul_ABt
     private int icol_loc = get_local_id(1);
     
     // work arrays
-    local double2 Aloc[BLOCK_SIZE][BLOCK_SIZE];
-    local double2 Bloc[BLOCK_SIZE][BLOCK_SIZE];
+    local Complex Aloc[BLOCK_SIZE][BLOCK_SIZE];
+    local Complex Bloc[BLOCK_SIZE][BLOCK_SIZE];
     
     // aggregated scalar product of the destination element C[idy,idx]
-    private double2 res = 0;
+    private Complex res = 0;
     
     // calculate number of blocks
     private int Nblock = ((k + BLOCK_SIZE - 1) / BLOCK_SIZE);
@@ -967,8 +967,8 @@ kernel void mul_ABt
         
         // load elements of the source blocks into the local memory, pad by zeros
         barrier(CLK_LOCAL_MEM_FENCE);
-        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (double2)(0.,0.));
-        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (double2)(0.,0.));
+        Aloc[icol_loc][irow_loc] = (Arow < m && Acol < k ? A[Arow * k + Acol] : (Complex)(0.,0.));
+        Bloc[irow_loc][icol_loc] = (Brow < k && Bcol < n ? B[Brow + k * Bcol] : (Complex)(0.,0.));
         barrier(CLK_LOCAL_MEM_FENCE);
         
         // each group's thread will calculate one of the scalar products
@@ -996,10 +996,10 @@ kernel void mul_ABt
  */
 kernel void kron_div
 (
-    private double2 E,
-    global double2 const * const restrict D1,
-    global double2 const * const restrict D2,
-    global double2       * const restrict y
+    private Complex E,
+    global Complex const * const restrict D1,
+    global Complex const * const restrict D2,
+    global Complex       * const restrict y
 )
 {
     // get worker's offset index (0 <= j < NSPLINE_PROJ)

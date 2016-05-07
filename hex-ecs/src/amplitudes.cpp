@@ -54,14 +54,14 @@
 Complex inv_power_extrapolate (rArray X, cArrayView Y)
 {
     // invert independent variable
-    for (double & x : X)
+    for (Real & x : X)
         x = 1.0 / x;
     
     // do the regression
-    double avg_x   = sum(X)   / X.size();
-    double avg_xx  = sum(X*X) / X.size();
-    Complex avg_y  = sum(Y)   / double(X.size());
-    Complex avg_xy = sum(X*Y) / double(X.size());
+    Real avg_x   = sum(X)   / X.size();
+    Real avg_xx  = sum(X*X) / X.size();
+    Complex avg_y  = sum(Y)   / Real(X.size());
+    Complex avg_xy = sum(X*Y) / Real(X.size());
     Complex a = (avg_xy - avg_x * avg_y) / (avg_xx - avg_x * avg_x);
     Complex b = avg_y - a * avg_x;
     
@@ -256,7 +256,7 @@ void Amplitudes::writeSQL_files ()
             for (unsigned i = 0; i < inp_.Etot.size(); i++)
             {
                 // write singlet value (S = 0)
-                if (Complex_finite(T_S0[i]) and T_S0[i] != 0.)
+                if (Complex_finite(T_S0[i]) and T_S0[i] != 0.0_r)
                 {
                     fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
                         << T.ni << "," << T.li << "," << T.mi << ","
@@ -267,7 +267,7 @@ void Amplitudes::writeSQL_files ()
                 }
                 
                 // write triplet value (S = 1)
-                if (Complex_finite(T_S1[i]) and T_S1[i] != 0.)
+                if (Complex_finite(T_S1[i]) and T_S1[i] != 0.0_r)
                 {
                     fsql << "INSERT OR REPLACE INTO \"tmat\" VALUES ("
                         << T.ni << "," << T.li << "," << T.mi << ","
@@ -387,7 +387,7 @@ void Amplitudes::writeICS_files ()
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {
     // final projectile momenta
-    rArray kf = sqrt(inp_.Etot + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
     // shorthands
     unsigned Nenergy = kf.size();               // energy count
@@ -418,9 +418,9 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     // extractions and get rid of the oscillations. Otherwise we need to extrapolate also
     // the trend of the T-matrix.
     
-    double wavelength = special::constant::two_pi / kf[ie];
-    double Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.R0();
-    double Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0., Ra);
+    Real wavelength = special::constant::two_pi / kf[ie];
+    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.R0();
+    Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0.0_r, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
     rArray grid;
@@ -442,7 +442,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     for (int i = 0; i < samples; i++)
     {
         // this is the evaluation point
-        double eval_r = (samples == 1 ? Rb : Ra + (i + 1) * (Rb - Ra) / (samples + 1));
+        Real eval_r = (samples == 1 ? Rb : Ra + (i + 1) * (Rb - Ra) / (samples + 1));
         grid.push_back(eval_r);
         
         // determine knot
@@ -513,8 +513,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         else
         {
             // plain averaging
-            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / double(samples);
-            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / double(samples);
+            Lambda_Slp[T][ell].first[ie] += sum(singlet_lambda[ell]) / Real(samples);
+            Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / Real(samples);
         }
     }
 }
@@ -522,7 +522,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
 void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 {
     // final projectile momenta
-    rArray kf = sqrt(inp_.Etot + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
     // allocate memory
     if (Tmat_Slp.find(T) == Tmat_Slp.end())
@@ -540,18 +540,18 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
         cArray const & rad_S1 = Lambda_Slp[T][ell].second;
         
         // compute T-matrices
-        Tmat_Slp[T][ell].first = rad_S0 * 4. * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
-        Tmat_Slp[T][ell].second = rad_S1 * 4. * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+        Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+        Tmat_Slp[T][ell].second = rad_S1 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
     }
 }
 
 void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 {
     // final projectile momenta
-    rArray ki = sqrt(inp_.Etot + 1./(T.ni*T.ni));
-    rArray kf = sqrt(inp_.Etot + 1./(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
+    rArray ki = sqrt(inp_.Etot + 1.0_r/(T.ni*T.ni));
+    rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
     // allocate memory
     if (sigma_S.find(T) == sigma_S.end())
@@ -576,7 +576,7 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
     }
 }
 
-Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double kmax, int l1, int l2)
+Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2)
 {
     // shorthands
     Complex const * const t = &(bspline_atom_.t(0));
@@ -586,31 +586,31 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
     int order   = bspline_atom_.order();
     
     // determine evaluation radius
-    double rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
+    Real rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
     
     // debug output
     std::ofstream dbg ("debug.log");
     
     // we want to approximate the following function f_{ℓ₁ℓ₂}^{LS}(k₁,k₂)
-    auto fLSl1l2k1k2 = [&](double k1) -> Complex
+    auto fLSl1l2k1k2 = [&](Real k1) -> Complex
     {
         if (k1 == 0 or k1*k1 >= kmax*kmax)
             return 0.;
         
         // compute momentum of the other electron
-        double k2 = std::sqrt(kmax*kmax - k1*k1);
+        Real k2 = std::sqrt(kmax*kmax - k1*k1);
         
         // Xi integrand
-        auto integrand = [&](double alpha) -> Complex
+        auto integrand = [&](Real alpha) -> Complex
         {
             
             // precompute projectors
-            double cos_alpha = (alpha == special::constant::pi_half) ? 0. : std::cos(alpha);
-            double sin_alpha = std::sin(alpha);
+            Real cos_alpha = (alpha == special::constant::pi_half) ? 0. : std::cos(alpha);
+            Real sin_alpha = std::sin(alpha);
             
             // precompute coordinates
-            double r1 = rho * cos_alpha;
-            double r2 = rho * sin_alpha;
+            Real r1 = rho * cos_alpha;
+            Real r2 = rho * sin_alpha;
             
             // evaluate Coulomb wave functions and derivatives
             double F1, F2, F1p, F2p;
@@ -624,8 +624,8 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
                 std::exit(EXIT_FAILURE);
             }
             
-            double F1F2 = F1 * F2;
-            double ddrho_F1F2 = 0.;
+            Real F1F2 = F1 * F2;
+            Real ddrho_F1F2 = 0.;
             
             if (cos_alpha != 0.)
                 ddrho_F1F2 += k1*F1p*cos_alpha*F2;
@@ -686,7 +686,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, double km
         // integrator
         ClenshawCurtis<decltype(integrand),Complex> Q(integrand);
         Q.setEps(1e-6);
-        Complex res = 2. * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
+        Complex res = 2.0_r * rho * Q.integrate(0., special::constant::pi_half) / special::constant::sqrt_pi;
         
         dbg << "CB " << k1 << " " << res.real() << " " << res.imag() << std::endl;
         
@@ -768,7 +768,7 @@ void Amplitudes::computeSigmaIon_ (Amplitudes::Transition T)
     unsigned Nenergy = inp_.Etot.size();
     
     // initial momentum
-    rArray ki = sqrt(inp_.Etot + 1./(T.ni*T.ni));
+    rArray ki = sqrt(inp_.Etot + 1.0_r/(T.ni*T.ni));
     
     // allocate memory for cross sections
     if (sigma_S.find(T) == sigma_S.end())

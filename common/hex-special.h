@@ -61,35 +61,35 @@ namespace special
 namespace constant
 {
 
-const double e               = M_E;        // e
+const Real e               = M_E;        // e
 
-const double pi              = M_PI;       // π
-const double pi_half         = M_PI_2;     // π/2
-const double pi_quart        = M_PI_4;     // π/4
-const double sqrt_pi         = M_SQRTPI;   // √π
-const double inv_pi          = M_1_PI;     // 1/π
-const double two_pi          = 2.0 * M_PI; // 2π
-const double two_inv_pi      = M_2_PI;     // 2/π
-const double two_inv_sqrt_pi = M_2_SQRTPI; // 2/√π
+const Real pi              = M_PI;       // π
+const Real pi_half         = M_PI_2;     // π/2
+const Real pi_quart        = M_PI_4;     // π/4
+const Real sqrt_pi         = M_SQRTPI;   // √π
+const Real inv_pi          = M_1_PI;     // 1/π
+const Real two_pi          = 2.0 * M_PI; // 2π
+const Real two_inv_pi      = M_2_PI;     // 2/π
+const Real two_inv_sqrt_pi = M_2_SQRTPI; // 2/√π
 
-const double sqrt_two        = M_SQRT2;    // √2
-const double sqrt_three      = M_SQRT3;    // √3
-const double sqrt_half       = M_SQRT1_2;  // 1/√2
+const Real sqrt_two        = M_SQRT2;    // √2
+const Real sqrt_three      = M_SQRT3;    // √3
+const Real sqrt_half       = M_SQRT1_2;  // 1/√2
 
-const double log2e           = M_LOG2E;    // log₂ e
-const double log10e          = M_LOG10E;   // log₁₀ e
-const double ln2             = M_LN2;      // ln 2
-const double ln10            = M_LN10;     // ln 10
-const double lnpi            = M_LNPI;     // ln π
+const Real log2e           = M_LOG2E;    // log₂ e
+const Real log10e          = M_LOG10E;   // log₁₀ e
+const Real ln2             = M_LN2;      // ln 2
+const Real ln10            = M_LN10;     // ln 10
+const Real lnpi            = M_LNPI;     // ln π
 
-const double euler           = M_EULER;    // γ
+const Real euler           = M_EULER;    // γ
 
-const double alpha           = GSL_CONST_NUM_FINE_STRUCTURE; // α
-const double alpha_sqr       = alpha*alpha; // α²
+const Real alpha           = GSL_CONST_NUM_FINE_STRUCTURE; // α
+const Real alpha_sqr       = alpha*alpha; // α²
 
-const double Inf = std::numeric_limits<double>::infinity();     // +∞
-const double Nan = std::numeric_limits<double>::quiet_NaN();    // NaN
-const double eps = std::numeric_limits<double>::epsilon();      // machine precision
+const Real Inf = std::numeric_limits<Real>::infinity();     // +∞
+const Real Nan = std::numeric_limits<Real>::quiet_NaN();    // NaN
+const Real eps = std::numeric_limits<Real>::epsilon();      // machine precision
 
 } // end of namespace "special::constant"
 
@@ -206,7 +206,7 @@ template <class T> T pow_int (T x, int n)
     T value = 1.;
     
     if (n < 0)
-        return 1. / pow_int(x, -n);
+        return T(1) / pow_int(x, -n);
     
     do
     {
@@ -573,7 +573,7 @@ inline Complex ric_h_plus (int n, double x)
  * phase the two values would differ by sign. Generaly, this convention cen be retrieved from the
  * Condon-Shortley convention by multiplying by the factor @f$ (-1)^{\max (0,m)} @f$.
  */
-Complex sphY (int l, int m, double theta, double phi);
+Complex sphY (int l, int m, Real theta, Real phi);
 
 /**
  * @brief Bi-polar spherical harmonic function.

@@ -93,13 +93,13 @@ void RadialIntegrals::Mi_integrand
     bspline_ij.B(j, iknot, n, in, values_j.data());
     
     // get upper bound
-    double t = bspline_ij.t(iknot + 1).real();
+    Real t = bspline_ij.t(iknot + 1).real();
     
     // scale factor for the multipole
-    double scalef = 1 / t;
+    Real scalef = 1 / t;
     
     // fill output array
-    if (R != 0.)
+    if (R != 0.0_r)
     {
         // use damping
         for (int k = 0; k < n; k++)
@@ -248,7 +248,7 @@ Complex RadialIntegrals::computeM_iknot
 (
     Bspline const & bspline, GaussLegendre const & g,
     int a, int i, int j,
-    int iknot, Complex R, double scale
+    int iknot, Complex R, Real scale
 ) const
 {
     // get interval boundaries
@@ -274,7 +274,7 @@ Complex RadialIntegrals::computeM_iknot
     Complex res = 0;
     
     // accumulate the (damped) result
-    if (R != 0.)
+    if (R != 0.0_r)
     {
         for (int k = 0; k < points; k++)
             res += values_i[k] * values_j[k] * special::pow_int(scale * xs[k], a) * ws[k] * damp(xs[k], 0., R);
@@ -355,7 +355,7 @@ Complex RadialIntegrals::computeS12
             bspline2.t(j).real() <= knots[n-1].real() and knots[n].real() <= bspline2.t(j + bspline2.order() + 1).real())
         {
             // get middle of the integration interval
-            Complex mid = 0.5 * (knots[n-1] + knots[n]);
+            Complex mid = 0.5_r * (knots[n-1] + knots[n]);
             
             // find to which interval this point belongs in both bases
             int k1 = bspline1.knot(mid);
@@ -702,7 +702,7 @@ void RadialIntegrals::apply_R_matrix
     }
 }
 
-cArray RadialIntegrals::overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<double(Complex)> weightf) const
+cArray RadialIntegrals::overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<Real(Complex)> weightf) const
 {
     // result
     cArray res (bspline.Nspline());
@@ -748,7 +748,7 @@ cArray RadialIntegrals::overlap (Bspline const & bspline, GaussLegendre const & 
     return res;
 }
 
-cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<double(Complex)> weightf) const
+cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<Real(Complex)> weightf) const
 {
     // result
     cArray res (bspline.Nspline());
@@ -782,7 +782,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
                 if (gsl_sf_hydrogenicR_e(n, l, 1., x.real(), &R) == GSL_EUNDRFLW)
                     return 0.;
                 else
-                    return weightf(x) * x * R.val;
+                    return weightf(x) * x * Real(R.val);
             }
         );
         
@@ -805,7 +805,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     return res;
 }
 
-cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<double(Complex)> weightf) const
+cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<Real(Complex)> weightf) const
 {
     // shorthands
     int Nenergy = vk.size();
@@ -850,7 +850,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
             for (int ipoint = 0; ipoint < points; ipoint++)
             {
                 // compute the damping factor
-                double damp = weightf(xs[ipoint]);
+                Real damp = weightf(xs[ipoint]);
                 
                 // if the factor is numerical zero, do not evaluate the function, just allocate zeros
                 if (damp == 0)

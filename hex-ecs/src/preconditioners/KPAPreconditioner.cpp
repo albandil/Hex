@@ -193,7 +193,7 @@ void KPACGPreconditioner::prepare
                 int n = std::floor(0.5 + 1.0 / std::sqrt(-2.0 * E.real()));
                 if (n > 0)
                 {
-                    double E0 = -0.5 / (n * n);
+                    Real E0 = -0.5 / (n * n);
                     if (std::abs(E0 - E) < 1e-3 * std::abs(E0))
                         maxn = std::max(maxn, n);
                 }
@@ -365,7 +365,7 @@ void KPACGPreconditioner::setup ()
     workspace_.resize(n);
 }
 
-void KPACGPreconditioner::update (double E)
+void KPACGPreconditioner::update (Real E)
 {
     // update parent
     CGPreconditioner::update(E);
@@ -390,13 +390,13 @@ void KPACGPreconditioner::update (double E)
         int n = std::floor(std::sqrt(-1.0 / (2.0 * E)));
         
         // get smallest non-zero knot separation
-        double h = special::constant::Inf;
+        Real h = special::constant::Inf;
         for (int i = 0; i < rad_.bspline_atom().Nspline(); i++)
             if (rad_.bspline_atom().t(i) != rad_.bspline_atom().t(i + 1))
                 h = std::min(h, std::abs(rad_.bspline_atom().t(i) - rad_.bspline_atom().t(i + 1)));
         
         // hunt & bisect for drop tolerance, start at classical turning point
-        double r1, r2, r3;
+        Real r1, r2, r3;
         for (r1 = 2 * n, r3 = 2 * r1;
              std::abs(Hydrogen::P(n, 0, r3)) > cmd_.droptol;
              r1 = r3, r3 *= 2);
@@ -479,7 +479,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
         {
             // calculate angular integral
-            double f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
+            Real f = special::computef(lambda, l1, l2, l1, l2, inp_.L);
             if (not std::isfinite(f))
                 HexException("Invalid result of computef(%d,%d,%d,%d,%d,%d).", lambda, l1, l2, l1, l2, inp_.L);
             

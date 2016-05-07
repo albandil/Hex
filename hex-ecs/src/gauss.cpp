@@ -41,7 +41,7 @@
 
 #include "gauss.h"
 
-std::vector<std::pair<double*,double*>> GaussLegendreData::data_ = {
+std::vector<std::pair<Real*,Real*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr),  // n = 0
     std::make_pair(nullptr, nullptr)   // n = 1
 };
@@ -51,8 +51,8 @@ void GaussLegendreData::precompute_nodes_and_weights (int points) const
     # pragma omp critical
     for (int n = data_.size(); n <= points; n++)
     {
-        double* nodes = new double [n];
-        double* weights = new double [n];
+        Real* nodes = new Real [n];
+        Real* weights = new Real [n];
         
         gsl_integration_glfixed_table *t = gsl_integration_glfixed_table_alloc(n);
         
@@ -77,7 +77,7 @@ void GaussLegendreData::precompute_nodes_and_weights (int points) const
     }
 }
 
-void GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx, const double* & vw) const
+void GaussLegendreData::gauss_nodes_and_weights (int points, const Real* & vx, const Real* & vw) const
 {
     // enforce at least second order rule
     if (points < 2)
@@ -95,12 +95,12 @@ void GaussLegendreData::gauss_nodes_and_weights (int points, const double* & vx,
 void GaussLegendre::scaled_nodes_and_weights (int points, Complex x1, Complex x2, Complex* xs, Complex* ws) const
 {
     // get the Gauss-Legendre nodes and weights
-    const double *vx, *vw;
+    const Real *vx, *vw;
     gauss_nodes_and_weights(points, vx, vw);
     
     // prepare centre and half-width of the interval
-    Complex hw = 0.5 * (x2 - x1);
-    Complex ct = 0.5 * (x2 + x1);
+    Complex hw = 0.5_r * (x2 - x1);
+    Complex ct = 0.5_r * (x2 + x1);
     
     // prepare evaluation nodes and weights
     for (int dat = 0; dat < points; dat++)

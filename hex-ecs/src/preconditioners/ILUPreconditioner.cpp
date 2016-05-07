@@ -80,10 +80,15 @@ void ILUCGPreconditioner::setup ()
         // prepare initial (empty) factorization data
         lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
         
-        // associate the matrix pointer
-        LUft_UMFPACK<LU_int_t,Complex> * ptr = dynamic_cast<LUft_UMFPACK<LU_int_t,Complex>*>(lu_[iblock].get());
-        if (ptr)
-            ptr->matrix(&csr_blocks_[iblock]);
+#ifdef WITH_UMFPACK
+        if (cmd_.factorizer == LUFT_UMFPACK)
+        {
+            // associate the matrix pointer
+            LUft_UMFPACK<LU_int_t,Complex> * ptr = dynamic_cast<LUft_UMFPACK<LU_int_t,Complex>*>(lu_[iblock].get());
+            if (ptr)
+                ptr->matrix(&csr_blocks_[iblock]);
+        }
+#endif
         
         // associate existing disk files
         lu_[iblock]->link(format("lu-%d.bin", iblock));
@@ -114,7 +119,7 @@ void ILUCGPreconditioner::setup ()
 #endif // WITH_SUPERLU_DIST
 }
 
-void ILUCGPreconditioner::update (double E)
+void ILUCGPreconditioner::update (Real E)
 {
     // reset data on energy change
     if (E != E_ and not cmd_.noluupdate)

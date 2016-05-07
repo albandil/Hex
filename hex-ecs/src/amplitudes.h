@@ -236,7 +236,7 @@ class Amplitudes
          */
         void computeSigma_ (Transition T);
         
-        Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, double kmax, int l1, int l2);
+        Chebyshev<double,Complex> fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2);
         void computeSigmaIon_ (Transition T);
         
         // B-spline environment

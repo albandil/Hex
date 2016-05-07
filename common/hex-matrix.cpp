@@ -44,10 +44,15 @@
 #include "hex-misc.h"
 #include "hex-symbandmatrix.h"
 
-// some used Lapack prototypes (Fortran convention!)
+#ifdef SINGLE
+extern "C" void cgetrf_ (int*, int*, Complex*, int*, int*, int*);
+extern "C" void cgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
+extern "C" void cgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
+#else
 extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
 extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
-extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, double*, int*);
+extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, Real*, int*);
+#endif
 
 // -------------------------------------------------------------------------------------
 // Dense matrix routines
@@ -70,7 +75,11 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
     inv = *this;
     
     // compute the LU factorization
+#ifdef SINGLE
+    cgetrf_
+#else
     zgetrf_
+#endif
     (
         &N,             // number of rows in the matrix
         &N,             // number of columns of the matrix
@@ -81,7 +90,11 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
     );
     
     // query for optimal work size for inversion
+#ifdef SINGLE
+    cgetri_
+#else
     zgetri_
+#endif
     (
         &N,             // order of the matrix
         inv.begin(),    // LU-factors (on return the inverse matrix)
@@ -97,7 +110,11 @@ void ColMatrix<Complex>::invert (ColMatrix<Complex> & inv) const
     WORK.resize(LWORK);
     
     // compute the inverse
+#ifdef SINGLE
+    cgetri_
+#else
     zgetri_
+#endif
     (
         &N,             // order of the matrix
         inv.begin(),    // LU-factors (on return the inverse matrix)
@@ -161,7 +178,11 @@ void ColMatrix<Complex>::diagonalize
     cArray A = data();
     
     // get work size
+#ifdef SINGLE
+    cgeev_
+#else
     zgeev_
+#endif
     (
         &JOBL,      // compute left eigenvectors
         &JOBR,      // compute right eigenvectors
@@ -184,7 +205,11 @@ void ColMatrix<Complex>::diagonalize
     WORK.resize(LWORK);
     
     // run the diagonalization
+#ifdef SINGLE
+    cgeev_
+#else
     zgeev_
+#endif
     (
         &JOBL,      // compute left eigenvectors
         &JOBR,      // compute right eigenvectors
@@ -464,7 +489,7 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
 #include <umfpack.h>
 
 template<>
-std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_umfpack (double droptol, void * data) const
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_umfpack (Real droptol, void * data) const
 {
     // Use standard UMFPACK sequence
     void *Symbolic, *Numeric;
@@ -547,7 +572,7 @@ CooMatrix<LU_int_t,Complex> CsrMatrix<LU_int_t,Complex>::tocoo () const
         std::size_t nz = 0;
         for (std::size_t i = 0; i < N; i++)
         {
-            if (x_[i] != 0.)
+            if (x_[i] != 0.0_r)
             {
                 Ti[nz] = i_[i];
                 Tj[nz] = jj[i];
@@ -565,7 +590,7 @@ CooMatrix<LU_int_t,Complex> CsrMatrix<LU_int_t,Complex>::tocoo () const
     // return new CooMatrix
     return CooMatrix<LU_int_t,Complex> (m_, n_, Tj, Ti, Tx);
 }
-
+/*
 template<>
 CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
 {
@@ -617,7 +642,7 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
     
     return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
 }
-
+*/
 #endif // WITH_UMFPACK
 
 
@@ -626,10 +651,14 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
 //
 
 #ifdef WITH_SUPERLU
-#include <slu_zdefs.h>
+#ifdef SINGLE
+    #include <slu_cdefs.h>
+#else
+    #include <slu_zdefs.h>
+#endif
 
 template<>
-std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (double droptol, void * data) const
+std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (Real droptol, void * data) const
 {
     //
     // Create matrix of the system.
@@ -643,7 +672,11 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
         
         SuperMatrix A;
         A.Stype = SLU_NR;       // storage type: compressed sparse, row-major
+#ifdef SINGLE
+        A.Dtype = SLU_C;        // data type: single complex
+#else
         A.Dtype = SLU_Z;        // data type: double complex
+#endif
         A.Mtype = SLU_GE;       // mathematical type: general
         A.nrow  = this->rows(); // number of rows
         A.ncol  = this->cols(); // number of columns
@@ -689,10 +722,10 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
         iArray perm_r(A.nrow), perm_c(A.ncol), etree(A.nrow);
         
         // row and column scale factors, reciprocal condition number, reciprocal pivot growth factor
-        rArray R(A.nrow), C(A.ncol); double rcond, rpg;
+        rArray R(A.nrow), C(A.ncol); Real rcond, rpg;
         
         // forward and backward errors (one element per one right hand side)
-        double ferr, berr;
+        Real ferr, berr;
         
         // equilibration done
         char equed;
@@ -701,7 +734,11 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
         int info;
         
         // LU factorization
+#ifdef SINGLE
+        cgssvx
+#else
         zgssvx
+#endif
         (
             &options,       // calculation options
             &A,             // matrix data structure
@@ -721,20 +758,20 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
             &rcond,         // reciprocal condition number
             &ferr,          // forward error
             &berr,          // backward error
-            &Glu,           // reusable information
+//             &Glu,           // reusable information
             &mem_usage,     // memory usage
             &stat,          // diagnostic infomation
             &info           // result status
         );
         
         if (info < 0)
-            HexException("SuperLU/zgssvx: Parameter %d has illegal value.", -info);
+            HexException("SuperLU/?gssvx: Parameter %d has illegal value.", -info);
         if (info > A.ncol + 1)
-            HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
+            HexException("SuperLU/?gssvx: Memory allocation failure after %d bytes.", info);
         if (info == A.ncol + 1)
-            HexException("SuperLU/zgssvx: Badly conditioned system.");
+            HexException("SuperLU/?gssvx: Badly conditioned system.");
         if (info > 0)
-            HexException("SuperLU/zgssvx: Singular factor.");
+            HexException("SuperLU/?gssvx: Singular factor.");
         
     // create a new LU factorization container
     LUft<int,Complex> * lu_ptr = new LUft_SUPERLU<int,Complex>
@@ -758,7 +795,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (do
 #include <superlu_zdefs.h>
 
 template<>
-std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_superlu_dist (double droptol, void * data) const
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_superlu_dist (Real droptol, void * data) const
 {
     //
     // Create matrix of the system.
@@ -776,7 +813,11 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
         
         SuperMatrix A;
         A.Stype = SLU_NC;       // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
+#ifdef SINGLE
+        A.Dtype = SLU_C;        // data type: single complex
+#else
         A.Dtype = SLU_Z;        // data type: double complex
+#endif
         A.Mtype = SLU_GE;       // mathematical type: general
         A.nrow  = this->rows(); // number of rows
         A.ncol  = this->cols(); // number of columns
@@ -858,3 +899,63 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
 }
 
 #endif // WITH_SUPERLU_DIST
+
+
+template<>
+CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
+{
+    // get number of structurally non-zero elements
+    LU_int_t nz = x_.size();
+    
+    // get row lengths
+    std::vector<LU_int_t> len (m_, 0);
+    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
+        len[i_[n]]++;
+    
+    // create element pointer array for each matrix row
+    std::vector<std::vector<LU_int_t>> elem_ptrs (m_);
+    
+    // reserve memory for the row data
+    for (LU_int_t n = 0; n < m_; n++)
+        elem_ptrs[n].reserve(len[n]);
+    
+    // store index of each element into the appropriate row
+    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
+        elem_ptrs[i_[n]].push_back(n);
+    
+    // sort element pointers by their column index
+    for (LU_int_t n = 0; n < m_; n++)
+        std::sort(elem_ptrs[n].begin(), elem_ptrs[n].end(), [&](LU_int_t a, LU_int_t b) { return j_[a] < j_[b]; });
+    
+    // allocate output arrays
+    NumberArray<LU_int_t> Ap(m_ + 1), Ai(nz);
+    cArray Ax(nz);
+    
+    // copy & sum entries
+    LU_int_t pos = 0;
+    for (LU_int_t m = 0; m < m_; m++)
+    {
+        // for all non-zero elements
+        for (LU_int_t n = 0; n < (LU_int_t)elem_ptrs[m].size(); n++)
+        {
+            // get global index
+            LU_int_t gid = elem_ptrs[m][n];
+            
+            // update elements
+            Ai[pos] += j_[gid];
+            Ax[pos] += x_[gid];
+            
+            // add also the next entry if it is in the same column
+            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and gid == elem_ptrs[m][n + 1])
+                continue;
+            
+            // otherwise move on to the next position
+            pos++;
+        }
+        
+        // insert next row pointer
+        Ap[m + 1] = pos;
+    }
+    
+    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
+}

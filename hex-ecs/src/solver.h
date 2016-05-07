@@ -81,7 +81,7 @@ class Solver
         Complex scalar_product_ (BlockArray<Complex> const & x, BlockArray<Complex> const & y) const;
         
         // CG norm function that broadcasts master's result to all nodes
-        double compute_norm_ (BlockArray<Complex> const & r) const;
+        Real compute_norm_ (BlockArray<Complex> const & r) const;
         
         // CG linear combination
         void axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) const;

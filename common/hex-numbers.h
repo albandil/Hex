@@ -58,8 +58,20 @@
 // Complex data type alias.
 //
 
-// shorthand for std::complex<double>
-typedef std::complex<double> Complex;
+#ifdef SINGLE
+    typedef float Real;
+#else
+    typedef double Real;
+#endif
+    
+// shorthand for std::complex<Real>
+typedef std::complex<Real> Complex;
+
+// real number literal
+inline Real operator "" _r (long double x)
+{
+    return x;
+}
 
 // imaginary number literal
 inline Complex operator "" _i (long double x)
@@ -68,7 +80,7 @@ inline Complex operator "" _i (long double x)
 }
 
 /// Squared modulus of a complex number.
-inline double sqrabs (Complex z)
+inline Real sqrabs (Complex z)
 {
     return z.real() * z.real() + z.imag() * z.imag();
 }

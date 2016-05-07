@@ -83,7 +83,7 @@ class PreconditionerBase
          * This function updates the preconditioner for another right hand side.
          * It may use the MPI environment.
          */
-        virtual void update (double E) = 0;
+        virtual void update (Real E) = 0;
         
         /**
          * @brief Clean up memory etc.

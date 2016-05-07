@@ -90,8 +90,8 @@ Complex Bspline::dspline (int i, int iknot, int k, Complex r) const
     Complex A = bspline(i,   iknot, k-1, r);
     Complex B = bspline(i+1, iknot, k-1, r);
     
-    Complex S1 = (t_[i+k]   != t_[i])   ? double(k) / (t_[i+k] - t_[i]) : 0.;
-    Complex S2 = (t_[i+k+1] != t_[i+1]) ? double(k) / (t_[i+k+1] - t_[i+1]) : 0.;
+    Complex S1 = (t_[i+k]   != t_[i])   ? Real(k) / (t_[i+k] - t_[i]) : 0.;
+    Complex S2 = (t_[i+k+1] != t_[i+1]) ? Real(k) / (t_[i+k+1] - t_[i+1]) : 0.;
     
     return A * S1 - B * S2;
 }
@@ -118,42 +118,42 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
     
     if (i + order_ + 1 < Nreknot_)
     {
-        // number of needed SIMD vectors for M doubles
-        int nvec = (M + simd_double_vec_size - 1) / simd_double_vec_size;
+        // number of needed SIMD vectors for M reals
+        int nvec = (M + simd_real_vec_size - 1) / simd_real_vec_size;
         
         // copy real parts of the evaluation points, pad by zeros
-        double * const restrict rx = (double*)assume_aligned(work_[ithread].data(), NumberArray<double>::Alloc::alignment);
+        Real * const restrict rx = (Real*)assume_aligned(work_[ithread].data(), NumberArray<Real>::Alloc::alignment);
         // --- v --- likely to autovectorize --- v ---
-        for (int m = 0; m < nvec * (int)simd_double_vec_size; m++)
+        for (int m = 0; m < nvec * (int)simd_real_vec_size; m++)
             rx[m] = (m < M ? x[m].real() : 0);
         // --- ^ --- likely to autovectorize --- ^ ---
         
         // evaluations of the parent B-splines of the wanted B-spline
-        double * const restrict b = (double*)assume_aligned(rx + nvec * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+        Real * const restrict b = (Real*)assume_aligned(rx + nvec * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
         
         // initialize all ancestral zero-order B-splines
         for (int n = 0; n <= order_; n++)
         {
             // determine value of the zero-order B-spline B_n on interval (t[iknot],t[iknot+1])
-            double val = (n + i == iknot ? 1. : 0.);
+            Real val = (n + i == iknot ? 1. : 0.);
             
             // store the value at all points
             for (int m = 0; m < nvec; m++)
             {
-                double * const restrict pb = (double*)assume_aligned(b + (m + n * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                Real * const restrict pb = (Real*)assume_aligned(b + (m + n * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
                 
                 // --- v --- likely to autovectorize --- v ---
-                for (unsigned v = 0; v < simd_double_vec_size; v++)
+                for (unsigned v = 0; v < simd_real_vec_size; v++)
                     pb[v] = val;
                 // --- ^ --- likely to autovectorize --- ^ ---
             }
         }
         
         // precomputed denominators (used later)
-        double * const restrict invden = b + (order_ + 1) * nvec * simd_double_vec_size;
+        Real * const restrict invden = b + (order_ + 1) * nvec * simd_real_vec_size;
         
         // real knots restricted pointer (for fast access)
-        double const * const restrict rknots = rknots_.data();
+        Real const * const restrict rknots = rknots_.data();
         
         // calculate B-splines of higher orders
         for (int ord = 1; ord <= order_; ord++)
@@ -166,12 +166,12 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             for (int n = 0; n <= order_ - ord; n++)
             for (int m = 0; m < nvec; m++)
             {
-                double * const restrict pb  = (double*)assume_aligned(b  + (m +  n      * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
-                double * const restrict pbn = (double*)assume_aligned(b  + (m + (n + 1) * nvec) * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
-                double * const restrict pr  = (double*)assume_aligned(rx +  m                   * simd_double_vec_size, NumberArray<double>::Alloc::alignment);
+                Real * const restrict pb  = (Real*)assume_aligned(b  + (m +  n      * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
+                Real * const restrict pbn = (Real*)assume_aligned(b  + (m + (n + 1) * nvec) * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
+                Real * const restrict pr  = (Real*)assume_aligned(rx +  m                   * simd_real_vec_size, NumberArray<Real>::Alloc::alignment);
                 
                 // --- v --- likely to autovectorize --- v ---
-                for (unsigned v = 0; v < simd_double_vec_size; v++)
+                for (unsigned v = 0; v < simd_real_vec_size; v++)
                     pb[v] = pb[v] * (pr[v] - rknots[i+n]) * invden[n] + pbn[v] * (rknots[i+ord+n+1] - pr[v]) * invden[n+1];
                 // --- ^ --- likely to autovectorize --- ^ ---
             }
@@ -202,8 +202,8 @@ void Bspline::B (int i, int iknot, int M, Complex const * const restrict x, Comp
             // update splines
             for (int n = 0; n <= order_ - ord; n++)
             {
-                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0. : 1. / (t_[i+ord+n]   - t_[i+n]));
-                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0. : 1. / (t_[i+ord+n+1] - t_[i+n+1]));
+                Complex invden1 = (t_[i+ord+n]   == t_[i+n]   ? 0.0_r : 1.0_r / (t_[i+ord+n]   - t_[i+n]));
+                Complex invden2 = (t_[i+ord+n+1] == t_[i+n+1] ? 0.0_r : 1.0_r / (t_[i+ord+n+1] - t_[i+n+1]));
                 
                 Complex * const restrict pb  = b +  n      * M;
                 Complex * const restrict pbn = b + (n + 1) * M;
@@ -269,7 +269,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView grid) const
             // for all splines
             for (int ispline = std::max(iknot-order_,0); ispline <= iknot and ispline < Nspline_; ispline++)
             {
-                if (coeff[ispline] == 0.)
+                if (coeff[ispline] == 0.0_r)
                     continue;
                 
                 Complex y1;
@@ -426,7 +426,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
 // ----------------------------------------------------------------------- //
 
 
-Bspline::Bspline (int order, rArrayView const & rknots, double th, rArrayView const & cknots)
+Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots)
     : rknots_(rknots), cknots_(cknots), theta_(th), rotation_(Complex(cos(th),sin(th))),
       R0_(rknots_.back()), Rmax_(cknots_.back()), Nknot_(rknots.size() + cknots.size() - 1),
       Nreknot_(rknots.size()), Nspline_(Nknot_ - order - 1), Nintval_(Nknot_ - 1),
@@ -477,7 +477,7 @@ int Bspline::knot (Complex x) const
         return -1;
 }
 
-Complex Bspline::eval (const cArrayView coeff, double x) const
+Complex Bspline::eval (const cArrayView coeff, Real x) const
 {
     Complex z = rotate(x);
     
@@ -500,7 +500,7 @@ Complex Bspline::eval (const cArrayView coeff, double x) const
     return result;
 }
 
-Complex Bspline::eval (const cArrayView coeff, double x, double y) const
+Complex Bspline::eval (const cArrayView coeff, Real x, Real y) const
 {
     Complex w = rotate(x);
     Complex z = rotate(y);

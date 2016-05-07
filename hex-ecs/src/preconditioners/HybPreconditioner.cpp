@@ -66,7 +66,7 @@ void HybCGPreconditioner::setup ()
     KPACGPreconditioner::setup();
 }
 
-void HybCGPreconditioner::update (double E)
+void HybCGPreconditioner::update (Real E)
 {
     // update ILU
     if (E != CGPreconditioner::E_)

@@ -61,7 +61,7 @@ void NoPreconditioner::setup ()
     rad_.setupTwoElectronIntegrals(par_, cmd_);
 }
 
-void NoPreconditioner::update (double E)
+void NoPreconditioner::update (Real E)
 {
     OMP_prepare;
     
@@ -115,9 +115,9 @@ void NoPreconditioner::update (double E)
             Complex half (0.5,0.0);
             SymBandMatrix<Complex> block = E * rad_.S_atom()(i,j) * rad_.S_proj();
             block -= (half * rad_.D_atom()(i,j) - rad_.Mm1_tr_atom()(i,j)) * rad_.S_proj();
-            block -= 0.5 * l1 * (l1 + 1) * rad_.Mm2_atom()(i,j) * rad_.S_proj();
+            block -= 0.5_r * l1 * (l1 + 1) * rad_.Mm2_atom()(i,j) * rad_.S_proj();
             block -= rad_.S_atom()(i,j) * (half * rad_.D_proj() - rad_.Mm1_tr_proj());
-            block -= 0.5 * l2 * (l2 + 1) * rad_.S_atom()(i,j) * rad_.Mm2_proj();
+            block -= 0.5_r * l2 * (l2 + 1) * rad_.S_atom()(i,j) * rad_.Mm2_proj();
             
             // two-electron part
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -173,7 +173,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     int Nspline_proj = rad_.bspline_proj().Nspline();
     
     // impact momentum
-    rArray ki = { std::sqrt(inp_.Etot[ie] + 1./(ni*ni)) };
+    rArray ki = { std::sqrt(inp_.Etot[ie] + 1.0_r/(ni*ni)) };
     
     // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
     RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj_full(), rad_.bspline_proj_full(), 0);
@@ -263,15 +263,15 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 continue;
             
             // (anti)symmetrization
-            double Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
+            Real Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(1.0_i,l)
                               * std::sqrt(special::constant::two_pi * (2 * l + 1))
-                              * special::ClebschGordan(li,mi, l,0, inp_.L,mi) / ki[0];
+                              * (Real)special::ClebschGordan(li,mi, l,0, inp_.L,mi) / ki[0];
             
             // skip non-contributing terms
-            if (prefactor == 0.)
+            if (prefactor == 0.0_r)
                 continue;
             
             // calculate angular integrals
@@ -357,29 +357,29 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             for (int iy = 0; iy < points; iy++)
                             {
                                 // radii
-                                double rx = xs[ixknot * points + ix].real(), ry = ys[iyknot * points + iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                Real rx = xs[ixknot * points + ix].real(), ry = ys[iyknot * points + iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                 
                                 // evaluated functions
                                 Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
                                 Complex By = B_y[(iyspline * (bspline_proj_.order() + 1) + iyknot - iyspline) * points + iy];
-                                double Pix = Pi_x[ixknot * points + ix];
-                                double Piy = Pi_y[iyknot * points + iy];
-                                double jix = ji_x[ixknot * points + ix];
-                                double jiy = ji_y[iyknot * points + iy];
+                                Real Pix = Pi_x[ixknot * points + ix];
+                                Real Piy = Pi_y[iyknot * points + iy];
+                                Real jix = ji_x[ixknot * points + ix];
+                                Real jiy = ji_y[iyknot * points + iy];
                                 Complex wx = xws[ixknot * points + ix];
                                 Complex wy = yws[iyknot * points + iy];
                                 
                                 // damp factor
-                                double dampfactor = damp(rx, ry, distance);
+                                Real dampfactor = damp(rx, ry, distance);
                                 
                                 // monopole contribution
-                                if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
+                                if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                 
                                 // higher multipoles contribution
                                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
                                 {
-                                    double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
+                                    Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
                                     if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
                                     if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                 }
@@ -398,30 +398,30 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 for (int iy = 0; iy < points; iy++)
                                 {
                                     // radii
-                                    double rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                    Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                     
                                     // evaluated functions
                                     Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
                                     Complex By = B_y[iy];
-                                    double Pix = Pi_x[ixknot * points + ix];
+                                    Real Pix = Pi_x[ixknot * points + ix];
                                     gsl_sf_result piy;
-                                    double Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
-                                    double jix = ji_x[ixknot * points + ix];
-                                    double jiy = special::ric_j(l, ki[0] * ry);
+                                    Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                    Real jix = ji_x[ixknot * points + ix];
+                                    Real jiy = special::ric_j(l, ki[0] * ry);
                                     Complex wx = xws[ixknot * points + ix];
                                     Complex wy = yws[iy];
                                     
                                     // damp factor
-                                    double dampfactor = damp(rx, ry, distance);
+                                    Real dampfactor = damp(rx, ry, distance);
                                     
                                     // monopole contribution
-                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
+                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                     
                                     // higher multipoles contribution
                                     for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
                                     {
-                                        double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
+                                        Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
                                         if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
                                         if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                     }
@@ -438,30 +438,30 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                 for (int iy = 0; iy < points; iy++)
                                 {
                                     // radii
-                                    double rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                    Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                     
                                     // evaluated functions
                                     Complex Bx = B_x[(ixspline * (bspline_atom_.order() + 1) + ixknot - ixspline) * points + ix];
                                     Complex By = B_y[iy];
-                                    double Pix = Pi_x[ixknot * points + ix];
+                                    Real Pix = Pi_x[ixknot * points + ix];
                                     gsl_sf_result piy;
-                                    double Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
-                                    double jix = ji_x[ixknot * points + ix];
-                                    double jiy = special::ric_j(l, ki[0] * ry);
+                                    Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                    Real jix = ji_x[ixknot * points + ix];
+                                    Real jiy = special::ric_j(l, ki[0] * ry);
                                     Complex wx = xws[ixknot * points + ix];
                                     Complex wy = yws[iy];
                                     
                                     // damp factor
-                                    double dampfactor = damp(rx, ry, distance);
+                                    Real dampfactor = damp(rx, ry, distance);
                                     
                                     // monopole contribution
-                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1./rx - 1./ry) * Pix * jiy * dampfactor * wx * wy;
-                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1./ry - 1./rx) * jix * Piy * dampfactor * wx * wy;
+                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
                                     
                                     // higher multipoles contribution
                                     for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
                                     {
-                                        double multipole = special::pow_int(rmin/rmax, lambda) / rmax;
+                                        Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
                                         if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
                                         if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
                                     }

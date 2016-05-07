@@ -100,11 +100,11 @@ void Solver::solve ()
     auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void { this->apply_preconditioner_(r,z); };
     auto matrix_multiply = [&](BlockArray<Complex> const & p, BlockArray<Complex> & q) -> void { this->matrix_multiply_(p,q); };
     auto scalar_product = [&](BlockArray<Complex> const & x, BlockArray<Complex> const & y) -> Complex { return this->scalar_product_(x,y); };
-    auto compute_norm = [&](BlockArray<Complex> const & r) -> double { return this->compute_norm_(r); };
+    auto compute_norm = [&](BlockArray<Complex> const & r) -> Real { return this->compute_norm_(r); };
     auto axby_operation = [&](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void { this->axby_operation_(a,x,b,y); };
     auto new_array = [&](std::size_t N, std::string name) -> BlockArray<Complex> { return this->new_array_(N,name); };
     
-    double E = special::constant::Nan;
+    Real E = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     
     for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
@@ -330,17 +330,17 @@ void Solver::solve ()
                                         Complex D_ik      = rad.D_atom()(i,k);
                                         Complex Mm1_tr_ik = rad.Mm1_tr_atom()(i,k);
                                         Complex Mm2_ik    = rad.Mm2_atom()(i,k);
-                                        Complex H_ik = 0.5 * D_ik + 0.5 * l1 * (l1 + 1) * Mm2_ik - Mm1_tr_ik;
+                                        Complex H_ik = 0.5_r * D_ik + 0.5_r * l1 * (l1 + 1) * Mm2_ik - Mm1_tr_ik;
                                         
                                         // compute element of the projectile hamiltonian
                                         Complex S_jl      = rad.S_proj()(jp,lp);
                                         Complex D_jl      = rad.D_proj()(jp,lp);
                                         Complex Mm1_tr_jl = rad.Mm1_proj()(jp,lp);
                                         Complex Mm2_jl    = rad.Mm2_proj()(jp,lp);
-                                        Complex H_jl = 0.5 * D_jl + 0.5 * l2 * (l2 + 1) * Mm2_jl - Mm1_tr_jl;
+                                        Complex H_jl = 0.5_r * D_jl + 0.5_r * l2 * (l2 + 1) * Mm2_jl - Mm1_tr_jl;
                                         
                                         // update the matrix element
-                                        A_ijkl += 0.5 * inp_.Etot[ie] * S_ik * S_jl - H_ik * S_jl - S_ik * H_jl;
+                                        A_ijkl += 0.5_r * inp_.Etot[ie] * S_ik * S_jl - H_ik * S_jl - S_ik * H_jl;
                                     }
                                     
                                     // update the right-hand side
@@ -362,7 +362,7 @@ void Solver::solve ()
             }
             
             // compute and check norm of the right hand side vector
-            double chi_norm = compute_norm(chi);
+            Real chi_norm = compute_norm(chi);
             if (chi_norm == 0.)
             {
                 // this should not happen, hopefully we already checked
@@ -519,13 +519,13 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
     par_.syncsum(&prod, 1);
     
     // return global scalar product
-    return prod / double(cmd_.groupsize);
+    return prod / Real(cmd_.groupsize);
 }
 
-double Solver::compute_norm_ (BlockArray<Complex> const & r) const
+Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
 {
     // compute node-local norm of 'r'
-    double rnorm2 = 0;
+    Real rnorm2 = 0;
     for (std::size_t i = 0; i < r.size(); i++) if (par_.isMyGroupWork(i))
     {
         if (not r.inmemory())

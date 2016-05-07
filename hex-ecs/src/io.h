@@ -121,7 +121,7 @@ class CommandLine
             s_zipdata () : file(), Xmin(-1), Ymin(-1), Xmax(-1), Ymax(-1), nX(-1), nY(-1) {}
             
             std::string file;
-            double Xmin, Ymin, Xmax, Ymax;
+            Real Xmin, Ymin, Xmax, Ymax;
             int nX, nY;
         }
         zipdata;
@@ -133,7 +133,7 @@ class CommandLine
         int preconditioner;
         
         /// Drop tolerance for the ILU preconditioner.
-        double droptol;
+        Real droptol;
         
         /// Which parts of the computation to run.
         int itinerary;
@@ -152,10 +152,10 @@ class CommandLine
         bool cache_own_radint;
         
         /// Tolerance for terminating iterative solution.
-        double itertol;
+        Real itertol;
         
         /// Tolerance for terminating block preconditioner.
-        double prec_itertol;
+        Real prec_itertol;
         
         /// Whether to use OpenMP parallelization to run preconditioner for several blocks simultaneously.
         bool parallel_precondition;
@@ -212,10 +212,10 @@ class CommandLine
         bool extract_extrapolate;
         
         /// Extraction radius.
-        double extract_rho;
+        Real extract_rho;
         
         /// Radial distance where to start radial averaging/extrapolation of the T-matrix.
-        double extract_rho_begin;
+        Real extract_rho_begin;
         
         /// Extraction averaging/extrapolation sample count.
         int extract_samples;
@@ -230,7 +230,7 @@ class CommandLine
         std::string map_solution_target;
         
         /// Apply SSOR coupling.
-        double ssor;
+        Real ssor;
         
         /// Keep calculated LU also for next energy.
         bool noluupdate;
@@ -248,7 +248,7 @@ class CommandLine
         int mumps_verbose;
         
         /// Whether to use drop tolerance for KPA preconditioner.
-        double kpa_drop;
+        Real kpa_drop;
         
         /// Exact rhs.
         bool exact_rhs;
@@ -304,7 +304,7 @@ class InputFile
         
         int order, ni, L, Pi, levels, maxell;
         iArray Spin;
-        double ecstheta, B;
+        Real ecstheta, B;
         rArray rknots, rknots_next, cknots, overlap_knots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;
 };
@@ -320,7 +320,7 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang)
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, Real E, std::vector<std::pair<int,int>> const & ang)
             : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang) {}
         
         /// Get name of the solution file.
@@ -484,7 +484,7 @@ class SolutionIO
     private:
         
         int L_, S_, Pi_, ni_, li_, mi_;
-        double E_;
+        Real E_;
         std::vector<std::pair<int,int>> ang_;
 };
 

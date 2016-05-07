@@ -292,13 +292,13 @@ public:
             {
                 // copy whole complex numbers
                 for (int i = 0; i <= N; i++)
-                    coefs[i] = 0.5 * (*(ftraf_ptr + i));
+                    coefs[i] = 0.5_r * (*(ftraf_ptr + i));
             }
-            else if (typeid(FType) == typeid(double))
+            else if (typeid(FType) == typeid(Real))
             {
                 // copy just real parts
                 for (int i = 0; i <= N; i++)
-                    coefs[i] = 0.5 * (*(ftraf_ptr + 2*i));
+                    coefs[i] = 0.5_r * (*(ftraf_ptr + 2*i));
             }
             else
             {
@@ -306,9 +306,9 @@ public:
             }
             
             // sum the quadrature rule
-            sum = 0.5 * (coefs[0] - coefs[N] / (N*N - 1.));
+            sum = 0.5_r * (coefs[0] - coefs[N] / (N*N - 1.0_r));
             for (int twok = 2; twok < N; twok += 2)
-                sum -= coefs[twok] / (twok*twok - 1.);
+                sum -= coefs[twok] / (twok*twok - 1.0_r);
             
             // echo debug information
             if (Verbose)
@@ -415,7 +415,7 @@ public:
         std::vector<FType> fvals, fvals_prev;
 
         // weights, new and previous
-        std::vector<double> weights, weights_prev;
+        std::vector<Real> weights, weights_prev;
 
         // previous integral
         FType sum_prev = special::constant::Nan;
