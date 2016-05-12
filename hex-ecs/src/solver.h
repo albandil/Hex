@@ -89,6 +89,9 @@ class Solver
         // CG new array
         BlockArray<Complex> new_array_ (std::size_t N, std::string name) const;
         
+        // CG optional write current solution
+        void process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const;
+        
         // concatenate previous-panel full solution and new single-panel solution
         void concatenate_panels_ (cArray & psi, cArray const & psip) const;
         
@@ -118,6 +121,10 @@ class Solver
         
         /// Linear solver (conjugate gradients).
         ConjugateGradients <Complex, cBlockArray, cBlockArray&> CG_;
+        
+        /// Quantum numbers of the state currently being solved.
+        int ni_, li_, mi_;
+        double E_;
 };
 
 #endif // HEX_ECS_SOLVER_H

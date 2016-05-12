@@ -91,7 +91,7 @@ class CommandLine
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
-              gpu_host_multiply(false), mumps_outofcore(true), mumps_verbose(0), kpa_drop(-1), exact_rhs(false)
+              gpu_host_multiply(false), mumps_outofcore(true), mumps_verbose(0), kpa_drop(-1), exact_rhs(false), write_intermediate_solutions(false)
         {
             // get command line options
             parse(argc, argv);
@@ -252,6 +252,9 @@ class CommandLine
         
         /// Exact rhs.
         bool exact_rhs;
+        
+        /// Write intermediate solutions.
+        bool write_intermediate_solutions;
 };
 
 /**
@@ -320,16 +323,16 @@ class SolutionIO
 {
     public:
         
-        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang)
-            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang) {}
+        SolutionIO (int L, int S, int Pi, int ni, int li, int mi, double E, std::vector<std::pair<int,int>> const & ang, std::string prefix = "psi")
+            : L_(L), S_(S), Pi_(Pi), ni_(ni), li_(li), mi_(mi), E_(E), ang_(ang), prefix_(prefix) {}
         
         /// Get name of the solution file.
         std::string name (int ill = -1) const
         {
             if (ill == -1)
-                return format("psi-%g-%d-%d-%d-%d-%d-%d.hdf", E_ + 1, L_, S_, Pi_, ni_, li_, mi_);
+                return format("%s-%g-%d-%d-%d-%d-%d-%d.hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_);
             else
-                return format("psi-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
+                return format("%s-%g-%d-%d-%d-%d-%d-%d-(%d,%d).hdf", prefix_.c_str(), E_ + 1, L_, S_, Pi_, ni_, li_, mi_, ang_[ill].first, ang_[ill].second);
         }
         
         /// Check that the file exists, return size.
@@ -486,6 +489,7 @@ class SolutionIO
         int L_, S_, Pi_, ni_, li_, mi_;
         double E_;
         std::vector<std::pair<int,int>> ang_;
+        std::string prefix_;
 };
 
 /**

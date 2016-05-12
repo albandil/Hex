@@ -94,16 +94,14 @@ const std::string sample_input =
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
     "  G  0.1 10.0  0.1  1.1\n"
-    "  L   11   60  50\n"
+    "  L   11  100  90\n"
     " -1\n"
     "# b) Real knots of the panel overlap, if any.\n"
-    "  L    0   40  41\n"
     " -1\n"
     "# c) Complex region knots.\n"
     "  G    0   50   1  1.02\n"
     " -1\n"
     "# d) Knots of other panels (propagator projectile basis).\n"
-    "  L    0   60  61\n"
     " -1\n"
     "\n"
     "# --------------- Atomic states -------------------\n"
@@ -202,6 +200,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--extract-samples                Number of evaluations of the T-matrix between --extract-rho-begin and --extract-rho.                                   \n"
                     "\t--extract-extrapolate            Radially extrapolate the extracted T-matrices instead of simple averaging.                                             \n"
                     "\t--groupsize <number>       (-G)  How many processes factorize single LU (only used for 'superlu_dist').                                                 \n"
+                    "\t--write-intermediate-solutions   Write all intermediate solution (after every iteration of the PCOCG solver).                                           \n"
                     "\t--own-radial-cache         (-w)  Keep two-electron radial integrals not referenced by preconditioner only on disk (slows down only the initialization). \n"
                     "\t--no-radial-cache          (-r)  Keep all two-electron radial integrals only on disk (slows down also the solution process).                            \n"
                     "\t--out-of-core              (-o)  Use hard disk drive to store most of intermediate data and thus to save RAM (considerably slower).                     \n"
@@ -407,6 +406,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // do not precompute large matrices but only apply them on the fly
                 lightweight_full = lightweight_radial_cache = true;
+                return true;
+            },
+        "write-intermediate-solutions", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // write intermediate solutions
+                write_intermediate_solutions = true;
                 return true;
             },
         "kpa-simple-rad", "R", 0, [&](std::vector<std::string> const & optargs) -> bool

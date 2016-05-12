@@ -97,14 +97,15 @@ void Solver::solve ()
     std::cout.imbue(std::locale::classic());
     
     // wrap member functions to lambda-functions for use in the CG solver
-    auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) -> void { this->apply_preconditioner_(r,z); };
-    auto matrix_multiply = [&](BlockArray<Complex> const & p, BlockArray<Complex> & q) -> void { this->matrix_multiply_(p,q); };
-    auto scalar_product = [&](BlockArray<Complex> const & x, BlockArray<Complex> const & y) -> Complex { return this->scalar_product_(x,y); };
-    auto compute_norm = [&](BlockArray<Complex> const & r) -> double { return this->compute_norm_(r); };
-    auto axby_operation = [&](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) -> void { this->axby_operation_(a,x,b,y); };
-    auto new_array = [&](std::size_t N, std::string name) -> BlockArray<Complex> { return this->new_array_(N,name); };
+    auto apply_preconditioner = [&](BlockArray<Complex> const & r, BlockArray<Complex> & z) { this->apply_preconditioner_(r,z); };
+    auto matrix_multiply      = [&](BlockArray<Complex> const & p, BlockArray<Complex> & q) { this->matrix_multiply_(p,q); };
+    auto scalar_product       = [&](BlockArray<Complex> const & x, BlockArray<Complex> const & y) { return this->scalar_product_(x,y); };
+    auto compute_norm         = [&](BlockArray<Complex> const & r) { return this->compute_norm_(r); };
+    auto axby_operation       = [&](Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) { this->axby_operation_(a,x,b,y); };
+    auto new_array            = [&](std::size_t N, std::string name) { return this->new_array_(N,name); };
+    auto process_solution     = [&](unsigned iteration, BlockArray<Complex> const & x) { return this->process_solution_(iteration,x); };
     
-    double E = special::constant::Nan;
+    E_ = special::constant::Nan;
     int iterations_done = 0, computations_done = 0;
     
     for (unsigned ie = 0; ie < inp_.Etot.size(); ie++)
@@ -221,8 +222,8 @@ void Solver::solve ()
         }
         
         // update the preconditioner, if this is the first energy to compute or it changed from previous iteration
-        if (not (E == 0.5 * inp_.Etot[ie]))
-            prec_->update(E = 0.5 * inp_.Etot[ie]);
+        if (not (E_ == 0.5 * inp_.Etot[ie]))
+            prec_->update(E_ = 0.5 * inp_.Etot[ie]);
         
         // for all initial states
         for (auto workitem : work)
@@ -230,15 +231,15 @@ void Solver::solve ()
             // decode initial state
             int instate = std::get<0>(workitem);
             ang_.S() = std::get<1>(workitem);
-            int ni = std::get<0>(inp_.instates[instate]);
-            int li = std::get<1>(inp_.instates[instate]);
-            int mi = std::get<2>(inp_.instates[instate]);
+            ni_ = std::get<0>(inp_.instates[instate]);
+            li_ = std::get<1>(inp_.instates[instate]);
+            mi_ = std::get<2>(inp_.instates[instate]);
             
             // create right hand side
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.cont)
             {
-                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << " ... " << std::flush;
+                std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
                 prec_->rhs(chi, ie, instate);
@@ -246,7 +247,7 @@ void Solver::solve ()
                 std::cout << "ok" << std::endl;
                 
                 // previous solution
-                SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
+                SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie], ang_.states());
                 
                 // apply the boundary condition
                 if (ipanel_ > 0 and reader.check() == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_-1].Nspline())
@@ -387,35 +388,29 @@ void Solver::solve ()
             // load initial guess
             if (not cmd_.cont and ipanel_ == 0 and ie > 0 and cmd_.carry_initial_guess)
             {
-                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie-1], ang_.states());
+                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie-1], ang_.states());
                 prev_sol_reader.load(psi);
             }
             if (not cmd_.cont and ipanel_ == 0 and cmd_.refine_solution)
             {
-                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
+                SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie], ang_.states());
                 prev_sol_reader.load(psi);
             }
             
             // launch the linear system solver
             Timer t;
             unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_atom;
-            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni,li,mi) << " and total spin S = " << ang_.S() << "." << std::endl;
+            std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
-            unsigned iterations = CG_.solve
-            (
-                chi,                    // right-hand side
-                psi,                    // on input, the initial guess, on return, the solution
-                cmd_.itertol,           // requested precision, |A·x - b|² < ε·|b|²
-                0,                      // minimal iteration count
-                max_iter,               // maximal iteration count
-                apply_preconditioner,   // preconditioner callback
-                matrix_multiply,        // matrix multiplication callback
-                true,                   // verbose output
-                compute_norm,           // how to evaluate norm of an array
-                scalar_product,         // how to calculate scalar product of two arrays
-                axby_operation,         // ax + by
-                new_array               // recipe for creation of a new array
-            );
+            CG_.apply_preconditioner = apply_preconditioner;
+            CG_.matrix_multiply      = matrix_multiply;
+            CG_.verbose              = true;
+            CG_.compute_norm         = compute_norm;
+            CG_.scalar_product       = scalar_product;
+            CG_.axby                 = axby_operation;
+            CG_.new_array            = new_array;
+            CG_.process_solution     = process_solution;
+            unsigned iterations = CG_.solve(chi, psi, cmd_.itertol, 0, max_iter);
             
             if (iterations >= max_iter)
                 std::cout << "\tConvergence too slow... The saved solution will be probably non-converged." << std::endl;
@@ -427,7 +422,7 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni, li, mi, inp_.Etot[ie], ang_.states());
+            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, E_, ang_.states());
             if (std::isfinite(compute_norm(psi)))
             {
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -584,6 +579,15 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
     }
     
     return array;
+}
+
+void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & x) const
+{
+    if (cmd_.write_intermediate_solutions)
+    {
+        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, E_, ang_.states(), format("tmp-%d", iteration));
+        writer.save(x);
+    }
 }
 
 void Solver::concatenate_panels_ (cArray & psi, cArray const & psi_panel) const

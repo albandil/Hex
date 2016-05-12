@@ -736,21 +736,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         
         // solve using the CG solver
         ConjugateGradients < Complex, clArray<Complex>, clArrayView<Complex> > CG;
-        n[ill] = CG.solve
-        (
-            rview,                  // rhs
-            zview,                  // solution
-            cmd_.prec_itertol,      // preconditioner tolerance
-            0,                      // min. iterations
-            Nsegsiz,                // max. iteration
-            inner_prec,             // preconditioner
-            inner_mmul,             // matrix multiplication
-            false,                  // verbose output
-            compute_norm,           // norm of an array
-            scalar_product,         // scalar product of two arrays
-            axby,                   // weighted sum of two arrays
-            new_opencl_array        // allocate and connect a new array
-        );
+        CG.verbose              = false;
+        CG.apply_preconditioner = inner_prec;
+        CG.matrix_multiply      = inner_mmul;
+        CG.compute_norm         = compute_norm;
+        CG.scalar_product       = scalar_product;
+        CG.axby                 = axby;
+        CG.new_array            = new_opencl_array;
+        n[ill] = CG.solve(rview, zview, cmd_.prec_itertol, 0, Nsegsiz);
         
         // download data arrays from the GPU
         zview.EnqueueDownload(queue_);

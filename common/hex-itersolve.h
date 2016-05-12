@@ -41,9 +41,17 @@
 #include "hex-special.h"
 
 /**
- * @brief Constrain the solution.
+ * @brief Process the solution.
  * 
- * The constriction is done by a projection of the residual vector "r".
+ * This function is called every time the solution is updated.
+ */
+template <class TArrayView> void default_process_solution (unsigned iteration, const TArrayView r)
+{
+    // no processing by default
+}
+
+/**
+ * @brief Constrain the residual vector.
  */
 template <class TArrayView> void default_constraint (TArrayView r)
 {
@@ -51,57 +59,35 @@ template <class TArrayView> void default_constraint (TArrayView r)
 }
 
 /**
- * @brief Return new complex array.
- * 
- * Create (and return a copy of) a NumberArray<Complex> object. This is used as
- * a default method of creating an array in cg_callbacks. It can be substituted
- * by a different method, if necessary; for example when the created array needs
- * to be registered at GPU first.
+ * @brief Allocate and return a new working array of length 'n'.
  */
-template <class T> NumberArray<T> default_new_array (std::size_t n, std::string name)
+template <class TArray>  [[noreturn]] TArray default_new_array (std::size_t n, std::string name)
 {
-    return NumberArray<T>(n);
+    HexException("CG: You need to specify \"new_array\" routine.");
 }
 
 /**
- * @brief Calculate scalar product of two arrays.
+ * @brief Calculate the scalar product of two arrays.
  */
-template <class T> T default_scalar_product (NumberArray<T> const & x, NumberArray<T> const & y)
+template <class T, class TArrayView> [[noreturn]] T default_scalar_product (const TArrayView x, const TArrayView y)
 {
-    return (x|y);
+    HexException("CG: You need to specify \"scalar_product\" routine.");
 }
 
 /**
- * @brief Compute norm of an array.
- * 
- * This routine is the default way of how to compute a norm of an object. It can be
- * overloaded by some more sophisticated implementation (e.g. BLAS or OpenCL version).
+ * @brief Compute the standard 2-norm of an array.
  */
-template <class T> double default_compute_norm (const ArrayView<T> x)
+template <class TArrayView> [[noreturn]] double default_compute_norm (const TArrayView x)
 {
-    return x.norm();
+    HexException("CG: You need to specify \"compute_norm\" routine.");
 }
 
 /**
  * @brief Do the @f$ \alpha x + \beta y @f$ operation.
- * 
- * Computes a linear combination of two vectors and stores the output in the first
- * vector. This is a default implementation of the method. It can be substituted by
- * another, if necessary; for example one could call specialized routine from BLAS
- * or use a GPU kernel.
  */
-template <class T> void default_axby (T a, ArrayView<T> x, T b, const ArrayView<T> y)
+template <class T, class TArrayView> [[noreturn]] void default_axby (T a, TArrayView x, T b, const TArrayView y)
 {
-    std::size_t N = x.size();
-    assert(N == y.size());
-    
-    // accelerators
-    T       * const restrict px = x.data();
-    T const * const restrict py = y.data();
-    
-    // do the axby per element
-    for (std::size_t i = 0; i < N; i++)
-        px[i] = a * px[i] + b * py[i];
+    HexException("CG: You need to specify \"axby\" routine.");
 }
 
 /**
@@ -184,33 +170,39 @@ class ConjugateGradients
 {
     public:
         
-        ConjugateGradients () : k(1), recovered(false) {}
+        ConjugateGradients ()
+            : verbose(false), 
+              compute_norm(default_compute_norm<TArrayView>),
+              scalar_product(default_scalar_product<T,TArrayView>),
+              axby(default_axby<T,TArrayView>),
+              new_array(default_new_array<TArray>),
+              constrain(default_constraint<TArrayView>),
+              process_solution(default_process_solution<TArrayView>),
+              k(1), recovered(false)
+        {
+            // nothing
+        }
         
-        template
-        <
-            class Preconditioner,
-            class MatrixMultiplication,
-            class ComputeNorm   = decltype(default_compute_norm<T>),
-            class ScalarProduct = decltype(default_scalar_product<T>),
-            class AxbyOperation = decltype(default_axby<T>),
-            class NewArray      = decltype(default_new_array<T>),
-            class Constraint    = decltype(default_constraint<TArrayView>)
-        >
+        // verbosity control
+        bool verbose;
+        
+        // callback functions
+        std::function<void (const TArrayView, TArrayView)> apply_preconditioner;
+        std::function<void (const TArrayView, TArrayView)> matrix_multiply;
+        std::function<double (TArrayView)> compute_norm;
+        std::function<T (TArrayView, TArrayView)> scalar_product;
+        std::function<void (T, const TArrayView, T, TArrayView)> axby;
+        std::function<TArray (std::size_t,std::string)> new_array;
+        std::function<void (TArrayView)> constrain;
+        std::function<void (unsigned, const TArrayView)> process_solution;
+        
         unsigned solve
         (
             const TArrayView b,
             TArrayView x,
             double eps,
             unsigned min_iterations,
-            unsigned max_iterations,
-            Preconditioner apply_preconditioner,
-            MatrixMultiplication matrix_multiply,
-            bool verbose                   = true,
-            ComputeNorm compute_norm       = default_compute_norm<T>,
-            ScalarProduct scalar_product   = default_scalar_product<T>,
-            AxbyOperation axby             = default_axby<T>,
-            NewArray new_array             = default_new_array<T>,
-            Constraint constrain           = default_constraint<TArrayView>
+            unsigned max_iterations
         )
         {
             Timer timer (time_offset);
@@ -231,7 +223,7 @@ class ConjugateGradients
             std::size_t N = b.size();
             
             // residual; initialized to starting residual using the initial guess
-            TArray r (std::move(new_array(N,"cg-r")));
+            TArray r (std::move(new_array(N, "cg-r")));
             if (not recovered)
             {
                 matrix_multiply(x, r); // r = A x
@@ -258,8 +250,8 @@ class ConjugateGradients
             }
             
             // some auxiliary arrays (search directions etc.)
-            TArray p (std::move(new_array(N,"cg-p")));
-            TArray z (std::move(new_array(N,"cg-z")));
+            TArray p (std::move(new_array(N, "cg-p")));
+            TArray z (std::move(new_array(N, "cg-z")));
             
             // Iterate
             
@@ -315,6 +307,7 @@ class ConjugateGradients
                 // update the solution and the residual
                 axby(1., x, alpha, p); // x = x + α p
                 axby(1., r, -alpha, z); // r = r - α z
+                process_solution(k, x);
                 constrain(r);
                 
                 // compute and check norm

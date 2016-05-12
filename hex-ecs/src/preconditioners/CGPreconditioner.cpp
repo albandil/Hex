@@ -49,37 +49,21 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     int Nspline_atom = rad_.bspline_atom().Nspline();
     int Nspline_proj = rad_.bspline_proj().Nspline();
     
-    // wrappers around the callbacks
-    auto inner_mmul = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
-    auto inner_prec = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
-    auto compute_norm = [&](const cArrayView a) { return this->CG_compute_norm(a); };
-    auto scalar_product = [&](const cArrayView a, const cArrayView b) { return this->CG_scalar_product(a, b); };
-    auto axby_operation = [&](Complex a, cArrayView x, Complex b, const cArrayView y) { this->CG_axby_operation(a, x, b, y); };
-    auto new_array = [&](std::size_t n, std::string name) { return cArray(n); };
-    auto constrain = [&](cArrayView r) { this->CG_constrain(r); };
-    
     // prepare the block-preconditioner for run
     this->CG_init(ill);
     
     // solve using the CG solver
     ConjugateGradients < Complex, cArray, cArrayView > CG;
     CG.reset();
-    int n = CG.solve
-    (
-        r,                      // rhs
-        z,                      // solution
-        cmd_.prec_itertol,      // preconditioner tolerance
-        0,                      // min. iterations
-        Nspline_atom * Nspline_proj, // max. iteration
-        inner_prec,             // preconditioner
-        inner_mmul,             // matrix multiplication
-        false,                  // verbose output
-        compute_norm,           // norm
-        scalar_product,         // scalar product
-        axby_operation,         // a*x + b*y operation
-        new_array,              // alocate new array
-        constrain               // constrain the residual
-    );
+    CG.verbose              = false;
+    CG.apply_preconditioner = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
+    CG.matrix_multiply      = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
+    CG.scalar_product       = [&](const cArrayView a, const cArrayView b) { return this->CG_scalar_product(a, b); };
+    CG.compute_norm         = [&](const cArrayView a) { return this->CG_compute_norm(a); };
+    CG.axby                 = [&](Complex a, cArrayView x, Complex b, const cArrayView y) { this->CG_axby_operation(a, x, b, y); };
+    CG.new_array            = [&](std::size_t n, std::string name) { return cArray(n); };
+    CG.constrain            = [&](cArrayView r) { this->CG_constrain(r); };
+    int n = CG.solve(r, z, cmd_.prec_itertol, 0, Nspline_atom * Nspline_proj);
     
     // release block-preconditioner block-specific data
     this->CG_exit(ill);
