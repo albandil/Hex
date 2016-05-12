@@ -65,7 +65,7 @@ class CGPreconditioner : public NoPreconditioner
         
         // reuse parent definitions
         virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (double E) { return NoPreconditioner::update(E); }
+        virtual void update (Real E) { return NoPreconditioner::update(E); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
         
@@ -82,7 +82,7 @@ class CGPreconditioner : public NoPreconditioner
         virtual void CG_exit (int iblock) const;
         
         // inner CG callback routines
-        virtual double CG_compute_norm (const cArrayView a) const;
+        virtual Real CG_compute_norm (const cArrayView a) const;
         virtual Complex CG_scalar_product (const cArrayView a, const cArrayView b) const;
         virtual void CG_axby_operation (Complex a, cArrayView x, Complex b, const cArrayView y) const;
         virtual void CG_constrain (cArrayView r) const;

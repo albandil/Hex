@@ -61,7 +61,7 @@ class AngularBasis
         int maxlambda () const { return maxlambda_; }
         
         /// Angular integrals.
-        double f (int ill, int illp, int lambda) const
+        Real f (int ill, int illp, int lambda) const
         {
             return f_[(lambda * states_.size() + ill) * states_.size() + illp];
         }

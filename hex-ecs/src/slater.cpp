@@ -177,10 +177,10 @@ Complex RadialIntegrals::computeR
     int Nreknot_proj_full = bspline_proj_full_.Nreknot();
     
     // leading and trailing knots of the B-splines
-    double ta1 = bspline_atom_.t(a).real(), ta2 = bspline_atom_.t(a + order + 1).real();
-    double tb1 = bspline_proj_.t(b).real(), tb2 = bspline_proj_.t(b + order + 1).real();
-    double tc1 = bspline_atom_.t(c).real(), tc2 = bspline_atom_.t(c + order + 1).real();
-    double td1 = bspline_proj_.t(d).real(), td2 = bspline_proj_.t(d + order + 1).real();
+    Real ta1 = bspline_atom_.t(a).real(), ta2 = bspline_atom_.t(a + order + 1).real();
+    Real tb1 = bspline_proj_.t(b).real(), tb2 = bspline_proj_.t(b + order + 1).real();
+    Real tc1 = bspline_atom_.t(c).real(), tc2 = bspline_atom_.t(c + order + 1).real();
+    Real td1 = bspline_proj_.t(d).real(), td2 = bspline_proj_.t(d + order + 1).real();
     
     // dismiss if there are no pair overlaps
     if (ta2 <= tc1 or tc2 <= ta1 or tb2 <= td1 or td2 <= tb1)
@@ -195,18 +195,18 @@ Complex RadialIntegrals::computeR
     // the overlap of Bb,Bd precedes the overlap of Ba,Bc
     if (std::min(tb2,td2) <= std::max(ta1,tc1))
     {
-        double t_ac = std::min(ta2,tc2);
-        double t_bd = std::min(tb2,td2);
-        double scale = gsl_sf_pow_int(t_bd / t_ac, lambda) / t_ac;
+        Real t_ac = std::min(ta2,tc2);
+        Real t_bd = std::min(tb2,td2);
+        Real scale = gsl_sf_pow_int(t_bd / t_ac, lambda) / t_ac;
         return scale * Mtr_mLm1_atom_[lambda](a,c) * Mtr_L_proj_[lambda](b,d);
     }
     
     // the overlap of Ba,Bc precedes the overlap of Bb,Bd
     if (std::min(ta2,tc2) <= std::max(tb1,td1))
     {
-        double t_ac = std::min(ta2,tc2);
-        double t_bd = std::min(tb2,td2);
-        double scale = gsl_sf_pow_int(t_ac / t_bd, lambda) / t_bd;
+        Real t_ac = std::min(ta2,tc2);
+        Real t_bd = std::min(tb2,td2);
+        Real scale = gsl_sf_pow_int(t_ac / t_bd, lambda) / t_bd;
         return scale * Mtr_L_atom_[lambda](a,c) * Mtr_mLm1_proj_[lambda](b,d);
     }
     
@@ -267,9 +267,9 @@ Complex RadialIntegrals::computeR
     for (int iy = std::max(tb, ix + 1); iy < std::min(tb + order + 1, Nreknot_proj_full - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_atom_.t(ix+1).real();
-        double ty = bspline_proj_full_.t(iy+1).real();
-        double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
+        Real tx = bspline_atom_.t(ix+1).real();
+        Real ty = bspline_proj_full_.t(iy+1).real();
+        Real scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
         Rtr_Labcd_offdiag += Mitr_L_ac[ix-ta] * Mitr_mLm1_bd[iy-tb] * scale;
@@ -280,9 +280,9 @@ Complex RadialIntegrals::computeR
     for (int iy = std::max(ta, ix + 1); iy < std::min(ta + order + 1, Nreknot_atom - 1); iy++)
     {
         // calculate scale factor
-        double tx = bspline_proj_full_.t(ix+1).real();
-        double ty = bspline_atom_.t(iy+1).real();
-        double scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
+        Real tx = bspline_proj_full_.t(ix+1).real();
+        Real ty = bspline_atom_.t(iy+1).real();
+        Real scale = gsl_sf_pow_int(tx / ty, lambda) / ty;
         
         // calculate contribution to the integral
         Rtr_Labcd_offdiag += Mitr_L_bd[ix-tb] * Mitr_mLm1_ac[iy-ta] * scale;

@@ -43,8 +43,14 @@
 #define SIMD_VECTOR_BITS 256u
 #define SIMD_VECTOR_BYTES (SIMD_VECTOR_BITS / 8u)
 
-// number of components of vector of doubles that fits into SIMD vector type
+// number of components of vector that fits into SIMD vector type
+#define simd_single_vec_size (SIMD_VECTOR_BYTES / sizeof(float))
 #define simd_double_vec_size (SIMD_VECTOR_BYTES / sizeof(double))
+#ifdef SINGLE
+    #define simd_real_vec_size simd_single_vec_size
+#else
+    #define simd_real_vec_size simd_double_vec_size
+#endif
 
 // aligned pointers
 #if (defined(__GNUC__) && !defined(__clang__))

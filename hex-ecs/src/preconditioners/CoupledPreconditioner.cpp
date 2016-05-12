@@ -124,7 +124,7 @@ void CoupledPreconditioner::setup ()
             // add full two-electron contribution
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
             {
-                double f = ang_.f(ill, illp, lambda);
+                Real f = ang_.f(ill, illp, lambda);
                 if (f != 0)
                     elem -= f * rad_.computeR(lambda,i,j,k,l);
             }
@@ -134,7 +134,7 @@ void CoupledPreconditioner::setup ()
             // add limited two-electron contribution
             for (int lambda = 0; lambda <= std::min(cmd_.coupling_limit, rad_.maxlambda()); lambda++)
             {
-                double f = ang_.f(ill, illp, lambda);
+                Real f = ang_.f(ill, illp, lambda);
                 if (f != 0)
                     elem -= f * rad_.computeR(lambda,i,j,k,l);
             }
@@ -184,10 +184,10 @@ void CoupledPreconditioner::setup ()
     settings.rhs = reinterpret_cast<mumps_double_complex*>(X.data());
 }
 
-void CoupledPreconditioner::update (double E)
+void CoupledPreconditioner::update (Real E)
 {
     // store energy change
-    double dE = E - E_;
+    Real dE = E - E_;
     
     // update parent
     NoPreconditioner::update(E);

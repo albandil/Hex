@@ -35,17 +35,24 @@
 // ---------------------------------------------------------------------------------- //
 
 // some used Blas prototypes (Fortran convention!)
+extern "C" void sgemv_ (char*, int*, int*, float*, float*, int*, float*, int*, float*, float*, int*);
 extern "C" void dgemv_ (char*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void zgemv_ (char*, int*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, Complex*, int*);
+extern "C" void cgemv_ (char*, int*, int*, std::complex<float>*, std::complex<float>*, int*, std::complex<float>*, int*, std::complex<float>*, std::complex<float>*, int*);
+extern "C" void zgemv_ (char*, int*, int*, std::complex<double>*, std::complex<double>*, int*, std::complex<double>*, int*, std::complex<double>*, std::complex<double>*, int*);
+extern "C" void sgemm_ (char*, char*, int*, int*, int*, float*, float*, int*, float*, int*, float*, float*, int*);
 extern "C" void dgemm_ (char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void zgemm_ (char*, char*, int*, int*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, Complex*, int*);
+extern "C" void cgemm_ (char*, char*, int*, int*, int*, std::complex<float>*, std::complex<float>*, int*, std::complex<float>*, int*, std::complex<float>*, std::complex<float>*, int*);
+extern "C" void zgemm_ (char*, char*, int*, int*, int*, std::complex<double>*, std::complex<double>*, int*, std::complex<double>*, int*, std::complex<double>*, std::complex<double>*, int*);
 
 // ---------------------------------------------------------------------------------- //
 
 // some used Lapack prototypes (Fortran convention!)
-extern "C" void zgetrf_ (int*, int*, Complex*, int*, int*, int*);
-extern "C" void zgetri_ (int*, Complex*, int*, int*, Complex*, int*, int*);
-extern "C" void zgeev_ (char*, char*, int*, Complex*, int*, Complex*, Complex*, int*, Complex*, int*, Complex*, int*, double*, int*);
+extern "C" void cgetrf_ (int*, int*, std::complex<float>*, int*, int*, int*);
+extern "C" void zgetrf_ (int*, int*, std::complex<double>*, int*, int*, int*);
+extern "C" void cgetri_ (int*, std::complex<float>*, int*, int*, std::complex<float>*, int*, int*);
+extern "C" void zgetri_ (int*, std::complex<double>*, int*, int*, std::complex<double>*, int*, int*);
+extern "C" void cgeev_ (char*, char*, int*, std::complex<float>*, int*, std::complex<float>*, std::complex<float>*, int*, std::complex<float>*, int*, std::complex<float>*, int*, float*, int*);
+extern "C" void zgeev_ (char*, char*, int*, std::complex<double>*, int*, std::complex<double>*, std::complex<double>*, int*, std::complex<double>*, int*, std::complex<double>*, int*, double*, int*);
 
 // ---------------------------------------------------------------------------------- //
 
@@ -72,7 +79,11 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
     Complex * pC = C.data().data();
     
     // call the dedicated BLAS routine
+#ifdef SINGLE
+    cgemm_(&layout_A, &layout_B, &m, &n, &k, &a, pA, &ld_A, pB, &ld_B, &b, pC, &ld_C);
+#else
     zgemm_(&layout_A, &layout_B, &m, &n, &k, &a, pA, &ld_A, pB, &ld_B, &b, pC, &ld_C);
+#endif
 }
 
 void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<Complex> const & B, Complex b, RowMatrixView<Complex> C)
@@ -101,10 +112,14 @@ void blas::gemm (Complex a, DenseMatrixView<Complex> const & A, DenseMatrixView<
     Complex * pC = C.data().data();
     
     // call the dedicated BLAS routine
+#ifdef SINGLE
+    cgemm_(&layout_B, &layout_A, &m, &n, &k, &a, pB, &ld_B, pA, &ld_A, &b, pC, &ld_C);
+#else
     zgemm_(&layout_B, &layout_A, &m, &n, &k, &a, pB, &ld_B, pA, &ld_A, &b, pC, &ld_C);
+#endif
 }
 
-void blas::gemv (double a, DenseMatrixView<double> const & A, const rArrayView v, double b, rArrayView w)
+void blas::gemv (Real a, DenseMatrixView<Real> const & A, const rArrayView v, Real b, rArrayView w)
 {
 #ifndef NDEBUG
     // verify compatibility of dimensions
@@ -117,15 +132,19 @@ void blas::gemv (double a, DenseMatrixView<double> const & A, const rArrayView v
     Int ld_A = A.ld();
     Int m = A.rows();
     Int n = A.cols();
-    double * pA = const_cast<double*>(A.data().data());
+    Real * pA = const_cast<Real*>(A.data().data());
     
     // get array data
     Int incv = 1, incw = 1;
-    double * pv = const_cast<double*>(v.data());
-    double * pw = w.data();
+    Real * pv = const_cast<Real*>(v.data());
+    Real * pw = w.data();
     
     // call the dedicated BLAS routine
+#ifdef SINGLE
+    sgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
+#else
     dgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
+#endif
 }
 
 void blas::gemv (Complex a, DenseMatrixView<Complex> const & A, const cArrayView v, Complex b, cArrayView w)
@@ -149,7 +168,11 @@ void blas::gemv (Complex a, DenseMatrixView<Complex> const & A, const cArrayView
     Complex * pw = w.data();
     
     // call the dedicated BLAS routine
+#ifdef SINGLE
+    cgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
+#else
     zgemv_(&layout_A, &m, &n, &a, pA, &ld_A, pv, &incv, &b, pw, &incw);
+#endif
 }
 
 void blas::xpby (cArrayView x, Complex b, const cArrayView y)

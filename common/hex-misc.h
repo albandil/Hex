@@ -56,6 +56,8 @@
     #include <unistd.h>
 #endif
 
+#include "hex-numbers.h"
+
 /**
  * @brief printf-like formatting.
  * 
@@ -373,7 +375,7 @@ template <> inline int string_to (std::string str)
  * The library routine "strtod" is used. If the conversion fails, the
  * function throws an exception.
  */
-template <> inline double string_to (std::string str)
+template <> inline Real string_to (std::string str)
 {
     // convert to float
     char* tail; double val = std::strtod(str.c_str(), &tail);

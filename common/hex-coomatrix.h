@@ -158,7 +158,7 @@ public:
             {
                 val = f(row,col);
                 
-                if (val != 0.)
+                if (val != 0.0_r)
                 {
                     i_.push_back(row);
                     j_.push_back(col);
@@ -198,7 +198,7 @@ public:
             {
                 val = f(row,col);
                 
-                if (val != 0.)
+                if (val != 0.0_r)
                 {
                     i_.push_back(row);
                     j_.push_back(col);

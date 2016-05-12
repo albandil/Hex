@@ -172,7 +172,11 @@ void LUft_UMFPACK<LU_int_t,Complex>::drop ()
 //
 
 #ifdef WITH_SUPERLU
-#include <slu_zdefs.h>
+#ifdef SINGLE
+    #include <slu_cdefs.h>
+#else
+    #include <slu_zdefs.h>
+#endif
 
 template<>
 void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
@@ -189,7 +193,11 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         
         SuperMatrix A;
         A.Stype = SLU_NR;           // storage type: compressed sparse, row-major
+#ifdef SINGLE
+        A.Dtype = SLU_C;            // data type: single complex
+#else
         A.Dtype = SLU_Z;            // data type: double complex
+#endif
         A.Mtype = SLU_GE;           // mathematical type: general
         A.nrow  = matrix_->rows();  // number of rows
         A.ncol  = matrix_->cols();  // number of columns
@@ -205,7 +213,11 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         
         SuperMatrix B;
         B.Stype = SLU_DN;               // storage type: Fortran dense matrix
-        B.Dtype = SLU_Z;                // data type: double
+#ifdef SINGLE
+        B.Dtype = SLU_C;                // data type: single complex
+#else
+        B.Dtype = SLU_Z;                // data type: double complex
+#endif
         B.Mtype = SLU_GE;               // mathematical type: general
         B.nrow = matrix_->cols();       // number of rows (= number of equations)
         B.ncol = eqs;                   // number of columns (= number of right hand sides)
@@ -221,7 +233,11 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         
         SuperMatrix X;
         X.Stype = SLU_DN;               // storage type: Fortran dense matrix
-        X.Dtype = SLU_Z;                // data type: double
+#ifdef SINGLE
+        X.Dtype = SLU_C;                // data type: single complex
+#else
+        X.Dtype = SLU_Z;                // data type: double complex
+#endif
         X.Mtype = SLU_GE;               // mathematical type: general
         X.nrow = matrix_->cols();       // number of rows (= number of equations)
         X.ncol = eqs;                   // number of columns (= number of right hand sides)
@@ -255,11 +271,15 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         rArray ferr(eqs), berr(eqs);
         
         // reciprocal condition number, reciprocal pivot growth factor
-        double rcond, rpg;
+        Real rcond, rpg;
         
         // back-substitution
         int info;
+#ifdef SINGLE
+        cgssvx
+#else
         zgssvx
+#endif
         (
             &options,                       // calculation options
             &A,                             // matrix data structure
@@ -267,8 +287,8 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             const_cast<int*>(&perm_r_[0]),  // row permutation
             const_cast<int*>(&etree_[0]),   // elimination tree
             const_cast<char*>(&equed_),     // equilibration done
-            const_cast<double*>(&R_[0]),    // row scale factors
-            const_cast<double*>(&C_[0]),    // column scale factors
+            const_cast<Real*>(&R_[0]),      // row scale factors
+            const_cast<Real*>(&C_[0]),      // column scale factors
             const_cast<SuperMatrix*>(&L_),  // L-factor
             const_cast<SuperMatrix*>(&U_),  // U-factor
             nullptr,                        // workspace (not used)
@@ -279,7 +299,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             &rcond,                         // reciprocal condition number
             &ferr[0],                       // forward error
             &berr[0],                       // backward error
-            const_cast<GlobalLU_t*>(&Glu_), // reusable information
+//             const_cast<GlobalLU_t*>(&Glu_), // reusable information
             &mem_usage,                     // memory usage
             &stat,                          // diagnostic infomation
             &info                           // result status
@@ -287,7 +307,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     
     // check status
     if (info != 0)
-        HexException("SuperLU/zgssvx failed with status %d.", info);
+        HexException("SuperLU/?gssvx failed with status %d.", info);
 }
 
 #endif // WITH_SUPERLU
@@ -372,9 +392,9 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         );
         
         if (info > A.ncol)
-            HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
+            HexException("SuperLU/?gssvx: Memory allocation failure after %d bytes.", info);
         if (info > 0)
-            HexException("SuperLU/zgssvx: Singular factor.");
+            HexException("SuperLU/?gssvx: Singular factor.");
     
     //
     // Clean up.

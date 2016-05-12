@@ -97,7 +97,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         
         // normalize
         for (int ill = 0; ill < (int)ang_.states().size(); ill++)
-            this->CG_mmul(ill, (2. - cmd_.ssor) / cmd_.ssor * x[ill], y[ill]);
+            this->CG_mmul(ill, (2.0_r - cmd_.ssor) / cmd_.ssor * x[ill], y[ill]);
         
         // backward SOR
         for (int ill = (int)ang_.states().size() - 1; ill >= 0; ill--)
@@ -186,7 +186,7 @@ void CGPreconditioner::finish ()
     NoPreconditioner::finish();
 }
 
-double CGPreconditioner::CG_compute_norm (const cArrayView a) const
+Real CGPreconditioner::CG_compute_norm (const cArrayView a) const
 {
     // compute norm (part will be computed by every process in group, result will be synchronized)
         
@@ -194,7 +194,7 @@ double CGPreconditioner::CG_compute_norm (const cArrayView a) const
     std::size_t N = (a.size() + par_.groupsize() - 1) / par_.groupsize();
     
     // calculate part of the norm
-    double norm2 = 0;
+    Real norm2 = 0;
     for (std::size_t i = par_.igroupproc() * N; i < (par_.igroupproc() + 1) * N and i < a.size(); i++)
         norm2 += sqrabs(a[i]);
     

@@ -134,8 +134,8 @@ public:
     Tout clenshaw (Tin const & x, int const & m) const
     {
         Tout d_j = 0, d_jp1 = 0, d_jp2 = 0;
-        const double one_x = scale(x);
-        const double two_x = 2 * one_x; // due to linearity of 'scale'
+        const Real one_x = scale(x);
+        const Real two_x = 2 * one_x; // due to linearity of 'scale'
         
         for (int j = m - 1; j >= 1; j--)
         {
@@ -145,7 +145,7 @@ public:
             d_jp1 = d_j;
         }
         
-        d_j = one_x * d_jp1 - d_jp2 + 0.5 * C[0];
+        d_j = one_x * d_jp1 - d_jp2 + 0.5_r * C[0];
         
         return d_j;
     }
@@ -165,10 +165,10 @@ public:
      * requested 'eps'. Nevertheless, the more polynomials get involved, the
      * less is this fact problematic.
      */
-    int tail (double eps) const
+    int tail (Real eps) const
     {
-        double sum = std::abs(0.5 * C[0]);
-        double abs_Ck;
+        Real sum = std::abs(0.5_r * C[0]);
+        Real abs_Ck;
         
         for (int k = 1; k < N; k++)
         {
@@ -376,8 +376,6 @@ private:
 
 /**
  * @brief Chebyshev approximation of a given real function.
- * 
- * Uses the function "fftw_plan_r2r_1d" for real data.
  */
 template<> template <class Functor> 
 void Chebyshev<double,double>::generate (Functor const & f, int n, double a, double b)
@@ -388,7 +386,7 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     C.resize(N);
     
     // input array
-    rArray fvals(N);
+    std::vector<double> fvals (N);
     
     // evaluate nodes and function
     double pi_over_N = special::constant::pi / N;
@@ -402,7 +400,8 @@ void Chebyshev<double,double>::generate (Functor const & f, int n, double a, dou
     gsl_fft_real_radix2_transform(fvals.data(), 1, N);
     
     // normalize
-    C *= 1. / N;
+    for (int i = 0; i < N; i++)
+        C[i] = fvals[i] / N;
 }
 
 /**
@@ -434,7 +433,7 @@ void Chebyshev<double,Complex>::generate (Functor const & f, int n, double a, do
     gsl_fft_complex_radix2_forward(reinterpret_cast<double*>(fvals.data()), 1, 4 * N);
     
     // copy normalized coefficients
-    C = fvals / double(N);
+    C = fvals / Real(N);
 }
 
 #endif /* HEX_CHEBYSHEV */

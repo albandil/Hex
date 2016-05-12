@@ -63,7 +63,7 @@ class Bspline
          * @param th     ECS angle in radians.
          * @param cknots To-be-complex knot array (including R₀ and Rmax).
          */
-        Bspline (int order, rArrayView const & rknots, double th, rArrayView const & cknots);
+        Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots);
         
         /**
          * @brief Evaluate B-spline.
@@ -130,7 +130,7 @@ class Bspline
          * 
          * @param r Real coordinate.
          */
-        inline Complex rotate (double r) const
+        inline Complex rotate (Real r) const
         {
             return (r <= R0_) ? r : R0_ + (r - R0_) * rotation_;
         };
@@ -140,7 +140,7 @@ class Bspline
          * 
          * @param z Complex coordinate.
          */
-        inline double unrotate (Complex z) const
+        inline Real unrotate (Complex z) const
         {
             return (z.imag() == 0.) ? z.real() : R0_ + ((z - R0_) / rotation_).real();
         };
@@ -188,7 +188,7 @@ class Bspline
          * @endcode
          * though the results are the same.
          */
-        Complex eval (const cArrayView coeff, double x) const;
+        Complex eval (const cArrayView coeff, Real x) const;
         
         /**
          * @brief Evaluate 2D B-spline expansion.
@@ -200,7 +200,7 @@ class Bspline
          * @endcode
          * though the results are the same.
          */
-        Complex eval (const cArrayView coeff, double x, double y) const;
+        Complex eval (const cArrayView coeff, Real x, Real y) const;
         
         // getters
         
@@ -223,13 +223,13 @@ class Bspline
         inline int order () const { return order_; }
         
         /// End of real grid.
-        inline double R0 () const { return R0_; };
+        inline Real R0 () const { return R0_; };
         
         /// End of complex grid (real, unrotated).
-        inline double Rmax () const { return Rmax_; };
+        inline Real Rmax () const { return Rmax_; };
         
         /// ECS rotation angle.
-        inline double ECStheta () const { return theta_; }
+        inline Real ECStheta () const { return theta_; }
         
         /// real knots
         inline rArray const & rknots () const { return rknots_; }
@@ -254,16 +254,16 @@ class Bspline
         Complex * restrict t_;
         
         /// rotation angle (rad)
-        double theta_;
+        Real theta_;
         
         /// ECS rotation factor
         Complex rotation_;
         
         /// end of real grid
-        double R0_;
+        Real R0_;
         
         /// end of complex grid
-        double Rmax_;
+        Real Rmax_;
         
         /// knot count
         int Nknot_;

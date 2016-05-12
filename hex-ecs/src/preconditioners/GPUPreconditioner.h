@@ -104,7 +104,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         
         // reuse parent definitions
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { KPACGPreconditioner::rhs(chi,ienergy,instate); }
-        virtual void update (double E) { KPACGPreconditioner::update(E); }
+        virtual void update (Real E) { KPACGPreconditioner::update(E); }
         
         // declare own definitions
         virtual void setup ();
@@ -142,7 +142,7 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         
         // device data connections
         mutable clArray<Complex> tmp_, tmA_;
-        mutable clArray<double> nrm_;
+        mutable clArray<Real> nrm_;
         clArrayView<Complex> t_atom_, t_proj_;
         clArrayView<Complex> S_atom_p_, D_atom_p_, Mm1_tr_atom_p_, Mm2_atom_p_;
         clArrayView<Complex> S_proj_p_, D_proj_p_, Mm1_tr_proj_p_, Mm2_proj_p_;

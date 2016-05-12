@@ -76,6 +76,18 @@ extern "C" void dstev_
     double * work,
     int * info
 );
+extern "C" void sstev_
+(
+    char * jobz,
+    int * n,
+    float * d,
+    float * e,
+    double * z,
+    int * ldz,
+    float * work,
+    int * info
+);
+
 
 int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, double epsrel)
 {
@@ -110,7 +122,11 @@ int special::coulomb_zeros (double eta, int L, int nzeros, double * zeros, doubl
             e[i-1] = std::sqrt((L+i+1)*(L+i+1)+eta*eta) / ((L+i+1)*std::sqrt((2*(L+i)+1)*(2*(L+i)+3)));
         
         // calculate eigenvalues
+#ifdef SINGLE
+        sstev_(&jobz, &n, &d[0], &e[0], nullptr, &ldz, nullptr, &info);
+#else
         dstev_(&jobz, &n, &d[0], &e[0], nullptr, &ldz, nullptr, &info);
+#endif
         
         // check status information
         if (info < 0)
@@ -183,12 +199,12 @@ Complex special::cfgamma (Complex s, Complex z)
 cArray special::ric_jv (int lmax, Complex z)
 {
     // results
-    cArray eval(lmax+1);
+    cArray eval (lmax+1);
     
     // use library routine for pure real arguments
     if (z.imag() == 0.)
     {
-        rArray ev(lmax+1);
+        std::vector<double> ev (lmax+1);
         int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
         
         // check that all evaluations are finite
@@ -230,7 +246,7 @@ cArray special::ric_jv (int lmax, Complex z)
     }
     
     // shorthand
-    Complex inv_z = 1. / z;
+    Complex inv_z = 1.0_r / z;
     
     // evaluate all angular momenta up to lmax
     for (int l = 0; l <= lmax; l++)
@@ -283,23 +299,23 @@ Complex special::dric_j (int l, Complex z)
 
 // Slater-type-orbital data for hydrogen
 
-static double a10[] = {2.};
-static double a20[] = {.7071067811865475,-.3535533905932737};
-static double a21[] = {.2041241452319315};
-static double a30[] = {.3849001794597506,-.25660011963983370,.02851112440442597};
-static double a31[] = {.12096245643373720,-.02016040940562287};
-static double a32[] = {.00901600917703977};
-static double a40[] = {.25,-.1875,.03125,-.001302083333333333};
-static double a41[] = {.08068715304598784,-.02017178826149696,.001008589413074848};
-static double a42[] = {.006987712429686843,-5.823093691405702E-4};
-static double a43[] = {2.2009225383555117E-4};
-static double a50[] = {.1788854381999831,-.1431083505599865,.02862167011199729,-.001908111340799819,3.8162226815996353E-5};
-static double a51[] = {.05842373946721772,-.01752712184016532,.001402169747213225,-3.115932771584945E-5};
-static double a52[] = {.005354624169818084,-7.139498893090778E-4,2.0398568265973652E-5};
-static double a53[] = {2.039856826597365E-4,-1.0199284132986826E-5};
-static double a54[] = {3.3997613776622754E-6};
+static Real a10[] = {2.};
+static Real a20[] = {.7071067811865475,-.3535533905932737};
+static Real a21[] = {.2041241452319315};
+static Real a30[] = {.3849001794597506,-.25660011963983370,.02851112440442597};
+static Real a31[] = {.12096245643373720,-.02016040940562287};
+static Real a32[] = {.00901600917703977};
+static Real a40[] = {.25,-.1875,.03125,-.001302083333333333};
+static Real a41[] = {.08068715304598784,-.02017178826149696,.001008589413074848};
+static Real a42[] = {.006987712429686843,-5.823093691405702E-4};
+static Real a43[] = {2.2009225383555117E-4};
+static Real a50[] = {.1788854381999831,-.1431083505599865,.02862167011199729,-.001908111340799819,3.8162226815996353E-5};
+static Real a51[] = {.05842373946721772,-.01752712184016532,.001402169747213225,-3.115932771584945E-5};
+static Real a52[] = {.005354624169818084,-7.139498893090778E-4,2.0398568265973652E-5};
+static Real a53[] = {2.039856826597365E-4,-1.0199284132986826E-5};
+static Real a54[] = {3.3997613776622754E-6};
 
-static double* ak[6][5] = {
+static Real* ak[6][5] = {
     {   0,  0,  0,   0,   0   },  // n = 0 gives only zeros
     { a10,  0,  0,   0,   0   },
     { a20, a21, 0,   0,   0   },
@@ -316,7 +332,7 @@ Complex hydro_P_table (unsigned n, unsigned l, Complex z)
     int terms = n - l;
     
     // get the coefficients
-    const double* const a = ak[n][l];
+    const Real* const a = ak[n][l];
     
     // compute the sum
     Complex sum = 0;
@@ -324,7 +340,7 @@ Complex hydro_P_table (unsigned n, unsigned l, Complex z)
         sum = a[i] + z * sum;
     
     // return the result
-    return sum * std::pow(z, l + 1) * std::exp(-z/double(n));
+    return sum * special::pow_int(z, l + 1) * std::exp(-z/Real(n));
 }
 
 Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
@@ -333,7 +349,7 @@ Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
     int terms = n - l;
     
     // get the coefficients
-    const double* a = ak[n][l];
+    const Real* a = ak[n][l];
     
     // compute the sum
     Complex sum = 0;
@@ -341,7 +357,7 @@ Complex dhydro_P_table (unsigned n, unsigned l, Complex z)
         sum = (l+i+1)*a[i] + z * sum;
     
     // return the result
-    return sum * std::pow(z, l) * std::exp(-z/double(n)) - hydro_P_table(n,l,z) / double(n);
+    return sum * special::pow_int(z, l) * std::exp(-z/Real(n)) - hydro_P_table(n,l,z) / Real(n);
 }
 
 /*
@@ -354,13 +370,13 @@ Complex associated_laguerre_poly (int k, int s, Complex z)
     Complex val = 0;
     
     // begin with highest order
-    val += std::pow(-1,k) / (fac(k) * fac(k-s));
+    val += special::pow_int(-1,k) / (fac(k) * fac(k-s));
     
     // continue with other orders
     for (int j = k - 1; j >= s; j--)
-        val = z * val + std::pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s));
+        val = z * val + special::pow_int(-1,j) / Real(fac(k-j) * fac(j) * fac(j-s));
     
-    return val * std::pow(fac(k),2);
+    return val * special::pow_int(Real(fac(k)),2);
 }
 
 /*
@@ -373,13 +389,13 @@ Complex der_associated_laguerre_poly (int k, int s, Complex z)
     Complex val = 0;
     
     // begin with highest order
-    val += std::pow(-1,k) / (fac(k) * fac(k-s-1));
+    val += special::pow_int(-1,k) / (fac(k) * fac(k-s-1));
     
     // continue with other orders
     for (int j = k - 1; j >= s + 1; j--)
-        val = z * val + std::pow(-1,j) / (fac(k-j) * fac(j) * fac(j-s-1));
+        val = z * val + special::pow_int(-1,j) / Real(fac(k-j) * fac(j) * fac(j-s-1));
     
-    return val * std::pow(fac(k),2);
+    return val * special::pow_int(Real(fac(k)),2);
 }
 
 /*
@@ -402,9 +418,9 @@ Complex special::hydro_P (unsigned n, unsigned l, Complex z)
         return hydro_P_table(n, l, z);
     
     // this is general
-    double Norm = hydrogen_wfn_normalization(n, l);
+    Real Norm = hydrogen_wfn_normalization(n, l);
     Complex Lag = associated_laguerre_poly(n + l, 2 * l + 1, z);
-    return z * Norm * std::pow(2.*z/double(n), l) * Lag * std::exp(-z/double(n));
+    return z * Norm * special::pow_int(2.0_r*z/Real(n), l) * Lag * std::exp(-z/Real(n));
 }
 
 /*
@@ -421,19 +437,19 @@ Complex special::dhydro_P (unsigned n, unsigned l, Complex z)
         return dhydro_P_table(n, l, z);
     
     // this is general
-    double Norm = hydrogen_wfn_normalization(n, l);
+    Real Norm = hydrogen_wfn_normalization(n, l);
     Complex Lag = associated_laguerre_poly(n + l, 2 * l + 1, z);
     Complex DLag= der_associated_laguerre_poly(n + 1, 2 * l + 1, z);
-    return Norm * std::pow(2.*z/double(n), l) * ((l + 1. - z/double(n)) * Lag + z * DLag) * std::exp(-z/double(n));
+    return Norm * special::pow_int(2.0_r*z/Real(n), l) * ((l + 1.0_r - z/Real(n)) * Lag + z * DLag) * std::exp(-z/Real(n));
 }
 
 
-Complex special::sphY (int l, int m, double theta, double phi)
+Complex special::sphY (int l, int m, Real theta, Real phi)
 {
     if (l < std::abs(m))
         return 0.;
     
-    return gsl_sf_legendre_sphPlm(l,std::abs(m),std::cos(theta))
+    return (Real)gsl_sf_legendre_sphPlm(l,std::abs(m),std::cos(theta))
            * Complex(std::cos(m*phi),std::sin(m*phi));
 }
 
@@ -480,8 +496,8 @@ Complex special::sphBiY (int l1, int l2, int L, int M, double theta1, double phi
     {
         Complex Y1 = special::sphY(l1, m, theta1, phi1);
         Complex Y2 = special::sphY(l2, M-m, theta2, phi2);
-        double CG = special::ClebschGordan(l1,m,l2,M-m,L,M);
-        YY += gsl_sf_pow_int(-1,m) * CG * Y1 * Y2;
+        Real CG = special::ClebschGordan(l1,m,l2,M-m,L,M);
+        YY += special::pow_int(-1,m) * CG * Y1 * Y2;
     }
     return YY;
 }

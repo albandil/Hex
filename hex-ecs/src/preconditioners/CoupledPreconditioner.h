@@ -72,7 +72,7 @@ class CoupledPreconditioner : public NoPreconditioner
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (double E);
+        virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
     

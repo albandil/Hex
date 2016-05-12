@@ -66,10 +66,10 @@ namespace blas
     
     void gemv
     (
-        double a,
-            DenseMatrixView<double> const & A,
+        Real a,
+            DenseMatrixView<Real> const & A,
             const rArrayView v,
-        double b,
+        Real b,
             rArrayView w
     );
     

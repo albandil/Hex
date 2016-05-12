@@ -277,7 +277,11 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
 #endif // WITH_UMFPACK
 
 #ifdef WITH_SUPERLU
-#include <slu_zdefs.h>
+#ifdef SINGLE
+    #include <slu_cdefs.h>
+#else
+    #include <slu_zdefs.h>
+#endif
 
 /**
  * @brief LU factorization object - SuperLU specialization.
@@ -326,10 +330,10 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save factorization data to disk.
-        virtual void save (std::string name) const { HexException("SuperLU factorizer does not yet support --out-of-core option."); }
+        virtual void save (std::string name) const { /*HexException("SuperLU factorizer does not yet support --out-of-core option.");*/ }
         
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("SuperLU factorizer does not yet support --out-of-core option."); }
+        virtual void load (std::string name, bool throw_on_io_failure = true) { if (throw_on_io_failure) HexException("SuperLU factorizer does not yet support --out-of-core option."); }
         
         /// Release memory.
         virtual void drop ()

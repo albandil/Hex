@@ -115,7 +115,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (double E);
+        virtual void update (Real E);
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void finish ();
         

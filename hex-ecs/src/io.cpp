@@ -625,8 +625,8 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
     {
         if (type[0] == 'L')
         {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
+            Real begin = ReadNext<Real>(inf).val;
+            Real end = ReadNext<Real>(inf).val;
             int samples = ReadNext<int>(inf).val;
             
             if (begin > end)
@@ -638,10 +638,10 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
         }
         else if (type[0] == 'G')
         {
-            double begin = ReadNext<double>(inf).val;
-            double end = ReadNext<double>(inf).val;
-            double d = ReadNext<double>(inf).val;
-            double quotient = ReadNext<double>(inf).val;
+            Real begin = ReadNext<Real>(inf).val;
+            Real end = ReadNext<Real>(inf).val;
+            Real d = ReadNext<Real>(inf).val;
+            Real quotient = ReadNext<Real>(inf).val;
             int samples = std::ceil(1 + std::log(1 + (end - begin) * (quotient - 1) / d) / std::log(quotient));
             
             if (begin > end)
@@ -656,8 +656,8 @@ void ReadArrays (std::ifstream & inf, rArray & arr)
         else if (type[0] == 'E')
         {
             // explicit list samples
-            double X;
-            while ((X = ReadNext<double>(inf).val) != -1)
+            Real X;
+            while ((X = ReadNext<Real>(inf).val) != -1)
                 arr.push_back(X);
         }
         else
@@ -673,7 +673,7 @@ void InputFile::read (std::ifstream & inf)
     
     // load B-spline parameters
     order = ReadNext<int>(inf).val;
-    ecstheta = ReadNext<double>(inf).val;
+    ecstheta = ReadNext<Real>(inf).val;
     
     std::cout << std::endl;
     std::cout << "B-spline basis" << std::endl;
@@ -895,7 +895,7 @@ void InputFile::read (std::ifstream & inf)
     
     std::cout << std::endl;
     std::cout << "Other parameters" << std::endl;
-    B = ReadNext<double>(inf).val;
+    B = ReadNext<Real>(inf).val;
     
     // print info
     std::cout << "\tmagnetic field: " << B << " a.u." << std::endl;
@@ -928,10 +928,10 @@ void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std:
         HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
     
     // evaluation grid
-    double Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
-    double Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
-    double Xmax = cmd.zipdata.Xmax < 0 ? bspline[0].Rmax() : cmd.zipdata.Xmax;
-    double Ymax = cmd.zipdata.Ymax < 0 ? bspline[i].Rmax() : cmd.zipdata.Ymax;
+    Real Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
+    Real Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
+    Real Xmax = cmd.zipdata.Xmax < 0 ? bspline[0].Rmax() : cmd.zipdata.Xmax;
+    Real Ymax = cmd.zipdata.Ymax < 0 ? bspline[i].Rmax() : cmd.zipdata.Ymax;
     grid_x = linspace(Xmin, Xmax, cmd.zipdata.nX);
     grid_y = linspace(Ymin, Ymax, cmd.zipdata.nY);
     

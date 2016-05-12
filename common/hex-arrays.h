@@ -1204,7 +1204,7 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
             // analyze: find compressible segments
             for (std::size_t i = 0; i < size(); i++)
             {
-                if ((*this)[i] == 0.)
+                if ((*this)[i] == 0.0_r)
                 {
                     // another consecutive zero
                     zero_counter++;
@@ -1783,9 +1783,9 @@ void writeVTK_points
 (
     std::ofstream & out,
     const ArrayView<Complex> f,
-    const ArrayView<double> xgrid,
-    const ArrayView<double> ygrid,
-    const ArrayView<double> zgrid,
+    const ArrayView<Real> xgrid,
+    const ArrayView<Real> ygrid,
+    const ArrayView<Real> zgrid,
     bool with_header = true
 );
 
@@ -1804,9 +1804,9 @@ void writeVTK_cells
 (
     std::ofstream & out,
     const ArrayView<Complex> f,
-    const ArrayView<double> xgrid,
-    const ArrayView<double> ygrid,
-    const ArrayView<double> zgrid
+    const ArrayView<Real> xgrid,
+    const ArrayView<Real> ygrid,
+    const ArrayView<Real> zgrid
 );
 
 //
@@ -1815,12 +1815,12 @@ void writeVTK_cells
 
 typedef NumberArray<int>          iArray;
 typedef NumberArray<int64_t>      lArray;
-typedef NumberArray<double>       rArray;
+typedef NumberArray<Real>         rArray;
 typedef NumberArray<Complex>      cArray;
 
 typedef ArrayView<int>         iArrayView;
 typedef ArrayView<int64_t>     lArrayView;
-typedef ArrayView<double>      rArrayView;
+typedef ArrayView<Real>        rArrayView;
 typedef ArrayView<Complex>     cArrayView;
 
 typedef Array<iArray>             iArrays;
@@ -1939,13 +1939,13 @@ DEFINE_FUN_2ARR(atan2,std::atan2)
 DEFINE_FUN_1ARR_1DBL(pow,std::pow)
 
 /// Return per-element hypot.
-NumberArray<double> hypot (NumberArray<double> const & A, NumberArray<double> const & B);
+NumberArray<Real> hypot (NumberArray<Real> const & A, NumberArray<Real> const & B);
 /// Return per-element square of absolute value.
-NumberArray<double> sqrabs (NumberArray<Complex> const & A);
+NumberArray<Real> sqrabs (NumberArray<Complex> const & A);
 /// Return per-element real part.
-NumberArray<double> realpart (NumberArray<Complex> const & A);
+NumberArray<Real> realpart (NumberArray<Complex> const & A);
 /// Return per-element imag part.
-NumberArray<double> imagpart (NumberArray<Complex> const & A);
+NumberArray<Real> imagpart (NumberArray<Complex> const & A);
 
 /// Sum elements in array.
 template <typename T> T sum (const ArrayView<T> v)

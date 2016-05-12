@@ -53,10 +53,10 @@
  * @param x Radial coordinate of the other electron.
  * @param R Truncation radius.
  */
-inline double damp (Complex y, Complex x, Complex R)
+inline Real damp (Complex y, Complex x, Complex R)
 {
     // compute hyperradius
-    double r = std::hypot(x.real(), y.real());
+    Real r = std::hypot(x.real(), y.real());
     
     // if sufficiently far, return clean zero
     if (r > R.real())
@@ -75,9 +75,9 @@ class weightEdgeDamp
             : bspline_(bspline) {}
         
         // weight function
-        double operator() (Complex z) const
+        Real operator() (Complex z) const
         {
-            double R0 = bspline_.R0();
+            Real R0 = bspline_.R0();
             
             // this will suppress function value from R0-5 onwards
             // which is useful for expanding (divergent) Ricatti-Bessel function
@@ -99,9 +99,9 @@ class weightEndDamp
             : bspline_(bspline) {}
         
         // weight function
-        double operator() (Complex z) const
+        Real operator() (Complex z) const
         {
-            double Rmax = bspline_.Rmax();
+            Real Rmax = bspline_.Rmax();
             
             // whis will suppress function value at Rmax
             // which is useful for expanding everywhere-nonzero hydrogenic function
@@ -188,7 +188,7 @@ class RadialIntegrals
         (
             Bspline const & bspline, GaussLegendre const & g,
             int a, int i, int j,
-            int iknot, Complex R, double scale
+            int iknot, Complex R, Real scale
         ) const;
         
         /**
@@ -392,9 +392,9 @@ class RadialIntegrals
          * @param bspline B-spline basis.
          * @param g Gauss-Legendre integrator adapted to the B-spline basis.
          * @param funct Some one-dimensional function (Complex -> Complex).
-         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> double).
+         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
          */
-        cArray overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<double(Complex)> weightf) const;
+        cArray overlap (Bspline const & bspline, GaussLegendre const & g, std::function<Complex(Complex)> funct, std::function<Real(Complex)> weightf) const;
         
         /** 
          * @brief Compute P-overlaps
@@ -405,9 +405,9 @@ class RadialIntegrals
          * @param g Gauss-Legendre integrator adapted to the B-spline basis.
          * @param n Principal quantum number.
          * @param l Orbital quantum number.
-         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> double).
+         * @param weightf Weight function to multiply every value of the hydrogenic function (Complex -> Real).
          */
-        cArray overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<double(Complex)> weightf) const;
+        cArray overlapP (Bspline const & bspline, GaussLegendre const & g, int n, int l, std::function<Real(Complex)> weightf) const;
 
         /**
          * @brief Compute j-overlaps
@@ -416,10 +416,10 @@ class RadialIntegrals
          * 
          * @param maxell Maximal degree of the Riccati-Bessel function.
          * @param vk Array containing linear momenta.
-         * @param weightf Weight function to multiply every value of the Bessel function (Complex -> double).
+         * @param weightf Weight function to multiply every value of the Bessel function (Complex -> Real).
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
-        cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<double(Complex)> weightf) const;
+        cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<Real(Complex)> weightf) const;
         
         /// Return reference to the B-spline object.
         Bspline const & bspline_atom () const { return bspline_atom_; }

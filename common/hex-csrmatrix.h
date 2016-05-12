@@ -270,7 +270,7 @@ public:
      */
     std::shared_ptr<LUft<IdxT,DataT>> factorize
     (
-        double droptol = 0,
+        Real droptol = 0,
         int use_library = LUFT_ANY,
         void * data = nullptr
     ) const
@@ -309,9 +309,9 @@ public:
         return nullptr;
     }
     
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (double droptol = 0, void * data = nullptr) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (double droptol = 0, void * data = nullptr) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (double droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (Real droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (Real droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (Real droptol = 0, void * data = nullptr) const;
     
     /**
      * @brief Solve the Ax = b problem, where "b" can be a matrix.
