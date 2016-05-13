@@ -422,7 +422,7 @@ void Solver::solve ()
             computations_done++;
             
             // save solution to disk (if valid)
-            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, E_, ang_.states());
+            SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states());
             if (std::isfinite(compute_norm(psi)))
             {
                 for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -585,7 +585,7 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 {
     if (cmd_.write_intermediate_solutions)
     {
-        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, E_, ang_.states(), format("tmp-%d", iteration));
+        SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), format("tmp-%d", iteration));
         writer.save(x);
     }
 }

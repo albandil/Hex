@@ -541,7 +541,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         //
         //  ┏━━━━━━━━━━━━┓     ┏━┱──────────┐  ┌─┲━━━━━━━━━━┓  ┌────────────┐     
         //  ┃            ┃     ┃ ┃          │  │ ┗━━━━━━━━━━┩  ┢━━━━━━━━━━━━┪     
-        //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃     Second multiplocation, then first !
+        //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃     Second multiplication, then first !
         //  ┃     U₁     ┃ +=  ┃ ┃   A₁     │  │     V      │  ┃     B₁'    ┃     A₁ ... prec_atom_[l1].invCl_invsqrtS
         //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃     B₁ ... prec_proj_[l2].invCl_invsqrtS [transposed]
         //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃
