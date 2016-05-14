@@ -28,7 +28,7 @@ LFLAGS = -fopenmp -lstdc++
 # ---------------------------------------------------------------------------- #
 
 BLASLAPACKFLAGS = 
-BLASLAPACKLIBS = -llapack
+BLASLAPACKLIBS = -llapack -lblas
 
 # BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
 # BLASLAPACKLIBS = -lopenblas
