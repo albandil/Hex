@@ -504,8 +504,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::size_t Nsegsiz = Nspline_atom * Nspline_proj;
     
     // performance timers
-    std::size_t us_prec = 0, us_mmul = 0, us_spro = 0, us_axby = 0, us_norm = 0;
-    std::size_t us_mmul_1 = 0;
+    std::size_t us_prec = 0, us_spro = 0, us_axby = 0, us_norm = 0;
+    std::size_t us_mmul_1 = 0, us_mmul_2_dcpl = 0, us_mmul_2_cpld = 0;
     
     // round 'Nsegsiz' to nearest larger multiple of Nlocal_
     std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
@@ -585,6 +585,8 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             // two-electron contribution
             for (int lambda = 0; lambda <= ang_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0)
             {
+                timer.reset();
+                
                 Real f = ang_.f(ill,ill,lambda);
                 
                 clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_atom_.handle());
@@ -599,6 +601,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_dcpl_, 9, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
+                
+                us_mmul_2_dcpl += timer.microseconds();
+                timer.reset();
                 
                 std::size_t Nband = bspline_atom_.Nspline() * (2 * bspline_atom_.order() + 1);
                 
@@ -615,9 +620,9 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_cpld_,10, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_cpld_, 1, nullptr, &Nband, nullptr, 0, nullptr, nullptr);
                 clFinish(queue_);
+                
+                us_mmul_2_cpld += timer.microseconds();
             }
-            
-            us_mmul += timer.microseconds();
         };
         
         // applies KPA preconditioner (two "kron-dots")
@@ -794,10 +799,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
     std::cout << std::setw(5) << format("%g", std::accumulate(n.begin(), n.end(), 0) / float(n.size()));
     
     // GPU kernel timing
-    std::size_t us_total = us_axby + us_mmul + us_norm + us_prec + us_spro;
+    std::size_t us_total = us_axby + us_mmul_1 + us_mmul_2_cpld + us_mmul_2_dcpl + us_norm + us_prec + us_spro;
     std::cout << " [prec: " << format("%2d", int(us_prec * 100. / us_total)) << "%"
               << ", mul1: " << format("%2d", int(us_mmul_1 * 100. / us_total)) << "%"
-              << ", mul2: " << format("%2d", int((us_mmul-us_mmul_1) * 100. / us_total)) << "%"
+              << ", mul2: " << format("%2d", int((us_mmul_2_cpld+us_mmul_2_dcpl) * 100. / us_total)) << "%"
               << ", axby: " << format("%2d", int(us_axby * 100. / us_total)) << "%"
               << ", norm: " << format("%2d", int(us_norm * 100. / us_total)) << "%"
               << ", spro: " << format("%2d", int(us_spro * 100. / us_total)) << "%"
