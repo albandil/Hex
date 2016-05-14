@@ -236,197 +236,6 @@ void ColMatrix<Complex>::diagonalize
 #endif
 }
 
-void dense_kron_dot_full
-(
-    int A_rows, int A_cols, Complex const * A_data,
-    int B_rows, int B_cols, Complex const * B_data,
-    Complex const * v_data,
-    Complex       * w_data,
-    Complex       * work
-)
-{
-    /*// work matrix
-    static int C_rows = 0, C_cols = 0;
-    static Complex * C_data = nullptr;
-    
-    // realloc the work matrix if necessary
-    if (not work)
-    {
-        if (A_rows * B_cols != C_rows * C_cols)
-        {
-            delete [] C_data;
-            C_data = new Complex [A_rows * B_cols];
-        }
-        work = C_data;
-    }
-    
-    // update sizes of the intermediate matrix
-    C_rows = A_rows; C_cols = B_cols;
-    
-    // skip invalid inputs (used to dealloc the work matrix)
-    if (A_rows == 0 or A_cols == 0 or A_data == nullptr or
-        B_rows == 0 or B_cols == 0 or B_data == nullptr or
-        v_data == nullptr or w_data == nullptr)
-        return;
-    
-    // auxiliary variables
-    Complex alpha = 1, beta = 0;
-    char norm = 'N', trans = 'T';
-    
-    // Let C = V' * A'. Then C is V_cols-by-A_rows.
-    // The matrices A and V are already transposed in the storage, so all we need
-    // to do is to swap the dimensions.
-    {
-        int m = B_cols, k = A_cols, n = A_rows;
-        zgemm_
-        (
-            &norm, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(v_data), &m,
-            const_cast<Complex*>(A_data), &k,
-            &beta, work, &m
-        );
-    }
-    
-    // Let W' = B * C. Then W' is B_rows-by-A_rows.
-    // The matrix B is in row-major storage, so we need to tell BLAS that it is actually transposed.
-    {
-        int m = B_rows, k = B_cols, n = C_cols;
-        zgemm_
-        (
-            &trans, &norm, &m, &n, &k,
-            &alpha, const_cast<Complex*>(B_data), &k,
-            work, &k,
-            &beta, w_data, &m
-        );
-    }*/
-}
-
-void dense_kron_dot
-(
-    int A_rows, int A_cols, Complex const * A_data,
-    int B_rows, int B_cols, Complex const * B_data,
-    Complex const * v_data,
-    Complex       * w_data,
-    Complex       * work,
-    int limit
-)
-{
-    /*if (limit <= 0)
-    {
-        // use full routine if no limit requested
-        dense_kron_dot_full
-        (
-            A_rows, A_cols, A_data,
-            B_rows, B_cols, B_data,
-            v_data, w_data, work
-        );
-        
-        return;
-    }
-    
-    // work matrix
-    static std::size_t worksize = 0;
-    static Complex * workspace = nullptr;
-    
-    // realloc the work matrix if necessary
-    if (not work)
-    {
-        std::size_t needed = (std::size_t)(A_rows + B_rows) * limit;
-        if (needed > worksize)
-        {
-            delete [] workspace;
-            worksize = needed;
-            workspace = new Complex [worksize];
-        }
-        work = workspace;
-    }
-    
-    // work pointers
-    Complex * AVT = work;
-    Complex * BVT = work + limit * A_rows;
-    
-    // skip invalid inputs (used to dealloc the work matrix)
-    if (A_rows == 0 or A_cols == 0 or A_data == nullptr or
-        B_rows == 0 or B_cols == 0 or B_data == nullptr or
-        v_data == nullptr or w_data == nullptr)
-        return;
-    
-    // auxiliary variables
-    Complex one = 1, zero = 0;
-    char norm = 'N', trans = 'T';
-    int s;
-    
-    // ----
-    
-        // AV₁' = V₁' * A'
-        zgemm_
-        (
-            &norm, &norm, &limit, &A_rows, &A_cols,
-            &one, const_cast<Complex*>(v_data), &B_cols,
-            const_cast<Complex*>(A_data), &A_cols,
-            &zero, AVT, &limit
-        );
-        
-        // BV₂' = B * V₂'
-        s = B_cols - limit;
-        zgemm_
-        (
-            &trans, &norm, &B_rows, &limit, &s,
-            &one, const_cast<Complex*>(B_data) + limit, &B_cols,
-            const_cast<Complex*>(v_data) + limit, &B_cols,
-            &zero, BVT, &B_rows
-        );
-        
-    // ----
-    
-    // clear W's data (needed to wait for this moment, because 'v' might be the same pointer as 'w')
-    std::memset(w_data, 0, A_rows * B_rows * sizeof(Complex));
-    
-    // ----
-    
-        // W' = B * AV₁'(corner)
-        zgemm_
-        (
-            &trans, &norm, &B_rows, &limit, &limit,
-            &one, const_cast<Complex*>(B_data), &B_cols,
-            AVT, &limit,
-            &zero, w_data, &B_rows
-        );
-        
-        // W' = W' + B * AV₁'(rest)
-        s = A_rows - limit;
-        zgemm_
-        (
-            &trans, &norm, &limit, &s, &limit,
-            &one, const_cast<Complex*>(B_data), &B_cols,
-            AVT + limit * limit, &limit,
-            &one, w_data + limit * B_rows, &B_rows
-        );
-    
-    // ----
-    
-        // W' = W' + BV₂' * A'(corner)
-        zgemm_
-        (
-            &norm, &norm, &B_rows, &limit, &limit,
-            &one, BVT, &B_rows,
-            const_cast<Complex*>(A_data), &A_cols,
-            &one, w_data, &B_rows
-        );
-        
-        // W'= W + BV₂' * A'(rest)
-        s = A_rows - limit;
-        zgemm_
-        (
-            &norm, &norm, &limit, &s, &limit,
-            &one, BVT, &B_rows,
-            const_cast<Complex*>(A_data) + limit * A_cols, &A_cols,
-            &one, w_data + limit * B_rows, &B_rows
-        );
-    
-    // ----*/
-}
-
 // -------------------------------------------------------------------------------------
 // Sparse matrix routines.
 //
@@ -480,6 +289,66 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
     
     return;
 }
+
+template<>
+CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
+{
+    // get number of structurally non-zero elements
+    LU_int_t nz = x_.size();
+    
+    // get row lengths
+    std::vector<LU_int_t> len (m_, 0);
+    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
+        len[i_[n]]++;
+    
+    // create element pointer array for each matrix row
+    std::vector<std::vector<LU_int_t>> elem_ptrs (m_);
+    
+    // reserve memory for the row data
+    for (LU_int_t n = 0; n < m_; n++)
+        elem_ptrs[n].reserve(len[n]);
+    
+    // store index of each element into the appropriate row
+    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
+        elem_ptrs[i_[n]].push_back(n);
+    
+    // sort element pointers by their column index
+    for (LU_int_t n = 0; n < m_; n++)
+        std::sort(elem_ptrs[n].begin(), elem_ptrs[n].end(), [&](LU_int_t a, LU_int_t b) { return j_[a] < j_[b]; });
+    
+    // allocate output arrays
+    NumberArray<LU_int_t> Ap(m_ + 1), Ai(nz);
+    cArray Ax(nz);
+    
+    // copy & sum entries
+    LU_int_t pos = 0;
+    for (LU_int_t m = 0; m < m_; m++)
+    {
+        // for all non-zero elements
+        for (LU_int_t n = 0; n < (LU_int_t)elem_ptrs[m].size(); n++)
+        {
+            // get global index
+            LU_int_t gid = elem_ptrs[m][n];
+            
+            // update elements
+            Ai[pos] += j_[gid];
+            Ax[pos] += x_[gid];
+            
+            // add also the next entry if it is in the same column
+            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and gid == elem_ptrs[m][n + 1])
+                continue;
+            
+            // otherwise move on to the next position
+            pos++;
+        }
+        
+        // insert next row pointer
+        Ap[m + 1] = pos;
+    }
+    
+    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
+}
+
 
 // -------------------------------------------------------------------------------------
 // UMFPACK-dependent functions.
@@ -590,59 +459,7 @@ CooMatrix<LU_int_t,Complex> CsrMatrix<LU_int_t,Complex>::tocoo () const
     // return new CooMatrix
     return CooMatrix<LU_int_t,Complex> (m_, n_, Tj, Ti, Tx);
 }
-/*
-template<>
-CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
-{
-    std::size_t nz = x_.size();
-    
-    // CSC matrix data
-    NumberArray<LU_int_t> Ap(n_ + 1), Ai(nz);
-    cArray Ax(nz);
-    
-    // do we have any elements at all?
-    if (nz != 0)
-    {
-    
-        LU_int_t status = UMFPACK_TRIPLET_TO_COL_F
-        (
-            n_,            // cols (rows of transposed matrix)
-            m_,            // rows (cols of transposed matrix)
-            nz,             // data length
-            j_.data(),     // column indices (rows of transposed matrix)
-            i_.data(),     // row indices (cols of transposed matrix)
-            
-            // interleaved data
-            reinterpret_cast<const double *>(x_.data()),
-            nullptr,
-            
-            Ap.data(),      // row pointers
-            Ai.data(),      // column indices
-            
-            // interleaved data
-            reinterpret_cast<double *>(Ax.data()),
-            nullptr,
-         
-            // map
-            nullptr
-        );
-        
-        // check success
-        if (status != 0)
-        {
-            std::cerr << "\n[CooMatrix::tocsr] Exit code " << status << "\n";
-            UMFPACK_REPORT_STATUS_F(0, status);
-        }
-        
-        // crop storage
-        std::size_t N = Ap[m_];
-        Ai.resize(N);
-        Ax.resize(N);
-    }
-    
-    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
-}
-*/
+
 #endif // WITH_UMFPACK
 
 
@@ -899,63 +716,3 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
 }
 
 #endif // WITH_SUPERLU_DIST
-
-
-template<>
-CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
-{
-    // get number of structurally non-zero elements
-    LU_int_t nz = x_.size();
-    
-    // get row lengths
-    std::vector<LU_int_t> len (m_, 0);
-    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
-        len[i_[n]]++;
-    
-    // create element pointer array for each matrix row
-    std::vector<std::vector<LU_int_t>> elem_ptrs (m_);
-    
-    // reserve memory for the row data
-    for (LU_int_t n = 0; n < m_; n++)
-        elem_ptrs[n].reserve(len[n]);
-    
-    // store index of each element into the appropriate row
-    for (LU_int_t n = 0; n < nz; n++) if (x_[n] != 0.0_r)
-        elem_ptrs[i_[n]].push_back(n);
-    
-    // sort element pointers by their column index
-    for (LU_int_t n = 0; n < m_; n++)
-        std::sort(elem_ptrs[n].begin(), elem_ptrs[n].end(), [&](LU_int_t a, LU_int_t b) { return j_[a] < j_[b]; });
-    
-    // allocate output arrays
-    NumberArray<LU_int_t> Ap(m_ + 1), Ai(nz);
-    cArray Ax(nz);
-    
-    // copy & sum entries
-    LU_int_t pos = 0;
-    for (LU_int_t m = 0; m < m_; m++)
-    {
-        // for all non-zero elements
-        for (LU_int_t n = 0; n < (LU_int_t)elem_ptrs[m].size(); n++)
-        {
-            // get global index
-            LU_int_t gid = elem_ptrs[m][n];
-            
-            // update elements
-            Ai[pos] += j_[gid];
-            Ax[pos] += x_[gid];
-            
-            // add also the next entry if it is in the same column
-            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and gid == elem_ptrs[m][n + 1])
-                continue;
-            
-            // otherwise move on to the next position
-            pos++;
-        }
-        
-        // insert next row pointer
-        Ap[m + 1] = pos;
-    }
-    
-    return CsrMatrix<LU_int_t,Complex> (m_, n_, Ap, Ai, Ax);
-}
