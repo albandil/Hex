@@ -91,6 +91,9 @@ class CGPreconditioner : public NoPreconditioner
         
         // last iterations
         mutable iArray n_;
+        
+        // timing
+        mutable std::size_t us_axby_, us_mmul_, us_norm_, us_prec_, us_spro_;
 };
 
 #endif

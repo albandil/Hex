@@ -56,13 +56,46 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     ConjugateGradients < Complex, cArray, cArrayView > CG;
     CG.reset();
     CG.verbose              = false;
-    CG.apply_preconditioner = [&](const cArrayView a, cArrayView b) { this->CG_prec(ill, a, b); };
-    CG.matrix_multiply      = [&](const cArrayView a, cArrayView b) { this->CG_mmul(ill, a, b); };
-    CG.scalar_product       = [&](const cArrayView a, const cArrayView b) { return this->CG_scalar_product(a, b); };
-    CG.compute_norm         = [&](const cArrayView a) { return this->CG_compute_norm(a); };
-    CG.axby                 = [&](Complex a, cArrayView x, Complex b, const cArrayView y) { this->CG_axby_operation(a, x, b, y); };
-    CG.new_array            = [&](std::size_t n, std::string name) { return cArray(n); };
-    CG.constrain            = [&](cArrayView r) { this->CG_constrain(r); };
+    CG.apply_preconditioner = [&](const cArrayView a, cArrayView b)
+                              {
+                                  Timer timer;
+                                  this->CG_prec(ill, a, b);
+                                  us_prec_ += timer.microseconds();
+                              };
+    CG.matrix_multiply      = [&](const cArrayView a, cArrayView b)
+                              {
+                                  Timer timer;
+                                  this->CG_mmul(ill, a, b);
+                                  us_mmul_ += timer.microseconds();
+                              };
+    CG.scalar_product       = [&](const cArrayView a, const cArrayView b)
+                              {
+                                  Timer timer;
+                                  Complex prod = this->CG_scalar_product(a, b);
+                                  us_spro_ += timer.microseconds();
+                                  return prod;
+                              };
+    CG.compute_norm         = [&](const cArrayView a)
+                              {
+                                  Timer timer;
+                                  Real nrm = this->CG_compute_norm(a);
+                                  us_norm_ += timer.microseconds();
+                                  return nrm;
+                              };
+    CG.axby                 = [&](Complex a, cArrayView x, Complex b, const cArrayView y)
+                              {
+                                  Timer timer;
+                                  this->CG_axby_operation(a, x, b, y);
+                                  us_axby_ += timer.microseconds();
+                              };
+    CG.new_array            = [&](std::size_t n, std::string name)
+                              {
+                                  return cArray(n);
+                              };
+    CG.constrain            = [&](cArrayView r)
+                              {
+                                  this->CG_constrain(r);
+                              };
     int n = CG.solve(r, z, cmd_.prec_itertol, 0, Nspline_atom * Nspline_proj);
     
     // release block-preconditioner block-specific data
@@ -73,6 +106,10 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
 
 void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
+    // clear timing information
+    us_axby_ = us_mmul_ = us_norm_ = us_prec_ = us_spro_ = 0;
+    
+    // apply SSOR
     if (cmd_.ssor > 0)
     {
         // working arrays
@@ -97,7 +134,9 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
         
         // normalize
         for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+        {
             this->CG_mmul(ill, (2.0_r - cmd_.ssor) / cmd_.ssor * x[ill], y[ill]);
+        }
         
         // backward SOR
         for (int ill = (int)ang_.states().size() - 1; ill >= 0; ill--)
@@ -152,6 +191,15 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
     std::cout << std::setw(5) << (*std::min_element(n_.begin(), n_.end()));
     std::cout << std::setw(5) << (*std::max_element(n_.begin(), n_.end()));
     std::cout << std::setw(5) << format("%g", std::accumulate(n_.begin(), n_.end(), 0) / float(n_.size()));
+    
+    // preconditioner timing
+    std::size_t us_total = us_axby_ + us_mmul_ + us_norm_ + us_prec_ + us_spro_;
+    std::cout << " [prec: " << format("%2d", int(us_prec_ * 100. / us_total)) << "%"
+              << ", mmul: " << format("%2d", int(us_mmul_ * 100. / us_total)) << "%"
+              << ", axby: " << format("%2d", int(us_axby_ * 100. / us_total)) << "%"
+              << ", norm: " << format("%2d", int(us_norm_ * 100. / us_total)) << "%"
+              << ", spro: " << format("%2d", int(us_spro_ * 100. / us_total)) << "%"
+              << "]";
 }
 
 void CGPreconditioner::CG_init (int iblock) const

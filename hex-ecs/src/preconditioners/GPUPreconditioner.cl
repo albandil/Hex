@@ -42,7 +42,7 @@
 // -D NSRCSEG=...
 // -D NDSTSEG=...
 
-// Enable Real precision (redundant in OpenCL 2.0).
+// Enable double precision (redundant in OpenCL 2.0).
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
 
 // Derived variables.
