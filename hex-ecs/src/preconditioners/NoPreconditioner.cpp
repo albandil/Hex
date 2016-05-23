@@ -779,6 +779,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             } // for all destination sub-segments
         } // for all source vector sub-segments
     } // if not cmd_.lightweight_radial_cache
+    
+    // constrain the result
+    if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
+    {
+        for (std::size_t ill = 0; ill < Nang; ill++)
+            cgprec->CG_constrain(q[ill]);
+    }
 }
 
 void NoPreconditioner::precondition (const BlockArray< Complex >& r, BlockArray< Complex >& z) const
