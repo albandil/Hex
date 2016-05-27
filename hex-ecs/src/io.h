@@ -87,7 +87,7 @@ class CommandLine
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
@@ -308,8 +308,9 @@ class InputFile
         int order, ni, L, Pi, levels, maxell;
         iArray Spin;
         Real ecstheta, B;
-        rArray rknots, rknots_next, cknots, overlap_knots, Etot;
+        rArray rknots, rknots_ext, cknots, Etot;
         std::vector<std::tuple<int,int,int>> instates, outstates;
+        bool inner_only;
 };
 
 /**
@@ -512,7 +513,7 @@ class SolutionIO
 void zip_solution
 (
     CommandLine & cmd,
-    std::vector<Bspline> const & bspline,
+    Bspline const & bspline,
     std::vector<std::pair<int,int>> const & ll
 );
 
@@ -521,7 +522,7 @@ void zip_solution
  */
 void write_grid
 (
-    std::vector<Bspline> const & bspline,
+    Bspline const & bspline,
     std::string const & basename
 );
 

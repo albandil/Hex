@@ -49,9 +49,9 @@ ILUCGPreconditioner::ILUCGPreconditioner
     AngularBasis const & ll,
     Bspline const & bspline_atom,
     Bspline const & bspline_proj,
-    Bspline const & bspline_proj_full,
     CommandLine const & cmd
-) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd), csr_blocks_(ll.states().size()), lu_(ll.states().size())
+) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+    lu_(ll.states().size())
 {
 #ifdef _OPENMP
     omp_init_lock(&lu_lock_);
@@ -92,7 +92,6 @@ void ILUCGPreconditioner::setup ()
         
         // associate existing disk files
         lu_[iblock]->link(format("lu-%d.bin", iblock));
-        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -128,9 +127,9 @@ void ILUCGPreconditioner::update (Real E)
         for (auto & lu : lu_)
             lu->drop();
         
-        // release outdated CSR diagonal blocks
-        for (auto & csr : csr_blocks_)
-            csr.drop();
+        // TODO release outdated CSR diagonal blocks
+        /*for (auto & csr : csr_blocks_)
+            csr.drop();*/
     }
     
     // update parent
@@ -143,23 +142,17 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // load data from linked disk files
-    if (lu_[iblock]->size() == 0 or csr_blocks_[iblock].size() == 0)
-    {
-        csr_blocks_[iblock].hdfload();
+    if (lu_[iblock]->size() == 0)
         lu_[iblock]->silent_load();
-    }
     
     // check that the factorization is loaded
-    if (lu_[iblock]->size() == 0 or csr_blocks_[iblock].size() == 0)
+    if (lu_[iblock]->size() == 0)
     {
 #ifdef _OPENMP
         // allow only one factorization at a time when not using SuperLU DIST
         if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
             omp_set_lock(&lu_lock_);
 #endif
-        
-        // create CSR representation of the current diagonal block
-        csr_blocks_[iblock] = dia_blocks_[iblock].tocoo<LU_int_t>().tocsr();
         
         // start timer
         Timer timer;
@@ -190,8 +183,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         );
         
         // save the diagonal block's CSR representation and its factorization
-        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
-        csr_blocks_[iblock].hdfsave();
         lu_[iblock]->link(format("lu-%d.bin", iblock));
         lu_[iblock]->save();
         
@@ -225,6 +216,5 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
 void ILUCGPreconditioner::finish ()
 {
     lu_.resize(0);
-    csr_blocks_.resize(0);
     CGPreconditioner::finish();
 }

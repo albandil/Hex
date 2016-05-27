@@ -239,14 +239,14 @@ public:
      * @param filename File name.
      * @param threshold Largest absolute value represented by white colour.
      */
-    void plot (const char* filename, double threshold = 0.) const
+    void plot (std::string const & filename, double threshold = 0.) const
     {
 #ifdef WITH_PNG
         // create output file
-        std::ofstream out(filename, std::ios_base::out | std::ios_base::binary);
+        std::ofstream out (filename, std::ios_base::out | std::ios_base::binary);
         
         // create PNG data generator
-        PngGenerator png(this, threshold);
+        PngGenerator png (this, threshold);
         
         // write PNG file
         png.write(out);

@@ -71,11 +71,15 @@ Complex inv_power_extrapolate (rArray X, cArrayView Y)
 
 Amplitudes::Amplitudes
 (
-    Bspline const & bspline_atom, Bspline const & bspline_proj,
-    InputFile const & inp, Parallel const & par, CommandLine const & cmd,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_outer,
+    Bspline const & bspline_full,
+    InputFile const & inp,
+    Parallel const & par,
+    CommandLine const & cmd,
     std::vector<std::pair<int,int>> const & ang
-) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-    rad_(bspline_atom_,bspline_proj,bspline_proj,0),
+) : bspline_inner_(bspline_inner), bspline_outer_(bspline_outer), bspline_full_(bspline_full),
+    rad_(bspline_inner, bspline_outer, bspline_full, 0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang)
 {
     // nothing to do
@@ -129,12 +133,12 @@ void Amplitudes::extract ()
                 }
                 
                 // check the size
-                if (!cmd_.outofcore and (int)solution[0].size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
-                {
-                    std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") have wrong size." << std::endl;
-                    std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution[0].size() << "." << std::endl;
-                    continue;
-                }
+//                 if (!cmd_.outofcore and (int)solution[0].size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
+//                 {
+//                     std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") have wrong size." << std::endl;
+//                     std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution[0].size() << "." << std::endl;
+//                     continue;
+//                 }
                 
                 // extract amplitudes to all final states
                 for (auto outstate : inp_.outstates)
@@ -385,7 +389,7 @@ void Amplitudes::writeICS_files ()
 }
 
 void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
-{
+{/*
     // final projectile momenta
     rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
@@ -517,7 +521,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             Lambda_Slp[T][ell].second[ie] += sum(triplet_lambda[ell]) / Real(samples);
         }
     }
-}
+*/}
 
 void Amplitudes::computeTmat_ (Amplitudes::Transition T)
 {
@@ -577,7 +581,7 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 }
 
 Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2)
-{
+{/*
     // shorthands
     Complex const * const t = &(bspline_atom_.t(0));
     int Nspline_atom = bspline_atom_.Nspline();
@@ -720,7 +724,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     }
     
     return CB;
-}
+*/}
 
 void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {

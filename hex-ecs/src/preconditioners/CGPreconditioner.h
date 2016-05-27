@@ -56,11 +56,11 @@ class CGPreconditioner : public NoPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_outer,
+            Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
+        ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
             n_(ang_.states().size(), -1) {}
         
         // reuse parent definitions

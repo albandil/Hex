@@ -64,9 +64,9 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_outer,
+            Bspline const & bspline_full,
             CommandLine const & cmd
         );
         
@@ -88,9 +88,6 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         virtual void CG_exit (int iblock) const;
         
     protected:
-        
-        // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
         
         // LU decompositions of the CSR blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;

@@ -31,19 +31,6 @@
 
 #include <iostream>
 
-#ifdef _OPENMP
-    #include <omp.h>
-    #define OMP_prepare omp_lock_t writelock; omp_init_lock(&writelock)
-    #define OMP_exclusive_in omp_set_lock(&writelock)
-    #define OMP_exclusive_out omp_unset_lock(&writelock)
-    #define OMP_clean omp_destroy_lock(&writelock)
-#else
-    #define OMP_prepare
-    #define OMP_exclusive_in
-    #define OMP_exclusive_out
-    #define OMP_clean
-#endif
-
 #include "hex-arrays.h"
 #include "hex-misc.h"
 
@@ -51,6 +38,8 @@
 #include "parallel.h"
 #include "preconditioners.h"
 #include "radial.h"
+
+#include "NoPreconditioner.h"
 
 const std::string NoPreconditioner::prec_name = "none";
 const std::string NoPreconditioner::prec_description = "\"Preconditioning\" by the identity matrix.";
@@ -63,12 +52,12 @@ void NoPreconditioner::setup ()
 
 void NoPreconditioner::update (Real E)
 {
-    OMP_prepare;
-    
     // shorthands
-    unsigned order = inp_.order;
-    unsigned Nspline_atom = bspline_atom_.Nspline();
-    unsigned Nspline_proj = bspline_proj_.Nspline();
+    int order = inp_.order;
+    int Nang = ang_.states().size();
+    int Nspline_inner = rad_.bspline_inner().Nspline();
+    int Nspline_outer = rad_.bspline_outer().Nspline();
+    int Nspline_full  = rad_.bspline_outer().Nspline();
     
     // update energy
     E_ = E;
@@ -80,44 +69,50 @@ void NoPreconditioner::update (Real E)
     std::cout << "\tPrecompute diagonal blocks... " << std::flush;
     
     // setup diagonal blocks
-    for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
+    for (int ill = 0; ill < Nang; ill++)
+    for (int illp = 0; illp < Nang; illp++)
     {
         // angular momenta
         int l1 = ang_.states()[ill].first;
         int l2 = ang_.states()[ill].second;
+        int l1p = ang_.states()[illp].first;
+        int l2p = ang_.states()[illp].second;
         
-        // initialize diagonal block
-        dia_blocks_[ill] = BlockSymBandMatrix<Complex>
+        // initialize diagonal block of the inner problem
+        A_blocks_[ill * Nang + illp] = BlockSymBandMatrix<Complex>
         (
-            Nspline_atom,               // block count
+            Nspline_inner,              // block count
             inp_.order + 1,             // block structure half-bandwidth
-            Nspline_proj,               // block size
+            Nspline_inner,              // block size
             inp_.order + 1,             // block half-bandwidth
             !cmd_.outofcore,            // keep in memory?
-            format("dblk-%d.ooc", ill)  // scratch disk file name
+            format("blk-A-%d-%d.ooc", ill, illp)  // scratch disk file name
         );
         
         // skip calculation if the disk file is already present
-        if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
+        /*if (cmd_.outofcore and cmd_.reuse_dia_blocks and dia_blocks_[ill].hdfcheck())
             continue;
         else if (cmd_.outofcore)
-            dia_blocks_[ill].hdfinit();
+            dia_blocks_[ill].hdfinit();*/
         
-        // for all blocks
-        # pragma omp parallel for schedule (dynamic,1)
-        for (unsigned i = 0; i < Nspline_atom; i++)
-        for (unsigned d = 0; d <= order; d++)
-        if (i + d < Nspline_atom)
+        // for all sub-blocks
+        for (int i = 0; i < Nspline_inner; i++)
+        for (int d = 0; d <= order; d++)
+        if (i + d < Nspline_inner)
         {
-            unsigned j = i + d;
+            int j = i + d;
+            
+            SymBandMatrix<Complex> subblock (Nspline_inner, order + 1);
             
             // one-electron part
-            Complex half (0.5,0.0);
-            SymBandMatrix<Complex> block = E * rad_.S_atom()(i,j) * rad_.S_proj();
-            block -= (half * rad_.D_atom()(i,j) - rad_.Mm1_tr_atom()(i,j)) * rad_.S_proj();
-            block -= 0.5_r * l1 * (l1 + 1) * rad_.Mm2_atom()(i,j) * rad_.S_proj();
-            block -= rad_.S_atom()(i,j) * (half * rad_.D_proj() - rad_.Mm1_tr_proj());
-            block -= 0.5_r * l2 * (l2 + 1) * rad_.S_atom()(i,j) * rad_.Mm2_proj();
+            if (ill == illp)
+            {
+                subblock += E * rad_.S_inner()(i,j) * rad_.S_inner();
+                subblock -= (0.5_z * rad_.D_inner()(i,j) - rad_.Mm1_tr_inner()(i,j)) * rad_.S_inner();
+                subblock -= 0.5_r * l1 * (l1 + 1) * rad_.Mm2_inner()(i,j) * rad_.S_inner();
+                subblock -= rad_.S_inner()(i,j) * (0.5_z * rad_.D_inner() - rad_.Mm1_tr_inner());
+                subblock -= 0.5_r * l2 * (l2 + 1) * rad_.S_inner()(i,j) * rad_.Mm2_inner();
+            }
             
             // two-electron part
             for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -132,31 +127,199 @@ void NoPreconditioner::update (Real E)
                     // use precomputed block ... 
                     if (not cmd_.cache_all_radint) // ... from scratch file
                     {
-                        OMP_exclusive_in;
-                        block.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
-                        OMP_exclusive_out;
+                        subblock.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                     }
                     else // ... from memory
                     {
-                        block.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
+                        subblock.data() += (-ang_.f(ill,ill,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d);
                     }
                 }
                 else
                 {
                     // compute the data anew
-                    block += Complex(-ang_.f(ill,ill,lambda)) * rad_.calc_R_tr_dia_block(lambda, i, j);
+                    subblock += Complex(-ang_.f(ill,ill,lambda)) * rad_.calc_R_tr_dia_block(lambda, i, j);
                 }
             }
             
             // save block
-            OMP_exclusive_in;
-            dia_blocks_[ill].setBlock(i * (order + 1) + d, block.data());
-            OMP_exclusive_out;
+            A_blocks_[ill * Nang + illp].setBlock(i * (order + 1) + d, subblock.data());
         }
+        
+        // get maximal asymptotic principal quantum number
+        int max_n = (E_ >= 0 ? 0 : 1.0 / std::sqrt(-2 * E_));
+        
+        // get number of asymptotic bound channels in first and second direction
+        int Nchan1 = (inp_.inner_only ? 0 : std::max(0, max_n - l1));
+        int Nchan2 = (inp_.inner_only ? 0 : std::max(0, max_n - l2));
+        
+        // create blocks for the asymptotic problems
+        B1_blocks_[ill * Nang + illp] = BlockSymBandMatrix<Complex>
+        (
+            Nchan1,                     // block count
+            Nchan1,                     // block structure half-bandwidth
+            Nspline_outer,              // block size
+            inp_.order + 1,             // block half-bandwidth
+            !cmd_.outofcore,            // keep in memory?
+            format("blk-B1-%d-%d.ooc", ill, illp)  // scratch disk file name
+        );
+        B2_blocks_[ill * Nang + illp] = BlockSymBandMatrix<Complex>
+        (
+            Nchan2,                     // block count
+            Nchan2,                     // block structure half-bandwidth
+            Nspline_outer,              // block size
+            inp_.order + 1,             // block half-bandwidth
+            !cmd_.outofcore,            // keep in memory?
+            format("blk-B2-%d-%d.ooc", ill, illp)  // scratch disk file name
+        );
+        
+        // create inner-outer coupling blocks
+        Cu_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        (
+            std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
+            std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer
+        );
+        Cl_blocks_[ill * Nang + illp] = CooMatrix<LU_int_t,Complex>
+        (
+            std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
+            std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer
+        );
+        
+        // setup stretched inner-outer problem
+        if (not inp_.inner_only)
+        {
+            // outer problem matrix : r2 -> inf asymptotic
+            for (int m = 0; m < Nchan1; m++)
+            {
+                // compute hydrogen orbital overlaps
+                cArray Sp_m_l1 = rad_.overlapP(rad_.bspline_inner(), rad_.gaussleg_inner(), l1 + m + 1, l1, weightEndDamp(rad_.bspline_inner()));
+                cArray Sp_m_l2 = rad_.overlapP(rad_.bspline_inner(), rad_.gaussleg_inner(), l2 + m + 1, l2, weightEndDamp(rad_.bspline_inner()));
+                
+                for (int n = 0; n < Nchan1; n++)
+                {
+                    // calculate bound state multipole integrals
+                    rArray rho (rad_.maxlambda() + 1);
+                    for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0.0_r)
+                        rho[lambda] = special::hydro_rho(l1 + m + 1, l1, l1 + n + 1, l1, lambda);
+                    
+                    // populate the matrix
+                    for (int j = Nspline_inner; j < Nspline_full; j++)
+                    for (int l = j - order; l <= std::min(j + order, Nspline_full - 1); l++)
+                    {
+                        Complex elem = 0;
+                        
+                        // channel-diagonal contribution
+                        if (m == n)
+                        {
+                            elem += (E_ + 0.5_r / ((l1 + m + 1) * (l1 + m + 1))) * rad_.S_proj()(j,l)
+                                - 0.5_z * rad_.D_proj()(j,l)
+                                - 0.5_z * (l1 * (l1 + 1.0_r)) * rad_.Mm2_proj()(j,l);
+                        }
+                        
+                        // channel-offdiagonal contribution
+                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0.0_r)
+                            elem -= ang_.f(ill,ill,lambda) * rho[lambda] * rad_.Mtr_mLm1_proj(lambda)(j,l);
+                        
+                        // check whether this element is outside of the inner region
+                        if (l >= Nspline_inner)
+                        {
+                            // YES : couple Xi_mj and F_nl
+                            coo.add
+                            (
+                                std::size_t(Nspline_inner) * Nspline_inner + m * Nspline_outer + (j - Nspline_inner),
+                                std::size_t(Nspline_inner) * Nspline_inner + n * Nspline_outer + (l - Nspline_inner),
+                                elem
+                            );
+                        }
+                        else
+                        {
+                            // NO : couple Xi_mj to Sp_i*psi_il, and also chi_ij to F
+                            for (int i = 0; i < Nspline_inner; i++)
+                            {
+                                coo.add
+                                (
+                                    std::size_t(Nspline_inner) * Nspline_inner + m * Nspline_outer + (j - Nspline_inner),
+                                    i * Nspline_inner + l,
+                                    elem * Sp_m_l1[i]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // outer problem matrix : r1 -> inf asymptotic
+            for (int m = 0; m < Nchan2; m++)
+            {
+                // compute hydrogen orbital overlaps
+                cArray Sp_m_l1 = rad_.overlapP(rad_.bspline_inner(), rad_.gaussleg_inner(), l1 + m + 1, l1, weightEndDamp(rad_.bspline_inner()));
+                cArray Sp_m_l2 = rad_.overlapP(rad_.bspline_inner(), rad_.gaussleg_inner(), l2 + m + 1, l2, weightEndDamp(rad_.bspline_inner()));
+                
+                for (int n = 0; n < Nchan2; n++)
+                {
+                    // calculate bound state multipole integrals
+                    rArray rho (rad_.maxlambda() + 1);
+                    for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0.0_r)
+                        rho[lambda] = special::hydro_rho(l2 + m + 1, l2, l2 + n + 1, l2, lambda);
+                    
+                    // populate the matrix
+                    for (int i = Nspline_inner; i < Nspline_full; i++)
+                    for (int k = i - order; k <= std::min(i + order, Nspline_full - 1); k++)
+                    {
+                        Complex elem = 0;
+                        
+                        // channel-diagonal contribution
+                        if (m == n)
+                        {
+                            elem += (E_ + 0.5_r / ((l2 + m + 1) * (l2 + m + 1))) * rad_.S_proj()(i,k)
+                                - 0.5_z * rad_.D_proj()(i,k)
+                                - 0.5_z * (l1 * (l1 + 1.0_r)) * rad_.Mm2_proj()(i,k);
+                        }
+                        
+                        // channel-offdiagonal contribution
+                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,ill,lambda) != 0.0_r)
+                            elem -= ang_.f(ill,ill,lambda) * rho[lambda] * rad_.Mtr_mLm1_proj(lambda)(i,k);
+                        
+                        // check whether this element is outside of the inner region
+                        if (k >= Nspline_inner)
+                        {
+                            // YES : couple Xi_mi and F_nk
+                            coo.add
+                            (
+                                std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + m) * Nspline_outer + (i - Nspline_inner),
+                                std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + n) * Nspline_outer + (k - Nspline_inner),
+                                elem
+                            );
+                        }
+                        else
+                        {
+                            // NO : couple Xi_mi and Sp_j*psi_kj
+                            for (int j = 0; j < Nspline_inner; j++)
+                            {
+                                // add the matrix element
+                                coo.add
+                                (
+                                    std::size_t(Nspline_inner) * Nspline_inner + (Nchan1 + m) * Nspline_inner + (i - Nspline_inner),
+                                    k * Nspline_inner + j,
+                                    elem * Sp_m_l2[j] // ? _n_
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // convert the COO matrix to CSR
+        csr_blocks_[ill] = coo.tocsr();
+        csr_blocks_[ill].plot(format("csr-%d.png", ill));
+        csr_blocks_[ill].hdflink(format("csr-%d.hdf", ill));
+        csr_blocks_[ill].hdfsave();
     }
     
     par_.wait();
     std::cout << "ok" << std::endl;
+    
+    std::exit(0);
     
     OMP_clean;
 }
@@ -176,7 +339,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1.0_r/(ni*ni)) };
     
     // radial information for full projectil B-spline basis (used only to expand Riccati-Bessel function)
-    RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj_full(), rad_.bspline_proj_full(), 0);
+    RadialIntegrals radf (rad_.bspline_atom(), rad_.bspline_proj(), 0);
     radf.verbose(false);
     radf.setupOneElectronIntegrals(par_, cmd_);
     
@@ -185,33 +348,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     CsrMatrix<LU_int_t,Complex> S_csr_proj = radf.S_proj().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_atom = S_csr_atom.factorize();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_proj = S_csr_proj.factorize();
-    
-    // setup polarization potential
-    /*double r0 = special::constant::two_pi / ki[0];
-    std::cout << "r0 = " << r0 << std::endl;
-    auto polarization_potential = [r0](double r) { return +120/(2*special::pow_int(r, 4)) * std::expm1(-special::pow_int(r/r0,6)); };
-    cArrays dwi_overlaps (inp_.maxell + 1), dwi_expansion (inp_.maxell + 1);
-    for (int ell = 0; ell <= inp_.maxell; ell++)
-    {
-        // calculate distorted wave for this incoming partial wave
-        DistortedWave dwi (ki[0], ell, polarization_potential, bspline_proj_.R0() * 10);
-        
-        // calculate overlap of the wave function with the B-spline basis
-        dwi_overlaps[ell] = rad_.overlap(rad_.bspline_proj(), radf.gaussleg_proj(), dwi, weightEdgeDamp(radf.bspline_proj()));
-        
-        // calculate the B-spline expansion coefficients
-        dwi_expansion[ell] = lu_S_proj->solve(dwi_overlaps[ell]);
-        
-        // DEBUG
-        rArray grid = linspace(0., bspline_atom_.Rmax(), 1001);
-        write_array(grid, bspline_atom_.zip(dwi_expansion[ell], grid), format("dwi-%d.dat", ell));
-        std::ofstream ofs (format("dwi-comp-%d.dat", ell));
-        for (int i = 0; i < 10001; i++)
-        {
-            double r = i * bspline_atom_.Rmax() / 1001;
-            ofs << r << " " << special::ric_j(ell, ki[0]*r) << " " << dwi(r) << " " << polarization_potential(r) << std::endl;
-        }
-    }*/
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps_atom = rad_.overlapj(rad_.bspline_atom(), rad_.gaussleg_atom(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_atom()));
@@ -795,5 +931,9 @@ void NoPreconditioner::precondition (const BlockArray< Complex >& r, BlockArray<
 
 void NoPreconditioner::finish ()
 {
-    dia_blocks_.resize(0);
+    A_blocks_ .resize(0);
+    B1_blocks_.resize(0);
+    B2_blocks_.resize(0);
+    Cu_blocks_.resize(0);
+    Cl_blocks_.resize(0);
 }

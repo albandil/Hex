@@ -39,21 +39,22 @@ Solver::Solver
     InputFile const & inp,
     Parallel const & par,
     AngularBasis const & ang,
-    std::vector<Bspline> const & bspline,
-    std::vector<Bspline> const & bspline_full
-) : cmd_(cmd), inp_(inp), par_(par), ang_(ang), bspline_(bspline),
-    bspline_full_(bspline_full), prec_(nullptr), ipanel_(0)
+    Bspline const & bspline_inner,
+    Bspline const & bspline_outer,
+    Bspline const & bspline_full
+) : cmd_(cmd), inp_(inp), par_(par), ang_(ang),
+    bspline_inner_(bspline_inner),
+    bspline_outer_(bspline_outer),
+    bspline_full_ (bspline_full),
+    prec_(nullptr)
 {
     // nothing to do
 }
 
-void Solver::choose_preconditioner (int ipanel)
+void Solver::choose_preconditioner ()
 {
-    // save panel choice
-    ipanel_ = ipanel;
-    
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_[0], bspline_[ipanel_], bspline_full_[ipanel_], cmd_);
+    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_inner_, bspline_outer_, bspline_full_, cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -81,9 +82,9 @@ void Solver::solve ()
     }
     
     // shorthands
-    int Nspline_atom = bspline_[0].Nspline();
-    int Nspline_proj = bspline_[ipanel_].Nspline();
-    
+    std::size_t Nspline_inner = bspline_inner_.Nspline();
+//     std::size_t Nspline_outer = bspline_outer_.Nspline();
+//     std::size_t Nspline_full  = bspline_full_ .Nspline();
     
     // print Hamiltonian size as a number with thousands separator (apostroph used)
     class MyNumPunct : public std::numpunct<char>
@@ -93,7 +94,7 @@ void Solver::solve ()
             virtual std::string do_grouping() const { return "\03"; }
     };
     std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
-    std::cout << "Hamiltonian size: " << (std::size_t)Nspline_atom * (std::size_t)Nspline_proj * ang_.states().size() << std::endl;
+    std::cout << "Inner problem hamiltonian size: " << (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size() << std::endl;
     std::cout.imbue(std::locale::classic());
     
     // wrap member functions to lambda-functions for use in the CG solver
@@ -115,6 +116,30 @@ void Solver::solve ()
                   << int(std::trunc(ie * 100. / inp_.Etot.size() + 0.5)) << " % finished, typically "
                   << (computations_done == 0 ? 0 : iterations_done / computations_done)
                   << " CG iterations per energy)" << std::endl;
+        
+        // check applicability of the projectile basis extension
+        if (not inp_.inner_only and inp_.Etot[ie] >= 0)
+            HexException("Projectile basis extension cannot be used for energies above ionization.");
+        
+        // get maximal asymptotic principal quantum number
+        int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0 / std::sqrt(-inp_.Etot[ie]));
+        
+        // get asymptotical bound states for each of the angular momentum pairs
+        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+        {
+            int l1 = ang_.states()[ill].first;
+            int l2 = ang_.states()[ill].second;
+            
+            // store all principal quantum numbers for given l₁ or l₂ and the total energy
+            bstates_.push_back
+            (
+                std::make_pair
+                (
+                    l1 + 1 >= max_n ? iArray{} : linspace(l1 + 1, max_n, max_n - l1),
+                    l2 + 1 >= max_n ? iArray{} : linspace(l2 + 1, max_n, max_n - l2)
+                )
+            );
+        }
         
         // we may have already computed all solutions for this energy... is it so?
         std::vector<std::pair<int,int>> work;
@@ -156,17 +181,17 @@ void Solver::solve ()
             
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
-            std::size_t size = reader.check();
+            /*std::size_t size = reader.check();*/
             
-            // solution has the expected size
-            if (size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline() and not cmd_.refine_solution)
+            // TODO : solution has the expected size
+            /*if (size == ? and not cmd_.refine_solution)
             {
                 std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") found." << std::endl;
                 continue;
-            }
+            }*/
             
-            // solution is smaller
-            if (0 < size and size < (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
+            // TODO : solution is smaller
+            /*if (0 < size and size < (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
             {
                 // is the size equal to previous panel basis size?
                 if (ipanel_ > 0 and size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_-1].Nspline())
@@ -185,10 +210,10 @@ void Solver::solve ()
                     std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
                               << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline() << ") and will be recomputed." << std::endl;
                 }
-            }
+            }*/
             
-            // solution is larger
-            if (size > (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
+            // TODO : solution is larger
+            /*if (size > (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
             {
                 // is the size equal to some higher panel basis size?
                 bool higher_panel_match = false;
@@ -208,7 +233,7 @@ void Solver::solve ()
                 // inform user that there is already some incompatible solution file
                 std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
                           << " found, but has a larger block size (" << size << " > " << (std::size_t)Nspline_atom * Nspline_proj << ") and will be recomputed." << std::endl;
-            }
+            }*/
             
             // add work
             work.push_back(std::make_pair(instate,Spin));
@@ -245,121 +270,6 @@ void Solver::solve ()
                 prec_->rhs(chi, ie, instate);
                 
                 std::cout << "ok" << std::endl;
-                
-                // previous solution
-                SolutionIO reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie], ang_.states());
-                
-                // apply the boundary condition
-                if (ipanel_ > 0 and reader.check() == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_-1].Nspline())
-                {
-                    std::cout << "\tApplying panel connection boundary condition ... " << std::flush;
-                    
-                    // radial integrals for the previous panel
-                    RadialIntegrals rad (bspline_full_[0], bspline_[ipanel_ - 1], bspline_full_[ipanel_ - 1], ang_.maxlambda() + 1);
-                    rad.verbose(false);
-                    rad.setupOneElectronIntegrals(par_, cmd_);
-                    rad.setupTwoElectronIntegrals(par_, cmd_);
-                    
-                    // for all angular segments of the right-hand side
-                    for (unsigned ill = 0; ill < ang_.states().size(); ill++)
-                    {
-                        // load the segment
-                        if (not chi.inmemory())
-                            chi.hdfload(ill);
-                        
-                        // decode the angular quantum numbers
-                        int l1 = ang_.states()[ill].first;
-                        int l2 = ang_.states()[ill].second;
-                        
-                        // for all angular segments of the solution
-                        for (unsigned illp = 0; illp < ang_.states().size(); illp++)
-                        {
-                            // load the previous panel's solution
-                            cArray prev_solution;
-                            prev_solution.hdfload(reader.name(illp));
-                            
-                            // decode the angular quantum numbers
-                            int l1p = ang_.states()[illp].first;
-                            int l2p = ang_.states()[illp].second;
-                            
-                            // precompute f
-                            rArray f (rad.maxlambda() + 1);
-                            for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
-                            {
-                                f[lambda] = special::computef(lambda,l1,l2,l1p,l2p,inp_.L);
-                                if (not std::isfinite(f[lambda]))
-                                    HexException("Evaluation of the angular integrals failed.");
-                            }
-                            
-                            // for all atomic B-splines
-                            # pragma omp parallel for collapse (2) schedule (dynamic,inp_.order)
-                            for (int i = 0; i < Nspline_atom; i++)  // for all atomic B-splines
-                            for (int j = 0; j < inp_.order; j++)    // for all projectile B-splines (numbered according to the current panel's basis)
-                            {
-                                int order = bspline_[0].order();
-                                
-                                for (int k = std::max(0, i - order); k < std::min(i + order + 1, Nspline_atom); k++)
-                                for (int l = j - inp_.order; l < 0; l++)
-                                {
-                                    // get indices in the previous panel basis
-                                    int jp = bspline_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + j;
-                                    int lp = bspline_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + l;
-                                    
-                                    // get indices in the previous full basis
-                                    //int jf = bspline_full_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + j;
-                                    int lf = bspline_full_[ipanel_ - 1].Nreknot() - inp_.overlap_knots.size() + l;
-                                    
-                                    // compute two-electron integrals
-                                    Complex R_ijkl = 0;
-                                    for (int lambda = 0; lambda <= rad.maxlambda(); lambda++)
-                                    {
-                                        if (f[lambda] != 0)
-                                            R_ijkl += f[lambda] * rad.computeR(lambda, i, jp, k, lp);
-                                    }
-                                    
-                                    // evaluate the matrix element (start by the two-electron part)
-                                    Complex A_ijkl = -R_ijkl;
-                                    
-                                    // get known element of the solution
-                                    Complex x_kl = prev_solution[k * bspline_full_[ipanel_ - 1].Nspline() + lf];
-                                    
-                                    // calculate one-electron part of the hamiltonian
-                                    if (ill == illp)
-                                    {
-                                        // compute element of the atomic hamiltonian
-                                        Complex S_ik      = rad.S_atom()(i,k);
-                                        Complex D_ik      = rad.D_atom()(i,k);
-                                        Complex Mm1_tr_ik = rad.Mm1_tr_atom()(i,k);
-                                        Complex Mm2_ik    = rad.Mm2_atom()(i,k);
-                                        Complex H_ik = 0.5_r * D_ik + 0.5_r * l1 * (l1 + 1) * Mm2_ik - Mm1_tr_ik;
-                                        
-                                        // compute element of the projectile hamiltonian
-                                        Complex S_jl      = rad.S_proj()(jp,lp);
-                                        Complex D_jl      = rad.D_proj()(jp,lp);
-                                        Complex Mm1_tr_jl = rad.Mm1_proj()(jp,lp);
-                                        Complex Mm2_jl    = rad.Mm2_proj()(jp,lp);
-                                        Complex H_jl = 0.5_r * D_jl + 0.5_r * l2 * (l2 + 1) * Mm2_jl - Mm1_tr_jl;
-                                        
-                                        // update the matrix element
-                                        A_ijkl += 0.5_r * inp_.Etot[ie] * S_ik * S_jl - H_ik * S_jl - S_ik * H_jl;
-                                    }
-                                    
-                                    // update the right-hand side
-                                    chi[ill][i * (std::size_t)Nspline_proj + j] -= A_ijkl * x_kl;
-                                }
-                            }
-                        }
-                        
-                        // save and release the segment of the right-hand side
-                        if (not chi.inmemory())
-                        {
-                            chi.hdfsave(ill);
-                            chi[ill].drop();
-                        }
-                    }
-                    
-                    std::cout << "ok" << std::endl;
-                }
             }
             
             // compute and check norm of the right hand side vector
@@ -386,12 +296,12 @@ void Solver::solve ()
             BlockArray<Complex> psi (std::move(new_array(ang_.states().size(),"cg-x")));
             
             // load initial guess
-            if (not cmd_.cont and ipanel_ == 0 and ie > 0 and cmd_.carry_initial_guess)
+            if (not cmd_.cont and ie > 0 and cmd_.carry_initial_guess)
             {
                 SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie-1], ang_.states());
                 prev_sol_reader.load(psi);
             }
-            if (not cmd_.cont and ipanel_ == 0 and cmd_.refine_solution)
+            if (not cmd_.cont and cmd_.refine_solution)
             {
                 SolutionIO prev_sol_reader (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, inp_.Etot[ie], ang_.states());
                 prev_sol_reader.load(psi);
@@ -399,7 +309,7 @@ void Solver::solve ()
             
             // launch the linear system solver
             Timer t;
-            unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_atom;
+            unsigned max_iter = (inp_.maxell + 1) * (std::size_t)Nspline_inner;
             std::cout << "\tStart linear solver with tolerance " << cmd_.itertol << " for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << "." << std::endl;
             std::cout << "\t   i | time        | residual        | min  max  avg  block precond. iter." << std::endl;
             CG_.apply_preconditioner = apply_preconditioner;
@@ -432,29 +342,9 @@ void Solver::solve ()
                         if (not psi.inmemory())
                             psi.hdfload(ill);
                         
-                        // save origin panel
-                        if (ipanel_ == 0)
-                        {
-                            // write the updated solution to disk
-                            if (not reader.save(psi, ill))
-                                HexException("Failed to save solution to disk - the data are lost!");
-                        }
-                        
-                        // connect further panels to the previous solution
-                        else
-                        {
-                            // load previous solution
-                            cArray prev_psi;
-                            if (not prev_psi.hdfload(reader.name(ill)))
-                                HexException("Failed to load previous panel solution from disk - the data are lost!");
-                            
-                            // update the solution
-                            concatenate_panels_(prev_psi, psi[ill]);
-                            
-                            // write the updated solution to disk
-                            if (not prev_psi.hdfsave(reader.name(ill)))
-                                HexException("Failed to save solution to disk - the data are lost!");
-                        }
+                        // write the updated solution to disk
+                        if (not reader.save(psi, ill))
+                            HexException("Failed to save solution to disk - the data are lost!");
                         
                         if (not psi.inmemory())
                             psi[ill].drop();
@@ -557,14 +447,29 @@ void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, Blo
 
 BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
 {
+    // just a quick check: N must be equal to the number of blocks
+    if (N != ang_.states().size())
+        HexException("Runtime error: Wrong number of angular blocks: %d != %d.", N, ang_.states().size());
+    
     // create a new block array and initialize blocks local to this MPI node
     BlockArray<Complex> array (N, !cmd_.outofcore, name);
+    
+    // inner B-spline count
+    std::size_t Nspline_inner = bspline_inner_.Nspline();
+    
+    // projectile exclusive B-spline count
+    std::size_t Nspline_outer = bspline_outer_.Nspline();
     
     // initialize all blocks ('resize' automatically zeroes added elements)
     for (std::size_t i = 0; i < N; i++) if (par_.isMyGroupWork(i))
     {
+        // get correct size of the block depending on the calculation mode (with/without projectile basis extension)
+        std::size_t size = Nspline_inner * Nspline_inner;
+        if (not inp_.inner_only)
+            size += (bstates_[i].first.size() + bstates_[i].second.size()) * Nspline_outer;
+        
         // allocate memory
-        array[i].resize(bspline_[0].Nspline() * bspline_[ipanel_].Nspline());
+        array[i].resize(size);
         
         // take care of out-of-core mode
         if (not array.inmemory())
@@ -588,42 +493,6 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
         SolutionIO writer (ang_.L(), ang_.S(), ang_.Pi(), ni_, li_, mi_, 2 * E_, ang_.states(), format("tmp-%d", iteration));
         writer.save(x);
     }
-}
-
-void Solver::concatenate_panels_ (cArray & psi, cArray const & psi_panel) const
-{
-    // atomic basis
-    Bspline const & bspline_atom = bspline_[0];
-    std::size_t Nspline_atom = bspline_atom.Nspline();
-    
-    // previous-panel full B-spline basis (-> psi)
-    Bspline const & bspline_full_prev = bspline_full_[ipanel_ - 1];
-    std::size_t Nspline_full_prev = bspline_full_prev.Nspline();
-    std::size_t Nspline_full_prev_nonoverlap = bspline_full_prev.Nreknot() - inp_.overlap_knots.size();
-    
-    // current panel B-spline basis
-    Bspline const & bspline_panel_curr = bspline_[ipanel_];
-    std::size_t Nspline_panel_curr = bspline_panel_curr.Nspline();
-    
-    // current full B-spline basis
-    Bspline const & bspline_full_curr = bspline_full_[ipanel_];
-    std::size_t Nspline_full_curr = bspline_full_curr.Nspline();
-    
-    // backup the previous full solution
-    cArray psi_prev = std::move(psi);
-    
-    // resize the solution to the new full basis size
-    psi.resize(Nspline_atom * Nspline_full_curr);
-    
-    // copy previous-panel full solution
-    for (std::size_t i = 0; i < Nspline_atom; i++)
-    for (std::size_t j = 0; j < Nspline_full_prev_nonoverlap; j++)
-        psi[i * Nspline_full_curr + j] = psi_prev[i * Nspline_full_prev + j];
-    
-    // copy current single-panel solution
-    for (std::size_t i = 0; i < Nspline_atom; i++)
-    for (std::size_t j = Nspline_full_prev_nonoverlap; j < Nspline_full_curr; j++)
-        psi[i * Nspline_full_curr + j] = psi_panel[i * Nspline_panel_curr + j - Nspline_full_prev_nonoverlap];
 }
 
 void Solver::finish ()

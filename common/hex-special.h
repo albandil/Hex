@@ -820,6 +820,14 @@ double Gaunt (int l1, int m1, int l2, int m2, int l, int m);
  */
 int triangle_count (int L, int maxell);
 
+/**
+ * Compute integral of two hydrogen orbitals and a multipole factor:
+ * \f[
+ *     \rho = \langle P_{n l} | r^\lambda | P_{n' l'} \rangle \,.
+ * \f]
+ */
+double hydro_rho (int n1, int l1, int n2, int l2, int lambda);
+
 } // end of namespace "special"
 
 #endif

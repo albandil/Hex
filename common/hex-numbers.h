@@ -79,6 +79,12 @@ inline Complex operator "" _i (long double x)
     return Complex(0.,x);
 }
 
+// complex number literal
+inline Complex operator "" _z (long double x)
+{
+    return Complex(x,0.);
+}
+
 /// Squared modulus of a complex number.
 inline Real sqrabs (Complex z)
 {

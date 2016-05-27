@@ -45,34 +45,42 @@
 
 RadialIntegrals::RadialIntegrals
 (
-    Bspline const & bspline_atom,
-    Bspline const & bspline_proj,
-    Bspline const & bspline_proj_full,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_outer,
+    Bspline const & bspline_full,
     int Nlambdas
 )
-  : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj), bspline_proj_full_(bspline_proj_full),
-    g_atom_(bspline_atom), g_proj_(bspline_proj),
-    D_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
-    S_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
-    Mm1_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
-    Mm1_tr_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
-    Mm2_atom_(bspline_atom.Nspline(),bspline_atom.order()+1),
-    D_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    S_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    Mm1_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    Mm1_tr_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    Mm2_proj_(bspline_proj.Nspline(),bspline_proj.order()+1),
-    verbose_(true), Nlambdas_(Nlambdas)
+  : bspline_inner_(bspline_inner),
+    bspline_outer_(bspline_outer),
+    bspline_full_ (bspline_full),
+    g_inner_(bspline_inner),
+    g_outer_(bspline_outer),
+    g_full_ (bspline_full),
+    D_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
+    S_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
+    Mm1_inner_   (bspline_inner.Nspline(), bspline_inner.order() + 1),
+    Mm1_tr_inner_(bspline_inner.Nspline(), bspline_inner.order() + 1),
+    Mm2_inner_   (bspline_inner.Nspline(), bspline_inner.order() + 1),
+    D_outer_     (bspline_outer.Nspline(), bspline_outer.order() + 1),
+    S_outer_     (bspline_outer.Nspline(), bspline_outer.order() + 1),
+    Mm1_outer_   (bspline_outer.Nspline(), bspline_outer.order() + 1),
+    Mm1_tr_outer_(bspline_outer.Nspline(), bspline_outer.order() + 1),
+    Mm2_outer_   (bspline_outer.Nspline(), bspline_outer.order() + 1),
+    D_full_      (bspline_full .Nspline(), bspline_full .order() + 1),
+    S_full_      (bspline_full .Nspline(), bspline_full .order() + 1),
+    Mm1_full_    (bspline_full .Nspline(), bspline_full .order() + 1),
+    Mm1_tr_full_ (bspline_full .Nspline(), bspline_full .order() + 1),
+    Mm2_full_    (bspline_full .Nspline(), bspline_full .order() + 1),
+    verbose_(true),
+    Nlambdas_(Nlambdas)
 {
     // maximal number of evaluation points (quadrature rule)
-    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_atom_.order() + Nlambdas + 1);
-    
-    // get projectile basis shift
-    proj_basis_shift_ = std::find(bspline_atom_.t().begin(), bspline_atom_.t().end(), bspline_proj_.t().front()) - bspline_atom_.t().begin();
+    int npts = std::max(EXPANSION_QUADRATURE_POINTS, bspline_inner_.order() + Nlambdas + 1);
     
     // precompute Gaussian weights
-    g_atom_.precompute_nodes_and_weights(npts);
-    g_proj_.precompute_nodes_and_weights(npts);
+    g_inner_.precompute_nodes_and_weights(npts);
+    g_outer_.precompute_nodes_and_weights(npts);
+    g_full_ .precompute_nodes_and_weights(npts);
 }
 
 void RadialIntegrals::Mi_integrand
@@ -378,76 +386,71 @@ Complex RadialIntegrals::computeS12
 
 void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
-    // shorthands
-    int Nspline_atom = bspline_atom_.Nspline(); int Nspline_proj = bspline_proj_.Nspline();
-    int Nknot_atom   = bspline_atom_.Nknot();   int Nknot_proj   = bspline_proj_.Nknot();
-    int Nreknot_atom = bspline_atom_.Nreknot(); int Nreknot_proj = bspline_proj_.Nreknot();
-    
-    // create file names for these radial integrals
-    D_atom_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_atom_.hash()));  D_proj_     .hdflink(format("rad-D-%.4lx.hdf",      bspline_proj_.hash()));
-    S_atom_     .hdflink(format("rad-S-%.4lx.hdf",      bspline_atom_.hash()));  S_proj_     .hdflink(format("rad-S-%.4lx.hdf",      bspline_proj_.hash()));
-    Mm1_atom_   .hdflink(format("rad-Mm1-%.4lx.hdf",    bspline_atom_.hash()));  Mm1_proj_   .hdflink(format("rad-Mm1-%.4lx.hdf",    bspline_proj_.hash()));
-    Mm1_tr_atom_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", bspline_atom_.hash()));  Mm1_tr_proj_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", bspline_proj_.hash()));
-    Mm2_atom_   .hdflink(format("rad-Mm2-%.4lx.hdf",    bspline_atom_.hash()));  Mm2_proj_   .hdflink(format("rad-Mm2-%.4lx.hdf",    bspline_proj_.hash()));
+    // inner basis one-electron integrals
+    #define SetupOneElectronIntegrals(REG) \
+        int Nknot_##REG   = bspline_##REG##_.Nknot(); \
+        int Nreknot_##REG = bspline_##REG##_.Nreknot(); \
+        \
+        std::size_t hash_##REG = bspline_##REG##_.hash(); \
+        \
+        D_##REG##_     .hdflink(format("rad-D-%.4lx.hdf",      hash_##REG)); \
+        S_##REG##_     .hdflink(format("rad-S-%.4lx.hdf",      hash_##REG)); \
+        Mm1_##REG##_   .hdflink(format("rad-Mm1-%.4lx.hdf",    hash_##REG)); \
+        Mm1_tr_##REG##_.hdflink(format("rad-Mm1_tr-%.4lx.hdf", hash_##REG)); \
+        Mm2_##REG##_   .hdflink(format("rad-Mm2-%.4lx.hdf",    hash_##REG)); \
+        \
+        D_##REG##_     .populate([=](int m, int n) -> Complex { return computeD(bspline_##REG##_, g_##REG##_,     m, n, Nknot_##REG - 1  ); }); \
+        S_##REG##_     .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_, g_##REG##_,  0, m, n                   ); }); \
+        Mm1_##REG##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_, g_##REG##_, -1, m, n                   ); }); \
+        Mm1_tr_##REG##_.populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_, g_##REG##_, -1, m, n, Nreknot_##REG - 1); }); \
+        Mm2_##REG##_   .populate([=](int m, int n) -> Complex { return computeM(bspline_##REG##_, g_##REG##_, -2, m, n                   ); }); \
+        \
+        if (not cmd.shared_scratch or par.IamMaster()) \
+        { \
+            D_##REG##_     .hdfsave(); \
+            S_##REG##_     .hdfsave(); \
+            Mm1_##REG##_   .hdfsave(); \
+            Mm1_tr_##REG##_.hdfsave(); \
+            Mm2_##REG##_   .hdfsave(); \
+        }
     
     if (verbose_)
         std::cout << "Precomputing one-electron integrals ... " << std::flush;
     
-    // compute one-electron matrices (atom basis)
-    D_atom_     .populate([=](int m, int n) -> Complex { return computeD(bspline_atom_, g_atom_,     m, n, Nknot_atom - 1  ); });
-    S_atom_     .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_,  0, m, n                  ); });
-    Mm1_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n                  ); });
-    Mm1_tr_atom_.populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -1, m, n, Nreknot_atom - 1); });
-    Mm2_atom_   .populate([=](int m, int n) -> Complex { return computeM(bspline_atom_, g_atom_, -2, m, n                  ); });
-    
-    // compute one-electron matrices (projectile basis)
-    D_proj_     .populate([=](int m, int n) -> Complex { return computeD(bspline_proj_, g_proj_,     m, n, Nknot_proj - 1  ); });
-    S_proj_     .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_,  0, m, n                  ); });
-    Mm1_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n                  ); });
-    Mm1_tr_proj_.populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -1, m, n, Nreknot_proj - 1); });
-    Mm2_proj_   .populate([=](int m, int n) -> Complex { return computeM(bspline_proj_, g_proj_, -2, m, n                  ); });
-    
-    // compute inter-basis overlaps
-    if (not cmd.map_solution.empty())
-    {
-        S12_ = RowMatrix<Complex>(Nspline_atom, Nspline_proj);
-        S21_ = RowMatrix<Complex>(Nspline_proj, Nspline_atom);
-        for (int i = 0; i < Nspline_atom; i++)
-        for (int j = 0; j < Nspline_proj; j++)
-            S12_(i,j) = S21_(j,i) = computeS12(g_atom_, bspline_atom_, bspline_proj_, i, j);
-    }
-    
-    // save the matrices to disk
-    if (not cmd.shared_scratch or par.IamMaster())
-    {
-        D_atom_     .hdfsave();  D_proj_     .hdfsave();
-        S_atom_     .hdfsave();  S_proj_     .hdfsave();
-        Mm1_atom_   .hdfsave();  Mm1_proj_   .hdfsave();
-        Mm1_tr_atom_.hdfsave();  Mm1_tr_proj_.hdfsave();
-        Mm2_atom_   .hdfsave();  Mm2_proj_   .hdfsave();
-    }
+    SetupOneElectronIntegrals(inner)
+    SetupOneElectronIntegrals(outer)
+    SetupOneElectronIntegrals(full)
     
     if (verbose_)
         std::cout << "ok" << std::endl << std::endl;
+    
+//     // compute inter-basis overlaps
+//     if (not cmd.map_solution.empty())
+//     {
+//         S12_ = RowMatrix<Complex>(Nspline_atom, Nspline_proj);
+//         S21_ = RowMatrix<Complex>(Nspline_proj, Nspline_atom);
+//         for (int i = 0; i < Nspline_atom; i++)
+//         for (int j = 0; j < Nspline_proj; j++)
+//             S12_(i,j) = S21_(j,i) = computeS12(g_atom_, bspline_atom_, bspline_proj_, i, j);
+//     }
 }
 
 void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLine const & cmd)
 {
     // shorthands
-    int order = bspline_atom_.order();
-    int Nspline_atom = bspline_atom_.Nspline();
-    int Nreknot_atom = bspline_atom_.Nreknot();
-    int Nspline_proj = bspline_proj_.Nspline();
-    int Nreknot_proj = bspline_proj_.Nreknot();
+    int order = bspline_inner_.order();
+    int Nspline_inner = bspline_inner_.Nspline(), Nreknot_inner = bspline_inner_.Nreknot();
+    int Nspline_outer = bspline_outer_.Nspline(), Nreknot_outer = bspline_outer_.Nreknot();
+    int Nspline_full  = bspline_full_ .Nspline(), Nreknot_full  = bspline_full_ .Nreknot();
     
-    // get knot that terminates (x^lambda)-scaled region
-    for (int i = 0; i < bspline_atom_.Nknot(); i++)
-    {
-        if (bspline_atom_.t(i).real() < 1)
-            lastscaled_ = i;
-        else
-            break;
-    }
+//     // get knot that terminates (x^lambda)-scaled region
+//     for (int i = 0; i < bspline_atom_.Nknot(); i++)
+//     {
+//         if (bspline_atom_.t(i).real() < 1)
+//             lastscaled_ = i;
+//         else
+//             break;
+//     }
     
     // set number of two-electron integrals
     R_tr_dia_.resize(Nlambdas_);
@@ -455,34 +458,45 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     if (verbose_)
         std::cout << "Precomputing partial integral moments (lambda = 0 .. " << Nlambdas_ - 1 << ")" << std::endl;
     
-    // compute partial moments
-    std::size_t mi_size_atom = Nspline_atom * (2 * order + 1) * (order + 1);
-    std::size_t mi_size_proj = Nspline_proj * (2 * order + 1) * (order + 1);
-    Mitr_L_atom_   .resize(Nlambdas_ * mi_size_atom);    Mitr_L_proj_   .resize(Nlambdas_ * mi_size_proj);
-    Mitr_mLm1_atom_.resize(Nlambdas_ * mi_size_atom);    Mitr_mLm1_proj_.resize(Nlambdas_ * mi_size_proj);
-    Mtr_L_atom_    .resize(Nlambdas_);                   Mtr_L_proj_    .resize(Nlambdas_);
-    Mtr_mLm1_atom_ .resize(Nlambdas_);                   Mtr_mLm1_proj_ .resize(Nlambdas_);
+    // partial moments
+    std::size_t mi_size_inner = Nspline_inner * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_outer = Nspline_outer * (2 * order + 1) * (order + 1);
+    std::size_t mi_size_full  = Nspline_full  * (2 * order + 1) * (order + 1);
+    Mitr_L_inner_   .resize(Nlambdas_ * mi_size_inner);  Mitr_L_outer_   .resize(Nlambdas_ * mi_size_outer);  Mitr_L_full_   .resize(Nlambdas_ * mi_size_full); 
+    Mitr_mLm1_inner_.resize(Nlambdas_ * mi_size_inner);  Mitr_mLm1_outer_.resize(Nlambdas_ * mi_size_outer);  Mitr_mLm1_full_.resize(Nlambdas_ * mi_size_full);
+    Mtr_L_inner_    .resize(Nlambdas_);                  Mtr_L_outer_    .resize(Nlambdas_);                  Mtr_L_full_    .resize(Nlambdas_);
+    Mtr_mLm1_inner_ .resize(Nlambdas_);                  Mtr_mLm1_outer_ .resize(Nlambdas_);                  Mtr_mLm1_full_ .resize(Nlambdas_);
+    
+    // resize vector of two-electron integrals
     R_tr_dia_diag_ .resize(Nlambdas_);
-    for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
+    
+    // for all multipole moments
+    for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
-        // atomic basis
-        cArrayView(Mitr_L_atom_,    lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,   lambda,   Nreknot_atom - 1);
-        cArrayView(Mitr_mLm1_atom_, lambda * mi_size_atom, mi_size_atom) = computeMi(bspline_atom_, g_atom_,  -lambda-1, Nreknot_atom - 1);
-        Mtr_L_atom_[lambda]    = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_,  lambda,   i, j, Nreknot_atom - 1, true); });
-        Mtr_mLm1_atom_[lambda] = SymBandMatrix<Complex>(Nspline_atom, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_atom_, g_atom_, -lambda-1, i, j, Nreknot_atom - 1, true); });
+        // inner basis
+        cArrayView(Mitr_L_inner_,    lambda * mi_size_inner, mi_size_inner) = computeMi(bspline_inner_, g_inner_,   lambda,   Nreknot_inner - 1);
+        cArrayView(Mitr_mLm1_inner_, lambda * mi_size_inner, mi_size_inner) = computeMi(bspline_inner_, g_inner_,  -lambda-1, Nreknot_inner - 1);
+        Mtr_L_inner_[lambda]    = SymBandMatrix<Complex>(Nspline_inner, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_inner_, g_inner_,  lambda,   i, j, Nreknot_inner - 1, true); });
+        Mtr_mLm1_inner_[lambda] = SymBandMatrix<Complex>(Nspline_inner, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_inner_, g_inner_, -lambda-1, i, j, Nreknot_inner - 1, true); });
         
-        // projectile basis
-        cArrayView(Mitr_L_proj_,    lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_,  lambda,   Nreknot_proj - 1);
-        cArrayView(Mitr_mLm1_proj_, lambda * mi_size_proj, mi_size_proj) = computeMi(bspline_proj_, g_proj_, -lambda-1, Nreknot_proj - 1);
-        Mtr_L_proj_[lambda]    = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_,  lambda,   i, j, Nreknot_proj - 1, true); });
-        Mtr_mLm1_proj_[lambda] = SymBandMatrix<Complex>(Nspline_proj, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_proj_, g_proj_, -lambda-1, i, j, Nreknot_proj - 1, true); });
+        // outer basis
+        cArrayView(Mitr_L_outer_,    lambda * mi_size_outer, mi_size_outer) = computeMi(bspline_outer_, g_outer_,  lambda,   Nreknot_outer - 1);
+        cArrayView(Mitr_mLm1_outer_, lambda * mi_size_outer, mi_size_outer) = computeMi(bspline_outer_, g_outer_, -lambda-1, Nreknot_outer - 1);
+        Mtr_L_outer_[lambda]    = SymBandMatrix<Complex>(Nspline_outer, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_outer_, g_outer_,  lambda,   i, j, Nreknot_outer - 1, true); });
+        Mtr_mLm1_outer_[lambda] = SymBandMatrix<Complex>(Nspline_outer, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_outer_, g_outer_, -lambda-1, i, j, Nreknot_outer - 1, true); });
+        
+        // full basis
+        cArrayView(Mitr_L_full_,    lambda * mi_size_full, mi_size_full) = computeMi(bspline_full_, g_full_,  lambda,   Nreknot_full - 1);
+        cArrayView(Mitr_mLm1_full_, lambda * mi_size_full, mi_size_full) = computeMi(bspline_full_, g_full_, -lambda-1, Nreknot_full - 1);
+        Mtr_L_full_[lambda]    = SymBandMatrix<Complex>(Nspline_full, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_full_, g_full_,  lambda,   i, j, Nreknot_full - 1, true); });
+        Mtr_mLm1_full_[lambda] = SymBandMatrix<Complex>(Nspline_full, order + 1).populate([&](int i, int j) -> Complex { return computeM(bspline_full_, g_full_, -lambda-1, i, j, Nreknot_full - 1, true); });
         
         // no need to do anything else for non-identical B-spline bases
 //         if (bspline_atom_.hash() != bspline_proj_.hash())
 //             continue;
         
         // diagonal contributions to two-electron integrals
-        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
+        std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_inner_.hash());
         if (not cmd.shared_scratch or par.isMyWork(lambda))
         {
             if (R_tr_dia_diag_[lambda].hdfload(filename))
@@ -506,9 +520,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         par.wait();
         
         // this process will load all necessary data that were calculated by other processes
-        for (int lambda = 0; lambda < (int)Nlambdas_; lambda++) if (not par.isMyWork(lambda))
+        for (int lambda = 0; lambda < Nlambdas_; lambda++) if (not par.isMyWork(lambda))
         {
-            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_atom_.hash());
+            std::string filename = format("rad-R_tr_dia_diag_%d-%.4lx.hdf", lambda, bspline_inner_.hash());
             R_tr_dia_diag_[lambda].hdfload(filename);
             std::cout << "\t- integrals for lambda = " << lambda << " loaded from \"" << filename << "\"" << std::endl;
         }
@@ -528,14 +542,14 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         bool keep_in_memory = ((par.isMyWork(lambda) and cmd.cache_own_radint) or cmd.cache_all_radint);
         
         // compose the file name
-        std::string filename = format("rad-R_tr_dia_%d-%.4lx-%.4lx.hdf", lambda, bspline_atom_.hash(), bspline_proj_.hash());
+        std::string filename = format("rad-R_tr_dia_%d-%.4lx.hdf", lambda, bspline_inner_.hash());
         
         // create the block matrix for radial integrals of this multipole
         R_tr_dia_[lambda] = BlockSymBandMatrix<Complex>
         (
-            Nspline_atom,       // block count
+            Nspline_inner,      // block count
             order + 1,          // block structure half-bandwidth
-            Nspline_proj,       // block size
+            Nspline_inner,      // block size
             order + 1,          // block half-bandwidth
             keep_in_memory,     // whether to keep in memory
             filename            // HDF scratch disk file name
@@ -547,7 +561,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         std::cout << "Precomputing multipole integrals (lambda = 0 .. " << Nlambdas_ - 1 << ")." << std::endl;
     
     // for all multipoles : compute / load
-    for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
+    for (int lambda = 0; lambda < Nlambdas_; lambda++)
     {
         // if the radial integrals are shared, this process will only compute the owned subset of radial integrals
         if (cmd.shared_scratch and not par.isMyWork(lambda))
@@ -579,9 +593,9 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         {
             // for all blocks of the radial matrix
             # pragma omp for schedule (dynamic,1)
-            for (int i = 0; i < Nspline_atom; i++)
+            for (int i = 0; i < Nspline_inner; i++)
             for (int d = 0; d <= order; d++)
-            if (i + d < Nspline_atom)
+            if (i + d < Nspline_inner)
             {
                 // calculate the block
                 SymBandMatrix<Complex> block = calc_R_tr_dia_block(lambda, i, i + d);
@@ -607,7 +621,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     // if this process skipped some lambda-s due to scratch sharing and still it needs them in memory, load them
     if (cmd.shared_scratch and cmd.cache_all_radint)
     {
-        for (int lambda = 0; lambda < (int)Nlambdas_; lambda++)
+        for (int lambda = 0; lambda < Nlambdas_; lambda++)
         {
             // skip own data (already loaded since calculation)
             if (par.isMyWork(lambda))
@@ -631,15 +645,15 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
 {
     // shorthands
-    int Nspline_proj = bspline_proj_.Nspline();
-    int order = bspline_proj_.order();
+    int Nspline_atom = bspline_inner_.Nspline();
+    int order = bspline_inner_.order();
     
     // (i,k)-block data
-    SymBandMatrix<Complex> block_ik (Nspline_proj, order + 1);
+    SymBandMatrix<Complex> block_ik (Nspline_atom, order + 1);
     
     // for all elements in the symmetrical block : evaluate 2-D integral of Bi(1)Bj(2)V(1,2)Bk(1)Bl(2)
-    for (int j = 0; j < Nspline_proj; j++)
-    for (int l = j; l < Nspline_proj and l <= j + order; l++)
+    for (int j = 0; j < Nspline_atom; j++)
+    for (int l = j; l < Nspline_atom and l <= j + order; l++)
         block_ik(j,l) = computeR(lambda, i, j, k, l, simple);
     
     return block_ik;
@@ -654,9 +668,8 @@ void RadialIntegrals::apply_R_matrix
 ) const
 {
     // shorthands
-    std::size_t Nspline_atom = bspline_atom_.Nspline();
-    std::size_t Nspline_proj = bspline_proj_.Nspline();
-    std::size_t order = bspline_atom_.order();
+    std::size_t Nspline_atom = bspline_inner_.Nspline();
+    std::size_t order = bspline_inner_.order();
     
     // update destination vector
     # pragma omp simd
@@ -664,7 +677,7 @@ void RadialIntegrals::apply_R_matrix
         dst[j] *= b;
     
     // workspace
-    cArray prod (Nspline_proj);
+    cArray prod (Nspline_atom);
     
     // for all blocks of the radial matrix
     # pragma omp parallel for firstprivate (prod) schedule (dynamic, 1)
@@ -675,28 +688,28 @@ void RadialIntegrals::apply_R_matrix
         SymBandMatrix<Complex> block_ik = std::move ( calc_R_tr_dia_block(lambda, i, k, simple) );
         
         // multiply source vector by this block
-        block_ik.dot(1., cArrayView(src, k * Nspline_proj, Nspline_proj), 0., prod);
+        block_ik.dot(1., cArrayView(src, k * Nspline_atom, Nspline_atom), 0., prod);
         
         // update destination vector
         # pragma omp critical
         {
             # pragma omp simd
-            for (std::size_t j  = 0; j < Nspline_proj; j++)
-                dst[i * Nspline_proj + j] += a * prod[j];
+            for (std::size_t j  = 0; j < Nspline_atom; j++)
+                dst[i * Nspline_atom + j] += a * prod[j];
         }
         
         // also handle symmetric case
         if (i != k)
         {
             // multiply source vector by this block
-            block_ik.dot(1., cArrayView(src, i * Nspline_proj, Nspline_proj), 0., prod);
+            block_ik.dot(1., cArrayView(src, i * Nspline_atom, Nspline_atom), 0., prod);
             
             // update destination vector
             # pragma omp critical
             {
                 # pragma omp simd
-                for (std::size_t j  = 0; j < Nspline_proj; j++)
-                    dst[k * Nspline_proj + j] += a * prod[j];
+                for (std::size_t j  = 0; j < Nspline_atom; j++)
+                    dst[k * Nspline_atom + j] += a * prod[j];
             }
         }
     }

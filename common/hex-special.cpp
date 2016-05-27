@@ -914,7 +914,7 @@ double special::Gaunt (int l1, int m1, int l2, int m2, int l, int m)
         special::ClebschGordan(l1, m1, l2, m2, l, m) * special::ClebschGordan(l1,  0, l2,  0, l, 0);
 }
 
-int triangle_count (int L, int maxl)
+int special::triangle_count (int L, int maxl)
 {
     int n = 0;
     
@@ -957,4 +957,32 @@ std::vector<std::vector<int>> special::FdB_partition (int n)
     while (partg.back() == 0); // stop at the partitioning (0,0,...,1)
     
     return partgs;
+}
+
+double special::hydro_rho (int n1, int l1, int n2, int l2, int lambda)
+{
+    // check validity of the parameters
+    assert(n1 > l1 && l1 >= 0 && n2 > l2 && l2 >= 0 && lambda >= 0);
+    
+    // hydrogen normalization factors
+    double N1 = std::sqrt(gsl_pow_3(2./n1) * gsl_sf_fact(n1 - l1 - 1) / (2 * n1 * gsl_sf_fact(n1 + l1)));
+    double N2 = std::sqrt(gsl_pow_3(2./n2) * gsl_sf_fact(n2 - l2 - 1) / (2 * n2 * gsl_sf_fact(n2 + l2)));
+    
+    // auxiliary fields
+    std::vector<double> C1, C2;
+    for (int i = 0; i < n1 - l1 - 1; i++)
+        C1.push_back(gsl_sf_pow_int(-1,i)/gsl_sf_fact(i) * gsl_sf_pow_int(2./n1, l1 + i) * gsl_sf_choose(n1 + l1, n1 - l1 - 1 - i));
+    for (int j = 0; j < n2 - l2 - 1; j++)
+        C2.push_back(gsl_sf_pow_int(-1,j)/gsl_sf_fact(j) * gsl_sf_pow_int(2./n2, l2 + j) * gsl_sf_choose(n2 + l2, n2 - l2 - 1 - j));
+    
+    // result
+    double result = 0;
+    
+    // for all terms of the product of the two Laguerre polynomials
+    for (int i = 0; i < n1 - l1 - 1; i++)
+    for (int j = 0; j < n2 - l2 - 1; j++)
+        result += C1[i] * C2[j] * gsl_sf_fact(l1 + l2 + lambda + 2 + i + j) / gsl_sf_pow_int(1./n1 + 1./n2, l1 + l2 + lambda + 2 + i + j + 1);
+    
+    // return the normalized result
+    return N1 * N2 * result;
 }

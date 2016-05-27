@@ -64,44 +64,18 @@ const std::string sample_input =
     "# For each section use any of the following options and terminate by -1.\n"
     "#     L[inear] <Start> <End> <Samples>\n"
     "#     G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
-    "# The sections of the example are graphically demonstrated below.\n"
-    "# Letters used here are the same as in numbering of the user input given\n"
-    "# after this comment.\n"
-    "#\n"
-    "#         0      60   100   150 a.u.\n"
-    "#  solver |aaaaaa|bbbb|ccccc|\n"
-    "#                            160  200   250 a.u.\n"
-    "#  1. propagator |bbbb|dddddd|bbbb|ccccc|\n"
-    "#                                        260  300   350 a.u.\n"
-    "#  2. propagator             |bbbb|dddddd|bbbb|ccccc|\n"
-    "#                                                    360  400   450 a.u.\n"
-    "#  3. propagator                         |bbbb|dddddd|bbbb|ccccc|\n"
-    "#\n"
-    "#  etc.\n"
-    "#\n"
-    "#   1) Solver grid (0 a.u. - 100 a.u. / 150 a.u.)\n"
-    "#      - multiple knots at origin (4×)\n"
-    "#      - geometric grid to 10 a.u.\n"
-    "#      - uniform grid to distance (60 a.u. + 40 a.u. =) 100 a.u.\n"
-    "#      - complex absorbtion layer to distance 150 a.u.\n"
-    "#   2) First propagation grid (60 a.u. - 200 a.u. / 250 a.u.)\n"
-    "#      - uniform grid of length (40 a.u. + 60 a.u. + 40 a.u. =) 140 a.u. to distance 200 a.u.\n"
-    "#      - complex absorbtion layer of length 50 a.u. to distance 250 a.u.\n"
-    "#   3+) Further propagation grids, always extending the distance by 100 a.u.\n"
-    "# It is a good idea to visualise the grid before the calculation. You can use the command\n"
-    "# \"hex-ecs --write-grid\" and view the result in ParaView, or any other program supporting VTK.\n"
+    "# There are one or two sections; the projectile asymptotic extension is optional.\n"
     "#\n"
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
     "  G  0.1 10.0  0.1  1.1\n"
     "  L   11  100  90\n"
     " -1\n"
-    "# b) Real knots of the panel overlap, if any.\n"
+    "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
+    "  L    0  100  101\n"
     " -1\n"
-    "# c) Complex region knots.\n"
+    "# c) Complex region knots. (Start from zero.)\n"
     "  G    0   50   1  1.02\n"
-    " -1\n"
-    "# d) Knots of other panels (propagator projectile basis).\n"
     " -1\n"
     "\n"
     "# --------------- Atomic states -------------------\n"
@@ -223,7 +197,6 @@ void CommandLine::parse (int argc, char* argv[])
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
 #endif
-                    "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
                     "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
 #ifdef WITH_OPENCL
@@ -537,12 +510,6 @@ void CommandLine::parse (int argc, char* argv[])
                 return true;
             },
 #endif
-        "panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // propagate solution along the projectile axis
-                panels = std::atoi(optargs[0].c_str());
-                return true;
-            },
         "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // allow multiple factorizations at a time
@@ -681,7 +648,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tecs angle = " << ecstheta << std::endl;
     
     //
-    // load real solver knot data
+    // load real atomic knot data
     //
     
     ReadArrays(inf, rknots);
@@ -698,25 +665,28 @@ void InputFile::read (std::ifstream & inf)
             HexException("The real knot sequence is not monotonous.");
     
     //
-    // load basis overlap knot data
+    // load real projectile extension knot data
     //
     
-    ReadArrays(inf, overlap_knots);
+    ReadArrays(inf, rknots_ext);
     
     // print info
     std::cout << std::endl;
-    std::cout << "Overlap knots (" << overlap_knots.size() << ")" << std::endl;
-    for (std::string line : overlap_knots.lines(100))
+    std::cout << "Extension knots (" << rknots_ext.size() << ")" << std::endl;
+    for (std::string line : rknots_ext.lines(100))
         std::cout << '\t' << line << std::endl;
     
     // check that the first knot is zero
-    if (overlap_knots.size() > 0 and overlap_knots[0] != 0.)
+    if (rknots_ext.size() > 0 and rknots_ext[0] != 0.)
         HexException("The first knot in overlap region must be zero.");
     
     // check order of knots
-    for (unsigned i = 1; i < overlap_knots.size(); i++)
-        if (overlap_knots[i] < overlap_knots[i-1])
+    for (unsigned i = 1; i < rknots_ext.size(); i++)
+        if (rknots_ext[i] < rknots_ext[i-1])
             HexException("The overlap knot sequence is not monotonous.");
+    
+    // determine whether only the inner problem is to be solved (i.e. no projectile extension grid)
+    inner_only = rknots_ext.empty();
     
     //
     // load complex knot data
@@ -738,23 +708,6 @@ void InputFile::read (std::ifstream & inf)
     for (unsigned i = 1; i < cknots.size(); i++)
         if (cknots[i] < cknots[i-1])
             HexException("The complex knot sequence is not monotonous.");
-    
-    //
-    // load real propagator knot data
-    //
-    
-    ReadArrays(inf, rknots_next);
-    
-    // print info
-    std::cout << std::endl;
-    std::cout << "Propagator real knots (" << rknots_next.size() << ")" << std::endl;
-    for (std::string line : rknots_next.lines(100))
-        std::cout << '\t' << line << std::endl;
-    
-    // check order of knots
-    for (unsigned i = 1; i < rknots_next.size(); i++)
-        if (rknots_next[i] < rknots_next[i-1])
-            HexException("The propagator real knot sequence is not monotonous.");
     
     //
     // load initial atomic quantum numbers
@@ -902,7 +855,7 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
 }
 
-void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std::vector<std::pair<int,int>> const & ll)
+/*void zip_solution (CommandLine& cmd, Bspline const & bspline, const std::vector< std::pair< int, int > >& ll)
 {
     cArray sol;     // stored solution expansion
     cArray ev;      // evaluated solution
@@ -948,27 +901,18 @@ void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std:
         ),
         grid_x, grid_y, rArray({0.})        // x,y,z
     );
-}
+}*/
 
-void write_grid (std::vector<Bspline> const & bspline, std::string const & basename)
+void write_grid (Bspline const & bspline, std::string const & basename)
 {
     // get atomic grid
-    rArray knots0 = bspline[0].rknots();
-    knots0.pop_back();
-    knots0.append(bspline[0].cknots());
+    rArray knots = bspline.rknots();
+    knots.pop_back();
+    knots.append(bspline.cknots());
     
-    // for all grids
-    for (unsigned i = 0; i < bspline.size(); i++)
-    {
-        // output file
-        std::ofstream out (format("%s-%d.vtk", basename.c_str(), i).c_str());
-        
-        // get knots
-        rArray knots = bspline[i].rknots();
-        knots.pop_back();
-        knots.append(bspline[i].cknots());
-        
-        // write knots (write header only for the first time)
-        writeVTK_points(out, cArray(), knots0, knots, rArray({0.}));
-    }
+    // output file
+    std::ofstream out (basename + ".vtk");
+    
+    // write knots (write header only for the first time)
+    writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
 }
