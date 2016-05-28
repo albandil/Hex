@@ -47,10 +47,12 @@ ILUCGPreconditioner::ILUCGPreconditioner
     Parallel const & par,
     InputFile const & inp,
     AngularBasis const & ll,
-    Bspline const & bspline_atom,
-    Bspline const & bspline_proj,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_outer,
+    Bspline const & bspline_full,
     CommandLine const & cmd
-) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, cmd),
+) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
+    csr_blocks_(ll.states().size()),
     lu_(ll.states().size())
 {
 #ifdef _OPENMP
@@ -127,9 +129,9 @@ void ILUCGPreconditioner::update (Real E)
         for (auto & lu : lu_)
             lu->drop();
         
-        // TODO release outdated CSR diagonal blocks
-        /*for (auto & csr : csr_blocks_)
-            csr.drop();*/
+        // release outdated CSR diagonal blocks
+        for (auto & csr : csr_blocks_)
+            csr.drop();
     }
     
     // update parent
@@ -156,6 +158,73 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         // start timer
         Timer timer;
+        
+        // number of asymptotic channels
+        int Nchan1 = Nchan_[iblock].first;
+        int Nchan2 = Nchan_[iblock].second;
+        
+        // number of B-splines
+        LU_int_t Nspline_inner = rad_.bspline_inner().Nspline();
+        LU_int_t Nspline_outer = rad_.bspline_outer().Nspline();
+        
+        // angular block
+        int iang = iblock * ang_.states().size() + iblock;
+        
+        // convert inner region matrix block to COO matrix
+        CooMatrix<LU_int_t,Complex> A_coo = A_blocks_[iang].tocoo<LU_int_t>();
+        A_coo.tocsr().tocoo().write("A-coo.txt"); // DEBUG
+        
+        // add the A-block
+        CooMatrix<LU_int_t,Complex> coo_block
+        (
+            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
+            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
+            A_coo.i(), A_coo.j(), A_coo.v()
+        );
+        
+        if (not inp_.inner_only)
+        {
+            // add the outer region C-blocks
+            coo_block += Cu_blocks_[iang];
+            coo_block += Cl_blocks_[iang];
+            Cu_blocks_[iang].write("Cu-coo.txt"); // DEBUG
+            Cl_blocks_[iang].write("Cl-coo.txt"); // DEBUG
+            
+            // add the B-blocks
+            for (int m = 0; m < Nchan1; m++)
+            for (int n = 0; n < Nchan1; n++)
+            {
+                CooMatrix<LU_int_t,Complex> B_coo_small = B1_blocks_[iang][m * Nchan1 + n].tocoo<LU_int_t>();
+                CooMatrix<LU_int_t,Complex> B_coo_large
+                (
+                    coo_block.rows(), coo_block.cols(),
+                    B_coo_small.i() + Nspline_inner * Nspline_inner + m * Nspline_outer,
+                    B_coo_small.j() + Nspline_inner * Nspline_inner + n * Nspline_outer,
+                    B_coo_small.v()
+                );
+                coo_block += B_coo_large;
+                B_coo_large.tocsr().tocoo().write(format("B1-%d-%d-coo.txt", m, n)); // DEBUG
+            }
+            for (int m = 0; m < Nchan2; m++)
+            for (int n = 0; n < Nchan2; n++)
+            {
+                CooMatrix<LU_int_t,Complex> B_coo_small = B2_blocks_[iang][m * Nchan2 + n].tocoo<LU_int_t>();
+                CooMatrix<LU_int_t,Complex> B_coo_large
+                (
+                    coo_block.rows(), coo_block.cols(),
+                    B_coo_small.i() + Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer,
+                    B_coo_small.j() + Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer,
+                    B_coo_small.v()
+                );
+                coo_block += B_coo_large;
+                B_coo_large.tocsr().tocoo().write(format("B2-%d-%d-coo.txt", m, n)); // DEBUG
+            }
+        }
+        
+        // create the CSR block that will be factorized
+        csr_blocks_[iblock] = coo_block.tocsr();
+        csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
+        csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
         
         // factorize the block and store it
         lu_[iblock] = csr_blocks_[iblock].factorize
@@ -184,7 +253,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         // save the diagonal block's CSR representation and its factorization
         lu_[iblock]->link(format("lu-%d.bin", iblock));
-        lu_[iblock]->save();
+//         lu_[iblock]->save();
         
 #ifdef _OPENMP
         // release lock

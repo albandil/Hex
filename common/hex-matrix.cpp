@@ -331,11 +331,12 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
             LU_int_t gid = elem_ptrs[m][n];
             
             // update elements
-            Ai[pos] += j_[gid];
+            Ai[pos]  = j_[gid];
             Ax[pos] += x_[gid];
             
-            // add also the next entry if it is in the same column
-            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and gid == elem_ptrs[m][n + 1])
+            // if the next row entry is in the same column, do not advance position counter,
+            // so that the element will be added to current position
+            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and j_[gid] == j_[elem_ptrs[m][n + 1]])
                 continue;
             
             // otherwise move on to the next position
@@ -385,7 +386,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
+        std::cerr << "\nSymbolic factorization error " << status << std::endl;
         UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -399,7 +400,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
+        std::cerr << "\nNumeric factorization error " << status << std::endl;
         UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }

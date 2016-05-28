@@ -87,7 +87,10 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
         
-    protected:
+//     protected:
+        
+        // diagonal blocks as CSR matrices
+        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
         
         // LU decompositions of the CSR blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;

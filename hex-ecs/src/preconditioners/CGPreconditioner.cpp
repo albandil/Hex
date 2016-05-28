@@ -46,8 +46,7 @@ const std::string CGPreconditioner::prec_description =
 int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) const
 {
     // shorthands
-    int Nspline_atom = rad_.bspline_atom().Nspline();
-    int Nspline_proj = rad_.bspline_proj().Nspline();
+    int Nspline_inner = rad_.bspline_inner().Nspline();
     
     // prepare the block-preconditioner for run
     this->CG_init(ill);
@@ -96,7 +95,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               {
                                   this->CG_constrain(r);
                               };
-    int n = CG.solve(r, z, cmd_.prec_itertol, 0, Nspline_atom * Nspline_proj);
+    int n = CG.solve(r, z, cmd_.prec_itertol, 0, Nspline_inner * Nspline_inner);
     
     // release block-preconditioner block-specific data
     this->CG_exit(ill);
@@ -204,8 +203,8 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
 
 void CGPreconditioner::CG_init (int iblock) const
 {
-    if (cmd_.outofcore and cmd_.wholematrix)
-        dia_blocks_[iblock].hdfload();
+//     if (cmd_.outofcore and cmd_.wholematrix)
+//         dia_blocks_[iblock].hdfload();
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
@@ -213,7 +212,49 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     if (cmd_.lightweight_full)
         HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
         
-    dia_blocks_[iblock].dot(1., p, 0., q, true);
+//     dia_blocks_[iblock].dot(1., p, 0., q, true);
+    
+    std::memset(q.data(), 0, q.size() * sizeof(Complex));
+    
+    std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
+    std::size_t Nspline_outer = rad_.bspline_outer().Nspline();
+    std::size_t Nang = ang_.states().size();
+    std::size_t iang = iblock * Nang + iblock;
+    
+    A_blocks_[iang].dot
+    (
+        1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
+        1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
+    );
+    
+    if (not inp_.inner_only)
+    {
+        std::size_t Nchan1 = Nchan_[iblock].first;
+        std::size_t Nchan2 = Nchan_[iblock].second;
+        
+        for (std::size_t m = 0; m < Nchan1; m++)
+        for (std::size_t n = 0; n < Nchan1; n++)
+        {
+            B1_blocks_[iang][m * Nchan1 + n].dot
+            (
+                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
+                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
+            );
+        }
+        
+        for (std::size_t m = 0; m < Nchan2; m++)
+        for (std::size_t n = 0; n < Nchan2; n++)
+        {
+            B1_blocks_[iang][m * Nchan2 + n].dot
+            (
+                1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
+                1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
+            );
+        }
+        
+        Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
+        Cl_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
+    }
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -223,13 +264,13 @@ void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) co
 
 void CGPreconditioner::CG_exit (int iblock) const
 {
-    if (cmd_.outofcore and cmd_.wholematrix)
-        dia_blocks_[iblock].drop();
+//     if (cmd_.outofcore and cmd_.wholematrix)
+//         dia_blocks_[iblock].drop();
 }
 
 void CGPreconditioner::finish ()
 {
-    dia_blocks_.resize(0);
+//     dia_blocks_.resize(0);
     n_.fill(-1);
     NoPreconditioner::finish();
 }

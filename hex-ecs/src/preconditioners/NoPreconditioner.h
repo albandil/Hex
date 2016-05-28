@@ -68,11 +68,11 @@ class NoPreconditioner : public PreconditionerBase
             CommandLine const & cmd
         ) : PreconditionerBase(),
             E_(0), cmd_(cmd), par_(par), inp_(inp), ang_(ll),
-            A_blocks_(ang_.states().size()),
-            B1_blocks_(ang_.states().size()),
-            B2_blocks_(ang_.states().size()),
-            Cu_blocks_(ang_.states().size()),
-            Cl_blocks_(ang_.states().size()),
+            A_blocks_ (ang_.states().size() * ang_.states().size()),
+            B1_blocks_(ang_.states().size() * ang_.states().size()),
+            B2_blocks_(ang_.states().size() * ang_.states().size()),
+            Cu_blocks_(ang_.states().size() * ang_.states().size()),
+            Cl_blocks_(ang_.states().size() * ang_.states().size()),
             rad_(bspline_inner, bspline_outer, bspline_full, ang_.maxlambda() + 1)
         {
             // nothing to do
@@ -113,14 +113,23 @@ class NoPreconditioner : public PreconditionerBase
         //  ┗━━━━━━┷━━━┷━━━━┛
         // The off-diagonal blocks Cu and Cl are actually stored as COO matrices with the dimension
         // of the whole matrix, but only the elements of the respective blocks are non-zero.
-        mutable std::vector<BlockSymBandMatrix<Complex>> A_blocks_;
-        mutable std::vector<BlockSymBandMatrix<Complex>> B1_blocks_;
-        mutable std::vector<BlockSymBandMatrix<Complex>> B2_blocks_;
-        mutable std::vector<CooMatrix<LU_int_t,Complex>> Cu_blocks_;
-        mutable std::vector<CooMatrix<LU_int_t,Complex>> Cl_blocks_;
+        std::vector<BlockSymBandMatrix<Complex>> A_blocks_;
+        std::vector<std::vector<SymBandMatrix<Complex>>> B1_blocks_;
+        std::vector<std::vector<SymBandMatrix<Complex>>> B2_blocks_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Cu_blocks_;
+        std::vector<CooMatrix<LU_int_t,Complex>> Cl_blocks_;
+        
+        // maximal bound state principal quantum number for given energy
+        int max_n_;
+        
+        // number of channels when r1 -> inf and r2 -> inf, respectively
+        std::vector<std::pair<int,int>> Nchan_;
         
         // radial integrals for the solution
         RadialIntegrals rad_;
+        
+        // hydrogen orbitals B-spline overlaps and expansions (on inner basis)
+        std::vector<cArrays> Sp, Xp;
 };
 
 #endif

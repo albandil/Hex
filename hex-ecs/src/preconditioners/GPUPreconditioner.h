@@ -143,11 +143,9 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         // device data connections
         mutable clArray<Complex> tmp_, tmA_;
         mutable clArray<Real> nrm_;
-        clArrayView<Complex> t_atom_, t_proj_;
-        clArrayView<Complex> S_atom_p_, D_atom_p_, Mm1_tr_atom_p_, Mm2_atom_p_;
-        clArrayView<Complex> S_proj_p_, D_proj_p_, Mm1_tr_proj_p_, Mm2_proj_p_;
-        std::vector<clArrayView<Complex>> Mi_L_atom_, Mi_mLm1_atom_, M_L_atom_, M_mLm1_atom_;
-        std::vector<clArrayView<Complex>> Mi_L_proj_, Mi_mLm1_proj_, M_L_proj_, M_mLm1_proj_;
+        clArrayView<Complex> t_inner_;
+        clArrayView<Complex> S_inner_p_, D_inner_p_, Mm1_tr_inner_p_, Mm2_inner_p_;
+        std::vector<clArrayView<Complex>> Mi_L_inner_, Mi_mLm1_inner_, M_L_inner_, M_mLm1_inner_;
         std::vector<clArrayView<Complex>> Rdia_;
         
         cl_short nsrcseg_, ndstseg_;

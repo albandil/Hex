@@ -104,7 +104,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_full,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
-            prec_atom_(inp.maxell+1), prec_proj_(inp.maxell+1), maxknot_(-1)
+            prec_inner_(inp.maxell + 1), maxknot_(-1)
         {
             // nothing more to do
         }
@@ -143,8 +143,7 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         );
         
         // preconditioner data
-        mutable std::vector<Data> prec_atom_;
-        mutable std::vector<Data> prec_proj_;
+        mutable std::vector<Data> prec_inner_;
         
         // workspace
         mutable cArrays workspace_;

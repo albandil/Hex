@@ -293,10 +293,17 @@ int main (int argc, char* argv[])
         std::cout << "\t\t- number of splines: " << bspline_inner.Nspline() << std::endl;
         std::cout << "\t\t- real knots : " << bspline_inner.rknots().front() << " to " << bspline_inner.rknots().back() << std::endl;
         std::cout << "\t\t- complex knots : " << bspline_inner.cknots().front() << " to " << bspline_inner.cknots().back() << std::endl;
-        std::cout << "\t- outer basis" << std::endl;
-        std::cout << "\t\t- number of splines: " << bspline_outer.Nspline() << std::endl;
-        std::cout << "\t\t- real knots : " << bspline_outer.rknots().front() << " to " << bspline_outer.rknots().back() << std::endl;
-        std::cout << "\t\t- complex knots : " << bspline_outer.cknots().front() << " to " << bspline_outer.cknots().back() << std::endl;
+        if (bspline_outer.Nspline() > 0)
+        {
+            std::cout << "\t- outer basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_outer.Nspline() << std::endl;
+            std::cout << "\t\t- real knots : " << bspline_outer.rknots().front() << " to " << bspline_outer.rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline_outer.cknots().front() << " to " << bspline_outer.cknots().back() << std::endl;
+            std::cout << "\t- full basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
+            std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline_full.cknots().front() << " to " << bspline_full.cknots().back() << std::endl;
+        }
         std::cout << std::endl;
         
         // pick preconditioner according to the user preferences
