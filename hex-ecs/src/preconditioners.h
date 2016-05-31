@@ -204,7 +204,6 @@ class Preconditioners
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
         )
@@ -213,8 +212,8 @@ class Preconditioners
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
             return   (i == cmd.preconditioner)
-                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd)
-                   : choose<i+1>(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd);
+                   ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_inner, bspline_full, cmd)
+                   : choose<i+1>(par, inp, ll, bspline_inner, bspline_full, cmd);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
         (
@@ -222,7 +221,6 @@ class Preconditioners
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
         )

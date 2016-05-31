@@ -217,7 +217,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
     std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
-    std::size_t Nspline_outer = rad_.bspline_outer().Nspline();
+    std::size_t Nspline_full = rad_.bspline_full().Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     std::size_t Nang = ang_.states().size();
     std::size_t iang = iblock * Nang + iblock;
     
@@ -255,6 +256,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
         Cl_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
     }
+    
+//     std::cout << "CG_mul " << iblock << " in " << p.norm() << " out " << q.norm() << std::endl;
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const

@@ -64,12 +64,11 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
-            ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
+        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
             prec_(ll.states().size(), Undecided)
         {
             // nothing more to do

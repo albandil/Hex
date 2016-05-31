@@ -48,10 +48,9 @@ ILUCGPreconditioner::ILUCGPreconditioner
     InputFile const & inp,
     AngularBasis const & ll,
     Bspline const & bspline_inner,
-    Bspline const & bspline_outer,
     Bspline const & bspline_full,
     CommandLine const & cmd
-) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
+) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
     csr_blocks_(ll.states().size()),
     lu_(ll.states().size())
 {
@@ -160,12 +159,12 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         Timer timer;
         
         // number of asymptotic channels
-        int Nchan1 = Nchan_[iblock].first;
-        int Nchan2 = Nchan_[iblock].second;
+        int Nchan2 = Nchan_[iblock].first;
+        int Nchan1 = Nchan_[iblock].second;
         
         // number of B-splines
         LU_int_t Nspline_inner = rad_.bspline_inner().Nspline();
-        LU_int_t Nspline_outer = rad_.bspline_outer().Nspline();
+        LU_int_t Nspline_outer = rad_.bspline_full().Nspline() - Nspline_inner;
         
         // angular block
         int iang = iblock * ang_.states().size() + iblock;
@@ -223,8 +222,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         // create the CSR block that will be factorized
         csr_blocks_[iblock] = coo_block.tocsr();
-        csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
-        csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
+//         csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
+//         csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
         
         // factorize the block and store it
         lu_[iblock] = csr_blocks_[iblock].factorize
@@ -267,6 +266,9 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 {
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
+    
+//     std::cout << "ILU PREC r[" << iblock << "].norm() = " << r.norm() << std::endl;
+//     std::cout << "ILU PREC z[" << iblock << "].norm() = " << z.norm() << std::endl;
 }
 
 void ILUCGPreconditioner::CG_exit (int iblock) const

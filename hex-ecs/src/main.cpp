@@ -156,15 +156,6 @@ int main (int argc, char* argv[])
             inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : rArray{ inp.rknots.back() }
         );
         
-        // create new B-spline basis for the outer problem
-        Bspline bspline_outer
-        (
-            inp.order,
-            inp.rknots_ext,
-            inp.ecstheta,
-            inp.rknots_ext.empty() ? rArray{} : inp.rknots.back() + inp.cknots
-        );
-        
         // create new B-spline basis for inner and outer problem (will be the same as 'bspline_atom' if 'rknots_ext' is empty)
         Bspline bspline_full
         (
@@ -260,12 +251,12 @@ int main (int argc, char* argv[])
     // TODO Zip solution file into VTK geometry if told so
     //
     
-        /*if (cmd.zipdata.file.size() != 0 and par.IamMaster())
+        if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
-            zip_solution(cmd, bspline_full, ang.states());
+            zip_solution(par, cmd, bspline_inner, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
-        }*/
+        }
     
     //
     // Write grid into VTK file if told so.
@@ -274,7 +265,6 @@ int main (int argc, char* argv[])
         if (cmd.writegrid and par.IamMaster())
         {
             write_grid(bspline_inner, "grid-inner");
-            write_grid(bspline_outer, "grid-outer");
             write_grid(bspline_full, "grid-full");
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
@@ -285,25 +275,21 @@ int main (int argc, char* argv[])
     //
     
         // create the solver instance
-        Solver solver (cmd, inp, par, ang, bspline_inner, bspline_outer, bspline_full);
+        Solver solver (cmd, inp, par, ang, bspline_inner, bspline_full);
         
         std::cout << std::endl;
         std::cout << "Bspline basis summary" << std::endl;
-        std::cout << "\t- inner basis" << std::endl;
-        std::cout << "\t\t- number of splines: " << bspline_inner.Nspline() << std::endl;
-        std::cout << "\t\t- real knots : " << bspline_inner.rknots().front() << " to " << bspline_inner.rknots().back() << std::endl;
-        std::cout << "\t\t- complex knots : " << bspline_inner.cknots().front() << " to " << bspline_inner.cknots().back() << std::endl;
-        if (bspline_outer.Nspline() > 0)
+        if (bspline_inner.Nspline() != bspline_full.Nspline())
         {
-            std::cout << "\t- outer basis" << std::endl;
-            std::cout << "\t\t- number of splines: " << bspline_outer.Nspline() << std::endl;
-            std::cout << "\t\t- real knots : " << bspline_outer.rknots().front() << " to " << bspline_outer.rknots().back() << std::endl;
-            std::cout << "\t\t- complex knots : " << bspline_outer.cknots().front() << " to " << bspline_outer.cknots().back() << std::endl;
-            std::cout << "\t- full basis" << std::endl;
-            std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
-            std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
-            std::cout << "\t\t- complex knots : " << bspline_full.cknots().front() << " to " << bspline_full.cknots().back() << std::endl;
+            std::cout << "\t- inner basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_inner.Nspline() << std::endl;
+            std::cout << "\t\t- real knots : " << bspline_inner.rknots().front() << " to " << bspline_inner.rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline_inner.cknots().front() << " to " << bspline_inner.cknots().back() << std::endl;
         }
+        std::cout << "\t- full basis" << std::endl;
+        std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
+        std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
+        std::cout << "\t\t- complex knots : " << bspline_full.cknots().front() << " to " << bspline_full.cknots().back() << std::endl;
         std::cout << std::endl;
         
         // pick preconditioner according to the user preferences
@@ -325,7 +311,7 @@ int main (int argc, char* argv[])
         if (cmd.itinerary & CommandLine::StgExtract)
         {
             // extract amplitudes
-            Amplitudes ampl (bspline_inner, bspline_outer, bspline_full, inp, par, cmd, ang.states());
+            Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
             ampl.extract();
             
             // write T-matrices to a text file as SQL statements 

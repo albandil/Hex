@@ -64,7 +64,6 @@ class Amplitudes
         Amplitudes
         (
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             InputFile const & inp,
             Parallel const & par,
@@ -245,7 +244,6 @@ class Amplitudes
         
         // B-spline environment
         Bspline const & bspline_inner_;
-        Bspline const & bspline_outer_;
         Bspline const & bspline_full_;
         
         // radial integrals

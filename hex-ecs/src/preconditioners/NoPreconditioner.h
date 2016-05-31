@@ -63,7 +63,6 @@ class NoPreconditioner : public PreconditionerBase
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
         ) : PreconditionerBase(),
@@ -73,7 +72,7 @@ class NoPreconditioner : public PreconditionerBase
             B2_blocks_(ang_.states().size() * ang_.states().size()),
             Cu_blocks_(ang_.states().size() * ang_.states().size()),
             Cl_blocks_(ang_.states().size() * ang_.states().size()),
-            rad_(bspline_inner, bspline_outer, bspline_full, ang_.maxlambda() + 1)
+            rad_(bspline_inner, bspline_full, ang_.maxlambda() + 1)
         {
             // nothing to do
         }

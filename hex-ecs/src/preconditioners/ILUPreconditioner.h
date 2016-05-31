@@ -65,7 +65,6 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
         );

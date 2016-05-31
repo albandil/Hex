@@ -970,17 +970,17 @@ double special::hydro_rho (int n1, int l1, int n2, int l2, int lambda)
     
     // auxiliary fields
     std::vector<double> C1, C2;
-    for (int i = 0; i < n1 - l1 - 1; i++)
+    for (int i = 0; i <= n1 - l1 - 1; i++)
         C1.push_back(gsl_sf_pow_int(-1,i)/gsl_sf_fact(i) * gsl_sf_pow_int(2./n1, l1 + i) * gsl_sf_choose(n1 + l1, n1 - l1 - 1 - i));
-    for (int j = 0; j < n2 - l2 - 1; j++)
+    for (int j = 0; j <= n2 - l2 - 1; j++)
         C2.push_back(gsl_sf_pow_int(-1,j)/gsl_sf_fact(j) * gsl_sf_pow_int(2./n2, l2 + j) * gsl_sf_choose(n2 + l2, n2 - l2 - 1 - j));
     
     // result
     double result = 0;
     
     // for all terms of the product of the two Laguerre polynomials
-    for (int i = 0; i < n1 - l1 - 1; i++)
-    for (int j = 0; j < n2 - l2 - 1; j++)
+    for (int i = 0; i <= n1 - l1 - 1; i++)
+    for (int j = 0; j <= n2 - l2 - 1; j++)
         result += C1[i] * C2[j] * gsl_sf_fact(l1 + l2 + lambda + 2 + i + j) / gsl_sf_pow_int(1./n1 + 1./n2, l1 + l2 + lambda + 2 + i + j + 1);
     
     // return the normalized result

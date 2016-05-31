@@ -100,10 +100,9 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
+        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
             prec_inner_(inp.maxell + 1), maxknot_(-1)
         {
             // nothing more to do

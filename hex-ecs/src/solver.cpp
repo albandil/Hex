@@ -40,11 +40,9 @@ Solver::Solver
     Parallel const & par,
     AngularBasis const & ang,
     Bspline const & bspline_inner,
-    Bspline const & bspline_outer,
     Bspline const & bspline_full
 ) : cmd_(cmd), inp_(inp), par_(par), ang_(ang),
     bspline_inner_(bspline_inner),
-    bspline_outer_(bspline_outer),
     bspline_full_ (bspline_full),
     prec_(nullptr)
 {
@@ -54,7 +52,7 @@ Solver::Solver
 void Solver::choose_preconditioner ()
 {
     // create the preconditioner
-    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_inner_, bspline_outer_, bspline_full_, cmd_);
+    prec_ = Preconditioners::choose(par_, inp_, ang_, bspline_inner_, bspline_full_, cmd_);
     
     // check success
     if (prec_ == nullptr)
@@ -454,11 +452,10 @@ BlockArray<Complex> Solver::new_array_ (std::size_t N, std::string name) const
     // create a new block array and initialize blocks local to this MPI node
     BlockArray<Complex> array (N, !cmd_.outofcore, name);
     
-    // inner B-spline count
+    // sizes
     std::size_t Nspline_inner = bspline_inner_.Nspline();
-    
-    // projectile exclusive B-spline count
-    std::size_t Nspline_outer = bspline_outer_.Nspline();
+    std::size_t Nspline_full = bspline_full_.Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // initialize all blocks ('resize' automatically zeroes added elements)
     for (std::size_t i = 0; i < N; i++) if (par_.isMyGroupWork(i))

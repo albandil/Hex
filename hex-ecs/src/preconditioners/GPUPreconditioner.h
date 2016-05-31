@@ -93,11 +93,10 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
             InputFile const & inp,
             AngularBasis const & ll,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_outer, bspline_full, cmd)
+        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
         {
             // nothing more to do
         }

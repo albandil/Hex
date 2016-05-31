@@ -855,53 +855,173 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
 }
 
-/*void zip_solution (CommandLine& cmd, Bspline const & bspline, const std::vector< std::pair< int, int > >& ll)
+void zip_solution
+(
+    Parallel const & par, 
+    CommandLine const & cmd,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
+    std::vector<std::pair<int,int>> const & ll
+)
 {
     cArray sol;     // stored solution expansion
     cArray ev;      // evaluated solution
     rArray grid_x;  // real evaluation grid (atomic electron)
     rArray grid_y;  // real evaluation grid (projectile electron)
     
+    // shorthands
+    std::size_t Nspline_inner = bspline_inner.Nspline();
+    std::size_t Nspline_full  = bspline_full .Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
+    
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipdata.file << "\"" << std::endl;
-    
-    // load the requested file
-    if (not sol.hdfload(cmd.zipdata.file.c_str()))
-        HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
-    
-    // determine which B-spline basis to use
-    unsigned i;
-    for (i = 0; i < bspline.size(); i++)
-    {
-        if (sol.size() == (std::size_t)bspline[0].Nspline() * (std::size_t)bspline[i].Nspline())
-            break;
-    }
-    
-    // was some basis appropriate?
-    if (i == bspline.size())
-        HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
     
     // evaluation grid
     Real Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
     Real Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
-    Real Xmax = cmd.zipdata.Xmax < 0 ? bspline[0].Rmax() : cmd.zipdata.Xmax;
-    Real Ymax = cmd.zipdata.Ymax < 0 ? bspline[i].Rmax() : cmd.zipdata.Ymax;
+    Real Xmax = cmd.zipdata.Xmax < 0 ? bspline_full.Rmax() : cmd.zipdata.Xmax;
+    Real Ymax = cmd.zipdata.Ymax < 0 ? bspline_full.Rmax() : cmd.zipdata.Ymax;
     grid_x = linspace(Xmin, Xmax, cmd.zipdata.nX);
     grid_y = linspace(Ymin, Ymax, cmd.zipdata.nY);
     
-    // write to file
-    std::ofstream out ((cmd.zipdata.file + ".vtk").c_str());
+    // load the requested file
+    HDFFile hdf (cmd.zipdata.file, HDFFile::readonly);
+    if (not hdf.valid())
+        HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
+    
+    // get solution information
+    int l1, l2, Nchan1, Nchan2; Real E;
+    if (not hdf.read("l1", &l1, 1) or
+        not hdf.read("l2", &l2, 1) or
+        not hdf.read("E", &E, 1) or
+        not sol.hdfload(cmd.zipdata.file))
+        HexException("This is not a valid solution file.");
+    
+    // get number of asymptotic channels
+    int max_n = (E >= 0 ? 0 : 1.0_r / std::sqrt(-E));
+    Nchan2 = (max_n >= l1 + 1 ? max_n - l1 : 0);
+    Nchan1 = (max_n >= l2 + 1 ? max_n - l2 : 0);
+    
+    // prepare radial integrals structure
+    RadialIntegrals r (bspline_inner, bspline_full, 0);
+    r.verbose(false);
+    r.setupOneElectronIntegrals(par, cmd);
+    
+    // prepare quadrature structure
+    GaussLegendre g_inner (bspline_inner);
+    
+    // factorize the overlap matrix
+    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
+    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu = S_csr.factorize();
+    
+    // compute all needed bound states
+    cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
+    for (int n1 = l1 + 1; n1 <= max_n; n1++)
+    {
+        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1, weightEndDamp(bspline_inner));
+        Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
+    }
+    for (int n2 = l2 + 1; n2 <= max_n; n2++)
+    {
+        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2, weightEndDamp(bspline_inner));
+        Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
+    }
+    
+    // expand the solution
+    cArray full_solution (Nspline_full * Nspline_full, 0.0_z);
+    for (std::size_t i = 0; i < Nspline_full; i++)
+    for (std::size_t j = 0; j < Nspline_full; j++)
+    {
+        if (i < Nspline_inner and j < Nspline_inner)
+        {
+            full_solution[i * Nspline_full + j] = sol[i * Nspline_inner + j];
+        }
+        else if (i >= Nspline_inner and j >= Nspline_inner)
+        {
+            full_solution[i * Nspline_full + j] = 0;
+        }
+        else if (i >= Nspline_inner)
+        {
+            // all channels r1 -> inf
+            for (int n = 0; n < Nchan1; n++)
+                full_solution[i * Nspline_full + j] += sol[Nspline_inner * Nspline_inner + n * Nspline_outer + i - Nspline_inner] * Xp2[n][j];
+        }
+        else /* if (j >= Nspline_inner) */
+        {
+            // all channels r2 -> inf
+            for (int n = 0; n < Nchan2; n++)
+                full_solution[i * Nspline_full + j] += Xp1[n][i] * sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + j - Nspline_inner];
+        }
+    }
+    
+    // write full solution to file
+    std::ofstream out ((cmd.zipdata.file + "-full.vtk").c_str());
     writeVTK_points
     (
         out,                                // output file stream
         Bspline::zip
         (
-            bspline[0], bspline[i],         // B-spline bases (for x and y)
-            sol,                            // function expansion in those two bases
+            bspline_full, bspline_full,     // B-spline bases (for x and y)
+            full_solution,                  // function expansion in those two bases
             grid_x, grid_y                  // evaluation grids
         ),
         grid_x, grid_y, rArray({0.})        // x,y,z
     );
-}*/
+    
+    // expand the channel functions
+    for (int n = 0; n < Nchan1; n++)
+    {
+        cArray full_channel_function (Nspline_full, 0.0_z);
+        
+        for (std::size_t i = 0; i < Nspline_full; i++)
+        {
+            if (i < Nspline_inner)
+            {
+                for (std::size_t j = 0; j < Nspline_inner; j++)
+                    full_channel_function[i] += sol[i * Nspline_inner + j] * Sp2[n][j];
+            }
+            else
+            {
+                full_channel_function[i] = sol[Nspline_inner * Nspline_inner + n * Nspline_outer + i - Nspline_inner];
+            }
+        }
+        
+        // write to file
+        std::ofstream out (format("%s-channel-X-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        writeVTK_points
+        (
+            out,
+            bspline_full.zip(full_channel_function, grid_x),
+            grid_x, rArray({0.}), rArray({0.})
+        );
+    }
+    for (int n = 0; n < Nchan2; n++)
+    {
+        cArray full_channel_function (Nspline_full);
+        
+        for (std::size_t i = 0; i < Nspline_full; i++)
+        {
+            if (i < Nspline_inner)
+            {
+                for (std::size_t j = 0; j < Nspline_inner; j++)
+                    full_channel_function[i] += Sp1[n][j] * sol[j * Nspline_inner + i];
+            }
+            else
+            {
+                full_channel_function[i] = sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + i - Nspline_inner];
+            }
+        }
+        
+        // write to file
+        std::ofstream out (format("%s-channel-%d-X.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        writeVTK_points
+        (
+            out,
+            bspline_full.zip(full_channel_function, grid_x),
+            grid_x, rArray({0.}), rArray({0.})
+        );
+    }
+}
 
 void write_grid (Bspline const & bspline, std::string const & basename)
 {

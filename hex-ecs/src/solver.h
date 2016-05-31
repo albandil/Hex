@@ -54,7 +54,6 @@ class Solver
             Parallel const & par,
             AngularBasis const & ang,
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full
         );
         
@@ -112,7 +111,6 @@ class Solver
         
         /// Radial bases.
         Bspline const & bspline_inner_;
-        Bspline const & bspline_outer_;
         Bspline const & bspline_full_;
         
         /// Solver preconditioner.

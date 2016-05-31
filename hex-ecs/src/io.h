@@ -41,6 +41,7 @@
 #include "hex-luft.h"
 
 #include "bspline.h"
+#include "parallel.h"
 
 /**
  * @brief Command line parameters.
@@ -358,10 +359,8 @@ class SolutionIO
                 size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
             }
             
-            // check that the sizes are consistent
-            std::size_t min_size = *std::min_element(size.begin(), size.end());
-            std::size_t max_size = *std::max_element(size.begin(), size.end());
-            return min_size == max_size ? min_size : 0;
+            // check that all blocks existed
+            return std::find(size.begin(), size.end(), 0) == size.end();
         }
         
         /**
@@ -478,11 +477,18 @@ class SolutionIO
                 return false;
             
             // write data
-            if (not hdf.write("array", solution.data(), solution.size()))
-                return false;
-            
-            // success
-            return true;
+            bool success = true;
+            success = (success and hdf.write("L",  &L_,  1));
+            success = (success and hdf.write("S",  &S_,  1));
+            success = (success and hdf.write("Pi", &Pi_, 1));
+            success = (success and hdf.write("ni", &ni_, 1));
+            success = (success and hdf.write("li", &li_, 1));
+            success = (success and hdf.write("mi", &mi_, 1));
+            success = (success and hdf.write("E",  &E_,  1));
+            success = (success and hdf.write("l1",  &ang_[ill].first,  1));
+            success = (success and hdf.write("l2",  &ang_[ill].second, 1));
+            success = (success and hdf.write("array", solution.data(), solution.size()));
+            return success;
         }
     
     private:
@@ -512,8 +518,10 @@ class SolutionIO
  */
 void zip_solution
 (
-    CommandLine & cmd,
-    Bspline const & bspline,
+    Parallel const & par, 
+    CommandLine const & cmd,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
     std::vector<std::pair<int,int>> const & ll
 );
 

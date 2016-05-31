@@ -122,7 +122,6 @@ class RadialIntegrals
         RadialIntegrals
         (
             Bspline const & bspline_inner,
-            Bspline const & bspline_outer,
             Bspline const & bspline_full,
             int Nlambdas
         );
@@ -423,22 +422,18 @@ class RadialIntegrals
         
         /// Return reference to the B-spline object.
         Bspline const & bspline_inner () const { return bspline_inner_; }
-        Bspline const & bspline_outer () const { return bspline_outer_; }
         Bspline const & bspline_full  () const { return bspline_full_ ; }
         
         /// Return the Gauss-Legendre integrator object.
         GaussLegendre const & gaussleg_inner () const { return g_inner_; }
-        GaussLegendre const & gaussleg_outer () const { return g_outer_; }
         GaussLegendre const & gaussleg_full  () const { return g_full_ ; }
         
         /// Return reference to the precomputed derivative overlap matrix.
         SymBandMatrix<Complex> const & D_inner () const { return D_inner_; }
-        SymBandMatrix<Complex> const & D_outer () const { return D_outer_; }
         SymBandMatrix<Complex> const & D_full  () const { return D_full_; }
         
         /// Return reference to the precomputed overlap matrix.
         SymBandMatrix<Complex> const & S_inner () const { return S_inner_; }
-        SymBandMatrix<Complex> const & S_outer () const { return S_outer_; }
         SymBandMatrix<Complex> const & S_full  () const { return S_full_ ; }
         
         /// Return reference to the inter-basis overlaps.
@@ -447,17 +442,14 @@ class RadialIntegrals
         
         /// Return reference to the precomputed integral moment matrix of order -1.
         SymBandMatrix<Complex> const & Mm1_inner () const { return Mm1_inner_; }
-        SymBandMatrix<Complex> const & Mm1_outer () const { return Mm1_outer_; }
         SymBandMatrix<Complex> const & Mm1_full  () const { return Mm1_full_ ; }
         
         /// Return reference to the precomputed integral moment matrix of order -1, truncated at the end of the real grid.
         SymBandMatrix<Complex> const & Mm1_tr_inner () const { return Mm1_tr_inner_; }
-        SymBandMatrix<Complex> const & Mm1_tr_outer () const { return Mm1_tr_outer_; }
         SymBandMatrix<Complex> const & Mm1_tr_full  () const { return Mm1_tr_full_ ; }
         
         /// Return reference to the precomputed integral moment matrix of order -2.
         SymBandMatrix<Complex> const & Mm2_inner () const { return Mm2_inner_; }
-        SymBandMatrix<Complex> const & Mm2_outer () const { return Mm2_outer_; }
         SymBandMatrix<Complex> const & Mm2_full  () const { return Mm2_full_ ; }
         
         /// Return reference to the precomputed array of diagonal contributions to two-electron integrals.
@@ -476,12 +468,10 @@ class RadialIntegrals
         
         /// Return reference to precomputed full (scaled) integral moments of order L.
         SymBandMatrix<Complex> const & Mtr_L_inner (int L) const { return Mtr_L_inner_[L]; }
-        SymBandMatrix<Complex> const & Mtr_L_outer (int L) const { return Mtr_L_outer_[L]; }
         SymBandMatrix<Complex> const & Mtr_L_full  (int L) const { return Mtr_L_full_ [L]; }
         
         /// Return reference to precomputed full (scaled) integral moments of order -L-1.
         SymBandMatrix<Complex> const & Mtr_mLm1_inner (int L) const { return Mtr_mLm1_inner_[L]; }
-        SymBandMatrix<Complex> const & Mtr_mLm1_outer (int L) const { return Mtr_mLm1_outer_[L]; }
         SymBandMatrix<Complex> const & Mtr_mLm1_full  (int L) const { return Mtr_mLm1_full_ [L]; }
         
         /// Return view of precomputed partial integral moments of order L.
@@ -495,20 +485,6 @@ class RadialIntegrals
             return cArrayView
             (
                 Mitr_L_inner_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        cArrayView Mitr_L_outer (int L) const
-        {
-            if (L < 0)
-                return Mitr_L_outer_;
-            
-            std::size_t mi_size = bspline_outer_.Nspline() * (2 * bspline_outer_.order() + 1) * (bspline_outer_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_L_outer_,
                 L * mi_size,
                 mi_size
             );
@@ -540,21 +516,6 @@ class RadialIntegrals
             return cArrayView
             (
                 Mitr_mLm1_inner_,
-                L * mi_size,
-                mi_size
-            );
-        }
-        
-        cArrayView Mitr_mLm1_outer (int L) const
-        {
-            if (L < 0)
-                return Mitr_mLm1_outer_;
-            
-            std::size_t mi_size = bspline_outer_.Nspline() * (2 * bspline_outer_.order() + 1) * (bspline_outer_.order() + 1);
-            
-            return cArrayView
-            (
-                Mitr_mLm1_outer_,
                 L * mi_size,
                 mi_size
             );
@@ -608,20 +569,14 @@ class RadialIntegrals
         
         // B-spline environment
         Bspline const & bspline_inner_;
-        Bspline const & bspline_outer_;
         Bspline const & bspline_full_;
         
         // Gauss-Legendre integrator
         GaussLegendre g_inner_;
-        GaussLegendre g_outer_;
         GaussLegendre g_full_;
-        
-        // knot that terminates multipole scaled region
-//         int lastscaled_;
         
         // one-electron moment and overlap matrices
         SymBandMatrix<Complex> D_inner_, S_inner_, Mm1_inner_, Mm1_tr_inner_, Mm2_inner_;
-        SymBandMatrix<Complex> D_outer_, S_outer_, Mm1_outer_, Mm1_tr_outer_, Mm2_outer_;
         SymBandMatrix<Complex> D_full_, S_full_, Mm1_full_, Mm1_tr_full_, Mm2_full_;
         
         // inter-basis overlaps
@@ -629,12 +584,10 @@ class RadialIntegrals
         
         // one-electron full integral moments for various orders (used to calculate R-integrals)
         std::vector<SymBandMatrix<Complex>> Mtr_L_inner_, Mtr_mLm1_inner_;
-        std::vector<SymBandMatrix<Complex>> Mtr_L_outer_, Mtr_mLm1_outer_;
         std::vector<SymBandMatrix<Complex>> Mtr_L_full_, Mtr_mLm1_full_;
         
         // partial one-electron integral moments for various orders (used to calculate R-integrals)
         cArray Mitr_L_inner_, Mitr_mLm1_inner_;
-        cArray Mitr_L_outer_, Mitr_mLm1_outer_;
         cArray Mitr_L_full_, Mitr_mLm1_full_;
         
         // diagonal contributions to R_tr_dia
@@ -648,9 +601,6 @@ class RadialIntegrals
         
         // number of multipole matrices
         int Nlambdas_;
-        
-        // projectile basis shift
-        int proj_basis_shift_;
 };
 
 #endif
