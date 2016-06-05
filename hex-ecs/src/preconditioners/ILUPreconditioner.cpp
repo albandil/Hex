@@ -171,7 +171,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         // convert inner region matrix block to COO matrix
         CooMatrix<LU_int_t,Complex> A_coo = A_blocks_[iang].tocoo<LU_int_t>();
-        A_coo.tocsr().tocoo().write("A-coo.txt"); // DEBUG
+//         A_coo.tocsr().tocoo().write("A-coo.txt"); // DEBUG
         
         // add the A-block
         CooMatrix<LU_int_t,Complex> coo_block
@@ -202,7 +202,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-                B_coo_large.tocsr().tocoo().write(format("B1-%d-%d-coo.txt", m, n)); // DEBUG
+//                 B_coo_large.tocsr().tocoo().write(format("B1-%d-%d-coo.txt", m, n)); // DEBUG
             }
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2; n++)
@@ -216,7 +216,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-                B_coo_large.tocsr().tocoo().write(format("B2-%d-%d-coo.txt", m, n)); // DEBUG
+//                 B_coo_large.tocsr().tocoo().write(format("B2-%d-%d-coo.txt", m, n)); // DEBUG
             }
         }
         
@@ -266,9 +266,6 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 {
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
-    
-//     std::cout << "ILU PREC r[" << iblock << "].norm() = " << r.norm() << std::endl;
-//     std::cout << "ILU PREC z[" << iblock << "].norm() = " << z.norm() << std::endl;
 }
 
 void ILUCGPreconditioner::CG_exit (int iblock) const

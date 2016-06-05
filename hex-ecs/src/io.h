@@ -188,9 +188,6 @@ class CommandLine
         /// Size of the local MPI communicator, used for distributed SuperLU.
         int groupsize;
         
-        /// Number of panels (solver + propagator sections).
-        int panels;
-        
         /// Allow parallel factorization.
         int parallel_factorization;
         

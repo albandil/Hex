@@ -56,7 +56,7 @@
 inline Real damp (Complex y, Complex x, Complex R)
 {
     // compute hyperradius
-    Real r = std::hypot(x.real(), y.real());
+    Real r = std::max(x.real(), y.real());
     
     // if sufficiently far, return clean zero
     if (r > R.real())

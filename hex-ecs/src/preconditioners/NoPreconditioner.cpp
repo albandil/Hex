@@ -441,9 +441,9 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     
     // shorthands
     int order = rad_.bspline_inner().order();
-    int Nspline_inner = rad_.bspline_inner().Nspline();
-    int Nspline_full  = rad_.bspline_full ().Nspline();
-    int Nspline_outer = Nspline_full - Nspline_inner;
+    std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
+    std::size_t Nspline_full  = rad_.bspline_full ().Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // impact momentum
     rArray ki = { std::sqrt(inp_.Etot[ie] + 1.0_r/(ni*ni)) };
@@ -462,15 +462,21 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     if (not std::isfinite(ji_expansion_full.norm()))
         HexException("Unable to expand Riccati-Bessel function in B-splines!");
     
+    // (anti)symmetrization
+    Real Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
+    
     // for all segments constituting the RHS
     for (unsigned ill = 0; ill < ang_.states().size(); ill++) if (par_.isMyGroupWork(ill))
     {
         int l1 = ang_.states()[ill].first;
         int l2 = ang_.states()[ill].second;
         
+        // get number of open channels in the outer region
+        int Nchan1 = Nchan_[ill].second;    // r1 -> inf, l2 bound
+        int Nchan2 = Nchan_[ill].first;     // r2 -> inf, l1 bound
+        
         // setup storage
-        // cArray chi_block (Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer);
-        cArray chi_block (Nspline_full * std::size_t(Nspline_full));
+        cArray chi_block (Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer);
         
         // for all allowed angular momenta (by momentum composition) of the projectile
         for (int l = std::abs(li - ang_.L()); l <= li + ang_.L(); l++)
@@ -478,9 +484,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             // skip wrong parity
             if ((ang_.L() + li + l) % 2 != ang_.Pi())
                 continue;
-            
-            // (anti)symmetrization
-            Real Sign = ((ang_.S() + ang_.Pi()) % 2 == 0) ? 1. : -1.;
             
             // compute energy- and angular momentum-dependent prefactor
             Complex prefactor = std::pow(1.0_i,l)
@@ -556,8 +559,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 
                 // for all B-spline pairs
                 # pragma omp parallel for collapse (2)
-                for (int ixspline = 0; ixspline < rad_.bspline_full().Nspline(); ixspline++)
-                for (int iyspline = 0; iyspline < rad_.bspline_full().Nspline(); iyspline++)
+                for (int ixspline = 0; ixspline < (int)Nspline_full; ixspline++)
+                for (int iyspline = 0; iyspline < (int)Nspline_full; iyspline++)
                 {
                     // contributions to the element of the right-hand side
                     Complex contrib_direct = 0, contrib_exchange = 0;
@@ -567,7 +570,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_.bspline_full().Nreknot() - 1; iyknot++) if (rad_.bspline_full().t(iyknot).real() != rad_.bspline_full().t(iyknot + 1).real())
                     {
                         // off-diagonal contribution
-                        if (ixknot != iyknot) // FIXME : Wrong condition for higher panels!
+                        if (ixknot != iyknot)
                         {
                             // for all quadrature points
                             for (int ix = 0; ix < points; ix++)
@@ -603,7 +606,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                             }
                         }
                         // diagonal contribution: needs to be integrated more carefully
-                        else if (ixknot < rad_.bspline_full().Nreknot() - 1) // FIXME : Works only for the first panel!
+                        else if (ixknot < rad_.bspline_full().Nreknot() - 1)
                         {
                             // for all quadrature points from the triangle x < y
                             for (int ix = 0; ix < points; ix++)
@@ -618,7 +621,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                     
                                     // evaluated functions
-                                    Complex Bx = B_x[(ixspline * (rad_.bspline_inner().order() + 1) + ixknot - ixspline) * points + ix];
+                                    Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
                                     Complex By = B_y[iy];
                                     Real Pix = Pi_x[ixknot * points + ix];
                                     gsl_sf_result piy;
@@ -688,25 +691,41 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                     
                     // update element of the right-hand side
-                    chi_block[ixspline * rad_.bspline_full().Nspline() + iyspline] += prefactor * (contrib_direct + Sign * contrib_exchange);
+                    #pragma omp critical
+                    {
+                        if (ixspline < (int)Nspline_inner and iyspline < (int)Nspline_inner)
+                        {
+                            chi_block[ixspline * Nspline_inner + iyspline] += prefactor * (contrib_direct + Sign * contrib_exchange);
+                        }
+                        else if (ixspline < (int)Nspline_inner)
+                        {
+                            // channel r2 -> inf; l1 bound
+                            for (int n = 0; n < Nchan2; n++)
+                                chi_block[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + iyspline - Nspline_inner] += prefactor * (contrib_direct + Sign * contrib_exchange) * Xp[l1][n][ixspline];
+                        }
+                        else /* if (iyspline < Nspline_inner) */
+                        {
+                            // channel r1 -> inf; l2 bound
+                            for (int n = 0; n < Nchan1; n++)
+                                chi_block[Nspline_inner * Nspline_inner + n * Nspline_outer + ixspline - Nspline_inner] += prefactor * (contrib_direct + Sign * contrib_exchange) * Xp[l2][n][iyspline];
+                        }
+                    }
                 }
+                
+                chi[ill] = std::move(chi_block);
             }
             else
             {
                 // pick the correct Bessel function expansion
                 cArrayView Ji_expansion_full (ji_expansion_full, l * Nspline_full, Nspline_full);
-                cArrayView Ji_expansion_inner (ji_expansion_full, l * Nspline_full, Nspline_inner);
                 
                 // get hydrogen orbital expansions
-                cArrayView Pi_overlap_full (Sp[li][ni - li - 1], 0, Nspline_full);
-                cArrayView Pi_expansion_inner (Xp[li][ni - li - 1], 0, Nspline_inner);
+                cArrayView Pi_overlap_full (Sp[li][ni - li - 1]);
+                cArrayView Pi_expansion_full (Xp[li][ni - li - 1]);
                 
                 // compute outer products of B-spline expansions
-                cArray Pj1 = outer_product(Pi_expansion_inner, Ji_expansion_inner);
-                cArray Pj2 = outer_product(Ji_expansion_inner, Pi_expansion_inner);
-                
-                // helper mini-block
-                cArray chi_miniblock (Nspline_inner * Nspline_inner);
+                cArray Pj1 = outer_product(Pi_expansion_full, Ji_expansion_full);
+                cArray Pj2 = outer_product(Ji_expansion_full, Pi_expansion_full);
                 
                 // for all contributing multipoles
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -714,50 +733,13 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     // add multipole terms (direct/exchange) for inner region
                     if (not cmd_.lightweight_radial_cache)
                     {
-                        if (f1[lambda] != 0.) rad_.R_tr_dia(lambda).dot(       prefactor * f1[lambda], Pj1, 1., chi_miniblock, true);
-                        if (f2[lambda] != 0.) rad_.R_tr_dia(lambda).dot(Sign * prefactor * f2[lambda], Pj2, 1., chi_miniblock, true);
+                        if (f1[lambda] != 0.) rad_.R_tr_dia(lambda).dot(       prefactor * f1[lambda], Pj1, 1., chi_block, true);
+                        if (f2[lambda] != 0.) rad_.R_tr_dia(lambda).dot(Sign * prefactor * f2[lambda], Pj2, 1., chi_block, true);
                     }
                     else
                     {
-                        if (f1[lambda] != 0.) rad_.apply_R_matrix(lambda,        prefactor * f1[lambda], Pj1, 1., chi_miniblock);
-                        if (f2[lambda] != 0.) rad_.apply_R_matrix(lambda, Sign * prefactor * f2[lambda], Pj2, 1., chi_miniblock);
-                    }
-                    
-                    // get needed one-electron moment matrices
-                    SymBandMatrix<Complex> Mtr_L_inner = rad_.Mtr_L_inner(lambda);
-                    SymBandMatrix<Complex> Mtr_mLm1_full = rad_.Mtr_mLm1_full(lambda);
-                    
-                    // un-scale the elements of the moment matrices
-                    for (int i = 0; i < Nspline_inner; i++)
-                    for (int j = i; j <= std::min(i + order, Nspline_inner - 1); j++)
-                    {
-                        double r = rad_.bspline_inner().t(std::min(i,j) + order + 1).real();
-                        Mtr_L_inner(i,j) *= special::pow_int(r, lambda);
-                    }
-                    for (int i = 0; i < Nspline_full; i++)
-                    for (int j = i; j <= std::min(i + order, Nspline_full - 1); j++)
-                    {
-                        double r = rad_.bspline_full().t(std::min(i,j) + order + 1).real();
-                        Mtr_mLm1_full(i,j) *= special::pow_int(r, -lambda-1);
-                    }
-                    
-                    // overlap arrays used below
-                    cArray Pf = Mtr_L_inner.dot(Pi_expansion_inner);
-                    cArray jf = Mtr_mLm1_full.dot(Ji_expansion_full);
-                    
-                    // update the block
-                    for (int i = 0; i < Nspline_full; i++)
-                    for (int j = 0; j < Nspline_full; j++)
-                    {
-                        Complex p1 = (i < Nspline_inner ? Pf[i] : 0.0_z);
-                        Complex j1 = (j < Nspline_inner ? 0.0_z : jf[j]);
-                        
-                        Complex j2 = (i < Nspline_inner ? 0.0_z : jf[i]);
-                        Complex p2 = (j < Nspline_inner ? Pf[j] : 0.0_z);
-                        
-                        Complex r = (i < Nspline_inner and j < Nspline_inner ? chi_miniblock[i * std::size_t(Nspline_inner) + j] : 0.0_z);
-                        
-                        chi_block[i * Nspline_full + j] += r + prefactor * (f1[lambda] * p1 * j1 + Sign * f2[lambda] * p2 * j2);
+                        if (f1[lambda] != 0.) rad_.apply_R_matrix(lambda,        prefactor * f1[lambda], Pj1, 1., chi_block);
+                        if (f2[lambda] != 0.) rad_.apply_R_matrix(lambda, Sign * prefactor * f2[lambda], Pj2, 1., chi_block);
                     }
                 }
                 
@@ -768,14 +750,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     chi_block += (-prefactor * Sign) * outer_product(rad_.Mm1_tr_full().dot(Ji_expansion_full), Pi_overlap_full);
             }
         }
-        
+/*
         //
         // compress outer region
         //
-        
-        // get number of open channels in the outer region
-        int Nchan2 = Nchan_[ill].first;     // r2 -> inf, l1 bound
-        int Nchan1 = Nchan_[ill].second;    // r1 -> inf, l2 bound
         
         // allocate space for the final block
         chi[ill].resize(Nspline_inner * std::size_t(Nspline_inner) + (Nchan1 + Nchan2) * Nspline_outer);
@@ -801,7 +779,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         }
         
 //         std::cout << "chi[" << ill << "].norm() = " << chi[ill].norm() << std::endl;
-        
+*/
         if (not chi.inmemory())
         {
             chi.hdfsave(ill);

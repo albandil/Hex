@@ -92,7 +92,13 @@ void Solver::solve ()
             virtual std::string do_grouping() const { return "\03"; }
     };
     std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
-    std::cout << "Inner problem hamiltonian size: " << (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size() << std::endl;
+    std::cout << "Inner hamiltonian size: " << (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size() << std::endl;
+//     std::cout << "Full hamiltonian size: " << std::accumulate
+//     (
+//         bstates_.begin(), bstates_.end(),
+//         (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size(),
+//         [](std::size_t n, std::pair<iArray,iArray> const & p) { return n + p.first.size() + p.second.size(); }
+//     ) << std::endl;
     std::cout.imbue(std::locale::classic());
     
     // wrap member functions to lambda-functions for use in the CG solver
