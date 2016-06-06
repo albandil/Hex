@@ -517,29 +517,20 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 
                 // precompute quadrature nodes and weights
                 cArray xs ((rad_.bspline_full().Nreknot() - 1) * points), xws ((rad_.bspline_full().Nreknot() - 1) * points);
-                cArray ys ((rad_.bspline_full().Nreknot() - 1) * points), yws ((rad_.bspline_full().Nreknot() - 1) * points);
                 # pragma omp parallel for
                 for (int ixknot = 0; ixknot < rad_.bspline_full().Nreknot() - 1; ixknot++)
                     rad_.gaussleg_full().scaled_nodes_and_weights(points, rad_.bspline_full().t(ixknot), rad_.bspline_full().t(ixknot + 1), &xs[ixknot * points], &xws[ixknot * points]);
-                # pragma omp parallel for
-                for (int iyknot = 0; iyknot < rad_.bspline_full().Nreknot() - 1; iyknot++)
-                    rad_.gaussleg_full().scaled_nodes_and_weights(points, rad_.bspline_full().t(iyknot), rad_.bspline_full().t(iyknot + 1), &ys[iyknot * points], &yws[iyknot * points]);
                 
                 // precompute B-splines
                 cArray B_x (rad_.bspline_full().Nspline() * (order + 1) * points);
-                cArray B_y (rad_.bspline_full().Nspline() * (order + 1) * points);
                 # pragma omp parallel for
                 for (int ixspline = 0; ixspline < rad_.bspline_full().Nspline(); ixspline++)
                 for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_.bspline_full().Nreknot() - 1; ixknot++)
                     rad_.bspline_full().B(ixspline, ixknot, points, &xs[ixknot * points], &B_x[(ixspline * (order + 1) + ixknot - ixspline) * points]);
-                # pragma omp parallel for
-                for (int iyspline = 0; iyspline < rad_.bspline_full().Nspline(); iyspline++)
-                for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_.bspline_full().Nreknot() - 1; iyknot++)
-                    rad_.bspline_full().B(iyspline, iyknot, points, &ys[iyknot * points], &B_y[(iyspline * (order + 1) + iyknot - iyspline) * points]);
                 
                 // precompute radial functions and Riccati-Bessel functions
-                rArray Pi_x ((rad_.bspline_full().Nreknot() - 1) * points), Pi_y ((rad_.bspline_full().Nreknot() - 1) * points);
-                rArray ji_x ((rad_.bspline_full().Nreknot() - 1) * points), ji_y ((rad_.bspline_full().Nreknot() - 1) * points);
+                rArray Pi_x ((rad_.bspline_full().Nreknot() - 1) * points);
+                rArray ji_x ((rad_.bspline_full().Nreknot() - 1) * points);
                 # pragma omp parallel for
                 for (unsigned ix = 0; ix < xs.size(); ix++)
                 {
@@ -547,16 +538,47 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     Pi_x[ix] = (gsl_sf_hydrogenicR_e(ni, li, 1., xs[ix].real(), &Pi) == GSL_EUNDRFLW ? 0. : xs[ix].real() * Pi.val);
                     ji_x[ix] = special::ric_j(l, ki[0] * xs[ix].real());
                 }
-                # pragma omp parallel for
-                for (unsigned iy = 0; iy < xs.size(); iy++)
-                {
-                    gsl_sf_result Pi;
-                    Pi_y[iy] = (gsl_sf_hydrogenicR_e(ni, li, 1., ys[iy].real(), &Pi) == GSL_EUNDRFLW ? 0. : ys[iy].real() * Pi.val);
-                    ji_y[iy] = special::ric_j(l, ki[0] * ys[iy].real());
-                }
                 
                 // damping distance
-                double distance = rad_.bspline_full().R0();
+                Real distance = rad_.bspline_full().R0();
+                
+                // precompute integral moments
+                cArrays M_L_P (rad_.maxlambda() + 1), M_mLm1_P (rad_.maxlambda() + 1);
+                cArrays M_L_j (rad_.maxlambda() + 1), M_mLm1_j (rad_.maxlambda() + 1);
+                for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
+                {
+                    M_L_P[lambda].resize(Nspline_full); M_mLm1_P[lambda].resize(Nspline_full);
+                    M_L_j[lambda].resize(Nspline_full); M_mLm1_j[lambda].resize(Nspline_full);
+                    
+                    # pragma omp parallel for
+                    for (int ispline = 0; ispline < (int)Nspline_full; ispline++)
+                    {
+                        for (int iknot = ispline; iknot < std::min(ispline + order + 1, rad_.bspline_full().Nreknot() - 1); iknot++) if (rad_.bspline_full().t(iknot).real() != rad_.bspline_full().t(iknot + 1).real())
+                        {
+                            for (int ipoint = 0; ipoint < points; ipoint++)
+                            {
+                                Real x = xs[iknot * points + ipoint].real();
+                                Real t = rad_.bspline_full().t(ispline + order + 1).real();
+                                
+                                Real L = special::pow_int(x / t, lambda);
+                                Real mLm1 = special::pow_int(x / t, -lambda-1);
+                                
+                                Complex w = xws[iknot * points + ipoint];
+                                Complex B = B_x[(ispline * (order + 1) + iknot - ispline) * points + ipoint];
+                                
+                                Real P = Pi_x[iknot * points + ipoint];
+                                Real j = ji_x[iknot * points + ipoint];
+                                
+                                Real d = damp(x, 0, distance);
+                                
+                                M_L_P[lambda][ispline] += w * B * L * P * d;
+                                M_L_j[lambda][ispline] += w * B * L * j * d;
+                                M_mLm1_P[lambda][ispline] += w * B * mLm1 * P * d;
+                                M_mLm1_j[lambda][ispline] += w * B * mLm1 * j * d;
+                            }
+                        }
+                    }
+                }
                 
                 // for all B-spline pairs
                 # pragma omp parallel for schedule(dynamic,Nspline_inner)
@@ -586,71 +608,61 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     // contributions to the element of the right-hand side
                     Complex contrib_direct = 0, contrib_exchange = 0;
                     
-                    // for all knots
-                    for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_.bspline_full().Nreknot() - 1; ixknot++) if (rad_.bspline_full().t(ixknot).real() != rad_.bspline_full().t(ixknot + 1).real())
-                    for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_.bspline_full().Nreknot() - 1; iyknot++) if (rad_.bspline_full().t(iyknot).real() != rad_.bspline_full().t(iyknot + 1).real())
+                    // non-overlapping B-splines ?
+                    if (std::abs(ixspline - iyspline) > order)
                     {
-                        // off-diagonal contribution
-                        if (ixknot != iyknot)
+                        // monopole contribution
+                        if (ixspline > iyspline and f1[0] != 0)
                         {
-                            // for all quadrature points
-                            for (int ix = 0; ix < points; ix++)
-                            for (int iy = 0; iy < points; iy++)
+                            contrib_direct   += f1[0] * (M_mLm1_P[0][ixspline] * M_L_j[0][iyspline] / rad_.bspline_full().t(ixspline + order + 1) - M_L_P[0][ixspline] * M_mLm1_j[0][iyspline] / rad_.bspline_full().t(iyspline + order + 1));
+                            contrib_exchange += 0;
+                        }
+                        if (ixspline < iyspline and f2[0] != 0)
+                        {
+                            contrib_direct   += 0;
+                            contrib_exchange += f2[0] * (M_L_j[0][ixspline] * M_mLm1_P[0][iyspline] / rad_.bspline_full().t(iyspline + order + 1) - M_mLm1_j[0][ixspline] * M_L_P[0][iyspline] / rad_.bspline_full().t(ixspline + order + 1));
+                        }
+                        
+                        // multipole contributions
+                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                        {
+                            if (ixspline > iyspline)
                             {
-                                // radii
-                                Real rx = xs[ixknot * points + ix].real(), ry = ys[iyknot * points + iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
-                                
-                                // evaluated functions
-                                Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
-                                Complex By = B_y[(iyspline * (order + 1) + iyknot - iyspline) * points + iy];
-                                Real Pix = Pi_x[ixknot * points + ix];
-                                Real Piy = Pi_y[iyknot * points + iy];
-                                Real jix = ji_x[ixknot * points + ix];
-                                Real jiy = ji_y[iyknot * points + iy];
-                                Complex wx = xws[ixknot * points + ix];
-                                Complex wy = yws[iyknot * points + iy];
-                                
-                                // damp factor
-                                Real dampfactor = damp(rx, ry, distance);
-                                
-                                // monopole contribution
-                                if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
-                                if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
-                                
-                                // higher multipoles contribution
-                                for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
-                                {
-                                    Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
-                                    if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                    if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
-                                }
+                                contrib_direct   += f1[lambda] * M_mLm1_P[lambda][ixspline] * M_L_j[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(iyspline + order + 1) / rad_.bspline_full().t(ixspline + order + 1), lambda) / rad_.bspline_full().t(ixspline + order + 1);
+                                contrib_exchange += f2[lambda] * M_mLm1_j[lambda][ixspline] * M_L_P[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(iyspline + order + 1) / rad_.bspline_full().t(ixspline + order + 1), lambda) / rad_.bspline_full().t(ixspline + order + 1);
+                            }
+                            if (ixspline < iyspline)
+                            {
+                                contrib_direct   += f1[lambda] * M_L_P[lambda][ixspline] * M_mLm1_j[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(ixspline + order + 1) / rad_.bspline_full().t(iyspline + order + 1), lambda) / rad_.bspline_full().t(iyspline + order + 1);;
+                                contrib_exchange += f2[lambda] * M_L_j[lambda][ixspline] * M_mLm1_P[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(ixspline + order + 1) / rad_.bspline_full().t(iyspline + order + 1), lambda) / rad_.bspline_full().t(iyspline + order + 1);;
                             }
                         }
-                        // diagonal contribution: needs to be integrated more carefully
-                        else if (ixknot < rad_.bspline_full().Nreknot() - 1)
+                    }
+                    else
+                    {
+                        // for all knots
+                        for (int ixknot = ixspline; ixknot <= ixspline + order and ixknot < rad_.bspline_full().Nreknot() - 1; ixknot++) if (rad_.bspline_full().t(ixknot).real() != rad_.bspline_full().t(ixknot + 1).real())
+                        for (int iyknot = iyspline; iyknot <= iyspline + order and iyknot < rad_.bspline_full().Nreknot() - 1; iyknot++) if (rad_.bspline_full().t(iyknot).real() != rad_.bspline_full().t(iyknot + 1).real())
                         {
-                            // for all quadrature points from the triangle x < y
-                            for (int ix = 0; ix < points; ix++)
+                            // off-diagonal contribution
+                            if (ixknot != iyknot)
                             {
-                                cArray ys (points), yws (points), B_y (points);
-                                rad_.gaussleg_full().scaled_nodes_and_weights(points, xs[ixknot * points + ix], rad_.bspline_full().t(iyknot + 1), &ys[0], &yws[0]);
-                                rad_.bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
-                                
+                                // for all quadrature points
+                                for (int ix = 0; ix < points; ix++)
                                 for (int iy = 0; iy < points; iy++)
                                 {
                                     // radii
-                                    Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                    Real rx = xs[ixknot * points + ix].real(), ry = xs[iyknot * points + iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
                                     
                                     // evaluated functions
                                     Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
-                                    Complex By = B_y[iy];
+                                    Complex By = B_x[(iyspline * (order + 1) + iyknot - iyspline) * points + iy];
                                     Real Pix = Pi_x[ixknot * points + ix];
-                                    gsl_sf_result piy;
-                                    Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                    Real Piy = Pi_x[iyknot * points + iy];
                                     Real jix = ji_x[ixknot * points + ix];
-                                    Real jiy = special::ric_j(l, ki[0] * ry);
+                                    Real jiy = ji_x[iyknot * points + iy];
                                     Complex wx = xws[ixknot * points + ix];
-                                    Complex wy = yws[iy];
+                                    Complex wy = xws[iyknot * points + iy];
                                     
                                     // damp factor
                                     Real dampfactor = damp(rx, ry, distance);
@@ -668,43 +680,86 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                                     }
                                 }
                             }
-                            
-                            // for all quadrature points from the triangle x > y
-                            for (int ix = 0; ix < points; ix++)
+                            // diagonal contribution: needs to be integrated more carefully
+                            else if (ixknot < rad_.bspline_full().Nreknot() - 1)
                             {
-                                cArray ys (points), yws (points), B_y (points);
-                                rad_.gaussleg_full().scaled_nodes_and_weights(points, rad_.bspline_full().t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
-                                rad_.bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
-                                
-                                for (int iy = 0; iy < points; iy++)
+                                // for all quadrature points from the triangle x < y
+                                for (int ix = 0; ix < points; ix++)
                                 {
-                                    // radii
-                                    Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                    cArray ys (points), yws (points), B_y (points);
+                                    rad_.gaussleg_full().scaled_nodes_and_weights(points, xs[ixknot * points + ix], rad_.bspline_full().t(iyknot + 1), &ys[0], &yws[0]);
+                                    rad_.bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
                                     
-                                    // evaluated functions
-                                    Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
-                                    Complex By = B_y[iy];
-                                    Real Pix = Pi_x[ixknot * points + ix];
-                                    gsl_sf_result piy;
-                                    Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
-                                    Real jix = ji_x[ixknot * points + ix];
-                                    Real jiy = special::ric_j(l, ki[0] * ry);
-                                    Complex wx = xws[ixknot * points + ix];
-                                    Complex wy = yws[iy];
-                                    
-                                    // damp factor
-                                    Real dampfactor = damp(rx, ry, distance);
-                                    
-                                    // monopole contribution
-                                    if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
-                                    if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
-                                    
-                                    // higher multipoles contribution
-                                    for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                                    for (int iy = 0; iy < points; iy++)
                                     {
-                                        Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
-                                        if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
-                                        if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                        // radii
+                                        Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                        
+                                        // evaluated functions
+                                        Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                        Complex By = B_y[iy];
+                                        Real Pix = Pi_x[ixknot * points + ix];
+                                        gsl_sf_result piy;
+                                        Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                        Real jix = ji_x[ixknot * points + ix];
+                                        Real jiy = special::ric_j(l, ki[0] * ry);
+                                        Complex wx = xws[ixknot * points + ix];
+                                        Complex wy = yws[iy];
+                                        
+                                        // damp factor
+                                        Real dampfactor = damp(rx, ry, distance);
+                                        
+                                        // monopole contribution
+                                        if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                        if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
+                                        
+                                        // higher multipoles contribution
+                                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                                        {
+                                            Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
+                                            if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
+                                            if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                        }
+                                    }
+                                }
+                                
+                                // for all quadrature points from the triangle x > y
+                                for (int ix = 0; ix < points; ix++)
+                                {
+                                    cArray ys (points), yws (points), B_y (points);
+                                    rad_.gaussleg_full().scaled_nodes_and_weights(points, rad_.bspline_full().t(iyknot), xs[ixknot * points + ix], &ys[0], &yws[0]);
+                                    rad_.bspline_full().B(iyspline, iyknot, points, &ys[0], &B_y[0]);
+                                    
+                                    for (int iy = 0; iy < points; iy++)
+                                    {
+                                        // radii
+                                        Real rx = xs[ixknot * points + ix].real(), ry = ys[iy].real(), rmin = std::min(rx,ry), rmax = std::max(rx,ry);
+                                        
+                                        // evaluated functions
+                                        Complex Bx = B_x[(ixspline * (order + 1) + ixknot - ixspline) * points + ix];
+                                        Complex By = B_y[iy];
+                                        Real Pix = Pi_x[ixknot * points + ix];
+                                        gsl_sf_result piy;
+                                        Real Piy = (gsl_sf_hydrogenicR_e(ni, li, 1., ry, &piy) == GSL_EUNDRFLW ? 0. : ry * piy.val);
+                                        Real jix = ji_x[ixknot * points + ix];
+                                        Real jiy = special::ric_j(l, ki[0] * ry);
+                                        Complex wx = xws[ixknot * points + ix];
+                                        Complex wy = yws[iy];
+                                        
+                                        // damp factor
+                                        Real dampfactor = damp(rx, ry, distance);
+                                        
+                                        // monopole contribution
+                                        if (rx > ry and li == l1 and l == l2) contrib_direct   += Bx * By * (1.0_r/rx - 1.0_r/ry) * Pix * jiy * dampfactor * wx * wy;
+                                        if (ry > rx and li == l2 and l == l1) contrib_exchange += Bx * By * (1.0_r/ry - 1.0_r/rx) * jix * Piy * dampfactor * wx * wy;
+                                        
+                                        // higher multipoles contribution
+                                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                                        {
+                                            Real multipole = special::pow_int(rmin/rmax, lambda) / rmax;
+                                            if (f1[lambda] != 0) contrib_direct   += f1[lambda] * Bx * By * multipole * Pix * jiy * dampfactor * wx * wy;
+                                            if (f2[lambda] != 0) contrib_exchange += f2[lambda] * Bx * By * multipole * jix * Piy * dampfactor * wx * wy;
+                                        }
                                     }
                                 }
                             }
