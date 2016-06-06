@@ -186,8 +186,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             // add the outer region C-blocks
             coo_block += Cu_blocks_[iang];
             coo_block += Cl_blocks_[iang];
-            Cu_blocks_[iang].write("Cu-coo.txt"); // DEBUG
-            Cl_blocks_[iang].write("Cl-coo.txt"); // DEBUG
+//             Cu_blocks_[iang].write("Cu-coo.txt"); // DEBUG
+//             Cl_blocks_[iang].write("Cl-coo.txt"); // DEBUG
             
             // add the B-blocks
             for (int m = 0; m < Nchan1; m++)

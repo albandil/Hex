@@ -85,7 +85,8 @@ void NoPreconditioner::update (Real E)
     if (cmd_.lightweight_full)
         return;
     
-    std::cout << "\tPrecompute diagonal blocks... " << std::flush;
+    std::cout << "\tPrecompute diagonal blocks ... " << std::flush;
+    Timer t;
     
     // LU-factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> csr_S = rad_.S_full().tocoo<LU_int_t>().tocsr();
@@ -428,8 +429,8 @@ void NoPreconditioner::update (Real E)
         }
     }
     
+    std::cout << "done after " << t.nice_time() << std::endl;
     par_.wait();
-    std::cout << "ok" << std::endl;
 }
 
 void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) const
@@ -558,10 +559,30 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                 double distance = rad_.bspline_full().R0();
                 
                 // for all B-spline pairs
-                # pragma omp parallel for collapse (2)
-                for (int ixspline = 0; ixspline < (int)Nspline_full; ixspline++)
-                for (int iyspline = 0; iyspline < (int)Nspline_full; iyspline++)
+                # pragma omp parallel for schedule(dynamic,Nspline_inner)
+                for (std::size_t ispline = 0; ispline < Nspline_inner * Nspline_inner + 2 * Nspline_inner * Nspline_outer; ispline++)
                 {
+                    // get B-spline indices
+                    int ixspline, iyspline;
+                    if (ispline < Nspline_inner * Nspline_inner)
+                    {
+                        // r1 < Ra, r2 < Ra
+                        ixspline = ispline % Nspline_inner;
+                        iyspline = ispline / Nspline_inner;
+                    }
+                    else if (ispline < Nspline_inner * Nspline_inner + Nspline_inner * Nspline_outer)
+                    {
+                        // r1 > Ra, r2 < Ra
+                        ixspline = (ispline - Nspline_inner * Nspline_inner) / Nspline_inner + Nspline_inner;
+                        iyspline = (ispline - Nspline_inner * Nspline_inner) % Nspline_inner;
+                    }
+                    else
+                    {
+                        // r1 < Ra, r2 > Ra
+                        ixspline = (ispline - Nspline_inner * Nspline_inner - Nspline_inner * Nspline_outer) % Nspline_inner;
+                        iyspline = (ispline - Nspline_inner * Nspline_inner - Nspline_inner * Nspline_outer) / Nspline_inner + Nspline_inner;
+                    }
+                    
                     // contributions to the element of the right-hand side
                     Complex contrib_direct = 0, contrib_exchange = 0;
                     

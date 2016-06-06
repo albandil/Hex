@@ -432,15 +432,6 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
     int Nspline_inner = bspline_inner_.Nspline(), Nreknot_inner = bspline_inner_.Nreknot();
     int Nspline_full  = bspline_full_ .Nspline(), Nreknot_full  = bspline_full_ .Nreknot();
     
-//     // get knot that terminates (x^lambda)-scaled region
-//     for (int i = 0; i < bspline_atom_.Nknot(); i++)
-//     {
-//         if (bspline_atom_.t(i).real() < 1)
-//             lastscaled_ = i;
-//         else
-//             break;
-//     }
-    
     // set number of two-electron integrals
     R_tr_dia_.resize(Nlambdas_);
     

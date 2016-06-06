@@ -268,12 +268,13 @@ void Solver::solve ()
             BlockArray<Complex> chi (ang_.states().size(), !cmd_.outofcore, "cg-b");
             if (not cmd_.cont)
             {
+                Timer t;
                 std::cout << "\tCreate right-hand side for initial state " << Hydrogen::stateName(ni_,li_,mi_) << " and total spin S = " << ang_.S() << " ... " << std::flush;
                 
                 // use the preconditioner setup routine
                 prec_->rhs(chi, ie, instate);
                 
-                std::cout << "ok" << std::endl;
+                std::cout << "done after " << t.nice_time() << std::endl;
             }
             
             // compute and check norm of the right hand side vector
