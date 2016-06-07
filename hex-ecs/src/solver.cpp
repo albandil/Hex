@@ -123,6 +123,7 @@ void Solver::solve ()
         int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0 / std::sqrt(-inp_.Etot[ie]));
         
         // get asymptotical bound states for each of the angular momentum pairs
+        bstates_.clear();
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             int l1 = ang_.states()[ill].first;
