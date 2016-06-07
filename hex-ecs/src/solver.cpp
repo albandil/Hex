@@ -81,8 +81,8 @@ void Solver::solve ()
     
     // shorthands
     std::size_t Nspline_inner = bspline_inner_.Nspline();
-//     std::size_t Nspline_outer = bspline_outer_.Nspline();
-//     std::size_t Nspline_full  = bspline_full_ .Nspline();
+    std::size_t Nspline_full  = bspline_full_ .Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
     
     // print Hamiltonian size as a number with thousands separator (apostroph used)
     class MyNumPunct : public std::numpunct<char>
@@ -92,13 +92,7 @@ void Solver::solve ()
             virtual std::string do_grouping() const { return "\03"; }
     };
     std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
-    std::cout << "Inner hamiltonian size: " << (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size() << std::endl;
-//     std::cout << "Full hamiltonian size: " << std::accumulate
-//     (
-//         bstates_.begin(), bstates_.end(),
-//         (std::size_t)Nspline_inner * (std::size_t)Nspline_inner * ang_.states().size(),
-//         [](std::size_t n, std::pair<iArray,iArray> const & p) { return n + p.first.size() + p.second.size(); }
-//     ) << std::endl;
+    std::cout << "Inner region hamiltonian size: " << Nspline_inner * Nspline_inner * ang_.states().size() << std::endl;
     std::cout.imbue(std::locale::classic());
     
     // wrap member functions to lambda-functions for use in the CG solver
@@ -144,6 +138,16 @@ void Solver::solve ()
                 )
             );
         }
+        
+        // print system information
+        std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
+        std::cout << "\tFull hamiltonian / solution size: " << std::accumulate
+        (
+            bstates_.begin(), bstates_.end(),
+            Nspline_inner * Nspline_inner * ang_.states().size(),
+            [&](std::size_t n, std::pair<iArray,iArray> const & p) { return n + (p.first.size() + p.second.size()) * Nspline_outer; }
+        ) << std::endl;
+        std::cout.imbue(std::locale::classic());
         
         // we may have already computed all solutions for this energy... is it so?
         std::vector<std::pair<int,int>> work;
