@@ -472,9 +472,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             {
                 Timer t;
                 R_tr_dia_diag_[lambda] = diagonalR(lambda);
+                if (verbose_) std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
                 R_tr_dia_diag_[lambda].hdfsave(filename);
-                if (verbose_)
-                    std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
             }
         }
     }

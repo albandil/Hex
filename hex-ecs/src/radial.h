@@ -225,6 +225,8 @@ class RadialIntegrals
             int a
         ) const;
         
+        cArray diagonalR (int lambda) const;
+        
         /**
          * @brief Two-electron integral.
          * 

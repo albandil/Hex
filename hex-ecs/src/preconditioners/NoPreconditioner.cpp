@@ -147,6 +147,7 @@ void NoPreconditioner::update (Real E)
             dia_blocks_[ill].hdfinit();*/
         
         // for all sub-blocks
+        # pragma omp parallel for if (A_blocks_[ill * Nang + illp].inmemory())
         for (int i = 0; i < Nspline_inner; i++)
         for (int d = 0; d <= order; d++)
         if (i + d < Nspline_inner)
@@ -164,7 +165,7 @@ void NoPreconditioner::update (Real E)
                     {
                         return E * rad_.S_full()(i,k) * rad_.S_full()(j,l)
                                - (0.5_z * rad_.D_full()(i,k) - rad_.Mm1_tr_full()(i,k)) * rad_.S_full()(j,l)
-                               - 0.5_r * l1 * (l1 + 1) * rad_.Mm2_full()(i,k) * rad_.S_inner()(j,l)
+                               - 0.5_r * l1 * (l1 + 1) * rad_.Mm2_full()(i,k) * rad_.S_full()(j,l)
                                - rad_.S_full()(i,k) * (0.5_z * rad_.D_full()(j,l) - rad_.Mm1_tr_full()(j,l))
                                - 0.5_r * l2 * (l2 + 1) * rad_.S_full()(i,k) * rad_.Mm2_full()(j,l);
                     }
@@ -181,18 +182,13 @@ void NoPreconditioner::update (Real E)
                 // calculate two-electron term
                 if (not cmd_.lightweight_radial_cache)
                 {
-                    // use precomputed block from scratch file ...
-                    if (not cmd_.cache_all_radint)
-                        subblock.data() += (-ang_.f(ill,illp,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d).slice(0, Nspline_inner * (order + 1));
-                    
-                    // ... or from memory
-                    else
-                        subblock.data() += (-ang_.f(ill,illp,lambda)) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d).slice(0, Nspline_inner * (order + 1));
+                    // use precomputed block from scratch file or from memory
+                    subblock.data() += -ang_.f(ill,illp,lambda) * rad_.R_tr_dia(lambda).getBlock(i * (order + 1) + d).slice(0, Nspline_inner * (order + 1));
                 }
                 else
                 {
                     // compute the data anew
-                    subblock.data() += Complex(-ang_.f(ill,illp,lambda)) * rad_.calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (order + 1));
+                    subblock.data() += -ang_.f(ill,illp,lambda) * rad_.calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (order + 1));
                 }
             }
             
@@ -320,12 +316,12 @@ void NoPreconditioner::update (Real E)
                          + rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
                 }
                 
-                double r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
-                double r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
+                Real r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
                 
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
                 {
-                    double scale = special::pow_int(r1/r2, lambda) / r2;
+                    Real scale = special::pow_int(r1/r2, lambda) / r2;
                     elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_L_full(lambda)(i,k) * rad_.Mtr_mLm1_full(lambda)(j,l);
                 }
                 
@@ -355,12 +351,12 @@ void NoPreconditioner::update (Real E)
                          + rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
                 }
                 
-                double r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
-                double r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
+                Real r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
                 
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
                 {
-                    double scale = special::pow_int(r2/r1, lambda) / r1;
+                    Real scale = special::pow_int(r2/r1, lambda) / r1;
                     elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * rad_.Mtr_L_full(lambda)(j,l);
                 }
                 
@@ -386,11 +382,11 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_.Mm2_full()(j,l);
                 }
                 
-                double r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
+                Real r2 = rad_.bspline_full().t(std::min(j,l) + order + 1).real();
                 
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
                 {
-                    double scale = special::pow_int(1/r2, lambda + 1);
+                    Real scale = special::pow_int(1/r2, lambda + 1);
                     elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(j,l) * special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
                 }
                 
@@ -416,11 +412,11 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_.Mm2_full()(i,k);
                 }
                 
-                double r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
+                Real r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
                 
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
                 {
-                    double scale = special::pow_int(1/r1, lambda + 1);
+                    Real scale = special::pow_int(1/r1, lambda + 1);
                     elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
                 }
                 
