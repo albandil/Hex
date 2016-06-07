@@ -580,7 +580,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                 }
                 
-                // for all B-spline pairs
+                // for all B-spline pairs (elements of the right-hand side)
                 # pragma omp parallel for schedule(dynamic,Nspline_inner)
                 for (std::size_t ispline = 0; ispline < Nspline_inner * Nspline_inner + 2 * Nspline_inner * Nspline_outer; ispline++)
                 {
@@ -628,13 +628,17 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         {
                             if (ixspline > iyspline)
                             {
-                                contrib_direct   += f1[lambda] * M_mLm1_P[lambda][ixspline] * M_L_j[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(iyspline + order + 1) / rad_.bspline_full().t(ixspline + order + 1), lambda) / rad_.bspline_full().t(ixspline + order + 1);
-                                contrib_exchange += f2[lambda] * M_mLm1_j[lambda][ixspline] * M_L_P[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(iyspline + order + 1) / rad_.bspline_full().t(ixspline + order + 1), lambda) / rad_.bspline_full().t(ixspline + order + 1);
+                                Real scale = special::pow_int(rad_.bspline_full().t(iyspline + order + 1).real() / rad_.bspline_full().t(ixspline + order + 1).real(), lambda) / rad_.bspline_full().t(ixspline + order + 1).real();
+                                
+                                contrib_direct   += f1[lambda] * M_mLm1_P[lambda][ixspline] * M_L_j[lambda][iyspline] * scale;
+                                contrib_exchange += f2[lambda] * M_mLm1_j[lambda][ixspline] * M_L_P[lambda][iyspline] * scale;
                             }
                             if (ixspline < iyspline)
                             {
-                                contrib_direct   += f1[lambda] * M_L_P[lambda][ixspline] * M_mLm1_j[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(ixspline + order + 1) / rad_.bspline_full().t(iyspline + order + 1), lambda) / rad_.bspline_full().t(iyspline + order + 1);;
-                                contrib_exchange += f2[lambda] * M_L_j[lambda][ixspline] * M_mLm1_P[lambda][iyspline] * special::pow_int(rad_.bspline_full().t(ixspline + order + 1) / rad_.bspline_full().t(iyspline + order + 1), lambda) / rad_.bspline_full().t(iyspline + order + 1);;
+                                Real scale = special::pow_int(rad_.bspline_full().t(ixspline + order + 1).real() / rad_.bspline_full().t(iyspline + order + 1).real(), lambda) / rad_.bspline_full().t(iyspline + order + 1).real();
+                                
+                                contrib_direct   += f1[lambda] * M_L_P[lambda][ixspline] * M_mLm1_j[lambda][iyspline] * scale;
+                                contrib_exchange += f2[lambda] * M_L_j[lambda][ixspline] * M_mLm1_P[lambda][iyspline] * scale;
                             }
                         }
                     }

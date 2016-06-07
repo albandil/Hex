@@ -479,10 +479,11 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             }
             else
             {
+                Timer t;
                 R_tr_dia_diag_[lambda] = diagonalR(lambda);
                 R_tr_dia_diag_[lambda].hdfsave(filename);
                 if (verbose_)
-                    std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+                    std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
             }
         }
     }
@@ -562,6 +563,8 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
             R_tr_dia_[lambda].hdfinit();
         }
         
+        Timer t;
+        
         # pragma omp parallel firstprivate (lambda)
         {
             // for all blocks of the radial matrix
@@ -580,7 +583,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
         }
         
         if (verbose_)
-            std::cout << "\t- integrals for lambda = " << lambda << " computed" << std::endl;
+            std::cout << "\t- integrals for lambda = " << lambda << " computed after " << t.nice_time() << std::endl;
         
         // save to disk even if the integrals are to be cached
         if (R_tr_dia_[lambda].inmemory())
