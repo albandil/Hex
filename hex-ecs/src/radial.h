@@ -217,28 +217,13 @@ class RadialIntegrals
          * @endcode
          *  
          * @param a Moment degree.
-         * @param iknotmax Index of knot that terminates the integration range.
          */
         cArray computeMi
         (
-            Bspline const & bspline, GaussLegendre const & g,
-            int a, int iknotmax = 0
+            Bspline const & bspline,
+            GaussLegendre const & g,
+            int a
         ) const;
-        
-        /**
-         * @brief Integrand used in calculation of integral moments.
-         * 
-         * This function is used by @ref computeMi to calculate partial integral moments
-         * of a coordinate between two B-splines.
-         */
-        void Mi_integrand
-        (
-            int n, Complex *in, Complex *out,
-            Bspline const & bspline_ij, int i, int j,
-            int a, int iknot, int iknotmax
-        ) const;
-        
-        cArray diagonalR (int lambda) const;
         
         /**
          * @brief Two-electron integral.
