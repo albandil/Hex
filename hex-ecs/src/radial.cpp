@@ -396,6 +396,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
             Mm2_##REG##_   .hdfsave(); \
         }
     
+    Timer t;
     if (verbose_)
         std::cout << "Precomputing one-electron integrals ... " << std::flush;
     
@@ -403,7 +404,7 @@ void RadialIntegrals::setupOneElectronIntegrals (Parallel const & par, CommandLi
     SetupOneElectronIntegrals(full)
     
     if (verbose_)
-        std::cout << "ok" << std::endl << std::endl;
+        std::cout << "done in " << t.nice_time() << std::endl << std::endl;
     
 //     // compute inter-basis overlaps
 //     if (not cmd.map_solution.empty())
