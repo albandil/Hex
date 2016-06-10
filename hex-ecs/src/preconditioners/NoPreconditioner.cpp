@@ -66,7 +66,8 @@ void NoPreconditioner::update (Real E)
     // get maximal asymptotic principal quantum number
     max_n_ = (E_ >= 0 ? 0 : 1.0 / std::sqrt(-2 * E_));
     
-    // get number of asymptotic channels
+    // update number of asymptotic channels
+    Nchan_.clear();
     for (int ill = 0; ill < Nang; ill++)
     {
         int l1 = ang_.states()[ill].first;
@@ -250,6 +251,7 @@ void NoPreconditioner::update (Real E)
         if (not inp_.inner_only)
         {
             // outer problem matrix : r2 -> inf, l1 bound
+            B2_blocks_[ill * Nang + illp].resize(Nchan2 * Nchan2p);
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2p; n++)
             {
@@ -268,10 +270,11 @@ void NoPreconditioner::update (Real E)
                     subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l1 + m + 1, l1, l1p + n + 1, l1p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
-                B2_blocks_[ill * Nang + illp].push_back(subblock);
+                B2_blocks_[ill * Nang + illp][m * Nchan2p + n] = std::move(subblock);
             }
             
             // outer problem matrix : r1 -> inf, l2 bound
+            B1_blocks_[ill * Nang + illp].resize(Nchan1 * Nchan1p);
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1p; n++)
             {
@@ -290,7 +293,7 @@ void NoPreconditioner::update (Real E)
                     subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l2 + m + 1, l2, l2p + n + 1, l2p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
-                B1_blocks_[ill * Nang + illp].push_back(subblock);
+                B1_blocks_[ill * Nang + illp][m * Nchan1p + n] = std::move(subblock);
             }
             
             // transition area r2 > r1, upper : psi_kl expressed in terms of F_nl for 'l' out of inner area
@@ -862,9 +865,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 Cl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
             }
         }
-        
-//         std::cout << "MMUL p[" << ill << "].norm() = " << p[ill].norm() << std::endl;
-//         std::cout << "MMUL q[" << ill << "].norm() = " << q[ill].norm() << std::endl;
     }
     
     // constrain the result
