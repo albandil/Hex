@@ -190,10 +190,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         );
         
         // save the diagonal block's CSR representation and its factorization
-        csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
-        csr_blocks_[iblock].hdfsave();
-        lu_[iblock]->link(format("lu-%d.bin", iblock));
-        lu_[iblock]->save();
+//         csr_blocks_[iblock].hdflink(format("csr-%d.hdf", iblock));
+//         csr_blocks_[iblock].hdfsave();
+//         lu_[iblock]->link(format("lu-%d.bin", iblock));
+//         lu_[iblock]->save();
         
 #ifdef _OPENMP
         // release lock
