@@ -34,7 +34,11 @@
 
 #ifdef WITH_MUMPS
 
-#include <mumps/zmumps_c.h>
+#ifdef SINGLE
+    #include <mumps/cmumps_c.h>
+#else
+    #include <mumps/zmumps_c.h>
+#endif
 
 #include "preconditioners.h"
 
@@ -60,27 +64,27 @@ class CoupledPreconditioner : public NoPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd) {}
+        ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd) {}
         
         // reuse parent definitions
+        virtual void setup () { NoPreconditioner::setup(); }
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
         virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
         
         // declare own definitions
-        virtual void setup ();
         virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         virtual void finish ();
     
     protected:
     
-        mutable ZMUMPS_STRUC_C settings;
-        NumberArray<MUMPS_INT> I, J;
-        cArray A;
+        // LU factorization data.
+        std::shared_ptr<LUft<LU_int_t,Complex>> lu_;
+        
+        // Workspace used for the solution.
         mutable cArray X;
 };
 

@@ -38,14 +38,16 @@ enum
     LUFT_ANY,
     LUFT_UMFPACK,
     LUFT_SUPERLU,
-    LUFT_SUPERLU_DIST
+    LUFT_SUPERLU_DIST,
+    LUFT_MUMPS
 };
 
-// Forward declaration of classes (needed by csrmatrix.h).
+// Forward declaration of classes.
 template <class IdxT, class DataT> class LUft;
 template <class IdxT, class DataT> class LUft_UMFPACK;
 template <class IdxT, class DataT> class LUft_SUPERLU;
 template <class IdxT, class DataT> class LUft_SUPERLU_DIST;
+template <class IdxT, class DataT> class LUft_MUMPS;
 
 // Load available matrices.
 #include "hex-arrays.h"
@@ -472,5 +474,92 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &);
 };
 #endif // WITH_SUPERLU_DIST
+
+#ifdef WITH_MUMPS
+
+#define ICNTL(x) icntl[(x)-1]
+
+#ifdef SINGLE
+    #include <mumps/cmumps_c.h>
+    #define MUMPS_STRUC_C CMUMPS_STRUC_C
+    #define MUMPS_C cmumps_c
+    #define MUMPS_COMPLEX mumps_float_complex
+#else
+    #include <mumps/zmumps_c.h>
+    #define MUMPS_STRUC_C ZMUMPS_STRUC_C
+    #define MUMPS_C zmumps_c
+    #define MUMPS_COMPLEX mumps_double_complex
+#endif
+
+/**
+ * @brief LU factorization object - MUMPS specialization.
+ * 
+ * This class holds information on LU factorization as computed by the free
+ * library MUMPS. It is derived from LUft and shares interface with that class.
+ * 
+ * \warning This class expect only symmetric matrices. The COO matrix passed
+ * to this class should contain only upper or lower part of the matrix (together
+ * with the main diagonal).
+ */
+template <class IdxT, class DataT>
+class LUft_MUMPS : public LUft<IdxT,DataT>
+{
+    public:
+        
+        /// Default constructor.
+        LUft_MUMPS ()
+            : LUft<IdxT,DataT>(), size_(0) {}
+        
+        /// Construct from data.
+        LUft_MUMPS (MUMPS_STRUC_C s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, cArray && a)
+            : LUft<IdxT,DataT>(), I(i), J(j), A(a), settings(s), size_(0) {}
+        
+        /// Destructor.
+        virtual ~LUft_MUMPS () { drop (); }
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const { return size_; }
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save factorization data to disk.
+        virtual void save (std::string name) const { HexException("MUMPS factorizer does not yet support --out-of-core option."); }
+        
+        /// Load factorization data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("MUMPS factorizer does not yet support --out-of-core option."); }
+        
+        /// Release memory.
+        virtual void drop ()
+        {
+            if (size_ != 0)
+            {
+                // destroy MUMPS instance
+                settings.job = -2;
+                zmumps_c(&settings);
+                size_ = 0;
+            }
+        }
+        
+    private:
+        
+        // Matrix elements.
+        NumberArray<MUMPS_INT> I, J;
+        cArray A;
+        
+        // Internal data of the library.
+#ifdef SINGLE
+        mutable CMUMPS_STRUC_C settings;
+#else
+        mutable ZMUMPS_STRUC_C settings;
+#endif
+        
+        // Factorization size.
+        std::size_t size_;
+        
+        // Disable bitwise copy
+        LUft_MUMPS const & operator= (LUft_MUMPS const &);
+};
+#endif // WITH_MUMPS
 
 #endif // HEX_LUFT_H

@@ -51,6 +51,11 @@ template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::New (int factorizer)
             return new LUft_SUPERLU_DIST<LU_int_t,Complex>();
             break;
 #endif
+#ifdef WITH_MUMPS
+        case LUFT_MUMPS:
+            return new LUft_MUMPS<LU_int_t,Complex>();
+            break;
+#endif
         default:
             HexException("No LU factorizer %d.", factorizer);
     }
@@ -404,3 +409,26 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
 }
 
 #endif // WITH_SUPERLU_DIST
+
+// ------------------------------------------------------------------------------------
+// MUMPS-dependent functions.
+//
+
+#ifdef WITH_MUMPS
+
+template<>
+void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+{
+    // copy right-hand side to the solution vector
+    if (x.data() != b.data())
+        x = b;
+    
+    // run the back-substitution
+    settings.nrhs = 1;
+    settings.lrhs = x.size();
+    settings.rhs = reinterpret_cast<MUMPS_COMPLEX*>(const_cast<Complex*>(x.data()));
+    settings.job = 3;
+    MUMPS_C(&settings);
+}
+
+#endif // WITH_MUMPS

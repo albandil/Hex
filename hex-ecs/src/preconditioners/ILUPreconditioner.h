@@ -32,14 +32,12 @@
 #ifndef HEX_ILUPRECONDITIONER_H
 #define HEX_ILUPRECONDITIONER_H
 
+#include "hex-luft.h"
+
 #include "preconditioners.h"
 
 #ifdef _OPENMP
 #include <omp.h>
-#endif
-
-#ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
 #endif
 
 /**
@@ -86,7 +84,7 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
         
-//     protected:
+    protected:
         
         // diagonal blocks as CSR matrices
         mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;

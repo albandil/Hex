@@ -717,3 +717,109 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
 }
 
 #endif // WITH_SUPERLU_DIST
+
+// -------------------------------------------------------------------------------------
+// MUMPS-dependent functions.
+//
+
+#ifdef WITH_MUMPS
+
+template<>
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_mumps (Real droptol, void * data) const
+{
+    //
+    // Extract parameters.
+    //
+    
+        bool out_of_core = std::intptr_t(data) % 2;
+        int verbosity_level = std::intptr_t(data) / 2;
+    
+    //
+    // Create matrix of the system (i.e. the IJV triplet).
+    //
+
+        // estimate non-zero element count of the upper triangle
+        LU_int_t nz = (i_.size() + n_) / 2;
+        
+        // data arrays
+        NumberArray<MUMPS_INT> I, J;
+        cArray A;
+        
+        // allocate memory
+        I.reserve(nz);
+        J.reserve(nz);
+        A.reserve(nz);
+        
+        // for all rows
+        for (LU_int_t row = 0, nz = 0; row < m_; row++)
+        {
+            // for all columns with structurally non-zero entries
+            for (LU_int_t idx = p_[row]; idx < p_[row + 1]; idx++)
+            {
+                // get column index
+                LU_int_t col = i_[idx];
+                
+                // only consider upper triangle (and the main diagonal)
+                if (row <= col and x_[idx] != 0.0_z)
+                {
+                    // insert the element
+                    I.push_back(row + 1);
+                    J.push_back(col + 1);
+                    A.push_back(x_[idx]);
+                    
+                    // update true element count
+                    nz++;
+                }
+            }
+        }
+    
+    //
+    // Prepare MUMPS environment.
+    //
+    
+        MUMPS_STRUC_C settings;
+        
+        // initialize
+        settings.sym = 2;
+        settings.par = 1;
+        settings.job = -1;
+        MUMPS_C(&settings);
+        
+        // analyze
+        settings.job = 1;
+        settings.ICNTL(1) = 6; // errors to STDOUT (default: 6)
+        settings.ICNTL(2) = 0; // diagnostics to /dev/null
+        settings.ICNTL(3) = 6; // global info to STDOUT (default: 6)
+        settings.ICNTL(4) = verbosity_level; // verbosity level (default: 2)
+        settings.ICNTL(5) = 0; // COO format
+        settings.ICNTL(22) = out_of_core; // OOC factorization
+        std::strcpy(settings.ooc_tmpdir, ".");
+        std::strcpy(settings.ooc_prefix, "ooc-");
+        settings.n = this->n_;
+        settings.nz = nz;
+        settings.irn = I.data();
+        settings.jcn = J.data();
+        settings.a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
+        Timer t2;
+        std::cout << "\t- analyze the hamiltonian using MUMPS ... " << std::flush;
+        MUMPS_C(&settings);
+        std::cout << "done in " << t2.nice_time() << std::endl << std::endl;
+    
+    //
+    // Compute the factorization.
+    //
+    
+        settings.job = 2;
+        MUMPS_C(&settings);
+    
+    // create a new LU factorization container
+    LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>
+    (
+        settings, std::move(I), std::move(J), std::move(A)
+    );
+    
+    // wrap the pointer into smart pointer
+    return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);
+}
+
+#endif // WITH_MUMPS

@@ -225,19 +225,19 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 //         csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
 //         csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
         
-        // factorize the block and store it
-        lu_[iblock] = csr_blocks_[iblock].factorize
-        (
-            cmd_.droptol,
-            cmd_.factorizer,
+        // set up factorization data
+        void * data = nullptr;
 #ifdef WITH_SUPERLU_DIST
-            // pass pointer to grid info if needed
-            cmd_.factorizer == LUFT_SUPERLU_DIST ? const_cast<gridinfo_t*>(&grid_) : nullptr
-#else
-            // do not pass any additional data
-            nullptr
+        if (cmd_.factorizer == LUFT_SUPERLU_DIST)
+            data = const_cast<gridinfo_t*>(&grid_);
 #endif
-        );
+#ifdef WITH_MUMPS
+        if (cmd_.factorizer == LUFT_MUMPS)
+            data = (void*)std::intptr_t(cmd_.mumps_outofcore + 2 * cmd_.mumps_verbose);
+#endif
+        
+        // factorize the block and store it
+        lu_[iblock] = csr_blocks_[iblock].factorize(cmd_.droptol, cmd_.factorizer, data);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical

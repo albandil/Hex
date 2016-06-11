@@ -165,7 +165,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
-                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
+                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu', 'superlu_dist' and 'mumps'). Default is 'umfpack' (if available).  \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
@@ -250,6 +250,8 @@ void CommandLine::parse (int argc, char* argv[])
                     factorizer = LUFT_SUPERLU;
                 else if (optargs[0] == "superlu_dist")
                     factorizer = LUFT_SUPERLU_DIST;
+                else if (optargs[0] == "mumps")
+                    factorizer = LUFT_MUMPS;
                 else
                     HexException("Unknown LU-factorizer '%s'.", optargs[0].c_str());
                 return true;
