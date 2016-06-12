@@ -787,9 +787,9 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         
         // analyze
         settings.job = 1;
-        settings.ICNTL(1) = 6; // errors to STDOUT (default: 6)
+        settings.ICNTL(1) = (verbosity_level == 0 ? 0 : 6); // errors to STDOUT (default: 6)
         settings.ICNTL(2) = 0; // diagnostics to /dev/null
-        settings.ICNTL(3) = 6; // global info to STDOUT (default: 6)
+        settings.ICNTL(3) = (verbosity_level == 0 ? 0 : 6); // global info to STDOUT (default: 6)
         settings.ICNTL(4) = verbosity_level; // verbosity level (default: 2)
         settings.ICNTL(5) = 0; // COO format
         settings.ICNTL(22) = out_of_core; // OOC factorization
@@ -800,10 +800,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         settings.irn = I.data();
         settings.jcn = J.data();
         settings.a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
-        Timer t2;
-        std::cout << "\t- analyze the hamiltonian using MUMPS ... " << std::flush;
         MUMPS_C(&settings);
-        std::cout << "done in " << t2.nice_time() << std::endl << std::endl;
     
     //
     // Compute the factorization.
@@ -813,9 +810,14 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         MUMPS_C(&settings);
     
     // create a new LU factorization container
+    // NOTE : It is necessary to pass the arrays by r-value reference, because
+    // we are using pointers to their data and simple copying would invalidate them.
     LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>
     (
-        settings, std::move(I), std::move(J), std::move(A)
+        settings,
+        std::move(I), std::move(J), std::move(A),
+        sizeof(MUMPS_COMPLEX) * (settings.info[9-1] >= 0 ?  settings.info[9-1] : 1000000 * std::abs(settings.info[9-1]))
+        + sizeof(MUMPS_INT) * settings.info[10-1]
     );
     
     // wrap the pointer into smart pointer

@@ -337,10 +337,6 @@ class SolutionIO
         /// Check that the file exists, return size.
         std::size_t check (int ill = -1) const
         {
-            // look for monolithic solution file
-            HDFFile fmono (name(), HDFFile::readonly);
-            if (fmono.valid()) return fmono.size("array")/2 / ang_.size();
-            
             // look for specific solution segment file
             if (ill >= 0)
             {
@@ -356,8 +352,11 @@ class SolutionIO
                 size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
             }
             
-            // check that all blocks existed
-            return std::find(size.begin(), size.end(), 0) == size.end();
+            // calculate total size
+            std::size_t total_size = std::accumulate(size.begin(), size.end(), 0);
+            
+            // check that all blocks existed: either return sum of sizes, or zero
+            return std::find(size.begin(), size.end(), 0) == size.end() ? total_size : 0;
         }
         
         /**

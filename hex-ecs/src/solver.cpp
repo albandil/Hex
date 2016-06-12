@@ -140,14 +140,17 @@ void Solver::solve ()
             );
         }
         
-        // print system information
-        std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
-        std::cout << "\tFull hamiltonian / solution size: " << std::accumulate
+        // calculate size of the hamiltonian
+        std::size_t Hsize = std::accumulate
         (
             bstates_.begin(), bstates_.end(),
             Nspline_inner * Nspline_inner * ang_.states().size(),
             [&](std::size_t n, std::pair<iArray,iArray> const & p) { return n + (p.first.size() + p.second.size()) * Nspline_outer; }
-        ) << std::endl;
+        );
+        
+        // print system information
+        std::cout.imbue(std::locale(std::locale::classic(), new MyNumPunct));
+        std::cout << "\tFull hamiltonian / solution size: " << Hsize << std::endl;
         std::cout.imbue(std::locale::classic());
         
         // we may have already computed all solutions for this energy... is it so?
@@ -190,59 +193,14 @@ void Solver::solve ()
             
             // check if there is some precomputed solution on the disk
             SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_.states());
-            /*std::size_t size = reader.check();*/
+            std::size_t size = reader.check();
             
-            // TODO : solution has the expected size
-            /*if (size == ? and not cmd_.refine_solution)
+            // solution has the expected size
+            if (size == Hsize and not cmd_.refine_solution)
             {
                 std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") found." << std::endl;
                 continue;
-            }*/
-            
-            // TODO : solution is smaller
-            /*if (0 < size and size < (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
-            {
-                // is the size equal to previous panel basis size?
-                if (ipanel_ > 0 and size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_-1].Nspline())
-                {
-                    // use that older solution in construction of the new one (later)
-                }
-                else if (ipanel_ > 0)
-                {
-                    // inform user that there is already some incompatible solution file
-                    std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                              << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * bspline_full_[ipanel_-1].Nspline() << ") and will be recomputed." << std::endl;
-                }
-                else
-                {
-                    // the same for first panel
-                    std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                              << " found, but has a smaller block size (" << size << " < " << (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline() << ") and will be recomputed." << std::endl;
-                }
-            }*/
-            
-            // TODO : solution is larger
-            /*if (size > (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel_].Nspline())
-            {
-                // is the size equal to some higher panel basis size?
-                bool higher_panel_match = false;
-                for (int ipanel = ipanel_ + 1; ipanel < cmd_.panels; ipanel++)
-                {
-                    if (size == (std::size_t)Nspline_atom * (std::size_t)bspline_full_[ipanel].Nspline())
-                        higher_panel_match = true;
-                }
-                
-                // consider this solution all right if sizes match for some further panel
-                if (higher_panel_match)
-                {
-                    std::cout << "\tSolution for initial state " << Hydrogen::stateName(ni,li,mi) << " (S = " << Spin << ") present and propagated." << std::endl;
-                    continue;
-                }
-                
-                // inform user that there is already some incompatible solution file
-                std::cout << "Warning: Solution for initial state (" << ni << "," << li << "," << mi << "), S = " << Spin << ", Etot = " << inp_.Etot[ie]
-                          << " found, but has a larger block size (" << size << " > " << (std::size_t)Nspline_atom * Nspline_proj << ") and will be recomputed." << std::endl;
-            }*/
+            }
             
             // add work
             work.push_back(std::make_pair(instate,Spin));

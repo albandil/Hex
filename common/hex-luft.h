@@ -511,8 +511,8 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             : LUft<IdxT,DataT>(), size_(0) {}
         
         /// Construct from data.
-        LUft_MUMPS (MUMPS_STRUC_C s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, cArray && a)
-            : LUft<IdxT,DataT>(), I(i), J(j), A(a), settings(s), size_(0) {}
+        LUft_MUMPS (MUMPS_STRUC_C s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, cArray && a, std::size_t z)
+            : LUft<IdxT,DataT>(), I(i), J(j), A(a), settings(s), size_(z) {}
         
         /// Destructor.
         virtual ~LUft_MUMPS () { drop (); }
@@ -527,14 +527,18 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         virtual void save (std::string name) const { HexException("MUMPS factorizer does not yet support --out-of-core option."); }
         
         /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true) { HexException("MUMPS factorizer does not yet support --out-of-core option."); }
+        virtual void load (std::string name, bool throw_on_io_failure = true)
+        {
+            if (throw_on_io_failure)
+                HexException("MUMPS factorizer does not yet support --out-of-core option.");
+        }
         
         /// Release memory.
         virtual void drop ()
         {
             if (size_ != 0)
             {
-                // destroy MUMPS instance
+                // destroy MUMPS data
                 settings.job = -2;
                 zmumps_c(&settings);
                 size_ = 0;
