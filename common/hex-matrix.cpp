@@ -777,48 +777,48 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
     // Prepare MUMPS environment.
     //
     
-        MUMPS_STRUC_C settings;
+        MUMPS_STRUC_C * settings = new MUMPS_STRUC_C;
         
         // initialize
-        settings.sym = 2;
-        settings.par = 1;
-        settings.job = -1;
-        MUMPS_C(&settings);
+        settings->sym = 2;
+        settings->par = 1;
+        settings->job = -1;
+        MUMPS_C(settings);
         
         // analyze
-        settings.job = 1;
-        settings.ICNTL(1) = (verbosity_level == 0 ? 0 : 6); // errors to STDOUT (default: 6)
-        settings.ICNTL(2) = 0; // diagnostics to /dev/null
-        settings.ICNTL(3) = (verbosity_level == 0 ? 0 : 6); // global info to STDOUT (default: 6)
-        settings.ICNTL(4) = verbosity_level; // verbosity level (default: 2)
-        settings.ICNTL(5) = 0; // COO format
-        settings.ICNTL(22) = out_of_core; // OOC factorization
-        std::strcpy(settings.ooc_tmpdir, ".");
-        std::strcpy(settings.ooc_prefix, "ooc-");
-        settings.n = this->n_;
-        settings.nz = nz;
-        settings.irn = I.data();
-        settings.jcn = J.data();
-        settings.a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
-        MUMPS_C(&settings);
+        settings->job = 1;
+        settings->ICNTL(1) = (verbosity_level == 0 ? 0 : 6); // errors to STDOUT (default: 6)
+        settings->ICNTL(2) = 0; // diagnostics to /dev/null
+        settings->ICNTL(3) = (verbosity_level == 0 ? 0 : 6); // global info to STDOUT (default: 6)
+        settings->ICNTL(4) = verbosity_level; // verbosity level (default: 2)
+        settings->ICNTL(5) = 0; // COO format
+        settings->ICNTL(22) = out_of_core; // OOC factorization
+        std::strcpy(settings->ooc_tmpdir, ".");
+        std::strcpy(settings->ooc_prefix, "ooc-");
+        settings->n = this->n_;
+        settings->nz = nz;
+        settings->irn = I.data();
+        settings->jcn = J.data();
+        settings->a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
+        MUMPS_C(settings);
     
     //
     // Compute the factorization.
     //
     
-        settings.job = 2;
-        MUMPS_C(&settings);
+        settings->job = 2;
+        MUMPS_C(settings);
+    
+    //
+    // Clean up
+    //
+    
+        settings->irn = nullptr;
+        settings->jcn = nullptr;
+        settings->a = nullptr;
     
     // create a new LU factorization container
-    // NOTE : It is necessary to pass the arrays by r-value reference, because
-    // we are using pointers to their data and simple copying would invalidate them.
-    LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>
-    (
-        settings,
-        std::move(I), std::move(J), std::move(A),
-        sizeof(MUMPS_COMPLEX) * (settings.info[9-1] >= 0 ?  settings.info[9-1] : 1000000 * std::abs(settings.info[9-1]))
-        + sizeof(MUMPS_INT) * settings.info[10-1]
-    );
+    LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>(settings);
     
     // wrap the pointer into smart pointer
     return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);

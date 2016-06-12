@@ -34,10 +34,15 @@
 #include "preconditioners.h"
 
 const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled solver that uses MUMPS out of core; nevertheless, it still consumes a huge amount of RAM.";
+const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
+    "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
+    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
+    "may prove insufficient.";
 
 void CoupledPreconditioner::update (Real E)
 {
+    HexException("The coupled preconditioner is broken in this version of the program!");
+    
     // concatenate all matrix blocks
     NumberArray<LU_int_t> I, J;
     cArray A;

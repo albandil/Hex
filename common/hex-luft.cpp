@@ -424,11 +424,11 @@ void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int 
         x = b;
     
     // run the back-substitution
-    settings.nrhs = 1;
-    settings.lrhs = x.size();
-    settings.rhs = reinterpret_cast<MUMPS_COMPLEX*>(const_cast<Complex*>(x.data()));
-    settings.job = 3;
-    MUMPS_C(&settings);
+    settings->nrhs = 1;
+    settings->lrhs = x.size();
+    settings->rhs = reinterpret_cast<MUMPS_COMPLEX*>(const_cast<Complex*>(x.data()));
+    settings->job = 3;
+    MUMPS_C(settings);
 }
 
 #endif // WITH_MUMPS

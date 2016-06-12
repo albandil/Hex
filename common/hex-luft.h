@@ -98,7 +98,7 @@ class LUft
          * 
          * Note: Currently implemented only for UMFPACK backend.
          */
-        virtual double cond () const { return 0; }
+        virtual Real cond () const { return 0; }
         
         /**
          * @brief Solve equations.
@@ -244,7 +244,7 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         virtual std::size_t size () const;
         
         /// Return condition number.
-        virtual double cond () const;
+        virtual Real cond () const;
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
@@ -315,7 +315,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
             SuperMatrix U,
             GlobalLU_t Glu,
             int bytes,
-            double droptol
+            Real droptol
         ) : LUft<IdxT,DataT>(), matrix_(matrix), perm_c_(perm_c), perm_r_(perm_r), etree_(etree), equed_(equed),
             R_(R), C_(R), L_(L), U_(U), Glu_(Glu), size_(bytes), droptol_(droptol)
         {
@@ -384,7 +384,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         std::size_t size_;
         
         /// Drop tolerance.
-        double droptol_;
+        Real droptol_;
         
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &);
@@ -508,17 +508,20 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         
         /// Default constructor.
         LUft_MUMPS ()
-            : LUft<IdxT,DataT>(), size_(0) {}
+            : LUft<IdxT,DataT>(), settings(nullptr) {}
         
         /// Construct from data.
-        LUft_MUMPS (MUMPS_STRUC_C s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, cArray && a, std::size_t z)
-            : LUft<IdxT,DataT>(), I(i), J(j), A(a), settings(s), size_(z) {}
+        LUft_MUMPS (MUMPS_STRUC_C * s)
+            : LUft<IdxT,DataT>(), settings(s) {}
         
         /// Destructor.
         virtual ~LUft_MUMPS () { drop (); }
         
         /// Return LU byte size.
-        virtual std::size_t size () const { return size_; }
+        virtual std::size_t size () const { return settings ? sizeof(MUMPS_COMPLEX) * (settings->info[9-1] >= 0 ?  settings->info[9-1] : 1000000 * std::abs(settings->info[9-1])) + sizeof(MUMPS_INT) * settings->info[10-1] : 0; }
+        
+        /// Condition number.
+        virtual Real cond () const { return settings ? settings->rinfo[11-1] : 0.0_r; }
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
@@ -536,30 +539,20 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         /// Release memory.
         virtual void drop ()
         {
-            if (size_ != 0)
+            if (settings != nullptr)
             {
                 // destroy MUMPS data
-                settings.job = -2;
-                zmumps_c(&settings);
-                size_ = 0;
+                settings->job = -2;
+                zmumps_c(settings);
+                delete settings;
+                settings = nullptr;
             }
         }
         
     private:
         
-        // Matrix elements.
-        NumberArray<MUMPS_INT> I, J;
-        cArray A;
-        
         // Internal data of the library.
-#ifdef SINGLE
-        mutable CMUMPS_STRUC_C settings;
-#else
-        mutable ZMUMPS_STRUC_C settings;
-#endif
-        
-        // Factorization size.
-        std::size_t size_;
+        mutable MUMPS_STRUC_C * settings;
         
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &);
