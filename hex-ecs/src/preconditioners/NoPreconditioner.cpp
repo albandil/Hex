@@ -86,7 +86,7 @@ void NoPreconditioner::update (Real E)
     if (cmd_.lightweight_full)
         return;
     
-    std::cout << "\tPrecompute diagonal blocks ... " << std::flush;
+    std::cout << "\tPrecompute matrix blocks ... " << std::flush;
     Timer t;
     
     // LU-factorize the overlap matrix
