@@ -657,9 +657,22 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Real knots (" << rknots.size() << ")" << std::endl;
-    for (std::string line : rknots.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (rknots.size() < 2000)
+    {
+        std::cout << "Real knots (" << rknots.size() << ")" << std::endl;
+        for (std::string line : rknots.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Real knots (first 1000 of " << rknots.size() << " )" << std::endl;
+        for (std::string line : rknots.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Real knots (last 1000 of " << rknots.size() << " )" << std::endl;
+        for (std::string line : rknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check order of knots
     for (unsigned i = 1; i < rknots.size(); i++)
@@ -674,9 +687,22 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Extension knots (" << rknots_ext.size() << ")" << std::endl;
-    for (std::string line : rknots_ext.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (rknots_ext.size() < 2000)
+    {
+        std::cout << "Extension knots (" << rknots_ext.size() << ")" << std::endl;
+        for (std::string line : rknots_ext.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Extension knots (first 1000 of " << rknots_ext.size() << " total)" << std::endl;
+        for (std::string line : rknots_ext.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Extension knots (last 1000 of " << rknots_ext.size() << " total)" << std::endl;
+        for (std::string line : rknots_ext.slice(rknots_ext.size() - 1000, rknots_ext.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check that the first knot is zero
     if (rknots_ext.size() > 0 and rknots_ext[0] != 0.)
@@ -698,9 +724,22 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Complex knots (before scaling; " << cknots.size() << ")" << std::endl;
-    for (std::string line : cknots.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (cknots.size() < 2000)
+    {
+        std::cout << "Complex knots (before scaling; " << cknots.size() << ")" << std::endl;
+        for (std::string line : cknots.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Complex knots (before scaling; first 1000 of " << cknots.size() << " )" << std::endl;
+        for (std::string line : cknots.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Complex knots (before scaling; last 1000 of " << cknots.size() << " )" << std::endl;
+        for (std::string line : cknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check that the first knot is zero
     if (cknots.size() > 0 and cknots[0] != 0.)
