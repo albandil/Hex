@@ -780,13 +780,13 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         MUMPS_STRUC_C * settings = new MUMPS_STRUC_C;
         
         // initialize
+        settings->job = MUMPS_INITIALIZE;
         settings->sym = 2;
         settings->par = 1;
-        settings->job = -1;
         MUMPS_C(settings);
         
         // analyze
-        settings->job = 1;
+        settings->job = MUMPS_ANALYZE;
         settings->ICNTL(1) = (verbosity_level == 0 ? 0 : 6); // errors to STDOUT (default: 6)
         settings->ICNTL(2) = 0; // diagnostics to /dev/null
         settings->ICNTL(3) = (verbosity_level == 0 ? 0 : 6); // global info to STDOUT (default: 6)
@@ -806,19 +806,20 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
     // Compute the factorization.
     //
     
-        settings->job = 2;
+        settings->job = MUMPS_FACTORIZE;
         MUMPS_C(settings);
     
     //
-    // Clean up
+    // Create a new LU factorization container
     //
     
-        settings->irn = nullptr;
-        settings->jcn = nullptr;
-        settings->a = nullptr;
-    
-    // create a new LU factorization container
-    LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>(settings);
+        LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>
+        (
+            settings,
+            std::move(I),
+            std::move(J),
+            std::move(A)
+        );
     
     // wrap the pointer into smart pointer
     return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);

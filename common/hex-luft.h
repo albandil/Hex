@@ -478,6 +478,11 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 #ifdef WITH_MUMPS
 
 #define ICNTL(x) icntl[(x)-1]
+#define MUMPS_INITIALIZE    (-1)
+#define MUMPS_FINISH        (-2)
+#define MUMPS_ANALYZE       1
+#define MUMPS_FACTORIZE     2
+#define MUMPS_SOLVE         3
 
 #ifdef SINGLE
     #include <mumps/cmumps_c.h>
@@ -511,8 +516,8 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             : LUft<IdxT,DataT>(), settings(nullptr) {}
         
         /// Construct from data.
-        LUft_MUMPS (MUMPS_STRUC_C * s)
-            : LUft<IdxT,DataT>(), settings(s) {}
+        LUft_MUMPS (MUMPS_STRUC_C * s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, NumberArray<DataT> && a)
+            : LUft<IdxT,DataT>(), settings(s), I(std::move(i)), J(std::move(j)), A(std::move(a)) {}
         
         /// Destructor.
         virtual ~LUft_MUMPS () { drop (); }
@@ -542,7 +547,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             if (settings != nullptr)
             {
                 // destroy MUMPS data
-                settings->job = -2;
+                settings->job = MUMPS_FINISH;
                 zmumps_c(settings);
                 delete settings;
                 settings = nullptr;
@@ -553,6 +558,10 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         
         // Internal data of the library.
         mutable MUMPS_STRUC_C * settings;
+        
+        // data arrays
+        NumberArray<MUMPS_INT> I, J;
+        NumberArray<DataT> A;
         
         // Disable bitwise copy
         LUft_MUMPS const & operator= (LUft_MUMPS const &);
