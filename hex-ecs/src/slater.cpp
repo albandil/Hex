@@ -142,7 +142,7 @@ cArray RadialIntegrals::diagonalR (int lambda) const
 {
     // assume bspline_atom == bspline_proj
     int order = bspline_full_.order();
-    int Nspline = bspline_full_.Nspline(); // WARNING : Only inner region integrals calculated !
+    int Nspline = bspline_inner_.Nspline(); // WARNING : Only inner region integrals calculated !
     int Nreknot = bspline_full_.Nreknot();
     
     // allocate space
