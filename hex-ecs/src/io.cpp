@@ -191,8 +191,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
-                    "\t--mumps-in-core                  Try to keep all factorization data in memory when using MUMPS.                                                         \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library.                                                                                  \n"
+                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS.                                                                                   \n"
+                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
@@ -426,10 +426,10 @@ void CommandLine::parse (int argc, char* argv[])
                 coupling_limit = std::atoi(optargs[0].c_str());
                 return true;
             },
-        "mumps-in-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+        "mumps-out-of-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // MUMPS out of core
-                mumps_outofcore = false;
+                mumps_outofcore = true;
                 return true;
             },
         "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool

@@ -794,7 +794,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         settings->ICNTL(5) = 0; // COO format
         settings->ICNTL(22) = out_of_core; // OOC factorization
         std::strcpy(settings->ooc_tmpdir, ".");
-        std::strcpy(settings->ooc_prefix, "ooc-");
+        std::strcpy(settings->ooc_prefix, "ooc_");
         settings->n = this->n_;
         settings->nz = nz;
         settings->irn = I.data();
