@@ -410,7 +410,7 @@ void NoPreconditioner::update (Real E)
                 
                 if (ill == illp and m == n)
                 {
-                    elem += (E_ + 0.5_r / ((n + l1 + 1) * (n + l1 + 1))) * rad_.S_full()(i,k)
+                    elem += (E_ + 0.5_r / ((n + l2 + 1) * (n + l2 + 1))) * rad_.S_full()(i,k)
                          - 0.5_r * rad_.D_full()(i,k)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_.Mm2_full()(i,k);
                 }
@@ -472,8 +472,8 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
         int l2 = ang_.states()[ill].second;
         
         // get number of open channels in the outer region
-        int Nchan1 = Nchan_[ill].second;    // r1 -> inf, l2 bound
-        int Nchan2 = Nchan_[ill].first;     // r2 -> inf, l1 bound
+        int Nchan1 = Nchan_[ill].first;     // r1 -> inf, l2 bound
+        int Nchan2 = Nchan_[ill].second;    // r2 -> inf, l1 bound
         
         // setup storage
         cArray chi_block (Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer);
@@ -834,10 +834,10 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             if (not inp_.inner_only)
             {
-                int Nchan2 = Nchan_[ill].first;     // # r2 -> inf; l1 bound
-                int Nchan1 = Nchan_[ill].second;    // # r1 -> inf; l2 bound
-                int Nchan2p = Nchan_[illp].first;   // # r2 -> inf; l1p bound
-                int Nchan1p = Nchan_[illp].second;  // # r1 -> inf; l2p bound
+                int Nchan1 = Nchan_[ill].first;     // # r1 -> inf; l2 bound
+                int Nchan2 = Nchan_[ill].second;    // # r2 -> inf; l1 bound
+                int Nchan1p = Nchan_[illp].first;   // # r1 -> inf; l2p bound
+                int Nchan2p = Nchan_[illp].second;  // # r2 -> inf; l1p bound
                 
                 // r1 -> inf
                 for (int m = 0; m < Nchan1; m++)

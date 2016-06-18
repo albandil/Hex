@@ -159,8 +159,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         Timer timer;
         
         // number of asymptotic channels
-        int Nchan2 = Nchan_[iblock].first;
-        int Nchan1 = Nchan_[iblock].second;
+        int Nchan1 = Nchan_[iblock].first;
+        int Nchan2 = Nchan_[iblock].second;
         
         // number of B-splines
         LU_int_t Nspline_inner = rad_.bspline_inner().Nspline();

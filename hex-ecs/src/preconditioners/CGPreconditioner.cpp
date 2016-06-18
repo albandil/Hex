@@ -246,7 +246,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         for (std::size_t m = 0; m < Nchan2; m++)
         for (std::size_t n = 0; n < Nchan2; n++)
         {
-            B1_blocks_[iang][m * Nchan2 + n].dot
+            B2_blocks_[iang][m * Nchan2 + n].dot
             (
                 1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
                 1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
