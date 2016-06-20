@@ -612,7 +612,7 @@ void RadialIntegrals::setupTwoElectronIntegrals (Parallel const & par, CommandLi
 SymBandMatrix<Complex> RadialIntegrals::calc_R_tr_dia_block (unsigned int lambda, int i, int k, bool simple) const
 {
     // shorthands
-    int Nspline = bspline_full_.Nspline();
+    int Nspline = bspline_inner_.Nspline(); // WARNING : Computing only inner-region integrals.
     int order = bspline_full_.order();
     
     // (i,k)-block data
