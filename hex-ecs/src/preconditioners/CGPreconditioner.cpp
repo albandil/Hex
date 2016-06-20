@@ -174,9 +174,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
             if (cmd_.outofcore)
             {
                 const_cast<BlockArray<Complex>&>(r)[ill].drop();
-                
-                z.hdfsave(ill);
-                z[ill].drop();
+                z.hdfsave(ill, true);
             }
         }
     }
@@ -209,8 +207,8 @@ void CGPreconditioner::CG_init (int iblock) const
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-    if (cmd_.lightweight_full)
-        HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
+//     if (cmd_.lightweight_full)
+//         HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
         
 //     dia_blocks_[iblock].dot(1., p, 0., q, true);
     
@@ -222,11 +220,26 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
     std::size_t Nang = ang_.states().size();
     std::size_t iang = iblock * Nang + iblock;
     
-    A_blocks_[iang].dot
-    (
-        1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-        1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
-    );
+    if (cmd_.lightweight_full)
+    {
+        dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).dot
+        (
+            1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
+            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
+        );
+    }
+    else
+    {
+        if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).hdfload();
+        
+        A_blocks_[iang].dot
+        (
+            1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
+            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
+        );
+        
+        if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
+    }
     
     if (not inp_.inner_only)
     {

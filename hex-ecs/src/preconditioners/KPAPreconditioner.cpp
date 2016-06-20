@@ -310,49 +310,7 @@ void KPACGPreconditioner::setup ()
                 done_atom, comp_l, needed_l
             );
         }
-        
-    //
-    // Check presence of the projectile electron preconditioner
-    //
-        
-        /*// status array indicating necessity to calculate the preconditioner matrix for given 'l'
-        Array<bool> done_proj (inp_.maxell + 1, true);
-        
-        // "to compute matrices": link them to scratch disk files and check presence
-        for (int l : comp_l)
-        {
-            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_proj().hash()).c_str());
-            done_proj[l] = prec_proj_[l].hdfcheck();
-        }
-        
-        // "needed matrices": link them to scratch disk files and check presence, load if present
-        for (int l : needed_l)
-        {
-            prec_proj_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_atom().hash()).c_str());
-            done_proj[l] = prec_proj_[l].hdfcheck();
-            
-            if (done_proj[l])
-            {
-                std::cout << "\t- projectile preconditioner data for l = " << l
-                           << " present in \"" << prec_proj_[l].filename << "\"" << std::endl;
-            }
-        }*/
     
-    //
-    // Calculation of the preconditioner for atomic basis.
-    //
-    
-        /*if (not all(done_proj))
-        {
-            std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
-            prepare
-            (
-                prec_proj_, bspline_outer_.Nspline(),
-                rad_.S_outer(), rad_.D_outer(), rad_.Mm1_tr_outer(), rad_.Mm2_outer(),
-                done_proj, comp_l, needed_l
-            );
-        }*/
-        
     std::cout << std::endl;
     
     // get maximal number of threads that will run the preconditioning routines concurrently

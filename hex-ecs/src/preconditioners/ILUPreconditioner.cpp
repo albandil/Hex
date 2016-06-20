@@ -36,6 +36,7 @@
 #include "hex-misc.h"
 
 #include "preconditioners.h"
+#include "NoPreconditioner.h"
 
 const std::string ILUCGPreconditioner::prec_name = "ILU";
 const std::string ILUCGPreconditioner::prec_description = 
@@ -72,8 +73,8 @@ void ILUCGPreconditioner::setup ()
     CGPreconditioner::setup();
     
     // check compatibility with the command line setup
-    if (cmd_.lightweight_full)
-        HexException("ILU preconditioner is not compatible with --lightweight-full. But you can still try --lightweight-radial-cache.");
+//     if (cmd_.lightweight_full)
+//         HexException("ILU preconditioner is not compatible with --lightweight-full. But you can still try --lightweight-radial-cache.");
     
     // setup attributes
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
@@ -170,7 +171,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int iang = iblock * ang_.states().size() + iblock;
         
         // convert inner region matrix block to COO matrix
-        CooMatrix<LU_int_t,Complex> A_coo = A_blocks_[iang].tocoo<LU_int_t>();
+        CooMatrix<LU_int_t,Complex> A_coo = (cmd_.lightweight_full ? dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock) : A_blocks_[iang]).tocoo<LU_int_t>();
 //         A_coo.tocsr().tocoo().write("A-coo.txt"); // DEBUG
         
         // add the A-block
@@ -254,6 +255,12 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         lu_[iblock]->link(format("lu-%d.bin", iblock));
 //         lu_[iblock]->save();
         
+#ifdef WITH_MUMPS
+        // MUMPS uses own COO copy of the CSR matrix -> drop it
+        if (cmd_.factorizer == LUFT_MUMPS)
+            csr_blocks_[iblock].drop();
+#endif
+        
 #ifdef _OPENMP
         // release lock
         if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
@@ -271,11 +278,11 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
     // release memory
-    if (cmd_.outofcore)
-    {
-        csr_blocks_[iblock].drop();
-        lu_[iblock]->drop();
-    }
+//     if (cmd_.outofcore)
+//     {
+//         csr_blocks_[iblock].drop();
+//         lu_[iblock]->drop();
+//     }
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);

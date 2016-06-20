@@ -308,6 +308,7 @@ void CommandLine::parse (int argc, char* argv[])
                 cache_all_radint = false;
                 cache_own_radint = false;
                 outofcore = true;
+                mumps_outofcore = true;
                 return true;
             },
         "out-of-core-continue", "O", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -317,6 +318,7 @@ void CommandLine::parse (int argc, char* argv[])
                 cache_own_radint = false;
                 reuse_dia_blocks = true;
                 outofcore = true;
+                mumps_outofcore = true;
                 cont = true;
                 return true;
             },

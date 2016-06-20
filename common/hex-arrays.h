@@ -1180,6 +1180,11 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
         //@}
         
+        std::string hdfname () const
+        {
+            return name_;
+        }
+        
         /**
          * @brief Get compressed array.
          * 
@@ -1434,10 +1439,14 @@ template <class T> class BlockArray
             return arrays_[iblock].hdfload(subname(iblock));
         }
         
-        bool hdfsave (std::size_t iblock)
+        bool hdfsave (std::size_t iblock, bool drop = false)
         {
             assert(iblock < arrays_.size());
-            return arrays_[iblock].hdfsave(subname(iblock));
+            if (not arrays_[iblock].hdfsave(subname(iblock)))
+                return false;
+            if (drop)
+                arrays_[iblock].drop();
+            return true;
         }
         
         bool inmemory () const
