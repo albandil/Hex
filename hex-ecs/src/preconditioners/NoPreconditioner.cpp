@@ -613,7 +613,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         int ichan1 = (ispline - Nspline_inner * Nspline_inner) / Nspline_outer;
                         
                         // calculate the exchange contribution
-                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (f2[lambda] != 0)
                             contrib_exchange += f2[lambda] * rho_l2[ichan1][lambda] * M_mLm1_j[lambda][ixspline] / special::pow_int(rad_.bspline_full().t(ixspline + order + 1).real(), lambda + 1);
                     }
                     else if (ispline >= Nspline_inner * Nspline_inner + Nchan1 * Nspline_outer)
@@ -623,7 +623,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                         int ichan2 = (ispline - Nspline_inner * Nspline_inner - Nchan1 * Nspline_outer) / Nspline_outer;
                         
                         // calculate the direct contribution
-                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++)
+                        for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (f1[lambda] != 0)
                             contrib_direct += f1[lambda] * rho_l1[ichan2][lambda] * M_mLm1_j[lambda][iyspline] / special::pow_int(rad_.bspline_full().t(iyspline + order + 1).real(), lambda + 1);
                     }
                     else /* if (ispline < Nspline_inner * Nspline_inner) */
