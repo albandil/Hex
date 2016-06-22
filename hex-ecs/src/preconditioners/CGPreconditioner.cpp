@@ -249,21 +249,25 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         for (std::size_t m = 0; m < Nchan1; m++)
         for (std::size_t n = 0; n < Nchan1; n++)
         {
+            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
             B1_blocks_[iang][m * Nchan1 + n].dot
             (
                 1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
                 1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
             );
+            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
         }
         
         for (std::size_t m = 0; m < Nchan2; m++)
         for (std::size_t n = 0; n < Nchan2; n++)
         {
+            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
             B2_blocks_[iang][m * Nchan2 + n].dot
             (
                 1.0_r, cArrayView(p, Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer, Nspline_outer),
                 1.0_r, cArrayView(q, Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
             );
+            if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
         }
         
         Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);

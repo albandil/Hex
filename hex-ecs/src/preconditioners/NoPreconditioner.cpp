@@ -274,7 +274,13 @@ void NoPreconditioner::update (Real E)
                     subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l1 + m + 1, l1, l1p + n + 1, l1p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
+                B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdflink(format("blk-B2-%d-%d-%d-%d.ooc", ill, illp, m, n));
                 B2_blocks_[ill * Nang + illp][m * Nchan2p + n] = std::move(subblock);
+                if (cmd_.outofcore)
+                {
+                    B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdfsave();
+                    B2_blocks_[ill * Nang + illp][m * Nchan2p + n].drop();
+                }
             }
             
             // outer problem matrix : r1 -> inf, l2 bound
@@ -297,7 +303,13 @@ void NoPreconditioner::update (Real E)
                     subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l2 + m + 1, l2, l2p + n + 1, l2p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
+                B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
                 B1_blocks_[ill * Nang + illp][m * Nchan1p + n] = std::move(subblock);
+                if (cmd_.outofcore)
+                {
+                    B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdfsave();
+                    B1_blocks_[ill * Nang + illp][m * Nchan1p + n].drop();
+                }
             }
             
             // transition area r2 > r1, upper : psi_kl expressed in terms of F_nl for 'l' out of inner area
@@ -886,22 +898,26 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     for (int m = 0; m < Nchan1; m++)
                     for (int n = 0; n < Nchan1p; n++)
                     {
+                        if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
                         B1_blocks_[ill * Nang + illp][m * Nchan1p + n].dot
                         (
                             1.0_z, cArrayView(p[illp], Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
                             1.0_z, cArrayView(q[ill], Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
                         );
+                        if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
                     }
                     
                     // r2 -> inf
                     for (int m = 0; m < Nchan2; m++)
                     for (int n = 0; n < Nchan2p; n++)
                     {
+                        if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
                         B2_blocks_[ill * Nang + illp][m * Nchan2p + n].dot
                         (
                             1.0_z, cArrayView(p[illp], Nspline_inner * Nspline_inner + (Nchan1p + n) * Nspline_outer, Nspline_outer),
                             1.0_z, cArrayView(q[ill], Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
                         );
+                        if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).drop();
                     }
                     
                     Cu_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);

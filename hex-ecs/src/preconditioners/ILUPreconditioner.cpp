@@ -194,7 +194,9 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             for (int m = 0; m < Nchan1; m++)
             for (int n = 0; n < Nchan1; n++)
             {
+                if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).hdfload();
                 CooMatrix<LU_int_t,Complex> B_coo_small = B1_blocks_[iang][m * Nchan1 + n].tocoo<LU_int_t>();
+                if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
                 CooMatrix<LU_int_t,Complex> B_coo_large
                 (
                     coo_block.rows(), coo_block.cols(),
@@ -208,7 +210,9 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2; n++)
             {
+                if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).hdfload();
                 CooMatrix<LU_int_t,Complex> B_coo_small = B2_blocks_[iang][m * Nchan2 + n].tocoo<LU_int_t>();
+                if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[iang][m * Nchan2 + n]).drop();
                 CooMatrix<LU_int_t,Complex> B_coo_large
                 (
                     coo_block.rows(), coo_block.cols(),
