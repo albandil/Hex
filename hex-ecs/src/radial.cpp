@@ -794,8 +794,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
     int order = bspline.order();
     
     // reserve space for the output array
-    std::size_t size = Nspline * Nenergy * (maxell + 1);
-    cArray res (size);
+    cArray res (Nspline * Nenergy * (maxell + 1));
     
     // per interval
     int points = EXPANSION_QUADRATURE_POINTS;
@@ -803,8 +802,11 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
     // quadrature weights and nodes
     cArray xs (points), ws (points);
     
+    // other auxiliary variables
+    cArray evalB ((order + 1) * points), evalj (points * (maxell + 1));
+    
     // for all knots
-    # pragma omp parallel for firstprivate (xs,ws)
+    # pragma omp parallel for firstprivate (xs,ws,evalB,evalj)
     for (int iknot = 0; iknot < Nknot - 1; iknot++)
     {
         // skip zero length intervals
@@ -815,36 +817,31 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
         g.scaled_nodes_and_weights(points, bspline.t(iknot), bspline.t(iknot+1), &xs[0], &ws[0]);
         
         // evaluate relevant B-splines on this knot
-        cArrays evalB(Nspline);
         for (int ispline = std::max(iknot-order,0); ispline < Nspline and ispline <= iknot; ispline++)
-        {
-            evalB[ispline] = cArray(points);
-            bspline.B(ispline, iknot, points, xs.data(), evalB[ispline].data());
-        }
+            bspline.B(ispline, iknot, points, xs.data(), &evalB[(iknot - ispline) * points]);
         
         // for all linear momenta (= energies)
         for (int ie = 0; ie < Nenergy; ie++)
         {
             // evaluate the Riccati-Bessel function for this knot and energy and for all angular momenta
-            cArrays evalj(points);
             for (int ipoint = 0; ipoint < points; ipoint++)
             {
                 // compute the damping factor
                 Real damp = weightf(xs[ipoint]);
                 
-                // if the factor is numerical zero, do not evaluate the function, just allocate zeros
-                if (damp == 0)
+                // if the factor is numerical zero, do not evaluate the function, just fill zeros
+                if (damp == 0.0_r)
                 {
-                    evalj[ipoint] = cArray(maxell + 1);
+                    evalj.fill(0.0_z);
                     continue;
                 }
                 
                 // evaluate all Riccati-Bessel functions in point
-                evalj[ipoint] = damp * special::ric_jv(maxell, vk[ie] * xs[ipoint]);
+                cArrayView(evalj, ipoint * (maxell + 1), maxell + 1) = damp * special::ric_jv(maxell, vk[ie] * xs[ipoint]);
                 
                 // clear all possible NaN entries (these may occur for far radii, where should be zero)
-                for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint][l]))
-                    evalj[ipoint][l] = 0.;
+                for (int l = 0; l <= maxell; l++) if (not Complex_finite(evalj[ipoint * (maxell + 1) + l]))
+                    evalj[ipoint * (maxell + 1) + l] = 0.0_z;
             }
             
             // for all angular momenta
@@ -856,7 +853,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                     // sum with weights
                     Complex sum = 0.;
                     for (int ipoint = 0; ipoint < points; ipoint++)
-                        sum += ws[ipoint] * evalj[ipoint][l] * evalB[ispline][ipoint];
+                        sum += ws[ipoint] * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
                     
                     // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
                     res[(ie * (maxell + 1) + l) * Nspline + ispline] += sum;
