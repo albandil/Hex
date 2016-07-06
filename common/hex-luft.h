@@ -523,7 +523,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         virtual ~LUft_MUMPS () { drop (); }
         
         /// Return LU byte size.
-        virtual std::size_t size () const { return settings ? sizeof(MUMPS_COMPLEX) * (settings->info[9-1] >= 0 ?  settings->info[9-1] : 1000000 * std::abs(settings->info[9-1])) + sizeof(MUMPS_INT) * settings->info[10-1] : 0; }
+        virtual std::size_t size () const { return settings ? sizeof(MUMPS_COMPLEX) * (settings->info[9-1] >= 0 ?  settings->info[9-1] : 1000000 * (std::size_t)std::abs(settings->info[9-1])) + sizeof(MUMPS_INT) * (std::size_t)settings->info[10-1] : 0; }
         
         /// Condition number.
         virtual Real cond () const { return settings ? settings->rinfo[11-1] : 0.0_r; }
