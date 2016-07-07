@@ -79,6 +79,13 @@ class LUft
         virtual ~LUft () {}
         
         /**
+         * @brief Validity indicator.
+         * 
+         * Returns true when the object contains a valid LU factorization.
+         */
+        virtual bool valid () const { return false; }
+        
+        /**
          * @brief Free memory.
          * 
          * Release memory occupied by the LU-factorization numeric object.
@@ -225,10 +232,10 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
     
         /// Default constructor.
         LUft_UMFPACK ()
-            : LUft<IdxT,DataT>(), numeric_(nullptr), matrix_(nullptr), info_(UMFPACK_INFO) {}
+            : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft_UMFPACK (CsrMatrix<IdxT,DataT> const * matrix, void * numeric)
+        LUft_UMFPACK (CsrMatrix<IdxT,DataT> const & matrix, void * numeric)
             : LUft<IdxT,DataT>(), numeric_(numeric), matrix_(matrix), info_(UMFPACK_INFO) {}
         
         /// Destructor.
@@ -237,8 +244,8 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Return factorization information.
         rArray const & info () const { return info_; }
         
-        /// Use this matrix pointer.
-        void matrix (CsrMatrix<IdxT,DataT> const * ptr) { matrix_ = ptr; }
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const;
@@ -263,8 +270,8 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Numeric decomposition as produced by UMFPACK.
         void * numeric_;
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix data, needed for solution.
+        mutable CsrMatrix<IdxT,DataT> matrix_;
         
     public:
         
@@ -304,7 +311,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU
         (
-            CsrMatrix<IdxT,DataT> const * matrix,
+            CsrMatrix<IdxT,DataT> const & matrix,
             iArray const & perm_c,
             iArray const & perm_r,
             iArray const & etree,
@@ -324,6 +331,9 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         
         /// Destructor.
         virtual ~LUft_SUPERLU () { drop(); }
+        
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -350,8 +360,8 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         
     private:
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix that has been factorized.
+        CsrMatrix<IdxT,DataT> matrix_;
         
         /// Row permutations.
         iArray perm_c_;
@@ -413,7 +423,7 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU_DIST
         (
-            CsrMatrix<IdxT,DataT> const * matrix,
+            CsrMatrix<IdxT,DataT> const & matrix,
             ScalePermstruct_t ScalePermstruct,
             LUstruct_t LUstruct,
             gridinfo_t * grid,
@@ -427,6 +437,9 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         
         /// Destructor.
         virtual ~LUft_SUPERLU_DIST () { drop (); }
+        
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -455,8 +468,8 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         
     private:
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix that has been factorized.
+        CsrMatrix<IdxT,DataT> matrix_;
         
         // scaling and permutation data
         ScalePermstruct_t ScalePermstruct_;
@@ -520,10 +533,13 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
             : LUft<IdxT,DataT>(), settings(s), I(std::move(i)), J(std::move(j)), A(std::move(a)) {}
         
         /// Destructor.
-        virtual ~LUft_MUMPS () { drop (); }
+        virtual ~LUft_MUMPS ();
+        
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
-        virtual std::size_t size () const { return settings ? sizeof(MUMPS_COMPLEX) * (settings->info[9-1] >= 0 ?  settings->info[9-1] : 1000000 * (std::size_t)std::abs(settings->info[9-1])) + sizeof(MUMPS_INT) * (std::size_t)settings->info[10-1] : 0; }
+        virtual std::size_t size () const;
         
         /// Condition number.
         virtual Real cond () const { return settings ? settings->rinfo[11-1] : 0.0_r; }
@@ -531,28 +547,14 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
-        /// Save factorization data to disk.
-        virtual void save (std::string name) const { HexException("MUMPS factorizer does not yet support --out-of-core option."); }
+        /// Save large data to disk.
+        virtual void save (std::string name) const;
         
-        /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true)
-        {
-            if (throw_on_io_failure)
-                HexException("MUMPS factorizer does not yet support --out-of-core option.");
-        }
+        /// Load large data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
         
         /// Release memory.
-        virtual void drop ()
-        {
-            if (settings != nullptr)
-            {
-                // destroy MUMPS data
-                settings->job = MUMPS_FINISH;
-                zmumps_c(settings);
-                delete settings;
-                settings = nullptr;
-            }
-        }
+        virtual void drop ();
         
     private:
         

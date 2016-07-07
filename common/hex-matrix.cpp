@@ -409,7 +409,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     UMFPACK_FREE_SYMBOLIC_F(&Symbolic);
     
     // create a new LU factorization container
-    LUft_UMFPACK<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(this, Numeric);
+    LUft_UMFPACK<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(*this, Numeric);
     lu_ptr->info_ = Info;
     
     // wrap the pointer into smart pointer
@@ -594,7 +594,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (Re
     // create a new LU factorization container
     LUft<int,Complex> * lu_ptr = new LUft_SUPERLU<int,Complex>
     (
-        this, perm_c, perm_r, etree, equed,
+        *this, perm_c, perm_r, etree, equed,
         R, C, L, U, Glu, mem_usage.for_lu, droptol
     );
     
@@ -709,7 +709,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
     // create a new LU factorization container
     LUft<LU_int_t,Complex> * lu_ptr = new LUft_SUPERLU_DIST<LU_int_t,Complex>
     (
-        this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
+        *this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
     );
     
     // wrap the pointer into smart pointer

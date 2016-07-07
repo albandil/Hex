@@ -86,11 +86,11 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         
     protected:
         
-        // diagonal blocks as CSR matrices
-        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
-        
-        // LU decompositions of the CSR blocks
+        // LU decompositions of the diagonal blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        
+        // prepare data structures for LU factorizations
+        void reset_lu ();
         
 #ifdef _OPENMP
         // factorization lock

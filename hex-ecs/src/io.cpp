@@ -191,7 +191,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
-                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS.                                                                                   \n"
+                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
                     "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION

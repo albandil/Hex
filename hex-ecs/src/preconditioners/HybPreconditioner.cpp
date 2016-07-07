@@ -77,13 +77,6 @@ void HybCGPreconditioner::update (Real E)
             lu->drop();
             lu->unlink();
         }
-        
-        // release outdated CSR diagonal blocks
-        for (auto & csr : ILUCGPreconditioner::csr_blocks_)
-        {
-            csr.drop();
-            csr.unlink();
-        }
     }
     
     // update common ancestor

@@ -52,7 +52,6 @@ ILUCGPreconditioner::ILUCGPreconditioner
     Bspline const & bspline_full,
     CommandLine const & cmd
 ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-    csr_blocks_(ll.states().size()),
     lu_(ll.states().size())
 {
 #ifdef _OPENMP
@@ -67,33 +66,15 @@ ILUCGPreconditioner::~ILUCGPreconditioner ()
 #endif
 }
 
-void ILUCGPreconditioner::setup ()
+void ILUCGPreconditioner::reset_lu ()
 {
-    // setup parent
-    CGPreconditioner::setup();
-    
-    // check compatibility with the command line setup
-//     if (cmd_.lightweight_full)
-//         HexException("ILU preconditioner is not compatible with --lightweight-full. But you can still try --lightweight-radial-cache.");
-    
-    // setup attributes
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
         // prepare initial (empty) factorization data
         lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
         
-#ifdef WITH_UMFPACK
-        if (cmd_.factorizer == LUFT_UMFPACK)
-        {
-            // associate the matrix pointer
-            LUft_UMFPACK<LU_int_t,Complex> * ptr = dynamic_cast<LUft_UMFPACK<LU_int_t,Complex>*>(lu_[iblock].get());
-            if (ptr)
-                ptr->matrix(&csr_blocks_[iblock]);
-        }
-#endif
-        
         // associate existing disk files
-        lu_[iblock]->link(format("lu-%d.bin", iblock));
+        lu_[iblock]->link(format("lu-%d.ooc", iblock));
     }
     
 #ifdef WITH_SUPERLU_DIST
@@ -120,18 +101,22 @@ void ILUCGPreconditioner::setup ()
 #endif // WITH_SUPERLU_DIST
 }
 
+void ILUCGPreconditioner::setup ()
+{
+    // setup parent
+    CGPreconditioner::setup();
+    
+    // prepare data structures for LU factorizations
+    reset_lu();
+}
+
 void ILUCGPreconditioner::update (Real E)
 {
     // reset data on energy change
     if (E != E_ and not cmd_.noluupdate)
     {
         // release outdated LU factorizations
-        for (auto & lu : lu_)
-            lu->drop();
-        
-        // release outdated CSR diagonal blocks
-        for (auto & csr : csr_blocks_)
-            csr.drop();
+        reset_lu();
     }
     
     // update parent
@@ -144,11 +129,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     CGPreconditioner::CG_init(iblock);
     
     // load data from linked disk files
-    if (lu_[iblock]->size() == 0)
+    if (not lu_[iblock]->valid())
         lu_[iblock]->silent_load();
     
     // check that the factorization is loaded
-    if (lu_[iblock]->size() == 0)
+    if (not lu_[iblock]->valid())
     {
 #ifdef _OPENMP
         // allow only one factorization at a time when not using SuperLU DIST
@@ -226,7 +211,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
         
         // create the CSR block that will be factorized
-        csr_blocks_[iblock] = coo_block.tocsr();
+        CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
 //         csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
 //         csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
         
@@ -242,28 +227,40 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 #endif
         
         // factorize the block and store it
-        lu_[iblock] = csr_blocks_[iblock].factorize(cmd_.droptol, cmd_.factorizer, data);
+        lu_[iblock] = csr.factorize(cmd_.droptol, cmd_.factorizer, data);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
-        std::cout << std::endl << std::setw(37) << format
-        (
-            "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
-            iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
-            timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
-            nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
-            lu_[iblock]->cond()                                                     // estimation of the condition number
-        );
+        {
+            if (lu_[iblock]->cond() != 0)
+            {
+                std::cout << std::endl << std::setw(37) << format
+                (
+                    "\tLU #%d (%d,%d) in %d:%02d (%s, cond %1.0e)",
+                    iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
+                    nice_size(lu_[iblock]->size()).c_str(),                                 // final memory size
+                    lu_[iblock]->cond()                                                     // estimation of the condition number
+                );
+            }
+            else
+            {
+                std::cout << std::endl << std::setw(37) << format
+                (
+                    "\tLU #%d (%d,%d) in %d:%02d (%s)",
+                    iblock, ang_.states()[iblock].first, ang_.states()[iblock].second,      // block identification (id, ℓ₁, ℓ₂)
+                    timer.seconds() / 60, timer.seconds() % 60,                             // factorization time
+                    nice_size(lu_[iblock]->size()).c_str()                                  // final memory size
+                );
+            }
+        }
         
         // save the diagonal block's CSR representation and its factorization
         lu_[iblock]->link(format("lu-%d.bin", iblock));
-//         lu_[iblock]->save();
-        
-#ifdef WITH_MUMPS
-        // MUMPS uses own COO copy of the CSR matrix -> drop it
-        if (cmd_.factorizer == LUFT_MUMPS)
-            csr_blocks_[iblock].drop();
-#endif
+        if (cmd_.outofcore)
+        {
+            lu_[iblock]->save();
+        }
         
 #ifdef _OPENMP
         // release lock
@@ -282,11 +279,10 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
     // release memory
-//     if (cmd_.outofcore)
-//     {
-//         csr_blocks_[iblock].drop();
-//         lu_[iblock]->drop();
-//     }
+    if (cmd_.outofcore)
+    {
+        lu_[iblock]->drop();
+    }
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);
