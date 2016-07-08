@@ -246,6 +246,9 @@ template<> class typeinfo<float>
         /// Component data type.
         typedef float cmpttype;
         
+        /// Integer type as large as this data type.
+        typedef int inttype;
+        
         /// Component count.
         static const std::size_t ncmpt = 1;
         
@@ -267,6 +270,9 @@ template<> class typeinfo<double>
     public:
         /// Component data type.
         typedef double cmpttype;
+        
+        /// Integer type as large as this data type.
+        typedef std::int64_t inttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;
