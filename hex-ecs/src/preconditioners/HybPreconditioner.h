@@ -46,7 +46,9 @@
 /**
  * @brief Hybrid preconditioner.
  * 
- * Combination of ILU and KPA.
+ * Combination of ILU and KPA:
+ * - KPA is used for angular blocks with no asymptotic channels.
+ * - ILU is used for angular blocks with asymptotic channels.
  */
 class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
 {
@@ -68,8 +70,7 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
             ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            prec_(ll.states().size(), Undecided)
+            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
         {
             // nothing more to do
         }
@@ -92,17 +93,8 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         
     protected:
         
+        // decide whether to use the ILU preconditioner
         bool ilu_needed (int iblock) const;
-        
-        enum Prec
-        {
-            Undecided,
-            UseILU,
-            UseKPA
-        };
-        
-        // which preconditioner to use
-        mutable iArray prec_;
 };
 
 #endif

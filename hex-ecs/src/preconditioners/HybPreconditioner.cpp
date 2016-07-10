@@ -38,26 +38,7 @@ const std::string HybCGPreconditioner::prec_description = "Combination of ILU an
 
 bool HybCGPreconditioner::ilu_needed (int iblock) const
 {
-    // decide which preconditioner to use
-    if (CGPreconditioner::n_[iblock] >= 0 and
-        NoPreconditioner::cmd_.kpa_max_iter >= 0 and
-        CGPreconditioner::n_[iblock] > NoPreconditioner::cmd_.kpa_max_iter)
-    {
-        // count ILU blocks
-        int nILU = std::count_if
-        (
-            prec_.begin(),
-            prec_.end(),
-            [](int i) -> bool { return i == UseILU; }
-        );
-        
-        // only allow next factorization if fitting in restriction
-        if (NoPreconditioner::cmd_.ilu_max_blocks < 0 or
-            NoPreconditioner::cmd_.ilu_max_blocks > nILU)
-            prec_[iblock] = UseILU;
-    }
-    
-    return prec_[iblock] == UseILU;
+    return Nchan_[iblock].first > 0 or Nchan_[iblock].second > 0;
 }
 
 void HybCGPreconditioner::setup ()
@@ -84,7 +65,6 @@ void HybCGPreconditioner::update (Real E)
     
     // reset counters
     CGPreconditioner::n_.fill(-1);
-    prec_.fill(Undecided);
 }
 
 void HybCGPreconditioner::CG_init (int iblock) const
