@@ -469,7 +469,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_full = S_csr_full.factorize();
     
     // j-overlaps of shape [Nangmom × Nspline]
-    cArray ji_overlaps_full = rad_.overlapj(rad_.bspline_full(), rad_.gaussleg_full(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_full()));
+    cArray ji_overlaps_full = rad_.overlapj(rad_.bspline_full(), rad_.gaussleg_full(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_full()), cmd_.fast_bessel);
     if (not std::isfinite(ji_overlaps_full.norm()))
         HexException("Unable to compute Riccati-Bessel function B-spline overlaps!");
     

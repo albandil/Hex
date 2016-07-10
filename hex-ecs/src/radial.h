@@ -405,7 +405,7 @@ class RadialIntegrals
          * @param weightf Weight function to multiply every value of the Bessel function (Complex -> Real).
          * @return Array of shape [vk.size() × (maxell + 1) × Nspline] in column-major format.
          */
-        cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<Real(Complex)> weightf) const;
+        cArray overlapj (Bspline const & bspline, GaussLegendre const & g, int maxell, const rArrayView vk, std::function<Real(Complex)> weightf, bool fast_bessel = false) const;
         
         /// Return reference to the B-spline object.
         Bspline const & bspline_inner () const { return bspline_inner_; }

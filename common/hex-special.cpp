@@ -196,7 +196,7 @@ Complex special::cfgamma (Complex s, Complex z)
     return cf * std::pow(z,s) * std::exp(-z);
 }
 
-cArray special::ric_jv (int lmax, Complex z)
+cArray special::ric_jv (int lmax, Complex z, std::function<int(int,double,double*)> jv)
 {
     // results
     cArray eval (lmax+1);
@@ -205,7 +205,7 @@ cArray special::ric_jv (int lmax, Complex z)
     if (z.imag() == 0.)
     {
         std::vector<double> ev (lmax+1);
-        int err = gsl_sf_bessel_jl_steed_array(lmax, z.real(), &ev[0]);
+        int err = jv(lmax, z.real(), &ev[0]);
         
         // check that all evaluations are finite
         bool all_finite = std::all_of

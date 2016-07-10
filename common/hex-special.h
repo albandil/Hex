@@ -417,8 +417,10 @@ Complex ric_j (int n, Complex z);
  * 
  * @param lmax Angular momentum limit.
  * @param z Complex argument.
+ * @param routine GSL routine used for purely real evaluations. Expected is either
+ *                the fast @c gsl_sf_bessel_jl_array, or the accurate @c gsl_sf_bessel_jl_steed_array.
  */
-cArray ric_jv (int lmax, Complex z);
+cArray ric_jv (int lmax, Complex z, std::function<int(int,double,double*)> jv = gsl_sf_bessel_jl_steed_array);
 
 /** Derivative of Riccati-Bessel function
  * 
