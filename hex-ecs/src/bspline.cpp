@@ -545,10 +545,10 @@ std::size_t Bspline::hash () const
     std::size_t seed = 0;
     
     for (auto & i : rknots_)
-        seed ^= *reinterpret_cast<std::int64_t const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     for (auto & i : cknots_)
-        seed ^= *reinterpret_cast<std::int64_t const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     for (unsigned i = 0; i < sizeof(theta_); i++)
         seed ^= *(i + (char*)&theta_) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
