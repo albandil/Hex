@@ -208,6 +208,11 @@ public:
         return elems_[irow * d_ + idia];
     }
     
+    SymBandMatrix<DataT> operator- () const
+    {
+        return SymBandMatrix<DataT>(n_, d_, -elems_);
+    }
+    
     NumberArray<DataT> const & data () const { return elems_; }
     NumberArray<DataT>       & data ()       { return elems_; }
     

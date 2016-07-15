@@ -260,7 +260,7 @@ kernel void mmul_1el
         private Complex elem = E * cmul(Spa[ik],Spp[jl]);
         elem -= (Real)(0.5) * (cmul(Dpa[ik],Spp[jl]) + cmul(Spa[ik],Dpp[jl]));
         elem -= (Real)(0.5) * l1 * (l1 + 1) * cmul(M2pa[ik],Spp[jl]) + (Real)(0.5) * l2 * (l2 + 1) * cmul(Spa[ik],M2pp[jl]);
-        elem += cmul(M1pa[ik],Spp[jl]) + cmul(Spa[ik],M1pp[jl]);
+        elem += cmul(M1pa[ik],Spp[jl]) - cmul(Spa[ik],M1pp[jl]);
         
         // multiply right-hand side by that matrix element
         y[i * NSPLINE_PROJ + j] += cmul(elem, x[k * NSPLINE_PROJ + l]);
@@ -412,7 +412,7 @@ kernel void mmul_2el
         }
         
         // multiply right-hand side by that matrix element
-        y[i * (ulong)(NSPLINE_PROJ) + j] -= f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
+        y[i * (ulong)(NSPLINE_PROJ) + j] += f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
     }
 }
 
@@ -475,7 +475,7 @@ kernel void mmul_2el_decoupled
         }
         
         // multiply right-hand side by the matrix element
-        y[i * (ulong)(NSPLINE_PROJ) + j] -= f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
+        y[i * (ulong)(NSPLINE_PROJ) + j] += f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
     }
 }
 
@@ -570,7 +570,7 @@ kernel void mmul_2el_coupled
         }
         
         // multiply right-hand side by that matrix element
-        y[i * (ulong)(NSPLINE_PROJ) + j] -= f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
+        y[i * (ulong)(NSPLINE_PROJ) + j] += f * cmul(elem, x[k * (ulong)(NSPLINE_PROJ) + l]);
     }
 }
 
@@ -725,7 +725,7 @@ kernel void mmul_2el_offset
         for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
         for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
         {
-            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] +=
                 f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
                 * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
         }
@@ -803,7 +803,7 @@ kernel void mmul_2el_decoupled_offset
         for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
         for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
         {
-            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] +=
                 f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
                 * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
         }
@@ -907,7 +907,7 @@ kernel void mmul_2el_coupled_offset
         for (int ill  = y_ang_begin; ill  < min(y_ang_begin + NDSTSEG, ANGULAR_BASIS_SIZE); ill ++)
         for (int illp = x_ang_begin; illp < min(x_ang_begin + NSRCSEG, ANGULAR_BASIS_SIZE); illp++)
         {
-            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] -=
+            y[((ill - y_ang_begin) * (ulong)(NSPLINE_ATOM) + i) * NSPLINE_PROJ + j] +=
                 f[foffset + ill * ANGULAR_BASIS_SIZE + illp]
                 * cmul(elem, x[((illp - x_ang_begin) * (ulong)(NSPLINE_ATOM) + k) * NSPLINE_PROJ + l]);
         }

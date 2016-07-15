@@ -635,7 +635,7 @@ void RadialIntegrals::apply_R_matrix
 ) const
 {
     // shorthands
-    std::size_t Nspline = bspline_full_.Nspline();
+    std::size_t Nspline = bspline_inner_.Nspline(); // WARNING : Computing only inner-region integrals.
     std::size_t order = bspline_full_.order();
     
     // update destination vector

@@ -280,6 +280,7 @@ void KPACGPreconditioner::setup ()
         for (int l : comp_l)
         {
             prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
+            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
             done_atom[l] = prec_inner_[l].hdfcheck();
         }
         
@@ -287,6 +288,7 @@ void KPACGPreconditioner::setup ()
         for (int l : needed_l)
         {
             prec_inner_[l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
+            prec_proj_ [l].hdflink(format("kpa-%d-%.4lx.hdf",l,rad_.bspline_inner().hash()).c_str());
             done_atom[l] = prec_inner_[l].hdfcheck();
             
             if (done_atom[l])
@@ -307,6 +309,13 @@ void KPACGPreconditioner::setup ()
             (
                 prec_inner_, rad_.bspline_inner().Nspline(),
                 rad_.S_inner(), rad_.D_inner(), rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
+                done_atom, comp_l, needed_l
+            );
+            std::cout << std::endl << "\tPrepare preconditioner matrices for projectile grid" << std::endl;
+            prepare
+            (
+                prec_proj_, rad_.bspline_inner().Nspline(),
+                rad_.S_inner(), rad_.D_inner(), -rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
                 done_atom, comp_l, needed_l
             );
         }
@@ -402,7 +411,7 @@ void KPACGPreconditioner::CG_init (int iblock) const
         // load preconditioner from disk
         if (not prec_inner_[l1].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l1);
-        if (not prec_inner_[l2].hdfload())
+        if (not prec_proj_[l2].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l2);
     }
     
@@ -431,7 +440,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         // multiply 'p' by the diagonal block (except for the two-electron term)
         kron_dot(0., q,  1., p, Complex(E_) * rad_.S_inner(), rad_.S_inner());
         kron_dot(1., q, -1., p, Complex(0.5) * rad_.D_inner() - rad_.Mm1_tr_inner() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_inner(), rad_.S_inner());
-        kron_dot(1., q, -1., p, rad_.S_inner(), Complex(0.5) * rad_.D_inner() - rad_.Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_inner());
+        kron_dot(1., q, -1., p, rad_.S_inner(), Complex(0.5) * rad_.D_inner() + rad_.Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_inner());
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -443,7 +452,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                rad_.apply_R_matrix(lambda, -f, p, 1., q, cmd_.kpa_simple_rad);
+                rad_.apply_R_matrix(lambda, +f, p, 1., q, cmd_.kpa_simple_rad);
         }
     }
     
@@ -481,7 +490,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     {
         // U = (AV)B
         RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data());
-        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_inner_[l2].invCl_invsqrtS.data());
+        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_proj_ [l2].invCl_invsqrtS.data());
         
         blas::gemm(1., A, R, 0., Z); // N³ operations
         blas::gemm(1., Z, B, 0., U); // N³ operations
@@ -540,7 +549,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     for (std::size_t i = 0; i < Nspline_inner; i++) 
     for (std::size_t j = 0; j < Nspline_inner; j++)
     {
-        U(i,j) /= (E_ - prec_inner_[l1].Dl[i] - prec_inner_[l2].Dl[j]);
+        U(i,j) /= (E_ - prec_inner_[l1].Dl[i] - prec_proj_[l2].Dl[j]);
         Z(i,j) = U(i,j); // <-- this is used in full product
     }
     
@@ -549,7 +558,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     {
         // W = (AU)B
         RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data());
-        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_inner_[l2].invsqrtS_Cl.data());
+        ColMatrixView<Complex> B (Nspline_inner, Nspline_inner, prec_proj_ [l2].invsqrtS_Cl.data());
         
         blas::gemm(1., A, Z, 0., U);    // N³ operations
         blas::gemm(1., U, B, 0., Z);    // N³ operations
@@ -613,7 +622,7 @@ void KPACGPreconditioner::CG_exit (int iblock) const
         
         // release memory
         prec_inner_[l1].drop();
-        prec_inner_[l2].drop();
+        prec_proj_ [l2].drop();
     }
     
     // exit parent

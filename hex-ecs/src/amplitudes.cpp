@@ -505,7 +505,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 if (ichan2 >= 0)
                 {
                     // number of final bound channels for r1 -> inf
-                    int Nchan1 = (max_n > ell ? max_n - ell : 0);
+                    int Nchan1 = 0;
                     
                     // change view to row-major dense matrix
                     cArrayView PsiScFf

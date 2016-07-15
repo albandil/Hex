@@ -88,7 +88,7 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp) c
                     return E_ * rad_.S_full()(i,k) * rad_.S_full()(j,l)
                             - (0.5_z * rad_.D_full()(i,k) - rad_.Mm1_tr_full()(i,k)) * rad_.S_full()(j,l)
                             - 0.5_r * l1 * (l1 + 1) * rad_.Mm2_full()(i,k) * rad_.S_full()(j,l)
-                            - rad_.S_full()(i,k) * (0.5_z * rad_.D_full()(j,l) - rad_.Mm1_tr_full()(j,l))
+                            - rad_.S_full()(i,k) * (0.5_z * rad_.D_full()(j,l) + rad_.Mm1_tr_full()(j,l))
                             - 0.5_r * l2 * (l2 + 1) * rad_.S_full()(i,k) * rad_.Mm2_full()(j,l);
                 }
             );
@@ -101,12 +101,12 @@ BlockSymBandMatrix<Complex> NoPreconditioner::calc_A_block (int ill, int illp) c
             if (not cmd_.lightweight_radial_cache)
             {
                 // use precomputed block from scratch file or from memory
-                subblock.data() += -ang_.f(ill,illp,lambda) * rad_.R_tr_dia(lambda).getBlock(i * (inp_.order + 1) + d).slice(0, Nspline_inner * (inp_.order + 1));
+                subblock.data() += ang_.f(ill,illp,lambda) * rad_.R_tr_dia(lambda).getBlock(i * (inp_.order + 1) + d).slice(0, Nspline_inner * (inp_.order + 1));
             }
             else
             {
                 // compute the data anew
-                subblock.data() += -ang_.f(ill,illp,lambda) * rad_.calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (inp_.order + 1));
+                subblock.data() += ang_.f(ill,illp,lambda) * rad_.calc_R_tr_dia_block(lambda, i, k).data().slice(0, Nspline_inner * (inp_.order + 1));
             }
         }
         
@@ -144,7 +144,7 @@ void NoPreconditioner::update (Real E)
         int l2 = ang_.states()[ill].second;
         
         // number of channels when r1 -> inf (i.e. second electron is bound)
-        int Nchan1 = std::max(0, max_n_ - l2);
+        int Nchan1 = 0;
         
         // number of channels when r2 -> inf (i.e. first electron is bound)
         int Nchan2 = std::max(0, max_n_ - l1);
@@ -271,7 +271,7 @@ void NoPreconditioner::update (Real E)
                 
                 // channel-offdiagonal contribution
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0.0_r)
-                    subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l1 + m + 1, l1, l1p + n + 1, l1p, lambda)) * Mtr_mLm1_outer[lambda];
+                    subblock += Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l1 + m + 1, l1, l1p + n + 1, l1p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
                 B2_blocks_[ill * Nang + illp][m * Nchan2p + n].hdflink(format("blk-B2-%d-%d-%d-%d.ooc", ill, illp, m, n));
@@ -300,7 +300,7 @@ void NoPreconditioner::update (Real E)
                 
                 // channel-offdiagonal contribution
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0.0_r)
-                    subblock -= Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l2 + m + 1, l2, l2p + n + 1, l2p, lambda)) * Mtr_mLm1_outer[lambda];
+                    subblock += Complex(ang_.f(ill,illp,lambda) * special::hydro_rho(l2 + m + 1, l2, l2p + n + 1, l2p, lambda)) * Mtr_mLm1_outer[lambda];
                 
                 // use the block
                 B1_blocks_[ill * Nang + illp][m * Nchan1p + n].hdflink(format("blk-B1-%d-%d-%d-%d.ooc", ill, illp, m, n));
@@ -332,7 +332,7 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_.Mm2_full()(i,k) * rad_.S_full()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_.S_full()(i,k) * rad_.Mm2_full()(j,l)
                          + rad_.Mm1_tr_full()(i,k) * rad_.S_full()(j,l)
-                         + rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
+                         - rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
                 }
                 
                 Real r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
@@ -341,7 +341,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(r1/r2, lambda) / r2;
-                    elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_L_full(lambda)(i,k) * rad_.Mtr_mLm1_full(lambda)(j,l);
+                    elem += ang_.f(ill,illp,lambda) * scale * rad_.Mtr_L_full(lambda)(i,k) * rad_.Mtr_mLm1_full(lambda)(j,l);
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp[l1p][n][k] * elem);
@@ -367,7 +367,7 @@ void NoPreconditioner::update (Real E)
                          - 0.5_r * (l1 * (l1 + 1.0_r)) * rad_.Mm2_full()(i,k) * rad_.S_full()(j,l)
                          - 0.5_r * (l2 * (l2 + 1.0_r)) * rad_.S_full()(i,k) * rad_.Mm2_full()(j,l)
                          + rad_.Mm1_tr_full()(i,k) * rad_.S_full()(j,l)
-                         + rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
+                         - rad_.S_full()(i,k) * rad_.Mm1_tr_full()(j,l);
                 }
                 
                 Real r1 = rad_.bspline_full().t(std::min(i,k) + order + 1).real();
@@ -376,7 +376,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(r2/r1, lambda) / r1;
-                    elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * rad_.Mtr_L_full(lambda)(j,l);
+                    elem += ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * rad_.Mtr_L_full(lambda)(j,l);
                 }
                 
                 Cu_blocks_[ill * Nang + illp].add(row, col, Xp[l2p][n][l] * elem);
@@ -406,7 +406,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(1/r2, lambda + 1);
-                    elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(j,l) * special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
+                    elem += ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(j,l) * special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l1p][n][k] * elem);
@@ -436,7 +436,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(1/r1, lambda + 1);
-                    elem -= ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
+                    elem += ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l2p][n][l] * elem);
@@ -809,7 +809,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                     
                     // update element of the right-hand side
-                    chi_block[ispline] += prefactor * (contrib_direct + Sign * contrib_exchange);
+                    chi_block[ispline] += -prefactor * contrib_direct * special::constant::sqrt_two;
                 }
                 
                 chi[ill] = std::move(chi_block);
