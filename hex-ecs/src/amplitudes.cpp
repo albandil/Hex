@@ -570,11 +570,14 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
         cArray const & rad_S0 = Lambda_Slp[T][ell].first;
         cArray const & rad_S1 = Lambda_Slp[T][ell].second;
         
+        // symmetry factor
+        Real sf = (inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
+        
         // compute T-matrices
         Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
         Tmat_Slp[T][ell].second = rad_S1 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
     }
 }
 
