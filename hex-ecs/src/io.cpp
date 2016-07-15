@@ -98,6 +98,9 @@ const std::string sample_input =
     "# L  S  Pi limit\n"
     "  0  *  0  4\n"
     "\n"
+    "# Projectile charge (+/-1)\n"
+    "  -1\n"
+    "\n"
     "# Atom + projectile total energies in Rydbergs.\n"
     "# Use any of the following options:\n"
     "#     L[inear] <Start> <End> <Samples>\n"
@@ -878,6 +881,15 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tS = " << Spin << std::endl;
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
+    
+    Zp = ReadNext<int>(inf).val;
+    
+    if (Zp == 0)
+        HexException("Invalid projectile charge 0. Use +1 or -1 for positron and electron respectively.");
+    
+    Zp = Zp / std::abs(Zp);
+    
+    std::cout << "\tZp = " << Zp << std::endl;
     
     //
     // load initial energies

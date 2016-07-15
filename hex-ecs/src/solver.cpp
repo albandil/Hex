@@ -134,8 +134,8 @@ void Solver::solve ()
             (
                 std::make_pair
                 (
-                    iArray{},
-                    l2 + 1 > max_n ? iArray{} : linspace(l2 + 1, max_n, max_n - l2)
+                    l2 + 1 > max_n or inp_.Zp > 0 ? iArray{} : linspace(l2 + 1, max_n, max_n - l2),
+                    l1 + 1 > max_n                ? iArray{} : linspace(l1 + 1, max_n, max_n - l1)
                 )
             );
         }

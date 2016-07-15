@@ -85,7 +85,7 @@ class NoPreconditioner : public PreconditionerBase
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
         // internal routines
-        BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp) const;
+        BlockSymBandMatrix<Complex> calc_A_block (int ill, int illp, bool twoel = true) const;
         
     protected:
         

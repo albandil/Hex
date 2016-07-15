@@ -315,7 +315,7 @@ void KPACGPreconditioner::setup ()
             prepare
             (
                 prec_proj_, rad_.bspline_inner().Nspline(),
-                rad_.S_inner(), rad_.D_inner(), -rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
+                rad_.S_inner(), rad_.D_inner(), Complex(-inp_.Zp) * rad_.Mm1_tr_inner(), rad_.Mm2_inner(),
                 done_atom, comp_l, needed_l
             );
         }
@@ -440,7 +440,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
         // multiply 'p' by the diagonal block (except for the two-electron term)
         kron_dot(0., q,  1., p, Complex(E_) * rad_.S_inner(), rad_.S_inner());
         kron_dot(1., q, -1., p, Complex(0.5) * rad_.D_inner() - rad_.Mm1_tr_inner() + Complex(0.5*(l1+1)*l1) * rad_.Mm2_inner(), rad_.S_inner());
-        kron_dot(1., q, -1., p, rad_.S_inner(), Complex(0.5) * rad_.D_inner() + rad_.Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_inner());
+        kron_dot(1., q, -1., p, rad_.S_inner(), Complex(0.5) * rad_.D_inner() + Complex(inp_.Zp) * rad_.Mm1_tr_inner() + Complex(0.5*(l2+1)*l2) * rad_.Mm2_inner());
         
         // multiply 'p' by the two-electron integrals
         for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -452,7 +452,7 @@ void KPACGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q)
             
             // multiply
             if (f != 0.)
-                rad_.apply_R_matrix(lambda, +f, p, 1., q, cmd_.kpa_simple_rad);
+                rad_.apply_R_matrix(lambda, inp_.Zp * f, p, 1., q, cmd_.kpa_simple_rad);
         }
     }
     

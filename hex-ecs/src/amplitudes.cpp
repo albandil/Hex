@@ -608,13 +608,12 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 }
 
 Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2)
-{/*
+{
     // shorthands
-    Complex const * const t = &(bspline_atom_.t(0));
-    int Nspline_atom = bspline_atom_.Nspline();
-    int Nspline_proj = bspline_proj_.Nspline();
-    int Nreknot = bspline_atom_.Nreknot();
-    int order   = bspline_atom_.order();
+    Complex const * const t = &(bspline_inner_.t(0));
+    int Nspline = bspline_inner_.Nspline();
+    int Nreknot = bspline_inner_.Nreknot();
+    int order   = bspline_inner_.order();
     
     // determine evaluation radius
     Real rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
@@ -664,22 +663,22 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
                 ddrho_F1F2 += k2*F1*F2p*sin_alpha;
             
             // get B-spline knots
-            int iknot1 = bspline_atom_.knot(r1);
-            int iknot2 = bspline_proj_.knot(r2);
+            int iknot1 = bspline_inner_.knot(r1);
+            int iknot2 = bspline_inner_.knot(r2);
             
             // auxiliary variables
-            cArray B1(Nspline_atom), dB1(Nspline_atom), B2(Nspline_proj), dB2(Nspline_proj);
+            cArray B1 (Nspline), dB1 (Nspline), B2 (Nspline), dB2 (Nspline);
             
             // evaluate the B-splines
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             {
-                B1[ispline1]  = bspline_atom_.bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1] = bspline_atom_.dspline(ispline1,iknot1,order,r1);
+                B1[ispline1]  = bspline_inner_.bspline(ispline1,iknot1,order,r1);
+                dB1[ispline1] = bspline_inner_.dspline(ispline1,iknot1,order,r1);
             }
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = bspline_proj_.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = bspline_proj_.dspline(ispline2,iknot2,order,r2);
+                B2[ispline2]  = bspline_inner_.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2] = bspline_inner_.dspline(ispline2,iknot2,order,r2);
             }
             
             // evaluate the solution
@@ -687,7 +686,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                int idx = ispline1 * Nspline_proj + ispline2;
+                int idx = ispline1 * Nspline + ispline2;
                 
                 Psi      += PsiSc[idx] *  B1[ispline1] *  B2[ispline2];
                 ddr1_Psi += PsiSc[idx] * dB1[ispline1] *  B2[ispline2];
@@ -728,9 +727,9 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     Chebyshev<double,Complex> CB;
     
     // avoid calculation when the extraction radius is too far
-    if (rho > bspline_atom_.R0())
+    if (rho > bspline_inner_.R0())
     {
-        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_atom_.R0() << std::endl;
+        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R0() << std::endl;
     }
     else   
     {
@@ -751,7 +750,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     }
     
     return CB;
-*/}
+}
 
 void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
 {

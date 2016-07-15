@@ -307,12 +307,54 @@ class InputFile
         // public attributes
         //
         
-        int order, ni, L, Pi, levels, maxell;
-        iArray Spin;
-        Real ecstheta, B;
-        rArray rknots, rknots_ext, cknots, Etot;
-        std::vector<std::tuple<int,int,int>> instates, outstates;
-        bool inner_only;
+            // B-spline order
+            int order;
+            
+            // initial atomic principal quantum number
+            int ni;
+            
+            // total angular momentum
+            int L;
+            
+            // total parity
+            int Pi;
+            
+            // 'nL', the limit on number of coupled angular states;
+            // there will be 'nL * (L + 1 - Pi)' coupled angular state pairs
+            int levels;
+            
+            // maximal one-electron orbital quantum number
+            int maxell;
+            
+            // total spins to calculate
+            iArray Spin;
+            
+            // ECS rotation angle
+            Real ecstheta;
+            
+            // weak magnetic field in atomic units (involved only perturbatively)
+            Real B;
+            
+            // real B-spline knots
+            rArray rknots;
+            
+            // real B-spline knot projectile extention
+            rArray rknots_ext;
+            
+            // complex-to-become knots (after rotation)
+            rArray cknots;
+            
+            // total energies for which to solve the system
+            rArray Etot;
+            
+            // initial and final atomic states
+            std::vector<std::tuple<int,int,int>> instates, outstates;
+            
+            // projectile charge (only sign)
+            Real Zp;
+            
+            // whether to calculate just the inner problem (decided from the knot sequence)
+            bool inner_only;
 };
 
 /**
