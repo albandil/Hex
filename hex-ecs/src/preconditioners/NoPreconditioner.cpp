@@ -924,7 +924,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     {
         OMP_CREATE_LOCKS(ang_.states().size());
         
-        unsigned maxlambda = rad_.maxlambda();
+        int maxlambda = rad_.maxlambda();
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)

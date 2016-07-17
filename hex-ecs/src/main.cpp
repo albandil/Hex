@@ -253,7 +253,7 @@ int main (int argc, char* argv[])
     
         if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
-            zip_solution(par, cmd, bspline_inner, bspline_full, ang.states());
+            zip_solution(cmd, inp, par, bspline_inner, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }

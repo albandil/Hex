@@ -560,8 +560,9 @@ class SolutionIO
  */
 void zip_solution
 (
-    Parallel const & par, 
     CommandLine const & cmd,
+    InputFile const & inp,
+    Parallel const & par, 
     Bspline const & bspline_inner,
     Bspline const & bspline_full,
     std::vector<std::pair<int,int>> const & ll

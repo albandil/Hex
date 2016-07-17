@@ -917,8 +917,9 @@ void InputFile::read (std::ifstream & inf)
 
 void zip_solution
 (
-    Parallel const & par, 
     CommandLine const & cmd,
+    InputFile const & inp,
+    Parallel const & par, 
     Bspline const & bspline_inner,
     Bspline const & bspline_full,
     std::vector<std::pair<int,int>> const & ll
@@ -959,8 +960,8 @@ void zip_solution
     
     // get number of asymptotic channels
     int max_n = (E >= 0 ? 0 : 1.0_r / std::sqrt(-E));
-    Nchan2 = (max_n >= l1 + 1 ? max_n - l1 : 0);
-    Nchan1 = (max_n >= l2 + 1 ? max_n - l2 : 0);
+    Nchan1 = (inp.Zp < 0 and max_n >= l2 + 1 ? max_n - l2 : 0);
+    Nchan2 = (               max_n >= l1 + 1 ? max_n - l1 : 0);
     
     // prepare radial integrals structure
     RadialIntegrals r (bspline_inner, bspline_full, 0);
@@ -976,12 +977,12 @@ void zip_solution
     
     // compute all needed bound states
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
-    for (int n1 = l1 + 1; n1 <= max_n; n1++)
+    for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
     {
         Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1, weightEndDamp(bspline_inner));
         Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
     }
-    for (int n2 = l2 + 1; n2 <= max_n; n2++)
+    for (int n2 = l2 + 1; n2 <= l2 + Nchan1; n2++)
     {
         Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2, weightEndDamp(bspline_inner));
         Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
