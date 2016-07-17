@@ -102,8 +102,8 @@ class GPUCGPreconditioner : public virtual KPACGPreconditioner
         }
         
         // reuse parent definitions
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { KPACGPreconditioner::rhs(chi,ienergy,instate); }
-        virtual void update (Real E) { KPACGPreconditioner::update(E); }
+        using KPACGPreconditioner::rhs;
+        using KPACGPreconditioner::update;
         
         // declare own definitions
         virtual void setup ();

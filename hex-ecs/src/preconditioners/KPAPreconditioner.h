@@ -109,8 +109,8 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         }
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        using CGPreconditioner::multiply;
+        using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();

@@ -76,9 +76,9 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         }
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        using CGPreconditioner::multiply;
+        using CGPreconditioner::rhs;
+        using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();
