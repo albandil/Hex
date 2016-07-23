@@ -33,15 +33,22 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "interfaces.h"
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+#include "../interfaces.h"
+#include "../quantities.h"
 
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(SpinAsymmetry);
+
+// --------------------------------------------------------------------------------- //
 
 const std::string SpinAsymmetry::Id = "asy";
 const std::string SpinAsymmetry::Description = "Spin asymetry.";

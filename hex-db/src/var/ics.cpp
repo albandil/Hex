@@ -33,16 +33,27 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include <sqlite3.h>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-chebyshev.h"
 #include "hex-clenshawcurtis.h"
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-// -------------------------------------------------------------------------- //
+#include "../quantities.h"
+#include "../utils.h"
+
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(IntegralCrossSection);
+
+// --------------------------------------------------------------------------------- //
 
 //
 // custom function for evaluation of square root within a SQL statement
@@ -124,22 +135,40 @@ void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
     }
 }
 
-// -------------------------------------------------------------------------- //
+// --------------------------------------------------------------------------------- //
 
-const std::string IntegralCrossSection::Id = "ics";
-const std::string IntegralCrossSection::Description = "Integral cross section.";
-const std::vector<std::pair<std::string,std::string>> IntegralCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"ell", "Partial wave."}
-};
-const std::vector<std::string> IntegralCrossSection::VecDependencies = { "Ei" };
+std::string IntegralCrossSection::id () const
+{
+    return "ics";
+}
+
+std::string IntegralCrossSection::description () const
+{
+    return "Integral cross section.";
+}
+
+std::vector<std::pair<std::string,std::string>> IntegralCrossSection::deps()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"ell", "Partial wave."}
+    };
+}
+
+std::vector<std::string> IntegralCrossSection::vdeps () const
+{
+    return "Ei";
+}
+
+// --------------------------------------------------------------------------------- //
 
 bool IntegralCrossSection::initialize (sqlitepp::session & db) const
 {
@@ -155,10 +184,11 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db) const
     return true;
 }
 
-std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
+bool IntegralCrossSection::createTable (sqlitepp::session & db) const
 {
-    static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + IntegralCrossSection::Id + "' "
+    sqlitepp::statement st (db);
+    st <<
+        "CREATE TABLE IF NOT EXISTS '" + id() + "' "
         "("
             "ni  INTEGER, "
             "li  INTEGER, "
@@ -172,12 +202,23 @@ std::vector<std::string> const & IntegralCrossSection::SQL_CreateTable () const
             "sigma DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,S,Ei,ell)"
         ")"
-    };
+    ;
     
-    return cmd;
+    try
+    {
+        st.exec();
+    }
+    catch (sqlitepp::exception & e)
+    {
+        std::cerr << "ERROR: Creation of table '" << id() << "' failed!" << std::endl;
+        std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+        return false;
+    }
+    
+    return true;
 }
 
-std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
+bool IntegralCrossSection::updateTable (sqlitepp::session & db) const
 {
     static const std::vector<std::string> cmd = {
         
@@ -245,6 +286,8 @@ std::vector<std::string> const & IntegralCrossSection::SQL_Update () const
     };
     return cmd;
 }
+
+// --------------------------------------------------------------------------------- //
 
 bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata) const
 {

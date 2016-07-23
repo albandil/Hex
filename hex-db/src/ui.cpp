@@ -33,13 +33,21 @@
 #include <cstring>
 #include <iostream>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-cmdline.h"
 #include "hex-version.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "db.h"
-#include "variables.h"
+#include "quantities.h"
+
+// --------------------------------------------------------------------------------- //
 
 typedef std::vector<std::string> const & Args;
+
+// --------------------------------------------------------------------------------- //
 
 const std::string HelpText = 
     "Usage:\n"
@@ -142,28 +150,28 @@ int main (int argc, char* argv[])
             table.setAlignment(OutputTable::left, OutputTable::left);
             table.setWidth(20,40);
             table.write("(name)", "(description)");
-            for (Variable const * var : vlist)
-                table.write(var->id(), var->description());
+            for (ScatteringQuantity const * Q : *quantities)
+                table.write(Q->id(), Q->description());
             
             std::exit(EXIT_SUCCESS);
         },
         "params", "p",   1, [ & ](Args opts) -> bool
         {
-            VariableList::const_iterator it = std::find_if
+            auto it = std::find_if
             (
-                vlist.begin(),
-                vlist.end(),
-                [ & ](Variable* const & it) -> bool { return it->id() == opts[0]; }
+                quantities->begin(),
+                quantities->end(),
+                [ & ](ScatteringQuantity* const & it) -> bool { return it->id() == opts[0]; }
             );
             
-            if (it == vlist.end())
+            if (it == quantities->end())
             {
-                std::cout << "No such variable \"" << opts[0] << "\"" << std::endl;
+                std::cout << "No such quantity \"" << opts[0] << "\"" << std::endl;
             }
             else
             {
                 std::cout << std::endl;
-                std::cout << "Variable \"" << opts[0] << "\" uses the following parameters:" << std::endl;
+                std::cout << "Quantity \"" << opts[0] << "\" uses the following parameters:" << std::endl;
                 std::cout << std::endl;
                 
                 OutputTable table;
@@ -227,7 +235,7 @@ int main (int argc, char* argv[])
         /* default*/ [ & ](std::string arg, Args opts) -> bool
         {
             // try to find it in the variable ids
-            for (const Variable* var : vlist)
+            for (ScatteringQuantity const * var : *quantities)
             {
                 if (var->id() == arg)
                 {
@@ -238,7 +246,7 @@ int main (int argc, char* argv[])
             }
             
             // try to find it in the variable dependencies
-            for (const Variable* var : vlist)
+            for (ScatteringQuantity const * var : *quantities)
             {
                 // scan the dependencies for 'arg'
                 bool this_arg_is_needed = false;

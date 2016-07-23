@@ -33,36 +33,60 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string TMatrix::Id = "tmat";
-const std::string TMatrix::Description = "T-matrix.";
-const std::vector<std::pair<std::string,std::string>> TMatrix::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"ell", "Outgoing projectile partial wave angular momentum."}
-};
-const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
+
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(TMatrix);
+
+// --------------------------------------------------------------------------------- //
+
+std::string TMatrix::id () const { return "tmat"; }
+
+std::string TMatrix::description() const { return "T-matrix."; }
+
+std::vector<std::pair<std::string,std::string>> TMatrix::deps () const
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"ell", "Outgoing projectile partial wave angular momentum."}
+    };
+}
+
+std::vector<std::string> TMatrix::vdeps() const
+{
+    return "Ei";
+}
+
+// --------------------------------------------------------------------------------- //
 
 bool TMatrix::initialize (sqlitepp::session & db) const
 {
     return true;
 }
 
-std::vector<std::string> const & TMatrix::SQL_CreateTable () const
+bool TMatrix::createTable (sqlitepp::session & db) const
 {
-    static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + TMatrix::Id + "' ("
+    sqlitepp::statement st (db);
+    st <<
+        "CREATE TABLE IF NOT EXISTS '" + id() + "' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -77,31 +101,44 @@ std::vector<std::string> const & TMatrix::SQL_CreateTable () const
             "Im_T_ell DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
         ")"
-    };
-    return cmd;
+    ;
+    
+    try
+    {
+        st.exec();
+    }
+    catch (sqlitepp::exception & e)
+    {
+        std::cerr << "ERROR: Creation of table '" << id() << "' failed!" << std::endl;
+        std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+        return false;
+    }
+    
+    return true;
 }
 
-std::vector<std::string> const & TMatrix::SQL_Update () const
+bool TMatrix::updateTable (sqlitepp::session & db) const
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return true;
 }
 
-bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool TMatrix::run (sqlitepp::session & db, std::map<std::string,std::string> const & sdata) const
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi0= Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf0= Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata,  "S", Id);
-    int ell= Conv<int>(sdata, "ell",Id);
+    int ni = Conv<int>(sdata, "ni", id());
+    int li = Conv<int>(sdata, "li", id());
+    int mi0= Conv<int>(sdata, "mi", id());
+    int nf = Conv<int>(sdata, "nf", id());
+    int lf = Conv<int>(sdata, "lf", id());
+    int mf0= Conv<int>(sdata, "mf", id());
+    int  S = Conv<int>(sdata, "S",  id());
+    int ell= Conv<int>(sdata, "ell",id());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -114,7 +151,7 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", id()));
         
     } catch (std::exception e) {
         
@@ -126,8 +163,8 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     double E, Re_T_ell, Im_T_ell;
     
     // create query statement
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + TMatrix::Id + " "
+    sqlitepp::statement st (db);
+    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + id() + " "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
