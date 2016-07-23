@@ -38,9 +38,8 @@ const std::string HybCGPreconditioner::prec_description = "Combination of ILU an
 
 bool HybCGPreconditioner::ilu_needed (int iblock) const
 {
-//     std::cout << "  1 channels = " << Nchan_[iblock].first << std::endl;
-//     std::cout << "  2 channels = " << Nchan_[iblock].second << std::endl;
-    return Nchan_[iblock].first > 0 or Nchan_[iblock].second > 0;
+    return Nchan_[iblock].first > 0
+        or Nchan_[iblock].second > 0;
 }
 
 void HybCGPreconditioner::setup ()
@@ -51,22 +50,7 @@ void HybCGPreconditioner::setup ()
 
 void HybCGPreconditioner::update (Real E)
 {
-    // update ILU
-    if (E != CGPreconditioner::E_)
-    {
-        // release outdated LU factorizations
-        for (auto & lu : ILUCGPreconditioner::lu_)
-        {
-            lu->drop();
-            lu->unlink();
-        }
-    }
-    
-    // update common ancestor
-    CGPreconditioner::update(E);
-    
-    // reset counters
-    CGPreconditioner::n_.fill(-1);
+    ILUCGPreconditioner::update(E);
 }
 
 void HybCGPreconditioner::CG_init (int iblock) const
@@ -79,12 +63,6 @@ void HybCGPreconditioner::CG_init (int iblock) const
 
 void HybCGPreconditioner::CG_mmul (int iblock, const cArrayView r, cArrayView z) const
 {
-//     std::cout << "HYB:CG_mmul:" << std::endl;
-//     std::cout << "  iblock = " << iblock << std::endl;
-//     std::cout << "  l1 = " << ang_.states()[iblock].first << std::endl;
-//     std::cout << "  l2 = " << ang_.states()[iblock].second << std::endl;
-//     std::cout << "  r.size() = " << r.size() << std::endl;
-//     std::cout << "  z.size() = " << z.size() << std::endl;
     if (ilu_needed(iblock))
         ILUCGPreconditioner::CG_mmul(iblock, r, z);
     else

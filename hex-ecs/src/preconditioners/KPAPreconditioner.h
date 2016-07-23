@@ -103,19 +103,19 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_full,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            prec_inner_(inp.maxell + 1), prec_proj_(inp.maxell + 1), maxknot_(-1)
+            prec_inner_(inp.maxell + 1), prec_proj_(inp.maxell + 1)
         {
             // nothing more to do
         }
         
         // reuse parent definitions
+        using CGPreconditioner::update;
+        using CGPreconditioner::rhs;
         using CGPreconditioner::multiply;
         using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (Real E);
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void finish ();
         
         // inner CG callback (needed by parent)
@@ -146,9 +146,6 @@ class KPACGPreconditioner : public virtual CGPreconditioner
         
         // workspace
         mutable cArrays workspace_;
-        
-        // drop tolerance knot for matrix multiplication
-        mutable int maxknot_;
 };
 
 #endif

@@ -166,7 +166,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 const_cast<BlockArray<Complex>&>(r).hdfload(ill);
                 z.hdfload(ill);
             }
-
+            
             // ivert diagonal block
             n_[ill] = solve_block(ill, r[ill], z[ill]);
             
@@ -201,17 +201,10 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
 
 void CGPreconditioner::CG_init (int iblock) const
 {
-//     if (cmd_.outofcore and cmd_.wholematrix)
-//         dia_blocks_[iblock].hdfload();
 }
 
 void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) const
 {
-//     if (cmd_.lightweight_full)
-//         HexException("Preconditioner %s is not compatible with the option --lightweight-full.", this->name().c_str());
-        
-//     dia_blocks_[iblock].dot(1., p, 0., q, true);
-    
     std::memset(q.data(), 0, q.size() * sizeof(Complex));
     
     std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
@@ -225,7 +218,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).dot
         (
             1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
+            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
+            !cmd_.parallel_precondition
         );
     }
     else
@@ -235,7 +229,8 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         A_blocks_[iang].dot
         (
             1.0_r, cArrayView(p, 0, Nspline_inner * Nspline_inner),
-            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner)
+            1.0_r, cArrayView(q, 0, Nspline_inner * Nspline_inner),
+            !cmd_.parallel_precondition
         );
         
         if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[iang]).drop();
@@ -246,6 +241,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         std::size_t Nchan1 = Nchan_[iblock].first;
         std::size_t Nchan2 = Nchan_[iblock].second;
         
+        # pragma omp parallel for if (!cmd_.parallel_precondition)
         for (std::size_t m = 0; m < Nchan1; m++)
         for (std::size_t n = 0; n < Nchan1; n++)
         {
@@ -258,6 +254,7 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
             if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[iang][m * Nchan1 + n]).drop();
         }
         
+        # pragma omp parallel for if (!cmd_.parallel_precondition)
         for (std::size_t m = 0; m < Nchan2; m++)
         for (std::size_t n = 0; n < Nchan2; n++)
         {

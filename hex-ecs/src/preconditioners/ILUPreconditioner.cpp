@@ -136,8 +136,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     if (not lu_[iblock]->valid())
     {
 #ifdef _OPENMP
-        // allow only one factorization at a time when not using SuperLU DIST
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
+        // allow only one factorization at a time when not using SuperLU DIST or MUMPS
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST and cmd_.factorizer != LUFT_MUMPS and not cmd_.parallel_factorization)
             omp_set_lock(&lu_lock_);
 #endif
         
@@ -157,7 +157,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
         // convert inner region matrix block to COO matrix
         CooMatrix<LU_int_t,Complex> A_coo = (cmd_.lightweight_full ? dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock) : A_blocks_[iang]).tocoo<LU_int_t>();
-//         A_coo.tocsr().tocoo().write("A-coo.txt"); // DEBUG
         
         // add the A-block
         CooMatrix<LU_int_t,Complex> coo_block
@@ -172,8 +171,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             // add the outer region C-blocks
             coo_block += Cu_blocks_[iang];
             coo_block += Cl_blocks_[iang];
-//             Cu_blocks_[iang].write("Cu-coo.txt"); // DEBUG
-//             Cl_blocks_[iang].write("Cl-coo.txt"); // DEBUG
             
             // add the B-blocks
             for (int m = 0; m < Nchan1; m++)
@@ -190,7 +187,6 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-//                 B_coo_large.tocsr().tocoo().write(format("B1-%d-%d-coo.txt", m, n)); // DEBUG
             }
             for (int m = 0; m < Nchan2; m++)
             for (int n = 0; n < Nchan2; n++)
@@ -206,14 +202,11 @@ void ILUCGPreconditioner::CG_init (int iblock) const
                     B_coo_small.v()
                 );
                 coo_block += B_coo_large;
-//                 B_coo_large.tocsr().tocoo().write(format("B2-%d-%d-coo.txt", m, n)); // DEBUG
             }
         }
         
         // create the CSR block that will be factorized
         CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
-//         csr_blocks_[iblock].tocoo().write("full-coo.txt"); // DEBUG
-//         csr_blocks_[iblock].plot(format("csr-%d.png", iblock)); // DEBUG
         
         // set up factorization data
         void * data = nullptr;
@@ -264,7 +257,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
 #ifdef _OPENMP
         // release lock
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST and not cmd_.parallel_factorization)
+        if (cmd_.factorizer != LUFT_SUPERLU_DIST and cmd_.factorizer != LUFT_MUMPS and not cmd_.parallel_factorization)
             omp_unset_lock(&lu_lock_);
 #endif
     }

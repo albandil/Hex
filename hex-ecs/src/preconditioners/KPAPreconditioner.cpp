@@ -332,71 +332,6 @@ void KPACGPreconditioner::setup ()
     workspace_.resize(n);
 }
 
-void KPACGPreconditioner::update (Real E)
-{
-    // update parent
-    CGPreconditioner::update(E);
-    
-    // determine knot where all open bound-state channels decrease below the drop tolerance
-    if (E >= 0 or cmd_.kpa_drop < 0)
-    {
-        // use whole matrices
-        maxknot_ = -1;
-    }
-    else if (cmd_.kpa_drop > 0)
-    {
-        // get knot from user-supplied distance
-        maxknot_  = rad_.bspline_inner().knot(cmd_.kpa_drop);
-        
-        std::cout << "\tKPA: dropping splines beyond " << cmd_.kpa_drop << " a.u.; B-spline index "
-                  << maxknot_ << " and up (of " << rad_.bspline_inner().Nspline() << ")" << std::endl;
-    }
-    else
-    {
-        // get highest open bound state channel
-        int n = std::floor(std::sqrt(-1.0 / (2.0 * E)));
-        
-        // get smallest non-zero knot separation
-        Real h = special::constant::Inf;
-        for (int i = 0; i < rad_.bspline_inner().Nspline(); i++)
-            if (rad_.bspline_inner().t(i) != rad_.bspline_inner().t(i + 1))
-                h = std::min(h, std::abs(rad_.bspline_inner().t(i) - rad_.bspline_inner().t(i + 1)));
-        
-        // hunt & bisect for drop tolerance, start at classical turning point
-        Real r1, r2, r3;
-        for (r1 = 2 * n, r3 = 2 * r1;
-             std::abs(Hydrogen::P(n, 0, r3)) > cmd_.droptol;
-             r1 = r3, r3 *= 2);
-        for (r2 = 0.5 * (r1 + r3);
-             std::abs(r1 - r3) > h;
-             (std::abs(Hydrogen::P(n, 0, r2)) > cmd_.droptol ? (r1 = r2) : (r3 = r2)), r2 = 0.5 * (r1 + r3));
-        
-        // get knot
-        maxknot_  = rad_.bspline_inner().knot(r2);
-        
-        std::cout << "\tKPA: dropping splines beyond " << r2 << " a.u. (" << n << "s's " << cmd_.droptol << " threshold); B-spline index "
-                  << maxknot_ << " and up (of " << rad_.bspline_inner().Nspline() << ")" << std::endl;
-    }
-}
-
-void KPACGPreconditioner::rhs (BlockArray<Complex>& chi, int ienergy, int instate) const
-{
-    // let parent bake the right-hand side
-    CGPreconditioner::rhs(chi, ienergy, instate);
-    
-    // constrain all blocks from the very beginning
-    for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
-    {
-        if (cmd_.outofcore)
-            chi[iblock].hdfload();
-        
-        this->CG_constrain(chi[iblock]);
-        
-        if (cmd_.outofcore)
-            chi[iblock].hdfsave(), chi[iblock].drop();
-    }
-}
-
 void KPACGPreconditioner::CG_init (int iblock) const
 {
     // initialize parent
@@ -417,8 +352,6 @@ void KPACGPreconditioner::CG_init (int iblock) const
     
     // calculate workspace size
     std::size_t size = rad_.bspline_inner().Nspline() * rad_.bspline_inner().Nspline();
-    if (maxknot_ > 0)
-        size *= 2;
     
     // allocate thread workspace
     unsigned ithread = 0;
@@ -477,16 +410,13 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 #ifdef _OPENMP
     ithread = omp_get_thread_num();
 #endif
-    Complex * work = workspace_[ithread].data();
     
-    // encapsulated memory regions
-    cArrayView U_data (Nspline_inner * Nspline_inner, work);
-    ColMatrixView<Complex> U (Nspline_inner, Nspline_inner, U_data);
+    // encapsulated memory chunks
+    ColMatrixView<Complex> U (Nspline_inner, Nspline_inner, workspace_[ithread]);
     RowMatrixView<Complex> R (Nspline_inner, Nspline_inner, r);
     RowMatrixView<Complex> Z (Nspline_inner, Nspline_inner, z);
     
-    // multiply by the first Kronecker product
-    if (maxknot_ < 0)
+    // first Kronecker product
     {
         // U = (AV)B
         RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data());
@@ -495,66 +425,14 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         blas::gemm(1., A, R, 0., Z); // N³ operations
         blas::gemm(1., Z, B, 0., U); // N³ operations
     }
-    else
-    {
-        //  ┏━━━━━━━━━━━━┓     ┏━━━━━━━━━━━━┓  ┏━┱──────────┐  ┏━━━━━━━━━━━━┓     
-        //  ┃            ┃     ┃            ┃  ┃ ┃          │  ┡━━━━━━━━━━━━┩     
-        //  ┃            ┃     ┃            ┃  ┃ ┃          │  │            │     First multiplication, then second !
-        //  ┃     U₁     ┃  =  ┃     A₁     ┃  ┃ ┃   V      │  │     B₁'    │     A₁ ... prec_inner_[l1].invCl_invsqrtS
-        //  ┃            ┃     ┃            ┃  ┃ ┃          │  │            │     B₁ ... prec_proj_[l2].invCl_invsqrtS [transposed]
-        //  ┃            ┃     ┃            ┃  ┃ ┃          │  │            │
-        //  ┗━━━━━━━━━━━━┛     ┗━━━━━━━━━━━━┛  ┗━┹──────────┘  └────────────┘
-        //
-        //  ┏━━━━━━━━━━━━┓     ┏━┱──────────┐  ┌─┲━━━━━━━━━━┓  ┌────────────┐     
-        //  ┃            ┃     ┃ ┃          │  │ ┗━━━━━━━━━━┩  ┢━━━━━━━━━━━━┪     
-        //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃     Second multiplication, then first !
-        //  ┃     U₁     ┃ +=  ┃ ┃   A₁     │  │     V      │  ┃     B₁'    ┃     A₁ ... prec_inner_[l1].invCl_invsqrtS
-        //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃     B₁ ... prec_proj_[l2].invCl_invsqrtS [transposed]
-        //  ┃            ┃     ┃ ┃          │  │            │  ┃            ┃
-        //  ┗━━━━━━━━━━━━┛     ┗━┹──────────┘  └────────────┘  ┗━━━━━━━━━━━━┛
-        //
-        //
-        
-        // create views of the sub-matrices
-        RowMatrixView<Complex> A_full (Nspline_inner, Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data(), Nspline_inner);
-        RowMatrixView<Complex> A_left (Nspline_inner, maxknot_, prec_inner_[l1].invCl_invsqrtS.data(), Nspline_inner);
-        ColMatrixView<Complex> B_top  (maxknot_, Nspline_inner, prec_inner_[l2].invCl_invsqrtS.data(), Nspline_inner);
-        ColMatrixView<Complex> B_bot  (Nspline_inner - maxknot_, Nspline_inner, cArrayView(prec_inner_[l2].invCl_invsqrtS.data(), maxknot_, (Nspline_inner - maxknot_) * Nspline_inner), Nspline_inner);
-        RowMatrixView<Complex> V_left (Nspline_inner, maxknot_, r, Nspline_inner);
-        RowMatrixView<Complex> V_top  (maxknot_, Nspline_inner - maxknot_, cArrayView(r, maxknot_, maxknot_ * Nspline_inner), Nspline_inner);
-        
-        // create view of working memory
-        cArrayView Xa_data (Nspline_inner * maxknot_, work + Nspline_inner * Nspline_inner);
-        cArrayView Xp_data (Nspline_inner * maxknot_, work + Nspline_inner * Nspline_inner);
-        ColMatrixView<Complex> AV (Nspline_inner, maxknot_, Xa_data);
-        ColMatrixView<Complex> VB (maxknot_, Nspline_inner, Xp_data);
-        
-        // calculate the matrix products
-        blas::gemm(1., A_full, V_left, 0., AV); // N²m operations
-        blas::gemm(1., AV, B_top, 0., U);       // N²m operations
-        blas::gemm(1., V_top, B_bot, 0., VB);   // mN(N-m) operations
-        blas::gemm(1., A_left, VB, 1., U);      // N²m operations
-    }
-    
-    //  ┏━━━━━━━━━━━━┓     ┏━━━━━━━━━━━━┓     ┏━━━━━━━━━━━━┓     
-    //  ┃            ┃     ┃            ┃     ┃            ┃     
-    //  ┃            ┃     ┃            ┃     ┃            ┃     Hadamard product.
-    //  ┃     U₂     ┃  =  ┃     D      ┃  o  ┃     U₁     ┃     Scaling by the diagonal.
-    //  ┃            ┃     ┃            ┃     ┃            ┃ 
-    //  ┃            ┃     ┃            ┃     ┃            ┃ 
-    //  ┗━━━━━━━━━━━━┛     ┗━━━━━━━━━━━━┛     ┗━━━━━━━━━━━━┛ 
     
     // Divide elements by the diagonal; N² operations
     # pragma omp parallel for
     for (std::size_t i = 0; i < Nspline_inner; i++) 
     for (std::size_t j = 0; j < Nspline_inner; j++)
-    {
-        U(i,j) /= (E_ - prec_inner_[l1].Dl[i] - prec_proj_[l2].Dl[j]);
-        Z(i,j) = U(i,j); // <-- this is used in full product
-    }
+        Z(i,j) = U(i,j) / (E_ - prec_inner_[l1].Dl[i] - prec_proj_[l2].Dl[j]);
     
-    // multiply by the second Kronecker product
-    if (maxknot_ < 0)
+    // second Kronecker product
     {
         // W = (AU)B
         RowMatrixView<Complex> A (Nspline_inner, Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data());
@@ -562,53 +440,6 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
         
         blas::gemm(1., A, Z, 0., U);    // N³ operations
         blas::gemm(1., U, B, 0., Z);    // N³ operations
-    }
-    else
-    {
-        //  ┏━┱──────────┐     ┏━━━━━━━━━━━━┓   ┏━━━━━━━━━━━━┓  ┏━┱──────────┐
-        //  ┃ ┃          │     ┃            ┃   ┃            ┃  ┃ ┃          │
-        //  ┃ ┃          │     ┃            ┃   ┃            ┃  ┃ ┃          │    Second multiplication, then first !
-        //  ┃ ┃   W      │  =  ┃     A₂     ┃   ┃     U₂     ┃  ┃ ┃   B₂'    │    A₂ ... prec_inner_[l1].invsqrtS_Cl
-        //  ┃ ┃          │     ┃            ┃   ┃            ┃  ┃ ┃          │    B₂ ... prec_inner_[l2].invsqrtS_Cl [transposed]
-        //  ┃ ┃          │     ┃            ┃   ┃            ┃  ┃ ┃          │
-        //  ┗━┹──────────┘     ┗━━━━━━━━━━━━┛   ┗━━━━━━━━━━━━┛  ┗━┹──────────┘
-        
-        //  ┌─┲━━━━━━━━━━┓     ┏━━━━━━━━━━━━┓   ┏━━━━━━━━━━━━┓  ┌─┲━━━━━━━━━━┓
-        //  │ ┗━━━━━━━━━━┩     ┡━━━━━━━━━━━━┩   ┃            ┃  │ ┃          ┃
-        //  │            │     │            │   ┃            ┃  │ ┃          ┃    First multiplication, then second !
-        //  │     W      │  =  │     A₂     │   ┃     U₂     ┃  │ ┃   B₂'    ┃    A₂ ... prec_inner_[l1].invsqrtS_Cl
-        //  │            │     │            │   ┃            ┃  │ ┃          ┃    B₂ ... prec_inner_[l2].invsqrtS_Cl [transposed]
-        //  │            │     │            │   ┃            ┃  │ ┃          ┃
-        //  └────────────┘     └────────────┘   ┗━━━━━━━━━━━━┛  └─┺━━━━━━━━━━┛
-        
-        // create views of the sub-matrices
-        RowMatrixView<Complex> A_full (Nspline_inner, Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data(), Nspline_inner);
-        RowMatrixView<Complex> A_top  (maxknot_, Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data(), Nspline_inner);
-        ColMatrixView<Complex> B_left (Nspline_inner, maxknot_, prec_inner_[l2].invsqrtS_Cl.data(), Nspline_inner);
-        ColMatrixView<Complex> B_right(Nspline_inner, Nspline_inner - maxknot_, cArrayView(prec_inner_[l2].invsqrtS_Cl.data(), maxknot_ * Nspline_inner, (Nspline_inner - maxknot_) * Nspline_inner), Nspline_inner);
-        RowMatrixView<Complex> W_left (Nspline_inner, maxknot_, z, Nspline_inner);
-        RowMatrixView<Complex> W_top  (maxknot_, Nspline_inner - maxknot_, cArrayView(z, maxknot_, maxknot_ * Nspline_inner), Nspline_inner);
-        
-        // create view of working memory
-        cArrayView Xa_data (Nspline_inner * maxknot_, work + Nspline_inner * Nspline_inner);
-        cArrayView Xp_data (Nspline_inner * maxknot_, work + Nspline_inner * Nspline_inner);
-        ColMatrixView<Complex> UB (Nspline_inner, maxknot_, Xa_data);
-        ColMatrixView<Complex> AU (maxknot_, Nspline_inner, Xp_data);
-        
-        // calculate the matrix products
-        blas::gemm(1., U, B_left, 0., UB);      // N²m operations
-        blas::gemm(1., A_full, UB, 0., W_left); // N²m operations
-        blas::gemm(1., A_top, U, 0., AU);       // N²m operations
-        blas::gemm(1., AU, B_right, 0., W_top); // m(N-m)N operations
-    }
-    
-    // erase thresholded part of the output
-    if (maxknot_ > 0)
-    {
-        # pragma omp parallel for
-        for (std::size_t i = maxknot_; i < Nspline_inner; i++) 
-        for (std::size_t j = maxknot_; j < Nspline_inner; j++)
-            Z(i,j) = 0.;
     }
 }
 
@@ -637,15 +468,7 @@ void KPACGPreconditioner::finish ()
 
 void KPACGPreconditioner::CG_constrain (cArrayView r) const
 {
-    if (maxknot_ > 0)
-    {
-        std::size_t Nspline = rad_.bspline_inner().Nspline();
-        
-        # pragma omp parallel for
-        for (std::size_t i = maxknot_; i < Nspline; i++) 
-        for (std::size_t j = maxknot_; j < Nspline; j++)
-            r[i * Nspline + j] = 0.;
-    }
+    
 }
 
 #endif

@@ -860,7 +860,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 calc_A_block(ill, illp, false).dot
                 (
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
-                    1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner)
+                    1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
+                    true
                 );
             }
             else
@@ -870,7 +871,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 A_blocks_[ill * Nang + illp].dot
                 (
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
-                    1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner)
+                    1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
+                    true
                 );
                 
                 if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
@@ -884,6 +886,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 int Nchan2p = Nchan_[illp].second;  // # r2 -> inf; l1p bound
                 
                 // r1 -> inf
+                # pragma omp parallel for
                 for (int m = 0; m < Nchan1; m++)
                 for (int n = 0; n < Nchan1p; n++)
                 {
@@ -897,6 +900,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 }
                 
                 // r2 -> inf
+                # pragma omp parallel for
                 for (int m = 0; m < Nchan2; m++)
                 for (int n = 0; n < Nchan2p; n++)
                 {
