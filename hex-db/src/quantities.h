@@ -47,47 +47,62 @@
 
 class ScatteringQuantity
 {
+    protected:
+        
+        /// Database session.
+        sqlitepp::session * db;
+    
     public:
         
-        // object management
-        
-            /// object factory
-            virtual ScatteringQuantity* New () = 0;
-        
-            /// destructor
-            virtual ~ScatteringQuantity () {}
-        
-        // access
+        // properties
             
             /// String identification of the variable.
-            virtual std::string id () const = 0;
+            virtual std::string name () = 0;
             
             /// Longer description text for use in program help.
-            virtual std::string description () const = 0;
+            virtual std::string description () = 0;
             
             /// List of all scattering event parameters (with description) that have to be specified by user.
-            virtual std::vector<std::pair<std::string,std::string>> deps () const = 0;
+            virtual std::vector<std::pair<std::string,std::string>> params () = 0;
             
             /// List of vectorizable scattering event parameters that have to be specified by user.
-            virtual std::vector<std::string> vdeps () const = 0;
-
+            virtual std::vector<std::string> vparams () = 0;
+            
+            /// List of other scattering quantities that need to be initialized/updated/etc before this class
+            /// because this class makes use of their data.
+            virtual std::vector<std::string> dependencies ()
+            {
+                return std::vector<std::string>();
+            }
+            
         // database interface
-        
+            
+            sqlitepp::session & session ()
+            {
+                return *db;
+            }
+            
             /// initialize (e.g.) by defining external routines for SQLite
-            virtual bool initialize (sqlitepp::session & db) const = 0;
+            virtual bool initialize (sqlitepp::session & db)
+            {
+                this->db = &db;
+                return true;
+            }
             
             /// SQL statements that create the required table, or empty vector if not needed.
-            virtual bool createTable (sqlitepp::session & db) const = 0;
+            virtual bool createTable ()
+            {
+                return true;
+            }
             
             /// SQL statements that update the table after insetion of new data.
-            virtual bool updateTable (sqlitepp::session & db) const = 0;
+            virtual bool updateTable ()
+            {
+                return true;
+            }
             
             /// write out requested data
-            virtual bool run
-            (
-                sqlitepp::session & db,
-                std::map<std::string,std::string> const & params
-            ) const = 0;
+            virtual bool run (std::map<std::string,std::string> const & params) = 0;
 };
 
 // --------------------------------------------------------------------------------- //
@@ -96,6 +111,8 @@ extern std::shared_ptr<std::vector<ScatteringQuantity*>> quantities;
 
 bool register_new_quantity (ScatteringQuantity* Q);
 
+ScatteringQuantity * get_quantity (std::string name);
+
 // --------------------------------------------------------------------------------- //
 
 // define new scattering quantity
@@ -103,18 +120,15 @@ bool register_new_quantity (ScatteringQuantity* Q);
 class Q : public ScatteringQuantity \
 { \
     public: \
-        std::string id () const; \
-        std::string description () const; \
-        std::vector<std::pair<std::string,std::string>> deps () const; \
-        std::vector<std::string> vdeps () const; \
-        bool initialize (sqlitepp::session & db) const; \
-        bool createTable (sqlitepp::session & db) const; \
-        bool updateTable (sqlitepp::session & db) const; \
-        bool run \
-        ( \
-            sqlitepp::session & db, \
-            std::map<std::string,std::string> const & params \
-        ) const; \
+        std::string name (); \
+        std::string description (); \
+        std::vector<std::pair<std::string,std::string>> params (); \
+        std::vector<std::string> vparams (); \
+        std::vector<std::string> dependencies (); \
+        bool initialize (sqlitepp::session & db); \
+        bool createTable (); \
+        bool updateTable (); \
+        bool run (std::map<std::string,std::string> const & params); \
 }; \
 bool Q##_##registered = register_new_quantity(new Q())
 

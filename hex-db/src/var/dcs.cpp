@@ -34,46 +34,84 @@
 #include <string>
 #include <vector>
 
-#include <sqlitepp/sqlitepp.hpp>
+// --------------------------------------------------------------------------------- //
 
 #include "hex-chebyshev.h"
 #include "hex-interpolate.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string DifferentialCrossSection::Id = "dcs";
-const std::string DifferentialCrossSection::Description = "Differential cross section.";
-const std::vector<std::pair<std::string,std::string>> DifferentialCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"theta", "Scattering angles for which to compute the cross section."}
-};
-const std::vector<std::string> DifferentialCrossSection::VecDependencies = { "theta" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool DifferentialCrossSection::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(DifferentialCrossSection);
+
+// --------------------------------------------------------------------------------- //
+
+std::string DifferentialCrossSection::name ()
 {
-    return true;
+    return "dcs";
 }
 
-std::vector<std::string> const & DifferentialCrossSection::SQL_CreateTable () const
+std::string DifferentialCrossSection::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Differential cross section.";
 }
 
-std::vector<std::string> const & DifferentialCrossSection::SQL_Update () const
+std::vector<std::string> DifferentialCrossSection::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "scatamp"
+    };
 }
+
+std::vector<std::pair<std::string,std::string>> DifferentialCrossSection::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"theta", "Scattering angles for which to compute the cross section."}
+    };
+}
+
+std::vector<std::string> DifferentialCrossSection::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "theta"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool DifferentialCrossSection::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool DifferentialCrossSection::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool DifferentialCrossSection::updateTable()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
 
 void hex_differential_cross_section
 (
@@ -119,7 +157,7 @@ void hex_differential_cross_section_
     rArrayView(*N, dcs) = sqrabs(amplitudes) * (kf/ki * 0.25 * (2 * (*S) + 1));
 }
 
-bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata) const
+bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -127,26 +165,26 @@ bool DifferentialCrossSection::run (std::map<std::string,std::string> const & sd
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata, "S", Id);
-    double E = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf = Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S", name());
+    double E = Conv<double>(sdata, "Ei", name()) * efactor;
     
     // angles
     rArray angles;
     
     // get angle / angles
-    try {
-        
+    try
+    {
         // is there a single angle specified using command line ?
-        angles.push_back(Conv<double>(sdata, "theta", Id));
-        
-    } catch (std::exception e) {
-        
+        angles.push_back(Conv<double>(sdata, "theta", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }

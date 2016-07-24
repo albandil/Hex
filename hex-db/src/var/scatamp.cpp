@@ -33,44 +33,84 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-chebyshev.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string ScatteringAmplitude::Id = "scatamp";
-const std::string ScatteringAmplitude::Description = "Scattering amplitude.";
-const std::vector<std::pair<std::string,std::string>> ScatteringAmplitude::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"theta", "Scattering angles for which to compute the amplitude."}
-};
-const std::vector<std::string> ScatteringAmplitude::VecDependencies = { "theta" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool ScatteringAmplitude::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(ScatteringAmplitude);
+
+// --------------------------------------------------------------------------------- //
+
+std::string ScatteringAmplitude::name ()
 {
-    return true;
+    return "scatamp";
 }
 
-std::vector<std::string> const & ScatteringAmplitude::SQL_Update () const
+std::string ScatteringAmplitude::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Scattering amplitude.";
 }
 
-std::vector<std::string> const & ScatteringAmplitude::SQL_CreateTable () const
+std::vector<std::string> ScatteringAmplitude::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "tmat"
+    };
 }
+
+std::vector<std::pair<std::string,std::string>> ScatteringAmplitude::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"theta", "Scattering angles for which to compute the amplitude."}
+    };
+}
+
+std::vector<std::string> ScatteringAmplitude::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "theta"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool ScatteringAmplitude::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool ScatteringAmplitude::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool ScatteringAmplitude::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
 
 void hex_scattering_amplitude
 (
@@ -97,6 +137,8 @@ void hex_scattering_amplitude_
     double * angles, double * result
 )
 {
+    ScatteringQuantity * TMat = dynamic_cast<ScatteringAmplitude*>(get_quantity("tmat"));
+    
     cArrayView results(*N,reinterpret_cast<Complex*>(result));
     results.fill(0.);
     
@@ -105,8 +147,8 @@ void hex_scattering_amplitude_
     
     // get lowest and highest partial wave
     int min_ell, max_ell;
-    sqlitepp::statement st(db);
-    st << "SELECT MIN(ell), MAX(L)-lf FROM " + TMatrix::Id + " "
+    sqlitepp::statement st (TMat->session());
+    st << "SELECT MIN(ell), MAX(L)-lf FROM 'tmat' "
            "WHERE ni = :ni "
            "  AND li = :li "
            "  AND mi = :mi "
@@ -134,10 +176,10 @@ void hex_scattering_amplitude_
         if (ell <= max_ell)
         {
             // prepare selection statement
-            sqlitepp::statement st1(db);
+            sqlitepp::statement st1 (TMat->session());
             // WARNING Sign convention changed.
-//             st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::Id + " "
-            st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + TMatrix::Id + " "
+//             st1 << "SELECT Ei, SUM(-Re_T_ell - Re_TBorn_ell), SUM(-Im_T_ell - Im_TBorn_ell) FROM " + TMatrix::name() + " "
+            st1 << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
                 "WHERE ni = :ni "
                 "  AND li = :li "
                 "  AND mi = :mi "
@@ -188,7 +230,7 @@ void hex_scattering_amplitude_
                 if (*ni == *nf and *li == *lf and *mi == *mf)
                 {
                     // extrapolate T_ell for elastic scattering [T ~ L^(-2.5)]
-                    tmatrices.push_back(tmatrices.back() * gsl_sf_pow_int((ell-1.)/ell,2.5));
+                    tmatrices.push_back(tmatrices.back() * std::pow((ell-1.)/ell,2.5));
                 }
                 else /*if (std::abs((*ni) - (*nf)) == 1 and std::abs((*li) - (*lf)) == 1)
                 {
@@ -228,7 +270,9 @@ void hex_scattering_amplitude_
         results += -FirstBornFullTMatrix(*ni, *li, *mi, *nf, *lf, *mf, *E, rArrayView(*N,angles)) / special::constant::two_pi;*/
 }
 
-bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -236,26 +280,26 @@ bool ScatteringAmplitude::run (std::map<std::string,std::string> const & sdata) 
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata, "S", Id);
-    double E = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf = Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S", name());
+    double E = Conv<double>(sdata, "Ei", name()) * efactor;
     
     // angles
     rArray angles;
     
     // get angle / angles
-    try {
-        
+    try
+    {
         // is there a single angle specified using command line ?
-        angles.push_back(Conv<double>(sdata, "theta", Id));
-        
-    } catch (std::exception e) {
-        
+        angles.push_back(Conv<double>(sdata, "theta", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }

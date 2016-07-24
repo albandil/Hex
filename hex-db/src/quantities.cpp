@@ -46,4 +46,17 @@ bool register_new_quantity (ScatteringQuantity* Q)
     return true;
 }
 
+ScatteringQuantity * get_quantity (std::string name)
+{
+    for (ScatteringQuantity * Q : *quantities)
+    {
+        if (Q->name() == name)
+        {
+            return Q;
+        }
+    }
+    
+    return nullptr;
+}
+
 // --------------------------------------------------------------------------------- //

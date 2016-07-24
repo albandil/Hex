@@ -34,58 +34,98 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string CollisionStrength::Id = "colls";
-const std::string CollisionStrength::Description = "Collision strength (energy scaled integral cross section).";
-const std::vector<std::pair<std::string,std::string>> CollisionStrength::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"ell", "Partial wave."}
-};
-const std::vector<std::string> CollisionStrength::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool CollisionStrength::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(CollisionStrength);
+
+// --------------------------------------------------------------------------------- //
+
+std::string CollisionStrength::name ()
 {
-    return true;
+    return "colls";
 }
 
-std::vector<std::string> const & CollisionStrength::SQL_CreateTable () const
+std::string CollisionStrength::description ()
 {
-    static std::vector<std::string> cmd;
-    return cmd;
+    return "Collision strength (energy scaled integral cross section).";
 }
 
-std::vector<std::string> const & CollisionStrength::SQL_Update () const
+std::vector<std::string> CollisionStrength::dependencies ()
 {
-    static std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "ics"
+    };
 }
 
-bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> CollisionStrength::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"ell", "Partial wave."}
+    };
+}
+
+std::vector<std::string> CollisionStrength::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool CollisionStrength::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool CollisionStrength::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool CollisionStrength::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool CollisionStrength::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
 //     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi0= Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf0= Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata, "S", Id);
-    int ell = Conv<int>(sdata, "ell", Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi0= Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S", name());
+    int ell = Conv<int>(sdata, "ell", name());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -96,20 +136,20 @@ bool CollisionStrength::run (std::map<std::string,std::string> const & sdata) co
     rArray energies, E_arr, sigma_arr;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
     
     // compose query
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, sigma FROM 'ics' "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "

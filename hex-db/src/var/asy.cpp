@@ -43,6 +43,7 @@
 
 #include "../interfaces.h"
 #include "../quantities.h"
+#include "../utils.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -50,51 +51,80 @@ createNewScatteringQuantity(SpinAsymmetry);
 
 // --------------------------------------------------------------------------------- //
 
-const std::string SpinAsymmetry::Id = "asy";
-const std::string SpinAsymmetry::Description = "Spin asymetry.";
-const std::vector<std::pair<std::string,std::string>> SpinAsymmetry::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"theta", "Scattering angles for which to compute the spin asymetry."}
-};
-const std::vector<std::string> SpinAsymmetry::VecDependencies = { "theta" };
-
-bool SpinAsymmetry::initialize (sqlitepp::session & db) const
+std::string SpinAsymmetry::name ()
 {
-    return true;
+    return "asy";
 }
 
-std::vector<std::string> const & SpinAsymmetry::SQL_CreateTable () const
+std::string SpinAsymmetry::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Spin asymetry.";
 }
 
-std::vector<std::string> const & SpinAsymmetry::SQL_Update () const
+std::vector<std::string> SpinAsymmetry::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "dcs"
+    };
 }
 
-bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> SpinAsymmetry::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"theta", "Scattering angles for which to compute the spin asymetry."}
+    };
+}
+
+std::vector<std::string> SpinAsymmetry::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "theta"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool SpinAsymmetry::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool SpinAsymmetry::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool SpinAsymmetry::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
-    double E = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf = Conv<int>(sdata, "mf", name());
+    double E = Conv<double>(sdata, "Ei", name()) * efactor;
     
     // angles
     rArray angles;
@@ -103,7 +133,7 @@ bool SpinAsymmetry::run (std::map<std::string,std::string> const & sdata) const
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(Conv<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", name()));
         
     } catch (std::exception e) {
         

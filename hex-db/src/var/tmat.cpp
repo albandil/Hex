@@ -50,11 +50,22 @@ createNewScatteringQuantity(TMatrix);
 
 // --------------------------------------------------------------------------------- //
 
-std::string TMatrix::id () const { return "tmat"; }
+std::string TMatrix::name ()
+{
+    return "tmat";
+}
 
-std::string TMatrix::description() const { return "T-matrix."; }
+std::string TMatrix::description ()
+{
+    return "T-matrix.";
+}
 
-std::vector<std::pair<std::string,std::string>> TMatrix::deps () const
+std::vector<std::string> TMatrix::dependencies ()
+{
+    return std::vector<std::string>();
+}
+
+std::vector<std::pair<std::string,std::string>> TMatrix::params ()
 {
     return std::vector<std::pair<std::string,std::string>>
     {
@@ -70,23 +81,26 @@ std::vector<std::pair<std::string,std::string>> TMatrix::deps () const
     };
 }
 
-std::vector<std::string> TMatrix::vdeps() const
+std::vector<std::string> TMatrix::vparams ()
 {
-    return "Ei";
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
 }
 
 // --------------------------------------------------------------------------------- //
 
-bool TMatrix::initialize (sqlitepp::session & db) const
+bool TMatrix::initialize (sqlitepp::session & db)
 {
-    return true;
+    return ScatteringQuantity::initialize(db);
 }
 
-bool TMatrix::createTable (sqlitepp::session & db) const
+bool TMatrix::createTable ()
 {
-    sqlitepp::statement st (db);
+    sqlitepp::statement st (session());
     st <<
-        "CREATE TABLE IF NOT EXISTS '" + id() + "' ("
+        "CREATE TABLE IF NOT EXISTS 'tmat' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -100,8 +114,7 @@ bool TMatrix::createTable (sqlitepp::session & db) const
             "Re_T_ell DOUBLE PRECISION, "
             "Im_T_ell DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
-        ")"
-    ;
+        ")";
     
     try
     {
@@ -109,36 +122,36 @@ bool TMatrix::createTable (sqlitepp::session & db) const
     }
     catch (sqlitepp::exception & e)
     {
-        std::cerr << "ERROR: Creation of table '" << id() << "' failed!" << std::endl;
+        std::cerr << "ERROR: Creation of table 'tmat' failed!" << std::endl;
         std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         return false;
     }
     
-    return true;
+    return ScatteringQuantity::createTable();
 }
 
-bool TMatrix::updateTable (sqlitepp::session & db) const
+bool TMatrix::updateTable ()
 {
-    return true;
+    return ScatteringQuantity::updateTable();
 }
 
 // --------------------------------------------------------------------------------- //
 
-bool TMatrix::run (sqlitepp::session & db, std::map<std::string,std::string> const & sdata) const
+bool TMatrix::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", id());
-    int li = Conv<int>(sdata, "li", id());
-    int mi0= Conv<int>(sdata, "mi", id());
-    int nf = Conv<int>(sdata, "nf", id());
-    int lf = Conv<int>(sdata, "lf", id());
-    int mf0= Conv<int>(sdata, "mf", id());
-    int  S = Conv<int>(sdata, "S",  id());
-    int ell= Conv<int>(sdata, "ell",id());
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi0= Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S",  name());
+    int ell= Conv<int>(sdata, "ell",name());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -148,13 +161,13 @@ bool TMatrix::run (sqlitepp::session & db, std::map<std::string,std::string> con
     rArray energies;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", id()));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
@@ -163,8 +176,8 @@ bool TMatrix::run (sqlitepp::session & db, std::map<std::string,std::string> con
     double E, Re_T_ell, Im_T_ell;
     
     // create query statement
-    sqlitepp::statement st (db);
-    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + id() + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "

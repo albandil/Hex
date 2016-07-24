@@ -150,8 +150,8 @@ int main (int argc, char* argv[])
             table.setAlignment(OutputTable::left, OutputTable::left);
             table.setWidth(20,40);
             table.write("(name)", "(description)");
-            for (ScatteringQuantity const * Q : *quantities)
-                table.write(Q->id(), Q->description());
+            for (ScatteringQuantity * Q : *quantities)
+                table.write(Q->name(), Q->description());
             
             std::exit(EXIT_SUCCESS);
         },
@@ -161,7 +161,7 @@ int main (int argc, char* argv[])
             (
                 quantities->begin(),
                 quantities->end(),
-                [ & ](ScatteringQuantity* const & it) -> bool { return it->id() == opts[0]; }
+                [ & ](ScatteringQuantity* & it) -> bool { return it->name() == opts[0]; }
             );
             
             if (it == quantities->end())
@@ -177,7 +177,7 @@ int main (int argc, char* argv[])
                 OutputTable table;
                 table.setAlignment(OutputTable::left, OutputTable::left);
                 table.setWidth(20,40);
-                for (auto v : (*it)->deps())
+                for (std::pair<std::string,std::string> v : (*it)->params())
                     table.write(v.first, v.second);
                 
                 std::cout << std::endl;
@@ -185,7 +185,7 @@ int main (int argc, char* argv[])
                 std::cout << "of which one of the following can be read from the standard input:" << std::endl;;
                 std::cout << std::endl;
                 
-                for (std::string v : (*it)->vdeps())
+                for (std::string v : (*it)->vparams())
                     std::cout << v << " ";
                 
                 std::cout << std::endl << std::endl;
@@ -235,9 +235,9 @@ int main (int argc, char* argv[])
         /* default*/ [ & ](std::string arg, Args opts) -> bool
         {
             // try to find it in the variable ids
-            for (ScatteringQuantity const * var : *quantities)
+            for (ScatteringQuantity * var : *quantities)
             {
-                if (var->id() == arg)
+                if (var->name() == arg)
                 {
                     // insert this id into ToDo list
                     vars.push_back(arg);
@@ -246,11 +246,12 @@ int main (int argc, char* argv[])
             }
             
             // try to find it in the variable dependencies
-            for (ScatteringQuantity const * var : *quantities)
+            for (ScatteringQuantity * var : *quantities)
             {
                 // scan the dependencies for 'arg'
                 bool this_arg_is_needed = false;
-                for (auto iter = var->deps().begin(); iter != var->deps().end(); iter++)
+                std::vector<std::pair<std::string,std::string>> params = var->params();
+                for (auto iter = params.begin(); iter != params.end(); iter++)
                 {
                     if (iter->first == arg)
                         this_arg_is_needed = true;

@@ -137,17 +137,26 @@ void db_interpolate (sqlite3_context* pdb, int n, sqlite3_value** val)
 
 // --------------------------------------------------------------------------------- //
 
-std::string IntegralCrossSection::id () const
+std::string IntegralCrossSection::name ()
 {
     return "ics";
 }
 
-std::string IntegralCrossSection::description () const
+std::string IntegralCrossSection::description ()
 {
     return "Integral cross section.";
 }
 
-std::vector<std::pair<std::string,std::string>> IntegralCrossSection::deps()
+std::vector<std::string> IntegralCrossSection::dependencies ()
+{
+    return std::vector<std::string>
+    {
+        "tmat",
+        "ionf"
+    };
+}
+
+std::vector<std::pair<std::string,std::string>> IntegralCrossSection::params ()
 {
     return std::vector<std::pair<std::string,std::string>>
     {
@@ -163,14 +172,17 @@ std::vector<std::pair<std::string,std::string>> IntegralCrossSection::deps()
     };
 }
 
-std::vector<std::string> IntegralCrossSection::vdeps () const
+std::vector<std::string> IntegralCrossSection::vparams ()
 {
-    return "Ei";
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
 }
 
 // --------------------------------------------------------------------------------- //
 
-bool IntegralCrossSection::initialize (sqlitepp::session & db) const
+bool IntegralCrossSection::initialize (sqlitepp::session & db)
 {
     // define square root function
     sqlite3_create_function(db.impl(), "SQRT", 1, SQLITE_UTF8, nullptr, &db_sqrt, nullptr, nullptr);
@@ -184,11 +196,11 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db) const
     return true;
 }
 
-bool IntegralCrossSection::createTable (sqlitepp::session & db) const
+bool IntegralCrossSection::createTable ()
 {
-    sqlitepp::statement st (db);
+    sqlitepp::statement st (session());
     st <<
-        "CREATE TABLE IF NOT EXISTS '" + id() + "' "
+        "CREATE TABLE IF NOT EXISTS 'ics' "
         "("
             "ni  INTEGER, "
             "li  INTEGER, "
@@ -201,8 +213,7 @@ bool IntegralCrossSection::createTable (sqlitepp::session & db) const
             "ell INTEGER, "
             "sigma DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,S,Ei,ell)"
-        ")"
-    ;
+        ")";
     
     try
     {
@@ -210,7 +221,7 @@ bool IntegralCrossSection::createTable (sqlitepp::session & db) const
     }
     catch (sqlitepp::exception & e)
     {
-        std::cerr << "ERROR: Creation of table '" << id() << "' failed!" << std::endl;
+        std::cerr << "ERROR: Creation of table 'ics' failed!" << std::endl;
         std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         return false;
     }
@@ -218,7 +229,7 @@ bool IntegralCrossSection::createTable (sqlitepp::session & db) const
     return true;
 }
 
-bool IntegralCrossSection::updateTable (sqlitepp::session & db) const
+bool IntegralCrossSection::updateTable ()
 {
     static const std::vector<std::string> cmd = {
         
@@ -260,7 +271,7 @@ bool IntegralCrossSection::updateTable (sqlitepp::session & db) const
         
         // Interpolate partial cross sections for discrete transition.
         
-        "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+        "INSERT OR REPLACE INTO 'ics' "
         "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, SQRT(Ei - 1./(ni*ni) + 1./(nf*nf)) * (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 / SQRT(Ei) AS sigma " // 16π²
         "FROM "
         "( "
@@ -276,34 +287,37 @@ bool IntegralCrossSection::updateTable (sqlitepp::session & db) const
         
         // Insert ionization (no interpolation needed: L is used as the partial wave number here).
         
-        "INSERT OR REPLACE INTO " + IntegralCrossSection::Id + " "
+        "INSERT OR REPLACE INTO 'ics' "
             "SELECT ni, li, mi, "
                    "0,  0,  0,  "
                    "S,  Ei, L,  "
                    "SUM(0.25*(2*S+1)*IONCS(QUOTE(cheb))/SQRT(Ei)) "
-                "FROM " + IonizationF::Id + " "
+                "FROM 'ionf' "
                 "GROUP BY ni, li, mi, S, Ei, L"
     };
-    return cmd;
+    
+    // TODO
+    
+    return false;
 }
 
 // --------------------------------------------------------------------------------- //
 
-bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata) const
+bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi0= Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf0= Conv<int>(sdata, "mf", Id);
-    int ell= Conv<int>(sdata, "ell",Id);
-    int  S = Conv<int>(sdata, "S",  Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi0= Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    int ell= Conv<int>(sdata, "ell",name());
+    int  S = Conv<int>(sdata, "S",  name());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -314,20 +328,20 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
     rArray energies, E_arr, sigma_arr;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
     
     // compose query
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, sigma FROM " + IntegralCrossSection::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, sigma FROM 'ics' "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "

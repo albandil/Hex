@@ -33,57 +33,97 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-special.h"
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string MomentumTransfer::Id = "momtf";
-const std::string MomentumTransfer::Description = "Momentum transfer.";
-const std::vector<std::pair<std::string,std::string>> MomentumTransfer::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
-};
-const std::vector<std::string> MomentumTransfer::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool MomentumTransfer::initialize(sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(MomentumTransfer);
+
+// --------------------------------------------------------------------------------- //
+
+std::string MomentumTransfer::name ()
 {
-    return true;
+    return "momtf";
 }
 
-std::vector<std::string> const & MomentumTransfer::SQL_CreateTable () const
+std::string MomentumTransfer::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Momentum transfer.";
 }
 
-std::vector<std::string> const & MomentumTransfer::SQL_Update () const
+std::vector<std::string> MomentumTransfer::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "tmat"
+    };
 }
 
-bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> MomentumTransfer::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."}
+    };
+}
+
+std::vector<std::string> MomentumTransfer::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool MomentumTransfer::initialize(sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool MomentumTransfer::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool MomentumTransfer::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi0= Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf0= Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata,  "S", Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi0= Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata,  "S", name());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -96,7 +136,7 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata) con
     try {
         
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
         
     } catch (std::exception e) {
         
@@ -109,8 +149,8 @@ bool MomentumTransfer::run (std::map<std::string,std::string> const & sdata) con
     int L, ell;
     
     // compose the statement
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, L, ell, Re_T_ell, Im_T_ell FROM " + TMatrix::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, L, ell, Re_T_ell, Im_T_ell FROM 'tmat' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "

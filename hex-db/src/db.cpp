@@ -76,19 +76,72 @@ void hex_initialize_ (const char* dbname)
     st << "PRAGMA journal_mode = OFF";
     st.exec();
     
-    // initialize variables
-    for (ScatteringQuantity const * var : *quantities)
-        var->initialize(db);
+    // sort quantities' classes in order of their dependencies
+    std::vector<std::size_t> position (quantities->size(), quantities->size());
+    std::size_t next_position = 0;
+    while
+    (
+        std::any_of
+        (
+            position.begin(), position.end(),
+            [](std::size_t pos) { return pos == quantities->size(); }
+        )
+    )
+    {
+        // get next quantity with undecided position
+        for (std::size_t i = 0; i < quantities->size(); i++) if (position[i] > next_position)
+        {
+            // get dependencies
+            std::vector<std::string> deps = (*quantities)[i]->dependencies();
+            
+            // check that all dependencies are already in place
+            bool depsOK = true;
+            for (std::size_t j = 0; j < quantities->size(); j++)
+            {
+                if (std::find(deps.begin(), deps.end(), (*quantities)[j]->name()) == deps.end())
+                    continue;
+                
+                if (position[j] < next_position)
+                    depsOK = false;
+            }
+            
+            // place the quantity to the next position
+            if (depsOK)
+            {
+                position[i] = next_position;
+                next_position++;
+            }
+        }
+    }
+    std::sort
+    (
+        quantities->begin(), quantities->end(),
+        [&](ScatteringQuantity * a, ScatteringQuantity * b)
+        {
+            return position[&a - &(*quantities)[0]] < position[&b - &(*quantities)[0]];
+        }
+    );
+    
+    // initialize the quantities
+    for (ScatteringQuantity * Q : *quantities)
+    {
+        if (not Q->initialize(db))
+        {
+            std::exit(EXIT_FAILURE);
+        }
+    }
 }
 
 void hex_new () { hex_new_(); }
 void hex_new_ ()
 {
     // create tables
-    for (ScatteringQuantity const * var : *quantities)
+    for (ScatteringQuantity * Q : *quantities)
     {
-        if (not var->createTable(db))
+        if (not Q->createTable())
+        {
             std::exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -169,7 +222,7 @@ void hex_import_ (const char* sqlname)
                 st << cmd1;
                 st.exec();
             }
-            catch (sqlitepp::exception & e)
+            catch (sqlitepp::exception e)
             {
                 std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       [Line " << line << "] Failed SQL command was: \"" << cmd1 << "\"" << std::endl;
@@ -189,24 +242,26 @@ void hex_import_ (const char* sqlname)
 void hex_update () { hex_update_(); }
 void hex_update_ ()
 {
-    for (ScatteringQuantity const * var : *quantities)
+    for (ScatteringQuantity * Q : *quantities)
     {
-        if (not var->updateTable(db))
+        if (not Q->updateTable())
+        {
             std::exit(EXIT_FAILURE);
+        }
     }
 }
 
 void hex_optimize () { hex_optimize_(); }
 void hex_optimize_ ()
 {
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (db);
     st << "VACUUM";
     
     try
     {
         st.exec();
     }
-    catch (sqlitepp::exception & e)
+    catch (sqlitepp::exception e)
     {
         HexException("Database optimizaion failed, code = %d (\"%s\").", e.code(), e.what());
     }
@@ -215,7 +270,7 @@ void hex_optimize_ ()
 void hex_dump (const char* dumpfile) { hex_dump_(dumpfile); }
 void hex_dump_ (const char* dumpfile)
 {
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (db);
     std::string dumpline, dumpcmd =
         "SELECT 'INSERT INTO 'tmat' VALUES(' || "
         "quote(ni) || ',' || "
@@ -266,7 +321,7 @@ void hex_dump_ (const char* dumpfile)
             std::cout << "COMMIT" << std::endl;
         }
     }
-    catch (sqlitepp::exception & e)
+    catch (sqlitepp::exception e)
     {
         std::cerr << "ERROR: Dump failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         std::cerr << "       Failed SQL command was: \"" << dumpcmd << "\"" << std::endl;
@@ -288,7 +343,7 @@ int hex_run
         (
             quantities->begin(),
             quantities->end(),
-            [&](ScatteringQuantity const * q){ return q->id() == varname; }
+            [&](ScatteringQuantity * q){ return q->name() == varname; }
         );
         
         // get a pointer from the dictionary
@@ -299,7 +354,7 @@ int hex_run
         }
         
         // try to compute the results
-        if (not (*var)->run(db, sdata))
+        if (not (*var)->run(sdata))
         {
             // this can easily happen
             HexException("Computation of \"%s\" failed.", varname.c_str());

@@ -34,48 +34,82 @@
 #include <string>
 #include <vector>
 
-#include <sqlite3.h>
+// --------------------------------------------------------------------------------- //
 
 #include "hex-chebyshev.h"
 #include "hex-clenshawcurtis.h"
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-// -------------------------------------------------------------------------- //
+#include "../quantities.h"
+#include "../utils.h"
 
-const std::string CompleteCrossSection::Id = "ccs";
-const std::string CompleteCrossSection::Description = "Complete cross section (L- and S-summed integral cross section).";
-const std::vector<std::pair<std::string,std::string>> CompleteCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
-};
-const std::vector<std::string> CompleteCrossSection::VecDependencies = { "Ei" };
+// --------------------------------------------------------------------------------- //
 
-bool CompleteCrossSection::initialize (sqlitepp::session & db) const
+createNewScatteringQuantity(CompleteCrossSection);
+
+// --------------------------------------------------------------------------------- //
+
+std::string CompleteCrossSection::name ()
 {
-    return true;
+    return "ccs";
 }
 
-std::vector<std::string> const & CompleteCrossSection::SQL_CreateTable () const
+std::string CompleteCrossSection::description ()
 {
-    static const std::vector<std::string> cmd;
-    
-    return cmd;
+    return "Complete cross section (L- and S-summed integral cross section).";
 }
 
-std::vector<std::string> const & CompleteCrossSection::SQL_Update () const
+std::vector<std::string> CompleteCrossSection::dependencies ()
 {
-    static std::vector<std::string> cmd;
-    
-    return cmd;
+    return std::vector<std::string>
+    {
+        "ics"
+    };
 }
+
+std::vector<std::pair<std::string,std::string>> CompleteCrossSection::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"Ei", "Projectile impact energy (Rydberg)."}
+    };
+}
+
+std::vector<std::string> CompleteCrossSection::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool CompleteCrossSection::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool CompleteCrossSection::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool CompleteCrossSection::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
 
 void hex_complete_cross_section
 (
@@ -104,6 +138,8 @@ void hex_complete_cross_section_
     int * npws, int * pws
 )
 {
+    CompleteCrossSection * CCS = dynamic_cast<CompleteCrossSection*>(get_quantity("ccs"));
+    
     double E, sigma;
     rArray E_arr, sigma_arr;
     
@@ -130,8 +166,8 @@ void hex_complete_cross_section_
     // get number of all energies
     if (*energies < 0 and n != nullptr)
     {
-        sqlitepp::statement st(db);
-        st << "SELECT COUNT(DISTINCT Ei) FROM " + IntegralCrossSection::Id + " "
+        sqlitepp::statement st (CCS->session());
+        st << "SELECT COUNT(DISTINCT Ei) FROM 'ics' "
                 "WHERE ni = :ni "
                 "  AND li = :li "
                 "  AND mi = :mi "
@@ -151,8 +187,8 @@ void hex_complete_cross_section_
         if (*N >= *n)
         {
             double E;
-            sqlitepp::statement st(db);
-            st << "SELECT DISTINCT Ei FROM " + IntegralCrossSection::Id + " "
+            sqlitepp::statement st (CCS->session());
+            st << "SELECT DISTINCT Ei FROM 'ics' "
                     "WHERE ni = :ni "
                     "  AND li = :li "
                     "  AND mi = :mi "
@@ -174,8 +210,8 @@ void hex_complete_cross_section_
     
     // get number of partial waves stored in the database
     int max_available_ell;
-    sqlitepp::statement ell_st(db);
-    ell_st << "SELECT MAX(ell) FROM " + IntegralCrossSection::Id + " "
+    sqlitepp::statement ell_st (CCS->session());
+    ell_st << "SELECT MAX(ell) FROM 'ics' "
               "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf",
         sqlitepp::into(max_available_ell),
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
@@ -187,8 +223,8 @@ void hex_complete_cross_section_
     for (int ell = 0; ell <= max_available_ell; ell++)
     {
         // compose query
-        sqlitepp::statement st(db);
-        st << "SELECT Ei, SUM(sigma) FROM " + IntegralCrossSection::Id + " "
+        sqlitepp::statement st (CCS->session());
+        st << "SELECT Ei, SUM(sigma) FROM 'ics' "
               "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND ell = :ell "
               "GROUP BY Ei "
               "ORDER BY Ei ASC",
@@ -256,28 +292,30 @@ void hex_complete_cross_section_
     }
 }
 
-bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
     int mf = 0; bool all_mf = false;
     if (sdata.find("mf") != sdata.end() and sdata.at("mf") == "*")
         all_mf = true;
     else
-        mf = Conv<int>(sdata, "mf", Id);
+        mf = Conv<int>(sdata, "mf", name());
     
     // check if we have the optional pw list
     iArray pws;
     if (sdata.find("pws") != sdata.end())
-        pws = Conv<iArray>(sdata, "pws", Id);
+        pws = Conv<iArray>(sdata, "pws", name());
     
     // energies and cross sections
     rArray energies;
@@ -286,7 +324,7 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     try
     {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
     }
     catch (std::exception e)
     {

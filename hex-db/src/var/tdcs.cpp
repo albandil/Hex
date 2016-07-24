@@ -33,6 +33,8 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-interpolate.h"
 #include "hex-chebyshev.h"
@@ -40,38 +42,76 @@
 #include "hex-vec3d.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string TripleDifferentialCrossSection::Id = "tdcs";
-const std::string TripleDifferentialCrossSection::Description = "Triple differential ionization cross section.";
-const std::vector<std::pair<std::string,std::string>> TripleDifferentialCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(ε₁,θ₁,φ₁) (ε₂,θ₂,φ₂)'."}
-};
-const std::vector<std::string> TripleDifferentialCrossSection::VecDependencies = { "dirs" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool TripleDifferentialCrossSection::initialize(sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(TripleDifferentialCrossSection);
+
+// --------------------------------------------------------------------------------- //
+
+std::string TripleDifferentialCrossSection::name ()
 {
-    return true;
+    return "tdcs";
 }
 
-std::vector<std::string> const & TripleDifferentialCrossSection::SQL_CreateTable () const
+std::string TripleDifferentialCrossSection::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Triple differential ionization cross section.";
 }
 
-std::vector<std::string> const & TripleDifferentialCrossSection::SQL_Update () const
+std::vector<std::string> TripleDifferentialCrossSection::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "ionf"
+    };
 }
 
-bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> TripleDifferentialCrossSection::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"dirs", "List of pairs of energy share and coordinate triplets in the, like this: '(ε₁,θ₁,φ₁) (ε₂,θ₂,φ₂)'."}
+    };
+}
+
+std::vector<std::string> TripleDifferentialCrossSection::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "dirs"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool TripleDifferentialCrossSection::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool TripleDifferentialCrossSection::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool TripleDifferentialCrossSection::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -79,20 +119,23 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int  S = Conv<int>(sdata,  "S", Id);
-    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int  S = Conv<int>(sdata,  "S", name());
+    double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     
     // read directions
     //  dirs.first  = ( theta1, phi1, E1frac )
     //  dirs.second = ( theta2, phi2, E2frac )
     // NOTE: energy fractions will be normalized to become on-shell
     std::vector<std::pair<geom::vec3d,geom::vec3d>> dirs;
-    try {
-        dirs.push_back(Conv<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", Id));
-    } catch (exception e) {
+    try
+    {
+        dirs.push_back(Conv<std::pair<geom::vec3d,geom::vec3d>>(sdata, "dirs", name()));
+    }
+    catch (exception e)
+    {
         dirs = readStandardInput<std::pair<geom::vec3d,geom::vec3d>>();
     }
     
@@ -104,8 +147,8 @@ bool TripleDifferentialCrossSection::run (std::map<std::string,std::string> cons
     int L, l1, l2;
     
     // create query statement
-    sqlitepp::statement st(db);
-    st << "SELECT L, l1, l2, Ei, QUOTE(cheb) FROM " + IonizationF::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT L, l1, l2, Ei, QUOTE(cheb) FROM 'ionf' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
