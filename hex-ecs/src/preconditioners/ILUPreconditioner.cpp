@@ -156,14 +156,17 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         int iang = iblock * ang_.states().size() + iblock;
         
         // convert inner region matrix block to COO matrix
-        CooMatrix<LU_int_t,Complex> A_coo = (cmd_.lightweight_full ? dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock) : A_blocks_[iang]).tocoo<LU_int_t>();
+        CooMatrix<LU_int_t,Complex> coo_block;
+        if (cmd_.lightweight_full)
+            coo_block = std::move(dynamic_cast<NoPreconditioner const*>(this)->calc_A_block(iblock, iblock).tocoo<LU_int_t>());
+        else
+            coo_block = std::move(A_blocks_[iang].tocoo<LU_int_t>());
         
         // add the A-block
-        CooMatrix<LU_int_t,Complex> coo_block
+        coo_block.resize
         (
             Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
-            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer,
-            A_coo.i(), A_coo.j(), A_coo.v()
+            Nspline_inner * Nspline_inner + (Nchan1 + Nchan2) * Nspline_outer
         );
         
         if (not inp_.inner_only)
@@ -206,7 +209,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         }
         
         // create the CSR block that will be factorized
-        CsrMatrix<LU_int_t,Complex> csr = coo_block.tocsr();
+        CsrMatrix<LU_int_t,Complex> csr = std::move(coo_block.tocsr());
+        coo_block = CooMatrix<LU_int_t,Complex>();
         
         // set up factorization data
         void * data = nullptr;

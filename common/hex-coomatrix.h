@@ -63,7 +63,7 @@ public:
     CooMatrix (IdxT m, IdxT n, ArrayView<IdxT> i, ArrayView<IdxT> j, ArrayView<DataT> x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && i, NumberArray<IdxT> && j, NumberArray<DataT> && x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
+        : m_(m), n_(n), i_(std::move(i)), j_(std::move(j)), x_(std::move(x)), sorted_(false) {}
     
     /**
      * Copy constructor initialized from dense array.
