@@ -39,7 +39,7 @@ private:
 	virtual void do_update(statement& st) = 0;
 };
 
-typedef std::auto_ptr<into_binder> into_binder_ptr;
+typedef std::unique_ptr<into_binder> into_binder_ptr;
 
 /// use binder interface
 class use_binder
@@ -58,7 +58,7 @@ private:
 	virtual void do_bind(statement& st, int pos) = 0;
 };
 
-typedef std::auto_ptr<use_binder> use_binder_ptr;
+typedef std::unique_ptr<use_binder> use_binder_ptr;
 
 //////////////////////////////////////////////////////////////////////////////
 
