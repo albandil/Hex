@@ -107,7 +107,7 @@ class ScatteringQuantity
 
 // --------------------------------------------------------------------------------- //
 
-extern std::shared_ptr<std::vector<ScatteringQuantity*>> quantities;
+extern std::unique_ptr<std::vector<ScatteringQuantity*>> quantities;
 
 bool register_new_quantity (ScatteringQuantity* Q);
 

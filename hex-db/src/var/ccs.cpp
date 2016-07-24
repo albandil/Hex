@@ -212,7 +212,8 @@ void hex_complete_cross_section_
     int max_available_ell;
     sqlitepp::statement ell_st (CCS->session());
     ell_st << "SELECT MAX(ell) FROM 'ics' "
-              "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf",
+              "WHERE ni = :ni AND li = :li AND mi = :mi"
+              "  AND nf = :nf AND lf = :lf AND mf = :mf",
         sqlitepp::into(max_available_ell),
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
         sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
@@ -261,9 +262,6 @@ void hex_complete_cross_section_
     // interpolate
     //
     
-    // threshold for ionization
-    double Eion = 1./((*ni)*(*ni));
-    
     // negative energy indicates output of all available cross sections
     if (*energies < 0.)
     {
@@ -272,10 +270,7 @@ void hex_complete_cross_section_
         for (int ell = 0; ell <= max_available_ell; ell++)
         if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
-            if (*energies < Eion)
-                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_linear);
-            else
-                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_cspline);
+            rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_cspline);
         }
     }
     else
@@ -284,10 +279,7 @@ void hex_complete_cross_section_
         for (int ell = 0; ell <= max_available_ell; ell++)
         if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
-            if (*energies < Eion)
-                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_linear);
-            else
-                rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_cspline);
+            rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_cspline);
         }
     }
 }

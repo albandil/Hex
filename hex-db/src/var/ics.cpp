@@ -39,6 +39,10 @@
 
 // --------------------------------------------------------------------------------- //
 
+#include <gsl/gsl_interp.h>
+
+// --------------------------------------------------------------------------------- //
+
 #include "hex-chebyshev.h"
 #include "hex-clenshawcurtis.h"
 #include "hex-interpolate.h"
@@ -193,7 +197,7 @@ bool IntegralCrossSection::initialize (sqlitepp::session & db)
     // define linear interpolation of two data points (5 arguments: x1, y1, x2, y2, x)
     sqlite3_create_function(db.impl(), "INTERPOLATE", 5, SQLITE_UTF8, nullptr, &db_interpolate, nullptr, nullptr);
     
-    return true;
+    return ScatteringQuantity::initialize(db);
 }
 
 bool IntegralCrossSection::createTable ()
@@ -231,74 +235,143 @@ bool IntegralCrossSection::createTable ()
 
 bool IntegralCrossSection::updateTable ()
 {
-    static const std::vector<std::string> cmd = {
+    // Get merged available energies from all total angular momenta for every discrete transition and partial wave.
+    int ni, li, mi, nf, lf, mf, S, ell;
+    sqlitepp::statement st1 (session());
+    st1 << "SELECT DISTINCT ni,li,mi,nf,lf,mf,S,ell FROM 'tmat'",
+        sqlitepp::into(ni), sqlitepp::into(li), sqlitepp::into(mi),
+        sqlitepp::into(nf), sqlitepp::into(lf), sqlitepp::into(mf),
+        sqlitepp::into(S),  sqlitepp::into(ell);
+    
+    // for all transitions and partial waves
+    while (st1.exec())
+    {
+        // get all merged energies for this transition and partial wave
+        double E = 0;
+        sqlitepp::statement st2 (session());
+        st2 << "SELECT DISTINCT Ei FROM 'tmat' "
+               "WHERE ni = :ni AND li = :li AND mi = :mi "
+               "  AND nf = :nf AND lf = :lf AND mf = :mf "
+               "  AND S  = :S  AND ell = :ell ORDER BY Ei ASC",
+               sqlitepp::into(E),
+               sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
+               sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
+               sqlitepp::use(S),  sqlitepp::use(ell);
+        rArray merged_energies;
+        while (st2.exec())
+        {
+            merged_energies.push_back(E);
+        }
         
-        // Avoid disk operations.
-        //   The SQLite program does normally all operations using a backou journal disk file, which
-        // slows down the calculation of the cross sections.
+        // get all total angular momenta and parities for this transition and partial wave
+        int L;
+        sqlitepp::statement st3 (session());
+        st3 << "SELECT DISTINCT L FROM 'tmat' "
+            "WHERE ni = :ni AND li = :li AND mi = :mi "
+            "  AND nf = :nf AND lf = :lf AND mf = :mf "
+            "  AND S  = :S  AND ell = :ell ORDER BY L ASC",
+            sqlitepp::into(L),
+            sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
+            sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
+            sqlitepp::use(S),  sqlitepp::use(ell);
+        iArray angular_momenta;
+        while (st3.exec())
+        {
+            angular_momenta.push_back(L);
+        }
         
-        "PRAGMA temp_store = MEMORY",
+        // merge-interpolate all T-matrix data for this transition and partial wave
+        cArray merged_T (merged_energies.size());
+        rArray energies (merged_energies.size()), Re_T (merged_energies.size()), Im_T (merged_energies.size());
+        for (int L : angular_momenta)
+        {
+            // retrieve data
+            double ret, imt;
+            sqlitepp::statement st4 (session());
+            st4 << "SELECT Ei,Re_T_ell,Im_T_ell FROM 'tmat' "
+                "WHERE ni = :ni AND li = :li AND mi = :mi "
+                "  AND nf = :nf AND lf = :lf AND mf = :mf "
+                "  AND S  = :S  AND ell = :ell AND L = :L",
+                sqlitepp::into(E), sqlitepp::into(ret), sqlitepp::into(imt),
+                sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
+                sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
+                sqlitepp::use(S),  sqlitepp::use(ell), sqlitepp::use(L);
+            std::size_t N = 0;
+            while (st4.exec())
+            {
+                energies[N] = E;
+                Re_T[N] = ret;
+                Im_T[N] = imt;
+                N++;
+            }
+            
+            // interpolate data
+            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_cspline, N);
+            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_cspline, N);
+            gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
+            gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
+            gsl_interp_init(spline_Re, energies.data(), Re_T.data(), N);
+            gsl_interp_init(spline_Im, energies.data(), Im_T.data(), N);
+            for (std::size_t i = 0; i < merged_energies.size(); i++)
+            {
+                // FIXME : What happens outside of bounds?
+                merged_T[i] += Complex
+                (
+                    gsl_interp_eval(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re),
+                    gsl_interp_eval(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im)
+                );
+            }
+            gsl_interp_accel_free(accel_Re);
+            gsl_interp_accel_free(accel_Im);
+            gsl_interp_free(spline_Re);
+            gsl_interp_free(spline_Im);
+        }
         
-        // Temporary table with merged available energies from all total angular momenta for every discrete transition and partial wave.
-        
-        "CREATE TEMP TABLE T AS SELECT DISTINCT ni,li,mi,nf,lf,mf,S,Ei,ell FROM tmat",
-        
-        // Temporary table where every transition, spin, total L, partial wave and required energy from 'T' contains also the highest lower-or-equal energy.
-        
-        "CREATE TEMP TABLE Low AS SELECT P.ni, P.li, P.mi, P.nf, P.lf, P.mf, P.L, P.S, P.ell, Q.EiReq, Q.EiLow, P.Re_T_ell AS ReTLow, P.Im_T_ell AS ImTLow "
-        "FROM tmat AS P NATURAL JOIN "
-        "("
-            "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MAX(tmat.Ei) AS EiLow, T.Ei AS EiReq "
-            "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
-            "WHERE tmat.Ei <= T.Ei "
-            "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
-        ") AS Q WHERE P.Ei = Q.EiLow",
-        
-        "DELETE FROM Low WHERE EiLow > EiReq ",
-        
-        // temporary table where every transition, spin, total L, partial wave and required energy from 'T' contains also the lowest higher-or-equal energy.
-        
-        "CREATE TABLE Upp AS SELECT P.ni, P.li, P.mi, P.nf, P.lf, P.mf, P.L, P.S, P.ell, Q.EiReq, Q.EiUpp, P.Re_T_ell AS ReTUpp, P.Im_T_ell AS ImTUpp "
-        "FROM tmat AS P NATURAL JOIN "
-        "( "
-            "SELECT T.ni AS ni, T.li AS li, T.mi AS mi, T.nf AS nf, T.lf AS lf, T.mf AS mf, tmat.L AS L, T.S AS S, T.ell AS ell, MIN(tmat.Ei) AS EiUpp, T.Ei AS EiReq "
-            "FROM T CROSS JOIN tmat USING (ni,li,mi,nf,lf,mf,S,ell) "
-            "WHERE T.Ei <= tmat.Ei "
-            "GROUP BY T.ni, T.li, T.mi, T.nf, T.lf, T.mf, tmat.L,  T.S,  T.ell, T.Ei "
-        ") AS Q WHERE P.Ei = Q.EiUpp",
-        
-        "DELETE FROM Upp WHERE EiUpp < EiReq ",
-        
-        // Interpolate partial cross sections for discrete transition.
-        
-        "INSERT OR REPLACE INTO 'ics' "
-        "SELECT ni, li, mi, nf, lf, mf, S, Ei, ell, SQRT(Ei - 1./(ni*ni) + 1./(nf*nf)) * (2 * S + 1) * (ReT * ReT + ImT * ImT) / 157.91367 / SQRT(Ei) AS sigma " // 16π²
-        "FROM "
-        "( "
-            "SELECT Low.ni  AS ni, Low.li  AS li,  Low.mi  AS mi, "
-                   "Low.nf  AS nf, Low.lf  AS lf,  Low.mf  AS mf, "
-                   "Low.S   AS S,  Low.ell AS ell, Low.EiReq AS Ei, "
-                   "SUM(INTERPOLATE(Low.EiLow, Low.ReTLow, Upp.EiUpp, Upp.ReTUpp, Low.EiReq)) AS ReT, "
-                   "SUM(INTERPOLATE(Low.EiLow, Low.ImTLow, Upp.EiUpp, Upp.ImTUpp, Low.EiReq)) AS ImT "
-            "FROM Low NATURAL JOIN Upp "
-            "WHERE Ei - 1./(ni*ni) + 1./(nf*nf) >= 0 "
-            "GROUP BY ni, li, mi, nf, lf, mf, S, Ei, ell "
-        ")",
-        
-        // Insert ionization (no interpolation needed: L is used as the partial wave number here).
-        
-        "INSERT OR REPLACE INTO 'ics' "
+        // write interpolated data to the database
+        sqlitepp::statement st5 (session());
+        double ics, Ei, Ef;
+        std::size_t rows = 0;
+        st5 << "INSERT OR REPLACE INTO 'ics' VALUES ";
+        for (std::size_t i = 0; i < merged_energies.size(); i++)
+        {
+            // initial and final energies
+            Ei = merged_energies[i];
+            Ef = Ei - 1./(ni*ni) + 1./(nf*nf);
+            
+            // skip forbidden channels
+            if (Ef < 0)
+                continue;
+            
+            // calculate partial integral cross section
+            ics = std::sqrt(Ef/Ei) * (2 * S + 1) * sqrabs(merged_T[i]) / std::pow(4 * special::constant::pi, 2);
+            
+            // separate data n-tuples with comma
+            if (rows++ > 0)
+                st5.q() << ",";
+            
+            // add another data n-tuple
+            st5.q() << " (" << ni << "," << li << "," << mi << "," << nf << "," << lf << "," << mf << "," << S << "," << Ei << "," << ell << "," << ics << ")";
+        }
+        if (rows > 0)
+        {
+            // add all data in one transaction
+            st5.exec();
+        }
+    }
+    
+    // Insert ionization (no interpolation needed: L is used as the partial wave number here.
+    
+    sqlitepp::statement st6 (session());
+    st6 << "INSERT OR REPLACE INTO 'ics' "
             "SELECT ni, li, mi, "
                    "0,  0,  0,  "
                    "S,  Ei, L,  "
                    "SUM(0.25*(2*S+1)*IONCS(QUOTE(cheb))/SQRT(Ei)) "
                 "FROM 'ionf' "
-                "GROUP BY ni, li, mi, S, Ei, L"
-    };
+                "GROUP BY ni, li, mi, S, Ei, L";
+    st6.exec();
     
-    // TODO
-    
-    return false;
+    return ScatteringQuantity::updateTable();
 }
 
 // --------------------------------------------------------------------------------- //

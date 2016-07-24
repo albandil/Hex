@@ -33,7 +33,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-std::shared_ptr<std::vector<ScatteringQuantity*>> quantities;
+std::unique_ptr<std::vector<ScatteringQuantity*>> quantities;
 
 // --------------------------------------------------------------------------------- //
 

@@ -79,6 +79,7 @@ void hex_initialize_ (const char* dbname)
     // sort quantities' classes in order of their dependencies
     std::vector<std::size_t> position (quantities->size(), quantities->size());
     std::size_t next_position = 0;
+    int u = 0;
     while
     (
         std::any_of
@@ -101,7 +102,7 @@ void hex_initialize_ (const char* dbname)
                 if (std::find(deps.begin(), deps.end(), (*quantities)[j]->name()) == deps.end())
                     continue;
                 
-                if (position[j] < next_position)
+                if (position[j] > next_position)
                     depsOK = false;
             }
             
@@ -112,15 +113,16 @@ void hex_initialize_ (const char* dbname)
                 next_position++;
             }
         }
+        
+        if (u++ == 100)
+            HexException("Cyclical dependency between scattering quantities?");
     }
-    std::sort
-    (
-        quantities->begin(), quantities->end(),
-        [&](ScatteringQuantity * a, ScatteringQuantity * b)
-        {
-            return position[&a - &(*quantities)[0]] < position[&b - &(*quantities)[0]];
-        }
-    );
+    
+    // create sorted vector of pointers
+    std::unique_ptr<std::vector<ScatteringQuantity*>> new_quantities (new std::vector<ScatteringQuantity*>(quantities->size()));
+    for (std::size_t i = 0; i < quantities->size(); i++)
+        (*new_quantities)[position[i]] = (*quantities)[i];
+    quantities.swap(new_quantities);
     
     // initialize the quantities
     for (ScatteringQuantity * Q : *quantities)
@@ -179,13 +181,18 @@ void hex_import_ (const char* sqlname)
     
     std::cout << "\rImporting data...  " << std::flush;
     
+    // store default precision
+    std::streamsize precision = std::cout.precision();
+    std::cout.precision(0);
+    std::cout.setf(std::ios::fixed, std::ios::floatfield);
+    
     do
     {
         // query statement
         sqlitepp::statement st(db);
         
         if (lines > 0)
-            std::cout << "\rImporting data...  " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
+            std::cout << "\rImporting data...  " << line * 100. / lines << " % " << std::flush;
         
         // read line from input stream
         std::string cmd, cmd1;
@@ -237,6 +244,8 @@ void hex_import_ (const char* sqlname)
     while (not is.eof());
     
     std::cout << "\rThe SQL batch file \"" << sqlname << "\" has been successfully imported." << std::endl;
+    std::cout.precision(precision);
+    std::cout.unsetf(std::ios::floatfield);
 }
 
 void hex_update () { hex_update_(); }
