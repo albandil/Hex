@@ -498,14 +498,16 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             }
             else
             {
+                // number of final bound channels for r1 -> inf and r2 -> inf
+                int Nchan1 = std::max(max_n - ang_[ill].second, 0);
+                int Nchan2 = std::max(max_n - ang_[ill].first, 0);
+                
                 // index of final bound channel for r2 -> inf
                 int ichan2 = T.nf - T.lf - 1;
                 
                 // does the channel exist?
-                if (ichan2 >= 0)
+                if (0 <= ichan2 and ichan2 < Nchan2)
                 {
-                    // number of final bound channels for r1 -> inf
-                    int Nchan1 = std::min(max_n, ang_[ill].second + 1);
                     
                     // change view to row-major dense matrix
                     cArrayView PsiScFf
