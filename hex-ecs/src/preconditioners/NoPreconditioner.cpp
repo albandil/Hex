@@ -188,7 +188,7 @@ void NoPreconditioner::update (Real E)
     }
     
     // setup blocks
-    for (int ill = 0; ill < Nang; ill++)
+    for (int ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
     for (int illp = 0; illp < Nang; illp++)
     {
         // angular momenta
@@ -820,7 +820,6 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
                     }
                 }
                 
-                chi[ill] = std::move(chi_block);
             }
             else
             {
@@ -828,6 +827,10 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
             }
         }
         
+        // use the calculated block
+        chi[ill] = chi_block;
+        
+        // optionally transfer to disk
         if (not chi.inmemory())
         {
             chi.hdfsave(ill);
