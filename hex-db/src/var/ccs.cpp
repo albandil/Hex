@@ -76,10 +76,10 @@ std::vector<std::pair<std::string,std::string>> CompleteCrossSection::params ()
     {
         {"ni", "Initial atomic principal quantum number."},
         {"li", "Initial atomic orbital quantum number."},
-        {"mi", "Initial atomic magnetic quantum number."},
+//         {"mi", "Initial atomic magnetic quantum number."},
         {"nf", "Final atomic principal quantum number."},
         {"lf", "Final atomic orbital quantum number."},
-        {"mf", "Final atomic magnetic quantum number."},
+//         {"mf", "Final atomic magnetic quantum number."},
         {"Ei", "Projectile impact energy (Rydberg)."}
     };
 }
@@ -295,11 +295,19 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     // scattering event parameters
     int ni = Conv<int>(sdata, "ni", name());
     int li = Conv<int>(sdata, "li", name());
-    int mi = Conv<int>(sdata, "mi", name());
     int nf = Conv<int>(sdata, "nf", name());
     int lf = Conv<int>(sdata, "lf", name());
+    
+    // initial magnetic quantum number
+    int mi = 0; bool all_mi = false;
+    if (sdata.find("mi") == sdata.end() or sdata.at("mi") == "*")
+        all_mi = true;
+    else
+        mi = Conv<int>(sdata, "mi", name());
+    
+    // final magnetic quantum number
     int mf = 0; bool all_mf = false;
-    if (sdata.find("mf") != sdata.end() and sdata.at("mf") == "*")
+    if (sdata.find("mf") == sdata.end() or sdata.at("mf") == "*")
         all_mf = true;
     else
         mf = Conv<int>(sdata, "mf", name());
@@ -351,22 +359,21 @@ bool CompleteCrossSection::run (std::map<std::string,std::string> const & sdata)
     // retrieve requested energies
     if (scaled_energies.size() > 0)
     {
-        if (all_mf)
+        // sum all cross sections from the initial state to all final magnetic sub-levels
+        sum_ccs.resize(ccs.size());
+        for (int mi0 = -li; mi0 <= li; mi0++)
+        for (int mf0 = -lf; mf0 <= lf; mf0++)
         {
-            // sum all cross sections from the initial state to all final magnetic sub-levels
-            sum_ccs.resize(ccs.size());
-            for (mf = -lf; mf <= lf; mf++)
-            {
-                hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
-                sum_ccs += ccs;
-                ccs.fill(0);
-            }
-            ccs = sum_ccs;
+            if ((all_mi or mi0 == mi) and (all_mf or mf0 == mf))
+                hex_complete_cross_section(ni, li, mi0, nf, lf, mf0, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
+            sum_ccs += ccs;
+            ccs.fill(0);
         }
-        else
-        {
-            hex_complete_cross_section(ni, li, mi, nf, lf, mf, scaled_energies.size(), scaled_energies.data(), ccs.data(), nullptr, pws.size(), pws.empty() ? nullptr : pws.data());
-        }
+        ccs = sum_ccs;
+        
+        // average initial state
+        if (all_mi)
+            ccs /= (2. * li + 1.);
     }
     
     // write header
