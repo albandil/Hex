@@ -362,6 +362,7 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
         
+        // TODO : share work within the group
         prod += (x[i]|y[i]);
         
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x)[i].drop();
@@ -384,6 +385,7 @@ Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
         if (not r.inmemory())
             const_cast<BlockArray<Complex>&>(r).hdfload(i);
         
+        // TODO : share work within the group
         rnorm2 += r[i].sqrnorm();
         
         if (not r.inmemory())
@@ -405,6 +407,7 @@ void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, Blo
         if (not x.inmemory()) x.hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
         
+        // TODO : share work within the group
         for (std::size_t j = 0; j < x[i].size(); j++)
             x[i][j] = a * x[i][j] + b * y[i][j];
         
