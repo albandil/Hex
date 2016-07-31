@@ -314,12 +314,14 @@ bool IntegralCrossSection::updateTable ()
             gsl_interp_init(spline_Im, energies.data(), Im_T.data(), N);
             for (std::size_t i = 0; i < merged_energies.size(); i++)
             {
-                // FIXME : What happens outside of bounds?
-                merged_T[i] += Complex
-                (
-                    gsl_interp_eval(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re),
-                    gsl_interp_eval(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im)
-                );
+                if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back())
+                {
+                    merged_T[i] += Complex
+                    (
+                        gsl_interp_eval(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re),
+                        gsl_interp_eval(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im)
+                    );
+                }
             }
             gsl_interp_accel_free(accel_Re);
             gsl_interp_accel_free(accel_Im);
