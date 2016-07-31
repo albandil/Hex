@@ -72,7 +72,6 @@ const std::string sample_input =
     "  L   11  100  90\n"
     " -1\n"
     "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
-    "  L    0  100  101\n"
     " -1\n"
     "# c) Complex region knots. (Start from zero.)\n"
     "  G    0   50   1  1.02\n"
@@ -153,8 +152,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.                                      \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
-                    "\t--map-solution <filename>        Convert solution between B-spline bases, requires target basis (--map-solution-target).                                \n"
-                    "\t--map-solution-target <filename> Target B-spline basis in another input file (like ecs.inp).                                                            \n"
 #ifdef WITH_MPI
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
@@ -185,14 +182,9 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core-continue     (-O)  Start solution from the existing OOC files.                                                                            \n"
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).  \n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
-                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
+//                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
-                    "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
-                    "\t--kpa-drop [<number>]            If given a number, use it as a threshold knot; the B-spline components beyond this knot will be assumed zero.          \n"
-                    "\t                                 If no number given, use the drop tolerance to find the knot as a distance where largest open bound channel decays      \n"
-                    "\t                                 below the drop tolerance. This option works only below ionization and generally requires softer --prec-tolerance.      \n"
-                    "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
@@ -231,18 +223,6 @@ void CommandLine::parse (int argc, char* argv[])
                 zipdata.Ymax = std::stod(optargs[4]);
                 zipdata.nX = std::stoi(optargs[5]);
                 zipdata.nY = std::stoi(optargs[6]);
-                return true;
-            },
-        "map-solution", "", -1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // solution file to map
-                map_solution = optargs;
-                return true;
-            },
-        "map-solution-target", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // solution file to map
-                map_solution_target = optargs[0];
                 return true;
             },
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -399,24 +379,6 @@ void CommandLine::parse (int argc, char* argv[])
                 kpa_simple_rad = true;
                 return true;
             },
-        "kpa-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // number of KPA preconditioner iterations to trigger ILU preconditioning
-                kpa_max_iter = std::atoi(optargs[0].c_str());
-                return true;
-            },
-        "kpa-drop", "", -1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // use drop tolerance
-                kpa_drop = (optargs.empty() ? 0. : std::stod(optargs[0]));
-                return true;
-            },
-        "ilu-max-blocks", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // maximal number of ILU preconditioned blocks for hybrid preconditioner
-                ilu_max_blocks = std::atoi(optargs[0].c_str());
-                return true;
-            },
         "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not recalculate LU
@@ -447,12 +409,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // precompute only the owned subset of radial integrals
                 shared_scratch = true;
-                return true;
-            },
-        "reuse-dia-blocks", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // load dia blocks from scratch files
-                reuse_dia_blocks = true;
                 return true;
             },
 #ifdef WITH_OPENCL
