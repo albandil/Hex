@@ -63,7 +63,7 @@ public:
     CooMatrix (IdxT m, IdxT n, ArrayView<IdxT> i, ArrayView<IdxT> j, ArrayView<DataT> x)
         : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
     CooMatrix (std::size_t m, std::size_t n, NumberArray<IdxT> && i, NumberArray<IdxT> && j, NumberArray<DataT> && x)
-        : m_(m), n_(n), i_(i), j_(j), x_(x), sorted_(false) {}
+        : m_(m), n_(n), i_(std::move(i)), j_(std::move(j)), x_(std::move(x)), sorted_(false) {}
     
     /**
      * Copy constructor initialized from dense array.
@@ -303,44 +303,59 @@ public:
         return *this;
     }
     
-    /// SpMV multiplication.
-    CooMatrix<IdxT,DataT> dot (const ArrayView<DataT> B) const
+    /// Inplace SpMV multiplication.
+    void dot (DataT a, const ArrayView<DataT> x, DataT b, ArrayView<DataT> y) const
     {
-        // FIXME: This is a memory INEFFICIENT method.
-        // NOTE: Row-major storage assumed for B.
+        assert(x.size() == (unsigned)n_);
+        assert(y.size() == (unsigned)m_);
         
-        // volumes
-        IdxT A_vol = x_.size();
-        IdxT B_vol = B.size();
-        
-        // check B shape
-        assert(B_vol % n_ == 0);
-        
-        // create output matrix
-        IdxT C_rows = m_;
-        IdxT C_cols = B_vol / n_;
-        CooMatrix C(C_rows, C_cols);
-        
-        // for all elements of A
-        for (IdxT i = 0; i < A_vol; i++)
+        for (IdxT i = 0; i < (IdxT)x_.size(); i++)
         {
             IdxT row = i_[i];
             IdxT col = j_[i];
             
-            // for all columns of B
-            for (IdxT icol = 0; icol < C_cols; icol++)
-            {
-                C.add
-                (
-                    row, icol,
-                    x_[i] * B[col*C_cols + icol]
-                );
-            }
+            y[row] = a * x_[i] * x[col] + b * y[row];
         }
-        
-        // summation is done by shaking
-        return C.shake();
     }
+    
+//     /// SpMV multiplication.
+//     CooMatrix<IdxT,DataT> dot (const ArrayView<DataT> B) const
+//     {
+//         // FIXME: This is a memory INEFFICIENT method.
+//         // NOTE: Row-major storage assumed for B.
+//         
+//         // volumes
+//         IdxT A_vol = x_.size();
+//         IdxT B_vol = B.size();
+//         
+//         // check B shape
+//         assert(B_vol % n_ == 0);
+//         
+//         // create output matrix
+//         IdxT C_rows = m_;
+//         IdxT C_cols = B_vol / n_;
+//         CooMatrix C(C_rows, C_cols);
+//         
+//         // for all elements of A
+//         for (IdxT i = 0; i < A_vol; i++)
+//         {
+//             IdxT row = i_[i];
+//             IdxT col = j_[i];
+//             
+//             // for all columns of B
+//             for (IdxT icol = 0; icol < C_cols; icol++)
+//             {
+//                 C.add
+//                 (
+//                     row, icol,
+//                     x_[i] * B[col*C_cols + icol]
+//                 );
+//             }
+//         }
+//         
+//         // summation is done by shaking
+//         return C.shake();
+//     }
     
     /**
      * @brief Double inner matrix-matrix product.
@@ -527,9 +542,9 @@ public:
      * %d\t%d\t%g\t%g
      * @endcode
      */
-    void write (const char* filename) const
+    void write (std::string const & filename) const
     {
-        std::ofstream f(filename);
+        std::ofstream f (filename);
         
         f << "# Matrix " << m_ << " × " << n_ << " with " << x_.size() << " nonzero elements:\n\n";
         
@@ -553,20 +568,20 @@ public:
      * @brief Save matrix to HDF file.
      * @param name Filename.
      */
-    bool hdfsave (const char* name) const
+    bool hdfsave (std::string const & name) const
     {
-        HDFFile hdf(name, HDFFile::overwrite);
-
+        HDFFile hdf (name, HDFFile::overwrite);
+        
         // write dimensions
         hdf.write("m", &m_, 1);
         hdf.write("n", &n_, 1);
-
+        
         // write indices
         if (not i_.empty())
             hdf.write("i", &(i_[0]), i_.size());
         if (not j_.empty())
             hdf.write("j", &(j_[0]), j_.size());
-
+        
         // write data
         if (not x_.empty())
         {
@@ -585,11 +600,11 @@ public:
      * @brief Load matrix from HDF file.
      * @param name Filename.
      */
-    bool hdfload (const char* name)
+    bool hdfload (std::string const & name)
     {
         sorted_ = false;
         
-        HDFFile hdf(name, HDFFile::readonly);
+        HDFFile hdf (name, HDFFile::readonly);
         
         // read dimensions
         hdf.read("m", &m_, 1);

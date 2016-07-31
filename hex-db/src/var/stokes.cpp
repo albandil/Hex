@@ -33,55 +33,97 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "interfaces.h"
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
+
+#include "../interfaces.h"
+#include "../quantities.h"
+#include "../utils.h"
+
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(StokesParameters);
+
+// --------------------------------------------------------------------------------- //
+
 
 //
 // StokesParameters members
 //
 
-const std::string StokesParameters::Id = "stokes";
-const std::string StokesParameters::Description = "Reduced Stokes parameters for the ns->n'p transition.";
-const std::vector<std::pair<std::string,std::string>> StokesParameters::Dependencies = {
-    {"ni", "Initial atomic principal quantum number; the state (ni,0,0) is used."},
-    {"nf", "Final atomic principal quantum number; the states (nf,1,*) are used."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"beta", "Angle between impact direction and the quantization axis."},
-    {"theta", "Scattering angles for which to compute the Stokes parameters."}
-};
-const std::vector<std::string> StokesParameters::VecDependencies = { "theta" };
-
-bool StokesParameters::initialize (sqlitepp::session & db) const
+std::string StokesParameters::name ()
 {
-    return true;
+    return "stokes";
 }
 
-std::vector<std::string> const & StokesParameters::SQL_CreateTable () const
+std::string StokesParameters::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Reduced Stokes parameters for the ns->n'p transition.";
 }
 
-std::vector<std::string> const & StokesParameters::SQL_Update () const
+std::vector<std::string> StokesParameters::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "scatamp",
+        "dcs"
+    };
 }
 
-bool StokesParameters::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> StokesParameters::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number; the state (ni,0,0) is used."},
+        {"nf", "Final atomic principal quantum number; the states (nf,1,*) are used."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"beta", "Angle between impact direction and the quantization axis."},
+        {"theta", "Scattering angles for which to compute the Stokes parameters."}
+    };
+}
+
+std::vector<std::string> StokesParameters::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "theta"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool StokesParameters::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool StokesParameters::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool StokesParameters::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool StokesParameters::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double afactor = change_units(Aunits, aUnit_rad);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int Ei = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     double ki = sqrt(Ei);
     double kf = sqrt(Ei - 1./(ni*ni) + 1./(nf*nf));
     
@@ -89,13 +131,13 @@ bool StokesParameters::run (std::map<std::string,std::string> const & sdata) con
     rArray angles;
     
     // get angle / angles
-    try {
-        
+    try
+    {
         // is there a single angle specified using command line ?
-        angles.push_back(Conv<double>(sdata, "theta", Id));
-        
-    } catch (std::exception e) {
-        
+        angles.push_back(Conv<double>(sdata, "theta", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more angles specified using the STDIN ?
         angles = readStandardInput<double>();
     }

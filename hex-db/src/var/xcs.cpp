@@ -33,11 +33,21 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "variables.h"
+
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(ExtrapolatedCrossSection);
+
+// --------------------------------------------------------------------------------- //
 
 const std::string ExtrapolatedCrossSection::Id = "xcs";
 const std::string ExtrapolatedCrossSection::Description = "Extrapolated cross section (using Aitken Δ²-process).";

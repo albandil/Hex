@@ -39,7 +39,7 @@
 const std::size_t HDFFile::header_byte_size = 1024;
 
 HDFFile::HDFFile (std::string filename, FileAccess flag)
-    : prefix(), file_(nullptr), name_(filename), changed_(false)
+    : prefix(), file_(), name_(filename), changed_(false)
 {
     // separate filesystem path and dataset path (by semicolon)
     std::size_t pos = name_.find(':');

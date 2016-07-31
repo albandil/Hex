@@ -147,67 +147,23 @@ int main (int argc, char* argv[])
     // Setup B-spline basis
     //
     
-        // B-spline bases for all panels
-        std::vector<Bspline> bspline_panel, bspline_full;
+        // create new B-spline basis for inner problem
+        Bspline bspline_inner
+        (
+            inp.order,
+            inp.rknots,
+            inp.ecstheta,
+            inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : rArray{ inp.rknots.back() }
+        );
         
-        // check that we have next panel knots for multi-panel calculation
-        if (cmd.panels > 1)
-        {
-            if (inp.rknots_next.empty())
-                HexException("No B-spline knots specified for next panels.");
-        }
-        
-        // create all panels' bases
-        rArrays rknots_panel, rknots_full;
-        for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
-        {
-            // compose lists of knots
-            if (ipanel == 0)
-            {
-                rknots_panel.push_back(inp.rknots);
-                if (not inp.overlap_knots.empty())
-                    rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
-                rknots_full = rknots_panel;
-            }
-            else
-            {
-                rknots_panel.resize(0);
-                if (not inp.overlap_knots.empty())
-                    rknots_panel.push_back(rknots_full.back().back() - inp.overlap_knots.back() + inp.overlap_knots);
-                rknots_panel.push_back(rknots_panel.back().back() + inp.rknots_next.slice(1, inp.rknots_next.size()));
-                if (not inp.overlap_knots.empty())
-                    rknots_panel.push_back(rknots_panel.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
-                
-                rknots_full.push_back(rknots_full.back().back() + inp.rknots_next.slice(1, inp.rknots_next.size()));
-                if (not inp.overlap_knots.empty())
-                    rknots_full.push_back(rknots_full.back().back() + inp.overlap_knots.slice(1, inp.overlap_knots.size()));
-            }
-            
-            // create new B-spline basis for this panel
-            bspline_panel.emplace_back
-            (
-                Bspline
-                (
-                    inp.order,
-                    join(rknots_panel),
-                    inp.ecstheta,
-                    rknots_panel.back().back() + inp.cknots
-                )
-            );
-            
-            // create new B-spline basis extending from origin to this panel
-            bspline_full.emplace_back
-            (
-                Bspline
-                (
-                    inp.order,
-                    join(rknots_full),
-                    inp.ecstheta,
-                    rknots_full.back().back() + inp.cknots
-                )
-            );
-        }
-        std::cout << std::endl;
+        // create new B-spline basis for inner and outer problem (will be the same as 'bspline_atom' if 'rknots_ext' is empty)
+        Bspline bspline_full
+        (
+            inp.order,
+            inp.rknots_ext.empty() ? inp.rknots : concatenate(inp.rknots, inp.rknots.back() + inp.rknots_ext.slice(1, inp.rknots_ext.size())),
+            inp.ecstheta,
+            inp.rknots_ext.empty() ? inp.rknots.back() + inp.cknots : inp.rknots.back() + inp.rknots_ext.back() + inp.cknots
+        );
     
     //
     // Setup angular data
@@ -225,10 +181,10 @@ int main (int argc, char* argv[])
         std::cout << std::endl;
     
     //
-    // Map solution file between two B-spline bases.
+    // TODO Map solution file between two B-spline bases.
     //
     
-        if (not cmd.map_solution.empty())
+        /*if (not cmd.map_solution.empty())
         {
             if (cmd.map_solution_target.empty())
                 HexException("The option --map-solution-target is required.");
@@ -289,15 +245,15 @@ int main (int argc, char* argv[])
             }
             
             return EXIT_SUCCESS;
-        }
+        }*/
     
     //
-    // Zip solution file into VTK geometry if told so
+    // TODO Zip solution file into VTK geometry if told so
     //
     
         if (cmd.zipdata.file.size() != 0 and par.IamMaster())
         {
-            zip_solution(cmd, bspline_full, ang.states());
+            zip_solution(cmd, inp, par, bspline_inner, bspline_full, ang.states());
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
         }
@@ -308,7 +264,7 @@ int main (int argc, char* argv[])
     
         if (cmd.writegrid and par.IamMaster())
         {
-            write_grid(bspline_panel, "grid-panel");
+            write_grid(bspline_inner, "grid-inner");
             write_grid(bspline_full, "grid-full");
             std::cout << std::endl << "Done." << std::endl << std::endl;
             return EXIT_SUCCESS;
@@ -319,49 +275,34 @@ int main (int argc, char* argv[])
     //
     
         // create the solver instance
-        Solver solver (cmd, inp, par, ang, bspline_panel, bspline_full);
+        Solver solver (cmd, inp, par, ang, bspline_inner, bspline_full);
         
-        // for all solver & propagator panels
-        for (int ipanel = 0; ipanel < cmd.panels; ipanel++)
+        std::cout << std::endl;
+        std::cout << "Bspline basis summary" << std::endl;
+        if (bspline_inner.Nspline() != bspline_full.Nspline())
         {
-            std::cout << std::endl;
-            std::cout << "--------------------------------------------------------------------------------" << std::endl;
-            std::cout << std::endl;
-            std::cout << "Bspline basis summary for panel " << ipanel + 1 << std::endl;
-            std::cout << "\t- atomic basis" << std::endl;
-            std::cout << "\t\t- number of splines: " << bspline_panel[0].Nspline() << std::endl;
-            std::cout << "\t\t- real knots : " << bspline_panel[0].rknots().front() << " to " << bspline_panel[0].rknots().back() << std::endl;
-            std::cout << "\t\t- complex knots : " << bspline_panel[0].cknots().front() << " to " << bspline_panel[0].cknots().back() << std::endl;
-            std::cout << "\t- projectile basis" << std::endl;
-            std::cout << "\t\t- number of splines: " << bspline_panel[ipanel].Nspline() << std::endl;
-            std::cout << "\t\t- real knots : " << bspline_panel[ipanel].rknots().front() << " to " << bspline_panel[ipanel].rknots().back() << std::endl;
-            std::cout << "\t\t- complex knots : " << bspline_panel[ipanel].cknots().front() << " to " << bspline_panel[ipanel].cknots().back() << std::endl;
-            if (ipanel > 0 and not inp.overlap_knots.empty())
-            {
-                std::cout << "\t\t- shared real knots with previous panel : " << bspline_panel[ipanel-1].rknots().back() - inp.overlap_knots.back()
-                          << " to " << bspline_panel[ipanel-1].rknots().back() << std::endl;
-            }
-            if (not inp.overlap_knots.empty())
-            {
-                std::cout << "\t\t- shared real knots with next panel : " << bspline_panel[ipanel].rknots().back() - inp.overlap_knots.back()
-                            << " to " << bspline_panel[ipanel].rknots().back() << std::endl;
-            }
-            std::cout << std::endl;
-            std::cout << "--------------------------------------------------------------------------------" << std::endl;
-            std::cout << std::endl;
-            
-            // pick preconditioner according to the user preferences
-            solver.choose_preconditioner(ipanel);
-            
-            // initialize preconditioner
-            solver.setup_preconditioner();
-            
-            // find the solution of the scattering equations
-            solver.solve();
-            
-            // release resources
-            solver.finish();
+            std::cout << "\t- inner basis" << std::endl;
+            std::cout << "\t\t- number of splines: " << bspline_inner.Nspline() << std::endl;
+            std::cout << "\t\t- real knots : " << bspline_inner.rknots().front() << " to " << bspline_inner.rknots().back() << std::endl;
+            std::cout << "\t\t- complex knots : " << bspline_inner.cknots().front() << " to " << bspline_inner.cknots().back() << std::endl;
         }
+        std::cout << "\t- full basis" << std::endl;
+        std::cout << "\t\t- number of splines: " << bspline_full.Nspline() << std::endl;
+        std::cout << "\t\t- real knots : " << bspline_full.rknots().front() << " to " << bspline_full.rknots().back() << std::endl;
+        std::cout << "\t\t- complex knots : " << bspline_full.cknots().front() << " to " << bspline_full.cknots().back() << std::endl;
+        std::cout << std::endl;
+        
+        // pick preconditioner according to the user preferences
+        solver.choose_preconditioner();
+        
+        // initialize preconditioner
+        solver.setup_preconditioner();
+        
+        // find the solution of the scattering equations
+        solver.solve();
+        
+        // release resources
+        solver.finish();
 
     //
     // Extract amplitudes
@@ -370,7 +311,7 @@ int main (int argc, char* argv[])
         if (cmd.itinerary & CommandLine::StgExtract)
         {
             // extract amplitudes
-            Amplitudes ampl (bspline_full.front(), bspline_full.back(), inp, par, cmd, ang.states());
+            Amplitudes ampl (bspline_inner, bspline_full, inp, par, cmd, ang.states());
             ampl.extract();
             
             // write T-matrices to a text file as SQL statements 

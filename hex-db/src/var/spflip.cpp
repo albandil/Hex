@@ -34,70 +34,108 @@
 #include <string>
 #include <vector>
 
-#include <sqlitepp/sqlitepp.hpp>
+// --------------------------------------------------------------------------------- //
 
 #include "hex-chebyshev.h"
 #include "hex-interpolate.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string SpinFlipCrossSection::Id = "spflip";
-const std::string SpinFlipCrossSection::Description = "Spin flip cross section.";
-const std::vector<std::pair<std::string,std::string>> SpinFlipCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
-};
-const std::vector<std::string> SpinFlipCrossSection::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool SpinFlipCrossSection::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(SpinFlipCrossSection);
+
+// --------------------------------------------------------------------------------- //
+
+std::string SpinFlipCrossSection::name ()
 {
-    return true;
+    return "spflip";
 }
 
-std::vector<std::string> const & SpinFlipCrossSection::SQL_CreateTable () const
+std::string SpinFlipCrossSection::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Spin flip cross section.";
 }
 
-std::vector<std::string> const & SpinFlipCrossSection::SQL_Update () const
+std::vector<std::string> SpinFlipCrossSection::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "tmat"
+    };
 }
 
-bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> SpinFlipCrossSection::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"Ei", "Projectile impact energy (Rydberg)."}
+    };
+}
+
+std::vector<std::string> SpinFlipCrossSection::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool SpinFlipCrossSection::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool SpinFlipCrossSection::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool SpinFlipCrossSection::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf = Conv<int>(sdata, "mf", name());
     
     // energies and cross sections
     rArray energies;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
@@ -107,12 +145,12 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
     
     // compute cross section
     double E, sigma;
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (session());
     st << "SELECT singlet.Ei AS Ei, SUM(singlet.ReT*singlet.ReT+singlet.ImT*singlet.ImT+triplet.ReT*triplet.ReT+triplet.ImT*triplet.ImT-2*singlet.ReT*triplet.ReT-2*singlet.ImT*triplet.ImT)/157.91367 "
               "FROM "
               "( "
                 "SELECT Ei, ell, SUM(Re_T_ell) AS ReT, SUM(Im_T_ell) As ImT "
-                "FROM tmat "
+                "FROM 'tmat' "
                 "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND S = 0 "
                 "GROUP BY Ei, ell, L "
                 "ORDER BY Ei, ell ASC "
@@ -120,7 +158,7 @@ bool SpinFlipCrossSection::run (std::map<std::string,std::string> const & sdata)
               "INNER JOIN "
               "( "
                 "SELECT Ei, ell, SUM(Re_T_ell) AS ReT, SUM(Im_T_ell) AS ImT "
-                "FROM tmat "
+                "FROM 'tmat' "
                 "WHERE ni = :ni AND li = :li AND mi = :mi AND nf = :nf AND lf = :lf AND mf = :mf AND S = 1 "
                 "GROUP BY Ei, ell, L "
                 "ORDER BY Ei, ell ASC "

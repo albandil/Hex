@@ -239,14 +239,14 @@ public:
      * @param filename File name.
      * @param threshold Largest absolute value represented by white colour.
      */
-    void plot (const char* filename, double threshold = 0.) const
+    void plot (std::string const & filename, double threshold = 0.) const
     {
 #ifdef WITH_PNG
         // create output file
-        std::ofstream out(filename, std::ios_base::out | std::ios_base::binary);
+        std::ofstream out (filename, std::ios_base::out | std::ios_base::binary);
         
         // create PNG data generator
-        PngGenerator png(this, threshold);
+        PngGenerator png (this, threshold);
         
         // write PNG file
         png.write(out);
@@ -305,6 +305,16 @@ public:
 #endif // WITH_SUPERLU_DIST
         }
         
+        if (use_library == LUFT_ANY or use_library ==  LUFT_MUMPS)
+        {
+#ifdef WITH_MUMPS
+            return factorize_mumps(droptol, data);
+#else
+            if (use_library != LUFT_ANY)
+                HexException("Program is not compiled with MUMPS support (use -DWITH_MUMPS).");
+#endif // WITH_MUMPS
+        }
+        
         HexException("Unsupported LU factorization method %d.", use_library);
         return nullptr;
     }
@@ -312,6 +322,7 @@ public:
     std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (Real droptol = 0, void * data = nullptr) const;
     std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (Real droptol = 0, void * data = nullptr) const;
     std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (Real droptol = 0, void * data = nullptr) const;
+    std::shared_ptr<LUft<IdxT,DataT>> factorize_mumps (Real droptol = 0, void * data = nullptr) const;
     
     /**
      * @brief Solve the Ax = b problem, where "b" can be a matrix.

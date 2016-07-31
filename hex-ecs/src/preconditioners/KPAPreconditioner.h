@@ -99,24 +99,33 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            prec_atom_(inp.maxell+1), prec_proj_(inp.maxell+1), maxknot_(-1)
+        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            prec_inner_(inp.maxell + 1), prec_proj_(inp.maxell + 1),
+            refcount_inner_(inp.maxell + 1, 0), refcount_proj_(inp.maxell + 1, 0)
         {
-            // nothing more to do
+#ifdef _OPENMP
+            omp_init_lock(&lck_);
+#endif
+        }
+        
+        virtual ~KPACGPreconditioner ()
+        {
+#ifdef _OPENMP
+            omp_destroy_lock(&lck_);
+#endif
         }
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        using CGPreconditioner::update;
+        using CGPreconditioner::rhs;
+        using CGPreconditioner::multiply;
+        using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();
-        virtual void update (Real E);
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
         virtual void finish ();
         
         // inner CG callback (needed by parent)
@@ -142,15 +151,21 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             std::set<int> needed_l
         );
         
+        // internal concurrent access lock
+        void lock_kpa_access () const;
+        void unlock_kpa_access () const;
+        
         // preconditioner data
-        mutable std::vector<Data> prec_atom_;
-        mutable std::vector<Data> prec_proj_;
+        mutable std::vector<Data> prec_inner_, prec_proj_;
+        mutable std::vector<unsigned> refcount_inner_, refcount_proj_;
+        
+        // memory access lock
+#ifdef _OPENMP
+        mutable omp_lock_t lck_;
+#endif
         
         // workspace
         mutable cArrays workspace_;
-        
-        // drop tolerance knot for matrix multiplication
-        mutable int maxknot_;
 };
 
 #endif

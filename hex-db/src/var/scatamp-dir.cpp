@@ -33,47 +33,87 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-chebyshev.h"
 #include "hex-special.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string ScatteringAmplitudeDir::Id = "scatamp-dir";
-const std::string ScatteringAmplitudeDir::Description = "Scattering amplitude (arbitrary impact direction).";
-const std::vector<std::pair<std::string,std::string>> ScatteringAmplitudeDir::Dependencies = {
-    {"ni",    "Initial atomic principal quantum number."                  },
-    {"li",    "Initial atomic orbital quantum number."                    },
-    {"mi",    "Initial atomic magnetic quantum number."                   },
-    {"nf",    "Final atomic principal quantum number."                    },
-    {"lf",    "Final atomic orbital quantum number."                      },
-    {"mf",    "Final atomic magnetic quantum number."                     },
-    {"S",     "Total spin of atomic + projectile electron."               },
-    {"Ei",    "Projectile impact energy (Rydberg)."                       },
-    {"alpha", "Quantization axis orientation (1st Euler angle)."          },
-    {"beta",  "Quantization axis orientation (2nd Euler angle)."          },
-    {"gamma", "Quantization axis orientation (3rd Euler angle)."          },
-    {"theta", "Scattering angles for which to compute the amplitude."     }
-};
-const std::vector<std::string> ScatteringAmplitudeDir::VecDependencies = { "theta" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool ScatteringAmplitudeDir::initialize(sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(ScatteringAmplitudeDir);
+
+// --------------------------------------------------------------------------------- //
+
+std::string ScatteringAmplitudeDir::name ()
 {
-    return true;
+    return "scatamp-dir";
 }
 
-std::vector<std::string> const & ScatteringAmplitudeDir::SQL_Update () const
+std::string ScatteringAmplitudeDir::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Scattering amplitude (arbitrary impact direction).";
 }
 
-std::vector<std::string> const & ScatteringAmplitudeDir::SQL_CreateTable () const
+std::vector<std::string> ScatteringAmplitudeDir::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "scatamp"
+    };
 }
+
+std::vector<std::pair<std::string,std::string>> ScatteringAmplitudeDir::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni",    "Initial atomic principal quantum number."                  },
+        {"li",    "Initial atomic orbital quantum number."                    },
+        {"mi",    "Initial atomic magnetic quantum number."                   },
+        {"nf",    "Final atomic principal quantum number."                    },
+        {"lf",    "Final atomic orbital quantum number."                      },
+        {"mf",    "Final atomic magnetic quantum number."                     },
+        {"S",     "Total spin of atomic + projectile electron."               },
+        {"Ei",    "Projectile impact energy (Rydberg)."                       },
+        {"alpha", "Quantization axis orientation (1st Euler angle)."          },
+        {"beta",  "Quantization axis orientation (2nd Euler angle)."          },
+        {"gamma", "Quantization axis orientation (3rd Euler angle)."          },
+        {"theta", "Scattering angles for which to compute the amplitude."     }
+    };
+}
+
+std::vector<std::string> ScatteringAmplitudeDir::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "theta"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool ScatteringAmplitudeDir::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool ScatteringAmplitudeDir::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool ScatteringAmplitudeDir::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
 
 void hex_scattering_amplitude_dir
 (
@@ -137,7 +177,9 @@ void hex_scattering_amplitude_dir_
     }
 }
 
-bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
@@ -145,17 +187,17 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
     double afactor = change_units(Aunits, aUnit_rad);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf = Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata, "S",  Id);
-    double E     = Conv<double>(sdata, "Ei",    Id) * efactor;
-    double alpha = Conv<double>(sdata, "alpha", Id) * afactor;
-    double beta  = Conv<double>(sdata, "beta",  Id) * afactor;
-    double gamma = Conv<double>(sdata, "gamma", Id) * afactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf = Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S",  name());
+    double E     = Conv<double>(sdata, "Ei",    name()) * efactor;
+    double alpha = Conv<double>(sdata, "alpha", name()) * afactor;
+    double beta  = Conv<double>(sdata, "beta",  name()) * afactor;
+    double gamma = Conv<double>(sdata, "gamma", name()) * afactor;
     
     // angles
     rArray angles;
@@ -164,7 +206,7 @@ bool ScatteringAmplitudeDir::run (std::map<std::string,std::string> const & sdat
     try {
         
         // is there a single angle specified using command line ?
-        angles.push_back(Conv<double>(sdata, "theta", Id));
+        angles.push_back(Conv<double>(sdata, "theta", name()));
         
     } catch (std::exception e) {
         

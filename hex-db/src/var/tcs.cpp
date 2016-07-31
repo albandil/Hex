@@ -34,64 +34,104 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string TotalCrossSection::Id = "tcs";
-const std::string TotalCrossSection::Description = "Total cross section.";
-const std::vector<std::pair<std::string,std::string>> TotalCrossSection::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"Ei", "Projectile impact energy (Rydberg)."}
-};
-const std::vector<std::string> TotalCrossSection::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool TotalCrossSection::initialize(sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(TotalCrossSection);
+
+// --------------------------------------------------------------------------------- //
+
+std::string TotalCrossSection::name ()
 {
-    return true;
+    return "tcs";
 }
 
-std::vector<std::string> const & TotalCrossSection::SQL_Update () const
+std::string TotalCrossSection::description ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return "Total cross section.";
 }
 
-std::vector<std::string> const & TotalCrossSection::SQL_CreateTable () const
+std::vector<std::string> TotalCrossSection::dependencies ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return std::vector<std::string>
+    {
+        "ics"
+    };
 }
 
-bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) const
+std::vector<std::pair<std::string,std::string>> TotalCrossSection::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"Ei", "Projectile impact energy (Rydberg)."}
+    };
+}
+
+std::vector<std::string> TotalCrossSection::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool TotalCrossSection::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool TotalCrossSection::createTable ()
+{
+    return ScatteringQuantity::createTable();
+}
+
+bool TotalCrossSection::updateTable ()
+{
+    return ScatteringQuantity::updateTable();
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // scattering event parameters
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
     
     // energies and cross sections
     double E, sigma;
     rArray energies, E_arr, sigma_arr;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
@@ -101,8 +141,8 @@ bool TotalCrossSection::run (std::map<std::string,std::string> const & sdata) co
     //
     
     // compose query
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, sum(sigma) FROM " + IntegralCrossSection::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, sum(sigma) FROM 'ics' "
             "WHERE ni = :ni "
             "  AND li = :li "
             "  AND mi = :mi "

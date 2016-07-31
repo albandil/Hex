@@ -13,8 +13,8 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O3" />
-					<Add option="-Wall" />
 					<Add option="-std=c++11" />
+					<Add option="-Wall" />
 					<Add option="-fcx-limited-range" />
 					<Add option="-fexceptions" />
 					<Add option="-fopenmp" />
@@ -23,6 +23,7 @@
 					<Add option="-DWITH_OPENCL" />
 					<Add option="-DWITH_UMFPACK" />
 					<Add option="-D_LONGINT" />
+					<Add option="-DWITH_MUMPS" />
 					<Add directory="../Win64/include" />
 					<Add directory="../Win64/include/suitesparse" />
 					<Add directory="../common" />
@@ -31,12 +32,13 @@
 				<Linker>
 					<Add option="-s" />
 					<Add option="-fopenmp" />
-					<Add library="../Win64/lib/libgsl-2.1.dll.a" />
-					<Add library="../Win64/lib/libmsmpi-v7.dll.a" />
-					<Add library="../Win64/lib/libopenblas-0.2.15.dll.a" />
-					<Add library="../Win64/lib/libumfpack-5.7.4.dll.a" />
+					<Add library="..\Win64\lib\libgsl-2.1.dll.a" />
+					<Add library="..\Win64\lib\libmsmpi-v7.dll.a" />
+					<Add library="..\Win64\lib\libopenblas-0.2.15.dll.a" />
+					<Add library="..\Win64\lib\libumfpack-5.7.4.dll.a" />
 					<Add library="gfortran" />
-					<Add library="../Win64/lib/libopencl-2.1.dll.a" />
+					<Add library="..\Win64\lib\libopencl-2.1.dll.a" />
+					<Add library="..\Win64\lib\libmumps-5.0.1.dll.a" />
 				</Linker>
 			</Target>
 		</Build>

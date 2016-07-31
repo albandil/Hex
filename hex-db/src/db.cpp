@@ -38,22 +38,32 @@
 #include <vector>
 #include <fstream>
 
+// --------------------------------------------------------------------------------- //
+
 #include <sqlitepp/sqlitepp.hpp>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-special.h"
 #include "hex-interpolate.h"
 
+// --------------------------------------------------------------------------------- //
+
 #include "db.h"
-#include "variables.h"
+#include "quantities.h"
 
-sqlitepp::session db;    // database handle
-VariableList vlist;        // list of scattering variables
+// --------------------------------------------------------------------------------- //
 
-// units
+sqlitepp::session db;
+
+// --------------------------------------------------------------------------------- //
+
 eUnit Eunits = eUnit_Ry;
 lUnit Lunits = lUnit_au;
 aUnit Aunits = aUnit_deg;
+
+// --------------------------------------------------------------------------------- //
 
 void hex_initialize (const char* dbname) { hex_initialize_(dbname); }
 void hex_initialize_ (const char* dbname)
@@ -62,39 +72,77 @@ void hex_initialize_ (const char* dbname)
     db.open(dbname);
     
     // disable journaling
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (db);
     st << "PRAGMA journal_mode = OFF";
     st.exec();
     
-    // initialize variables
-    for (const Variable* var : vlist)
-        var->initialize(db);
+    // sort quantities' classes in order of their dependencies
+    std::vector<std::size_t> position (quantities->size(), quantities->size());
+    std::size_t next_position = 0;
+    int u = 0;
+    while
+    (
+        std::any_of
+        (
+            position.begin(), position.end(),
+            [](std::size_t pos) { return pos == quantities->size(); }
+        )
+    )
+    {
+        // get next quantity with undecided position
+        for (std::size_t i = 0; i < quantities->size(); i++) if (position[i] > next_position)
+        {
+            // get dependencies
+            std::vector<std::string> deps = (*quantities)[i]->dependencies();
+            
+            // check that all dependencies are already in place
+            bool depsOK = true;
+            for (std::size_t j = 0; j < quantities->size(); j++)
+            {
+                if (std::find(deps.begin(), deps.end(), (*quantities)[j]->name()) == deps.end())
+                    continue;
+                
+                if (position[j] > next_position)
+                    depsOK = false;
+            }
+            
+            // place the quantity to the next position
+            if (depsOK)
+            {
+                position[i] = next_position;
+                next_position++;
+            }
+        }
+        
+        if (u++ == 100)
+            HexException("Cyclical dependency between scattering quantities?");
+    }
+    
+    // create sorted vector of pointers
+    std::unique_ptr<std::vector<ScatteringQuantity*>> new_quantities (new std::vector<ScatteringQuantity*>(quantities->size()));
+    for (std::size_t i = 0; i < quantities->size(); i++)
+        (*new_quantities)[position[i]] = (*quantities)[i];
+    quantities.swap(new_quantities);
+    
+    // initialize the quantities
+    for (ScatteringQuantity * Q : *quantities)
+    {
+        if (not Q->initialize(db))
+        {
+            std::exit(EXIT_FAILURE);
+        }
+    }
 }
 
 void hex_new () { hex_new_(); }
 void hex_new_ ()
 {
     // create tables
-    for (const Variable* var : vlist)
-    for (std::string const & cmd : var->SQL_CreateTable())
+    for (ScatteringQuantity * Q : *quantities)
     {
-        sqlitepp::statement st(db);
-        
-        if (cmd.size() == 0)
-            continue;
-        
-        st << cmd;
-        
-        try {
-            
-            st.exec();
-            
-        } catch (sqlitepp::exception & e) {
-            
-            std::cerr << "ERROR: Creation of tables failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-            std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
+        if (not Q->createTable())
+        {
             std::exit(EXIT_FAILURE);
-            
         }
     }
 }
@@ -133,13 +181,18 @@ void hex_import_ (const char* sqlname)
     
     std::cout << "\rImporting data...  " << std::flush;
     
+    // store default precision
+    std::streamsize precision = std::cout.precision();
+    std::cout.precision(0);
+    std::cout.setf(std::ios::fixed, std::ios::floatfield);
+    
     do
     {
         // query statement
         sqlitepp::statement st(db);
         
         if (lines > 0)
-            std::cout << "\rImporting data...  " << std::fixed << std::setprecision(0) << line * 100. / lines << " % " << std::flush;
+            std::cout << "\rImporting data...  " << line * 100. / lines << " % " << std::flush;
         
         // read line from input stream
         std::string cmd, cmd1;
@@ -171,17 +224,16 @@ void hex_import_ (const char* sqlname)
             cmd = trim(cmd);
             
             // try to execute the first command
-            try {
-                
+            try
+            {
                 st << cmd1;
                 st.exec();
-                
-            } catch (sqlitepp::exception & e) {
-            
+            }
+            catch (sqlitepp::exception e)
+            {
                 std::cerr << "ERROR: Import failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
                 std::cerr << "       [Line " << line << "] Failed SQL command was: \"" << cmd1 << "\"" << std::endl;
                 std::exit(EXIT_FAILURE);
-                
             }
         }
         while (cmd.size() > 0);
@@ -192,49 +244,33 @@ void hex_import_ (const char* sqlname)
     while (not is.eof());
     
     std::cout << "\rThe SQL batch file \"" << sqlname << "\" has been successfully imported." << std::endl;
+    std::cout.precision(precision);
+    std::cout.unsetf(std::ios::floatfield);
 }
 
 void hex_update () { hex_update_(); }
 void hex_update_ ()
 {
-    for (const Variable* var : vlist)
+    for (ScatteringQuantity * Q : *quantities)
     {
-        std::cout << "\rUpdating " << var->id() << "...      " << std::flush;
-        
-        for (std::string const & cmd : var->SQL_Update())
+        if (not Q->updateTable())
         {
-            sqlitepp::statement st(db);
-            
-            if (cmd.size() == 0)
-                continue;
-            
-            st << cmd;
-            
-            try
-            {
-                st.exec();
-            }
-            catch (sqlitepp::exception & e)
-            {
-                std::cerr << "ERROR: Update failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
-                std::cerr << "       Failed SQL command was: \"" << cmd << "\"" << std::endl;
-                std::exit(EXIT_FAILURE);
-            }
+            std::exit(EXIT_FAILURE);
         }
     }
-    std::cout << "\rThe database has been successfully updated." << std::endl;
 }
 
 void hex_optimize () { hex_optimize_(); }
 void hex_optimize_ ()
 {
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (db);
     st << "VACUUM";
+    
     try
     {
         st.exec();
     }
-    catch (sqlitepp::exception & e)
+    catch (sqlitepp::exception e)
     {
         HexException("Database optimizaion failed, code = %d (\"%s\").", e.code(), e.what());
     }
@@ -243,9 +279,9 @@ void hex_optimize_ ()
 void hex_dump (const char* dumpfile) { hex_dump_(dumpfile); }
 void hex_dump_ (const char* dumpfile)
 {
-    sqlitepp::statement st(db);
+    sqlitepp::statement st (db);
     std::string dumpline, dumpcmd =
-        "SELECT 'INSERT INTO " + TMatrix::Id + " VALUES(' || "
+        "SELECT 'INSERT INTO 'tmat' VALUES(' || "
         "quote(ni) || ',' || "
         "quote(li) || ',' || "
         "quote(mi) || ',' || "
@@ -259,10 +295,10 @@ void hex_dump_ (const char* dumpfile)
         "quote(Re_T_ell) || ',' || "
         "quote(Im_T_ell) || ',' || "
         "quote(Re_TBorn_ell) || ',' || "
-        "quote(Im_TBorn_ell) || ')' FROM " + TMatrix::Id + ";";
+        "quote(Im_TBorn_ell) || ')' FROM 'tmat';";
     
-    try {
-        
+    try
+    {
         // create statement
         st << dumpcmd, sqlitepp::into(dumpline);
         
@@ -293,13 +329,12 @@ void hex_dump_ (const char* dumpfile)
                 std::cout << dumpline << std::endl;
             std::cout << "COMMIT" << std::endl;
         }
-        
-    } catch (sqlitepp::exception & e) {
-        
+    }
+    catch (sqlitepp::exception e)
+    {
         std::cerr << "ERROR: Dump failed, code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
         std::cerr << "       Failed SQL command was: \"" << dumpcmd << "\"" << std::endl;
         std::exit(EXIT_FAILURE);
-        
     }
 }
 
@@ -313,17 +348,22 @@ int hex_run
     for (std::string const & varname : vars)
     {
         // pointer to the correct "Variable" object
-        Variable const * var;
+        auto var = std::find_if
+        (
+            quantities->begin(),
+            quantities->end(),
+            [&](ScatteringQuantity * q){ return q->name() == varname; }
+        );
         
         // get a pointer from the dictionary
-        if ((var = vlist.get(varname)) == nullptr)
+        if (var == quantities->end())
         {
             // this should never happen
-            HexException("Runtime error.");
+            HexException("Quantity \"%s\" not available.", varname.c_str());
         }
         
         // try to compute the results
-        if (not var->run(sdata))
+        if (not (*var)->run(sdata))
         {
             // this can easily happen
             HexException("Computation of \"%s\" failed.", varname.c_str());

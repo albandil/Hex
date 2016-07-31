@@ -41,6 +41,7 @@
 #include "hex-luft.h"
 
 #include "bspline.h"
+#include "parallel.h"
 
 /**
  * @brief Command line parameters.
@@ -86,12 +87,13 @@ class CommandLine
             : writegrid(false), zipdata(), parallel(false), preconditioner(0),
               droptol(1e-8), itinerary(StgNone), outofcore(false), cont(false), wholematrix(false), cache_all_radint(true), cache_own_radint(true),
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
-              lightweight_full(false), lightweight_radial_cache(false), shared_scratch(false), reuse_dia_blocks(false),
-              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1), panels(1),
+              lightweight_full(false), lightweight_radial_cache(true), shared_scratch(false), reuse_dia_blocks(false),
+              kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1),
               parallel_factorization(false), parallel_extraction(true), kpa_max_iter(-1), ilu_max_blocks(-1),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
-              gpu_host_multiply(false), mumps_outofcore(true), mumps_verbose(0), kpa_drop(-1), exact_rhs(false), write_intermediate_solutions(false)
+              gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),
+              fast_bessel(false)
         {
             // get command line options
             parse(argc, argv);
@@ -187,9 +189,6 @@ class CommandLine
         /// Size of the local MPI communicator, used for distributed SuperLU.
         int groupsize;
         
-        /// Number of panels (solver + propagator sections).
-        int panels;
-        
         /// Allow parallel factorization.
         int parallel_factorization;
         
@@ -255,6 +254,9 @@ class CommandLine
         
         /// Write intermediate solutions.
         bool write_intermediate_solutions;
+        
+        /// Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.
+        bool fast_bessel;
 };
 
 /**
@@ -305,11 +307,54 @@ class InputFile
         // public attributes
         //
         
-        int order, ni, L, Pi, levels, maxell;
-        iArray Spin;
-        Real ecstheta, B;
-        rArray rknots, rknots_next, cknots, overlap_knots, Etot;
-        std::vector<std::tuple<int,int,int>> instates, outstates;
+            // B-spline order
+            int order;
+            
+            // initial atomic principal quantum number
+            int ni;
+            
+            // total angular momentum
+            int L;
+            
+            // total parity
+            int Pi;
+            
+            // 'nL', the limit on number of coupled angular states;
+            // there will be 'nL * (L + 1 - Pi)' coupled angular state pairs
+            int levels;
+            
+            // maximal one-electron orbital quantum number
+            int maxell;
+            
+            // total spins to calculate
+            iArray Spin;
+            
+            // ECS rotation angle
+            Real ecstheta;
+            
+            // weak magnetic field in atomic units (involved only perturbatively)
+            Real B;
+            
+            // real B-spline knots
+            rArray rknots;
+            
+            // real B-spline knot projectile extention
+            rArray rknots_ext;
+            
+            // complex-to-become knots (after rotation)
+            rArray cknots;
+            
+            // total energies for which to solve the system
+            rArray Etot;
+            
+            // initial and final atomic states
+            std::vector<std::tuple<int,int,int>> instates, outstates;
+            
+            // projectile charge (only sign)
+            Real Zp;
+            
+            // whether to calculate just the inner problem (decided from the knot sequence)
+            bool inner_only;
 };
 
 /**
@@ -338,10 +383,6 @@ class SolutionIO
         /// Check that the file exists, return size.
         std::size_t check (int ill = -1) const
         {
-            // look for monolithic solution file
-            HDFFile fmono (name(), HDFFile::readonly);
-            if (fmono.valid()) return fmono.size("array")/2 / ang_.size();
-            
             // look for specific solution segment file
             if (ill >= 0)
             {
@@ -357,10 +398,11 @@ class SolutionIO
                 size[illp] = (fsingle.valid() ? fsingle.size("array")/2 : 0);
             }
             
-            // check that the sizes are consistent
-            std::size_t min_size = *std::min_element(size.begin(), size.end());
-            std::size_t max_size = *std::max_element(size.begin(), size.end());
-            return min_size == max_size ? min_size : 0;
+            // calculate total size
+            std::size_t total_size = std::accumulate(size.begin(), size.end(), 0);
+            
+            // check that all blocks existed: either return sum of sizes, or zero
+            return std::find(size.begin(), size.end(), 0) == size.end() ? total_size : 0;
         }
         
         /**
@@ -477,11 +519,18 @@ class SolutionIO
                 return false;
             
             // write data
-            if (not hdf.write("array", solution.data(), solution.size()))
-                return false;
-            
-            // success
-            return true;
+            bool success = true;
+            success = (success and hdf.write("L",  &L_,  1));
+            success = (success and hdf.write("S",  &S_,  1));
+            success = (success and hdf.write("Pi", &Pi_, 1));
+            success = (success and hdf.write("ni", &ni_, 1));
+            success = (success and hdf.write("li", &li_, 1));
+            success = (success and hdf.write("mi", &mi_, 1));
+            success = (success and hdf.write("E",  &E_,  1));
+            success = (success and hdf.write("l1",  &ang_[ill].first,  1));
+            success = (success and hdf.write("l2",  &ang_[ill].second, 1));
+            success = (success and hdf.write("array", solution.data(), solution.size()));
+            return success;
         }
     
     private:
@@ -511,8 +560,11 @@ class SolutionIO
  */
 void zip_solution
 (
-    CommandLine & cmd,
-    std::vector<Bspline> const & bspline,
+    CommandLine const & cmd,
+    InputFile const & inp,
+    Parallel const & par, 
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
     std::vector<std::pair<int,int>> const & ll
 );
 
@@ -521,7 +573,7 @@ void zip_solution
  */
 void write_grid
 (
-    std::vector<Bspline> const & bspline,
+    Bspline const & bspline,
     std::string const & basename
 );
 

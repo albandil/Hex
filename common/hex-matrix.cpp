@@ -331,11 +331,12 @@ CsrMatrix<LU_int_t,Complex> CooMatrix<LU_int_t,Complex>::tocsr () const
             LU_int_t gid = elem_ptrs[m][n];
             
             // update elements
-            Ai[pos] += j_[gid];
+            Ai[pos]  = j_[gid];
             Ax[pos] += x_[gid];
             
-            // add also the next entry if it is in the same column
-            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and gid == elem_ptrs[m][n + 1])
+            // if the next row entry is in the same column, do not advance position counter,
+            // so that the element will be added to current position
+            if (n < (LU_int_t)elem_ptrs[m].size() - 1 and j_[gid] == j_[elem_ptrs[m][n + 1]])
                 continue;
             
             // otherwise move on to the next position
@@ -385,7 +386,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
+        std::cerr << "\nSymbolic factorization error " << status << std::endl;
         UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -399,7 +400,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     );
     if (status != 0)
     {
-        std::cerr << "\n[CsrMatrix::factorize] Exit status " << status << std::endl;
+        std::cerr << "\nNumeric factorization error " << status << std::endl;
         UMFPACK_REPORT_STATUS_F(0, status);
         std::exit(EXIT_FAILURE);
     }
@@ -408,7 +409,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_u
     UMFPACK_FREE_SYMBOLIC_F(&Symbolic);
     
     // create a new LU factorization container
-    LUft_UMFPACK<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(this, Numeric);
+    LUft_UMFPACK<LU_int_t,Complex> * lu_ptr = new LUft_UMFPACK<LU_int_t,Complex>(*this, Numeric);
     lu_ptr->info_ = Info;
     
     // wrap the pointer into smart pointer
@@ -593,7 +594,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (Re
     // create a new LU factorization container
     LUft<int,Complex> * lu_ptr = new LUft_SUPERLU<int,Complex>
     (
-        this, perm_c, perm_r, etree, equed,
+        *this, perm_c, perm_r, etree, equed,
         R, C, L, U, Glu, mem_usage.for_lu, droptol
     );
     
@@ -708,7 +709,7 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
     // create a new LU factorization container
     LUft<LU_int_t,Complex> * lu_ptr = new LUft_SUPERLU_DIST<LU_int_t,Complex>
     (
-        this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
+        *this, ScalePermstruct, LUstruct, grid, mem_usage.for_lu
     );
     
     // wrap the pointer into smart pointer
@@ -716,3 +717,112 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_s
 }
 
 #endif // WITH_SUPERLU_DIST
+
+// -------------------------------------------------------------------------------------
+// MUMPS-dependent functions.
+//
+
+#ifdef WITH_MUMPS
+
+template<>
+std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_mumps (Real droptol, void * data) const
+{
+    //
+    // Extract parameters.
+    //
+    
+        bool out_of_core = std::intptr_t(data) % 2;
+        int verbosity_level = std::intptr_t(data) / 2;
+    
+    //
+    // Create matrix of the system (i.e. the IJV triplet).
+    //
+
+        // estimate non-zero element count of the upper triangle
+        LU_int_t nz = (i_.size() + n_) / 2;
+        
+        // data arrays
+        NumberArray<MUMPS_INT> I, J;
+        cArray A;
+        
+        // allocate memory
+        I.reserve(nz);
+        J.reserve(nz);
+        A.reserve(nz);
+        
+        // for all rows
+        for (LU_int_t row = 0, nz = 0; row < m_; row++)
+        {
+            // for all columns with structurally non-zero entries
+            for (LU_int_t idx = p_[row]; idx < p_[row + 1]; idx++)
+            {
+                // get column index
+                LU_int_t col = i_[idx];
+                
+                // only consider upper triangle (and the main diagonal)
+                if (row <= col and x_[idx] != 0.0_z)
+                {
+                    // insert the element
+                    I.push_back(row + 1);
+                    J.push_back(col + 1);
+                    A.push_back(x_[idx]);
+                    
+                    // update true element count
+                    nz++;
+                }
+            }
+        }
+    
+    //
+    // Prepare MUMPS environment.
+    //
+    
+        MUMPS_STRUC_C * settings = new MUMPS_STRUC_C;
+        
+        // initialize
+        settings->job = MUMPS_INITIALIZE;
+        settings->sym = 2;
+        settings->par = 1;
+        MUMPS_C(settings);
+        
+        // analyze
+        settings->job = MUMPS_ANALYZE;
+        settings->ICNTL(1) = (verbosity_level == 0 ? 0 : 6); // errors to STDOUT (default: 6)
+        settings->ICNTL(2) = 0; // diagnostics to /dev/null
+        settings->ICNTL(3) = (verbosity_level == 0 ? 0 : 6); // global info to STDOUT (default: 6)
+        settings->ICNTL(4) = verbosity_level; // verbosity level (default: 2)
+        settings->ICNTL(5) = 0; // COO format
+        settings->ICNTL(22) = out_of_core; // OOC factorization
+        std::strcpy(settings->ooc_tmpdir, ".");
+        std::strcpy(settings->ooc_prefix, "ooc_");
+        settings->n = this->n_;
+        settings->nz = nz;
+        settings->irn = I.data();
+        settings->jcn = J.data();
+        settings->a = reinterpret_cast<MUMPS_COMPLEX*>(A.data());
+        MUMPS_C(settings);
+    
+    //
+    // Compute the factorization.
+    //
+    
+        settings->job = MUMPS_FACTORIZE;
+        MUMPS_C(settings);
+    
+    //
+    // Create a new LU factorization container
+    //
+    
+        LUft<LU_int_t,Complex> * lu_ptr = new LUft_MUMPS<LU_int_t,Complex>
+        (
+            settings,
+            std::move(I),
+            std::move(J),
+            std::move(A)
+        );
+    
+    // wrap the pointer into smart pointer
+    return std::shared_ptr<LUft<LU_int_t,Complex>>(lu_ptr);
+}
+
+#endif // WITH_MUMPS

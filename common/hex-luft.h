@@ -38,14 +38,16 @@ enum
     LUFT_ANY,
     LUFT_UMFPACK,
     LUFT_SUPERLU,
-    LUFT_SUPERLU_DIST
+    LUFT_SUPERLU_DIST,
+    LUFT_MUMPS
 };
 
-// Forward declaration of classes (needed by csrmatrix.h).
+// Forward declaration of classes.
 template <class IdxT, class DataT> class LUft;
 template <class IdxT, class DataT> class LUft_UMFPACK;
 template <class IdxT, class DataT> class LUft_SUPERLU;
 template <class IdxT, class DataT> class LUft_SUPERLU_DIST;
+template <class IdxT, class DataT> class LUft_MUMPS;
 
 // Load available matrices.
 #include "hex-arrays.h"
@@ -77,6 +79,13 @@ class LUft
         virtual ~LUft () {}
         
         /**
+         * @brief Validity indicator.
+         * 
+         * Returns true when the object contains a valid LU factorization.
+         */
+        virtual bool valid () const { return false; }
+        
+        /**
          * @brief Free memory.
          * 
          * Release memory occupied by the LU-factorization numeric object.
@@ -96,7 +105,7 @@ class LUft
          * 
          * Note: Currently implemented only for UMFPACK backend.
          */
-        virtual double cond () const { return 0; }
+        virtual Real cond () const { return 0; }
         
         /**
          * @brief Solve equations.
@@ -223,10 +232,10 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
     
         /// Default constructor.
         LUft_UMFPACK ()
-            : LUft<IdxT,DataT>(), numeric_(nullptr), matrix_(nullptr), info_(UMFPACK_INFO) {}
+            : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
-        LUft_UMFPACK (CsrMatrix<IdxT,DataT> const * matrix, void * numeric)
+        LUft_UMFPACK (CsrMatrix<IdxT,DataT> const & matrix, void * numeric)
             : LUft<IdxT,DataT>(), numeric_(numeric), matrix_(matrix), info_(UMFPACK_INFO) {}
         
         /// Destructor.
@@ -235,14 +244,14 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Return factorization information.
         rArray const & info () const { return info_; }
         
-        /// Use this matrix pointer.
-        void matrix (CsrMatrix<IdxT,DataT> const * ptr) { matrix_ = ptr; }
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const;
         
         /// Return condition number.
-        virtual double cond () const;
+        virtual Real cond () const;
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
@@ -261,8 +270,8 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         /// Numeric decomposition as produced by UMFPACK.
         void * numeric_;
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix data, needed for solution.
+        mutable CsrMatrix<IdxT,DataT> matrix_;
         
     public:
         
@@ -302,7 +311,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU
         (
-            CsrMatrix<IdxT,DataT> const * matrix,
+            CsrMatrix<IdxT,DataT> const & matrix,
             iArray const & perm_c,
             iArray const & perm_r,
             iArray const & etree,
@@ -313,7 +322,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
             SuperMatrix U,
             GlobalLU_t Glu,
             int bytes,
-            double droptol
+            Real droptol
         ) : LUft<IdxT,DataT>(), matrix_(matrix), perm_c_(perm_c), perm_r_(perm_r), etree_(etree), equed_(equed),
             R_(R), C_(R), L_(L), U_(U), Glu_(Glu), size_(bytes), droptol_(droptol)
         {
@@ -322,6 +331,9 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         
         /// Destructor.
         virtual ~LUft_SUPERLU () { drop(); }
+        
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -348,8 +360,8 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         
     private:
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix that has been factorized.
+        CsrMatrix<IdxT,DataT> matrix_;
         
         /// Row permutations.
         iArray perm_c_;
@@ -382,7 +394,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         std::size_t size_;
         
         /// Drop tolerance.
-        double droptol_;
+        Real droptol_;
         
         // Disable bitwise copy
         LUft_SUPERLU const & operator= (LUft_SUPERLU const &);
@@ -411,7 +423,7 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU_DIST
         (
-            CsrMatrix<IdxT,DataT> const * matrix,
+            CsrMatrix<IdxT,DataT> const & matrix,
             ScalePermstruct_t ScalePermstruct,
             LUstruct_t LUstruct,
             gridinfo_t * grid,
@@ -425,6 +437,9 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         
         /// Destructor.
         virtual ~LUft_SUPERLU_DIST () { drop (); }
+        
+        /// Validity indicator.
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -453,8 +468,8 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         
     private:
         
-        /// Pointer to the matrix that has been factorized. Necessary for validity of @ref numeric_.
-        CsrMatrix<IdxT,DataT> const * matrix_;
+        /// Matrix that has been factorized.
+        CsrMatrix<IdxT,DataT> matrix_;
         
         // scaling and permutation data
         ScalePermstruct_t ScalePermstruct_;
@@ -472,5 +487,87 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &);
 };
 #endif // WITH_SUPERLU_DIST
+
+#ifdef WITH_MUMPS
+
+#define ICNTL(x) icntl[(x)-1]
+#define MUMPS_INITIALIZE    (-1)
+#define MUMPS_FINISH        (-2)
+#define MUMPS_ANALYZE       1
+#define MUMPS_FACTORIZE     2
+#define MUMPS_SOLVE         3
+
+#ifdef SINGLE
+    #include <mumps/cmumps_c.h>
+    #define MUMPS_STRUC_C CMUMPS_STRUC_C
+    #define MUMPS_C cmumps_c
+    #define MUMPS_COMPLEX mumps_float_complex
+#else
+    #include <mumps/zmumps_c.h>
+    #define MUMPS_STRUC_C ZMUMPS_STRUC_C
+    #define MUMPS_C zmumps_c
+    #define MUMPS_COMPLEX mumps_double_complex
+#endif
+
+/**
+ * @brief LU factorization object - MUMPS specialization.
+ * 
+ * This class holds information on LU factorization as computed by the free
+ * library MUMPS. It is derived from LUft and shares interface with that class.
+ * 
+ * \warning This class expect only symmetric matrices. The COO matrix passed
+ * to this class should contain only upper or lower part of the matrix (together
+ * with the main diagonal).
+ */
+template <class IdxT, class DataT>
+class LUft_MUMPS : public LUft<IdxT,DataT>
+{
+    public:
+        
+        /// Default constructor.
+        LUft_MUMPS ()
+            : LUft<IdxT,DataT>(), settings(nullptr) {}
+        
+        /// Construct from data.
+        LUft_MUMPS (MUMPS_STRUC_C * s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, NumberArray<DataT> && a)
+            : LUft<IdxT,DataT>(), settings(s), I(std::move(i)), J(std::move(j)), A(std::move(a)) {}
+        
+        /// Destructor.
+        virtual ~LUft_MUMPS ();
+        
+        /// Validity indicator.
+        virtual bool valid () const;
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const;
+        
+        /// Condition number.
+        virtual Real cond () const { return settings ? settings->rinfo[11-1] : 0.0_r; }
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save large data to disk.
+        virtual void save (std::string name) const;
+        
+        /// Load large data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
+        
+        /// Release memory.
+        virtual void drop ();
+        
+    private:
+        
+        // Internal data of the library.
+        mutable MUMPS_STRUC_C * settings;
+        
+        // data arrays
+        NumberArray<MUMPS_INT> I, J;
+        NumberArray<DataT> A;
+        
+        // Disable bitwise copy
+        LUft_MUMPS const & operator= (LUft_MUMPS const &);
+};
+#endif // WITH_MUMPS
 
 #endif // HEX_LUFT_H

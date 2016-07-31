@@ -79,6 +79,12 @@ inline Complex operator "" _i (long double x)
     return Complex(0.,x);
 }
 
+// complex number literal
+inline Complex operator "" _z (long double x)
+{
+    return Complex(x,0.);
+}
+
 /// Squared modulus of a complex number.
 inline Real sqrabs (Complex z)
 {
@@ -240,6 +246,9 @@ template<> class typeinfo<float>
         /// Component data type.
         typedef float cmpttype;
         
+        /// Integer type as large as this data type.
+        typedef int inttype;
+        
         /// Component count.
         static const std::size_t ncmpt = 1;
         
@@ -261,6 +270,9 @@ template<> class typeinfo<double>
     public:
         /// Component data type.
         typedef double cmpttype;
+        
+        /// Integer type as large as this data type.
+        typedef std::int64_t inttype;
         
         /// Component count.
         static const std::size_t ncmpt = 1;

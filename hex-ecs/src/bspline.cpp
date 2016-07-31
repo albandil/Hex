@@ -427,9 +427,16 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
 
 
 Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots)
-    : rknots_(rknots), cknots_(cknots), theta_(th), rotation_(Complex(cos(th),sin(th))),
-      R0_(rknots_.back()), Rmax_(cknots_.back()), Nknot_(rknots.size() + cknots.size() - 1),
-      Nreknot_(rknots.size()), Nspline_(Nknot_ - order - 1), Nintval_(Nknot_ - 1),
+    : rknots_(rknots),
+      cknots_(cknots),
+      theta_(th),
+      rotation_(Complex(cos(th),sin(th))),
+      R0_(rknots_.empty() ? 0 : rknots_.back()),
+      Rmax_(cknots_.empty() ? R0_ : cknots_.back()),
+      Nknot_(rknots.size() + cknots.size() - 1),
+      Nreknot_(rknots.size()),
+      Nspline_(Nknot_ > order + 1 ? Nknot_ - order - 1 : 0),
+      Nintval_(Nknot_ > 1 ? Nknot_ - 1 : 0),
       order_(order)
 {
     // real and complex knot counts; both include the knot R₀
@@ -437,11 +444,14 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
     int cknots_len = cknots.size();
     
     // join the sequences; rotate the complex one
-    t_ = new Complex [rknots_len + cknots_len - 1];
-    for (int i = 0; i < rknots_len; i++)
-        t_[i] = rknots[i];
-    for (int i = 1; i < cknots_len; i++)
-        t_[i + rknots_len - 1] = rotate(cknots[i]);
+    if (rknots_len + cknots_len > 0)
+    {
+        t_ = new Complex [rknots_len + cknots_len - 1];
+        for (int i = 0; i < rknots_len; i++)
+            t_[i] = rknots[i];
+        for (int i = 1; i < cknots_len; i++)
+            t_[i + rknots_len - 1] = rotate(cknots[i]);
+    }
     
     // allocate workspace for all threads
     unsigned nthreads = 1;
@@ -535,10 +545,10 @@ std::size_t Bspline::hash () const
     std::size_t seed = 0;
     
     for (auto & i : rknots_)
-        seed ^= *reinterpret_cast<std::int64_t const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     for (auto & i : cknots_)
-        seed ^= *reinterpret_cast<std::int64_t const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= *reinterpret_cast<typeinfo<Real>::inttype const*>(&i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     
     for (unsigned i = 0; i < sizeof(theta_); i++)
         seed ^= *(i + (char*)&theta_) + 0x9e3779b9 + (seed << 6) + (seed >> 2);

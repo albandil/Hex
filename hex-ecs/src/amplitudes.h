@@ -63,8 +63,11 @@ class Amplitudes
         
         Amplitudes
         (
-            Bspline const & bspline_atom, Bspline const & bspline_proj,
-            InputFile const & inp, Parallel const & par, CommandLine const & cmd,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
+            InputFile const & inp,
+            Parallel const & par,
+            CommandLine const & cmd,
             std::vector<std::pair<int,int>> const & ang
         );
         
@@ -240,8 +243,8 @@ class Amplitudes
         void computeSigmaIon_ (Transition T);
         
         // B-spline environment
-        Bspline const & bspline_atom_;
-        Bspline const & bspline_proj_;
+        Bspline const & bspline_inner_;
+        Bspline const & bspline_full_;
         
         // radial integrals
         RadialIntegrals rad_;

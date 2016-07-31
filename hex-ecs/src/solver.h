@@ -53,12 +53,12 @@ class Solver
             InputFile const & inp,
             Parallel const & par,
             AngularBasis const & ang,
-            std::vector<Bspline> const & bspline,
-            std::vector<Bspline> const & bspline_full
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full
         );
         
         /// Pick preconditioner for a given panel.
-        void choose_preconditioner (int ipanel);
+        void choose_preconditioner ();
         
         /// Precompute (or load) the radial data.
         void setup_preconditioner ();
@@ -110,14 +110,11 @@ class Solver
         AngularBasis ang_;
         
         /// Radial bases.
-        std::vector<Bspline> const & bspline_;
-        std::vector<Bspline> const & bspline_full_;
+        Bspline const & bspline_inner_;
+        Bspline const & bspline_full_;
         
         /// Solver preconditioner.
         PreconditionerBase * prec_;
-        
-        /// Chosen panel of solution.
-        int ipanel_;
         
         /// Linear solver (conjugate gradients).
         ConjugateGradients <Complex, cBlockArray, cBlockArray&> CG_;
@@ -125,6 +122,9 @@ class Solver
         /// Quantum numbers of the state currently being solved.
         int ni_, li_, mi_;
         Real E_;
+        
+        /// Asymptotic bound channels for every angular momentum state (l₁,l₂) and r₁- or r₂-asymptotics.
+        std::vector<std::pair<iArray,iArray>> bstates_;
 };
 
 #endif // HEX_ECS_SOLVER_H

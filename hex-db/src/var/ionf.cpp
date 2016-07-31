@@ -33,7 +33,11 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include <gsl/gsl_sf.h>
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-arrays.h"
 #include "hex-interpolate.h"
@@ -41,32 +45,68 @@
 #include "hex-vec3d.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string IonizationF::Id = "ionf";
-const std::string IonizationF::Description = "Ionization amplitude radial part.";
-const std::vector<std::pair<std::string,std::string>> IonizationF::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"L", "Total orbital momentum of atomic + projectile electron."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"l1", "Atomic electron orbital momentum in the final state."},
-    {"l2", "Projectile orbital momentum in the final state."},
-    {"Eshare", "Energy fraction (atomic vs projectile electron) in the final state."}
-};
-const std::vector<std::string> IonizationF::VecDependencies = { "Eshare" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool IonizationF::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(IonizationF);
+
+// --------------------------------------------------------------------------------- //
+
+std::string IonizationF::name ()
 {
-    return true;
+    return "ionf";
 }
 
-std::vector<std::string> const & IonizationF::SQL_CreateTable () const
+std::string IonizationF::description ()
 {
-    static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + IonizationF::Id + "' ("
+    return "Ionization amplitude radial part.";
+}
+
+std::vector<std::string> IonizationF::dependencies ()
+{
+    return std::vector<std::string>();
+}
+
+std::vector<std::pair<std::string,std::string>> IonizationF::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"L", "Total orbital momentum of atomic + projectile electron."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"l1", "Atomic electron orbital momentum in the final state."},
+        {"l2", "Projectile orbital momentum in the final state."},
+        {"Eshare", "Energy fraction (atomic vs projectile electron) in the final state."}
+    };
+}
+
+std::vector<std::string> IonizationF::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Eshare"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool IonizationF::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool IonizationF::createTable ()
+{
+    sqlitepp::statement st (session());
+    st <<
+        "CREATE TABLE IF NOT EXISTS 'ionf' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -77,39 +117,53 @@ std::vector<std::string> const & IonizationF::SQL_CreateTable () const
             "l2 INTEGER, "
             "cheb BLOB, "
             "PRIMARY KEY (ni,li,mi,L,S,Ei,l1,l2)"
-        ")"
-    };
+        ")";
     
-    return cmd;
+    try
+    {
+        st.exec();
+    }
+    catch (sqlitepp::exception & e)
+    {
+        std::cerr << "ERROR: Creation of table 'ionf' failed!" << std::endl;
+        std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+        return false;
+    }
+    
+    return ScatteringQuantity::createTable();
 }
 
-std::vector<std::string> const & IonizationF::SQL_Update () const
+bool IonizationF::updateTable ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return ScatteringQuantity::updateTable();
 }
 
-bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool IonizationF::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi = Conv<int>(sdata, "mi", Id);
-    int  L = Conv<int>(sdata,  "L", Id);
-    int  S = Conv<int>(sdata,  "S", Id);
-    int l1 = Conv<int>(sdata, "l1", Id);
-    int l2 = Conv<int>(sdata, "l2", Id);
-    double Ei = Conv<double>(sdata, "Ei", Id) * efactor;
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi = Conv<int>(sdata, "mi", name());
+    int  L = Conv<int>(sdata,  "L", name());
+    int  S = Conv<int>(sdata,  "S", name());
+    int l1 = Conv<int>(sdata, "l1", name());
+    int l2 = Conv<int>(sdata, "l2", name());
+    double Ei = Conv<double>(sdata, "Ei", name()) * efactor;
     
     // read energy sharing (in user units)
     rArray Eshare;
-    try {
-        Eshare.push_back(Conv<double>(sdata, "Eshare", Id));
-    } catch (std::exception e) {
+    try
+    {
+        Eshare.push_back(Conv<double>(sdata, "Eshare", name()));
+    }
+    catch (std::exception e)
+    {
         Eshare = readStandardInput<double>();
     }
     
@@ -118,8 +172,8 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
     std::string blob;
     
     // create query statement
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, QUOTE(cheb) FROM " + IonizationF::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, QUOTE(cheb) FROM 'ionf' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "
@@ -128,7 +182,6 @@ bool IonizationF::run (std::map<std::string,std::string> const & sdata) const
           "  AND l1 = :l1 "
           "  AND l2 = :l2 "
           "ORDER BY Ei ASC",
-          
        sqlitepp::into(E), sqlitepp::into(blob),
        sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
        sqlitepp::use(L), sqlitepp::use(S),

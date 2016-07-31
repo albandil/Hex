@@ -32,14 +32,12 @@
 #ifndef HEX_ILUPRECONDITIONER_H
 #define HEX_ILUPRECONDITIONER_H
 
+#include "hex-luft.h"
+
 #include "preconditioners.h"
 
 #ifdef _OPENMP
 #include <omp.h>
-#endif
-
-#ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
 #endif
 
 /**
@@ -64,18 +62,17 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
             CommandLine const & cmd
         );
         
         ~ILUCGPreconditioner ();
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        using CGPreconditioner::multiply;
+        using CGPreconditioner::rhs;
+        using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();
@@ -89,11 +86,11 @@ class ILUCGPreconditioner : public virtual CGPreconditioner
         
     protected:
         
-        // diagonal CSR block for every coupled state
-        mutable std::vector<CsrMatrix<LU_int_t,Complex>> csr_blocks_;
-        
-        // LU decompositions of the CSR blocks
+        // LU decompositions of the diagonal blocks
         mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        
+        // prepare data structures for LU factorizations
+        void reset_lu ();
         
 #ifdef _OPENMP
         // factorization lock

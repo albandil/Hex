@@ -6,7 +6,7 @@
 //                    / /   / /    \_\      / /  \ \                                 //
 //                                                                                   //
 //                                                                                   //
-//  Copyright (c) 2015, Jakub Benda, Charles University in Prague                    //
+//  Copyright (c) 2016, Jakub Benda, Charles University in Prague                    //
 //                                                                                   //
 // MIT License:                                                                      //
 //                                                                                   //
@@ -29,36 +29,34 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#include <string>
+#include "quantities.h"
 
-#include "hex-misc.h"
+// --------------------------------------------------------------------------------- //
 
-#ifndef GIT_COMMIT
-#define GIT_COMMIT ""
-#endif
+std::unique_ptr<std::vector<ScatteringQuantity*>> quantities;
 
-char const * commit_hash = GIT_COMMIT;
+// --------------------------------------------------------------------------------- //
 
-std::string logo (std::string esc)
+bool register_new_quantity (ScatteringQuantity* Q)
 {
-    return format
-    (
-        "%s                                         \n"
-        "%s       / /   / /    __    \\ \\  / /     \n"
-        "%s      / /__ / /   / _ \\    \\ \\/ /     \n"
-        "%s     /  ___  /   | |/_/    / /\\ \\      \n"
-        "%s    / /   / /    \\_\\      / /  \\ \\   \n"
-        "%s                                         \n"
-        "%s             UK MFF (c) 2016             \n"
-        "%s                                         \n"
-#ifdef _LONGINT
-        "%s       version: 2.00 %s ILP64\n"
-#else
-        "%s         version: 2.00 %s\n"
-#endif
-        "%s                                         \n",
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),esc.c_str(),esc.c_str(),esc.c_str(),
-        esc.c_str(),commit_hash,esc.c_str()
-    );
+    if (quantities.get() == nullptr)
+        quantities.reset(new std::vector<ScatteringQuantity*>());
+    
+    quantities->push_back(Q);
+    return true;
 }
+
+ScatteringQuantity * get_quantity (std::string name)
+{
+    for (ScatteringQuantity * Q : *quantities)
+    {
+        if (Q->name() == name)
+        {
+            return Q;
+        }
+    }
+    
+    return nullptr;
+}
+
+// --------------------------------------------------------------------------------- //

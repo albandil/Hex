@@ -213,6 +213,58 @@ template <class T> class ArrayView
         {
             return ArrayView<T>(begin() + i, begin() + j);
         }
+        
+        /**
+         * @brief Output to a set of strings.
+         * 
+         * This will print the contents of the array to a set of strings
+         * of given maximal length. Elements are delimited by commas.
+         */
+        std::vector<std::string> lines (unsigned len) const
+        {
+            std::stringstream line, tmp;
+            std::vector<std::string> output;
+            
+            for (std::size_t i = 0; i < size(); i++)
+            {
+                // if line is empty, always add the next element
+                if (line.str().empty())
+                    line << '[' << (*this)[i];
+                
+                // otherwise check length first
+                else
+                {
+                    // use temporary stream
+                    tmp.str("");
+                    tmp << line.str() << (*this)[i];
+                    
+                    // if the new element fits within the maximal length, add it
+                    if (tmp.str().size() + 1 <= len)
+                        line << (*this)[i];
+                    
+                    // otherwise flush the line and start a new one
+                    else
+                    {
+                        output.push_back(line.str());
+                        line.str("");
+                        line << (*this)[i];
+                    }
+                }
+                
+                // add comma, if this is not the last element in the array
+                if (i != size() - 1)
+                    line << ',';
+                
+                // otherwise flush this last line
+                else
+                {
+                    line << ']';
+                    output.push_back(line.str());
+                }
+            }
+            
+            return output;
+        }
 };
 
 /**
@@ -515,58 +567,6 @@ template <class T, class Alloc_> class Array : public ArrayView<T>
             std::swap(ArrayView<T>::array_, b.ArrayView<T>::array_);
             
             return *this;
-        }
-        
-        /**
-         * @brief Output to a set of strings.
-         * 
-         * This will print the contents of the array to a set of strings
-         * of given maximal length. Elements are delimited by commas.
-         */
-        Array<std::string> lines (unsigned len) const
-        {
-            std::stringstream line, tmp;
-            Array<std::string> output;
-            
-            for (std::size_t i = 0; i < size(); i++)
-            {
-                // if line is empty, always add the next element
-                if (line.str().empty())
-                    line << '[' << (*this)[i];
-                
-                // otherwise check length first
-                else
-                {
-                    // use temporary stream
-                    tmp.str("");
-                    tmp << line.str() << (*this)[i];
-                    
-                    // if the new element fits within the maximal length, add it
-                    if (tmp.str().size() + 1 <= len)
-                        line << (*this)[i];
-                    
-                    // otherwise flush the line and start a new one
-                    else
-                    {
-                        output.push_back(line.str());
-                        line.str("");
-                        line << (*this)[i];
-                    }
-                }
-                
-                // add comma, if this is not the last element in the array
-                if (i != size() - 1)
-                    line << ',';
-                
-                // otherwise flush this last line
-                else
-                {
-                    line << ']';
-                    output.push_back(line.str());
-                }
-            }
-            
-            return output;
         }
 };
 
@@ -1180,6 +1180,11 @@ template <class T, class Alloc_> class NumberArray : public Array<T, Alloc_>
         }
         //@}
         
+        std::string hdfname () const
+        {
+            return name_;
+        }
+        
         /**
          * @brief Get compressed array.
          * 
@@ -1434,10 +1439,14 @@ template <class T> class BlockArray
             return arrays_[iblock].hdfload(subname(iblock));
         }
         
-        bool hdfsave (std::size_t iblock)
+        bool hdfsave (std::size_t iblock, bool drop = false)
         {
             assert(iblock < arrays_.size());
-            return arrays_[iblock].hdfsave(subname(iblock));
+            if (not arrays_[iblock].hdfsave(subname(iblock)))
+                return false;
+            if (drop)
+                arrays_[iblock].drop();
+            return true;
         }
         
         bool inmemory () const
@@ -1510,7 +1519,7 @@ typedef BlockArray<Complex> cBlockArray;
 #include "hex-arrithm.h"
 
 /// Scalar product of two arrays.
-template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const & b)
+template <class T> T operator | (const ArrayView<T> a, const ArrayView<T> b)
 {
     // get size; check if sizes match
     std::size_t N = a.size();
@@ -1520,8 +1529,8 @@ template <class T> T operator | (NumberArray<T> const & a, NumberArray<T> const 
     T result = 0;
     
     // iterators
-    T const * const restrict pa = (T const *)assume_aligned(a.data(), NumberArray<T>::Alloc::alignment);
-    T const * const restrict pb = (T const *)assume_aligned(b.data(), NumberArray<T>::Alloc::alignment);
+    T const * const restrict pa = a.data();
+    T const * const restrict pb = b.data();
     
     // sum the products
     for (std::size_t i = 0; i < N; i++)

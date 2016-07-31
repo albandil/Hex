@@ -35,59 +35,10 @@
 #include "hex-vec3d.h"
 #include "hex-version.h"
 
-#include "variables.h"
+#include "utils.h"
 
-VariableList::VariableList () :
-    list ({
-        new TMatrix,
-        new ScatteringAmplitude,
-        new ScatteringAmplitudeDir,
-        new DifferentialCrossSection,
-        new IntegralCrossSection,
-        new CompleteCrossSection,
-        new ExtrapolatedCrossSection,
-        new CollisionStrength,
-        new MomentumTransfer,
-        new TotalCrossSection,
-        new IonizationF,
-        new IonizationAmplitude,
-        new TripleDifferentialCrossSection,
-        new StokesParameters,
-        new SpinAsymmetry,
-        new SpinFlipCrossSection
-    })
+double change_units (eUnit A, eUnit B)
 {
-    
-}
-
-VariableList::~VariableList ()
-{
-    // delete list items
-    for (Variable* var : list)
-        delete var;
-}
-
-Variable const * VariableList::get (std::string const & id) const
-{
-    // search the list for a (pointer to a) variable with the correct ID
-    std::vector<Variable*>::const_iterator it = std::find_if
-    (
-        list.begin(),
-        list.end(),
-        [&](Variable* const & constptr) -> bool
-        {
-            return constptr->id() == id;
-        }
-    );
-    
-    // return pointer to the variable
-    if (it != list.end())
-        return *it;
-    else
-        return nullptr;
-}
-
-double change_units (eUnit A, eUnit B){
     // no change
     if (A == B)
         return 1.;

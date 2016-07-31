@@ -71,11 +71,14 @@ Complex inv_power_extrapolate (rArray X, cArrayView Y)
 
 Amplitudes::Amplitudes
 (
-    Bspline const & bspline_atom, Bspline const & bspline_proj,
-    InputFile const & inp, Parallel const & par, CommandLine const & cmd,
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
+    InputFile const & inp,
+    Parallel const & par,
+    CommandLine const & cmd,
     std::vector<std::pair<int,int>> const & ang
-) : bspline_atom_(bspline_atom), bspline_proj_(bspline_proj),
-    rad_(bspline_atom_,bspline_proj,bspline_proj,0),
+) : bspline_inner_(bspline_inner), bspline_full_(bspline_full),
+    rad_(bspline_inner, bspline_full, 0),
     inp_(inp), par_(par), cmd_(cmd), ang_(ang)
 {
     // nothing to do
@@ -125,14 +128,6 @@ void Amplitudes::extract ()
                     // TODO
                     
                     std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") not found." << std::endl;
-                    continue;
-                }
-                
-                // check the size
-                if (!cmd_.outofcore and (int)solution[0].size() != bspline_atom_.Nspline() * bspline_proj_.Nspline())
-                {
-                    std::cout << "\t\t\tSolution files for L = " << inp_.L << ", Pi = " << inp_.Pi << ", (ni,li,mi) = (" << ni << "," << li << "," << mi << ") have wrong size." << std::endl;
-                    std::cout << "\t\t\t - Expected " << bspline_atom_.Nspline() * bspline_proj_.Nspline() << ", found " << solution[0].size() << "." << std::endl;
                     continue;
                 }
                 
@@ -389,14 +384,18 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     // final projectile momenta
     rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
     
+    // maximal principal quantum number for this total energy
+    int max_n = (inp_.Etot[ie] >= 0 ? 0 : 1.0_r / std::sqrt(-inp_.Etot[ie]));
+    
     // shorthands
     unsigned Nenergy = kf.size();               // energy count
     int order   = inp_.order;                   // B-spline order
-    int Nspline_atom = bspline_atom_.Nspline(); // B-spline count (atomic basis)
-    int Nspline_proj = bspline_proj_.Nspline(); // B-spline count (projectile basis)
+    int Nspline_inner = bspline_inner_.Nspline(); // B-spline count (inner basis)
+    int Nspline_full  = bspline_full_ .Nspline(); // B-spline count (combined basis)
+    int Nspline_outer = Nspline_full - Nspline_inner; // B-spline count (outer basis)
     
     // compute final hydrogen orbital overlaps with B-spline basis
-    cArray Pf_overlaps = rad_.overlapP(bspline_atom_, rad_.gaussleg_atom(), T.nf, T.lf, weightEndDamp(bspline_atom_));
+    cArray Pf_overlaps = rad_.overlapP(bspline_inner_, rad_.gaussleg_inner(), T.nf, T.lf, weightEndDamp(bspline_inner_));
     
     // check that memory for this transition is allocated
     if (Lambda_Slp.find(T) == Lambda_Slp.end())
@@ -419,7 +418,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     // the trend of the T-matrix.
     
     Real wavelength = special::constant::two_pi / kf[ie];
-    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_proj_.R0();
+    Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R0();
     Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0.0_r, Ra);
     int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
     
@@ -435,8 +434,8 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     if (Ra > Rb)
         HexException("Wrong order of radial extraction bounds, %g > %g.", Ra, Rb);
     
-    if (Rb > bspline_proj_.R0())
-        HexException("Extraction radius too far, %g > %g.", Rb, bspline_proj_.R0());
+    if (Rb > bspline_full_.R0())
+        HexException("Extraction radius too far, %g > %g.", Rb, bspline_full_.R0());
     
     // evaluate radial part for all evaluation radii
     for (int i = 0; i < samples; i++)
@@ -446,21 +445,21 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         grid.push_back(eval_r);
         
         // determine knot
-        int eval_knot = bspline_proj_.knot(eval_r);
+        int eval_knot = bspline_full_.knot(eval_r);
         
         // evaluate j and dj at far radius for all angular momenta up to maxell
         cArray j_R0 = special::ric_jv(inp_.maxell, kf[ie] * eval_r);
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
         
         // evaluate B-splines and their derivatives at evaluation radius
-        cArray Bspline_R0(Nspline_proj), Dspline_R0(Nspline_proj);
-        for (int ispline = 0; ispline < Nspline_proj; ispline++)
+        cArray Bspline_R0(Nspline_full), Dspline_R0(Nspline_full);
+        for (int ispline = 0; ispline < Nspline_full; ispline++)
         {
             // evaluate B-spline
-            Bspline_R0[ispline] = bspline_proj_.bspline(ispline, eval_knot, order, eval_r);
+            Bspline_R0[ispline] = bspline_full_.bspline(ispline, eval_knot, order, eval_r);
             
             // evaluate B-spline derivative
-            Dspline_R0[ispline] = bspline_proj_.dspline(ispline, eval_knot, order, eval_r);
+            Dspline_R0[ispline] = bspline_full_.dspline(ispline, eval_knot, order, eval_r);
         }
         
         // evaluate Wronskians
@@ -483,11 +482,45 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             if (not solution.inmemory())
                 const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
             
-            // change view to row-major dense matrix
-            RowMatrixView<Complex> PsiSc (Nspline_atom, Nspline_proj, solution[ill]);
-            
-            // calculate radial integral
-            Complex lambda = (Pf_overlaps | PsiSc | Wj[ell]);
+            Complex lambda = 0;
+            if (inp_.inner_only)
+            {
+                // change view to row-major dense matrix
+                RowMatrixView<Complex> PsiSc
+                (
+                    Nspline_inner,  // rows
+                    Nspline_inner,  // columns
+                    solution[ill]   // data
+                );
+                
+                // calculate radial integral
+                lambda = (Pf_overlaps | PsiSc | Wj[ell]);
+            }
+            else
+            {
+                // number of final bound channels for r1 -> inf and r2 -> inf
+                int Nchan1 = std::max(max_n - ang_[ill].second, 0);
+                int Nchan2 = std::max(max_n - ang_[ill].first, 0);
+                
+                // index of final bound channel for r2 -> inf
+                int ichan2 = T.nf - T.lf - 1;
+                
+                // does the channel exist?
+                if (0 <= ichan2 and ichan2 < Nchan2)
+                {
+                    
+                    // change view to row-major dense matrix
+                    cArrayView PsiScFf
+                    (
+                        solution[ill],  // data
+                        Nspline_inner * Nspline_inner + (Nchan1 + ichan2) * Nspline_outer, // offset
+                        Nspline_outer   // elements
+                    );
+                    
+                    // calculate radial integral
+                    lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
+                }
+            }
             
             // update the stored value
             # pragma omp critical
@@ -539,11 +572,14 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
         cArray const & rad_S0 = Lambda_Slp[T][ell].first;
         cArray const & rad_S1 = Lambda_Slp[T][ell].second;
         
+        // symmetry factor
+        Real sf = (inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
+        
         // compute T-matrices
         Tmat_Slp[T][ell].first = rad_S0 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
         Tmat_Slp[T][ell].second = rad_S1 * 4.0_r * special::constant::pi / kf * std::pow(Complex(0.,1.), -ell)
-                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * special::constant::sqrt_half;
+                    * (Real)special::ClebschGordan(T.lf, T.mf, ell, T.mi - T.mf, inp_.L, T.mi) * sf;
     }
 }
 
@@ -579,11 +615,10 @@ void Amplitudes::computeSigma_ (Amplitudes::Transition T)
 Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax, int l1, int l2)
 {
     // shorthands
-    Complex const * const t = &(bspline_atom_.t(0));
-    int Nspline_atom = bspline_atom_.Nspline();
-    int Nspline_proj = bspline_proj_.Nspline();
-    int Nreknot = bspline_atom_.Nreknot();
-    int order   = bspline_atom_.order();
+    Complex const * const t = &(bspline_inner_.t(0));
+    int Nspline = bspline_inner_.Nspline();
+    int Nreknot = bspline_inner_.Nreknot();
+    int order   = bspline_inner_.order();
     
     // determine evaluation radius
     Real rho = (cmd_.extract_rho > 0) ? cmd_.extract_rho : t[Nreknot-2].real();
@@ -633,22 +668,22 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
                 ddrho_F1F2 += k2*F1*F2p*sin_alpha;
             
             // get B-spline knots
-            int iknot1 = bspline_atom_.knot(r1);
-            int iknot2 = bspline_proj_.knot(r2);
+            int iknot1 = bspline_inner_.knot(r1);
+            int iknot2 = bspline_inner_.knot(r2);
             
             // auxiliary variables
-            cArray B1(Nspline_atom), dB1(Nspline_atom), B2(Nspline_proj), dB2(Nspline_proj);
+            cArray B1 (Nspline), dB1 (Nspline), B2 (Nspline), dB2 (Nspline);
             
             // evaluate the B-splines
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             {
-                B1[ispline1]  = bspline_atom_.bspline(ispline1,iknot1,order,r1);
-                dB1[ispline1] = bspline_atom_.dspline(ispline1,iknot1,order,r1);
+                B1[ispline1]  = bspline_inner_.bspline(ispline1,iknot1,order,r1);
+                dB1[ispline1] = bspline_inner_.dspline(ispline1,iknot1,order,r1);
             }
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                B2[ispline2]  = bspline_proj_.bspline(ispline2,iknot2,order,r2);
-                dB2[ispline2] = bspline_proj_.dspline(ispline2,iknot2,order,r2);
+                B2[ispline2]  = bspline_inner_.bspline(ispline2,iknot2,order,r2);
+                dB2[ispline2] = bspline_inner_.dspline(ispline2,iknot2,order,r2);
             }
             
             // evaluate the solution
@@ -656,7 +691,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
             for (int ispline1 = std::max(0,iknot1-order); ispline1 <= iknot1; ispline1++)
             for (int ispline2 = std::max(0,iknot2-order); ispline2 <= iknot2; ispline2++)
             {
-                int idx = ispline1 * Nspline_proj + ispline2;
+                int idx = ispline1 * Nspline + ispline2;
                 
                 Psi      += PsiSc[idx] *  B1[ispline1] *  B2[ispline2];
                 ddr1_Psi += PsiSc[idx] * dB1[ispline1] *  B2[ispline2];
@@ -697,9 +732,9 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     Chebyshev<double,Complex> CB;
     
     // avoid calculation when the extraction radius is too far
-    if (rho > bspline_atom_.R0())
+    if (rho > bspline_inner_.R0())
     {
-        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_atom_.R0() << std::endl;
+        std::cout << "Warning: Extraction radius rho = " << rho << " is too far; the atomic real grid ends at R0 = " << bspline_inner_.R0() << std::endl;
     }
     else   
     {

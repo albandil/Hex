@@ -46,7 +46,9 @@
 /**
  * @brief Hybrid preconditioner.
  * 
- * Combination of ILU and KPA.
+ * Combination of ILU and KPA:
+ * - KPA is used for angular blocks with no asymptotic channels.
+ * - ILU is used for angular blocks with asymptotic channels.
  */
 class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPreconditioner
 {
@@ -63,22 +65,20 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : CGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            ILUCGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            KPACGPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
-            prec_(ll.states().size(), Undecided)
+        ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            ILUCGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
+            KPACGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd)
         {
             // nothing more to do
         }
         
         // reuse parent definitions
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { CGPreconditioner::multiply(p,q); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { CGPreconditioner::rhs(chi,ienergy,instate); }
-        virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const { CGPreconditioner::precondition(r,z); }
+        using CGPreconditioner::multiply;
+        using CGPreconditioner::rhs;
+        using CGPreconditioner::precondition;
         
         // declare own definitions
         virtual void setup ();
@@ -93,17 +93,8 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         
     protected:
         
+        // decide whether to use the ILU preconditioner
         bool ilu_needed (int iblock) const;
-        
-        enum Prec
-        {
-            Undecided,
-            UseILU,
-            UseKPA
-        };
-        
-        // which preconditioner to use
-        mutable iArray prec_;
 };
 
 #endif

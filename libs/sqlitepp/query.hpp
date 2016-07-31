@@ -86,7 +86,7 @@ public:
 	// Add into binder.
 	query& operator,(into_binder_ptr i)
 	{
-		return put(i);
+		return put(std::move(i));
 	}
 	
 	// Add use binder.
@@ -95,7 +95,7 @@ public:
 	// Add use binder.
 	query& operator,(use_binder_ptr u)
 	{
-		return put(u);
+		return put(std::move(u));
 	}
 
 	// Swap queries.
@@ -141,7 +141,7 @@ public:
 	once_query(once_query& src);
 
 	// Execute statement on destroy.
-	~once_query();
+	~once_query() noexcept(false);
 private:
 	// Create proxy for session.
 	once_query(session& s);

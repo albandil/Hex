@@ -154,12 +154,13 @@ public:
      * @param d How many (main and) upper diagonals to populate.
      * @param f The functor that will compute the matrix elements.
      */
-    template <class Functor> SymBandMatrix<DataT> & populate (Functor f)
+    template <class Functor> SymBandMatrix<DataT> & populate (Functor f, bool parallelize = true)
     {
         // throw away old data
         elems_.resize(n_ * d_);
         
         // evaluate the elements
+        # pragma omp parallel for collapse (2) if (parallelize)
         for (std::size_t irow = 0; irow < n_; irow++)
         for (std::size_t id = 0; id < d_; id++)
         if (irow + id < n_)
@@ -205,6 +206,11 @@ public:
         assert(irow < n_ and icol < n_ and idia < d_);
         
         return elems_[irow * d_ + idia];
+    }
+    
+    SymBandMatrix<DataT> operator- () const
+    {
+        return SymBandMatrix<DataT>(n_, d_, -elems_);
     }
     
     NumberArray<DataT> const & data () const { return elems_; }

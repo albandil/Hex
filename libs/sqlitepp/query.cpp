@@ -165,7 +165,7 @@ once_query::once_query(once_query& src)
 }
 //----------------------------------------------------------------------------
 
-once_query::~once_query()
+once_query::~once_query() noexcept(false)
 {
 	if ( s_ )
 	{

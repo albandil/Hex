@@ -51,6 +51,11 @@ template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::New (int factorizer)
             return new LUft_SUPERLU_DIST<LU_int_t,Complex>();
             break;
 #endif
+#ifdef WITH_MUMPS
+        case LUFT_MUMPS:
+            return new LUft_MUMPS<LU_int_t,Complex>();
+            break;
+#endif
         default:
             HexException("No LU factorizer %d.", factorizer);
     }
@@ -83,6 +88,12 @@ std::size_t LUft_UMFPACK<LU_int_t,Complex>::size () const
 }
 
 template<>
+bool LUft_UMFPACK<LU_int_t,Complex>::valid () const
+{
+    return numeric_ != nullptr and size() > 0;
+}
+
+template<>
 double LUft_UMFPACK<LU_int_t,Complex>::cond () const
 {
     return info_[UMFPACK_RCOND];
@@ -92,8 +103,8 @@ template<>
 void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     // check sizes
-    assert(eqs * matrix_->cols() == x.size());
-    assert(eqs * matrix_->cols() == b.size());
+    assert(eqs * matrix_.cols() == x.size());
+    assert(eqs * matrix_.cols() == b.size());
     
     // solve for all RHSs
     for (int eq = 0; eq < eqs; eq++)
@@ -102,19 +113,19 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
         int status = UMFPACK_SOLVE_F
         (
             UMFPACK_Aat,            // matrix orientation
-            matrix_->p().data(),    // row pointers
-            matrix_->i().data(),    // column indices
+            matrix_.p().data(),     // row pointers
+            matrix_.i().data(),     // column indices
             
             // matrix elements (interleaved)
-            reinterpret_cast<const double*>(matrix_->x().data()),
+            reinterpret_cast<const double*>(matrix_.x().data()),
             nullptr,
             
             // solutions (interleaved)
-            reinterpret_cast<double*>(&x[0] + eq * matrix_->rows()),
+            reinterpret_cast<double*>(&x[0] + eq * matrix_.rows()),
             nullptr,
             
             // right-hand side vectors (interleaved)
-            reinterpret_cast<const double*>(&b[0] + eq * matrix_->rows()),
+            reinterpret_cast<const double*>(&b[0] + eq * matrix_.rows()),
             nullptr,
             
             numeric_,   // factorization object
@@ -134,6 +145,8 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
 template<>
 void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
 {
+    matrix_.hdfsave("csr-" + name);
+    
     int err = UMFPACK_SAVE_NUMERIC_F(numeric_, const_cast<char*>(name.c_str()));
     
     if (err == UMFPACK_ERROR_invalid_Numeric_object)
@@ -146,6 +159,14 @@ void LUft_UMFPACK<LU_int_t,Complex>::save (std::string name) const
 template<>
 void LUft_UMFPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
 {
+    if (not matrix_.hdfload("csr-" + name))
+    {
+        if (throw_on_io_failure)
+            HexException("[LUft::load] Failed to load the file \"csr-%s\".", name.c_str());
+        
+        return;
+    }
+    
     int err = UMFPACK_LOAD_NUMERIC_F(&numeric_, const_cast<char*>(name.c_str()));
     
     if (err == UMFPACK_ERROR_out_of_memory)
@@ -162,6 +183,7 @@ void LUft_UMFPACK<LU_int_t,Complex>::drop ()
     {
         UMFPACK_FREE_NUMERIC_F(&numeric_);
         numeric_ = nullptr;
+        matrix_.drop();
     }
 }
 
@@ -187,9 +209,9 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     
         NRformat AStore;
         AStore.nnz    = matrix_->x().size();                        // number of non-zero elements
-        AStore.nzval  = const_cast<Complex*>(matrix_->x().data());  // pointer to the array of non-zero elements
-        AStore.colind = const_cast<int*>(matrix_->i().data());      // row indices
-        AStore.rowptr = const_cast<int*>(matrix_->p().data());      // column pointers
+        AStore.nzval  = const_cast<Complex*>(matrix_.x().data());   // pointer to the array of non-zero elements
+        AStore.colind = const_cast<int*>(matrix_.i().data());       // row indices
+        AStore.rowptr = const_cast<int*>(matrix_.p().data());       // column pointers
         
         SuperMatrix A;
         A.Stype = SLU_NR;           // storage type: compressed sparse, row-major
@@ -199,8 +221,8 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         A.Dtype = SLU_Z;            // data type: double complex
 #endif
         A.Mtype = SLU_GE;           // mathematical type: general
-        A.nrow  = matrix_->rows();  // number of rows
-        A.ncol  = matrix_->cols();  // number of columns
+        A.nrow  = matrix_.rows();   // number of rows
+        A.ncol  = matrix_.cols();   // number of columns
         A.Store = &AStore;          // data structure pointer
     
     //
@@ -326,9 +348,9 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
     // Create matrix of the system.
     //
     
-        cArray xdata (matrix_->x());
-        NumberArray<LU_int_t> idata (matrix_->i());
-        NumberArray<LU_int_t> pdata (matrix_->p());
+        cArray xdata (matrix_.x());
+        NumberArray<LU_int_t> idata (matrix_.i());
+        NumberArray<LU_int_t> pdata (matrix_.p());
         
         NCformat AStore;
         AStore.nnz    = xdata.size();                           // number of non-zero elements
@@ -340,8 +362,8 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         A.Stype = SLU_NC;           // storage type: compressed sparse, column-major (SuperLU-dist suports no other)
         A.Dtype = SLU_Z;            // data type: double complex
         A.Mtype = SLU_GE;           // mathematical type: general
-        A.nrow  = matrix_->rows();  // number of rows
-        A.ncol  = matrix_->cols();  // number of columns
+        A.nrow  = matrix_.rows();   // number of rows
+        A.ncol  = matrix_.cols();   // number of columns
         A.Store = &AStore;          // data structure pointer
     
     //
@@ -404,3 +426,92 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
 }
 
 #endif // WITH_SUPERLU_DIST
+
+// ------------------------------------------------------------------------------------
+// MUMPS-dependent functions.
+//
+
+#ifdef WITH_MUMPS
+
+template<>
+bool LUft_MUMPS<LU_int_t,Complex>::valid () const
+{
+    return settings != nullptr and mmin(I.size(), J.size(), A.size()) > 0;
+}
+
+template<>
+void LUft_MUMPS<LU_int_t,Complex>::drop ()
+{
+    I.drop();
+    J.drop();
+    A.drop();
+}
+
+template<>
+LUft_MUMPS<LU_int_t,Complex>::~LUft_MUMPS ()
+{
+    drop ();
+    
+    if (settings != nullptr)
+    {
+        // destroy MUMPS data
+        settings->job = MUMPS_FINISH;
+        zmumps_c(settings);
+        delete settings;
+        settings = nullptr;
+    }
+}
+
+template<>
+std::size_t LUft_MUMPS<LU_int_t,Complex>::size () const
+{
+    if (not settings)
+        return 0;
+    
+    std::size_t s = settings->info[9-1];
+    
+    if (s == 0)
+        s = 1000000 * (std::size_t)std::abs(settings->info[9-1]) + sizeof(MUMPS_INT) * (std::size_t)settings->info[10-1];
+        
+    return sizeof(MUMPS_COMPLEX) * s;
+}
+
+template<>
+void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+{
+    // copy right-hand side to the solution vector
+    if (x.data() != b.data())
+        x = b;
+    
+    // run the back-substitution
+    settings->nrhs = 1;
+    settings->lrhs = x.size();
+    settings->rhs = reinterpret_cast<MUMPS_COMPLEX*>(x.data());
+    settings->irn = const_cast<MUMPS_INT*>(I.data());
+    settings->jcn = const_cast<MUMPS_INT*>(J.data());
+    settings->a   = reinterpret_cast<MUMPS_COMPLEX*>(const_cast<Complex*>(A.data()));
+    settings->job = 3;
+    MUMPS_C(settings);
+}
+
+template<>
+void LUft_MUMPS<LU_int_t,Complex>::save (std::string name) const
+{
+    I.hdfsave("I-" + name);
+    J.hdfsave("J-" + name);
+    A.hdfsave("A-" + name);
+}
+
+template<>
+void LUft_MUMPS<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+{
+    if (not I.hdfload("I-" + name) or
+        not J.hdfload("J-" + name) or
+        not A.hdfload("A-" + name))
+    {
+        if (throw_on_io_failure)
+            HexException("Failed to load MUMPS IJV matrices.");
+    }
+}
+
+#endif // WITH_MUMPS

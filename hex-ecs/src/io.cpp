@@ -64,44 +64,17 @@ const std::string sample_input =
     "# For each section use any of the following options and terminate by -1.\n"
     "#     L[inear] <Start> <End> <Samples>\n"
     "#     G[eometric] <Start> <End> <FirstInterval> <Quotient>\n"
-    "# The sections of the example are graphically demonstrated below.\n"
-    "# Letters used here are the same as in numbering of the user input given\n"
-    "# after this comment.\n"
-    "#\n"
-    "#         0      60   100   150 a.u.\n"
-    "#  solver |aaaaaa|bbbb|ccccc|\n"
-    "#                            160  200   250 a.u.\n"
-    "#  1. propagator |bbbb|dddddd|bbbb|ccccc|\n"
-    "#                                        260  300   350 a.u.\n"
-    "#  2. propagator             |bbbb|dddddd|bbbb|ccccc|\n"
-    "#                                                    360  400   450 a.u.\n"
-    "#  3. propagator                         |bbbb|dddddd|bbbb|ccccc|\n"
-    "#\n"
-    "#  etc.\n"
-    "#\n"
-    "#   1) Solver grid (0 a.u. - 100 a.u. / 150 a.u.)\n"
-    "#      - multiple knots at origin (4×)\n"
-    "#      - geometric grid to 10 a.u.\n"
-    "#      - uniform grid to distance (60 a.u. + 40 a.u. =) 100 a.u.\n"
-    "#      - complex absorbtion layer to distance 150 a.u.\n"
-    "#   2) First propagation grid (60 a.u. - 200 a.u. / 250 a.u.)\n"
-    "#      - uniform grid of length (40 a.u. + 60 a.u. + 40 a.u. =) 140 a.u. to distance 200 a.u.\n"
-    "#      - complex absorbtion layer of length 50 a.u. to distance 250 a.u.\n"
-    "#   3+) Further propagation grids, always extending the distance by 100 a.u.\n"
-    "# It is a good idea to visualise the grid before the calculation. You can use the command\n"
-    "# \"hex-ecs --write-grid\" and view the result in ParaView, or any other program supporting VTK.\n"
+    "# There are one or two sections; the projectile asymptotic extension is optional.\n"
     "#\n"
     "# a) Real knots of the basis that is common to atomic and projectile electron.\n"
     "  L  0.0  0.0   4\n"
     "  G  0.1 10.0  0.1  1.1\n"
     "  L   11  100  90\n"
     " -1\n"
-    "# b) Real knots of the panel overlap, if any.\n"
+    "# b) Real knots that are exclusive to the projectile, if any. (Start from zero.)\n"
     " -1\n"
-    "# c) Complex region knots.\n"
+    "# c) Complex region knots. (Start from zero.)\n"
     "  G    0   50   1  1.02\n"
-    " -1\n"
-    "# d) Knots of other panels (propagator projectile basis).\n"
     " -1\n"
     "\n"
     "# --------------- Atomic states -------------------\n"
@@ -123,6 +96,9 @@ const std::string sample_input =
     "# Angular momenta.\n"
     "# L  S  Pi limit\n"
     "  0  *  0  4\n"
+    "\n"
+    "# Projectile charge (+/-1)\n"
+    "  -1\n"
     "\n"
     "# Atom + projectile total energies in Rydbergs.\n"
     "# Use any of the following options:\n"
@@ -176,8 +152,6 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--zip <parameters>         (-z)  Solution file to zip (i.e. evaluate in B-spline basis and produce VTK datafile).                                       \n"
                     "\t                                 The '<parameters>' stands for '<filename> <Xmin> <Ymin> <Xmax> <Ymax> <Xn> <Yn>'.                                      \n"
                     "\t--write-grid               (-g)  Write grid layout to a VTK file.                                                                                       \n"
-                    "\t--map-solution <filename>        Convert solution between B-spline bases, requires target basis (--map-solution-target).                                \n"
-                    "\t--map-solution-target <filename> Target B-spline basis in another input file (like ecs.inp).                                                            \n"
 #ifdef WITH_MPI
                     "\t--mpi                      (-m)  Use MPI (assuming that the program has been launched by mpiexec).                                                      \n"
 #endif
@@ -185,13 +159,14 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--stg-integ-solve          (-b)  Only calculate integrals and the solution.                                                                             \n"
                     "\t--stg-extract              (-c)  Only extract amplitudes (assumes that the solution files exist).                                                       \n"
                     "\t--exact-rhs                      Use a different variant of right-hand side (slower and should be almost the same as the default - faster - variant).   \n"
+                    "\t--fast-bessel                    Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.                            \n"
                     "\t--preconditioner <name>    (-p)  Preconditioner to use (default: ILU).                                                                                  \n"
                     "\t--list-preconditioners     (-P)  List available preconditioners with short description of each.                                                         \n"
                     "\t--ssor <number>                  Apply SSOR coupling.                                                                                                   \n"
                     "\t--tolerance <number>       (-T)  Set tolerance for the conjugate gradients solver (default: 1e-8).                                                      \n"
                     "\t--prec-tolerance <number>  (-t)  Set tolerance for the conjugate gradients preconditioner (default: 1e-8).                                              \n"
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
-                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu' and 'superlu_dist'). Default is 'umfpack' (if available).           \n"
+                    "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu', 'superlu_dist' and 'mumps'). Default is 'umfpack' (if available).  \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
@@ -207,23 +182,17 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--out-of-core-continue     (-O)  Start solution from the existing OOC files.                                                                            \n"
                     "\t--whole-matrix             (-W)  In the above three cases: Load whole matrix from scratch file when calculating dot product (speeds them up a little).  \n"
                     "\t--shared-scratch           (-s)  Let every MPI process calculate only a subset of shared radial integrals (assume shared output directory).             \n"
-                    "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
+//                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
-                    "\t--kpa-max-iter                   Maximal KPA iterations for hybrid preconditioner.                                                                      \n"
-                    "\t--kpa-drop [<number>]            If given a number, use it as a threshold knot; the B-spline components beyond this knot will be assumed zero.          \n"
-                    "\t                                 If no number given, use the drop tolerance to find the knot as a distance where largest open bound channel decays      \n"
-                    "\t                                 below the drop tolerance. This option works only below ionization and generally requires softer --prec-tolerance.      \n"
-                    "\t--ilu-max-blocks                 Maximal number of ILU preconditioned blocks (per MPI node) for hybrid preconditioner.                                  \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
-                    "\t--mumps-in-core                  Try to keep all factorization data in memory when using MUMPS.                                                         \n"
-                    "\t--mumps-verbose                  Verbosity level of the MUMPS library.                                                                                  \n"
+                    "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
+                    "\t--mumps-verbose                  Verbosity level of the MUMPS library. Zero ('0') means no output, higher numbers increase the verbosity.               \n"
 #endif
 #ifndef DISABLE_PARALLEL_PRECONDITION
                     "\t--parallel-precondition          Apply multiple block preconditioners in parallel.                                                                      \n"
 #endif
-                    "\t--panels <number>                Propagate solution through given number of panels.                                                                     \n"
                     "\t--carry-initial-guess            Whether to use previous-energy solution as an initial guess for the new energy.                                        \n"
                     "\t--refine-solution                Load existing solutions and check that they are within tolerance, update if needed.                                    \n"
 #ifdef WITH_OPENCL
@@ -256,18 +225,6 @@ void CommandLine::parse (int argc, char* argv[])
                 zipdata.nY = std::stoi(optargs[6]);
                 return true;
             },
-        "map-solution", "", -1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // solution file to map
-                map_solution = optargs;
-                return true;
-            },
-        "map-solution-target", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // solution file to map
-                map_solution_target = optargs[0];
-                return true;
-            },
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // choose factorizer
@@ -277,6 +234,8 @@ void CommandLine::parse (int argc, char* argv[])
                     factorizer = LUFT_SUPERLU;
                 else if (optargs[0] == "superlu_dist")
                     factorizer = LUFT_SUPERLU_DIST;
+                else if (optargs[0] == "mumps")
+                    factorizer = LUFT_MUMPS;
                 else
                     HexException("Unknown LU-factorizer '%s'.", optargs[0].c_str());
                 return true;
@@ -420,24 +379,6 @@ void CommandLine::parse (int argc, char* argv[])
                 kpa_simple_rad = true;
                 return true;
             },
-        "kpa-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // number of KPA preconditioner iterations to trigger ILU preconditioning
-                kpa_max_iter = std::atoi(optargs[0].c_str());
-                return true;
-            },
-        "kpa-drop", "", -1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // use drop tolerance
-                kpa_drop = (optargs.empty() ? 0. : std::stod(optargs[0]));
-                return true;
-            },
-        "ilu-max-blocks", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // maximal number of ILU preconditioned blocks for hybrid preconditioner
-                ilu_max_blocks = std::atoi(optargs[0].c_str());
-                return true;
-            },
         "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // do not recalculate LU
@@ -451,10 +392,10 @@ void CommandLine::parse (int argc, char* argv[])
                 coupling_limit = std::atoi(optargs[0].c_str());
                 return true;
             },
-        "mumps-in-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+        "mumps-out-of-core", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // MUMPS out of core
-                mumps_outofcore = false;
+                mumps_outofcore = true;
                 return true;
             },
         "mumps-verbose", "", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -468,12 +409,6 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // precompute only the owned subset of radial integrals
                 shared_scratch = true;
-                return true;
-            },
-        "reuse-dia-blocks", "", 0, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // load dia blocks from scratch files
-                reuse_dia_blocks = true;
                 return true;
             },
 #ifdef WITH_OPENCL
@@ -537,12 +472,6 @@ void CommandLine::parse (int argc, char* argv[])
                 return true;
             },
 #endif
-        "panels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
-            {
-                // propagate solution along the projectile axis
-                panels = std::atoi(optargs[0].c_str());
-                return true;
-            },
         "parallel-factorization", "", 0, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // allow multiple factorizations at a time
@@ -607,6 +536,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use exact RHS
                 exact_rhs = true;
+                return true;
+            },
+        "fast-bessel", "", 0, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
+                fast_bessel = true;
                 return true;
             },
         
@@ -681,16 +616,29 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tecs angle = " << ecstheta << std::endl;
     
     //
-    // load real solver knot data
+    // load real atomic knot data
     //
     
     ReadArrays(inf, rknots);
     
     // print info
     std::cout << std::endl;
-    std::cout << "Real knots (" << rknots.size() << ")" << std::endl;
-    for (std::string line : rknots.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (rknots.size() < 2000)
+    {
+        std::cout << "Real knots (" << rknots.size() << ")" << std::endl;
+        for (std::string line : rknots.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Real knots (first 1000 of " << rknots.size() << " )" << std::endl;
+        for (std::string line : rknots.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Real knots (last 1000 of " << rknots.size() << " )" << std::endl;
+        for (std::string line : rknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check order of knots
     for (unsigned i = 1; i < rknots.size(); i++)
@@ -698,25 +646,41 @@ void InputFile::read (std::ifstream & inf)
             HexException("The real knot sequence is not monotonous.");
     
     //
-    // load basis overlap knot data
+    // load real projectile extension knot data
     //
     
-    ReadArrays(inf, overlap_knots);
+    ReadArrays(inf, rknots_ext);
     
     // print info
     std::cout << std::endl;
-    std::cout << "Overlap knots (" << overlap_knots.size() << ")" << std::endl;
-    for (std::string line : overlap_knots.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (rknots_ext.size() < 2000)
+    {
+        std::cout << "Extension knots (" << rknots_ext.size() << ")" << std::endl;
+        for (std::string line : rknots_ext.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Extension knots (first 1000 of " << rknots_ext.size() << " total)" << std::endl;
+        for (std::string line : rknots_ext.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Extension knots (last 1000 of " << rknots_ext.size() << " total)" << std::endl;
+        for (std::string line : rknots_ext.slice(rknots_ext.size() - 1000, rknots_ext.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check that the first knot is zero
-    if (overlap_knots.size() > 0 and overlap_knots[0] != 0.)
+    if (rknots_ext.size() > 0 and rknots_ext[0] != 0.)
         HexException("The first knot in overlap region must be zero.");
     
     // check order of knots
-    for (unsigned i = 1; i < overlap_knots.size(); i++)
-        if (overlap_knots[i] < overlap_knots[i-1])
+    for (unsigned i = 1; i < rknots_ext.size(); i++)
+        if (rknots_ext[i] < rknots_ext[i-1])
             HexException("The overlap knot sequence is not monotonous.");
+    
+    // determine whether only the inner problem is to be solved (i.e. no projectile extension grid)
+    inner_only = rknots_ext.empty();
     
     //
     // load complex knot data
@@ -726,9 +690,22 @@ void InputFile::read (std::ifstream & inf)
     
     // print info
     std::cout << std::endl;
-    std::cout << "Complex knots (before scaling; " << cknots.size() << ")" << std::endl;
-    for (std::string line : cknots.lines(100))
-        std::cout << '\t' << line << std::endl;
+    if (cknots.size() < 2000)
+    {
+        std::cout << "Complex knots (before scaling; " << cknots.size() << ")" << std::endl;
+        for (std::string line : cknots.lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
+    else
+    {
+        std::cout << "Complex knots (before scaling; first 1000 of " << cknots.size() << " )" << std::endl;
+        for (std::string line : cknots.slice(0, 1000).lines(100))
+            std::cout << '\t' << line << std::endl;
+        std::cout << std::endl;
+        std::cout << "Complex knots (before scaling; last 1000 of " << cknots.size() << " )" << std::endl;
+        for (std::string line : cknots.slice(rknots.size() - 1000, rknots.size()).lines(100))
+            std::cout << '\t' << line << std::endl;
+    }
     
     // check that the first knot is zero
     if (cknots.size() > 0 and cknots[0] != 0.)
@@ -738,23 +715,6 @@ void InputFile::read (std::ifstream & inf)
     for (unsigned i = 1; i < cknots.size(); i++)
         if (cknots[i] < cknots[i-1])
             HexException("The complex knot sequence is not monotonous.");
-    
-    //
-    // load real propagator knot data
-    //
-    
-    ReadArrays(inf, rknots_next);
-    
-    // print info
-    std::cout << std::endl;
-    std::cout << "Propagator real knots (" << rknots_next.size() << ")" << std::endl;
-    for (std::string line : rknots_next.lines(100))
-        std::cout << '\t' << line << std::endl;
-    
-    // check order of knots
-    for (unsigned i = 1; i < rknots_next.size(); i++)
-        if (rknots_next[i] < rknots_next[i-1])
-            HexException("The propagator real knot sequence is not monotonous.");
     
     //
     // load initial atomic quantum numbers
@@ -878,6 +838,15 @@ void InputFile::read (std::ifstream & inf)
     std::cout << "\tPi = " << Pi << std::endl;
     std::cout << "\tnL = " << levels << std::endl;
     
+    Zp = ReadNext<int>(inf).val;
+    
+    if (Zp == 0)
+        HexException("Invalid projectile charge 0. Use +1 or -1 for positron and electron respectively.");
+    
+    Zp = Zp / std::abs(Zp);
+    
+    std::cout << "\tZp = " << Zp << std::endl;
+    
     //
     // load initial energies
     //
@@ -902,73 +871,185 @@ void InputFile::read (std::ifstream & inf)
     std::cout << std::endl;
 }
 
-void zip_solution (CommandLine & cmd, std::vector<Bspline> const & bspline, std::vector<std::pair<int,int>> const & ll)
+void zip_solution
+(
+    CommandLine const & cmd,
+    InputFile const & inp,
+    Parallel const & par, 
+    Bspline const & bspline_inner,
+    Bspline const & bspline_full,
+    std::vector<std::pair<int,int>> const & ll
+)
 {
     cArray sol;     // stored solution expansion
     cArray ev;      // evaluated solution
     rArray grid_x;  // real evaluation grid (atomic electron)
     rArray grid_y;  // real evaluation grid (projectile electron)
     
+    // shorthands
+    std::size_t Nspline_inner = bspline_inner.Nspline();
+    std::size_t Nspline_full  = bspline_full .Nspline();
+    std::size_t Nspline_outer = Nspline_full - Nspline_inner;
+    
     std::cout << "Zipping B-spline expansion of the solution: \"" << cmd.zipdata.file << "\"" << std::endl;
-    
-    // load the requested file
-    if (not sol.hdfload(cmd.zipdata.file.c_str()))
-        HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
-    
-    // determine which B-spline basis to use
-    unsigned i;
-    for (i = 0; i < bspline.size(); i++)
-    {
-        if (sol.size() == (std::size_t)bspline[0].Nspline() * (std::size_t)bspline[i].Nspline())
-            break;
-    }
-    
-    // was some basis appropriate?
-    if (i == bspline.size())
-        HexException("The solution file of size %ld is not compatible with defined B-spline basis. Did you specify the same number of panels?", sol.size());
     
     // evaluation grid
     Real Xmin = cmd.zipdata.Xmin < 0 ? 0 : cmd.zipdata.Xmin;
     Real Ymin = cmd.zipdata.Ymin < 0 ? 0 : cmd.zipdata.Ymin;
-    Real Xmax = cmd.zipdata.Xmax < 0 ? bspline[0].Rmax() : cmd.zipdata.Xmax;
-    Real Ymax = cmd.zipdata.Ymax < 0 ? bspline[i].Rmax() : cmd.zipdata.Ymax;
+    Real Xmax = cmd.zipdata.Xmax < 0 ? bspline_full.Rmax() : cmd.zipdata.Xmax;
+    Real Ymax = cmd.zipdata.Ymax < 0 ? bspline_full.Rmax() : cmd.zipdata.Ymax;
     grid_x = linspace(Xmin, Xmax, cmd.zipdata.nX);
     grid_y = linspace(Ymin, Ymax, cmd.zipdata.nY);
     
-    // write to file
-    std::ofstream out ((cmd.zipdata.file + ".vtk").c_str());
+    // load the requested file
+    HDFFile hdf (cmd.zipdata.file, HDFFile::readonly);
+    if (not hdf.valid())
+        HexException("Cannot load file %s.", cmd.zipdata.file.c_str());
+    
+    // get solution information
+    int l1, l2, Nchan1, Nchan2; Real E;
+    if (not hdf.read("l1", &l1, 1) or
+        not hdf.read("l2", &l2, 1) or
+        not hdf.read("E", &E, 1) or
+        not sol.hdfload(cmd.zipdata.file))
+        HexException("This is not a valid solution file.");
+    
+    // get number of asymptotic channels
+    int max_n = (E >= 0 ? 0 : 1.0_r / std::sqrt(-E));
+    Nchan1 = (inp.Zp < 0 and max_n >= l2 + 1 ? max_n - l2 : 0);
+    Nchan2 = (               max_n >= l1 + 1 ? max_n - l1 : 0);
+    
+    // prepare radial integrals structure
+    RadialIntegrals r (bspline_inner, bspline_full, 0);
+    r.verbose(false);
+    r.setupOneElectronIntegrals(par, cmd);
+    
+    // prepare quadrature structure
+    GaussLegendre g_inner (bspline_inner);
+    
+    // factorize the overlap matrix
+    CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
+    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu = S_csr.factorize();
+    
+    // compute all needed bound states
+    cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);
+    for (int n1 = l1 + 1; n1 <= l1 + Nchan2; n1++)
+    {
+        Sp1[n1 - l1 - 1] = r.overlapP(bspline_inner, g_inner, n1, l1, weightEndDamp(bspline_inner));
+        Xp1[n1 - l1 - 1] = S_lu->solve(Sp1[n1 - l1 - 1]);
+    }
+    for (int n2 = l2 + 1; n2 <= l2 + Nchan1; n2++)
+    {
+        Sp2[n2 - l2 - 1] = r.overlapP(bspline_inner, g_inner, n2, l2, weightEndDamp(bspline_inner));
+        Xp2[n2 - l2 - 1] = S_lu->solve(Sp2[n2 - l2 - 1]);
+    }
+    
+    // expand the solution
+    cArray full_solution (Nspline_full * Nspline_full, 0.0_z);
+    for (std::size_t i = 0; i < Nspline_full; i++)
+    for (std::size_t j = 0; j < Nspline_full; j++)
+    {
+        if (i < Nspline_inner and j < Nspline_inner)
+        {
+            full_solution[i * Nspline_full + j] = sol[i * Nspline_inner + j];
+        }
+        else if (i >= Nspline_inner and j >= Nspline_inner)
+        {
+            full_solution[i * Nspline_full + j] = 0;
+        }
+        else if (i >= Nspline_inner)
+        {
+            // all channels r1 -> inf
+            for (int n = 0; n < Nchan1; n++)
+                full_solution[i * Nspline_full + j] += sol[Nspline_inner * Nspline_inner + n * Nspline_outer + i - Nspline_inner] * Xp2[n][j];
+        }
+        else /* if (j >= Nspline_inner) */
+        {
+            // all channels r2 -> inf
+            for (int n = 0; n < Nchan2; n++)
+                full_solution[i * Nspline_full + j] += Xp1[n][i] * sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + j - Nspline_inner];
+        }
+    }
+    
+    // write full solution to file
+    std::ofstream out ((cmd.zipdata.file + "-full.vtk").c_str());
     writeVTK_points
     (
         out,                                // output file stream
         Bspline::zip
         (
-            bspline[0], bspline[i],         // B-spline bases (for x and y)
-            sol,                            // function expansion in those two bases
+            bspline_full, bspline_full,     // B-spline bases (for x and y)
+            full_solution,                  // function expansion in those two bases
             grid_x, grid_y                  // evaluation grids
         ),
         grid_x, grid_y, rArray({0.})        // x,y,z
     );
+    
+    // expand the channel functions
+    for (int n = 0; n < Nchan1; n++)
+    {
+        cArray full_channel_function (Nspline_full, 0.0_z);
+        
+        for (std::size_t i = 0; i < Nspline_full; i++)
+        {
+            if (i < Nspline_inner)
+            {
+                for (std::size_t j = 0; j < Nspline_inner; j++)
+                    full_channel_function[i] += sol[i * Nspline_inner + j] * Sp2[n][j];
+            }
+            else
+            {
+                full_channel_function[i] = sol[Nspline_inner * Nspline_inner + n * Nspline_outer + i - Nspline_inner];
+            }
+        }
+        
+        // write to file
+        std::ofstream out (format("%s-channel-X-%d.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        writeVTK_points
+        (
+            out,
+            bspline_full.zip(full_channel_function, grid_x),
+            grid_x, rArray({0.}), rArray({0.})
+        );
+    }
+    for (int n = 0; n < Nchan2; n++)
+    {
+        cArray full_channel_function (Nspline_full);
+        
+        for (std::size_t i = 0; i < Nspline_full; i++)
+        {
+            if (i < Nspline_inner)
+            {
+                for (std::size_t j = 0; j < Nspline_inner; j++)
+                    full_channel_function[i] += Sp1[n][j] * sol[j * Nspline_inner + i];
+            }
+            else
+            {
+                full_channel_function[i] = sol[Nspline_inner * Nspline_inner + (Nchan1 + n) * Nspline_outer + i - Nspline_inner];
+            }
+        }
+        
+        // write to file
+        std::ofstream out (format("%s-channel-%d-X.vtk", cmd.zipdata.file.c_str(), n).c_str());
+        writeVTK_points
+        (
+            out,
+            bspline_full.zip(full_channel_function, grid_x),
+            grid_x, rArray({0.}), rArray({0.})
+        );
+    }
 }
 
-void write_grid (std::vector<Bspline> const & bspline, std::string const & basename)
+void write_grid (Bspline const & bspline, std::string const & basename)
 {
     // get atomic grid
-    rArray knots0 = bspline[0].rknots();
-    knots0.pop_back();
-    knots0.append(bspline[0].cknots());
+    rArray knots = bspline.rknots();
+    knots.pop_back();
+    knots.append(bspline.cknots());
     
-    // for all grids
-    for (unsigned i = 0; i < bspline.size(); i++)
-    {
-        // output file
-        std::ofstream out (format("%s-%d.vtk", basename.c_str(), i).c_str());
-        
-        // get knots
-        rArray knots = bspline[i].rknots();
-        knots.pop_back();
-        knots.append(bspline[i].cknots());
-        
-        // write knots (write header only for the first time)
-        writeVTK_points(out, cArray(), knots0, knots, rArray({0.}));
-    }
+    // output file
+    std::ofstream out (basename + ".vtk");
+    
+    // write knots (write header only for the first time)
+    writeVTK_points(out, cArray(), knots, knots, rArray({0.}));
 }

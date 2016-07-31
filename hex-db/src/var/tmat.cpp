@@ -33,36 +33,74 @@
 #include <string>
 #include <vector>
 
+// --------------------------------------------------------------------------------- //
+
 #include "hex-arrays.h"
 #include "hex-interpolate.h"
 #include "hex-version.h"
 
-#include "variables.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string TMatrix::Id = "tmat";
-const std::string TMatrix::Description = "T-matrix.";
-const std::vector<std::pair<std::string,std::string>> TMatrix::Dependencies = {
-    {"ni", "Initial atomic principal quantum number."},
-    {"li", "Initial atomic orbital quantum number."},
-    {"mi", "Initial atomic magnetic quantum number."},
-    {"nf", "Final atomic principal quantum number."},
-    {"lf", "Final atomic orbital quantum number."},
-    {"mf", "Final atomic magnetic quantum number."},
-    {"S", "Total spin of atomic + projectile electron."},
-    {"Ei", "Projectile impact energy (Rydberg)."},
-    {"ell", "Outgoing projectile partial wave angular momentum."}
-};
-const std::vector<std::string> TMatrix::VecDependencies = { "Ei" };
+#include "../quantities.h"
+#include "../utils.h"
 
-bool TMatrix::initialize (sqlitepp::session & db) const
+// --------------------------------------------------------------------------------- //
+
+createNewScatteringQuantity(TMatrix);
+
+// --------------------------------------------------------------------------------- //
+
+std::string TMatrix::name ()
 {
-    return true;
+    return "tmat";
 }
 
-std::vector<std::string> const & TMatrix::SQL_CreateTable () const
+std::string TMatrix::description ()
 {
-    static const std::vector<std::string> cmd = {
-        "CREATE TABLE IF NOT EXISTS '" + TMatrix::Id + "' ("
+    return "T-matrix.";
+}
+
+std::vector<std::string> TMatrix::dependencies ()
+{
+    return std::vector<std::string>();
+}
+
+std::vector<std::pair<std::string,std::string>> TMatrix::params ()
+{
+    return std::vector<std::pair<std::string,std::string>>
+    {
+        {"ni", "Initial atomic principal quantum number."},
+        {"li", "Initial atomic orbital quantum number."},
+        {"mi", "Initial atomic magnetic quantum number."},
+        {"nf", "Final atomic principal quantum number."},
+        {"lf", "Final atomic orbital quantum number."},
+        {"mf", "Final atomic magnetic quantum number."},
+        {"S", "Total spin of atomic + projectile electron."},
+        {"Ei", "Projectile impact energy (Rydberg)."},
+        {"ell", "Outgoing projectile partial wave angular momentum."}
+    };
+}
+
+std::vector<std::string> TMatrix::vparams ()
+{
+    return std::vector<std::string>
+    {
+        "Ei"
+    };
+}
+
+// --------------------------------------------------------------------------------- //
+
+bool TMatrix::initialize (sqlitepp::session & db)
+{
+    return ScatteringQuantity::initialize(db);
+}
+
+bool TMatrix::createTable ()
+{
+    sqlitepp::statement st (session());
+    st <<
+        "CREATE TABLE IF NOT EXISTS 'tmat' ("
             "ni INTEGER, "
             "li INTEGER, "
             "mi INTEGER, "
@@ -76,32 +114,44 @@ std::vector<std::string> const & TMatrix::SQL_CreateTable () const
             "Re_T_ell DOUBLE PRECISION, "
             "Im_T_ell DOUBLE PRECISION, "
             "PRIMARY KEY (ni,li,mi,nf,lf,mf,L,S,Ei,ell)"
-        ")"
-    };
-    return cmd;
+        ")";
+    
+    try
+    {
+        st.exec();
+    }
+    catch (sqlitepp::exception & e)
+    {
+        std::cerr << "ERROR: Creation of table 'tmat' failed!" << std::endl;
+        std::cerr << "       code = " << e.code() << " (\"" << e.what() << "\")" << std::endl;
+        return false;
+    }
+    
+    return ScatteringQuantity::createTable();
 }
 
-std::vector<std::string> const & TMatrix::SQL_Update () const
+bool TMatrix::updateTable ()
 {
-    static const std::vector<std::string> cmd;
-    return cmd;
+    return ScatteringQuantity::updateTable();
 }
 
-bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
+// --------------------------------------------------------------------------------- //
+
+bool TMatrix::run (std::map<std::string,std::string> const & sdata)
 {
     // manage units
     double efactor = change_units(Eunits, eUnit_Ry);
     double lfactor = change_units(lUnit_au, Lunits);
     
     // atomic and projectile data
-    int ni = Conv<int>(sdata, "ni", Id);
-    int li = Conv<int>(sdata, "li", Id);
-    int mi0= Conv<int>(sdata, "mi", Id);
-    int nf = Conv<int>(sdata, "nf", Id);
-    int lf = Conv<int>(sdata, "lf", Id);
-    int mf0= Conv<int>(sdata, "mf", Id);
-    int  S = Conv<int>(sdata,  "S", Id);
-    int ell= Conv<int>(sdata, "ell",Id);
+    int ni = Conv<int>(sdata, "ni", name());
+    int li = Conv<int>(sdata, "li", name());
+    int mi0= Conv<int>(sdata, "mi", name());
+    int nf = Conv<int>(sdata, "nf", name());
+    int lf = Conv<int>(sdata, "lf", name());
+    int mf0= Conv<int>(sdata, "mf", name());
+    int  S = Conv<int>(sdata, "S",  name());
+    int ell= Conv<int>(sdata, "ell",name());
     
     // use mi >= 0; if mi < 0, flip both signs
     int mi = (mi0 < 0 ? -mi0 : mi0);
@@ -111,13 +161,13 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     rArray energies;
     
     // get energy / energies
-    try {
-        
+    try
+    {
         // is there a single energy specified using command line ?
-        energies.push_back(Conv<double>(sdata, "Ei", Id));
-        
-    } catch (std::exception e) {
-        
+        energies.push_back(Conv<double>(sdata, "Ei", name()));
+    }
+    catch (std::exception e)
+    {
         // are there more energies specified using the STDIN ?
         energies = readStandardInput<double>();
     }
@@ -126,8 +176,8 @@ bool TMatrix::run (std::map<std::string,std::string> const & sdata) const
     double E, Re_T_ell, Im_T_ell;
     
     // create query statement
-    sqlitepp::statement st(db);
-    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM " + TMatrix::Id + " "
+    sqlitepp::statement st (session());
+    st << "SELECT Ei, SUM(Re_T_ell), SUM(Im_T_ell) FROM 'tmat' "
           "WHERE ni = :ni "
           "  AND li = :li "
           "  AND mi = :mi "

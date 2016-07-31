@@ -56,10 +56,6 @@ void GPUCGPreconditioner::setup ()
 {
     KPACGPreconditioner::setup();
     
-    // check zero panel
-    if (bspline_atom_.hash() != bspline_proj_.hash())
-        HexException("GPU preconditioner only supports #0 panel (use KPA for further panels).");
-    
     // create program source, append zero
     std::string source;
     source.resize(src_preconditioners_GPUPreconditioner_cl_len + 1);
@@ -68,11 +64,9 @@ void GPUCGPreconditioner::setup ()
     source.back() = '\0';
     
     // shorthands
-    int order = bspline_atom_.order();
-    int Nspline_atom = bspline_atom_.Nspline();
-    int Nreknot_atom = bspline_atom_.Nreknot();
-    int Nspline_proj = bspline_proj_.Nspline();
-    int Nreknot_proj = bspline_proj_.Nreknot();
+    int order = rad_.bspline_inner().order();
+    int Nspline_inner = rad_.bspline_inner().Nspline();
+    int Nreknot_inner = rad_.bspline_inner().Nreknot();
     
     // auxiliary variables
     char platform_name[1024], platform_vendor[1024], platform_version[1024], device_name[1024], device_vendor[1024];
@@ -172,7 +166,7 @@ void GPUCGPreconditioner::setup ()
     else
     {
         // determine how many solution segments will fit into the device memory
-        unsigned memseg = 0.8 * global_memory_size / (bspline_atom_.Nspline() * bspline_proj_.Nspline() * sizeof(Complex));
+        unsigned memseg = 0.8 * global_memory_size / (Nspline_inner * Nspline_inner * sizeof(Complex));
         if (memseg < 2 and cmd_.gpu_multiply)
             HexException("Insufficent OpenCL device memory for lightweight on-device multiplication.");
         
@@ -192,21 +186,21 @@ void GPUCGPreconditioner::setup ()
     std::size_t greq = 0;
     // - Nspline*Nspline for: four preconditioner matrices, 5 CG arrays (x,b,r,p,z) and one temporary array (tmA)
     if (not cmd_.gpu_large_data)
-        greq += 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
+        greq += 10 * (std::size_t)Nspline_inner * (std::size_t)Nspline_inner;
     // - padded one-electron matrices (S, D, M1, M2)
-    greq += 4 * (rad_.S_atom().size() + rad_.S_proj().size());
+    greq += 4 * (rad_.S_inner().size() + rad_.S_inner().size());
     // - preconditioner eigenvalues
-    greq += Nspline_atom + Nspline_proj;
+    greq += Nspline_inner + Nspline_inner;
     // - full integral moments
-    greq += (rad_.maxlambda() + 1) * (rad_.S_atom().size() + rad_.S_proj().size());
+    greq += (rad_.maxlambda() + 1) * (rad_.S_inner().size() + rad_.S_inner().size());
     // - partial integral moments
-    greq += 2 * rad_.Mitr_L_atom(-1).size() + rad_.Mitr_L_proj(-1).size();
+    greq += 2 * rad_.Mitr_L_inner(-1).size() + rad_.Mitr_L_inner(-1).size();
     // - diagonal contribution to two-electron integrals
-    if (bspline_atom_.hash() == bspline_proj_.hash() and not cmd_.gpu_large_data)
-        greq += (rad_.maxlambda() + 1) * bspline_atom_.Nspline() * special::pow_int(bspline_atom_.order() + 1, 3);
+    if (not cmd_.gpu_large_data)
+        greq += (rad_.maxlambda() + 1) * Nspline_inner * special::pow_int(order + 1, 3);
     // - solution vector
     if (cmd_.gpu_multiply and not cmd_.gpu_host_multiply)
-        greq = std::max(greq, (std::size_t)nsrcseg_ * ndstseg_ * bspline_atom_.Nspline() * bspline_proj_.Nspline());
+        greq = std::max(greq, (std::size_t)nsrcseg_ * ndstseg_ * Nspline_inner * Nspline_inner);
     // - all these were complex numbers
     greq *= 16;
     
@@ -215,9 +209,9 @@ void GPUCGPreconditioner::setup ()
     
     if (cmd_.gpu_large_data)
     {
-        std::size_t host_mem = 16 * 10 * (std::size_t)Nspline_atom * (std::size_t)Nspline_proj;
+        std::size_t host_mem = 16 * 10 * (std::size_t)Nspline_inner * (std::size_t)Nspline_inner;
         if (cmd_.gpu_host_multiply)
-            host_mem += 16 * nsrcseg_ * ndstseg_ * (std::size_t)bspline_atom_.Nspline() * (std::size_t)bspline_proj_.Nspline();
+            host_mem += 16 * nsrcseg_ * ndstseg_ * (std::size_t)Nspline_inner * (std::size_t)Nspline_inner;
         std::cout << "\t- data kept in host memory: " << format("%.2f", host_mem/gsl_sf_pow_int(1024,3)) << " GiB " << std::endl;
         std::cout << "\t- WARNING: --ocl-use-host-memory will slow down the solution due to the host-device data transfers." << std::endl;
     }
@@ -250,10 +244,10 @@ void GPUCGPreconditioner::setup ()
     std::ostringstream flags;
     flags << " -cl-fast-relaxed-math ";
     flags << " -D ORDER="        << order        << " ";
-    flags << " -D NSPLINE_ATOM=" << Nspline_atom << " ";
-    flags << " -D NSPLINE_PROJ=" << Nspline_proj << " ";
-    flags << " -D NREKNOT_ATOM=" << Nreknot_atom << " ";
-    flags << " -D NREKNOT_PROJ=" << Nreknot_proj << " ";
+    flags << " -D NSPLINE_ATOM=" << Nspline_inner << " ";
+    flags << " -D NSPLINE_PROJ=" << Nspline_inner << " ";
+    flags << " -D NREKNOT_ATOM=" << Nreknot_inner << " ";
+    flags << " -D NREKNOT_PROJ=" << Nreknot_inner << " ";
     flags << " -D NLOCAL="       << Nlocal_      << " ";
     flags << " -D BLOCK_SIZE="   << blocksize_   << " ";
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_.states().size() << " ";
@@ -303,57 +297,37 @@ void GPUCGPreconditioner::setup ()
     krdv_       = clCreateKernel(program_, "kron_div",        nullptr);
     
     // round 'Nsegsiz' to nearest larger multiple of Nlocal_
-    std::size_t Nsegsiz = Nspline_atom * Nspline_proj;
+    std::size_t Nsegsiz = Nspline_inner * Nspline_inner;
     std::size_t Nglobal = Nlocal_ * ((Nsegsiz + Nlocal_ - 1) / Nlocal_);
     
     // some OpenCL auxiliary storage arrays (used by kernels for temporary data)
     tmp_.resize(Nglobal / Nlocal_);              tmp_.connect(context_, smallDataFlags_);
     nrm_.resize(Nglobal / Nlocal_);              nrm_.connect(context_, smallDataFlags_);
-    tmA_.resize(Nspline_atom * Nspline_proj);    tmA_.connect(context_, largeDataFlags_);
+    tmA_.resize(Nspline_inner * Nspline_inner);    tmA_.connect(context_, largeDataFlags_);
     
     // connect B-spline knots
-    t_atom_.reset(bspline_atom_.t().size(), bspline_atom_.t().data());  t_atom_.connect(context_, smallDataFlags_);
-    t_proj_.reset(bspline_proj_.t().size(), bspline_proj_.t().data());  t_proj_.connect(context_, smallDataFlags_);
+    t_inner_.reset(rad_.bspline_inner().t().size(), rad_.bspline_inner().t().data());  t_inner_.connect(context_, smallDataFlags_);
     
     // create OpenCL representation of the one-electron matrices + transfer data to GPU memory
-    S_atom_p_.reset(rad_.S_atom().data().size(), rad_.S_atom().data().data());                   S_atom_p_.connect(context_, smallDataFlags_);
-    D_atom_p_.reset(rad_.D_atom().data().size(), rad_.D_atom().data().data());                   D_atom_p_.connect(context_, smallDataFlags_);
-    Mm1_tr_atom_p_.reset(rad_.Mm1_tr_atom().data().size(), rad_.Mm1_tr_atom().data().data());    Mm1_tr_atom_p_.connect(context_, smallDataFlags_);
-    Mm2_atom_p_.reset(rad_.Mm2_atom().data().size(), rad_.Mm2_atom().data().data());             Mm2_atom_p_.connect(context_, smallDataFlags_);
-    
-    S_proj_p_.reset(rad_.S_proj().data().size(), rad_.S_proj().data().data());                   S_proj_p_.connect(context_, smallDataFlags_);
-    D_proj_p_.reset(rad_.D_proj().data().size(), rad_.D_proj().data().data());                   D_proj_p_.connect(context_, smallDataFlags_);
-    Mm1_tr_proj_p_.reset(rad_.Mm1_tr_proj().data().size(), rad_.Mm1_tr_proj().data().data());    Mm1_tr_proj_p_.connect(context_, smallDataFlags_);
-    Mm2_proj_p_.reset(rad_.Mm2_proj().data().size(), rad_.Mm2_proj().data().data());             Mm2_proj_p_.connect(context_, smallDataFlags_);
+    S_inner_p_.reset(rad_.S_inner().data().size(), rad_.S_inner().data().data());                   S_inner_p_.connect(context_, smallDataFlags_);
+    D_inner_p_.reset(rad_.D_inner().data().size(), rad_.D_inner().data().data());                   D_inner_p_.connect(context_, smallDataFlags_);
+    Mm1_tr_inner_p_.reset(rad_.Mm1_tr_inner().data().size(), rad_.Mm1_tr_inner().data().data());    Mm1_tr_inner_p_.connect(context_, smallDataFlags_);
+    Mm2_inner_p_.reset(rad_.Mm2_inner().data().size(), rad_.Mm2_inner().data().data());             Mm2_inner_p_.connect(context_, smallDataFlags_);
     
     // create OpenCL representation of the one-electron partial integral moments + transfer data to GPU memory
-    Mi_L_atom_.resize(rad_.maxlambda() + 1); Mi_mLm1_atom_.resize(rad_.maxlambda() + 1);
-    M_L_atom_.resize(rad_.maxlambda() + 1); M_mLm1_atom_.resize(rad_.maxlambda() + 1);
+    Mi_L_inner_.resize(rad_.maxlambda() + 1); Mi_mLm1_inner_.resize(rad_.maxlambda() + 1);
+    M_L_inner_.resize(rad_.maxlambda() + 1); M_mLm1_inner_.resize(rad_.maxlambda() + 1);
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
     {
-        Mi_L_atom_[lambda].reset(rad_.Mitr_L_atom(lambda).size(), rad_.Mitr_L_atom(lambda).data());
-        Mi_mLm1_atom_[lambda].reset(rad_.Mitr_mLm1_atom(lambda).size(), rad_.Mitr_mLm1_atom(lambda).data());
-        M_L_atom_[lambda].reset(rad_.Mtr_L_atom(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_L_atom(lambda).data().data()));
-        M_mLm1_atom_[lambda].reset(rad_.Mtr_mLm1_atom(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_mLm1_atom(lambda).data().data()));
+        Mi_L_inner_[lambda].reset(rad_.Mitr_L_inner(lambda).size(), rad_.Mitr_L_inner(lambda).data());
+        Mi_mLm1_inner_[lambda].reset(rad_.Mitr_mLm1_inner(lambda).size(), rad_.Mitr_mLm1_inner(lambda).data());
+        M_L_inner_[lambda].reset(rad_.Mtr_L_inner(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_L_inner(lambda).data().data()));
+        M_mLm1_inner_[lambda].reset(rad_.Mtr_mLm1_inner(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_mLm1_inner(lambda).data().data()));
         
-        Mi_L_atom_[lambda].connect(context_, smallDataFlags_);
-        Mi_mLm1_atom_[lambda].connect(context_, smallDataFlags_);
-        M_L_atom_[lambda].connect(context_, smallDataFlags_);
-        M_mLm1_atom_[lambda].connect(context_, smallDataFlags_);
-    }
-    Mi_L_proj_.resize(rad_.maxlambda() + 1); Mi_mLm1_proj_.resize(rad_.maxlambda() + 1);
-    M_L_proj_.resize(rad_.maxlambda() + 1); M_mLm1_proj_.resize(rad_.maxlambda() + 1);
-    for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
-    {
-        Mi_L_proj_[lambda].reset(rad_.Mitr_L_proj(lambda).size(), rad_.Mitr_L_proj(lambda).data());
-        Mi_mLm1_proj_[lambda].reset(rad_.Mitr_mLm1_proj(lambda).size(), rad_.Mitr_mLm1_proj(lambda).data());
-        M_L_proj_[lambda].reset(rad_.Mtr_L_proj(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_L_proj(lambda).data().data()));
-        M_mLm1_proj_[lambda].reset(rad_.Mtr_mLm1_proj(lambda).data().size(), const_cast<Complex*>(rad_.Mtr_mLm1_proj(lambda).data().data()));
-        
-        Mi_L_proj_[lambda].connect(context_, smallDataFlags_);
-        Mi_mLm1_proj_[lambda].connect(context_, smallDataFlags_);
-        M_L_proj_[lambda].connect(context_, smallDataFlags_);
-        M_mLm1_proj_[lambda].connect(context_, smallDataFlags_);
+        Mi_L_inner_[lambda].connect(context_, smallDataFlags_);
+        Mi_mLm1_inner_[lambda].connect(context_, smallDataFlags_);
+        M_L_inner_[lambda].connect(context_, smallDataFlags_);
+        M_mLm1_inner_[lambda].connect(context_, smallDataFlags_);
     }
     Rdia_.resize(rad_.maxlambda() + 1);
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
@@ -373,7 +347,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
     else
     {
         // shorthands
-        std::size_t Nsegsiz = bspline_atom_.Nspline() * bspline_proj_.Nspline();
+        std::size_t Nsegsiz = rad_.bspline_inner().Nspline() * rad_.bspline_inner().Nspline();
         
         // device data handles
         int location = (cmd_.gpu_host_multiply ? CL_MEM_ALLOC_HOST_PTR : 0);
@@ -400,14 +374,14 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             
             // multiply by diagonal block (one-electron contribution)
             clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
-            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
-            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
-            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
-            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_proj_p_.handle());
-            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_proj_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
-            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
+            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
+            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_p_.handle());
+            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
+            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
             clSetKernelArg(mml1_,10, sizeof(int),    &l2);
             clSetKernelArg(mml1_,11, sizeof(cl_mem), &pgpu);
@@ -427,26 +401,26 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             cl_int foffset = lambda * ang_.states().size() * ang_.states().size();
             
             // set kernel arguments
-            clSetKernelArg(mml2_dcpl_offset_, 0, sizeof(cl_mem), &t_atom_.handle());
-            clSetKernelArg(mml2_dcpl_offset_, 1, sizeof(cl_mem), &t_proj_.handle());
+            clSetKernelArg(mml2_dcpl_offset_, 0, sizeof(cl_mem), &t_inner_.handle());
+            clSetKernelArg(mml2_dcpl_offset_, 1, sizeof(cl_mem), &t_inner_.handle());
             clSetKernelArg(mml2_dcpl_offset_, 2, sizeof(int),    &(lambda));
             clSetKernelArg(mml2_dcpl_offset_, 3, sizeof(cl_mem), &(fgpu.handle()));
             clSetKernelArg(mml2_dcpl_offset_, 4, sizeof(cl_int), &foffset);
-            clSetKernelArg(mml2_dcpl_offset_, 5, sizeof(cl_mem), &(M_L_atom_[lambda].handle()));
-            clSetKernelArg(mml2_dcpl_offset_, 6, sizeof(cl_mem), &(M_mLm1_atom_[lambda].handle()));
-            clSetKernelArg(mml2_dcpl_offset_, 7, sizeof(cl_mem), &(M_L_proj_[lambda].handle()));
-            clSetKernelArg(mml2_dcpl_offset_, 8, sizeof(cl_mem), &(M_mLm1_proj_[lambda].handle()));
+            clSetKernelArg(mml2_dcpl_offset_, 5, sizeof(cl_mem), &(M_L_inner_[lambda].handle()));
+            clSetKernelArg(mml2_dcpl_offset_, 6, sizeof(cl_mem), &(M_mLm1_inner_[lambda].handle()));
+            clSetKernelArg(mml2_dcpl_offset_, 7, sizeof(cl_mem), &(M_L_inner_[lambda].handle()));
+            clSetKernelArg(mml2_dcpl_offset_, 8, sizeof(cl_mem), &(M_mLm1_inner_[lambda].handle()));
             clSetKernelArg(mml2_dcpl_offset_, 9, sizeof(cl_mem), &pgpu);
             clSetKernelArg(mml2_dcpl_offset_,10, sizeof(cl_mem), &qgpu);
-            clSetKernelArg(mml2_cpld_offset_, 0, sizeof(cl_mem), &t_atom_.handle());
-            clSetKernelArg(mml2_cpld_offset_, 1, sizeof(cl_mem), &t_proj_.handle());
+            clSetKernelArg(mml2_cpld_offset_, 0, sizeof(cl_mem), &t_inner_.handle());
+            clSetKernelArg(mml2_cpld_offset_, 1, sizeof(cl_mem), &t_inner_.handle());
             clSetKernelArg(mml2_cpld_offset_, 2, sizeof(int),    &(lambda));
             clSetKernelArg(mml2_cpld_offset_, 3, sizeof(cl_mem), &(fgpu.handle()));
             clSetKernelArg(mml2_cpld_offset_, 4, sizeof(cl_int), &foffset);
-            clSetKernelArg(mml2_cpld_offset_, 5, sizeof(cl_mem), &(Mi_L_atom_[lambda].handle()));
-            clSetKernelArg(mml2_cpld_offset_, 6, sizeof(cl_mem), &(Mi_mLm1_atom_[lambda].handle()));
-            clSetKernelArg(mml2_cpld_offset_, 7, sizeof(cl_mem), &(Mi_L_proj_[lambda].handle()));
-            clSetKernelArg(mml2_cpld_offset_, 8, sizeof(cl_mem), &(Mi_mLm1_proj_[lambda].handle()));
+            clSetKernelArg(mml2_cpld_offset_, 5, sizeof(cl_mem), &(Mi_L_inner_[lambda].handle()));
+            clSetKernelArg(mml2_cpld_offset_, 6, sizeof(cl_mem), &(Mi_mLm1_inner_[lambda].handle()));
+            clSetKernelArg(mml2_cpld_offset_, 7, sizeof(cl_mem), &(Mi_L_inner_[lambda].handle()));
+            clSetKernelArg(mml2_cpld_offset_, 8, sizeof(cl_mem), &(Mi_mLm1_inner_[lambda].handle()));
             clSetKernelArg(mml2_cpld_offset_, 9, sizeof(cl_mem), &(Rdia_[lambda].handle()));
             clSetKernelArg(mml2_cpld_offset_,10, sizeof(cl_mem), &pgpu);
             clSetKernelArg(mml2_cpld_offset_,11, sizeof(cl_mem), &qgpu);
@@ -473,7 +447,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
                     clEnqueueNDRangeKernel(queue_, mml2_dcpl_offset_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
                     clFinish(queue_);
                     
-                    std::size_t Nband = bspline_atom_.Nspline() * (2 * bspline_atom_.order() + 1);
+                    std::size_t Nband = rad_.bspline_inner().Nspline() * (2 * rad_.bspline_inner().order() + 1);
                     
                     clSetKernelArg(mml2_cpld_offset_, 12, sizeof(cl_short), &first_srcseg);
                     clSetKernelArg(mml2_cpld_offset_, 13, sizeof(cl_short), &first_dstseg);
@@ -499,9 +473,8 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
 void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
 {
     // shorthands
-    std::size_t Nspline_atom = bspline_atom_.Nspline();
-    std::size_t Nspline_proj = bspline_proj_.Nspline();
-    std::size_t Nsegsiz = Nspline_atom * Nspline_proj;
+    std::size_t Nspline_inner = rad_.bspline_inner().Nspline();
+    std::size_t Nsegsiz = Nspline_inner * Nspline_inner;
     
     // performance timers
     std::size_t us_prec = 0, us_spro = 0, us_axby = 0, us_norm = 0;
@@ -535,12 +508,12 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
         this->CG_init(ill);
         
         // preconditioner matrices
-        clArrayView<Complex> prec1a (Nspline_atom * Nspline_atom, prec_atom_[l1].invCl_invsqrtS.data().data());  prec1a.connect(context_, largeDataFlags_);
-        clArrayView<Complex> prec2a (Nspline_proj * Nspline_proj, prec_proj_[l2].invCl_invsqrtS.data().data());  prec2a.connect(context_, largeDataFlags_);
-        clArrayView<Complex> Dl1 (Nspline_atom, prec_atom_[l1].Dl.data());                                       Dl1.connect(context_, smallDataFlags_);
-        clArrayView<Complex> Dl2 (Nspline_proj, prec_proj_[l2].Dl.data());                                       Dl2.connect(context_, smallDataFlags_);
-        clArrayView<Complex> prec1b (Nspline_atom * Nspline_atom, prec_atom_[l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
-        clArrayView<Complex> prec2b (Nspline_proj * Nspline_proj, prec_proj_[l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec1a (Nspline_inner * Nspline_inner, prec_inner_[l1].invCl_invsqrtS.data().data());  prec1a.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec2a (Nspline_inner * Nspline_inner, prec_inner_[l2].invCl_invsqrtS.data().data());  prec2a.connect(context_, largeDataFlags_);
+        clArrayView<Complex> Dl1 (Nspline_inner, prec_inner_[l1].Dl.data());                                       Dl1.connect(context_, smallDataFlags_);
+        clArrayView<Complex> Dl2 (Nspline_inner, prec_inner_[l2].Dl.data());                                       Dl2.connect(context_, smallDataFlags_);
+        clArrayView<Complex> prec1b (Nspline_inner * Nspline_inner, prec_inner_[l1].invsqrtS_Cl.data().data());     prec1b.connect(context_, largeDataFlags_);
+        clArrayView<Complex> prec2b (Nspline_inner * Nspline_inner, prec_inner_[l2].invsqrtS_Cl.data().data());     prec2b.connect(context_, largeDataFlags_);
         
         // allocation (and upload) of an OpenCL array
         auto new_opencl_array = [&](std::size_t n, std::string name) -> clArray<Complex>
@@ -565,14 +538,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             
             // one-electron contribution
             clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
-            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_atom_p_.handle());
-            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_atom_p_.handle());
-            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_atom_p_.handle());
-            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_atom_p_.handle());
-            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_proj_p_.handle());
-            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_proj_p_.handle());
-            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_proj_p_.handle());
-            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_proj_p_.handle());
+            clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
+            clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
+            clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 4, sizeof(cl_mem), &Mm2_inner_p_.handle());
+            clSetKernelArg(mml1_, 5, sizeof(cl_mem), &S_inner_p_.handle());
+            clSetKernelArg(mml1_, 6, sizeof(cl_mem), &D_inner_p_.handle());
+            clSetKernelArg(mml1_, 7, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
+            clSetKernelArg(mml1_, 8, sizeof(cl_mem), &Mm2_inner_p_.handle());
             clSetKernelArg(mml1_, 9, sizeof(int),    &l1);
             clSetKernelArg(mml1_,10, sizeof(int),    &l2);
             clSetKernelArg(mml1_,11, sizeof(cl_mem), &a.handle());
@@ -589,14 +562,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 
                 Real f = ang_.f(ill,ill,lambda);
                 
-                clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_atom_.handle());
-                clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_proj_.handle());
+                clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_inner_.handle());
+                clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_dcpl_, 2, sizeof(int),    &lambda);
                 clSetKernelArg(mml2_dcpl_, 3, sizeof(Real), &f);
-                clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_atom_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_atom_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_proj_[lambda].handle());
-                clSetKernelArg(mml2_dcpl_, 7, sizeof(cl_mem), &M_mLm1_proj_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_inner_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_inner_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_inner_[lambda].handle());
+                clSetKernelArg(mml2_dcpl_, 7, sizeof(cl_mem), &M_mLm1_inner_[lambda].handle());
                 clSetKernelArg(mml2_dcpl_, 8, sizeof(cl_mem), &a.handle());
                 clSetKernelArg(mml2_dcpl_, 9, sizeof(cl_mem), &b.handle());
                 clEnqueueNDRangeKernel(queue_, mml2_dcpl_, 1, nullptr, &Nsegsiz, nullptr, 0, nullptr, nullptr);
@@ -605,16 +578,16 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 us_mmul_2_dcpl += timer.microseconds();
                 timer.reset();
                 
-                std::size_t Nband = bspline_atom_.Nspline() * (2 * bspline_atom_.order() + 1);
+                std::size_t Nband = rad_.bspline_inner().Nspline() * (2 * rad_.bspline_inner().order() + 1);
                 
-                clSetKernelArg(mml2_cpld_, 0, sizeof(cl_mem), &t_atom_.handle());
-                clSetKernelArg(mml2_cpld_, 1, sizeof(cl_mem), &t_proj_.handle());
+                clSetKernelArg(mml2_cpld_, 0, sizeof(cl_mem), &t_inner_.handle());
+                clSetKernelArg(mml2_cpld_, 1, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_cpld_, 2, sizeof(int),    &lambda);
                 clSetKernelArg(mml2_cpld_, 3, sizeof(Real), &f);
-                clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &Mi_L_atom_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &Mi_mLm1_atom_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 6, sizeof(cl_mem), &Mi_L_proj_[lambda].handle());
-                clSetKernelArg(mml2_cpld_, 7, sizeof(cl_mem), &Mi_mLm1_proj_[lambda].handle());
+                clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &Mi_L_inner_[lambda].handle());
+                clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &Mi_mLm1_inner_[lambda].handle());
+                clSetKernelArg(mml2_cpld_, 6, sizeof(cl_mem), &Mi_L_inner_[lambda].handle());
+                clSetKernelArg(mml2_cpld_, 7, sizeof(cl_mem), &Mi_mLm1_inner_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 8, sizeof(cl_mem), &Rdia_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 9, sizeof(cl_mem), &a.handle());
                 clSetKernelArg(mml2_cpld_,10, sizeof(cl_mem), &b.handle());
@@ -632,14 +605,14 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Timer timer;
             
             // "gsize" is Nspline rounded to nearest greater multiple of "blocksize_"
-            std::size_t gsize_atom = blocksize_ * ((Nspline_atom + blocksize_ - 1) / blocksize_);
-            std::size_t gsize_proj = blocksize_ * ((Nspline_proj + blocksize_ - 1) / blocksize_);
+            std::size_t gsize_atom = blocksize_ * ((Nspline_inner + blocksize_ - 1) / blocksize_);
+            std::size_t gsize_proj = blocksize_ * ((Nspline_inner + blocksize_ - 1) / blocksize_);
             std::size_t gsize[2], lsize[2] = { blocksize_, blocksize_ };
             
             // matrix dimensions
             int m, n, k;
             
-            m = Nspline_proj; n = Nspline_atom; k = Nspline_proj;
+            m = Nspline_inner; n = Nspline_inner; k = Nspline_inner;
             gsize[0] = gsize_proj; gsize[1] = gsize_atom;
             clSetKernelArg(mabt_, 0, sizeof(int), &m);
             clSetKernelArg(mabt_, 1, sizeof(int), &n);
@@ -650,7 +623,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            m = Nspline_atom; n = Nspline_proj; k = Nspline_atom;
+            m = Nspline_inner; n = Nspline_inner; k = Nspline_inner;
             gsize[0] = gsize_atom; gsize[1] = gsize_proj;
             clSetKernelArg(mabt_, 0, sizeof(int), &m);
             clSetKernelArg(mabt_, 1, sizeof(int), &n);
@@ -665,10 +638,10 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clSetKernelArg(krdv_, 1, sizeof(cl_mem),  &Dl1.handle());
             clSetKernelArg(krdv_, 2, sizeof(cl_mem),  &Dl2.handle());
             clSetKernelArg(krdv_, 3, sizeof(cl_mem),  &y.handle());
-            clEnqueueNDRangeKernel(queue_, krdv_, 1, nullptr, &Nspline_proj, nullptr, 0, nullptr, nullptr);
+            clEnqueueNDRangeKernel(queue_, krdv_, 1, nullptr, &Nspline_inner, nullptr, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            m = Nspline_proj; n = Nspline_atom; k = Nspline_proj;
+            m = Nspline_inner; n = Nspline_inner; k = Nspline_inner;
             gsize[0] = gsize_proj; gsize[1] = gsize_atom;
             clSetKernelArg(mabt_, 0, sizeof(int), &m);
             clSetKernelArg(mabt_, 1, sizeof(int), &n);
@@ -679,7 +652,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             clEnqueueNDRangeKernel(queue_, mabt_, 2, nullptr, gsize, lsize, 0, nullptr, nullptr);
             clFinish(queue_);
             
-            m = Nspline_atom; n = Nspline_proj; k = Nspline_atom;
+            m = Nspline_inner; n = Nspline_inner; k = Nspline_inner;
             gsize[0] = gsize_atom; gsize[1] = gsize_proj;
             clSetKernelArg(mabt_, 0, sizeof(int), &m);
             clSetKernelArg(mabt_, 1, sizeof(int), &n);
@@ -814,16 +787,16 @@ void GPUCGPreconditioner::finish ()
     tmp_.disconnect();
     nrm_.disconnect();
     tmA_.disconnect();
-    D_atom_p_.disconnect();        D_proj_p_.disconnect();
-    S_atom_p_.disconnect();        S_proj_p_.disconnect();
-    Mm1_tr_atom_p_.disconnect();   Mm1_tr_proj_p_.disconnect();
-    Mm2_atom_p_.disconnect();      Mm2_proj_p_.disconnect();
+    D_inner_p_.disconnect();        D_inner_p_.disconnect();
+    S_inner_p_.disconnect();        S_inner_p_.disconnect();
+    Mm1_tr_inner_p_.disconnect();   Mm1_tr_inner_p_.disconnect();
+    Mm2_inner_p_.disconnect();      Mm2_inner_p_.disconnect();
     for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
     {
-        Mi_L_atom_[lambda].disconnect();
-        Mi_mLm1_atom_[lambda].disconnect();
-        Mi_L_proj_[lambda].disconnect();
-        Mi_mLm1_proj_[lambda].disconnect();
+        Mi_L_inner_[lambda].disconnect();
+        Mi_mLm1_inner_[lambda].disconnect();
+        Mi_L_inner_[lambda].disconnect();
+        Mi_mLm1_inner_[lambda].disconnect();
         Rdia_[lambda].disconnect();
     }
     KPACGPreconditioner::finish();

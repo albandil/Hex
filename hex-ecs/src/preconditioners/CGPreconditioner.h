@@ -56,18 +56,17 @@ class CGPreconditioner : public NoPreconditioner
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
-            Bspline const & bspline_atom,
-            Bspline const & bspline_proj,
-            Bspline const & bspline_proj_full,
+            Bspline const & bspline_inner,
+            Bspline const & bspline_full,
             CommandLine const & cmd
-        ) : NoPreconditioner(par, inp, ll, bspline_atom, bspline_proj, bspline_proj_full, cmd),
+        ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
             n_(ang_.states().size(), -1) {}
         
         // reuse parent definitions
-        virtual void setup () { return NoPreconditioner::setup(); }
-        virtual void update (Real E) { return NoPreconditioner::update(E); }
-        virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const { NoPreconditioner::rhs(chi, ienergy, instate); }
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const { NoPreconditioner::multiply(p, q); }
+        using NoPreconditioner::setup;
+        using NoPreconditioner::update;
+        using NoPreconditioner::rhs;
+        using NoPreconditioner::multiply;
         
         // declare own definitions
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
