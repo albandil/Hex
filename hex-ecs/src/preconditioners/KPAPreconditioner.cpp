@@ -337,18 +337,24 @@ void KPACGPreconditioner::CG_init (int iblock) const
     // initialize parent
     CGPreconditioner::CG_init(iblock);
     
+    // get block angular momenta
+    int l1 = ang_.states()[iblock].first;
+    int l2 = ang_.states()[iblock].second;
+    
     // initialize self
+    lock_kpa_access();
     {
-        // get block angular momenta
-        int l1 = ang_.states()[iblock].first;
-        int l2 = ang_.states()[iblock].second;
+        // update reference count
+        refcount_inner_[l1]++;
+        refcount_proj_[l2]++;
         
-        // load preconditioner from disk
-        if (not prec_inner_[l1].hdfload())
+        // load preconditioners from disk if needed
+        if (refcount_inner_[l1] == 1 and not prec_inner_[l1].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l1);
-        if (not prec_proj_[l2].hdfload())
+        if (refcount_proj_[l2] == 1 and not prec_proj_[l2].hdfload())
             HexException("Failed to read preconditioner matrix for l = %d.", l2);
     }
+    unlock_kpa_access();
     
     // calculate workspace size
     std::size_t size = rad_.bspline_inner().Nspline() * rad_.bspline_inner().Nspline();
@@ -412,7 +418,7 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 #endif
     
     // encapsulated memory chunks
-    ColMatrixView<Complex> U (Nspline_inner, Nspline_inner, workspace_[ithread]);
+    ColMatrix<Complex> U (Nspline_inner, Nspline_inner, workspace_[ithread]);
     RowMatrixView<Complex> R (Nspline_inner, Nspline_inner, r);
     RowMatrixView<Complex> Z (Nspline_inner, Nspline_inner, z);
     
@@ -446,15 +452,25 @@ void KPACGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void KPACGPreconditioner::CG_exit (int iblock) const
 {
     // exit self
+    lock_kpa_access();
     {
         // get block angular momenta
         int l1 = ang_.states()[iblock].first;
         int l2 = ang_.states()[iblock].second;
         
+        // update reference count (allow drop only in out-of-core)
+        if (refcount_inner_[l1] > 1 or not cmd_.outofcore)
+            refcount_inner_[l1]--;
+        if (refcount_proj_[l2] > 1 or not cmd_.outofcore)
+            refcount_proj_[l2]--;
+        
         // release memory
-        prec_inner_[l1].drop();
-        prec_proj_ [l2].drop();
+        if (refcount_inner_[l1] == 0)
+            prec_inner_[l1].drop();
+        if (refcount_proj_[l2] == 0)
+            prec_proj_ [l2].drop();
     }
+    unlock_kpa_access();
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);
@@ -468,7 +484,22 @@ void KPACGPreconditioner::finish ()
 
 void KPACGPreconditioner::CG_constrain (cArrayView r) const
 {
-    
+    // nothing
 }
+
+void KPACGPreconditioner::lock_kpa_access () const
+{
+#ifdef _OPENMP
+    omp_set_lock(&lck_);
+#endif
+}
+
+void KPACGPreconditioner::unlock_kpa_access () const
+{
+#ifdef _OPENMP
+    omp_unset_lock(&lck_);
+#endif    
+}
+
 
 #endif

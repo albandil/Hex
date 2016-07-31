@@ -167,7 +167,7 @@ void CGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<C
                 z.hdfload(ill);
             }
             
-            // ivert diagonal block
+            // invert diagonal block
             n_[ill] = solve_block(ill, r[ill], z[ill]);
             
             // unload segment
@@ -270,8 +270,6 @@ void CGPreconditioner::CG_mmul (int iblock, const cArrayView p, cArrayView q) co
         Cu_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
         Cl_blocks_[iang].dot(1.0_r, p, 1.0_r, q);
     }
-    
-//     std::cout << "CG_mul " << iblock << " in " << p.norm() << " out " << q.norm() << std::endl;
 }
 
 void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
@@ -281,13 +279,10 @@ void CGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) co
 
 void CGPreconditioner::CG_exit (int iblock) const
 {
-//     if (cmd_.outofcore and cmd_.wholematrix)
-//         dia_blocks_[iblock].drop();
 }
 
 void CGPreconditioner::finish ()
 {
-//     dia_blocks_.resize(0);
     n_.fill(-1);
     NoPreconditioner::finish();
 }

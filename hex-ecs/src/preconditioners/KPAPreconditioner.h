@@ -103,9 +103,19 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             Bspline const & bspline_full,
             CommandLine const & cmd
         ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-            prec_inner_(inp.maxell + 1), prec_proj_(inp.maxell + 1)
+            prec_inner_(inp.maxell + 1), prec_proj_(inp.maxell + 1),
+            refcount_inner_(inp.maxell + 1, 0), refcount_proj_(inp.maxell + 1, 0)
         {
-            // nothing more to do
+#ifdef _OPENMP
+            omp_init_lock(&lck_);
+#endif
+        }
+        
+        virtual ~KPACGPreconditioner ()
+        {
+#ifdef _OPENMP
+            omp_destroy_lock(&lck_);
+#endif
         }
         
         // reuse parent definitions
@@ -141,8 +151,18 @@ class KPACGPreconditioner : public virtual CGPreconditioner
             std::set<int> needed_l
         );
         
+        // internal concurrent access lock
+        void lock_kpa_access () const;
+        void unlock_kpa_access () const;
+        
         // preconditioner data
         mutable std::vector<Data> prec_inner_, prec_proj_;
+        mutable std::vector<unsigned> refcount_inner_, refcount_proj_;
+        
+        // memory access lock
+#ifdef _OPENMP
+        mutable omp_lock_t lck_;
+#endif
         
         // workspace
         mutable cArrays workspace_;

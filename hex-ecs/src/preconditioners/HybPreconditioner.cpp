@@ -79,8 +79,10 @@ void HybCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 
 void HybCGPreconditioner::CG_exit (int iblock) const
 {
-    ILUCGPreconditioner::CG_exit(iblock);
-    KPACGPreconditioner::CG_exit(iblock);
+    if (ilu_needed(iblock))
+        ILUCGPreconditioner::CG_exit(iblock);
+    else
+        KPACGPreconditioner::CG_exit(iblock);
 }
 
 void HybCGPreconditioner::finish()
