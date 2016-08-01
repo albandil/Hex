@@ -38,31 +38,6 @@
 
 #include "hex-arrays.h"
 
-// OpenMP macros
-#ifdef _OPENMP
-    #include <omp.h>
-    
-    #define OMP_CREATE_LOCKS(n) \
-        std::vector<omp_lock_t> omplck(n); \
-        for (omp_lock_t & L : omplck) \
-            omp_init_lock(&L);
-
-    #define OMP_LOCK_LOCK(i) \
-        omp_set_lock(&omplck[i]);
-
-    #define OMP_UNLOCK_LOCK(i) \
-        omp_unset_lock(&omplck[i]);
-
-    #define OMP_DELETE_LOCKS() \
-        for (omp_lock_t & L : omplck) \
-            omp_destroy_lock(&L);
-#else
-    #define OMP_CREATE_LOCKS(n)
-    #define OMP_LOCK_LOCK(i)
-    #define OMP_UNLOCK_LOCK(i)
-    #define OMP_DELETE_LOCKS()
-#endif
-
 /**
  * @brief MPI info.
  * 

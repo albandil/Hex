@@ -33,6 +33,7 @@
 
 #include "hex-arrays.h"
 #include "hex-misc.h"
+#include "hex-openmp.h"
 
 #include "gauss.h"
 #include "parallel.h"

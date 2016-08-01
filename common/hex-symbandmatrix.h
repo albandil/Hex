@@ -32,14 +32,11 @@
 #ifndef HEX_SYMBANDMATRIX_H
 #define HEX_SYMBANDMATRIX_H
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
 #include "hex-hdffile.h"
+#include "hex-openmp.h"
 
 /**
  * @brief Matrix parts.
@@ -840,27 +837,25 @@ template <class DataT> class BlockSymBandMatrix
             // scale destination vector
             w *= b;
             
-#ifdef _OPENMP
-            // write locks
-            std::vector<omp_lock_t> lock(blockcount_);
-            for (std::size_t i = 0; i < blockcount_; i++)
-                omp_init_lock(&lock[i]);
-#endif
-            // workspace
-            NumberArray<DataT> product (size_);
+            // create synchronization locks
+            OMP_CREATE_LOCKS(blockcount_);
             
-            // for all blocks
-            # pragma omp parallel firstprivate (product) if (parallelize)
+            // parallel section start
+            # pragma omp parallel if (parallelize)
             {
+                // thread-private workspace
+                NumberArray<DataT> product (size_);
+                
                 // open data file for reading
                 NumberArray<DataT> diskdata;
                 HDFFile * hdf = nullptr;
                 if (not inmemory_)
                     hdf = new HDFFile (diskfile_, HDFFile::readonly);
-                    
+                
+                // for all block diagonals
                 for (std::size_t d = 0; d < blockhalfbw_; d++)
                 {
-                    // parallel processing of blocks on this diagonal (only if requested, and they are present in memory)
+                    // parallel processing of blocks in this diagonal
                     # pragma omp for schedule (dynamic,1)
                     for (std::size_t i = 0; i < blockcount_; i++)
                     if (i + d < blockcount_)
@@ -872,6 +867,7 @@ template <class DataT> class BlockSymBandMatrix
                         // data view of this block
                         ArrayView<DataT> view;
                         
+                        // select matrix block data
                         if (inmemory_)
                         {
                             // use data in memory
@@ -898,13 +894,17 @@ template <class DataT> class BlockSymBandMatrix
                                 0., product
                             );
                             
-                            # pragma omp simd
-                            for (std::size_t pos = 0; pos < size_; pos++)
-                                w[i * size_ + pos] += a * product[pos];
+                            OMP_LOCK_LOCK(i);
+                            {
+                                # pragma omp simd
+                                for (std::size_t pos = 0; pos < size_; pos++)
+                                    w[i * size_ + pos] += a * product[pos];
+                            }
+                            OMP_UNLOCK_LOCK(i);
                         }
                         
                         // multiply by the other diagonals (both symmetries)
-                        if (d != 0)
+                        else
                         {
                             SymBandMatrix<DataT>::sym_band_dot
                             (
@@ -912,15 +912,14 @@ template <class DataT> class BlockSymBandMatrix
                                 1., ArrayView<DataT>(v, (i + d) * size_, size_),
                                 0., product
                             );
-#ifdef _OPENMP
-                            omp_set_lock(&lock[i]);
-#endif
-                            # pragma omp simd
-                            for (std::size_t pos = 0; pos < size_; pos++)
-                                w[i * size_ + pos] += a * product[pos];
-#ifdef _OPENMP
-                            omp_unset_lock(&lock[i]);
-#endif
+                            
+                            OMP_LOCK_LOCK(i);
+                            {
+                                # pragma omp simd
+                                for (std::size_t pos = 0; pos < size_; pos++)
+                                    w[i * size_ + pos] += a * product[pos];
+                            }
+                            OMP_UNLOCK_LOCK(i);
                             
                             SymBandMatrix<DataT>::sym_band_dot
                             (
@@ -928,27 +927,25 @@ template <class DataT> class BlockSymBandMatrix
                                 1., ArrayView<DataT>(v, i * size_, size_),
                                 0., product
                             );
-#ifdef _OPENMP
-                            omp_set_lock(&lock[i + d]);
-#endif
-                            # pragma omp simd
-                            for (std::size_t pos = 0; pos < size_; pos++)
-                                w[(i + d) * size_ + pos] += a * product[pos];
-#ifdef _OPENMP
-                            omp_unset_lock(&lock[i + d]);
-#endif
+                            
+                            OMP_LOCK_LOCK(i + d);
+                            {
+                                # pragma omp simd
+                                for (std::size_t pos = 0; pos < size_; pos++)
+                                    w[(i + d) * size_ + pos] += a * product[pos];
+                            }
+                            OMP_UNLOCK_LOCK(i + d);
                         }
                     }
                 }
                 
+                // release disk file
                 if (not inmemory_)
                     delete hdf;
             }
             
-#ifdef _OPENMP
-            for (std::size_t i = 0; i < size_; i++)
-                omp_destroy_lock(&lock[i]);
-#endif
+            // delete synchronization locks
+            OMP_DELETE_LOCKS();
         }
         
         //
