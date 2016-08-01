@@ -420,7 +420,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
     Real wavelength = special::constant::two_pi / kf[ie];
     Real Rb   = (cmd_.extract_rho       > 0) ? cmd_.extract_rho       : bspline_full_.R0();
     Real Ra   = (cmd_.extract_rho_begin > 0) ? cmd_.extract_rho_begin : Rb - wavelength; Ra = std::max(0.0_r, Ra);
-    int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 10;
+    int samples = (cmd_.extract_samples   > 0) ? cmd_.extract_samples   : 1;
     
     rArray grid;
     cArrays singlet_lambda, triplet_lambda;
@@ -452,7 +452,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         cArray dj_R0 = special::dric_jv(inp_.maxell, kf[ie] * eval_r) * kf[ie];
         
         // evaluate B-splines and their derivatives at evaluation radius
-        cArray Bspline_R0(Nspline_full), Dspline_R0(Nspline_full);
+        cArray Bspline_R0 (Nspline_full), Dspline_R0 (Nspline_full);
         for (int ispline = 0; ispline < Nspline_full; ispline++)
         {
             // evaluate B-spline
@@ -508,7 +508,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 // does the channel exist?
                 if (0 <= ichan2 and ichan2 < Nchan2)
                 {
-                    
                     // change view to row-major dense matrix
                     cArrayView PsiScFf
                     (
@@ -521,6 +520,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                     lambda = (PsiScFf | Wj[ell].slice(Nspline_inner, Nspline_full));
                 }
             }
+            
             
             // update the stored value
             # pragma omp critical
