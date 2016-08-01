@@ -468,4 +468,6 @@ void Solver::process_solution_ (unsigned iteration, BlockArray<Complex> const & 
 void Solver::finish ()
 {
     prec_->finish();
+    delete prec_;
+    prec_ = nullptr;
 }

@@ -463,6 +463,12 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
         work_.push_back(rArray(work_size_));
 }
 
+Bspline::~Bspline ()
+{
+    delete t_;
+    t_ = nullptr;
+}
+
 
 // ----------------------------------------------------------------------- //
 //  Others                                                                 //

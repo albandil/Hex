@@ -46,6 +46,19 @@ std::vector<std::pair<Real*,Real*>> GaussLegendreData::data_ = {
     std::make_pair(nullptr, nullptr)   // n = 1
 };
 
+GaussLegendreData::~GaussLegendreData ()
+{
+    for (std::pair<Real*,Real*> & p : data_)
+    {
+        if (p.first != nullptr)
+            delete p.first;
+        if (p.second != nullptr)
+            delete p.second;
+        
+        p.first = p.second = nullptr;
+    }
+}
+
 void GaussLegendreData::precompute_nodes_and_weights (int points) const
 {
     # pragma omp critical

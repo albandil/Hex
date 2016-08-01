@@ -65,6 +65,8 @@ class Bspline
          */
         Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots);
         
+        ~Bspline ();
+        
         /**
          * @brief Evaluate B-spline.
          * 

@@ -41,6 +41,8 @@ class GaussLegendreData
 {
     public:
         
+        ~GaussLegendreData ();
+        
         /**
          * @brief Retrieve Gauss-Legendre data.
          * 

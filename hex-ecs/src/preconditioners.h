@@ -55,6 +55,13 @@ class PreconditionerBase
     public:
         
         /**
+         * @brief Virtual destructor.
+         * 
+         * To be overridden in derived classes.
+         */
+        virtual ~PreconditionerBase () {}
+        
+        /**
          * @brief Name of the preconditioner.
          * 
          * The name is used in the command line option --preconditioner.
