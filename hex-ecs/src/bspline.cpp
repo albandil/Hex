@@ -429,6 +429,7 @@ cArray Bspline::zip (const cArrayView coeff, const rArrayView xgrid, const rArra
 Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView const & cknots)
     : rknots_(rknots),
       cknots_(cknots),
+      t_(nullptr),
       theta_(th),
       rotation_(Complex(cos(th),sin(th))),
       R0_(rknots_.empty() ? 0 : rknots_.back()),
@@ -456,7 +457,8 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
     // allocate workspace for all threads
     unsigned nthreads = 1;
 #ifdef _OPENMP
-    #pragma omp parallel
+    # pragma omp parallel
+    # pragma omp master
     nthreads = omp_get_num_threads();
 #endif
     while (work_.size() <= nthreads)
@@ -465,7 +467,8 @@ Bspline::Bspline (int order, rArrayView const & rknots, Real th, rArrayView cons
 
 Bspline::~Bspline ()
 {
-    delete t_;
+    if (t_ != nullptr)
+        delete [] t_;
     t_ = nullptr;
 }
 
