@@ -858,7 +858,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         {
             if (cmd_.outofcore) const_cast<BlockArray<Complex> &>(p).hdfload(illp);
             
-            if (cmd_.lightweight_full and not cmd_.outofcore)
+            if (cmd_.lightweight_full)
             {
                 // only one-electron contribution; the rest is below
                 calc_A_block(ill, illp, false).dot
@@ -928,7 +928,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     }
     
     // lightweight-full off-diagonal contribution
-    if (cmd_.lightweight_full and not cmd_.outofcore)
+    if (cmd_.lightweight_full)
     {
         OMP_CREATE_LOCKS(ang_.states().size());
         
