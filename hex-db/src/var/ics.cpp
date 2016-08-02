@@ -282,9 +282,9 @@ bool IntegralCrossSection::updateTable ()
         
         // merge-interpolate all T-matrix data for this transition and partial wave
         cArray merged_T (merged_energies.size());
-        rArray energies (merged_energies.size()), Re_T (merged_energies.size()), Im_T (merged_energies.size());
         for (int L : angular_momenta)
         {
+            rArray energies, Re_T, Im_T;
             // retrieve data
             double ret, imt;
             sqlitepp::statement st4 (session());
@@ -296,35 +296,52 @@ bool IntegralCrossSection::updateTable ()
                 sqlitepp::use(ni), sqlitepp::use(li), sqlitepp::use(mi),
                 sqlitepp::use(nf), sqlitepp::use(lf), sqlitepp::use(mf),
                 sqlitepp::use(S),  sqlitepp::use(ell), sqlitepp::use(L);
-            std::size_t N = 0;
             while (st4.exec())
             {
-                energies[N] = E;
-                Re_T[N] = ret;
-                Im_T[N] = imt;
-                N++;
+                energies.push_back(E);
+                Re_T.push_back(ret);
+                Im_T.push_back(imt);
             }
             
             // interpolate data
-            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_cspline, N);
-            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_cspline, N);
-            gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
-            gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
-            gsl_interp_init(spline_Re, energies.data(), Re_T.data(), N);
-            gsl_interp_init(spline_Im, energies.data(), Im_T.data(), N);
-            for (std::size_t i = 0; i < merged_energies.size(); i++)
+            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_cspline, energies.size());
+            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_cspline, energies.size());
+            gsl_interp_init(spline_Re, energies.data(), Re_T.data(), energies.size());
+            gsl_interp_init(spline_Im, energies.data(), Im_T.data(), energies.size());
+            # pragma omp parallel
             {
-                if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back())
+                gsl_interp_accel* accel_Re = gsl_interp_accel_alloc();
+                gsl_interp_accel* accel_Im = gsl_interp_accel_alloc();
+                
+                double ret, imt;
+                
+                # pragma omp for
+                for (std::size_t i = 0; i < merged_energies.size(); i++)
                 {
-                    merged_T[i] += Complex
-                    (
-                        gsl_interp_eval(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re),
-                        gsl_interp_eval(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im)
-                    );
+                    if (energies.front() <= merged_energies[i] and merged_energies[i] <= energies.back())
+                    {
+                        int err_re = gsl_interp_eval_e(spline_Re, energies.data(), Re_T.data(), merged_energies[i], accel_Re, &ret);
+                        int err_im = gsl_interp_eval_e(spline_Im, energies.data(), Im_T.data(), merged_energies[i], accel_Im, &imt);
+                        
+                        if (err_re != GSL_SUCCESS)
+                        {
+                            std::cout << "Warning: Failed to interpolate real data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                "L = " << L << ", ell = " << ell << ", Ei = " << merged_energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                        }
+                        
+                        if (err_im != GSL_SUCCESS)
+                        {
+                            std::cout << "Warning: Failed to interpolate imag data for transition (" << ni << "," << li << "," << mi << ") -> (" << nf << "," << lf << "," << mf << "), "
+                                "L = " << L << ", ell = " << ell << ", Ei = " << merged_energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
+                        }
+                        
+                        merged_T[i] += Complex (ret, imt);
+                    }
                 }
+                
+                gsl_interp_accel_free(accel_Re);
+                gsl_interp_accel_free(accel_Im);
             }
-            gsl_interp_accel_free(accel_Re);
-            gsl_interp_accel_free(accel_Im);
             gsl_interp_free(spline_Re);
             gsl_interp_free(spline_Im);
         }
