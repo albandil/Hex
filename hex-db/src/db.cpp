@@ -73,7 +73,7 @@ void hex_initialize_ (const char* dbname)
     
     // disable journaling
     sqlitepp::statement st (db);
-    st << "PRAGMA journal_mode = OFF";
+    st << "PRAGMA synchronous = OFF";
     st.exec();
     
     // sort quantities' classes in order of their dependencies
