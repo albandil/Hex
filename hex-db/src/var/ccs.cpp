@@ -209,19 +209,19 @@ void hex_complete_cross_section_
     }
     
     // get number of partial waves stored in the database
-    int max_available_ell;
+    int min_available_ell, max_available_ell;
     sqlitepp::statement ell_st (CCS->session());
-    ell_st << "SELECT MAX(ell) FROM 'ics' "
+    ell_st << "SELECT MIN(ell), MAX(ell) FROM 'ics' "
               "WHERE ni = :ni AND li = :li AND mi = :mi"
               "  AND nf = :nf AND lf = :lf AND mf = :mf",
-        sqlitepp::into(max_available_ell),
+        sqlitepp::into(min_available_ell), sqlitepp::into(max_available_ell),
         sqlitepp::use(*ni), sqlitepp::use(*li), sqlitepp::use(mi),
         sqlitepp::use(*nf), sqlitepp::use(*lf), sqlitepp::use(mf);
     ell_st.exec();
     
     // retrieve cross sections for all requested (and available) partial waves
     rArrays E_data, sigma_data;
-    for (int ell = 0; ell <= max_available_ell; ell++)
+    for (int ell = min_available_ell; ell <= max_available_ell; ell++)
     {
         // compose query
         sqlitepp::statement st (CCS->session());
