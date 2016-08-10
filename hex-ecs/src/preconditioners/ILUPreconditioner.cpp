@@ -137,7 +137,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
     {
 #ifdef _OPENMP
         // allow only one factorization at a time when not using SuperLU DIST or MUMPS
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST and cmd_.factorizer != LUFT_MUMPS and not cmd_.parallel_factorization)
+        if (not cmd_.parallel_factorization)
             omp_set_lock(&lu_lock_);
 #endif
         
@@ -261,7 +261,7 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         
 #ifdef _OPENMP
         // release lock
-        if (cmd_.factorizer != LUFT_SUPERLU_DIST and cmd_.factorizer != LUFT_MUMPS and not cmd_.parallel_factorization)
+        if (not cmd_.parallel_factorization)
             omp_unset_lock(&lu_lock_);
 #endif
     }
@@ -269,17 +269,37 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_set_lock(&lu_lock_);
+#endif
+    
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
+    
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_unset_lock(&lu_lock_);
+#endif    
 }
 
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_set_lock(&lu_lock_);
+#endif
+    
     // release memory
     if (cmd_.outofcore)
     {
         lu_[iblock]->drop();
     }
+    
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_unset_lock(&lu_lock_);
+#endif
     
     // exit parent
     CGPreconditioner::CG_exit(iblock);
@@ -287,6 +307,17 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
 
 void ILUCGPreconditioner::finish ()
 {
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_set_lock(&lu_lock_);
+#endif
+    
     lu_.resize(0);
+    
+#ifdef _OPENMP
+    if (cmd_.factorizer == LUFT_MUMPS)
+        omp_unset_lock(&lu_lock_);
+#endif
+    
     CGPreconditioner::finish();
 }
