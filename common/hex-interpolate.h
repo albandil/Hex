@@ -130,26 +130,34 @@ inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray con
         return rArray(x.size(), y0[0]);
     
     // setup the interpolator
-    gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());
-    gsl_interp_init (itp, x0.data(), y0.data(), x0.size());
-    gsl_interp_accel *accel = gsl_interp_accel_alloc ();
-    
-    // interpolate
-    rArray y(x.size());
-    for (size_t i = 0; i < x.size(); i++)
+    if (x0.size() >= gsl_interp_type_min_size(interpolation))
     {
-        // check that we are not extrapolating
-        if (x0.front() <= x[i] and x[i] <= x0.back())
-            y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
-        else
-            y[i] = 0.;
+        gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());
+        gsl_interp_init (itp, x0.data(), y0.data(), x0.size());
+        gsl_interp_accel *accel = gsl_interp_accel_alloc ();
+        
+        // interpolate
+        rArray y(x.size());
+        for (size_t i = 0; i < x.size(); i++)
+        {
+            // check that we are not extrapolating
+            if (x0.front() <= x[i] and x[i] <= x0.back())
+                y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
+            else
+                y[i] = 0.;
+        }
+        
+        // release memory
+        gsl_interp_accel_free (accel);
+        gsl_interp_free (itp);
+        
+        return y;
     }
-    
-    // release memory
-    gsl_interp_accel_free (accel);
-    gsl_interp_free (itp);
-    
-    return y;
+    else
+    {
+        // release memory
+        return rArray(x.size(), 0.);
+    }
 }
 
 #endif
