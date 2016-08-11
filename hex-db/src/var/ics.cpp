@@ -303,6 +303,10 @@ bool IntegralCrossSection::updateTable ()
                 Im_T.push_back(imt);
             }
             
+            // skip datasets with too few samples
+            if (energies.size() < 3)
+                continue;
+            
             // interpolate data
             gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_cspline, energies.size());
             gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_cspline, energies.size());
