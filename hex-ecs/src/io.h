@@ -89,7 +89,7 @@ class CommandLine
               itertol(1e-8), prec_itertol(1e-8), parallel_precondition(false), gpu_large_data(false),
               lightweight_full(false), lightweight_radial_cache(true), shared_scratch(false), reuse_dia_blocks(false),
               kpa_simple_rad(false), ocl_platform(0), ocl_device(0), factorizer(LUFT_ANY), groupsize(1),
-              parallel_factorization(false), parallel_extraction(true), ilu_max_iter(-1),
+              parallel_factorization(false), parallel_extraction(true), ilu_max_iter(10),
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),

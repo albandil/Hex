@@ -390,6 +390,7 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // maximal number of ILU preconditioner iterations
                 ilu_max_iter = std::atoi(optargs[0].c_str());
+                return true;
             },
 #ifdef WITH_MUMPS
         "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
