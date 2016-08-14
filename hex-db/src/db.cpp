@@ -251,6 +251,7 @@ void hex_import_ (const char* sqlname)
 void hex_update () { hex_update_(); }
 void hex_update_ ()
 {
+    std::cout << "Updating database (this may take a few minutes)..." << std::endl;
     for (ScatteringQuantity * Q : *quantities)
     {
         if (not Q->updateTable())
@@ -258,6 +259,7 @@ void hex_update_ ()
             std::exit(EXIT_FAILURE);
         }
     }
+    std::cout << "Successfully updated!" << std::endl;
 }
 
 void hex_optimize () { hex_optimize_(); }
