@@ -91,8 +91,6 @@ class HybCGPreconditioner : public ILUCGPreconditioner, public KPACGPrecondition
         virtual void CG_mmul (int iblock, const cArrayView r, cArrayView z) const;
         virtual void CG_exit (int iblock) const;
         
-    protected:
-        
         // decide whether to use the ILU preconditioner
         bool ilu_needed (int iblock) const;
 };

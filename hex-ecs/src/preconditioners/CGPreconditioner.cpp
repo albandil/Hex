@@ -51,6 +51,21 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     // prepare the block-preconditioner for run
     this->CG_init(ill);
     
+    // maximal number of nested iterations
+    int max_iterations = Nspline_inner;
+    
+    // adjust max iterations for ILU-preconditioned blocks
+    if (HybCGPreconditioner const * hp = dynamic_cast<HybCGPreconditioner const*>(this))
+    {
+        if (hp->ilu_needed(ill) and cmd_.ilu_max_iter > 0)
+            max_iterations = cmd_.ilu_max_iter;
+    }
+    else if (dynamic_cast<ILUCGPreconditioner const*>(this) != nullptr)
+    {
+        if (cmd_.ilu_max_iter > 0)
+            max_iterations = cmd_.ilu_max_iter;
+    }
+    
     // solve using the CG solver
     ConjugateGradients < Complex, cArray, cArrayView > CG;
     CG.reset();
@@ -95,7 +110,10 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               {
                                   this->CG_constrain(r);
                               };
-    int n = CG.solve(r, z, cmd_.prec_itertol, 0, Nspline_inner * Nspline_inner);
+    int n = CG.solve(r, z, cmd_.prec_itertol, 0, max_iterations);
+    
+    if (n == max_iterations)
+        HexException("Maximal number of iterations (%d) reached in the sub-preconditioner.", max_iterations);
     
     // release block-preconditioner block-specific data
     this->CG_exit(ill);

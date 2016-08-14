@@ -168,6 +168,7 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--drop-tolerance <number>  (-d)  Set drop tolerance for the ILU preconditioner (default: 1e-15).                                                        \n"
                     "\t--lu <name>                (-F)  Factorization library (one of 'umfpack', 'superlu', 'superlu_dist' and 'mumps'). Default is 'umfpack' (if available).  \n"
                     "\t--no-lu-update                   Do not recalculate LU factorization for different energies, use the first factorization for all of them.               \n"
+                    "\t--ilu-max-iter <number>          Maximal number of iterations of the nested ILU preconditioner. When the number is exceeded, exception is thrown.       \n"
                     "\t--parallel-factorization         Factorize multiple blocks simultaneously.                                                                              \n"
                     "\t--no-parallel-extraction         Disallow parallel extraction of T-matrices (e.g. when the whole solution does not fit into the memory).                \n"
                     "\t--extract-rho-begin              Where to start averaging / extrapolating the T-matrix.                                                                 \n"
@@ -384,6 +385,11 @@ void CommandLine::parse (int argc, char* argv[])
                 // do not recalculate LU
                 noluupdate = true;
                 return true;
+            },
+        "ilu-max-iter", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // maximal number of ILU preconditioner iterations
+                ilu_max_iter = std::atoi(optargs[0].c_str());
             },
 #ifdef WITH_MUMPS
         "coupling-limit", "", 1, [&](std::vector<std::string> const & optargs) -> bool
