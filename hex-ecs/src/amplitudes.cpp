@@ -86,6 +86,8 @@ Amplitudes::Amplitudes
 
 void Amplitudes::extract ()
 {
+    par_.wait();
+    
     std::cout << std::endl;
     if (cmd_.extract_extrapolate)
         std::cout << "Extrapolating T-matrices ";
@@ -128,7 +130,7 @@ void Amplitudes::extract ()
                     if (reader.load(solution, ill))
                         valid_blocks++;
                 }
-                par_.syncsum(&valid_blocks, 1);
+                par_.syncsum(&valid_blocks, ang_.size());
                 
                 if (/*valid_blocks != ang_.size()*/not reader.load(solution))
                 {
@@ -215,16 +217,13 @@ void Amplitudes::extract ()
 
 void Amplitudes::writeSQL_files ()
 {
+    // let the file be written by the master process, and by the group-masters in multi-group case
+    if (not par_.IamMaster() and (cmd_.shared_scratch or not par_.IamGroupMaster()))
+        return;
+    
     // compose output filename
     std::ostringstream ossfile;
-    if (par_.active())
-    {
-        ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << "-(" << par_.iproc() << ").sql";
-    }
-    else
-    {
-        ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
-    }
+    ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
     
     // Create SQL batch file
     std::ofstream fsql(ossfile.str().c_str());
@@ -321,6 +320,10 @@ void Amplitudes::writeSQL_files ()
 
 void Amplitudes::writeICS_files ()
 {
+    // let the file be written by the master process, and by the group-masters in multi-group case
+    if (not par_.IamMaster() and (cmd_.shared_scratch or not par_.IamGroupMaster()))
+        return;
+    
     // open files
     std::ofstream fS0 (format("ics-L%d-S0-Pi%d.dat", inp_.L, inp_.Pi));
     std::ofstream fS1 (format("ics-L%d-S1-Pi%d.dat", inp_.L, inp_.Pi));

@@ -248,7 +248,7 @@ int main (int argc, char* argv[])
         }*/
     
     //
-    // TODO Zip solution file into VTK geometry if told so
+    // Zip solution file into VTK geometry if told so
     //
     
         if (cmd.zipdata.file.size() != 0 and par.IamMaster())
