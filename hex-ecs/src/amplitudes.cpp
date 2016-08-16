@@ -132,7 +132,7 @@ void Amplitudes::extract ()
                 }
                 par_.syncsum(&valid_blocks, ang_.size());
                 
-                if (/*valid_blocks != ang_.size()*/not reader.load(solution))
+                if (/*valid_blocks != ang_.size()*/not reader.load(solution)) // TODO : OOC, and also multi-node
                 {
                     // complain only if the solution is allowed
                     // TODO
@@ -226,7 +226,7 @@ void Amplitudes::writeSQL_files ()
     ossfile << "tmat-L" << inp_.L << "-Pi" << inp_.Pi << ".sql";
     
     // Create SQL batch file
-    std::ofstream fsql(ossfile.str().c_str());
+    std::ofstream fsql (ossfile.str().c_str());
     
     // set exponential format for floating point output
     fsql.setf(std::ios_base::scientific);
@@ -571,8 +571,14 @@ void Amplitudes::computeTmat_ (Amplitudes::Transition T)
     for (int ell = 0; ell <= inp_.maxell; ell++)
     {
         // get radial integrals
-        cArray const & rad_S0 = Lambda_Slp[T][ell].first;
-        cArray const & rad_S1 = Lambda_Slp[T][ell].second;
+        cArray & rad_S0 = Lambda_Slp[T][ell].first;
+        cArray & rad_S1 = Lambda_Slp[T][ell].second;
+        
+        // synchronize data
+        par_.mastersum(rad_S0.data(), rad_S0.size(), 0);
+        par_.mastersum(rad_S1.data(), rad_S1.size(), 0);
+        par_.bcast(0, rad_S0);
+        par_.bcast(0, rad_S1);
         
         // symmetry factor
         Real sf = (inp_.Zp > 0 ? 1.0_r : special::constant::sqrt_half);
