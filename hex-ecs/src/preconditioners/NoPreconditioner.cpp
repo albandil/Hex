@@ -848,16 +848,42 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     unsigned Nspline_outer = Nspline_full - Nspline_inner;
     unsigned Nang = ang_.states().size();
     
+    // de-const-ed source vector reference
+    BlockArray<Complex> & v = const_cast<BlockArray<Complex> &>(p);
+    
+    // in distributed case we first need to collect the whole source vector
     for (unsigned ill = 0; ill < Nang; ill++)
+    {
+        // calculate rank of the process that owns this source vector segment (use group master process)
+        int owner = (ill % par_.Ngroup()) * par_.groupsize();
+        
+        // load the source segment from disk, if necessary
+        if (par_.iproc() == owner and cmd_.outofcore)
+            v.hdfload(ill);
+        
+        // broadcast the source segment from the owner process to all others
+        par_.bcast(owner, v[ill]);
+        
+        // optionally release memory, but only by owner
+        if (par_.iproc() == owner and cmd_.outofcore)
+            v[ill].drop();
+    }
+    
+    // for all angular block rows
+    for (unsigned ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
     {
         if (cmd_.outofcore) q.hdfload(ill);
         
         std::memset(q[ill].data(), 0, q[ill].size() * sizeof(Complex));
         
-        for (unsigned illp = 0; illp < Nang; illp++)
+        // for all angular blocks in a block row; only executed by one of the processes in a process group
+        for (unsigned illp = 0; illp < Nang; illp++) if (par_.igroupproc() == (int)illp % par_.groupsize())
         {
-            if (cmd_.outofcore) const_cast<BlockArray<Complex> &>(p).hdfload(illp);
+            // load data from disk; but only by owner process, otherwise we assume that they have been just broadcast to this process
+            if (par_.isMyGroupWork(illp) and cmd_.outofcore)
+                const_cast<BlockArray<Complex> &>(p).hdfload(illp);
             
+            // near-origin part multiplication
             if (cmd_.lightweight_full)
             {
                 // only one-electron contribution; the rest is below
@@ -870,8 +896,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             }
             else
             {
-                if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
+                // read matrix from disk
+                if (cmd_.outofcore and cmd_.wholematrix)
+                    const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).hdfload();
                 
+                // full diagonal block multiplication
                 A_blocks_[ill * Nang + illp].dot
                 (
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
@@ -879,9 +908,12 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     true
                 );
                 
-                if (cmd_.outofcore and cmd_.wholematrix) const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
+                // release memory
+                if (cmd_.outofcore and cmd_.wholematrix)
+                    const_cast<BlockSymBandMatrix<Complex> &>(A_blocks_[ill * Nang + illp]).drop();
             }
             
+            // channel expansion part multiplication
             if (not inp_.inner_only)
             {
                 int Nchan1 = Nchan_[ill].first;     // # r1 -> inf; l2 bound
@@ -921,18 +953,33 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 Cl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
             }
             
-            if (cmd_.outofcore) const_cast<BlockArray<Complex> &>(p)[illp].drop();
+            // release memory by the owner process
+            if (par_.isMyGroupWork(illp) and cmd_.outofcore)
+                const_cast<BlockArray<Complex> &>(p)[illp].drop();
         }
         
-        if (cmd_.outofcore) q.hdfsave(ill, true);
+        if (cmd_.outofcore) q.hdfsave(ill, true /* = drop */);
     }
     
     // lightweight-full off-diagonal contribution
     if (cmd_.lightweight_full)
     {
-        OMP_CREATE_LOCKS(ang_.states().size());
+        OMP_CREATE_LOCKS(Nang * Nspline_inner);
         
         int maxlambda = rad_.maxlambda();
+        
+        // TODO : It is slightly more subtle to do this efficiently in out-of-core mode, so we are just
+        //        loading the destination vectors here. But would it possible to rewrite the code to load
+        //        only the necessary pieces of those vectors on the fly.
+        
+        for (unsigned ill = 0; ill < Nang; ill++)
+        {
+            if (par_.isMyGroupWork(ill) and cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex> &>(p).hdfload(ill);
+                q.hdfload(ill);
+            }
+        }
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -944,45 +991,90 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             
             SymBandMatrix<Complex> R = std::move(rad_.calc_R_tr_dia_block(lambda, i, k));
             
-            for (unsigned ill = 0; ill < ang_.states().size(); ill++)
-            for (unsigned illp = 0; illp < ang_.states().size(); illp++)
+            for (unsigned ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
+            for (unsigned illp = 0; illp < Nang; illp++) if (par_.igroupproc() == (int)illp % par_.groupsize())
             if (Real f = ang_.f(ill, illp, lambda))
             {
-                OMP_LOCK_LOCK(ill);
-                
                 if (true)
                 {
+                    OMP_LOCK_LOCK(ill * Nspline_inner + i);
+                    
                     R.dot
                     (
                         inp_.Zp * f, cArrayView(p[illp], k * Nspline_inner, Nspline_inner),
-                        1.0_z, cArrayView(q[ill],  i * Nspline_inner, Nspline_inner)
+                        1.0_z, cArrayView(q[ill], i * Nspline_inner, Nspline_inner)
                     );
+                    
+                    OMP_UNLOCK_LOCK(ill * Nspline_inner + i);
                 }
                 
                 if (i != k)
                 {
+                    OMP_LOCK_LOCK(ill * Nspline_inner + k);
+                    
                     R.dot
                     (
                         inp_.Zp * f, cArrayView(p[illp], i * Nspline_inner, Nspline_inner),
-                        1.0_z, cArrayView(q[ill],  k * Nspline_inner, Nspline_inner)
+                        1.0_z, cArrayView(q[ill], k * Nspline_inner, Nspline_inner)
                     );
+                    
+                    OMP_UNLOCK_LOCK(ill * Nspline_inner + k);
                 }
-                
-                OMP_UNLOCK_LOCK(ill);
+            }
+        }
+        
+        // Here we (save and) drop the whole segments that were loaded before.
+        
+        for (unsigned ill = 0; ill < Nang; ill++)
+        {
+            if (par_.isMyGroupWork(ill) and cmd_.outofcore)
+            {
+                const_cast<BlockArray<Complex> &>(p)[ill].drop();
+                q.hdfsave(ill, true /* = drop */);
             }
         }
         
         OMP_DELETE_LOCKS();
     }
     
+    // synchronize the results and get rid of the broadcasted source data
+    for (unsigned ill = 0; ill < Nang; ill++)
+    {
+        // sum the contributions to the result across the group
+        if (par_.isMyGroupWork(ill))
+        {
+            // load segment from disk
+            if (cmd_.outofcore)
+                q.hdfload(ill);
+            
+            // synchronize (sum) across the group
+            par_.syncsum_g(q[ill].data(), q[ill].size());
+            
+            // release destination memory
+            if (cmd_.outofcore)
+                q.hdfsave(ill, true /* = drop */);
+        }
+        
+        // release source memory (if not owner)
+        if (not par_.isMyGroupWork(ill))
+            const_cast<BlockArray<Complex> &>(p)[ill].drop();
+    }
+    
     // constrain the result
     if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
     {
-        for (std::size_t ill = 0; ill < Nang; ill++)
+        for (std::size_t ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
         {
-            if (cmd_.outofcore) q.hdfload(ill);
+            // load segment from disk
+            if (cmd_.outofcore)
+                q.hdfload(ill);
+            
+            // constrain
             cgprec->CG_constrain(q[ill]);
-            if (cmd_.outofcore) q.hdfsave(ill, true);
+            
+            // release memory
+            if (cmd_.outofcore)
+                q.hdfsave(ill, true /* = drop */);
         }
     }
 }

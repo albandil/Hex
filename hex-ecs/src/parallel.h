@@ -144,7 +144,7 @@ class Parallel
          * This function returns true if this process is the master process,
          * i.e. it has ID zero.
          */
-        inline bool IamMaster () const
+        bool IamMaster () const
         {
             return iproc_ == 0;
         }
@@ -155,7 +155,7 @@ class Parallel
          * This function returns true if this process is the master process within its,
          * i.e. it has local ID zero.
          */
-        inline bool IamGroupMaster () const
+        bool IamGroupMaster () const
         {
             return iproc_ % groupsize_ == 0;
         }
@@ -169,7 +169,7 @@ class Parallel
          * 
          * @param i Work item ID.
          */
-        inline bool isMyWork (int i) const
+        bool isMyWork (int i) const
         {
             return i % Nproc_ == iproc_;
         }
@@ -183,31 +183,31 @@ class Parallel
          * 
          * @param i Work item ID.
          */
-        inline bool isMyGroupWork (int i) const
+        bool isMyGroupWork (int i) const
         {
             return i % Ngroup_ == igroup_;
         }
         
         /// Returns true if the MPI is active.
-        inline bool active () const { return active_; }
+        bool active () const { return active_; }
         
         /// Returns the rank of the communicator (process is).
-        inline int iproc () const { return iproc_; }
+        int iproc () const { return iproc_; }
         
         /// Returns the rank of process group.
-        inline int igroup () const { return igroup_; }
+        int igroup () const { return igroup_; }
         
         /// Returns index of rank within the group.
-        inline int igroupproc () const { return iproc_ % groupsize_; }
+        int igroupproc () const { return iproc_ % groupsize_; }
         
         /// Returns the size of the communicator (process count).
-        inline int Nproc () const { return Nproc_; }
+        int Nproc () const { return Nproc_; }
         
         /// Returns the number of groups.
-        inline int Ngroup () const { return Ngroup_; }
+        int Ngroup () const { return Ngroup_; }
         
         /// Return group size.
-        inline int groupsize () const { return groupsize_; }
+        int groupsize () const { return groupsize_; }
         
         /**
          * @brief Broadcast array from owner to everyone.
@@ -489,6 +489,14 @@ class Parallel
 #ifdef WITH_MPI
             if (active_)
                 MPI_Barrier(MPI_COMM_WORLD);
+#endif
+        }
+        
+        void wait_g () const
+        {
+#ifdef WITH_MPI
+            if (active_)
+                MPI_Barrier(groupcomm_);
 #endif
         }
         

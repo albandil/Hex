@@ -179,7 +179,7 @@ class Amplitudes
          *        \mathrm{d}r_1 \ .
          * @f]
          */
-        void computeLambda_ (Transition T, BlockArray<Complex> const & solution, int ie, int Spin);
+        void computeLambda_ (Transition T, BlockArray<Complex> & solution, int ie, int Spin);
         
         /**
          * @brief Evaluate T-matrices.
@@ -229,7 +229,7 @@ class Amplitudes
          * @param coupled_states List of all coupled-state angular momenta pairs.
          * @return Vector of radial integrals.
          */
-        void computeXi_ (Transition T, BlockArray<Complex> const & solution, int ie, int Spin);
+        void computeXi_ (Transition T, BlockArray<Complex> & solution, int ie, int Spin);
         
         /**
          * @brief Evaluate cross sections.

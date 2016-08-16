@@ -72,18 +72,21 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
     CG.verbose              = false;
     CG.apply_preconditioner = [&](const cArrayView a, cArrayView b)
                               {
+                                  par_.wait_g();
                                   Timer timer;
                                   this->CG_prec(ill, a, b);
                                   us_prec_ += timer.microseconds();
                               };
     CG.matrix_multiply      = [&](const cArrayView a, cArrayView b)
                               {
+                                  par_.wait_g();
                                   Timer timer;
                                   this->CG_mmul(ill, a, b);
                                   us_mmul_ += timer.microseconds();
                               };
     CG.scalar_product       = [&](const cArrayView a, const cArrayView b)
                               {
+                                  par_.wait_g();
                                   Timer timer;
                                   Complex prod = this->CG_scalar_product(a, b);
                                   us_spro_ += timer.microseconds();
@@ -91,6 +94,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               };
     CG.compute_norm         = [&](const cArrayView a)
                               {
+                                  par_.wait_g();
                                   Timer timer;
                                   Real nrm = this->CG_compute_norm(a);
                                   us_norm_ += timer.microseconds();
@@ -98,6 +102,7 @@ int CGPreconditioner::solve_block (int ill, const cArrayView r, cArrayView z) co
                               };
     CG.axby                 = [&](Complex a, cArrayView x, Complex b, const cArrayView y)
                               {
+                                  par_.wait_g();
                                   Timer timer;
                                   this->CG_axby_operation(a, x, b, y);
                                   us_axby_ += timer.microseconds();

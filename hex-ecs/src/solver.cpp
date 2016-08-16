@@ -353,18 +353,25 @@ void Solver::matrix_multiply_ (BlockArray<Complex> const & p, BlockArray<Complex
 
 Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Complex> const & y) const
 {
-    // compute node-local scalar product
+    // compute scalar product
     Complex prod = 0;
     
-    // for all segments
+    // for all segments owned by current process' group
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
+        // load segments, if needed
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x).hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
         
-        // TODO : share work within the group
-        prod += (x[i]|y[i]);
+        // choose a chunk for this member of the group
+        std::size_t jmin = x[i].size() * (par_.igroupproc()    ) / par_.groupsize();
+        std::size_t jmax = x[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
         
+        // update the scalar product
+        for (std::size_t j = jmin; j < x[i].size() and j < jmax; j++)
+            prod += x[i][j] * y[i][j];
+        
+        // release memory
         if (not x.inmemory()) const_cast<BlockArray<Complex>&>(x)[i].drop();
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
     }
@@ -378,18 +385,25 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
 
 Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
 {
-    // compute node-local norm of 'r'
+    // compute norm
     Real rnorm2 = 0;
+    
+    // compute node-local norm of 'r'
     for (std::size_t i = 0; i < r.size(); i++) if (par_.isMyGroupWork(i))
     {
-        if (not r.inmemory())
-            const_cast<BlockArray<Complex>&>(r).hdfload(i);
+        // load segment, if needed
+        if (not r.inmemory()) const_cast<BlockArray<Complex>&>(r).hdfload(i);
         
-        // TODO : share work within the group
-        rnorm2 += r[i].sqrnorm();
+        // choose a chunk for this member of the group
+        std::size_t jmin = r[i].size() * (par_.igroupproc()    ) / par_.groupsize();
+        std::size_t jmax = r[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
         
-        if (not r.inmemory())
-            const_cast<BlockArray<Complex>&>(r)[i].drop();
+        // update the square norm
+        for (std::size_t j = jmin; j < r[i].size() and j < jmax; j++)
+            rnorm2 += sqrabs(r[i][j]);
+        
+        // release memory
+        if (not r.inmemory()) const_cast<BlockArray<Complex>&>(r)[i].drop();
     }
     
     // collect norms from other nodes
@@ -404,14 +418,34 @@ void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, Blo
     // only references blocks that are local to this MPI node
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
+        // load segment, if needed
         if (not x.inmemory()) x.hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
         
-        // TODO : share work within the group
-        for (std::size_t j = 0; j < x[i].size(); j++)
+        // choose a chunk for this member of the group
+        std::size_t jmin = x[i].size() * (par_.igroupproc()    ) / par_.groupsize();
+        std::size_t jmax = x[i].size() * (par_.igroupproc() + 1) / par_.groupsize();
+        
+        // update the linear combination
+        for (std::size_t j = jmin; j < jmax and j < x[i].size(); j++)
             x[i][j] = a * x[i][j] + b * y[i][j];
         
-        if (not x.inmemory()) { x.hdfsave(i); x[i].drop(); }
+        // synchronize across the group
+        for (int inode = 0; inode < par_.groupsize(); inode++)
+        {
+            std::size_t jmin = x[i].size() * (inode    ) / par_.groupsize();
+            std::size_t jmax = x[i].size() * (inode + 1) / par_.groupsize();
+            
+            jmax = std::min(x[i].size(), jmax);
+            
+            par_.bcast_g(par_.igroup(), inode, x[i].data() + jmin, jmax - jmin);
+        }
+        
+        // broadcast data from groupmaster to other processes in the group
+//         par_.bcast_g(par_.igroup(), 0, x[i].data(), x[i].size());
+        
+        // release memory (groupmaster optionally saves the data to disk)
+        if (not x.inmemory()) { if (par_.IamGroupMaster()) x.hdfsave(i); x[i].drop(); }
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
     }
 }

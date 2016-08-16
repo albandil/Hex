@@ -119,10 +119,18 @@ void Amplitudes::extract ()
                 int li = std::get<1>(instate);
                 int mi = std::get<2>(instate);
                 
-                // load the solution
+                // check existence of the solution; take into account distributed calculations
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
                 BlockArray<Complex> solution (ang_.size(), !cmd_.outofcore, "sol");
-                if (not reader.load(solution))
+                std::size_t valid_blocks = 0;
+                for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
+                {
+                    if (reader.load(solution, ill))
+                        valid_blocks++;
+                }
+                par_.syncsum(&valid_blocks, 1);
+                
+                if (/*valid_blocks != ang_.size()*/not reader.load(solution))
                 {
                     // complain only if the solution is allowed
                     // TODO
@@ -379,7 +387,7 @@ void Amplitudes::writeICS_files ()
     fS1.close();
 }
 
-void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
+void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
     // final projectile momenta
     rArray kf = sqrt(inp_.Etot + 1.0_r/(T.nf*T.nf) + (T.mf-T.mi) * inp_.B);
@@ -469,7 +477,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
         
         // compute radial factor
         # pragma omp parallel for schedule (dynamic,1) if (cmd_.parallel_extraction)
-        for (unsigned ill = 0; ill < ang_.size(); ill++)
+        for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
         {
             // skip blocks that do not contribute to (l1 = ) lf
             if (ang_[ill].first != T.lf)
@@ -480,7 +488,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             
             // load solution block
             if (not solution.inmemory())
-                const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
+                solution.hdfload(ill);
             
             Complex lambda = 0;
             if (inp_.inner_only)
@@ -521,7 +529,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
                 }
             }
             
-            
             // update the stored value
             # pragma omp critical
             if (Spin == 0)
@@ -531,7 +538,7 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> c
             
             // unload solution block
             if (not solution.inmemory())
-                const_cast<BlockArray<Complex>&>(solution)[ill].drop();
+                solution[ill].drop();
         }
     }
     
@@ -757,7 +764,7 @@ Chebyshev<double,Complex> Amplitudes::fcheb (cArrayView const & PsiSc, Real kmax
     return CB;
 }
 
-void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const & solution, int ie, int Spin)
+void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> & solution, int ie, int Spin)
 {
     // maximal available momentum
     double kmax = std::sqrt(inp_.Etot[ie]);
@@ -780,7 +787,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
         
         // load solution block
         if (not solution.inmemory())
-            const_cast<BlockArray<Complex>&>(solution).hdfload(ill);
+            solution.hdfload(ill);
         
         // compute new ionization amplitude
         Chebyshev<double,Complex> CB = fcheb(solution[ill], kmax, l1, l2);
@@ -791,7 +798,7 @@ void Amplitudes::computeXi_ (Amplitudes::Transition T, BlockArray<Complex> const
         
         // unload solution block
         if (not solution.inmemory())
-            const_cast<BlockArray<Complex>&>(solution)[ill].drop();
+            solution[ill].drop();
     }
     
     std::cout << "ok" << std::endl;
