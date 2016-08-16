@@ -500,6 +500,15 @@ class Parallel
 #endif
         }
         
+        void* groupcomm () const
+        {
+#ifdef WITH_MPI
+            if (active_)
+                return groupcomm_;
+#endif
+            return nullptr;
+        }
+        
     private:
         
         // whether the MPI is on

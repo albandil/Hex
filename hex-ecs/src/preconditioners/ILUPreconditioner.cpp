@@ -219,8 +219,18 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             data = const_cast<gridinfo_t*>(&grid_);
 #endif
 #ifdef WITH_MUMPS
+        MUMPS_INT mumps_data[3];
         if (cmd_.factorizer == LUFT_MUMPS)
-            data = (void*)std::intptr_t(cmd_.mumps_outofcore + 2 * cmd_.mumps_verbose);
+        {
+            mumps_data[0] = cmd_.mumps_outofcore;
+            mumps_data[1] = cmd_.mumps_verbose;
+    #ifdef WITH_MPI
+            mumps_data[2] = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
+    #else
+            mumps_data[2] = 0;
+    #endif
+            data = mumps_data;
+        }
 #endif
         
         // factorize the block and store it
@@ -277,10 +287,13 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
     
-#ifdef _OPENMP
     if (cmd_.factorizer == LUFT_MUMPS)
+    {
+#ifdef _OPENMP
         omp_unset_lock(&lu_lock_);
-#endif    
+#endif
+        par_.bcast_g(par_.igroup(), 0, z.data(), z.size());
+    }
 }
 
 void ILUCGPreconditioner::CG_exit (int iblock) const

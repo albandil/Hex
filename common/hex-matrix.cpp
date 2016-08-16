@@ -731,8 +731,9 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
     // Extract parameters.
     //
     
-        bool out_of_core = std::intptr_t(data) % 2;
-        int verbosity_level = std::intptr_t(data) / 2;
+        bool out_of_core = *((MUMPS_INT*)data);
+        MUMPS_INT verbosity_level = *((MUMPS_INT*)data + 1);
+        MUMPS_INT comm = *((MUMPS_INT*)data + 2);
     
     //
     // Create matrix of the system (i.e. the IJV triplet).
@@ -783,6 +784,9 @@ std::shared_ptr<LUft<LU_int_t,Complex>> CsrMatrix<LU_int_t,Complex>::factorize_m
         settings->job = MUMPS_INITIALIZE;
         settings->sym = 2;
         settings->par = 1;
+#ifdef WITH_MPI
+        settings->comm_fortran = comm;
+#endif
         MUMPS_C(settings);
         
         // analyze
