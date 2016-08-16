@@ -441,9 +441,6 @@ void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, Blo
             par_.bcast_g(par_.igroup(), inode, x[i].data() + jmin, jmax - jmin);
         }
         
-        // broadcast data from groupmaster to other processes in the group
-//         par_.bcast_g(par_.igroup(), 0, x[i].data(), x[i].size());
-        
         // release memory (groupmaster optionally saves the data to disk)
         if (not x.inmemory()) { if (par_.IamGroupMaster()) x.hdfsave(i); x[i].drop(); }
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y)[i].drop();
