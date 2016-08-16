@@ -356,6 +356,9 @@ Complex Solver::scalar_product_ (BlockArray<Complex> const & x, BlockArray<Compl
     // compute scalar product
     Complex prod = 0;
     
+    // make sure no process is playing with the data
+    par_.wait();
+    
     // for all segments owned by current process' group
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
@@ -388,6 +391,9 @@ Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
     // compute norm
     Real rnorm2 = 0;
     
+    // make sure no process is playing with the data
+    par_.wait();
+    
     // compute node-local norm of 'r'
     for (std::size_t i = 0; i < r.size(); i++) if (par_.isMyGroupWork(i))
     {
@@ -415,10 +421,13 @@ Real Solver::compute_norm_ (BlockArray<Complex> const & r) const
 
 void Solver::axby_operation_ (Complex a, BlockArray<Complex> & x, Complex b, BlockArray<Complex> const & y) const
 {
+    // make sure no process is playing with the data
+    par_.wait();
+    
     // only references blocks that are local to this MPI node
     for (std::size_t i = 0; i < x.size(); i++) if (par_.isMyGroupWork(i))
     {
-        // load segment, if needed
+        // load segments, if needed
         if (not x.inmemory()) x.hdfload(i);
         if (not y.inmemory()) const_cast<BlockArray<Complex>&>(y).hdfload(i);
         

@@ -848,6 +848,13 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
     unsigned Nspline_outer = Nspline_full - Nspline_inner;
     unsigned Nang = ang_.states().size();
     
+    // make sure no process is playing with the data
+    par_.wait();
+    
+    // TODO : It is slightly more subtle to do this efficiently in out-of-core mode, so we are just
+    //        loading the destination vectors here. But would it possible to rewrite the code to load
+    //        only the necessary pieces of those vectors on the fly.
+    
     // de-const-ed source vector reference
     BlockArray<Complex> & v = const_cast<BlockArray<Complex> &>(p);
     
@@ -864,25 +871,19 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // broadcast the source segment from the owner process to all others
         par_.bcast(owner, v[ill]);
         
-        // optionally release memory, but only by owner
-        if (par_.iproc() == owner and cmd_.outofcore)
-            v[ill].drop();
+        // also load the destination segment
+        if (par_.isMyGroupWork(ill) and cmd_.outofcore)
+            q.hdfload(ill);
     }
     
     // for all angular block rows
     for (unsigned ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
     {
-        if (cmd_.outofcore) q.hdfload(ill);
-        
         std::memset(q[ill].data(), 0, q[ill].size() * sizeof(Complex));
         
         // for all angular blocks in a block row; only executed by one of the processes in a process group
         for (unsigned illp = 0; illp < Nang; illp++) if (par_.igroupproc() == (int)illp % par_.groupsize())
         {
-            // load data from disk; but only by owner process, otherwise we assume that they have been just broadcast to this process
-            if (par_.isMyGroupWork(illp) and cmd_.outofcore)
-                const_cast<BlockArray<Complex> &>(p).hdfload(illp);
-            
             // near-origin part multiplication
             if (cmd_.lightweight_full)
             {
@@ -926,13 +927,20 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 for (int m = 0; m < Nchan1; m++)
                 for (int n = 0; n < Nchan1p; n++)
                 {
-                    if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
+                    // read matrix from disk
+                    if (cmd_.outofcore)
+                        const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).hdfload();
+                    
+                    // multiply
                     B1_blocks_[ill * Nang + illp][m * Nchan1p + n].dot
                     (
                         1.0_z, cArrayView(p[illp], Nspline_inner * Nspline_inner + n * Nspline_outer, Nspline_outer),
                         1.0_z, cArrayView(q[ill], Nspline_inner * Nspline_inner + m * Nspline_outer, Nspline_outer)
                     );
-                    if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
+                    
+                    // release memory
+                    if (cmd_.outofcore)
+                        const_cast<SymBandMatrix<Complex>&>(B1_blocks_[ill * Nang + illp][m * Nchan1p + n]).drop();
                 }
                 
                 // r2 -> inf
@@ -940,25 +948,26 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 for (int m = 0; m < Nchan2; m++)
                 for (int n = 0; n < Nchan2p; n++)
                 {
-                    if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
+                    // read matrix from disk
+                    if (cmd_.outofcore)
+                        const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).hdfload();
+                    
+                    // multiply
                     B2_blocks_[ill * Nang + illp][m * Nchan2p + n].dot
                     (
                         1.0_z, cArrayView(p[illp], Nspline_inner * Nspline_inner + (Nchan1p + n) * Nspline_outer, Nspline_outer),
                         1.0_z, cArrayView(q[ill], Nspline_inner * Nspline_inner + (Nchan1 + m) * Nspline_outer, Nspline_outer)
                     );
+                    
+                    // release memory
                     if (cmd_.outofcore) const_cast<SymBandMatrix<Complex>&>(B2_blocks_[ill * Nang + illp][m * Nchan2p + n]).drop();
                 }
                 
+                // multiply by coupling matrices
                 Cu_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
                 Cl_blocks_[ill * Nang + illp].dot(1.0_z, p[illp], 1.0_z, q[ill]);
             }
-            
-            // release memory by the owner process
-            if (par_.isMyGroupWork(illp) and cmd_.outofcore)
-                const_cast<BlockArray<Complex> &>(p)[illp].drop();
         }
-        
-        if (cmd_.outofcore) q.hdfsave(ill, true /* = drop */);
     }
     
     // lightweight-full off-diagonal contribution
@@ -967,19 +976,6 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         OMP_CREATE_LOCKS(Nang * Nspline_inner);
         
         int maxlambda = rad_.maxlambda();
-        
-        // TODO : It is slightly more subtle to do this efficiently in out-of-core mode, so we are just
-        //        loading the destination vectors here. But would it possible to rewrite the code to load
-        //        only the necessary pieces of those vectors on the fly.
-        
-        for (unsigned ill = 0; ill < Nang; ill++)
-        {
-            if (par_.isMyGroupWork(ill) and cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex> &>(p).hdfload(ill);
-                q.hdfload(ill);
-            }
-        }
         
         # pragma omp parallel for collapse (3) schedule (dynamic,1)
         for (int lambda = 0; lambda <= maxlambda; lambda++)
@@ -1023,58 +1019,30 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             }
         }
         
-        // Here we (save and) drop the whole segments that were loaded before.
-        
-        for (unsigned ill = 0; ill < Nang; ill++)
-        {
-            if (par_.isMyGroupWork(ill) and cmd_.outofcore)
-            {
-                const_cast<BlockArray<Complex> &>(p)[ill].drop();
-                q.hdfsave(ill, true /* = drop */);
-            }
-        }
-        
         OMP_DELETE_LOCKS();
     }
     
-    // synchronize the results and get rid of the broadcasted source data
-    for (unsigned ill = 0; ill < Nang; ill++)
-    {
-        // sum the contributions to the result across the group
-        if (par_.isMyGroupWork(ill))
-        {
-            // load segment from disk
-            if (cmd_.outofcore)
-                q.hdfload(ill);
-            
-            // synchronize (sum) across the group
-            par_.syncsum_g(q[ill].data(), q[ill].size());
-            
-            // release destination memory
-            if (cmd_.outofcore)
-                q.hdfsave(ill, true /* = drop */);
-        }
-        
-        // release source memory (if not owner)
-        if (not par_.isMyGroupWork(ill))
-            const_cast<BlockArray<Complex> &>(p)[ill].drop();
-    }
+    // release source vectors
+    for (unsigned ill = 0; ill < Nang; ill++) if (cmd_.outofcore)
+        v[ill].drop();
     
-    // constrain the result
-    if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
+    // synchronize and release the result vectors
+    for (unsigned ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
     {
-        for (std::size_t ill = 0; ill < Nang; ill++) if (par_.isMyGroupWork(ill))
-        {
-            // load segment from disk
-            if (cmd_.outofcore)
-                q.hdfload(ill);
-            
-            // constrain
+        // synchronize (sum) across the group
+        par_.syncsum_g(q[ill].data(), q[ill].size());
+        
+        // constrain
+        if (const CGPreconditioner * cgprec = dynamic_cast<const CGPreconditioner*>(this))
             cgprec->CG_constrain(q[ill]);
+        
+        // release memory
+        if (cmd_.outofcore)
+        {
+            if (par_.IamGroupMaster())
+                q.hdfsave(ill);
             
-            // release memory
-            if (cmd_.outofcore)
-                q.hdfsave(ill, true /* = drop */);
+            q[ill].drop();
         }
     }
 }
