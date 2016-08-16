@@ -121,7 +121,7 @@ void Amplitudes::extract ()
                 
                 // check existence of the solution; take into account distributed calculations
                 SolutionIO reader (inp_.L, Spin, inp_.Pi, ni, li, mi, inp_.Etot[ie], ang_);
-                BlockArray<Complex> solution (ang_.size(), !cmd_.outofcore, "sol");
+                BlockArray<Complex> solution (ang_.size(), true, "sol");
                 std::size_t valid_blocks = 0;
                 for (unsigned ill = 0; ill < ang_.size(); ill++) if (par_.isMyGroupWork(ill) and par_.IamGroupMaster())
                 {
@@ -486,10 +486,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
             // get angular momentum
             int ell = ang_[ill].second;
             
-            // load solution block
-            if (not solution.inmemory())
-                solution.hdfload(ill);
-            
             Complex lambda = 0;
             if (inp_.inner_only)
             {
@@ -535,10 +531,6 @@ void Amplitudes::computeLambda_ (Amplitudes::Transition T, BlockArray<Complex> &
                 singlet_lambda[ell][i] += lambda;
             else
                 triplet_lambda[ell][i] += lambda;
-            
-            // unload solution block
-            if (not solution.inmemory())
-                solution[ill].drop();
         }
     }
     
