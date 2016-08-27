@@ -304,12 +304,12 @@ bool IntegralCrossSection::updateTable ()
             }
             
             // skip datasets with too few samples
-            if (energies.size() < 3)
+            if (energies.size() < gsl_interp_type_min_size(gsl_interp_akima))
                 continue;
             
             // interpolate data
-            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_cspline, energies.size());
-            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_cspline, energies.size());
+            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_akima, energies.size());
+            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_akima, energies.size());
             gsl_interp_init(spline_Re, energies.data(), Re_T.data(), energies.size());
             gsl_interp_init(spline_Im, energies.data(), Im_T.data(), energies.size());
             # pragma omp parallel
@@ -491,7 +491,7 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         // interpolate (linear below ionization threshold, cspline above)
         rArray ics = (efactor * energies.front() < Eion) ? 
             interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_cspline);
+            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_akima);
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)
