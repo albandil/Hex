@@ -490,8 +490,8 @@ bool IntegralCrossSection::run (std::map<std::string,std::string> const & sdata)
         
         // interpolate (linear below ionization threshold, cspline above)
         rArray ics = (efactor * energies.front() < Eion) ? 
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_linear) :
-            interpolate_real(E_arr, sigma_arr, energies * efactor, gsl_interp_akima);
+            interpolate_real(E_arr, E_arr * sigma_arr, energies * efactor, gsl_interp_linear) / (energies * efactor) :
+            interpolate_real(E_arr, E_arr * sigma_arr, energies * efactor, gsl_interp_akima ) / (energies * efactor);
         
         // output
         for (std::size_t i = 0; i < energies.size(); i++)

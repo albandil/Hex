@@ -270,7 +270,7 @@ void hex_complete_cross_section_
         for (int ell = 0; ell <= max_available_ell; ell++)
         if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
-            rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], E_arr, gsl_interp_akima);
+            rArrayView(*N,ccs) += interpolate_real(E_data[ell], E_data[ell] * sigma_data[ell], E_arr, gsl_interp_akima) / E_arr;
         }
     }
     else
@@ -279,7 +279,7 @@ void hex_complete_cross_section_
         for (int ell = 0; ell <= max_available_ell; ell++)
         if (pws == nullptr or std::find(pws, pws + *npws, ell) != pws + *npws)
         {
-            rArrayView(*N,ccs) += interpolate_real(E_data[ell], sigma_data[ell], rArray(*N,energies), gsl_interp_akima);
+            rArrayView(*N,ccs) += interpolate_real(E_data[ell], E_data[ell] * sigma_data[ell], rArrayView(*N,energies), gsl_interp_akima) / rArrayView(*N,energies);
         }
     }
 }
