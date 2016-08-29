@@ -117,7 +117,7 @@ template <typename T> NumberArray<T> interpolate (rArray const & x0, NumberArray
  *  - gsl_interp_akima_periodic : Non-rounded Akima spline with periodic 
  *    boundary conditions. This method uses the non-rounded corner algorithm of Wodicka.
  */
-inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray const & x, const gsl_interp_type * interpolation)
+inline rArray interpolate_real (const rArrayView x0, const rArrayView y0, const rArrayView x, const gsl_interp_type * interpolation)
 {
     assert(x0.size() == y0.size());
     
@@ -129,22 +129,29 @@ inline rArray interpolate_real (rArray const & x0, rArray const & y0, rArray con
     if (x0.size() == 1)
         return rArray(x.size(), y0[0]);
     
-    // setup the interpolator
-    if (x0.size() >= gsl_interp_type_min_size(interpolation))
+    // setup the interpolator (fallback to linear interpolation if lacking points)
+    if (x0.size() >= gsl_interp_type_min_size(interpolation) or
+        x0.size() >= gsl_interp_type_min_size(interpolation = gsl_interp_linear))
     {
         gsl_interp *itp = gsl_interp_alloc (interpolation, x0.size());
         gsl_interp_init (itp, x0.data(), y0.data(), x0.size());
         gsl_interp_accel *accel = gsl_interp_accel_alloc ();
         
         // interpolate
-        rArray y(x.size());
+        rArray y (x.size());
         for (size_t i = 0; i < x.size(); i++)
         {
-            // check that we are not extrapolating
-            if (x0.front() <= x[i] and x[i] <= x0.back())
-                y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
-            else
+            // extrapolate left by copying the value
+            if (x[i] < x0.front())
+                y[i] = y0.front();
+            
+            // do not extrapolate right
+            else if (x0.back() < x[i])
                 y[i] = 0.;
+            
+            // otherwise interopolate
+            else
+                y[i] = gsl_interp_eval (itp, x0.data(), y0.data(), x[i], accel);
         }
         
         // release memory

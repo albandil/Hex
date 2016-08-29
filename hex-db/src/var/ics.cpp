@@ -303,13 +303,14 @@ bool IntegralCrossSection::updateTable ()
                 Im_T.push_back(imt);
             }
             
-            // skip datasets with too few samples
-            if (energies.size() < gsl_interp_type_min_size(gsl_interp_akima))
+            // default to Akima spline interpolation, but fall back to linear if not enough points
+            gsl_interp_type const * interp = gsl_interp_akima;
+            if (energies.size() < gsl_interp_type_min_size(interp) and energies.size() < gsl_interp_type_min_size(interp = gsl_interp_linear))
                 continue;
             
             // interpolate data
-            gsl_interp* spline_Re = gsl_interp_alloc(gsl_interp_akima, energies.size());
-            gsl_interp* spline_Im = gsl_interp_alloc(gsl_interp_akima, energies.size());
+            gsl_interp* spline_Re = gsl_interp_alloc(interp, energies.size());
+            gsl_interp* spline_Im = gsl_interp_alloc(interp, energies.size());
             gsl_interp_init(spline_Re, energies.data(), Re_T.data(), energies.size());
             gsl_interp_init(spline_Im, energies.data(), Im_T.data(), energies.size());
             # pragma omp parallel
