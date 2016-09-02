@@ -240,7 +240,7 @@ bool IonizationAmplitude::run (std::map<std::string,std::string> const & sdata)
                 {
                     YY += special::ClebschGordan(l1,m,l2,mi-m,L,mi)
                           * special::sphY(l1,m,dirs[idir].first.x*afactor,dirs[idir].first.y*afactor)
-                          * special::sphY(l1,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
+                          * special::sphY(l2,m,dirs[idir].second.x*afactor,dirs[idir].second.y*afactor);
                 }
                 
                 // evaluate Coulomb phaseshifts
