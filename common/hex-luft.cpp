@@ -434,20 +434,6 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
 #ifdef WITH_MUMPS
 
 template<>
-bool LUft_MUMPS<LU_int_t,Complex>::valid () const
-{
-    return settings != nullptr and mmin(I.size(), J.size(), A.size()) > 0;
-}
-
-template<>
-void LUft_MUMPS<LU_int_t,Complex>::drop ()
-{
-    I.drop();
-    J.drop();
-    A.drop();
-}
-
-template<>
 LUft_MUMPS<LU_int_t,Complex>::~LUft_MUMPS ()
 {
     drop ();
@@ -468,12 +454,11 @@ std::size_t LUft_MUMPS<LU_int_t,Complex>::size () const
     if (not settings)
         return 0;
     
-    std::size_t s = settings->info[9-1];
+    #define INFO(x) info[x-1]
+    std::size_t elems_size = (settings->INFO(9) > 0 ? settings->INFO(9) : std::size_t{1000000} * std::abs(settings->INFO(9)));
+    std::size_t index_size = settings->INFO(10);
     
-    if (s == 0)
-        s = 1000000 * (std::size_t)std::abs(settings->info[9-1]) + sizeof(MUMPS_INT) * (std::size_t)settings->info[10-1];
-        
-    return sizeof(MUMPS_COMPLEX) * s;
+    return sizeof(MUMPS_COMPLEX) * elems_size + sizeof(MUMPS_INT) * index_size;
 }
 
 template<>
@@ -492,26 +477,6 @@ void LUft_MUMPS<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int 
     settings->a   = reinterpret_cast<MUMPS_COMPLEX*>(const_cast<Complex*>(A.data()));
     settings->job = 3;
     MUMPS_C(settings);
-}
-
-template<>
-void LUft_MUMPS<LU_int_t,Complex>::save (std::string name) const
-{
-    I.hdfsave("I-" + name);
-    J.hdfsave("J-" + name);
-    A.hdfsave("A-" + name);
-}
-
-template<>
-void LUft_MUMPS<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
-{
-    if (not I.hdfload("I-" + name) or
-        not J.hdfload("J-" + name) or
-        not A.hdfload("A-" + name))
-    {
-        if (throw_on_io_failure)
-            HexException("Failed to load MUMPS IJV matrices.");
-    }
 }
 
 #endif // WITH_MUMPS

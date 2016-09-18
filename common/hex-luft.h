@@ -526,7 +526,7 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         
         /// Default constructor.
         LUft_MUMPS ()
-            : LUft<IdxT,DataT>(), settings(nullptr) {}
+            : LUft<IdxT,DataT> (), settings (nullptr) {}
         
         /// Construct from data.
         LUft_MUMPS (MUMPS_STRUC_C * s, NumberArray<MUMPS_INT> && i, NumberArray<MUMPS_INT> && j, NumberArray<DataT> && a)
@@ -536,25 +536,51 @@ class LUft_MUMPS : public LUft<IdxT,DataT>
         virtual ~LUft_MUMPS ();
         
         /// Validity indicator.
-        virtual bool valid () const;
+        virtual bool valid () const
+        {
+            return settings != nullptr and mmin(I.size(), J.size(), A.size()) > 0;
+        }
         
         /// Return LU byte size.
         virtual std::size_t size () const;
         
         /// Condition number.
-        virtual Real cond () const { return settings ? settings->rinfo[11-1] : 0.0_r; }
+        virtual Real cond () const
+        {
+            #define RINFO(x) rinfo[x-1]
+            return settings ? settings->RINFO(11) : 0.0_r;
+        }
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
         /// Save large data to disk.
-        virtual void save (std::string name) const;
+        virtual void save (std::string name) const
+        {
+            I.hdfsave("I-" + name);
+            J.hdfsave("J-" + name);
+            A.hdfsave("A-" + name);
+        }
         
         /// Load large data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        virtual void load (std::string name, bool throw_on_io_failure = true)
+        {
+            if (not I.hdfload("I-" + name) or
+                not J.hdfload("J-" + name) or
+                not A.hdfload("A-" + name))
+            {
+                if (throw_on_io_failure)
+                    HexException("Failed to load MUMPS IJV matrices.");
+            }
+        }
         
         /// Release memory.
-        virtual void drop ();
+        virtual void drop ()
+        {
+            I.drop();
+            J.drop();
+            A.drop();
+        }
         
     private:
         
