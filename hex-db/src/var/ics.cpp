@@ -284,7 +284,7 @@ bool IntegralCrossSection::updateTable ()
         cArray merged_T (merged_energies.size());
         for (int L : angular_momenta)
         {
-            rArray energies, Re_T, Im_T;
+            rArray energies, Re_T, Im_T, k;
             // retrieve data
             double ret, imt;
             sqlitepp::statement st4 (session());
@@ -299,8 +299,9 @@ bool IntegralCrossSection::updateTable ()
             while (st4.exec())
             {
                 energies.push_back(E);
-                Re_T.push_back(ret);
-                Im_T.push_back(imt);
+                k.push_back(std::sqrt(E));
+                Re_T.push_back(ret * k.back());
+                Im_T.push_back(imt * k.back());
             }
             
             // default to Akima spline interpolation, but fall back to linear if not enough points
@@ -340,7 +341,7 @@ bool IntegralCrossSection::updateTable ()
                                 "L = " << L << ", ell = " << ell << ", Ei = " << merged_energies[i] << " (" << gsl_strerror(err_re) << ")" << std::endl;
                         }
                         
-                        merged_T[i] += Complex (ret, imt);
+                        merged_T[i] += Complex(ret, imt) / std::sqrt(merged_energies[i]);
                     }
                 }
                 
