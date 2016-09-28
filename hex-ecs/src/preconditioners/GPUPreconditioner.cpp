@@ -253,6 +253,7 @@ void GPUCGPreconditioner::setup ()
     flags << " -D ANGULAR_BASIS_SIZE=" << ang_.states().size() << " ";
     flags << " -D NSRCSEG="      << nsrcseg_     << " ";
     flags << " -D NDSTSEG="      << ndstseg_     << " ";
+    flags << " -D ZP="           << inp_.Zp      << " ";
 #ifdef SINGLE
     flags << " -D Real=float -D Complex=float2 ";
 #else
@@ -373,7 +374,7 @@ void GPUCGPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Co
             clFinish(queue_);
             
             // multiply by diagonal block (one-electron contribution)
-            clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
+            clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
             clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
@@ -537,7 +538,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
             Timer timer;
             
             // one-electron contribution
-            clSetKernelArg(mml1_, 0, sizeof(Real), &E_);
+            clSetKernelArg(mml1_, 0, sizeof(Real),   &E_);
             clSetKernelArg(mml1_, 1, sizeof(cl_mem), &S_inner_p_.handle());
             clSetKernelArg(mml1_, 2, sizeof(cl_mem), &D_inner_p_.handle());
             clSetKernelArg(mml1_, 3, sizeof(cl_mem), &Mm1_tr_inner_p_.handle());
@@ -565,7 +566,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_dcpl_, 0, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_dcpl_, 1, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_dcpl_, 2, sizeof(int),    &lambda);
-                clSetKernelArg(mml2_dcpl_, 3, sizeof(Real), &f);
+                clSetKernelArg(mml2_dcpl_, 3, sizeof(Real),   &f);
                 clSetKernelArg(mml2_dcpl_, 4, sizeof(cl_mem), &M_L_inner_[lambda].handle());
                 clSetKernelArg(mml2_dcpl_, 5, sizeof(cl_mem), &M_mLm1_inner_[lambda].handle());
                 clSetKernelArg(mml2_dcpl_, 6, sizeof(cl_mem), &M_L_inner_[lambda].handle());
@@ -583,7 +584,7 @@ void GPUCGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArra
                 clSetKernelArg(mml2_cpld_, 0, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_cpld_, 1, sizeof(cl_mem), &t_inner_.handle());
                 clSetKernelArg(mml2_cpld_, 2, sizeof(int),    &lambda);
-                clSetKernelArg(mml2_cpld_, 3, sizeof(Real), &f);
+                clSetKernelArg(mml2_cpld_, 3, sizeof(Real),   &f);
                 clSetKernelArg(mml2_cpld_, 4, sizeof(cl_mem), &Mi_L_inner_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 5, sizeof(cl_mem), &Mi_mLm1_inner_[lambda].handle());
                 clSetKernelArg(mml2_cpld_, 6, sizeof(cl_mem), &Mi_L_inner_[lambda].handle());
