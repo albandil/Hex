@@ -204,6 +204,8 @@ void CommandLine::parse (int argc, char* argv[])
                     "\t--cl-multiply                    Do the sparse matrix multiplication on the OpenCL device (memory intensive!).                                          \n"
                     "\t--cl-host-multiply               Keep vectors in host memory when doing matrix multiplication on OpenCL device.                                         \n"
 #endif
+                    "\t--multigrid-depth                Depth of the geometric multigrid (= maximal refinement level of the original B-spline knot sequence).                  \n"
+                    "\t--multigrid-coarse-prec          What preconditioner to use for preconditioning of the solution of the coarse problem (specified in input file).        \n"
                     "\n"
                 ;
                 std::exit(EXIT_SUCCESS);
@@ -549,6 +551,19 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS
                 fast_bessel = true;
+                return true;
+            },
+        "multigrid-depth", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // multigrid levels
+                multigrid_depth = std::stoi(optargs[0]);
+                return true;
+            },
+        "multigrid-coarse-prec", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // preconditioner
+                if ((multigrid_coarse_prec = Preconditioners::findByName(optargs[0])) == -1)
+                    HexException("Unknown coarse preconditioner \"%s\".", optargs[0].c_str());
                 return true;
             },
         

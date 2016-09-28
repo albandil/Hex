@@ -134,6 +134,7 @@ class ILUCGPreconditioner;
 class GPUCGPreconditioner;
 class HybCGPreconditioner;
 class CoupledPreconditioner;
+class GMGPreconditioner;
 
 #include "preconditioners/NoPreconditioner.h"
 #include "preconditioners/CGPreconditioner.h"
@@ -142,6 +143,7 @@ class CoupledPreconditioner;
 #include "preconditioners/GPUPreconditioner.h"
 #include "preconditioners/HybPreconditioner.h"
 #include "preconditioners/CoupledPreconditioner.h"
+#include "preconditioners/GMGPreconditioner.h"
 
 /**
  * @brief Preconditioner traits.
@@ -188,6 +190,7 @@ class Preconditioners
 #ifdef WITH_MUMPS
             , CoupledPreconditioner     // Coupled solver.
 #endif
+            , GMGPreconditioner         // Geometric multigrid preconditioner.
         > AvailableTypes;
         
         /**
@@ -207,6 +210,7 @@ class Preconditioners
         //@{
         template <int i = 0> static inline typename std::enable_if<(i < std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
         (
+            int preconditioner,
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
@@ -218,12 +222,13 @@ class Preconditioners
             // check if i-th preconditioner is the right one
             // - Yes : return new pointer of its type
             // - No : try the next preconditioner
-            return   (i == cmd.preconditioner)
+            return   (i == preconditioner)
                    ? new typename std::tuple_element<i,AvailableTypes>::type (par, inp, ll, bspline_inner, bspline_full, cmd)
-                   : choose<i+1>(par, inp, ll, bspline_inner, bspline_full, cmd);
+                   : choose<i+1>(preconditioner, par, inp, ll, bspline_inner, bspline_full, cmd);
         }
         template <int i = 0> static inline typename std::enable_if<(i == std::tuple_size<AvailableTypes>::value), PreconditionerBase*>::type choose
         (
+            int preconditioner,
             Parallel const & par,
             InputFile const & inp,
             AngularBasis const & ll,
