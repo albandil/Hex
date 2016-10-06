@@ -498,12 +498,12 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 #define MUMPS_SOLVE         3
 
 #ifdef SINGLE
-    #include <mumps/cmumps_c.h>
+    #include <cmumps_c.h>
     #define MUMPS_STRUC_C CMUMPS_STRUC_C
     #define MUMPS_C cmumps_c
     #define MUMPS_COMPLEX mumps_float_complex
 #else
-    #include <mumps/zmumps_c.h>
+    #include <zmumps_c.h>
     #define MUMPS_STRUC_C ZMUMPS_STRUC_C
     #define MUMPS_C zmumps_c
     #define MUMPS_COMPLEX mumps_double_complex

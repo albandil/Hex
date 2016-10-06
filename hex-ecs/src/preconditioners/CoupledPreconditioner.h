@@ -35,9 +35,9 @@
 #ifdef WITH_MUMPS
 
 #ifdef SINGLE
-    #include <mumps/cmumps_c.h>
+    #include <cmumps_c.h>
 #else
-    #include <mumps/zmumps_c.h>
+    #include <zmumps_c.h>
 #endif
 
 #include "preconditioners.h"
