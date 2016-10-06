@@ -283,7 +283,7 @@ void hex_dump_ (const char* dumpfile)
 {
     sqlitepp::statement st (db);
     std::string dumpline, dumpcmd =
-        "SELECT 'INSERT INTO 'tmat' VALUES(' || "
+        "SELECT 'INSERT INTO tmat VALUES(' || "
         "quote(ni) || ',' || "
         "quote(li) || ',' || "
         "quote(mi) || ',' || "
@@ -295,9 +295,7 @@ void hex_dump_ (const char* dumpfile)
         "quote(Ei) || ',' || "
         "quote(ell) || ',' || "
         "quote(Re_T_ell) || ',' || "
-        "quote(Im_T_ell) || ',' || "
-        "quote(Re_TBorn_ell) || ',' || "
-        "quote(Im_TBorn_ell) || ')' FROM 'tmat';";
+        "quote(Im_T_ell) || ')' FROM 'tmat';";
     
     try
     {
