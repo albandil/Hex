@@ -46,6 +46,55 @@
     <!-- Load external scripts -->
     <script type = "text/javascript" language = "javascript" src = "db-scripts.js">
     </script>
+    
+    <!-- Append generated function -->
+    <script type = "text/javascript" language = "javascript">
+        function jsDataSet()
+        {
+            var elem;
+            
+            //
+            // set attributes of the table cells
+            //
+            
+            for (var i = 1; i <= Nstates; i++)
+            for (var f = 0; f <= Nstates; f++)
+            {
+                elem = document.getElementById("dat-" + i + "-" + f);
+                elem.onmouseover = jsDataMOver;
+                elem.onclick = jsDataClick;
+            }
+            
+            //
+            // set data of the table cells
+            //
+            
+<?php
+            include "hexdbexe.inc";    // defines $hexdbexe
+            include "hexdblib.inc";    // defines $hexdblib
+            include "hexdbdat.inc";    // defines $hexdbdat
+            
+            $sql = 'SELECT CHAR(9,9,9),"elem = document.getElementById(",CHAR(34),"dat-",ni,"-",nf,CHAR(34),");",CHAR(10,9,9,9),"elem.dataset.colour_",liname,"_",lfname," = ",CASE WHEN nE < 1024 THEN nE/4 ELSE 255 END,";",CHAR(10,9,9,9),"elem.dataset.data_",liname,"_",lfname," = ",CHAR(34),ni,liname," &rarr; ",nf,lfname,"<br/>(",CASE WHEN ni = nf THEN ( CASE WHEN li = lf THEN "elastic transition" ELSE "degenerate transition" END ) ELSE ( CASE WHEN ni < nf THEN "excitation" ELSE "de-excitation" END ) END,")<br/><br/>Energies [Ry]:<br/>",minE,"&ndash;",maxE," Ry (",nE," data points)",CHAR(34),";",CHAR(10,9,9,9) FROM (SELECT ni,li,nf,lf,CASE WHEN li <= 6 THEN SUBSTR("spdfghi",li+1,1) ELSE CHAR(107+li-7) END AS liname,CASE WHEN lf <= 6 THEN SUBSTR("spdfghi",lf+1,1) ELSE CHAR(107+lf-7) END AS lfname,MIN(Ei) AS minE,MAX(Ei) AS maxE,COUNT(DISTINCT Ei) AS nE FROM ics GROUP BY ni,li,nf,lf);';
+            
+            $procsql = proc_open (
+                "sqlite3 -separator '' $hexdbdat",
+                array(array("pipe","r"), array("pipe","w"), array("pipe","a")),
+                $pipes
+            );
+            
+            // feed standard input to hex-db process
+            fwrite($pipes[0], $sql . "\n");
+            fclose($pipes[0]);
+            
+            // get standard output and close pipes
+            $sqloutput = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            
+            echo $sqloutput;
+?>
+        }
+    </script>
 
     <!-- Setup MathJax -->
     <script type="text/x-mathjax-config">
@@ -57,7 +106,7 @@
     </script>
 
     <!-- Load MathJax -->
-    <script src="/MathJax/MathJax.js"></script>
+    <script src="MathJax/MathJax.js"></script>
 </head>
  
 <body onload = "jsDataSet(); jsDataAngular();">
@@ -196,13 +245,12 @@
                     $chckstatus = "";
                 }
                 
-                printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set energy range:</div>\n");
+                printf("\t\t<div class = \"text\" title = \"Set to '-1','0','1' to get all computed data. Otherwise you will get interpolated result. The interpolation is linear for most cases. Only for all integral cross sections at energies behind the ionization threshold the interpolation uses csplines.\">Set uniform energy range:</div>\n");
                 printf("\t\t<center>\n");
                 printf("\t\t\t\\(E_{\mathrm{min}}\\) = <input type = \"text\" title = \"lowest impact energy\" id = \"iEmin\" name = \"Emin\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emin"]) ? $_POST["Emin"] : "");
                 printf("\t\t\t\\(E_{\mathrm{max}}\\) = <input type = \"text\" title = \"highest impact energy\" id = \"iEmax\" name = \"Emax\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["Emax"]) ? $_POST["Emax"] : "");
                 printf("\t\t\t\\(\\Delta E\\) = <input type = \"text\" title = \"impact energy spacing\" id = \"idE\" name = \"dE\" size = \"5\" value = \"%s\" $editstatus required = \"required\"/>\n", isset($_POST["dE"]) ? $_POST["dE"] : "");
                 printf("\t\t</center>\n");
-                
                 
                 printf("\t\t<div class = \"text\">or</div>\n");
                 printf("\t\t<center>\n");
@@ -211,14 +259,24 @@
             }
 ?>
         
+        <div class = "text">Graph axis scales:</div>
+            <center>
+                Horizontal: <select name = "xscale" title = "horizontal scale">
+                    <option value = "lin" <?php if (!isset($_POST["xscale"]) or $_POST["xscale"] != "log") echo "selected = \"selected\""; ?> >linear</option>
+                    <option value = "log" <?php if (isset($_POST["xscale"]) and $_POST["xscale"] == "log") echo "selected = \"selected\""; ?> >logarithmic</option>
+                </select>
+                &nbsp;&nbsp;&nbsp;
+                Vertical: <select name = "yscale" title = "vertical scale">
+                    <option value = "lin" <?php if (!isset($_POST["yscale"]) or $_POST["yscale"] != "log") echo "selected = \"selected\""; ?> >linear</option>
+                    <option value = "log" <?php if (isset($_POST["yscale"]) and $_POST["yscale"] == "log") echo "selected = \"selected\""; ?> >logarithmic</option>
+                </select>
+            </center>
+        </div>
+        
         <br/>
         
         <!-- hidden element containing the output from hex-db -->
 <?php
-            include "hexdbexe.inc";    // defines $hexdbexe
-            include "hexdblib.inc";    // defines $hexdblib
-            include "hexdbdat.inc";    // defines $hexdbdat
-            
             if (isset($_POST["qty"]) and isset($_POST["view"]))
             {
                 // prepare Hex-db command line
@@ -270,7 +328,7 @@
                 fclose($pipes[0]);
                 
                 // get standard output and close pipes
-                 $hexoutput = stream_get_contents($pipes[1]);
+                $hexoutput = stream_get_contents($pipes[1]);
                 fclose($pipes[1]);
                 fclose($pipes[2]);
                 
@@ -311,13 +369,13 @@
             
             // write to Gnuplot's standard input
 //             fwrite($pipes2[0], "set terminal svg mouse jsdir \"http://gnuplot.sourceforge.net/demo_svg_4.6/\" size 500,300\n"); // SVG
-            fwrite($pipes2[0], "set terminal png size 500,300\n"); // PNG
+            fwrite($pipes2[0], "set terminal png size 500,400\n"); // PNG
             fwrite($pipes2[0], "unset key\n");
             
             if (in_array($var, array("scatamp", "dcs", "asy")))
                 fwrite($pipes2[0], "set xlabel \"angle [" . $Aunits . "]\"\n");
             else
-                fwrite($pipes2[0], "set xlabel \"Ei [" . $Eunits . "]\"\n");
+                fwrite($pipes2[0], "set xlabel \"E_i [" . $Eunits . "]\"\n");
             
             if ($var == "colls")
                 fwrite($pipes2[0], "set ylabel \"omega\"\n");
@@ -327,9 +385,15 @@
             if ($Tunits == "cgs")
                 fwrite($pipes2[0], "set format y '%g'\n");
                 
+            fwrite($pipes2[0], "set grid\n");
+            if (isset($_POST["xscale"]) and $_POST["xscale"] == "log")
+                fwrite($pipes2[0], "set logscale x\n");
+            if (isset($_POST["yscale"]) and $_POST["yscale"] == "log")
+                fwrite($pipes2[0], "set logscale y\n");
+            
             if ($var == "scatamp")
             {
-                fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
+                fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines, \"\" using 1:3 with lines\n");
                 fwrite($pipes2[0], $hexoutput);
                 fwrite($pipes2[0], "e\n");
                 fwrite($pipes2[0], $hexoutput);
@@ -338,9 +402,9 @@
             else
             {
                 if ($_POST["Emin"] < 0 and $nums[0] < 0)
-                    fwrite($pipes2[0], "set grid; set logscale; plot \"-\" using 1:2 with lines\n");
+                    fwrite($pipes2[0], "plot \"-\" using 1:2 with lines\n");
                 else
-                    fwrite($pipes2[0], "set grid; plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
+                    fwrite($pipes2[0], "plot [" . $nums[0] . ":" . end($nums) .  "] \"-\" using 1:2 with lines\n");
                 fwrite($pipes2[0], $hexoutput);
                 fwrite($pipes2[0], "e\n");
             }
