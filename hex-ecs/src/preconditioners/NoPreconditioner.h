@@ -57,6 +57,8 @@ class NoPreconditioner : public PreconditionerBase
         virtual std::string const & name () const { return prec_name; }
         virtual std::string const & description () const { return prec_description; }
         
+        RadialIntegrals const & rad () const { return rad_; }
+        
         NoPreconditioner
         (
             Parallel const & par,
@@ -81,7 +83,7 @@ class NoPreconditioner : public PreconditionerBase
         virtual void update (Real E);
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixTriangle tri = both) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
         // internal routines

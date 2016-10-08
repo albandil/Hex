@@ -78,11 +78,20 @@ class GMGPreconditioner : public NoPreconditioner
         virtual void update (Real E);
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
     
-    protected:
-    
     private:
         
         int level_;
+        
+        Bspline bspline_inner_fine_;
+        Bspline bspline_inner_coarse_;
+        Bspline bspline_full_fine_;
+        Bspline bspline_full_coarse_;
+        
+        RowMatrix<Complex> restrictor_inner_, restrictor_outer_;
+        RowMatrix<Complex> prolongator_inner_, prolongator_outer_;
+        
+        cArrays D;
+        
         PreconditionerBase * subgrid_;
 };
 

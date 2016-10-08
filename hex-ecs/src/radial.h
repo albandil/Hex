@@ -555,8 +555,8 @@ class RadialIntegrals
     private:
         
         // B-spline environment
-        Bspline const & bspline_inner_;
-        Bspline const & bspline_full_;
+        Bspline bspline_inner_;
+        Bspline bspline_full_;
         
         // Gauss-Legendre integrator
         GaussLegendre g_inner_;

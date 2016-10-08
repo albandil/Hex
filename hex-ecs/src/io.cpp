@@ -947,7 +947,7 @@ void zip_solution
     r.setupOneElectronIntegrals(par, cmd);
     
     // prepare quadrature structure
-    GaussLegendre g_inner (bspline_inner);
+    GaussLegendre g_inner;
     
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();

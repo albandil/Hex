@@ -293,14 +293,14 @@ public:
      * 
      * @param B Set of vectors to multiply as a column-major dense matrix.
      */
-    void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B) const
+    void dot (DataT a, const ArrayView<DataT> A, DataT b, ArrayView<DataT> B, MatrixTriangle tri = both) const
     {
-        sym_band_dot(n_, d_, elems_, a, A, b, B);
+        sym_band_dot(n_, d_, elems_, a, A, b, B, tri);
     }
-    NumberArray<DataT> dot (const ArrayView<DataT> A) const
+    NumberArray<DataT> dot (const ArrayView<DataT> A, MatrixTriangle tri = both) const
     {
         NumberArray<DataT> B (A.size());
-        sym_band_dot(n_, d_, elems_, 1., A, 0., B);
+        sym_band_dot(n_, d_, elems_, 1., A, 0., B, tri);
         return B;
     }
     
@@ -316,7 +316,8 @@ public:
     (
         int n, int d, const ArrayView<DataT> M,
         DataT a, const ArrayView<DataT> A,
-        DataT b,       ArrayView<DataT> B
+        DataT b,       ArrayView<DataT> B,
+        MatrixTriangle tri = both
     );
     
     /**
@@ -824,7 +825,7 @@ template <class DataT> class BlockSymBandMatrix
          *          The result will be again of the same size.
          * @param parallelize Multiply by several blocks at once (OpenMP used).
          */
-        void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false) const
+        void dot (DataT a, const ArrayView<DataT> v, DataT b, ArrayView<DataT> w, bool parallelize = false, MatrixTriangle tri = both) const
         {
             // check vector size
             if (v.size() != blockcount_ * size_)
@@ -891,7 +892,8 @@ template <class DataT> class BlockSymBandMatrix
                             (
                                 size_, halfbw_, view,
                                 1., ArrayView<DataT>(v, i * size_, size_),
-                                0., product
+                                0., product,
+                                tri
                             );
                             
                             OMP_LOCK_LOCK(i);
@@ -910,7 +912,8 @@ template <class DataT> class BlockSymBandMatrix
                             (
                                 size_, halfbw_, view,
                                 1., ArrayView<DataT>(v, (i + d) * size_, size_),
-                                0., product
+                                0., product,
+                                tri & strict_upper
                             );
                             
                             OMP_LOCK_LOCK(i);
@@ -925,7 +928,8 @@ template <class DataT> class BlockSymBandMatrix
                             (
                                 size_, halfbw_, view,
                                 1., ArrayView<DataT>(v, i * size_, size_),
-                                0., product
+                                0., product,
+                                tri & strict_lower
                             );
                             
                             OMP_LOCK_LOCK(i + d);

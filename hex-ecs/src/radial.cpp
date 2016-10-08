@@ -51,8 +51,6 @@ RadialIntegrals::RadialIntegrals
 )
   : bspline_inner_(bspline_inner),
     bspline_full_ (bspline_full),
-    g_inner_(bspline_inner),
-    g_full_ (bspline_full),
     D_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
     S_inner_     (bspline_inner.Nspline(), bspline_inner.order() + 1),
     Mm1_inner_   (bspline_inner.Nspline(), bspline_inner.order() + 1),

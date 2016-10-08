@@ -112,7 +112,7 @@ class PreconditionerBase
          * This function implements matrix multiplication by the matrix of
          * the set of equations that is to be solved.
          */
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const = 0;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixTriangle tri = both) const = 0;
         
         /**
          * @brief Precondition the equation.

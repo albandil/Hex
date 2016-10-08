@@ -840,7 +840,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     }
 }
 
-void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q) const
+void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixTriangle tri) const
 {
     // shorthands
     unsigned Nspline_inner = rad_.bspline_inner().Nspline();
@@ -892,7 +892,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 (
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
                     1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
-                    true
+                    true,
+                    ill == illp ? tri : (ill < illp ? (tri & strict_lower) : (tri & strict_upper))
                 );
             }
             else
@@ -906,7 +907,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                 (
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
                     1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
-                    true
+                    true,
+                    ill == illp ? tri : (ill < illp ? (tri & strict_lower) : (tri & strict_upper))
                 );
                 
                 // release memory
@@ -998,7 +1000,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     R.dot
                     (
                         inp_.Zp * f, cArrayView(p[illp], k * Nspline_inner, Nspline_inner),
-                        1.0_z, cArrayView(q[ill], i * Nspline_inner, Nspline_inner)
+                        1.0_z, cArrayView(q[ill], i * Nspline_inner, Nspline_inner),    
+                        ill == illp and i == k ? tri : (ill < illp or (ill == illp and i < k) ? tri & strict_lower : tri & strict_upper)
                     );
                     
                     OMP_UNLOCK_LOCK(ill * Nspline_inner + i);
@@ -1011,7 +1014,8 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     R.dot
                     (
                         inp_.Zp * f, cArrayView(p[illp], i * Nspline_inner, Nspline_inner),
-                        1.0_z, cArrayView(q[ill], k * Nspline_inner, Nspline_inner)
+                        1.0_z, cArrayView(q[ill], k * Nspline_inner, Nspline_inner),
+                        ill == illp and i == k ? tri : (ill < illp or (ill == illp and i < k) ? tri & strict_lower : tri & strict_upper)
                     );
                     
                     OMP_UNLOCK_LOCK(ill * Nspline_inner + k);
