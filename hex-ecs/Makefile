@@ -19,6 +19,13 @@ CFLAGS = -fopenmp -Wall -mtune=native -march=native -fcx-limited-range -Wno-unkn
 LFLAGS = -fopenmp -lstdc++
 
 # ---------------------------------------------------------------------------- #
+# OpenMPI environment (optional)                                               #
+# ---------------------------------------------------------------------------- #
+
+OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
+OPENMPILIBS  = $(shell mpicxx --showme:link)
+
+# ---------------------------------------------------------------------------- #
 # BLAS & LAPACK                                                                #
 #                                                                              #
 # The macro DISABLE_PARALLEL_PRECONDITION will inhibit nested parallelism      #
@@ -63,12 +70,13 @@ SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 # SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -D_LONGINT
 # SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lmetis_ilp64
 
-# ---------------------------------------------------------------------------- #
-# MUMPS library for the out-of-core coupled solver.                            #
-# ---------------------------------------------------------------------------- #
-
-# MUMPSFLAGS = -DWITH_MUMPS
+# - sequential MUMPS
+# MUMPSFLAGS = -DWITH_MUMPS -UWITH_MPI
 # MUMPSLIBS = -lzmumps_seq
+
+# - parallel MUMPS
+# MUMPSFLAGS = -DWITH_MUMPS
+# MUMPSLIBS = -lzmumps
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
@@ -78,13 +86,6 @@ GSLFLAGS = $(shell gsl-config --cflags)
 GSLLIBS = $(shell gsl-config --libs)
 
 # ---------------------------------------------------------------------------- #
-# OpenMPI environment (optional)                                               #
-# ---------------------------------------------------------------------------- #
-
-OPENMPIFLAGS = -DWITH_MPI $(shell mpicxx --showme:compile)
-OPENMPILIBS  = $(shell mpicxx --showme:link)
-
-# ---------------------------------------------------------------------------- #
 # OpenCL (optional)                                                            #
 # ---------------------------------------------------------------------------- #
 
@@ -92,7 +93,7 @@ OPENMPILIBS  = $(shell mpicxx --showme:link)
 # OPENCLLIBS = -lOpenCL
 
 # ---------------------------------------------------------------------------- #
-# PNG++ (optional)                                                             #
+# PNG++ (optional, for debugging purposes)                                     #
 # ---------------------------------------------------------------------------- #
 
 # PNGPPFLAGS = -DWITH_PNG -I../libs

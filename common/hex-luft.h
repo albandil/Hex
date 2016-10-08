@@ -306,7 +306,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
     
         /// Default constructor.
         LUft_SUPERLU ()
-            : LUft<IdxT,DataT>(), matrix_(nullptr), size_(0) {}
+            : LUft<IdxT,DataT>(), matrix_(), size_(0) {}
         
         /// Initialize the structure using the matrix and its numeric decomposition.
         LUft_SUPERLU
@@ -333,7 +333,7 @@ class LUft_SUPERLU : public LUft<IdxT,DataT>
         virtual ~LUft_SUPERLU () { drop(); }
         
         /// Validity indicator.
-        virtual bool valid () const;
+        virtual bool valid () const { return matrix_.size() != 0; }
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }

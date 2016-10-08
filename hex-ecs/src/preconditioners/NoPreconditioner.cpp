@@ -408,7 +408,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(1/r2, lambda + 1);
-                    elem += inp_.Zp * ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(j,l) * special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
+                    elem += inp_.Zp * ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(j,l) * (Real)special::hydro_rho(m + l1 + 1, l1, n + l1p + 1, l1p, lambda);
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l1p][n][k] * elem);
@@ -438,7 +438,7 @@ void NoPreconditioner::update (Real E)
                 for (int lambda = 1; lambda <= rad_.maxlambda(); lambda++) if (ang_.f(ill,illp,lambda) != 0)
                 {
                     Real scale = special::pow_int(1/r1, lambda + 1);
-                    elem += inp_.Zp * ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
+                    elem += inp_.Zp * ang_.f(ill,illp,lambda) * scale * rad_.Mtr_mLm1_full(lambda)(i,k) * (Real)special::hydro_rho(m + l2 + 1, l2, n + l2p + 1, l2p, lambda);
                 }
                 
                 Cl_blocks_[ill * Nang + illp].add(row, col, Sp[l2p][n][l] * elem);

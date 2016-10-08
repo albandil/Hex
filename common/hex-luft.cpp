@@ -94,7 +94,7 @@ bool LUft_UMFPACK<LU_int_t,Complex>::valid () const
 }
 
 template<>
-double LUft_UMFPACK<LU_int_t,Complex>::cond () const
+Real LUft_UMFPACK<LU_int_t,Complex>::cond () const
 {
     return info_[UMFPACK_RCOND];
 }
@@ -117,15 +117,15 @@ void LUft_UMFPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
             matrix_.i().data(),     // column indices
             
             // matrix elements (interleaved)
-            reinterpret_cast<const double*>(matrix_.x().data()),
+            reinterpret_cast<const Real*>(matrix_.x().data()),
             nullptr,
             
             // solutions (interleaved)
-            reinterpret_cast<double*>(&x[0] + eq * matrix_.rows()),
+            reinterpret_cast<Real*>(&x[0] + eq * matrix_.rows()),
             nullptr,
             
             // right-hand side vectors (interleaved)
-            reinterpret_cast<const double*>(&b[0] + eq * matrix_.rows()),
+            reinterpret_cast<const Real*>(&b[0] + eq * matrix_.rows()),
             nullptr,
             
             numeric_,   // factorization object
@@ -208,7 +208,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     //
     
         NRformat AStore;
-        AStore.nnz    = matrix_->x().size();                        // number of non-zero elements
+        AStore.nnz    = matrix_.x().size();                         // number of non-zero elements
         AStore.nzval  = const_cast<Complex*>(matrix_.x().data());   // pointer to the array of non-zero elements
         AStore.colind = const_cast<int*>(matrix_.i().data());       // row indices
         AStore.rowptr = const_cast<int*>(matrix_.p().data());       // column pointers
@@ -230,7 +230,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     //
     
         DNformat BStore;
-        BStore.lda = matrix_->cols();                   // leading dimension
+        BStore.lda = matrix_.cols();                    // leading dimension
         BStore.nzval = const_cast<Complex*>(b.data());  // data pointer
         
         SuperMatrix B;
@@ -241,7 +241,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         B.Dtype = SLU_Z;                // data type: double complex
 #endif
         B.Mtype = SLU_GE;               // mathematical type: general
-        B.nrow = matrix_->cols();       // number of rows (= number of equations)
+        B.nrow = matrix_.cols();        // number of rows (= number of equations)
         B.ncol = eqs;                   // number of columns (= number of right hand sides)
         B.Store = &BStore;              // data structure pointer
         
@@ -250,7 +250,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
     //
         
         DNformat XStore;
-        XStore.lda = matrix_->cols();   // leading dimension
+        XStore.lda = matrix_.cols();    // leading dimension
         XStore.nzval = x.data();        // data pointer
         
         SuperMatrix X;
@@ -261,7 +261,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
         X.Dtype = SLU_Z;                // data type: double complex
 #endif
         X.Mtype = SLU_GE;               // mathematical type: general
-        X.nrow = matrix_->cols();       // number of rows (= number of equations)
+        X.nrow = matrix_.cols();        // number of rows (= number of equations)
         X.ncol = eqs;                   // number of columns (= number of right hand sides)
         X.Store = &XStore;              // data structure pointer
         
@@ -321,7 +321,7 @@ void LUft_SUPERLU<int,Complex>::solve (const cArrayView b, cArrayView x, int eqs
             &rcond,                         // reciprocal condition number
             &ferr[0],                       // forward error
             &berr[0],                       // backward error
-//             const_cast<GlobalLU_t*>(&Glu_), // reusable information
+            const_cast<GlobalLU_t*>(&Glu_), // reusable information
             &mem_usage,                     // memory usage
             &stat,                          // diagnostic infomation
             &info                           // result status

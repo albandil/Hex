@@ -576,7 +576,7 @@ std::shared_ptr<LUft<int,Complex>> CsrMatrix<int,Complex>::factorize_superlu (Re
             &rcond,         // reciprocal condition number
             &ferr,          // forward error
             &berr,          // backward error
-//             &Glu,           // reusable information
+            &Glu,           // reusable information
             &mem_usage,     // memory usage
             &stat,          // diagnostic infomation
             &info           // result status
