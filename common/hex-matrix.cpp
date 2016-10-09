@@ -241,7 +241,7 @@ void ColMatrix<Complex>::diagonalize
 //
 
 template<>
-void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Complex alpha, const cArrayView A, Complex beta, cArrayView B, MatrixTriangle tri)
+void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Complex alpha, const cArrayView A, Complex beta, cArrayView B, MatrixSelection::Selection tri)
 {
     // check dimensions
     if (A.size() % n != 0)
@@ -273,14 +273,14 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
         {
             // Diagonal element
             
-                if (tri & diagonal)
+                if (tri & MatrixSelection::Diagonal)
                 {
                     pB[k] += pM[k * d] * alpha * pA[k];
                 }
             
             // Direct pass (~ strict upper triangle)
         
-                if (tri & strict_upper)
+                if (tri & MatrixSelection::StrictUpper)
                 {
                     for (int l = 1; l < d and k + l < n; l++)
                         pB[k] += pM[k * d + l] * alpha * pA[k + l];
@@ -288,7 +288,7 @@ void SymBandMatrix<Complex>::sym_band_dot (int n, int d, const cArrayView M, Com
         
             // Mirror pass (~ strict lower triangle)
                 
-                if (tri & strict_lower)
+                if (tri & MatrixSelection::StrictLower)
                 {
                     for (int l = 1; l < d and k + l < n; l++)
                         pB[k + l] += pM[k * d + l] * alpha * pA[k];

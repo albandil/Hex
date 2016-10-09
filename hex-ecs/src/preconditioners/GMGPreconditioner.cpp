@@ -40,10 +40,10 @@ template <class T> NumberArray<T> dither (NumberArray<T> const & arr)
 {
     NumberArray<T> brr;
     
-    // copy the first, the last and every other element from arr to brr
+    // copy al zeros, the last knot and also every second knot from arr to brr
     for (std::size_t i = 0; i < arr.size(); i++)
     {
-        if (i == 0 or i + 1 == arr.size() or i % 2 == 0)
+        if (arr[i] == 0 or i + 1 == arr.size() or i % 2 == 0)
             brr.push_back(arr[i]);
     }
     
@@ -117,9 +117,12 @@ GMGPreconditioner::GMGPreconditioner
 
 void GMGPreconditioner::setup ()
 {
+    // setup subgrid
+    subgrid_->setup();
+    
     if (level_ > 0)
     {
-        std::cout << "Setting up GMG preconditioner level " << level_ << std::endl;
+        std::cout << "Setting up GMG preconditioner level " << level_ << " (" << bspline_full_coarse_.Nspline() << " B-splines)" << std::endl << std::endl;
         
         // update parent
         NoPreconditioner::setup();
@@ -135,8 +138,24 @@ void GMGPreconditioner::setup ()
         ColMatrix<Complex> Scf (Sfc);
         
         // factorize inner overlap matrix for both the fine and coarse basis
-        std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_fine = this->rad_.S_inner().tocoo<LU_int_t>().tocsr().factorize();
-        std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_coarse = dynamic_cast<NoPreconditioner*>(subgrid_)->rad().S_inner().tocoo<LU_int_t>().tocsr().factorize();
+        SymBandMatrix<Complex> S_fine = this->rad_.S_inner();
+        SymBandMatrix<Complex> S_coarse = dynamic_cast<GMGPreconditioner*>(subgrid_)->rad().S_inner();
+        std::cout << "S_coarse.data().size() = " << S_coarse.data().size() << std::endl;
+        std::cout << "S_coarse.data().norm() = " << S_coarse.data().norm() << std::endl;
+        
+        CooMatrix<LU_int_t,Complex> S_fine_coo = S_fine.tocoo<LU_int_t>();
+        CooMatrix<LU_int_t,Complex> S_coarse_coo = S_coarse.tocoo<LU_int_t>();
+        std::cout << "S_coarse_coo.v().size() = " << S_coarse_coo.v().size() << std::endl;
+        
+        CsrMatrix<LU_int_t,Complex> S_fine_csr = S_fine_coo.tocsr();
+        CsrMatrix<LU_int_t,Complex> S_coarse_csr = S_coarse_coo.tocsr();
+        std::cout << "S_coarse_csr.x().size() = " << S_coarse_csr.x().size() << std::endl;
+        
+        std::cout << "a\n";
+        std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_fine = S_fine_csr.factorize();
+        std::cout << "b\n";
+        std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_coarse = S_coarse_csr.factorize();
+        std::cout << "c\n";
         
         // create restrictors and prolongators
         ColMatrix<Complex> restrictor_inner (bspline_inner_coarse_.Nspline(), bspline_inner_fine_.Nspline());
@@ -146,13 +165,13 @@ void GMGPreconditioner::setup ()
         restrictor_inner_ = RowMatrix<Complex>(restrictor_inner);
         prolongator_inner_ = RowMatrix<Complex>(prolongator_inner);
     }
-    
-    // setup subgrid
-    subgrid_->setup();
 }
 
 void GMGPreconditioner::update (Real E)
 {
+    // update subgrid
+    subgrid_->update(E);
+    
     if (level_ > 0)
     {
         // update parent
@@ -183,9 +202,6 @@ void GMGPreconditioner::update (Real E)
             }
         }
     }
-    
-    // update subgrid
-    subgrid_->update(E);
 }
 
 void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
@@ -293,8 +309,8 @@ void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     for (int cycle = 0; cycle < nSmoothCycles; cycle++)
     {
         BlockArray<Complex> w = z;
-        this->multiply(w, z, strict_upper);
-        this->multiply(z, w, strict_lower);
+        this->multiply(w, z, MatrixSelection::StrictUpper);
+        this->multiply(z, w, MatrixSelection::StrictLower);
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
         {
             z[ill] -= w[ill];

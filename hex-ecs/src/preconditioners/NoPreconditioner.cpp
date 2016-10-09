@@ -840,7 +840,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     }
 }
 
-void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixTriangle tri) const
+void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri) const
 {
     // shorthands
     unsigned Nspline_inner = rad_.bspline_inner().Nspline();
@@ -884,6 +884,11 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
         // for all angular blocks in a block row; only executed by one of the processes in a process group
         for (unsigned illp = 0; illp < Nang; illp++) if (par_.igroupproc() == (int)illp % par_.groupsize())
         {
+            // determine which part of the block should be considered non-zero for a particlar selection
+            MatrixSelection::Selection selection = tri;
+            if (ill < illp) selection = (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None);
+            if (ill > illp) selection = (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None);
+            
             // near-origin part multiplication
             if (cmd_.lightweight_full)
             {
@@ -893,7 +898,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
                     1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
                     true,
-                    ill == illp ? tri : (ill < illp ? (tri & strict_lower) : (tri & strict_upper))
+                    selection
                 );
             }
             else
@@ -908,7 +913,7 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
                     1.0_z, cArrayView(p[illp], 0, Nspline_inner * Nspline_inner),
                     1.0_z, cArrayView(q[ill], 0, Nspline_inner * Nspline_inner),
                     true,
-                    ill == illp ? tri : (ill < illp ? (tri & strict_lower) : (tri & strict_upper))
+                    selection
                 );
                 
                 // release memory
@@ -993,32 +998,50 @@ void NoPreconditioner::multiply (BlockArray<Complex> const & p, BlockArray<Compl
             for (unsigned illp = 0; illp < Nang; illp++) if (par_.igroupproc() == (int)illp % par_.groupsize())
             if (Real f = ang_.f(ill, illp, lambda))
             {
-                if (true)
+                // diagonal blocks
+                if (d == 0)
                 {
                     OMP_LOCK_LOCK(ill * Nspline_inner + i);
                     
                     R.dot
                     (
-                        inp_.Zp * f, cArrayView(p[illp], k * Nspline_inner, Nspline_inner),
+                        inp_.Zp * f, cArrayView(p[illp], i * Nspline_inner, Nspline_inner),
                         1.0_z, cArrayView(q[ill], i * Nspline_inner, Nspline_inner),    
-                        ill == illp and i == k ? tri : (ill < illp or (ill == illp and i < k) ? tri & strict_lower : tri & strict_upper)
+                        ill == illp ? tri : (ill < illp ? (tri & MatrixSelection::StrictUpper ? MatrixSelection::Both : MatrixSelection::None) :
+                                                          (tri & MatrixSelection::StrictLower ? MatrixSelection::Both : MatrixSelection::None))
                     );
                     
                     OMP_UNLOCK_LOCK(ill * Nspline_inner + i);
                 }
                 
-                if (i != k)
+                // off-diagonal blocks
+                else
                 {
-                    OMP_LOCK_LOCK(ill * Nspline_inner + k);
+                    if (tri & MatrixSelection::StrictUpper)
+                    {
+                        OMP_LOCK_LOCK(ill * Nspline_inner + i);
+                        
+                        R.dot
+                        (
+                            inp_.Zp * f, cArrayView(p[illp], k * Nspline_inner, Nspline_inner),
+                            1.0_z, cArrayView(q[ill], i * Nspline_inner, Nspline_inner)
+                        );
+                        
+                        OMP_UNLOCK_LOCK(ill * Nspline_inner + i);
+                    }
                     
-                    R.dot
-                    (
-                        inp_.Zp * f, cArrayView(p[illp], i * Nspline_inner, Nspline_inner),
-                        1.0_z, cArrayView(q[ill], k * Nspline_inner, Nspline_inner),
-                        ill == illp and i == k ? tri : (ill < illp or (ill == illp and i < k) ? tri & strict_lower : tri & strict_upper)
-                    );
-                    
-                    OMP_UNLOCK_LOCK(ill * Nspline_inner + k);
+                    if (tri & MatrixSelection::StrictLower)
+                    {
+                        OMP_LOCK_LOCK(ill * Nspline_inner + k);
+                        
+                        R.dot
+                        (
+                            inp_.Zp * f, cArrayView(p[illp], i * Nspline_inner, Nspline_inner),
+                            1.0_z, cArrayView(q[ill], k * Nspline_inner, Nspline_inner)
+                        );
+                        
+                        OMP_UNLOCK_LOCK(ill * Nspline_inner + k);
+                    }
                 }
             }
         }

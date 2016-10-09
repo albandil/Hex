@@ -423,10 +423,6 @@ class RadialIntegrals
         SymBandMatrix<Complex> const & S_inner () const { return S_inner_; }
         SymBandMatrix<Complex> const & S_full  () const { return S_full_ ; }
         
-        /// Return reference to the inter-basis overlaps.
-//         RowMatrix<Complex> const & S12 () const { return S12_; }
-//         RowMatrix<Complex> const & S21 () const { return S21_; }
-        
         /// Return reference to the precomputed integral moment matrix of order -1.
         SymBandMatrix<Complex> const & Mm1_inner () const { return Mm1_inner_; }
         SymBandMatrix<Complex> const & Mm1_full  () const { return Mm1_full_ ; }

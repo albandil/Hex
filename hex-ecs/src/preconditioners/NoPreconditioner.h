@@ -83,7 +83,7 @@ class NoPreconditioner : public PreconditionerBase
         virtual void update (Real E);
         virtual void finish ();
         virtual void rhs (BlockArray<Complex> & chi, int ienergy, int instate) const;
-        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixTriangle tri = both) const;
+        virtual void multiply (BlockArray<Complex> const & p, BlockArray<Complex> & q, MatrixSelection::Selection tri = MatrixSelection::Both) const;
         virtual void precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const;
         
         // internal routines
