@@ -75,6 +75,7 @@ GMGPreconditioner::GMGPreconditioner
 ) : NoPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
     level_(level),
     bspline_inner_fine_(bspline_inner),
+    bspline_full_fine_(bspline_full),
     bspline_inner_coarse_
     (
         bspline_inner.order(),
@@ -82,7 +83,6 @@ GMGPreconditioner::GMGPreconditioner
         bspline_inner.ECStheta(),
         dither(bspline_inner.cknots())
     ),
-    bspline_full_fine_(bspline_full),
     bspline_full_coarse_
     (
         bspline_full.order(),
@@ -108,11 +108,16 @@ GMGPreconditioner::GMGPreconditioner
         (
             cmd.multigrid_coarse_prec,
             par, inp, ll,
-            bspline_inner_coarse_,
-            bspline_full_coarse_,
+            bspline_inner_fine_,
+            bspline_full_fine_,
             cmd
         );
     }
+}
+
+GMGPreconditioner::~GMGPreconditioner ()
+{
+    delete subgrid_;
 }
 
 void GMGPreconditioner::setup ()
@@ -120,12 +125,12 @@ void GMGPreconditioner::setup ()
     // setup subgrid
     subgrid_->setup();
     
+    // setup parent
+    NoPreconditioner::setup();
+    
     if (level_ > 0)
     {
         std::cout << "Setting up GMG preconditioner level " << level_ << " (" << bspline_full_coarse_.Nspline() << " B-splines)" << std::endl << std::endl;
-        
-        // update parent
-        NoPreconditioner::setup();
         
         // create integrator
         GaussLegendre g;
@@ -135,27 +140,20 @@ void GMGPreconditioner::setup ()
         for (int i = 0; i < bspline_inner_fine_.Nspline(); i++)
         for (int j = 0; j < bspline_inner_coarse_.Nspline(); j++)
             Sfc(i,j) = rad_.computeS12(g, bspline_inner_fine_, bspline_inner_coarse_, i, j);
-        ColMatrix<Complex> Scf (Sfc);
+        ColMatrix<Complex> Scf (Sfc.T());
         
         // factorize inner overlap matrix for both the fine and coarse basis
         SymBandMatrix<Complex> S_fine = this->rad_.S_inner();
         SymBandMatrix<Complex> S_coarse = dynamic_cast<GMGPreconditioner*>(subgrid_)->rad().S_inner();
-        std::cout << "S_coarse.data().size() = " << S_coarse.data().size() << std::endl;
-        std::cout << "S_coarse.data().norm() = " << S_coarse.data().norm() << std::endl;
         
         CooMatrix<LU_int_t,Complex> S_fine_coo = S_fine.tocoo<LU_int_t>();
         CooMatrix<LU_int_t,Complex> S_coarse_coo = S_coarse.tocoo<LU_int_t>();
-        std::cout << "S_coarse_coo.v().size() = " << S_coarse_coo.v().size() << std::endl;
         
         CsrMatrix<LU_int_t,Complex> S_fine_csr = S_fine_coo.tocsr();
         CsrMatrix<LU_int_t,Complex> S_coarse_csr = S_coarse_coo.tocsr();
-        std::cout << "S_coarse_csr.x().size() = " << S_coarse_csr.x().size() << std::endl;
         
-        std::cout << "a\n";
         std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_fine = S_fine_csr.factorize();
-        std::cout << "b\n";
         std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_inner_coarse = S_coarse_csr.factorize();
-        std::cout << "c\n";
         
         // create restrictors and prolongators
         ColMatrix<Complex> restrictor_inner (bspline_inner_coarse_.Nspline(), bspline_inner_fine_.Nspline());
@@ -172,11 +170,11 @@ void GMGPreconditioner::update (Real E)
     // update subgrid
     subgrid_->update(E);
     
+    // update parent
+    NoPreconditioner::update(E);
+    
     if (level_ > 0)
     {
-        // update parent
-        NoPreconditioner::update(E);
-        
         // calculate full matrix diagonal for use in Gauss-Seidel iterations
         D.resize(ang_.states().size());
         for (unsigned ill = 0; ill < ang_.states().size(); ill++)
@@ -186,13 +184,13 @@ void GMGPreconditioner::update (Real E)
             for (int j = 0; j < bspline_inner_fine_.Nspline(); j++)
             {
                 D[ill][i * bspline_inner_fine_.Nspline() + j] =
-                    E_ * rad_.S_inner()(i,j) * rad_.S_inner()(i,j)
-                    - 0.5 * rad_.D_inner()(i,j) * rad_.S_inner()(i,j)
-                    - 0.5 * rad_.S_inner()(i,j) * rad_.D_inner()(i,j)
-                    - rad_.Mm2_inner()(i,j) * rad_.S_inner()(i,j)
-                    - rad_.S_inner()(i,j) * rad_.Mm2_inner()(i,j)
-                    + rad_.Mm1_tr_inner()(i,j) * rad_.S_inner()(i,j)
-                    + rad_.S_inner()(i,j) * rad_.Mm1_tr_inner()(i,j);
+                    E_ * rad_.S_inner()(i,i) * rad_.S_inner()(j,j)
+                    - 0.5 * rad_.D_inner()(i,i) * rad_.S_inner()(j,j)
+                    - 0.5 * rad_.S_inner()(i,i) * rad_.D_inner()(j,j)
+                    - rad_.Mm2_inner()(i,i) * rad_.S_inner()(j,j)
+                    - rad_.S_inner()(i,i) * rad_.Mm2_inner()(j,j)
+                    + rad_.Mm1_tr_inner()(i,i) * rad_.S_inner()(j,j)
+                    + rad_.S_inner()(i,i) * rad_.Mm1_tr_inner()(j,j);
                 
                 for (int lambda = 0; lambda <= rad_.maxlambda(); lambda++)
                 {
@@ -220,10 +218,24 @@ void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
     // restriction: down-sample the residual
     if (level_ > 0)
     {
+//         std::cout << "before restriction r[0].norm() = " << r[0].norm() << std::endl;
+//         std::cout << "r[0].size() = " << r[0].size() << ", bspline_inner_fine_.Nspline()^2 = " << bspline_inner_fine_.Nspline()*bspline_inner_fine_.Nspline() << std::endl;
+//         std::ofstream ofs (format("r-%.4x.vtk", bspline_inner_fine_.hash()));
+//         rArray grid = linspace(0., 100., 1001);
+//         writeVTK_points
+//         (
+//             ofs,
+//             bspline_inner_fine_.zip(r[0], grid, grid),
+//             grid,
+//             grid,
+//             rArray { 0. }
+//         );
+//         ofs.close();
+        
         for (unsigned ill = 0; ill < r.size(); ill++)
         {
             // get number of channels
-            int nc = (r[ill].size() - Nspline_inner_fine * Nspline_inner_fine) / Nspline_outer_fine;
+            int nc = (Nspline_inner_fine == Nspline_full_fine ? 0 : (r[ill].size() - Nspline_inner_fine * Nspline_inner_fine) / Nspline_outer_fine);
             
             // allocate the memory
             rn[ill].resize(Nspline_inner_coarse * Nspline_inner_coarse + nc * Nspline_outer_coarse);
@@ -258,18 +270,85 @@ void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
                 );
             }
         }
+        
+//         std::cout << "rn[0].norm() = " << rn[0].norm() << std::endl;
+//         std::cout << "rn[0].size() = " << rn[0].size() << ", bspline_inner_coarse_.Nspline()^2 = " << bspline_inner_coarse_.Nspline()*bspline_inner_coarse_.Nspline() << std::endl;
+//         ofs.open(format("rn-%.4x.vtk", bspline_inner_coarse_.hash()));
+//         writeVTK_points
+//         (
+//             ofs,
+//             bspline_inner_coarse_.zip(rn[0], grid, grid),
+//             grid,
+//             grid,
+//             rArray { 0. }
+//         );
+        
+        /// VERIFY
+//         kron_dot(S_fine, S_fine, r[0]);
+//         kron_dot(S_coar, S_coar, rn[0]);
+        
+//         ofs.close();
+//         std::exit(0);
     }
     
     // solution: precondition by sub-grid
-    subgrid_->precondition(rn, zn);
+    if (level_ > 0)
+    {
+        std::cout << "Subgrid" << std::endl;
+        subgrid_->precondition(rn, zn);
+    }
+    else
+    {
+        std::cout << "r[0].norm() = " << r[0].norm() << std::endl;
+        std::ofstream ofs (format("r-%.4x.vtk", bspline_inner_fine_.hash()));
+        rArray grid = linspace(0., 100., 1001);
+        writeVTK_points
+        (
+            ofs,
+            bspline_inner_fine_.zip(r[0], grid, grid),
+            grid,
+            grid,
+            rArray { 0. }
+        );
+        ofs.close();
+        
+        std::cout << "Inner preconditioner" << std::endl;
+        subgrid_->precondition(r, z);
+        
+        std::cout << "z[0].norm() = " << z[0].norm() << std::endl;
+        ofs.open(format("z-%.4x.vtk", bspline_inner_fine_.hash()));
+        writeVTK_points
+        (
+            ofs,
+            bspline_inner_fine_.zip(z[0], grid, grid),
+            grid,
+            grid,
+            rArray { 0. }
+        );
+        ofs.close();
+        std::exit(1);
+    }
     
     // prolongation: interpolate the solution
     if (level_ > 0)
     {
+        std::cout << "zn[0].norm() = " << zn[0].norm() << std::endl;
+        std::ofstream ofs (format("zn-%.4x.vtk", bspline_inner_coarse_.hash()));
+        rArray grid = linspace(0., 100., 1001);
+        writeVTK_points
+        (
+            ofs,
+            bspline_inner_coarse_.zip(zn[0], grid, grid),
+            grid,
+            grid,
+            rArray { 0. }
+        );
+        ofs.close();
+        
         for (unsigned ill = 0; ill < r.size(); ill++)
         {
             // get number of channels
-            int nc = (r[ill].size() - Nspline_inner_fine * Nspline_inner_fine) / Nspline_outer_fine;
+            int nc = (Nspline_inner_fine == Nspline_full_fine ? 0 : (r[ill].size() - Nspline_inner_fine * Nspline_inner_fine) / Nspline_outer_fine);
             
             // interpolate the inner region
             cArrayView
@@ -300,70 +379,104 @@ void GMGPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<
                 );
             }
         }
+        
+        std::cout << "z[0].norm() = " << z[0].norm() << std::endl;
+        ofs.open(format("z-%.4x.vtk", bspline_inner_fine_.hash()));
+        writeVTK_points
+        (
+            ofs,
+            bspline_inner_fine_.zip(z[0], grid, grid),
+            grid,
+            grid,
+            rArray { 0. }
+        );
+        ofs.close();
+        std::exit(1);
     }
     
+    std::cout << "z[0].norm() = " << z[0].norm() << std::endl;
+    std::ofstream ofs (format("z-%.4x.vtk", bspline_inner_fine_.hash()));
+    rArray grid = linspace(0., 100., 1001);
+    writeVTK_points
+    (
+        ofs,
+        bspline_inner_fine_.zip(z[0], grid, grid),
+        grid,
+        grid,
+        rArray { 0. }
+    );
+    ofs.close();
+    
     // correct high-frequency error using Gauss-Seidel iterations
-    int nSmoothCycles = 5;
-//     std::size_t I = 0, J = 0;
-    Complex elem;
-    for (int cycle = 0; cycle < nSmoothCycles; cycle++)
+    if (level_ > 0)
     {
-        BlockArray<Complex> w = z;
-        this->multiply(w, z, MatrixSelection::StrictUpper);
-        this->multiply(z, w, MatrixSelection::StrictLower);
-        for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+        int nSmoothCycles = 0;
+//     std::size_t I = 0, J = 0;
+        Complex elem;
+        for (int cycle = 0; cycle < nSmoothCycles; cycle++)
         {
-            z[ill] -= w[ill];
-            z[ill] /= D[ill];
-        }
-        
-        /*
-        // forward : multiply by the strict upper triangle
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
-        for (std::size_t i = 0; i < Nspline_inner_fine; i++)
-        for (std::size_t j = 0; j < Nspline_inner_fine; j++)
-        {
-            elem = 0;
-            J = 0;
-            
-            for (int illp = 0; illp < (int)ang_.states().size(); illp++)
-            for (std::size_t k = 0; k < Nspline_inner_fine; k++)
-            for (std::size_t l = 0; l < Nspline_inner_fine; l++)
+            BlockArray<Complex> w = z;
+            for (unsigned i = 0; i < zn.size(); i++)
             {
-                if (J > I)
-                {
-                    elem += calc_matrix_elem(ill, illp, i, j, k, l) * z[illp][k * Nspline_inner_fine + l];
-                }
-                J++;
+                std::cout << "+@" << cycle << ": z[" << i << "].norm() = " << w[i].norm() << ", D[" << i << "].norm() = " << D[i].norm() << std::endl;
+            }
+            this->multiply(w, z, MatrixSelection::StrictUpper);
+            this->multiply(z, w, MatrixSelection::StrictLower);
+            for (unsigned ill = 0; ill < ang_.states().size(); ill++)
+            {
+                z[ill] -= w[ill];
+                z[ill] /= D[ill];
+                std::cout << "-@" << cycle << ": z[" << ill << "].norm() = " << z[ill].norm() << std::endl;
             }
             
-            z[ill][i * Nspline_inner_fine + j] = elem;
-            I++;
-        }
-        
-        // backward : solve the lower triangle
-        for (int ill = 0; ill < (int)ang_.states().size(); ill++)
-        for (std::size_t i = 0; i < Nspline_inner_fine; i++)
-        for (std::size_t j = 0; j < Nspline_inner_fine; j++)
-        {
-            elem = 0;
-            J = 0;
-            
-            for (int illp = 0; illp < (int)ang_.states().size(); illp++)
-            for (std::size_t k = 0; k < Nspline_inner_fine; k++)
-            for (std::size_t l = 0; l < Nspline_inner_fine; l++)
+            /*
+            // forward : multiply by the strict upper triangle
+            for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+            for (std::size_t i = 0; i < Nspline_inner_fine; i++)
+            for (std::size_t j = 0; j < Nspline_inner_fine; j++)
             {
-                if (J < I)
+                elem = 0;
+                J = 0;
+                
+                for (int illp = 0; illp < (int)ang_.states().size(); illp++)
+                for (std::size_t k = 0; k < Nspline_inner_fine; k++)
+                for (std::size_t l = 0; l < Nspline_inner_fine; l++)
                 {
-                    elem += calc_matrix_elem(ill, illp, i, j, k, l) * z[illp][k * Nspline_inner_fine + l];
+                    if (J > I)
+                    {
+                        elem += calc_matrix_elem(ill, illp, i, j, k, l) * z[illp][k * Nspline_inner_fine + l];
+                    }
+                    J++;
                 }
-                J++;
+                
+                z[ill][i * Nspline_inner_fine + j] = elem;
+                I++;
             }
             
-            z[ill][i * Nspline_inner_fine + j] -= elem;
-            z[ill][i * Nspline_inner_fine + j] /= elem += calc_matrix_elem(ill, ill, i, j, i, j);
-            
-            I++;
-        }*/
+            // backward : solve the lower triangle
+            for (int ill = 0; ill < (int)ang_.states().size(); ill++)
+            for (std::size_t i = 0; i < Nspline_inner_fine; i++)
+            for (std::size_t j = 0; j < Nspline_inner_fine; j++)
+            {
+                elem = 0;
+                J = 0;
+                
+                for (int illp = 0; illp < (int)ang_.states().size(); illp++)
+                for (std::size_t k = 0; k < Nspline_inner_fine; k++)
+                for (std::size_t l = 0; l < Nspline_inner_fine; l++)
+                {
+                    if (J < I)
+                    {
+                        elem += calc_matrix_elem(ill, illp, i, j, k, l) * z[illp][k * Nspline_inner_fine + l];
+                    }
+                    J++;
+                }
+                
+                z[ill][i * Nspline_inner_fine + j] -= elem;
+                z[ill][i * Nspline_inner_fine + j] /= elem += calc_matrix_elem(ill, ill, i, j, i, j);
+                
+                I++;
+            }*/
+        }
     }
 }

@@ -68,6 +68,8 @@ class GMGPreconditioner : public NoPreconditioner
             int level
         );
         
+        virtual ~GMGPreconditioner ();
+        
         // reuse parent definitions
         using NoPreconditioner::rhs;
         using NoPreconditioner::multiply;
@@ -82,9 +84,10 @@ class GMGPreconditioner : public NoPreconditioner
         
         int level_;
         
-        Bspline bspline_inner_fine_;
+        Bspline const & bspline_inner_fine_;
+        Bspline const & bspline_full_fine_;
+        
         Bspline bspline_inner_coarse_;
-        Bspline bspline_full_fine_;
         Bspline bspline_full_coarse_;
         
         RowMatrix<Complex> restrictor_inner_, restrictor_outer_;
