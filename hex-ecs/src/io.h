@@ -93,7 +93,7 @@ class CommandLine
               carry_initial_guess(false), gpu_multiply(false), extract_extrapolate(false), extract_rho(-1), extract_rho_begin(-1), extract_samples(-1),
               refine_solution(false), map_solution(), map_solution_target(), ssor(-1), noluupdate(false), coupling_limit(1000),
               gpu_host_multiply(false), mumps_outofcore(false), mumps_verbose(0), kpa_drop(-1), exact_rhs(true), write_intermediate_solutions(false),
-              fast_bessel(false)
+              fast_bessel(false), hyb_additional_levels(0)
         {
             // get command line options
             parse(argc, argv);
@@ -254,6 +254,9 @@ class CommandLine
         
         /// Use faster Bessel function evaluation routine (not the Steed/Barnett) when calculating RHS.
         bool fast_bessel;
+        
+        /// Additional levels to be solved by ILU preconditioner when using HYB preconditioner.
+        int hyb_additional_levels;
 };
 
 /**
