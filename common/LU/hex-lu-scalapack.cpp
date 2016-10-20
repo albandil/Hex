@@ -29,83 +29,66 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#ifdef WITH_SCALAPACK
 
-#include "hex-csrmatrix.h"
+// --------------------------------------------------------------------------------- //
 
-#include "preconditioners.h"
+#include "hex-lu-scalapack.h"
 
-const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
-    "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
+// --------------------------------------------------------------------------------- //
 
-void CoupledPreconditioner::update (Real E)
+template<>
+LUft_SCALAPACK<LU_int_t,Complex>::LUft_SCALAPACK ()
 {
-    HexException("The coupled preconditioner is broken in this version of the program!");
+    // nothing
+}
+
+template<>
+void LUft_SCALAPACK<LU_int_t,Complex>::drop ()
+{
     
-    // concatenate all matrix blocks
-    NumberArray<LU_int_t> I, J;
-    cArray A;
-    // TODO
+}
+
+template<>
+LUft_SCALAPACK<LU_int_t,Complex>::~LUft_SCALAPACK ()
+{
+    // nothing
+}
+
+template<>
+void LUft_SCALAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
+{
     
-    // convert the blocks to CSR
-    CsrMatrix<LU_int_t, Complex> csr;
-    // TODO
+}
+
+template<>
+void LUft_SCALAPACK<LU_int_t,Complex>::solve (const ArrayView<Complex> b, ArrayView<Complex> x, int eqs) const
+{
     
-    // set up factorization data
-    LUftData data;
-    data.drop_tolerance = cmd_.droptol;
-#ifdef WITH_SUPERLU_DIST
-    if (cmd_.factorizer == "superlu_dist")
-    {
-        // TODO : setup grid
-    }
+}
+
+template<>
+void LUft_SCALAPACK<LU_int_t,Complex>::save (std::string name) const
+{
+    
+}
+
+template<>
+void LUft_SCALAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+{
+    
+}
+
+template<>
+std::size_t LUft_SCALAPACK<LU_int_t,Complex>::size () const
+{
+    return 0;
+}
+
+// --------------------------------------------------------------------------------- //
+
+addFactorizerToRuntimeSelectionTable(SCALAPACK, LU_int_t, Complex)
+
+// --------------------------------------------------------------------------------- //
+
 #endif
-#ifdef WITH_MUMPS
-    if (cmd_.factorizer == "mumps")
-    {
-        data.out_of_core = cmd_.mumps_outofcore;
-        data.verbosity = cmd_.mumps_verbose;
-    #ifdef WITH_MPI
-        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
-    #else
-        data.fortran_comm = 0;
-    #endif
-    }
-#endif
-    
-    // factorize
-    lu_->factorize(csr, data);
-}
-
-void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
-{
-    // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
-    
-    // convert block array to monolithic array
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        X[ill * Nchunk + i] = r[ill][i];
-    
-    // solve
-    lu_->solve(X, X, 1);
-    
-    // copy solution to result
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        z[ill][i] = X[ill * Nchunk + i];
-}
-
-void CoupledPreconditioner::finish ()
-{
-    // delete the factorization object
-    lu_.reset();
-    
-    // finish parent class
-    NoPreconditioner::finish();
-}
-
-#endif // WITH_MUMPS

@@ -38,6 +38,7 @@
 
 #include "hex-arrays.h"
 #include "hex-cmdline.h"
+#include "hex-csrmatrix.h"
 #include "hex-matrix.h"
 
 #include "io.h"
@@ -230,16 +231,7 @@ void CommandLine::parse (int argc, char* argv[])
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // choose factorizer
-                if (optargs[0] == "umfpack")
-                    factorizer = LUFT_UMFPACK;
-                else if (optargs[0] == "superlu")
-                    factorizer = LUFT_SUPERLU;
-                else if (optargs[0] == "superlu_dist")
-                    factorizer = LUFT_SUPERLU_DIST;
-                else if (optargs[0] == "mumps")
-                    factorizer = LUFT_MUMPS;
-                else
-                    HexException("Unknown LU-factorizer '%s'.", optargs[0].c_str());
+                factorizer = optargs[0];
                 return true;
             },
         "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -943,7 +935,9 @@ void zip_solution
     
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu = S_csr.factorize();
+    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu;
+    S_lu.reset(LUft<LU_int_t,Complex>::Choose(cmd.factorizer));
+    S_lu->factorize(S_csr);
     
     // compute all needed bound states
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);

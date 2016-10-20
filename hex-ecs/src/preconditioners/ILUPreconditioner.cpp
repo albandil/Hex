@@ -32,6 +32,7 @@
 #include <iostream>
 
 #include "hex-arrays.h"
+#include "hex-csrmatrix.h"
 #include "hex-luft.h"
 #include "hex-misc.h"
 
@@ -52,7 +53,7 @@ ILUCGPreconditioner::ILUCGPreconditioner
     Bspline const & bspline_full,
     CommandLine const & cmd
 ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-    lu_(ll.states().size())
+    data_(ll.states().size()), lu_(ll.states().size())
 {
 #ifdef _OPENMP
     omp_init_lock(&lu_lock_);
@@ -71,7 +72,7 @@ void ILUCGPreconditioner::reset_lu ()
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
         // prepare initial (empty) factorization data
-        lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
+        lu_[iblock].reset(LUft<LU_int_t,Complex>::Choose(cmd_.factorizer));
         
         // associate existing disk files
         lu_[iblock]->link(format("lu-%d.ooc", iblock));
@@ -79,7 +80,7 @@ void ILUCGPreconditioner::reset_lu ()
     
 #ifdef WITH_SUPERLU_DIST
     // create process grid for SuperLU-dist
-    if (cmd_.factorizer == LUFT_SUPERLU_DIST)
+    if (cmd_.factorizer == "superlu_dist")
     {
         // list processes
         for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
@@ -213,28 +214,28 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         coo_block = CooMatrix<LU_int_t,Complex>();
         
         // set up factorization data
-        void * data = nullptr;
+        data_[iblock].drop_tolerance = cmd_.droptol;
 #ifdef WITH_SUPERLU_DIST
-        if (cmd_.factorizer == LUFT_SUPERLU_DIST)
-            data = const_cast<gridinfo_t*>(&grid_);
+        if (cmd_.factorizer == "superlu_dist")
+        {
+            data_[iblock].superlu_dist_grid = const_cast<gridinfo_t*>(&grid_);
+        }
 #endif
 #ifdef WITH_MUMPS
-        MUMPS_INT mumps_data[3];
-        if (cmd_.factorizer == LUFT_MUMPS)
+        if (cmd_.factorizer == "mumps")
         {
-            mumps_data[0] = cmd_.mumps_outofcore;
-            mumps_data[1] = cmd_.mumps_verbose;
+            data_[iblock].out_of_core = cmd_.mumps_outofcore;
+            data_[iblock].verbosity = cmd_.mumps_verbose;
     #ifdef WITH_MPI
-            mumps_data[2] = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
+            data_[iblock].fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
     #else
-            mumps_data[2] = 0;
+            data_[iblock].fortran_comm = 0;
     #endif
-            data = mumps_data;
         }
 #endif
         
         // factorize the block and store it
-        lu_[iblock] = csr.factorize(cmd_.droptol, cmd_.factorizer, data);
+        lu_[iblock]->factorize(csr, data_[iblock]);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
@@ -280,14 +281,14 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
     
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
     {
 #ifdef _OPENMP
         omp_unset_lock(&lu_lock_);
@@ -299,7 +300,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
@@ -310,7 +311,7 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
     }
     
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
     
@@ -321,14 +322,14 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
 void ILUCGPreconditioner::finish ()
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
     lu_.resize(0);
     
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
     

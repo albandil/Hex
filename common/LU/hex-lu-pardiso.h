@@ -29,85 +29,112 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_ILUPRECONDITIONER_H
-#define HEX_ILUPRECONDITIONER_H
+#ifdef WITH_PARDISO
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-luft.h"
+#include "hex-csrmatrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#define DPARM(x) dparm_[x-1]
+#define IPARM(x) iparm_[x-1]
 
-#ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
-#endif
+// --------------------------------------------------------------------------------- //
+
+extern "C" void pardisoinit
+(
+    void *pt[64],
+    int *mtype,
+    int *solver,
+    int iparm[64],
+    double dparm[64],
+    int *error
+);
+
+extern "C" void pardiso
+(
+    void *pt[64],
+    int *maxfct,
+    int *mnum,
+    int *mtype,
+    int *phase,
+    int *n,
+    double a[],
+    int ia[],
+    int ja[],
+    int perm[],
+    int *nrhs,
+    int iparm[64],
+    int *msglvl,
+    double b[],
+    double x[],
+    int *error,
+    double dparm[64]
+);
+
+// --------------------------------------------------------------------------------- //
 
 /**
- * @brief ILU-preconditioned CG-based preconditioner.
+ * @brief LU factorization using Pardiso.
  * 
- * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
- * preconditioning. This is done by redefining virtual function CG_prec. The factorization
- * is drop tolerance based and is computed by UMFPACK.
+ * Uses direct sparse solver Pardiso.
  */
-class ILUCGPreconditioner : public virtual CGPreconditioner
+template <class IdxT, class DataT>
+class LUft_Pardiso : public LUft<IdxT,DataT>
 {
     public:
+    
+        /// Default constructor.
+        LUft_Pardiso ();
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        /// Destructor.
+        virtual ~LUft_Pardiso();
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // Disable bitwise copy
+        LUft_Pardiso const & operator= (LUft_Pardiso const &) = delete;
         
-        ILUCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        );
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_Pardiso<IdxT,DataT>(); }
         
-        ~ILUCGPreconditioner ();
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "pardiso"; }
         
-        // reuse parent definitions
-        using CGPreconditioner::multiply;
-        using CGPreconditioner::rhs;
-        using CGPreconditioner::precondition;
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void finish ();
+        /// Validity indicator.
+        virtual bool valid () const { return size() != 0; }
         
-        // inner CG callback (needed by parent)
-        virtual void CG_init (int iblock) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
+        /// Return LU byte size.
+        virtual std::size_t size () const;
         
-    protected:
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
-        // LU data
-        mutable std::vector<LUftData> data_;
+        /// Save to disk.
+        virtual void save (std::string name) const;
         
-        // LU decompositions of the diagonal blocks
-        mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        /// Load from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
         
-        // prepare data structures for LU factorizations
-        void reset_lu ();
+        /// Release memory.
+        virtual void drop ();
+    
+    private:
         
-#ifdef _OPENMP
-        // factorization lock
-        mutable omp_lock_t lu_lock_;
-#endif
+        /// Matrix that has been factorized.
+        NumberArray<int> P_;
+        NumberArray<int> I_;
+        NumberArray<std::complex<double>> X_;
         
-#ifdef WITH_SUPERLU_DIST
-        // process grid
-        gridinfo_t grid_;
-#endif
+        /// Internal data of Pardiso.
+        void* pt_[64];
+        int iparm_[64];
+        double dparm_[64];
 };
 
-#endif
+// --------------------------------------------------------------------------------- //
+
+#endif // WITH_PARDISO

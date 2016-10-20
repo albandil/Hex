@@ -29,83 +29,76 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#ifdef WITH_SCALAPACK
 
+// --------------------------------------------------------------------------------- //
+
+#include "hex-luft.h"
 #include "hex-csrmatrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
-    "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
-
-void CoupledPreconditioner::update (Real E)
+/**
+ * @brief LU factorization using ScaLAPACK.
+ * 
+ * This is a really last-resort option tractable only for very small matrices.
+ * They are converted to a banded format (using reverse Cuthill McKee algorithm)
+ * and solved by a direct application of the banded PZGBTRF + PZGBTRS routines.
+ */
+template <class IdxT, class DataT>
+class LUft_SCALAPACK : public LUft<IdxT,DataT>
 {
-    HexException("The coupled preconditioner is broken in this version of the program!");
+    public:
     
-    // concatenate all matrix blocks
-    NumberArray<LU_int_t> I, J;
-    cArray A;
-    // TODO
+        /// Default constructor.
+        LUft_SCALAPACK ();
+        
+        /// Destructor.
+        virtual ~LUft_SCALAPACK();
+        
+        // Disable bitwise copy
+        LUft_SCALAPACK const & operator= (LUft_SCALAPACK const &) = delete;
+        
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SCALAPACK<IdxT,DataT>(); }
+        
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "scalapack"; }
+        
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        
+        /// Validity indicator.
+        virtual bool valid () const { return size() != 0; }
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const;
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save to disk.
+        virtual void save (std::string name) const;
+        
+        /// Load from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
+        
+        /// Release memory.
+        virtual void drop ();
     
-    // convert the blocks to CSR
-    CsrMatrix<LU_int_t, Complex> csr;
-    // TODO
-    
-    // set up factorization data
-    LUftData data;
-    data.drop_tolerance = cmd_.droptol;
-#ifdef WITH_SUPERLU_DIST
-    if (cmd_.factorizer == "superlu_dist")
-    {
-        // TODO : setup grid
-    }
-#endif
-#ifdef WITH_MUMPS
-    if (cmd_.factorizer == "mumps")
-    {
-        data.out_of_core = cmd_.mumps_outofcore;
-        data.verbosity = cmd_.mumps_verbose;
-    #ifdef WITH_MPI
-        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
-    #else
-        data.fortran_comm = 0;
-    #endif
-    }
-#endif
-    
-    // factorize
-    lu_->factorize(csr, data);
-}
+    private:
+        
+        /// Matrix that has been factorized.
+        NumberArray<int> P_;
+        NumberArray<int> I_;
+        NumberArray<std::complex<double>> X_;
+        
+        /// Internal data of Pardiso.
+        void* pt_[64];
+        int iparm_[64];
+        double dparm_[64];
+};
 
-void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
-{
-    // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
-    
-    // convert block array to monolithic array
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        X[ill * Nchunk + i] = r[ill][i];
-    
-    // solve
-    lu_->solve(X, X, 1);
-    
-    // copy solution to result
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        z[ill][i] = X[ill * Nchunk + i];
-}
+// --------------------------------------------------------------------------------- //
 
-void CoupledPreconditioner::finish ()
-{
-    // delete the factorization object
-    lu_.reset();
-    
-    // finish parent class
-    NoPreconditioner::finish();
-}
-
-#endif // WITH_MUMPS
+#endif // WITH_SCALAPACK

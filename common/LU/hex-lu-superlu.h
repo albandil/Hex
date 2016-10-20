@@ -29,85 +29,110 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifndef HEX_ILUPRECONDITIONER_H
-#define HEX_ILUPRECONDITIONER_H
+#ifdef WITH_SUPERLU
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-luft.h"
+#include "hex-csrmatrix.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-#ifdef _OPENMP
-#include <omp.h>
+#ifdef SINGLE
+    #include <slu_cdefs.h>
+#else
+    #include <slu_zdefs.h>
 #endif
 
-#ifdef WITH_SUPERLU_DIST
-#include <superlu_zdefs.h>
-#endif
+// --------------------------------------------------------------------------------- //
 
 /**
- * @brief ILU-preconditioned CG-based preconditioner.
+ * @brief LU factorization object - SuperLU specialization.
  * 
- * Enhances CGPreconditioner conjugate gradients solver by incomplete LU factorization
- * preconditioning. This is done by redefining virtual function CG_prec. The factorization
- * is drop tolerance based and is computed by UMFPACK.
+ * This class holds information on LU factorization as computed by the free
+ * library SuperLU (sequential version). It is derived from LUft and
+ * shares interface with that class.
  */
-class ILUCGPreconditioner : public virtual CGPreconditioner
+template <class IdxT, class DataT>
+class LUft_SUPERLU : public LUft<IdxT,DataT>
 {
     public:
+    
+        /// Default constructor.
+        LUft_SUPERLU ();
         
-        static const std::string prec_name;
-        static const std::string prec_description;
+        /// Destructor.
+        virtual ~LUft_SUPERLU () { drop(); }
         
-        virtual std::string const & name () const { return prec_name; }
-        virtual std::string const & description () const { return prec_description; }
+        // Disable bitwise copy
+        LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
         
-        ILUCGPreconditioner
-        (
-            Parallel const & par,
-            InputFile const & inp,
-            AngularBasis const & ll,
-            Bspline const & bspline_inner,
-            Bspline const & bspline_full,
-            CommandLine const & cmd
-        );
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU<IdxT,DataT>(); }
         
-        ~ILUCGPreconditioner ();
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "superlu"; }
         
-        // reuse parent definitions
-        using CGPreconditioner::multiply;
-        using CGPreconditioner::rhs;
-        using CGPreconditioner::precondition;
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
-        // declare own definitions
-        virtual void setup ();
-        virtual void update (Real E);
-        virtual void finish ();
+        /// Validity indicator.
+        virtual bool valid () const;
         
-        // inner CG callback (needed by parent)
-        virtual void CG_init (int iblock) const;
-        virtual void CG_prec (int iblock, const cArrayView r, cArrayView z) const;
-        virtual void CG_exit (int iblock) const;
+        /// Return LU byte size.
+        virtual std::size_t size () const { return size_; }
         
-    protected:
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
-        // LU data
-        mutable std::vector<LUftData> data_;
+        /// Save factorization data to disk.
+        virtual void save (std::string name) const;
         
-        // LU decompositions of the diagonal blocks
-        mutable std::vector<std::shared_ptr<LUft<LU_int_t,Complex>>> lu_;
+        /// Load factorization data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
         
-        // prepare data structures for LU factorizations
-        void reset_lu ();
+        /// Release memory.
+        virtual void drop ();
         
-#ifdef _OPENMP
-        // factorization lock
-        mutable omp_lock_t lu_lock_;
-#endif
+    private:
         
-#ifdef WITH_SUPERLU_DIST
-        // process grid
-        gridinfo_t grid_;
-#endif
+        /// Matrix that has been factorized.
+        NumberArray<int_t> P_;
+        NumberArray<int_t> I_;
+        cArray X_;
+        
+        /// Row permutations.
+        iArray perm_c_;
+        
+        /// Column permutations.
+        iArray perm_r_;
+        
+        /// Elimitation tree.
+        iArray etree_;
+        
+        /// Equilibration done.
+        char equed_;
+        
+        /// Row scale factors.
+        rArray R_;
+        
+        /// Column scale factors.
+        rArray C_;
+        
+        /// L-factor.
+        SuperMatrix L_;
+        
+        /// U-factor.
+        SuperMatrix U_;
+        
+        /// Reusable information.
+        GlobalLU_t Glu_;
+        
+        /// Memory size.
+        std::size_t size_;
+        
+        /// Drop tolerance.
+        Real droptol_;
 };
 
-#endif
+#endif // WITH_SUPERLU
