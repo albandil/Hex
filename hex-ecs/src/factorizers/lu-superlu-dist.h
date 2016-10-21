@@ -29,90 +29,54 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_UMFPACK
+#ifdef WITH_SUPERLU_DIST
 
 // --------------------------------------------------------------------------------- //
 
-#include <umfpack.h>
+#include "hex-csrmatrix.h"
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-luft.h"
-
-// --------------------------------------------------------------------------------- //
-
-#ifdef _LONGINT
-    #define UMFPACK_DEFAULTS_F          umfpack_zl_defaults
-    #define UMFPACK_SYMBOLIC_F          umfpack_zl_symbolic
-    #define UMFPACK_FREE_SYMBOLIC_F     umfpack_zl_free_symbolic
-    #define UMFPACK_NUMERIC_F           umfpack_zl_numeric
-    #define UMFPACK_SAVE_NUMERIC_F      umfpack_zl_save_numeric
-    #define UMFPACK_LOAD_NUMERIC_F      umfpack_zl_load_numeric
-    #define UMFPACK_FREE_NUMERIC_F      umfpack_zl_free_numeric
-    #define UMFPACK_SOLVE_F             umfpack_zl_solve
-    #define UMFPACK_GET_LUNZ_F          umfpack_zl_get_lunz
-    #define UMFPACK_REPORT_STATUS_F     umfpack_zl_report_status
-    #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zl_col_to_triplet
-    #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zl_triplet_to_col
-#else
-    #define UMFPACK_DEFAULTS_F          umfpack_zi_defaults
-    #define UMFPACK_SYMBOLIC_F          umfpack_zi_symbolic
-    #define UMFPACK_FREE_SYMBOLIC_F     umfpack_zi_free_symbolic
-    #define UMFPACK_NUMERIC_F           umfpack_zi_numeric
-    #define UMFPACK_SAVE_NUMERIC_F      umfpack_zi_save_numeric
-    #define UMFPACK_LOAD_NUMERIC_F      umfpack_zi_load_numeric
-    #define UMFPACK_FREE_NUMERIC_F      umfpack_zi_free_numeric
-    #define UMFPACK_SOLVE_F             umfpack_zi_solve
-    #define UMFPACK_GET_LUNZ_F          umfpack_zi_get_lunz
-    #define UMFPACK_REPORT_STATUS_F     umfpack_zi_report_status
-    #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zi_col_to_triplet
-    #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zi_triplet_to_col
-#endif
+#include <superlu_zdefs.h>
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief LU factorization object - UMFPACK specialization.
+ * @brief LU factorization object - SuperLU-dist specialization.
  * 
  * This class holds information on LU factorization as computed by the free
- * library UMFPACK (part of SuiteSparse toolkit). It is derived from LUft and
+ * library SuperLU (distributed version). It is derived from LUft and
  * shares interface with that class.
  */
 template <class IdxT, class DataT>
-class LUft_UMFPACK : public LUft<IdxT,DataT>
+class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 {
     public:
-    
+        
         /// Default constructor.
-        LUft_UMFPACK ()
-            : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
+        LUft_SUPERLU_DIST ();
         
         /// Destructor.
-        virtual ~LUft_UMFPACK () { drop(); }
+        virtual ~LUft_SUPERLU_DIST ();
         
         // Disable bitwise copy
-        LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
+        LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &) = delete;
         
         /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_UMFPACK<IdxT,DataT>(); }
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU_DIST<IdxT,DataT>(); }
         
         /// Get name of the factorizer.
-        virtual std::string name () const { return "umfpack"; }
+        virtual std::string name () const { return "superlu_dist"; }
         
         /// Factorize.
         virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
-        /// Return factorization information.
-        rArray const & info () const { return info_; }
-        
         /// Validity indicator.
-        virtual bool valid () const;
+        virtual bool valid () const { return size_ != 0; }
         
         /// Return LU byte size.
-        virtual std::size_t size () const;
-        
-        /// Return condition number.
-        virtual Real cond () const;
+        virtual std::size_t size () const { return size_; }
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
@@ -128,18 +92,24 @@ class LUft_UMFPACK : public LUft<IdxT,DataT>
         
     private:
         
-        /// Numeric decomposition as produced by UMFPACK.
-        void * numeric_;
+        /// Matrix that has been factorized.
+        NumberArray<int_t> P_;
+        NumberArray<int_t> I_;
+        NumberArray<std::complex<double>> X_;
         
-        /// Matrix data, needed for solution.
-        NumberArray<LU_int_t> p_;
-        NumberArray<LU_int_t> i_;
-        NumberArray<std::complex<double>> x_;
+        // scaling and permutation data
+        ScalePermstruct_t ScalePermstruct_;
         
-    public:
+        // factorization data
+        LUstruct_t LUstruct_;
         
-        /// Set of status flags produced by UMFPACK.
-        mutable rArray info_;
+        // process grid
+        gridinfo_t * grid_;
+        
+        /// Memory size.
+        std::size_t size_;
 };
 
-#endif // WITH_UMFPACK
+// --------------------------------------------------------------------------------- //
+
+#endif // WITH_SUPERLU_DIST

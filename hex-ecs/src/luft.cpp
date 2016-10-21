@@ -29,76 +29,47 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SCALAPACK
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-luft.h"
-#include "hex-csrmatrix.h"
+std::shared_ptr<std::vector<LUft<LU_int_t,Complex>*>> LU;
 
 // --------------------------------------------------------------------------------- //
 
-/**
- * @brief LU factorization using ScaLAPACK.
- * 
- * This is a really last-resort option tractable only for very small matrices.
- * They are converted to a banded format (using reverse Cuthill McKee algorithm)
- * and solved by a direct application of the banded PZGBTRF + PZGBTRS routines.
- */
-template <class IdxT, class DataT>
-class LUft_SCALAPACK : public LUft<IdxT,DataT>
+LUftData defaultLUftData =
 {
-    public:
-    
-        /// Default constructor.
-        LUft_SCALAPACK ();
-        
-        /// Destructor.
-        virtual ~LUft_SCALAPACK();
-        
-        // Disable bitwise copy
-        LUft_SCALAPACK const & operator= (LUft_SCALAPACK const &) = delete;
-        
-        /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SCALAPACK<IdxT,DataT>(); }
-        
-        /// Get name of the factorizer.
-        virtual std::string name () const { return "scalapack"; }
-        
-        /// Factorize.
-        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
-        
-        /// Validity indicator.
-        virtual bool valid () const { return size() != 0; }
-        
-        /// Return LU byte size.
-        virtual std::size_t size () const;
-        
-        /// Solve equations.
-        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
-        
-        /// Save to disk.
-        virtual void save (std::string name) const;
-        
-        /// Load from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
-        
-        /// Release memory.
-        virtual void drop ();
-    
-    private:
-        
-        /// Matrix that has been factorized.
-        NumberArray<int> P_;
-        NumberArray<int> I_;
-        NumberArray<std::complex<double>> X_;
-        
-        /// Internal data of Pardiso.
-        void* pt_[64];
-        int iparm_[64];
-        double dparm_[64];
+    /* drop_tolerance */            1e-8
+    /* out_of_core */               , false
+    /* verbosity */                 , 0
+    /* Fortran MPI communicator */  , 0
+    /* superlu_dist_grid */         , nullptr
 };
 
 // --------------------------------------------------------------------------------- //
 
-#endif // WITH_SCALAPACK
+template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::Choose (std::string factorizer)
+{
+    if (LU.get() == nullptr)
+        HexException("No LU factorization method available.");
+    
+    for (LUft<LU_int_t,Complex> *lu : *LU)
+    {
+        if (lu->name() == factorizer or factorizer == "any")
+        {
+            return lu->New();
+        }
+    }
+    
+    std::cout << "Error!" << std::endl;
+    std::cout << "  The LU factorizer \"" << factorizer << "\" is not available." << std::endl;
+    std::cout << "  The program may not be compiled with support for that factorizer." << std::endl;
+    std::cout << "  The available factorizers are: ";
+    
+    for (LUft<LU_int_t,Complex> *lu : *LU)
+        std::cout << "\"" << lu->name() << "\" ";
+    
+    std::cout << std::endl << std::endl;
+    
+    std::exit(1);
+}

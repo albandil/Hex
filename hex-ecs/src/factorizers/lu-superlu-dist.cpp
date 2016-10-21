@@ -33,7 +33,7 @@
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-lu-superlu-dist.h"
+#include "lu-superlu-dist.h"
 
 // --------------------------------------------------------------------------------- //
 
@@ -66,7 +66,7 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::drop ()
 template<>
 LUft_SUPERLU_DIST<LU_int_t,Complex>::~LUft_SUPERLU_DIST ()
 {
-    drop ();
+    drop();
 }
 
 template<>
@@ -86,7 +86,7 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex>
         
         X_.resize(matrix.x().size());
         for (std::size_t i = 0; i < X_.size(); i++)
-            X_[i] = Complex(matrix.x()[i].real(), matrix.x()[i].imag());
+            X_[i] = std::complex<double>(matrix.x()[i].real(), matrix.x()[i].imag());
         
         NCformat AStore;
         AStore.nnz    = X_.size();       // number of non-zero elements
@@ -111,17 +111,15 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex>
     //
     
         // get process grid
-        gridinfo_t * grid = (gridinfo_t *)data.superlu_dist_grid;
+        grid_ = (gridinfo_t *)data.superlu_dist_grid;
         
         // calculation options
         superlu_dist_options_t options;
         set_default_options_dist(&options);
-        options.ParSymbFact = YES;
-        options.ColPerm = METIS_AT_PLUS_A;
-        options.PrintStat = NO;
-        options.SymPattern = YES;
-//         options.ILU_DropRule = DROP_BASIC;
-//         options.ILU_DropTol = droptol;
+        options.PrintStat    = NO;
+        options.SymPattern   = YES;
+//         options.ILU_DropRule = /* DROP_BASIC */ 1;
+//         options.ILU_DropTol  = data.drop_tolerance;
         
         // distributed scale and permutation data
         ScalePermstructInit(A.nrow, A.ncol, &ScalePermstruct_);
@@ -152,7 +150,7 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex>
             nullptr,            // right hand sides (not used)
             A.nrow,             // right hand sides leading dimension
             0,                  // number of right hand sides (none, only factorizing)
-            grid,               // process grid
+            grid_,              // process grid
             &LUstruct_,         // factorization data
             berr,               // backward error
             &stat,              // diagnostic information
@@ -160,7 +158,7 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex>
         );
         
         superlu_dist_mem_usage_t mem_usage;
-        zQuerySpace_dist(A.nrow, &LUstruct_, grid, &stat, &mem_usage);
+        zQuerySpace_dist(A.nrow, &LUstruct_, grid_, &stat, &mem_usage);
         
         if (info > A.ncol)
             HexException("SuperLU/zgssvx: Memory allocation failure after %d bytes.", info);
@@ -198,14 +196,10 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         // calculation options
         superlu_dist_options_t options;
         set_default_options_dist(&options);
-        options.ParSymbFact = YES;
-        options.ColPerm = METIS_AT_PLUS_A;
-        options.PrintStat = NO;
-        options.SymPattern = YES;
-        options.Fact = FACTORED;
-        options.IterRefine = NOREFINE;
-//         options.ILU_DropRule = DROP_BASIC;
-//         options.ILU_DropTol = droptol;
+        options.PrintStat   = NO;
+        options.SymPattern  = YES;
+        options.Fact        = FACTORED;
+        options.IterRefine  = NOREFINE;
         
         // calculation diagnostic information
         SuperLUStat_t stat;
@@ -221,14 +215,18 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
         // status indicator
         int info;
         
+        // right-hand side
+        std::vector<std::complex<double>> X (b.size());
+        for (std::size_t i = 0; i < X.size(); i++)
+            X[i] = std::complex<double>(b[i].real(), b[i].imag());
+        
         // LU factorization
-        x = b;
         pzgssvx_ABglobal
         (
             &options,                                           // calculation options
             &A,                                                 // matrix to factorize
             const_cast<ScalePermstruct_t*>(&ScalePermstruct_),  // scaling and permutation data
-            const_cast<doublecomplex*>(reinterpret_cast<const doublecomplex*>(&x[0])), // right hand sides (assume packed)
+            const_cast<doublecomplex*>(reinterpret_cast<const doublecomplex*>(&X[0])), // right hand sides (assume packed)
             A.nrow,                                             // right hand sides leading dimension
             eqs,                                                // number of right hand sides
             grid_,                                              // process grid
@@ -242,6 +240,10 @@ void LUft_SUPERLU_DIST<LU_int_t,Complex>::solve (const cArrayView b, cArrayView 
             HexException("SuperLU/?gssvx: Memory allocation failure after %d bytes.", info);
         if (info > 0)
             HexException("SuperLU/?gssvx: Singular factor.");
+        
+        // solution
+        for (std::size_t i = 0; i < X.size(); i++)
+            x[i] = Complex(X[i].real(), X[i].imag());
     
     //
     // Clean up.

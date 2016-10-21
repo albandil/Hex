@@ -32,8 +32,7 @@
 #ifndef HEX_ILUPRECONDITIONER_H
 #define HEX_ILUPRECONDITIONER_H
 
-#include "hex-luft.h"
-
+#include "luft.h"
 #include "preconditioners.h"
 
 #ifdef _OPENMP

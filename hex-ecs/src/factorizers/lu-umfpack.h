@@ -29,138 +29,118 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#ifdef WITH_UMFPACK
+
+// --------------------------------------------------------------------------------- //
+
+#include <umfpack.h>
 
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
-#include "hex-luft.h"
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
-#define ICNTL(x) icntl[(x)-1]
-#define MUMPS_NOACTION      0
-#define MUMPS_INITIALIZE    (-1)
-#define MUMPS_FINISH        (-2)
-#define MUMPS_ANALYZE       1
-#define MUMPS_FACTORIZE     2
-#define MUMPS_SOLVE         3
-
-// --------------------------------------------------------------------------------- //
-
-#ifdef SINGLE
-    #include <cmumps_c.h>
-    #define MUMPS_STRUC_C CMUMPS_STRUC_C
-    #define MUMPS_C cmumps_c
-    #define MUMPS_COMPLEX mumps_float_complex
+#ifdef _LONGINT
+    #define UMFPACK_DEFAULTS_F          umfpack_zl_defaults
+    #define UMFPACK_SYMBOLIC_F          umfpack_zl_symbolic
+    #define UMFPACK_FREE_SYMBOLIC_F     umfpack_zl_free_symbolic
+    #define UMFPACK_NUMERIC_F           umfpack_zl_numeric
+    #define UMFPACK_SAVE_NUMERIC_F      umfpack_zl_save_numeric
+    #define UMFPACK_LOAD_NUMERIC_F      umfpack_zl_load_numeric
+    #define UMFPACK_FREE_NUMERIC_F      umfpack_zl_free_numeric
+    #define UMFPACK_SOLVE_F             umfpack_zl_solve
+    #define UMFPACK_GET_LUNZ_F          umfpack_zl_get_lunz
+    #define UMFPACK_REPORT_STATUS_F     umfpack_zl_report_status
+    #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zl_col_to_triplet
+    #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zl_triplet_to_col
 #else
-    #include <zmumps_c.h>
-    #define MUMPS_STRUC_C ZMUMPS_STRUC_C
-    #define MUMPS_C zmumps_c
-    #define MUMPS_COMPLEX mumps_double_complex
+    #define UMFPACK_DEFAULTS_F          umfpack_zi_defaults
+    #define UMFPACK_SYMBOLIC_F          umfpack_zi_symbolic
+    #define UMFPACK_FREE_SYMBOLIC_F     umfpack_zi_free_symbolic
+    #define UMFPACK_NUMERIC_F           umfpack_zi_numeric
+    #define UMFPACK_SAVE_NUMERIC_F      umfpack_zi_save_numeric
+    #define UMFPACK_LOAD_NUMERIC_F      umfpack_zi_load_numeric
+    #define UMFPACK_FREE_NUMERIC_F      umfpack_zi_free_numeric
+    #define UMFPACK_SOLVE_F             umfpack_zi_solve
+    #define UMFPACK_GET_LUNZ_F          umfpack_zi_get_lunz
+    #define UMFPACK_REPORT_STATUS_F     umfpack_zi_report_status
+    #define UMFPACK_COL_TO_TRIPLET_F    umfpack_zi_col_to_triplet
+    #define UMFPACK_TRIPLET_TO_COL_F    umfpack_zi_triplet_to_col
 #endif
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief LU factorization object - MUMPS specialization.
+ * @brief LU factorization object - UMFPACK specialization.
  * 
  * This class holds information on LU factorization as computed by the free
- * library MUMPS. It is derived from LUft and shares interface with that class.
- * 
- * @warning This class expect only symmetric matrices. The COO matrix passed
- * to this class should contain only upper or lower part of the matrix (together
- * with the main diagonal).
+ * library UMFPACK (part of SuiteSparse toolkit). It is derived from LUft and
+ * shares interface with that class.
  */
 template <class IdxT, class DataT>
-class LUft_MUMPS : public LUft<IdxT,DataT>
+class LUft_UMFPACK : public LUft<IdxT,DataT>
 {
     public:
-        
-        typedef struct
-        {
-            MUMPS_INT out_of_core;
-            MUMPS_INT verbosity_level;
-            MUMPS_INT comm;
-        }
-        Data;
-        
+    
         /// Default constructor.
-        LUft_MUMPS ();
+        LUft_UMFPACK ()
+            : LUft<IdxT,DataT>(), numeric_(nullptr), info_(UMFPACK_INFO) {}
         
         /// Destructor.
-        virtual ~LUft_MUMPS ();
+        virtual ~LUft_UMFPACK () { drop(); }
         
         // Disable bitwise copy
-        LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
+        LUft_UMFPACK const & operator= (LUft_UMFPACK const &) = delete;
         
         /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_MUMPS<IdxT,DataT>(); }
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_UMFPACK<IdxT,DataT>(); }
         
         /// Get name of the factorizer.
-        virtual std::string name () const { return "mumps"; }
+        virtual std::string name () const { return "umfpack"; }
         
         /// Factorize.
         virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
+        /// Return factorization information.
+        rArray const & info () const { return info_; }
+        
         /// Validity indicator.
-        virtual bool valid () const
-        {
-            return mmin(I.size(), J.size(), A.size()) > 0;
-        }
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const;
         
-        /// Condition number.
-        virtual Real cond () const
-        {
-            #define RINFO(x) rinfo[x-1]
-            return settings.RINFO(11);
-        }
+        /// Return condition number.
+        virtual Real cond () const;
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
-        /// Save large data to disk.
-        virtual void save (std::string name) const
-        {
-            I.hdfsave("I-" + name);
-            J.hdfsave("J-" + name);
-            A.hdfsave("A-" + name);
-        }
+        /// Save factorization data to disk.
+        virtual void save (std::string name) const;
         
-        /// Load large data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true)
-        {
-            if (not I.hdfload("I-" + name) or
-                not J.hdfload("J-" + name) or
-                not A.hdfload("A-" + name))
-            {
-                if (throw_on_io_failure)
-                    HexException("Failed to load MUMPS IJV matrices.");
-            }
-        }
+        /// Load factorization data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
         
         /// Release memory.
-        virtual void drop ()
-        {
-            I.drop();
-            J.drop();
-            A.drop();
-        }
+        virtual void drop ();
         
     private:
         
-        // Internal data of the library.
-        mutable MUMPS_STRUC_C settings;
+        /// Numeric decomposition as produced by UMFPACK.
+        void * numeric_;
         
-        // rank
-        MUMPS_INT n_;
+        /// Matrix data, needed for solution.
+        NumberArray<LU_int_t> p_;
+        NumberArray<LU_int_t> i_;
+        NumberArray<std::complex<double>> x_;
         
-        // data arrays
-        NumberArray<MUMPS_INT> I, J;
-        NumberArray<DataT> A;
+    public:
+        
+        /// Set of status flags produced by UMFPACK.
+        mutable rArray info_;
 };
 
-#endif // WITH_MUMPS
+#endif // WITH_UMFPACK

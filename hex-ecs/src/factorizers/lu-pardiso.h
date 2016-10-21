@@ -29,66 +29,112 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_PARDISO
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-lu-scalapack.h"
+#include "hex-csrmatrix.h"
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::LUft_SCALAPACK ()
-{
-    // nothing
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::drop ()
-{
-    
-}
-
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::~LUft_SCALAPACK ()
-{
-    // nothing
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
-{
-    
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::solve (const ArrayView<Complex> b, ArrayView<Complex> x, int eqs) const
-{
-    
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::save (std::string name) const
-{
-    
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
-{
-    
-}
-
-template<>
-std::size_t LUft_SCALAPACK<LU_int_t,Complex>::size () const
-{
-    return 0;
-}
+#define DPARM(x) dparm_[x-1]
+#define IPARM(x) iparm_[x-1]
 
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(SCALAPACK, LU_int_t, Complex)
+extern "C" void pardisoinit
+(
+    void *pt[64],
+    int *mtype,
+    int *solver,
+    int iparm[64],
+    double dparm[64],
+    int *error
+);
+
+extern "C" void pardiso
+(
+    void *pt[64],
+    int *maxfct,
+    int *mnum,
+    int *mtype,
+    int *phase,
+    int *n,
+    double a[],
+    int ia[],
+    int ja[],
+    int perm[],
+    int *nrhs,
+    int iparm[64],
+    int *msglvl,
+    double b[],
+    double x[],
+    int *error,
+    double dparm[64]
+);
 
 // --------------------------------------------------------------------------------- //
 
-#endif
+/**
+ * @brief LU factorization using Pardiso.
+ * 
+ * Uses direct sparse solver Pardiso.
+ */
+template <class IdxT, class DataT>
+class LUft_Pardiso : public LUft<IdxT,DataT>
+{
+    public:
+    
+        /// Default constructor.
+        LUft_Pardiso ();
+        
+        /// Destructor.
+        virtual ~LUft_Pardiso();
+        
+        // Disable bitwise copy
+        LUft_Pardiso const & operator= (LUft_Pardiso const &) = delete;
+        
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_Pardiso<IdxT,DataT>(); }
+        
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "pardiso"; }
+        
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        
+        /// Validity indicator.
+        virtual bool valid () const { return size() != 0; }
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const;
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save to disk.
+        virtual void save (std::string name) const;
+        
+        /// Load from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
+        
+        /// Release memory.
+        virtual void drop ();
+    
+    private:
+        
+        /// Matrix that has been factorized.
+        NumberArray<int> P_;
+        NumberArray<int> I_;
+        NumberArray<std::complex<double>> X_;
+        
+        /// Internal data of Pardiso.
+        void* pt_[64];
+        int iparm_[64];
+        double dparm_[64];
+};
+
+// --------------------------------------------------------------------------------- //
+
+#endif // WITH_PARDISO

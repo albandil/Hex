@@ -29,51 +29,55 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SUPERLU_DIST
+#ifdef WITH_SUPERLU
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-luft.h"
 #include "hex-csrmatrix.h"
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include <superlu_zdefs.h>
+#ifdef SINGLE
+    #include <slu_cdefs.h>
+#else
+    #include <slu_zdefs.h>
+#endif
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief LU factorization object - SuperLU-dist specialization.
+ * @brief LU factorization object - SuperLU specialization.
  * 
  * This class holds information on LU factorization as computed by the free
- * library SuperLU (distributed version). It is derived from LUft and
+ * library SuperLU (sequential version). It is derived from LUft and
  * shares interface with that class.
  */
 template <class IdxT, class DataT>
-class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
+class LUft_SUPERLU : public LUft<IdxT,DataT>
 {
     public:
-        
+    
         /// Default constructor.
-        LUft_SUPERLU_DIST ();
+        LUft_SUPERLU ();
         
         /// Destructor.
-        virtual ~LUft_SUPERLU_DIST ();
+        virtual ~LUft_SUPERLU () { drop(); }
         
         // Disable bitwise copy
-        LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &) = delete;
+        LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
         
         /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU_DIST<IdxT,DataT>(); }
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU<IdxT,DataT>(); }
         
         /// Get name of the factorizer.
-        virtual std::string name () const { return "superlu_dist"; }
+        virtual std::string name () const { return "superlu"; }
         
         /// Factorize.
         virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
         /// Validity indicator.
-        virtual bool valid () const { return size_ != 0; }
+        virtual bool valid () const;
         
         /// Return LU byte size.
         virtual std::size_t size () const { return size_; }
@@ -95,21 +99,40 @@ class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
         /// Matrix that has been factorized.
         NumberArray<int_t> P_;
         NumberArray<int_t> I_;
-        NumberArray<std::complex<double>> X_;
+        cArray X_;
         
-        // scaling and permutation data
-        ScalePermstruct_t ScalePermstruct_;
+        /// Row permutations.
+        iArray perm_c_;
         
-        // factorization data
-        LUstruct_t LUstruct_;
+        /// Column permutations.
+        iArray perm_r_;
         
-        // process grid
-        gridinfo_t * grid_;
+        /// Elimitation tree.
+        iArray etree_;
+        
+        /// Equilibration done.
+        char equed_;
+        
+        /// Row scale factors.
+        rArray R_;
+        
+        /// Column scale factors.
+        rArray C_;
+        
+        /// L-factor.
+        SuperMatrix L_;
+        
+        /// U-factor.
+        SuperMatrix U_;
+        
+        /// Reusable information.
+        GlobalLU_t Glu_;
         
         /// Memory size.
         std::size_t size_;
+        
+        /// Drop tolerance.
+        Real droptol_;
 };
 
-// --------------------------------------------------------------------------------- //
-
-#endif // WITH_SUPERLU_DIST
+#endif // WITH_SUPERLU

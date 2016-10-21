@@ -33,9 +33,9 @@
 
 #include "hex-arrays.h"
 #include "hex-csrmatrix.h"
-#include "hex-luft.h"
 #include "hex-misc.h"
 
+#include "luft.h"
 #include "preconditioners.h"
 #include "NoPreconditioner.h"
 
@@ -65,6 +65,11 @@ ILUCGPreconditioner::~ILUCGPreconditioner ()
 #ifdef _OPENMP
     omp_destroy_lock(&lu_lock_);
 #endif
+    
+#ifdef WITH_SUPERLU_DIST
+    if (cmd_.factorizer == "superlu_dist")
+        superlu_gridexit(&grid_);
+#endif
 }
 
 void ILUCGPreconditioner::reset_lu ()
@@ -82,22 +87,16 @@ void ILUCGPreconditioner::reset_lu ()
     // create process grid for SuperLU-dist
     if (cmd_.factorizer == "superlu_dist")
     {
-        // list processes
-        for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
+        int_t nprow = std::sqrt(par_.groupsize());
+        int_t npcol = par_.groupsize() / nprow;
+        
+        while (nprow * npcol != par_.groupsize())
         {
-            // list member processes
-            NumberArray<int_t> usermap;
-            for (int iproc = 0; iproc < cmd_.groupsize; iproc++)
-                usermap.push_back(igroup * cmd_.groupsize + iproc);
-            
-            // create the grid
-            gridinfo_t grid;
-            superlu_gridmap(MPI_COMM_WORLD, cmd_.groupsize, 1, &usermap[0], cmd_.groupsize, &grid);
-            
-            // assign this process to the grid, if it is member of current group
-            if (par_.isMyGroupWork(igroup))
-                grid_ = grid;
+            nprow--;
+            npcol = par_.groupsize() / nprow;
         }
+        
+        superlu_gridinit(par_.groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
 }

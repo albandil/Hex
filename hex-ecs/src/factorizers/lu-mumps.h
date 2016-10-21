@@ -29,110 +29,138 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SUPERLU
+#ifdef WITH_MUMPS
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-luft.h"
 #include "hex-csrmatrix.h"
+#include "luft.h"
+
+// --------------------------------------------------------------------------------- //
+
+#define ICNTL(x) icntl[(x)-1]
+#define MUMPS_NOACTION      0
+#define MUMPS_INITIALIZE    (-1)
+#define MUMPS_FINISH        (-2)
+#define MUMPS_ANALYZE       1
+#define MUMPS_FACTORIZE     2
+#define MUMPS_SOLVE         3
 
 // --------------------------------------------------------------------------------- //
 
 #ifdef SINGLE
-    #include <slu_cdefs.h>
+    #include <cmumps_c.h>
+    #define MUMPS_STRUC_C CMUMPS_STRUC_C
+    #define MUMPS_C cmumps_c
+    #define MUMPS_COMPLEX mumps_float_complex
 #else
-    #include <slu_zdefs.h>
+    #include <zmumps_c.h>
+    #define MUMPS_STRUC_C ZMUMPS_STRUC_C
+    #define MUMPS_C zmumps_c
+    #define MUMPS_COMPLEX mumps_double_complex
 #endif
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief LU factorization object - SuperLU specialization.
+ * @brief LU factorization object - MUMPS specialization.
  * 
  * This class holds information on LU factorization as computed by the free
- * library SuperLU (sequential version). It is derived from LUft and
- * shares interface with that class.
+ * library MUMPS. It is derived from LUft and shares interface with that class.
+ * 
+ * @warning This class expect only symmetric matrices. The COO matrix passed
+ * to this class should contain only upper or lower part of the matrix (together
+ * with the main diagonal).
  */
 template <class IdxT, class DataT>
-class LUft_SUPERLU : public LUft<IdxT,DataT>
+class LUft_MUMPS : public LUft<IdxT,DataT>
 {
     public:
-    
+        
+        typedef struct
+        {
+            MUMPS_INT out_of_core;
+            MUMPS_INT verbosity_level;
+            MUMPS_INT comm;
+        }
+        Data;
+        
         /// Default constructor.
-        LUft_SUPERLU ();
+        LUft_MUMPS ();
         
         /// Destructor.
-        virtual ~LUft_SUPERLU () { drop(); }
+        virtual ~LUft_MUMPS ();
         
         // Disable bitwise copy
-        LUft_SUPERLU const & operator= (LUft_SUPERLU const &) = delete;
+        LUft_MUMPS const & operator= (LUft_MUMPS const &) = delete;
         
         /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU<IdxT,DataT>(); }
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_MUMPS<IdxT,DataT>(); }
         
         /// Get name of the factorizer.
-        virtual std::string name () const { return "superlu"; }
+        virtual std::string name () const { return "mumps"; }
         
         /// Factorize.
         virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
         
         /// Validity indicator.
-        virtual bool valid () const;
+        virtual bool valid () const
+        {
+            return mmin(I.size(), J.size(), A.size()) > 0;
+        }
         
         /// Return LU byte size.
-        virtual std::size_t size () const { return size_; }
+        virtual std::size_t size () const;
+        
+        /// Condition number.
+        virtual Real cond () const
+        {
+            #define RINFO(x) rinfo[x-1]
+            return settings.RINFO(11);
+        }
         
         /// Solve equations.
         virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
         
-        /// Save factorization data to disk.
-        virtual void save (std::string name) const;
+        /// Save large data to disk.
+        virtual void save (std::string name) const
+        {
+            I.hdfsave("I-" + name);
+            J.hdfsave("J-" + name);
+            A.hdfsave("A-" + name);
+        }
         
-        /// Load factorization data from disk.
-        virtual void load (std::string name, bool throw_on_io_failure = true);
+        /// Load large data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true)
+        {
+            if (not I.hdfload("I-" + name) or
+                not J.hdfload("J-" + name) or
+                not A.hdfload("A-" + name))
+            {
+                if (throw_on_io_failure)
+                    HexException("Failed to load MUMPS IJV matrices.");
+            }
+        }
         
         /// Release memory.
-        virtual void drop ();
+        virtual void drop ()
+        {
+            I.drop();
+            J.drop();
+            A.drop();
+        }
         
     private:
         
-        /// Matrix that has been factorized.
-        NumberArray<int_t> P_;
-        NumberArray<int_t> I_;
-        cArray X_;
+        // Internal data of the library.
+        mutable MUMPS_STRUC_C settings;
         
-        /// Row permutations.
-        iArray perm_c_;
+        // rank
+        MUMPS_INT n_;
         
-        /// Column permutations.
-        iArray perm_r_;
-        
-        /// Elimitation tree.
-        iArray etree_;
-        
-        /// Equilibration done.
-        char equed_;
-        
-        /// Row scale factors.
-        rArray R_;
-        
-        /// Column scale factors.
-        rArray C_;
-        
-        /// L-factor.
-        SuperMatrix L_;
-        
-        /// U-factor.
-        SuperMatrix U_;
-        
-        /// Reusable information.
-        GlobalLU_t Glu_;
-        
-        /// Memory size.
-        std::size_t size_;
-        
-        /// Drop tolerance.
-        Real droptol_;
+        // data arrays
+        NumberArray<MUMPS_INT> I, J;
+        NumberArray<DataT> A;
 };
 
-#endif // WITH_SUPERLU
+#endif // WITH_MUMPS

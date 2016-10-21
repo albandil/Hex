@@ -41,7 +41,6 @@
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
-#include "hex-luft.h"
 
 /**
  * @brief Complex CSR matrix.

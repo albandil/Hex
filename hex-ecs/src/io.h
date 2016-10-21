@@ -38,9 +38,9 @@
 #include <string>
 
 #include "hex-arrays.h"
-#include "hex-luft.h"
 
 #include "bspline.h"
+#include "luft.h"
 #include "parallel.h"
 
 /**

@@ -29,77 +29,41 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_PARDISO
+#ifdef WITH_SCALAPACK
 
 // --------------------------------------------------------------------------------- //
 
-#include "hex-luft.h"
 #include "hex-csrmatrix.h"
-
-// --------------------------------------------------------------------------------- //
-
-#define DPARM(x) dparm_[x-1]
-#define IPARM(x) iparm_[x-1]
-
-// --------------------------------------------------------------------------------- //
-
-extern "C" void pardisoinit
-(
-    void *pt[64],
-    int *mtype,
-    int *solver,
-    int iparm[64],
-    double dparm[64],
-    int *error
-);
-
-extern "C" void pardiso
-(
-    void *pt[64],
-    int *maxfct,
-    int *mnum,
-    int *mtype,
-    int *phase,
-    int *n,
-    double a[],
-    int ia[],
-    int ja[],
-    int perm[],
-    int *nrhs,
-    int iparm[64],
-    int *msglvl,
-    double b[],
-    double x[],
-    int *error,
-    double dparm[64]
-);
+#include "luft.h"
 
 // --------------------------------------------------------------------------------- //
 
 /**
- * @brief LU factorization using Pardiso.
+ * @brief LU factorization using ScaLAPACK.
  * 
- * Uses direct sparse solver Pardiso.
+ * This is a really last-resort option tractable only for very small matrices.
+ * They are converted to a banded format (using reverse Cuthill McKee algorithm)
+ * and solved by a direct application of the banded PZGBTRF + PZGBTRS routines.
  */
 template <class IdxT, class DataT>
-class LUft_Pardiso : public LUft<IdxT,DataT>
+class LUft_SCALAPACK : public LUft<IdxT,DataT>
 {
     public:
     
         /// Default constructor.
-        LUft_Pardiso ();
+        LUft_SCALAPACK ();
         
         /// Destructor.
-        virtual ~LUft_Pardiso();
+        virtual ~LUft_SCALAPACK();
         
         // Disable bitwise copy
-        LUft_Pardiso const & operator= (LUft_Pardiso const &) = delete;
+        LUft_SCALAPACK const & operator= (LUft_SCALAPACK const &) = delete;
         
         /// New instance of the factorizer.
-        virtual LUft<IdxT,DataT> * New () const { return new LUft_Pardiso<IdxT,DataT>(); }
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SCALAPACK<IdxT,DataT>(); }
         
         /// Get name of the factorizer.
-        virtual std::string name () const { return "pardiso"; }
+        virtual std::string name () const { return "scalapack"; }
         
         /// Factorize.
         virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
@@ -137,4 +101,4 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
 
 // --------------------------------------------------------------------------------- //
 
-#endif // WITH_PARDISO
+#endif // WITH_SCALAPACK
