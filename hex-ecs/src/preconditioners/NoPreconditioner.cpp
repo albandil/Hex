@@ -161,7 +161,7 @@ void NoPreconditioner::update (Real E)
     // LU-factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> csr_S = rad_.S_full().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S;
-    lu_S.reset(LUft<LU_int_t,Complex>::Choose("any"));
+    lu_S.reset(LUft<LU_int_t,Complex>::Choose("lapack"));
     lu_S->factorize(csr_S);
     
     // outer one-electron overlap matrix
@@ -472,7 +472,7 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     // calculate LU-decomposition of the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr_full = rad_.S_full().tocoo<LU_int_t>().tocsr();
     std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_full;
-    lu_S_full.reset(LUft<LU_int_t,Complex>::Choose("any"));
+    lu_S_full.reset(LUft<LU_int_t,Complex>::Choose("lapack"));
     lu_S_full->factorize(S_csr_full);
     
     // j-overlaps of shape [Nangmom × Nspline]

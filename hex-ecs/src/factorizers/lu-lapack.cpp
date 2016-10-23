@@ -29,67 +29,108 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SCALAPACK
+// --------------------------------------------------------------------------------- //
+
+#include "hex-blas.h"
+#include "lu-lapack.h"
 
 // --------------------------------------------------------------------------------- //
 
-#include "lu-scalapack.h"
-
-// --------------------------------------------------------------------------------- //
-
 template<>
-LUft_SCALAPACK<LU_int_t,Complex>::LUft_SCALAPACK ()
-{
-    // nothing
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::drop ()
+LUft_LAPACK<LU_int_t,Complex>::LUft_LAPACK ()
+    : LUft<LU_int_t,Complex>()
 {
     
 }
 
 template<>
-LUft_SCALAPACK<LU_int_t,Complex>::~LUft_SCALAPACK ()
+void LUft_LAPACK<LU_int_t,Complex>::drop ()
 {
-    // nothing
+    LU_.drop();
+    ipiv_.drop();
 }
 
 template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
-{
-    
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::solve (const ArrayView<Complex> b, ArrayView<Complex> x, int eqs) const
+LUft_LAPACK<LU_int_t,Complex>::~LUft_LAPACK ()
 {
     
 }
 
 template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::save (std::string name) const
+void LUft_LAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
-    HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
+    // determine bandwidth
+    k_ = 0;
+    for (blas::Int irow = 0; irow < (blas::Int)matrix.p().size(); irow++)
+    {
+        for (blas::Int idx = matrix.p()[irow]; idx < (blas::Int)matrix.p()[irow + 1]; idx++)
+        {
+            blas::Int icol = matrix.i()[idx];
+            if (matrix.x()[idx] != 0.0_z)
+                k_ = std::max(k_, std::abs(irow - icol));
+        }
+    }
+    
+    // allocate pivot array and the working matrix
+    n_ = matrix.rows();
+    ipiv_.resize(n_);
+    LU_.resize((3*k_ + 1) * n_);
+    LU_.fill(0);
+    
+    // populate the input matrix
+    ColMatrixView<Complex> LU (3*k_ + 1, n_, LU_);
+    for (blas::Int irow = 0; irow < (blas::Int)matrix.p().size(); irow++)
+    {
+        for (blas::Int idx = matrix.p()[irow]; idx < (blas::Int)matrix.p()[irow + 1]; idx++)
+        {
+            blas::Int icol = matrix.i()[idx];
+            if (matrix.x()[idx] != 0.0_z)
+                LU(2*k_ + irow - icol, icol) = matrix.x()[idx];
+        }
+    }
+    
+    // factorize the symmetric banded matrix
+    blas::Int info = blas::sbtrf(n_, k_, LU_, ipiv_);
+    
+    // check success indicator
+    if (info < 0)
+        HexException("LAPACK: The argument %d has illegal value.", -info);
+    if (info > 0)
+        HexException("LAPACK: Matrix is singular.");
 }
 
 template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
+void LUft_LAPACK<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
+{
+    // solve the system
+    blas::Int info = blas::sbtrs(n_, k_, LU_, ipiv_, b, x);
+    
+    // check success indicator
+    if (info < 0)
+        HexException("LAPACK: The argument %d has illegal value.", -info);
+}
+
+template<>
+std::size_t LUft_LAPACK<LU_int_t,Complex>::size () const
+{
+    return LU_.size() * sizeof(Complex) + ipiv_.size() * sizeof(blas::Int);
+}
+
+template<>
+void LUft_LAPACK<LU_int_t,Complex>::save (std::string name) const
+{ 
+    HexException("LAPACK factorizer does not yet support --out-of-core option.");
+}
+
+template<>
+void LUft_LAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
 {
     if (throw_on_io_failure)
-        HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
-}
-
-template<>
-std::size_t LUft_SCALAPACK<LU_int_t,Complex>::size () const
-{
-    return 0;
+        HexException("LAPACK factorizer does not yet support --out-of-core option.");
 }
 
 // --------------------------------------------------------------------------------- //
 
-/* addFactorizerToRuntimeSelectionTable(SCALAPACK, LU_int_t, Complex) */
+addFactorizerToRuntimeSelectionTable(LAPACK, LU_int_t, Complex)
 
 // --------------------------------------------------------------------------------- //
-
-#endif

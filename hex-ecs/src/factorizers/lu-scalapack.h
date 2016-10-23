@@ -85,18 +85,6 @@ class LUft_SCALAPACK : public LUft<IdxT,DataT>
         
         /// Release memory.
         virtual void drop ();
-    
-    private:
-        
-        /// Matrix that has been factorized.
-        NumberArray<int> P_;
-        NumberArray<int> I_;
-        NumberArray<std::complex<double>> X_;
-        
-        /// Internal data of Pardiso.
-        void* pt_[64];
-        int iparm_[64];
-        double dparm_[64];
 };
 
 // --------------------------------------------------------------------------------- //

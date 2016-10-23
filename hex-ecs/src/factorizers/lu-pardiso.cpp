@@ -42,27 +42,88 @@
 // --------------------------------------------------------------------------------- //
 
 template<>
+void LUft_Pardiso<LU_int_t,Complex>::pardisoerror (int error) const
+{
+    switch (error)
+    {
+        case 0:
+            return;
+        case -1:
+            HexException("Pardiso: Input inconsistent.");
+        case -2:
+            HexException("Pardiso: Not enough memory.");
+        case -3:
+            HexException("Pardiso: Reordering problem.");
+        case -4:
+            HexException("Pardiso: Zero pivot, numerical fact. or iterative refinement problem.");
+        case -5:
+            HexException("Pardiso: Unclassified (internal) error.");
+        case -6:
+            HexException("Pardiso: Preordering failed.");
+        case -7:
+            HexException("Pardiso: Diagonal matrix problem.");
+        case -8:
+            HexException("Pardiso: 32-bit integer overflow problem.");
+        case -10:
+            HexException("Pardiso: No license file \"pardiso.lic\" found.");
+        case -11:
+            HexException("Pardiso: License is expired.");
+        case -12:
+            HexException("Pardiso: Wrong username or hostname.");
+        case -100:
+            HexException("Pardiso: Reached maximum number of Krylov-subspace iteration in iterative solver.");
+        case -101:
+            HexException("Pardiso: No sufficient convergence in Krylov-subspace iteration within 25 iterations.");
+        case -102:
+            HexException("Pardiso: Error in Krylov-subspace iteration.");
+        case -103:
+            HexException("Pardiso: Break-down in Krylov-subspace iteration.");
+        default:
+            HexException("Pardiso: Unknown error.");
+    }
+}
+
+template<>
 LUft_Pardiso<LU_int_t,Complex>::LUft_Pardiso ()
     : LUft<LU_int_t,Complex>()
 {
-    std::memset(pt_, 0, sizeof(pt_));
+    std::memset(pt_,    0, sizeof(pt_));
     std::memset(iparm_, 0, sizeof(iparm_));
     std::memset(dparm_, 0, sizeof(dparm_));
+    
+    int mtype  = 13;     // complex symmetric
+    int solver = 0;     // sparse direct solver
+    int error  = 0;     // success indicator
+    
+    pardisoinit(pt_, &mtype, &solver, iparm_, dparm_, &error);
+    pardisoerror(error);
+}
+
+template <>
+void LUft_Pardiso<LU_int_t,Complex>::drop ()
+{
+    int maxfct = 1;     // maximal number of numerical factorizations
+    int mtype  = 13;     // matrix type: complex symmetric
+    int phase  = -1;    // release all internal memory for all matrices
+    int msglvl = 0;     // verbosity
+    int error  = 0;     // success indicator
+    
+    int O      = 0;     // dummy integer
+    double D   = 0;     // dummy double
+    
+    pardiso(pt_, &maxfct, &O, &mtype, &phase, &O, &D, &O, &O, &O, &O, iparm_, &msglvl, &D, &D, &error, dparm_);
+    pardisoerror(error);
 }
 
 template<>
 LUft_Pardiso<LU_int_t,Complex>::~LUft_Pardiso ()
 {
-    // nothing
+    drop();
 }
 
 template<>
 void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
 {
-    int mtype = 6;  // complex symmetric
-    int solver = 0; // sparse direct solver
-    int error;
-    
     //
     // Cast matrix data to the data types expected by Pardiso (32-bit Int and 8-byte Real).
     //
@@ -70,12 +131,12 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
         // copy row pointers
         P_.resize(matrix.p().size());
         for (std::size_t i = 0; i < P_.size(); i++)
-            P_[i] = matrix.p()[i];
+            P_[i] = matrix.p()[i] + 1;
         
         // copy column indices
         I_.resize(matrix.i().size());
         for (std::size_t i = 0; i < I_.size(); i++)
-            I_[i] = matrix.i()[i];
+            I_[i] = matrix.i()[i] + 1;
         
         // copy elements
         X_.resize(matrix.x().size());
@@ -83,25 +144,16 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
             X_[i] = std::complex<double>(matrix.x()[i].real(), matrix.x()[i].imag());
     
     //
-    // Initialize Pardiso.
-    //
-    
-        std::memset(pt_, 0, sizeof(pt_));
-        std::memset(iparm_, 0, sizeof(iparm_));
-        std::memset(dparm_, 0, sizeof(dparm_));
-        
-        pardisoinit (pt_, &mtype, &solver, iparm_, dparm_, &error);
-    
-    //
     // Calculate the LU factorization.
     //
     
         int maxfct = 1;                 // maximal number of factorizations
-        int mnum = 1;                   // index of the matrix to factorize
-        int phase = 12;                 // analysis & numerical factorization
-        int n = P_.size() - 1;          // rank of the matrix
-        std::vector<double> perm (n);   // permutation
+        int mnum   = 1;                 // index of the matrix to factorize
+        int mtype  = 13;                 // complex symmetric
+        int phase  = 12;                // analysis & numerical factorization
+        int n      = P_.size() - 1;     // rank of the matrix
         int msglvl = 1;                 // verbosity
+        int error  = 0;                 // success indicator
         
         DPARM(5) = data.drop_tolerance;     // ILU drop tolerance
         
@@ -116,6 +168,10 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
         IPARM(52) = 1;
 #endif
         
+//         pardiso_chkmatrix(&mtype, &n, reinterpret_cast<double*>(X_.data()), const_cast<int*>(P_.data()), const_cast<int*>(I_.data()), &error);
+//         pardisoerror(error);
+        
+        std::cout << "FACTOR\n";
         pardiso
         (
             pt_,
@@ -136,9 +192,9 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
             &error,
             dparm_
         );
+        std::cout << "FACTOR OK\n";
         
-        if (error != 0)
-            HexException("Pardiso failed to factorize the matrix (code = %d).", error);
+        pardisoerror(error);
 }
 
 template <>
@@ -146,11 +202,11 @@ void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
 {
     int maxfct = 1;
     int mnum = 1;
-    int mtype = 6;
+    int mtype = 13;
     int phase = -1;
     int n = b.size();
     int msglvl = 1;
-    int error;
+    int error = 0;
     
     pardiso
     (
@@ -173,51 +229,16 @@ void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
         const_cast<double*>(dparm_)
     );
     
-    if (error != 0)
-        HexException("Pardiso failed to solve.");
+    pardisoerror(error);
 }
-
-template <>
-void LUft_Pardiso<LU_int_t,Complex>::drop ()
-{
-    int maxfct = 1;
-    int mnum = 1;
-    int mtype = 6;
-    int phase = -1;
-    int n = P_.size() - 1;
-    int msglvl = 1;
-    int error = 1;
-    
-    pardiso
-    (
-        pt_,
-        &maxfct,
-        &mnum,
-        &mtype,
-        &phase,
-        &n,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        iparm_,
-        &msglvl,
-        nullptr,
-        nullptr,
-        &error,
-        dparm_
-    );
-    
-    if (error != 0)
-        HexException("Pardiso failed to release memory.");
-}
-
 
 template <>
 std::size_t LUft_Pardiso<LU_int_t,Complex>::size () const
 {
-    return IPARM(18) * std::size_t(16);
+    // IPARM(18) is negative for invalid / uninitialized setups,
+    // but Hex-ecs is expecting zero
+    
+    return IPARM(18) > 0 ? IPARM(18) * std::size_t(16) : 0;
 }
 
 template<>
@@ -235,7 +256,7 @@ void LUft_Pardiso<LU_int_t,Complex>::load (std::string name, bool throw_on_io_fa
 
 // --------------------------------------------------------------------------------- //
 
-addFactorizerToRuntimeSelectionTable(Pardiso, LU_int_t, Complex)
+/* addFactorizerToRuntimeSelectionTable(Pardiso, LU_int_t, Complex) */
 
 // --------------------------------------------------------------------------------- //
 

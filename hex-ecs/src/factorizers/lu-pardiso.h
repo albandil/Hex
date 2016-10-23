@@ -34,6 +34,7 @@
 // --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+
 #include "luft.h"
 
 // --------------------------------------------------------------------------------- //
@@ -45,33 +46,43 @@
 
 extern "C" void pardisoinit
 (
-    void *pt[64],
-    int *mtype,
-    int *solver,
-    int iparm[64],
-    double dparm[64],
-    int *error
+    void *pt[64],       // internal data pointer
+    int *mtype,         // matrix type
+    int *solver,        // direct or iterative solver
+    int iparm[64],      // integer parameters
+    double dparm[64],   // real parameters
+    int *error          // error code
 );
 
 extern "C" void pardiso
 (
-    void *pt[64],
-    int *maxfct,
-    int *mnum,
-    int *mtype,
-    int *phase,
-    int *n,
-    double a[],
-    int ia[],
-    int ja[],
-    int perm[],
-    int *nrhs,
-    int iparm[64],
-    int *msglvl,
-    double b[],
-    double x[],
-    int *error,
-    double dparm[64]
+    void *pt[64],       // internal data pointer
+    int *maxfct,        // maximal number of factorizations with the same structure
+    int *mnum,          // matrix index (1 <= mnum <= maxfct)
+    int *mtype,         // matrix type
+    int *phase,         // solver execution phase
+    int *n,             // number of equations
+    double a[],         // matrix elements
+    int ia[],           // column pointers
+    int ja[],           // row indices
+    int perm[],         // custom fill-in reducing permutation
+    int *nrhs,          // number of right-hand sides
+    int iparm[64],      // integer parameters
+    int *msglvl,        // verbosity level
+    double b[],         // right-hand sides
+    double x[],         // solutions
+    int *error,         // error code
+    double dparm[64]    // real parameters
+);
+
+extern "C" void pardiso_chkmatrix
+(
+    int *mtype,         // matrix type
+    int *n,             // number of equations
+    double a[],         // matrix elements
+    int ia[],           // column pointers
+    int ja[],           // row indices
+    int *error          // error code
 );
 
 // --------------------------------------------------------------------------------- //
@@ -123,6 +134,9 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
         virtual void drop ();
     
     private:
+        
+        /// Inspect the returned success indicator.
+        void pardisoerror (int error) const;
         
         /// Matrix that has been factorized.
         NumberArray<int> P_;

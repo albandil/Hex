@@ -34,41 +34,34 @@ BLASLAPACKFLAGS = -DDISABLE_PARALLEL_PRECONDITION
 BLASLAPACKLIBS = -lopenblas
 
 # ---------------------------------------------------------------------------- #
-# SuiteSparse/UMFPACK                                                          #
-#  - needed for sparse matrix manipulation                                     #
-#  - default choice for LU factorization (e.g. in ILU preconditioner)          #
-#  - supports both LP64 (32-bit integer) and ILP64 (64-bit integer)            #
-#  - already the factorization of moderate matrices requires ILP64, so         #
-#    the flag -D_LONGINT is included by default                                #
+# LU decomposition libraries                                                   #
+# - strongly recommended, otherwise everything will be done using LAPACK       #
 # ---------------------------------------------------------------------------- #
 
+# SuiteSparse/UMFPACK
+# - ILP64 mode needed already for medium-size matrices (-D_LONGINT)
 SUITESPARSEFLAGS = -DWITH_UMFPACK -D_LONGINT
 SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 
-# ---------------------------------------------------------------------------- #
-# Other LU factorization libraries                                             #
-#  - these are optional                                                        #
-#  - use only one at a time                                                    #
-# ---------------------------------------------------------------------------- #
-
-# - sequential SuperLU with only 32-bit integer support
-# SUPERLUFLAGS = -DWITH_SUPERLU -U_LONGINT
+# Sequential SuperLU
+# SUPERLUFLAGS = -DWITH_SUPERLU
 # SUPERLULIBS = -lsuperlu
 
-# - distributed SuperLU + Metis compiled with 32-bit integer (LP64 mode)
+# Distributed SuperLU + ParMetis (LP64 mode)
 # SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -U_LONGINT
-# SUPERLUDISTLIBS = -lsuperlu_dist_lp64 -lmetis_lp64
+# SUPERLUDISTLIBS = -lsuperlu_dist_lp64 -lparmetis_lp64
 
-# - distributed SuperLU + Metis compiled with 64-bit integer (ILP64 mode)
+# Distributed SuperLU + ParMetis (ILP64 mode)
 # SUPERLUDISTFLAGS = -DWITH_SUPERLU_DIST -D_LONGINT
-# SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lmetis_ilp64
+# SUPERLUDISTLIBS = -lsuperlu_dist_ilp64 -lparmetis_ilp64
 
-# ---------------------------------------------------------------------------- #
-# MUMPS library for the out-of-core coupled solver.                            #
-# ---------------------------------------------------------------------------- #
-
+# Distributed MUMPS
 # MUMPSFLAGS = -DWITH_MUMPS
-# MUMPSLIBS = -lzmumps_seq
+# MUMPSLIBS = -lmumps
+
+# ScaLAPACK
+# SCALAPACKFLAGS = -DWITH_SCALAPACK
+# SCALAPACKLIBS = -lscalapack
 
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
@@ -128,14 +121,16 @@ endif
 BASECXX = $(shell basename $(CXX))
 
 # common source files
-COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen hex-luft hex-matrix \
-                 hex-misc hex-special hex-version
+COMMON_FILES   = hex-arrays hex-blas hex-hdffile hex-hydrogen \
+                 hex-matrix hex-misc hex-special hex-version
 COMMON_SOURCES = $(patsubst %,../common/%.cpp,$(COMMON_FILES))
 COMMON_OBJECTS = $(patsubst %,obj/$(BASECXX)/common/%.o,$(COMMON_FILES))
 COMMON_DEPS    = $(patsubst %,obj/$(BASECXX)/common/%.dep,$(COMMON_FILES))
 
 # source files specific to hex-ecs
-HEX_ECS_FILES   = amplitudes ang gauss bspline io main radial slater solver \
+HEX_ECS_FILES   = amplitudes ang gauss bspline io luft main radial slater solver \
+                  factorizers/lu-umfpack factorizers/lu-mumps factorizers/lu-superlu factorizers/lu-lapack \
+                  factorizers/lu-superlu-dist factorizers/lu-pardiso factorizers/lu-scalapack \
                   preconditioners/NoPreconditioner preconditioners/CGPreconditioner \
                   preconditioners/KPAPreconditioner preconditioners/ILUPreconditioner \
                   preconditioners/GPUPreconditioner preconditioners/HybPreconditioner \

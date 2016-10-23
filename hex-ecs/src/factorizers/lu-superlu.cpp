@@ -314,7 +314,7 @@ bool LUft_SUPERLU<LU_int_t,Complex>::valid () const
 template<>
 void LUft_SUPERLU<LU_int_t,Complex>::save (std::string name) const
 {
-    /*HexException("SuperLU factorizer does not yet support --out-of-core option.");*/
+    HexException("SuperLU factorizer does not yet support --out-of-core option.");
 }
 
 template<>

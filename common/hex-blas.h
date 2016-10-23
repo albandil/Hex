@@ -88,6 +88,11 @@ namespace blas
         Complex b,
         const cArrayView y
     );
+    
+    Int sbtrf (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv);
+    Int sbtrf (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv);
+    Int sbtrs (Int n, Int k, rArrayView ab, ArrayView<Int> ipiv, const rArrayView r, rArrayView x);
+    Int sbtrs (Int n, Int k, cArrayView ab, ArrayView<Int> ipiv, const cArrayView r, cArrayView x);
 }
 
 #endif

@@ -35,14 +35,89 @@
 // ---------------------------------------------------------------------------------- //
 
 // some used Blas prototypes (Fortran convention!)
-extern "C" void sgemv_ (char*, int*, int*, float*, float*, int*, float*, int*, float*, float*, int*);
-extern "C" void dgemv_ (char*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void cgemv_ (char*, int*, int*, std::complex<float>*, std::complex<float>*, int*, std::complex<float>*, int*, std::complex<float>*, std::complex<float>*, int*);
-extern "C" void zgemv_ (char*, int*, int*, std::complex<double>*, std::complex<double>*, int*, std::complex<double>*, int*, std::complex<double>*, std::complex<double>*, int*);
-extern "C" void sgemm_ (char*, char*, int*, int*, int*, float*, float*, int*, float*, int*, float*, float*, int*);
-extern "C" void dgemm_ (char*, char*, int*, int*, int*, double*, double*, int*, double*, int*, double*, double*, int*);
-extern "C" void cgemm_ (char*, char*, int*, int*, int*, std::complex<float>*, std::complex<float>*, int*, std::complex<float>*, int*, std::complex<float>*, std::complex<float>*, int*);
-extern "C" void zgemm_ (char*, char*, int*, int*, int*, std::complex<double>*, std::complex<double>*, int*, std::complex<double>*, int*, std::complex<double>*, std::complex<double>*, int*);
+
+extern "C" void sgemv_
+(
+    char*, blas::Int*, blas::Int*, float*, float*,
+    blas::Int*, float*, blas::Int*, float*, float*, blas::Int*
+);
+extern "C" void dgemv_
+(
+    char*, blas::Int*, blas::Int*, double*, double*,
+    blas::Int*, double*, blas::Int*, double*, double*, blas::Int*
+);
+extern "C" void cgemv_
+(
+    char*, blas::Int*, blas::Int*, std::complex<float>*, std::complex<float>*,
+    blas::Int*, std::complex<float>*, blas::Int*, std::complex<float>*,
+    std::complex<float>*, blas::Int*
+);
+extern "C" void zgemv_
+(
+    char*, blas::Int*, blas::Int*, std::complex<double>*, std::complex<double>*,
+    blas::Int*, std::complex<double>*, blas::Int*, std::complex<double>*,
+    std::complex<double>*, blas::Int*
+);
+extern "C" void sgemm_
+(
+    char*, char*, blas::Int*, blas::Int*, blas::Int*, float*, float*,
+    blas::Int*, float*, blas::Int*, float*, float*, blas::Int*
+);
+extern "C" void dgemm_
+(
+    char*, char*, blas::Int*, blas::Int*, blas::Int*, double*, double*,
+    blas::Int*, double*, blas::Int*, double*, double*, blas::Int*
+);
+extern "C" void cgemm_
+(
+    char*, char*, blas::Int*, blas::Int*, blas::Int*, std::complex<float>*, std::complex<float>*,
+    blas::Int*, std::complex<float>*, blas::Int*, std::complex<float>*, std::complex<float>*, blas::Int*
+);
+extern "C" void zgemm_
+(
+    char*, char*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*, std::complex<double>*, blas::Int*,
+    std::complex<double>*, blas::Int*, std::complex<double>*, std::complex<double>*, blas::Int*
+);
+extern "C" void sgbtrf_
+(
+    blas::Int*, blas::Int*, blas::Int*, blas::Int*, float*,
+    blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void dgbtrf_
+(
+    blas::Int*, blas::Int*, blas::Int*, blas::Int*, double*,
+    blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void cgbtrf_
+(
+    blas::Int*, blas::Int*, blas::Int*, blas::Int*, std::complex<float>*,
+    blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void zgbtrf_
+(
+    blas::Int*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*,
+    blas::Int*, blas::Int*, blas::Int*
+);
+extern "C" void sgbtrs_
+(
+    char*, blas::Int*, blas::Int*, blas::Int*, blas::Int*, float*,
+    blas::Int*, blas::Int*, float*, blas::Int*, blas::Int*
+);
+extern "C" void dgbtrs_
+(
+    char*, blas::Int*, blas::Int*, blas::Int*, blas::Int*, double*,
+    blas::Int*, blas::Int*, double*, blas::Int*, blas::Int*
+);
+extern "C" void cgbtrs_
+(
+    char*, blas::Int*, blas::Int*, blas::Int*, blas::Int*, std::complex<float>*,
+    blas::Int*, blas::Int*, std::complex<float>*, blas::Int*, blas::Int*
+);
+extern "C" void zgbtrs_
+(
+    char*, blas::Int*, blas::Int*, blas::Int*, blas::Int*, std::complex<double>*,
+    blas::Int*, blas::Int*, std::complex<double>*, blas::Int*, blas::Int*
+);
 
 // ---------------------------------------------------------------------------------- //
 
@@ -194,4 +269,67 @@ void blas::xpby (cArrayView x, Complex b, const cArrayView y)
     # pragma omp simd
     for (std::size_t i = 0; i < N; i++)
         px[i] += b * py[i];
+}
+
+blas::Int blas::sbtrf (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::Int> ipiv)
+{
+    blas::Int info;
+    blas::Int ldab = 3*k + 1;
+    
+#ifdef SINGLE
+    sgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
+#else
+    dgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
+#endif
+    
+    return info;
+}
+
+
+blas::Int blas::sbtrf (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::Int> ipiv)
+{
+    blas::Int info;
+    blas::Int ldab = 3*k + 1;
+    
+#ifdef SINGLE
+    cgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
+#else
+    zgbtrf_(&n, &n, &k, &k, &ab[0], &ldab, &ipiv[0], &info);
+#endif
+    
+    return info;
+}
+
+blas::Int blas::sbtrs (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::Int> ipiv, const rArrayView b, rArrayView x)
+{
+    blas::Int info;
+    blas::Int ldab = 3*k + 1;
+    blas::Int nrhs = b.size() / n;
+    char trans = 'N';
+    x = b;
+    
+#ifdef SINGLE
+    sgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+#else
+    dgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+#endif
+    
+    return info;
+}
+
+blas::Int blas::sbtrs (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::Int> ipiv, const cArrayView b, cArrayView x)
+{
+    blas::Int info;
+    blas::Int ldab = 3*k + 1;
+    blas::Int nrhs = b.size() / n;
+    char trans = 'N';
+    x = b;
+    
+#ifdef SINGLE
+    cgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+#else
+    zgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+#endif
+    
+    return info;
 }

@@ -29,67 +29,67 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_SCALAPACK
+#include "hex-csrmatrix.h"
 
-// --------------------------------------------------------------------------------- //
+#include "luft.h"
 
-#include "lu-scalapack.h"
-
-// --------------------------------------------------------------------------------- //
-
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::LUft_SCALAPACK ()
+/**
+ * @brief LU factorization using LAPACK.
+ * 
+ * This makes sense only for very small matrices.
+ */
+template <class IdxT, class DataT>
+class LUft_LAPACK : public LUft<IdxT,DataT>
 {
-    // nothing
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::drop ()
-{
+    public:
     
-}
-
-template<>
-LUft_SCALAPACK<LU_int_t,Complex>::~LUft_SCALAPACK ()
-{
-    // nothing
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> const & matrix, LUftData data)
-{
+        /// Default constructor.
+        LUft_LAPACK ();
+        
+        /// Destructor.
+        virtual ~LUft_LAPACK();
+        
+        // Disable bitwise copy
+        LUft_LAPACK const & operator= (LUft_LAPACK const &) = delete;
+        
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_LAPACK<IdxT,DataT>(); }
+        
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "lapack"; }
+        
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        
+        /// Validity indicator.
+        virtual bool valid () const { return size() != 0; }
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const;
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save to disk.
+        virtual void save (std::string name) const;
+        
+        /// Load from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
+        
+        /// Release memory.
+        virtual void drop ();
     
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::solve (const ArrayView<Complex> b, ArrayView<Complex> x, int eqs) const
-{
-    
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::save (std::string name) const
-{
-    HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
-}
-
-template<>
-void LUft_SCALAPACK<LU_int_t,Complex>::load (std::string name, bool throw_on_io_failure)
-{
-    if (throw_on_io_failure)
-        HexException("ScaLAPACK factorizer does not yet support --out-of-core option.");
-}
-
-template<>
-std::size_t LUft_SCALAPACK<LU_int_t,Complex>::size () const
-{
-    return 0;
-}
-
-// --------------------------------------------------------------------------------- //
-
-/* addFactorizerToRuntimeSelectionTable(SCALAPACK, LU_int_t, Complex) */
-
-// --------------------------------------------------------------------------------- //
-
-#endif
+    private:
+        
+        /// Factorization computed by xGBTRF use in xGBTRS.
+        cArray LU_;
+        
+        /// Pivot sequence.
+        NumberArray<blas::Int> ipiv_;
+        
+        /// Matrix rank.
+        blas::Int n_;
+        
+        /// Matrix half-bandwidth.
+        blas::Int k_;
+};
