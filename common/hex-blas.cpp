@@ -300,35 +300,33 @@ blas::Int blas::sbtrf (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::
     return info;
 }
 
-blas::Int blas::sbtrs (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::Int> ipiv, const rArrayView b, rArrayView x)
+blas::Int blas::sbtrs (blas::Int n, blas::Int k, rArrayView ab, ArrayView<blas::Int> ipiv, rArrayView bx)
 {
     blas::Int info;
     blas::Int ldab = 3*k + 1;
-    blas::Int nrhs = b.size() / n;
+    blas::Int nrhs = bx.size() / n;
     char trans = 'N';
-    x = b;
     
 #ifdef SINGLE
-    sgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+    sgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #else
-    dgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+    dgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #endif
     
     return info;
 }
 
-blas::Int blas::sbtrs (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::Int> ipiv, const cArrayView b, cArrayView x)
+blas::Int blas::sbtrs (blas::Int n, blas::Int k, cArrayView ab, ArrayView<blas::Int> ipiv, cArrayView bx)
 {
     blas::Int info;
     blas::Int ldab = 3*k + 1;
-    blas::Int nrhs = b.size() / n;
+    blas::Int nrhs = bx.size() / n;
     char trans = 'N';
-    x = b;
     
 #ifdef SINGLE
-    cgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+    cgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #else
-    zgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &x[0], &n, &info);
+    zgbtrs_(&trans, &n, &k, &k, &nrhs, &ab[0], &ldab, &ipiv[0], &bx[0], &n, &info);
 #endif
     
     return info;

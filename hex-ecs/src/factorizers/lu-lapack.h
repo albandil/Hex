@@ -81,6 +81,9 @@ class LUft_LAPACK : public LUft<IdxT,DataT>
     
     private:
         
+        /// Cuthill-McKee ordering.
+        NumberArray<LU_int_t> R_;
+        
         /// Factorization computed by xGBTRF use in xGBTRS.
         cArray LU_;
         
