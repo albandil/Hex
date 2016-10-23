@@ -743,6 +743,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
     cArray xs (points), ws (points);
     
     // for all knots
+    # pragma omp parallel for firstprivate (points,xs,ws,evalB,evalP)
     for (int iknot = 0; iknot < bspline.Nknot() - 1; iknot++)
     {
         // skip zero length intervals
@@ -778,6 +779,7 @@ cArray RadialIntegrals::overlapP (Bspline const & bspline, GaussLegendre const &
                 sum += ws[ipoint] * evalP[ipoint] * evalB[ipoint];
             
             // store the overlap
+            # pragma omp critical
             res[ispline] += sum;
         }
     }
@@ -806,7 +808,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
     cArray evalB ((order + 1) * points), evalj (points * (maxell + 1));
     
     // for all knots
-    # pragma omp parallel for firstprivate (xs,ws,evalB,evalj)
+    # pragma omp parallel for firstprivate (points,xs,ws,evalB,evalj)
     for (int iknot = 0; iknot < Nknot - 1; iknot++)
     {
         // skip zero length intervals
@@ -859,6 +861,7 @@ cArray RadialIntegrals::overlapj (Bspline const & bspline, GaussLegendre const &
                         sum += ws[ipoint] * evalj[ipoint * (maxell + 1) + l] * evalB[(iknot - ispline) * points + ipoint];
                     
                     // store the overlap; keep the shape Nmomenta × Nspline × (maxl+1)
+                    # pragma omp critical
                     res[(ie * (maxell + 1) + l) * Nspline + ispline] += sum;
                 }
             }
