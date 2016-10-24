@@ -29,7 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_PARDISO
+#if (defined(WITH_PARDISO) || defined(WITH_MKL))
 
 // --------------------------------------------------------------------------------- //
 
@@ -44,46 +44,73 @@
 
 // --------------------------------------------------------------------------------- //
 
+#ifdef WITH_MKL
+
+// old interfaces still in Intel MKL
+
 extern "C" void pardisoinit
 (
-    void *pt[64],       // internal data pointer
-    int *mtype,         // matrix type
-    int *solver,        // direct or iterative solver
-    int iparm[64],      // integer parameters
-    double dparm[64],   // real parameters
-    int *error          // error code
+    void* pt,               // internal data structure
+    const int* mtype,       // matrix type
+    int* iparm              // integer parameters
 );
 
 extern "C" void pardiso
 (
-    void *pt[64],       // internal data pointer
-    int *maxfct,        // maximal number of factorizations with the same structure
-    int *mnum,          // matrix index (1 <= mnum <= maxfct)
-    int *mtype,         // matrix type
-    int *phase,         // solver execution phase
-    int *n,             // number of equations
-    double a[],         // matrix elements
-    int ia[],           // column pointers
-    int ja[],           // row indices
-    int perm[],         // custom fill-in reducing permutation
-    int *nrhs,          // number of right-hand sides
-    int iparm[64],      // integer parameters
-    int *msglvl,        // verbosity level
-    double b[],         // right-hand sides
-    double x[],         // solutions
-    int *error,         // error code
-    double dparm[64]    // real parameters
+    void* pt,               // internal data structure
+    const int* maxfct,      // maximal number of factorizations
+    const int* mnum,        // factorization index
+    const int* mtype,       // matrix type
+    const int* phase,       // solver phase
+    const int* n,           // matrix rank
+    const void* a,          // matrix non-zero elements
+    const int* ia,          // matrix column pointers
+    const int* ja,          // matrix row indices
+    int* perm,              // permutation array
+    const int* nrhs,        // number of right-hand sides
+    int* iparm,             // integer parameters
+    const int* msglvl,      // verbosity level
+    void* b,                // right-hand sides
+    void* x,                // solutions
+    int* error              // status indicator
 );
 
-extern "C" void pardiso_chkmatrix
+#else
+
+// new interfaces (as of Pardiso 5.0.0)
+
+extern "C" void pardisoinit
 (
-    int *mtype,         // matrix type
-    int *n,             // number of equations
-    double a[],         // matrix elements
-    int ia[],           // column pointers
-    int ja[],           // row indices
-    int *error          // error code
+    void* pt,               // internal data structure
+    const int* mtype,       // matrix type
+    const int* solver,      // solver
+    int* iparm,             // integer parameters
+    double* dparm,          // real parameters
+    int* error              // status indicator
 );
+
+extern "C" void pardiso
+(
+    void* pt,               // internal data structure
+    const int* maxfct,      // maximal number of factorizations
+    const int* mnum,        // factorization index
+    const int* mtype,       // matrix type
+    const int* phase,       // solver phase
+    const int* n,           // matrix rank
+    const void* a,          // matrix non-zero elements
+    const int* ia,          // matrix column pointers
+    const int* ja,          // matrix row indices
+    int* perm,              // permutation array
+    const int* nrhs,        // number of right-hand sides
+    int* iparm,             // integer parameters
+    const int* msglvl,      // verbosity level
+    void* b,                // right-hand sides
+    void* x,                // solutions
+    int* error,             // status indicator
+    double* dparm           // double parameters
+);
+
+#endif
 
 // --------------------------------------------------------------------------------- //
 
@@ -143,6 +170,9 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
         NumberArray<int> I_;
         NumberArray<std::complex<double>> X_;
         
+        /// Permutation.
+        NumberArray<int> perm_;
+        
         /// Internal data of Pardiso.
         void* pt_[64];
         int iparm_[64];
@@ -151,4 +181,4 @@ class LUft_Pardiso : public LUft<IdxT,DataT>
 
 // --------------------------------------------------------------------------------- //
 
-#endif // WITH_PARDISO
+#endif // WITH_MKL or WITH_PARDISO

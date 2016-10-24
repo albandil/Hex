@@ -29,7 +29,7 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_PARDISO
+#if (defined(WITH_PARDISO) || defined(WITH_MKL))
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -95,15 +95,19 @@ LUft_Pardiso<LU_int_t,Complex>::LUft_Pardiso ()
     int solver = 0;     // sparse direct solver
     int error  = 0;     // success indicator
     
+#ifdef WITH_MKL
+    pardisoinit(pt_, &mtype, iparm_);
+#else
     pardisoinit(pt_, &mtype, &solver, iparm_, dparm_, &error);
     pardisoerror(error);
+#endif
 }
 
-template <>
+template<>
 void LUft_Pardiso<LU_int_t,Complex>::drop ()
 {
     int maxfct = 1;     // maximal number of numerical factorizations
-    int mtype  = 13;     // matrix type: complex symmetric
+    int mtype  = 13;    // matrix type: complex symmetric
     int phase  = -1;    // release all internal memory for all matrices
     int msglvl = 0;     // verbosity
     int error  = 0;     // success indicator
@@ -111,7 +115,12 @@ void LUft_Pardiso<LU_int_t,Complex>::drop ()
     int O      = 0;     // dummy integer
     double D   = 0;     // dummy double
     
+#ifdef WITH_MKL
+    pardiso(pt_, &maxfct, &O, &mtype, &phase, &O, &D, &O, &O, &O, &O, iparm_, &msglvl, &D, &D, &error);
+#else
     pardiso(pt_, &maxfct, &O, &mtype, &phase, &O, &D, &O, &O, &O, &O, iparm_, &msglvl, &D, &D, &error, dparm_);
+#endif
+    
     pardisoerror(error);
 }
 
@@ -149,29 +158,26 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
     
         int maxfct = 1;                 // maximal number of factorizations
         int mnum   = 1;                 // index of the matrix to factorize
-        int mtype  = 13;                 // complex symmetric
+        int mtype  = 13;                // complex symmetric
         int phase  = 12;                // analysis & numerical factorization
         int n      = P_.size() - 1;     // rank of the matrix
-        int msglvl = 1;                 // verbosity
+        int msglvl = 0;                 // verbosity
         int error  = 0;                 // success indicator
+        int nrhs   = 1;                 // number of right-hand sides
+        
+#ifdef WITH_PARDISO
+    #ifdef _OPENMP
+        IPARM(3) = omp_get_max_threads();
+    #else
+        IPARM(3) = 1;
+    #endif
+        IPARM(52) = data.groupsize;
+#endif
+        
+        perm_.resize(n);
         
         DPARM(5) = data.drop_tolerance;     // ILU drop tolerance
         
-#ifdef _OPENMP
-        IPARM(3) = omp_get_num_threads();   // OpenMP threads
-#else
-        IPARM(3) = 1;
-#endif
-#ifdef WITH_MPI
-        MPI_Comm_size(MPI_Comm_f2c(data.fortran_comm), &IPARM(52)); // number of MPI processes used for this factorization
-#else
-        IPARM(52) = 1;
-#endif
-        
-//         pardiso_chkmatrix(&mtype, &n, reinterpret_cast<double*>(X_.data()), const_cast<int*>(P_.data()), const_cast<int*>(I_.data()), &error);
-//         pardisoerror(error);
-        
-        std::cout << "FACTOR\n";
         pardiso
         (
             pt_,
@@ -181,31 +187,32 @@ void LUft_Pardiso<LU_int_t,Complex>::factorize (CsrMatrix<LU_int_t,Complex> cons
             &phase,
             &n,
             reinterpret_cast<double*>(X_.data()),
-            const_cast<int*>(P_.data()),
-            const_cast<int*>(I_.data()),
-            nullptr,
-            nullptr,
+            P_.data(),
+            I_.data(),
+            perm_.data(),
+            &nrhs,
             iparm_,
             &msglvl,
             nullptr,
             nullptr,
-            &error,
-            dparm_
+            &error
+#ifdef WITH_PARDISO
+            , dparm_
+#endif
         );
-        std::cout << "FACTOR OK\n";
         
         pardisoerror(error);
 }
 
-template <>
+template<>
 void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, int eqs) const
 {
     int maxfct = 1;
     int mnum = 1;
     int mtype = 13;
-    int phase = -1;
-    int n = b.size();
-    int msglvl = 1;
+    int phase = 33;
+    int n = b.size() / eqs;
+    int msglvl = 0;
     int error = 0;
     
     pardiso
@@ -219,20 +226,22 @@ void LUft_Pardiso<LU_int_t,Complex>::solve (const cArrayView b, cArrayView x, in
         const_cast<double*>(reinterpret_cast<const double*>(X_.data())),
         const_cast<int*>(P_.data()),
         const_cast<int*>(I_.data()),
-        nullptr,
+        const_cast<int*>(perm_.data()),
         &eqs,
         const_cast<int*>(iparm_),
         &msglvl,
         const_cast<double*>(reinterpret_cast<const double*>(b.data())),
         const_cast<double*>(reinterpret_cast<const double*>(x.data())),
-        &error,
-        const_cast<double*>(dparm_)
+        &error
+#ifdef WITH_PARDISO
+        , const_cast<double*>(dparm_)
+#endif
     );
     
     pardisoerror(error);
 }
 
-template <>
+template<>
 std::size_t LUft_Pardiso<LU_int_t,Complex>::size () const
 {
     // IPARM(18) is negative for invalid / uninitialized setups,
@@ -256,7 +265,7 @@ void LUft_Pardiso<LU_int_t,Complex>::load (std::string name, bool throw_on_io_fa
 
 // --------------------------------------------------------------------------------- //
 
-/* addFactorizerToRuntimeSelectionTable(Pardiso, LU_int_t, Complex) */
+addFactorizerToRuntimeSelectionTable(Pardiso, LU_int_t, Complex)
 
 // --------------------------------------------------------------------------------- //
 

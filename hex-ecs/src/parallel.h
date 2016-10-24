@@ -34,6 +34,8 @@
 
 #ifdef WITH_MPI
 #include <mpi.h>
+#else
+#define MPI_Comm std::intptr_t
 #endif
 
 #include "hex-arrays.h"

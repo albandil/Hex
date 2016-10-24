@@ -52,6 +52,7 @@ typedef struct
     bool out_of_core;
     int verbosity;
     int fortran_comm;
+    int groupsize;
     void * superlu_dist_grid;
 }
 LUftData;

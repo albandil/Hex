@@ -63,6 +63,16 @@ SUITESPARSELIBS = -lumfpack -lamd -lsuitesparseconfig
 # SCALAPACKFLAGS = -DWITH_SCALAPACK
 # SCALAPACKLIBS = -lscalapack
 
+# Intel MKL Pardiso
+# - incompatible with Pardiso 5.0.0
+# PARDISOFLAGS = -DWITH_MKL
+# PARDISOLIBS = -mkl
+
+# Pardiso 5.0.0
+# - incompatible with Intel MKL Pardiso
+# PARDISOFLAGS = -DWITH_PARDISO
+# PARDISOLIBS = -lpardiso500-MPI-GNU472-X86-64
+
 # ---------------------------------------------------------------------------- #
 # GSL                                                                          #
 # ---------------------------------------------------------------------------- #

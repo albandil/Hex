@@ -43,6 +43,7 @@ LUftData defaultLUftData =
     /* out_of_core */               , false
     /* verbosity */                 , 0
     /* Fortran MPI communicator */  , 0
+    /* groupsize */                 , 1
     /* superlu_dist_grid */         , nullptr
 };
 
