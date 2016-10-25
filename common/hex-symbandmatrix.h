@@ -578,8 +578,6 @@ public:
         
         DataT const * el = elems_.data();
         
-        std::cout << triangle << "\n";
-        
         // for all elements
         for (IdxT i = 0; i < (IdxT)n_; i++)
         for (IdxT d = 0; d < (IdxT)d_; d++)
