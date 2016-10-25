@@ -352,6 +352,13 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
     
     assert(x.size() == y.size());
     
+    for (std::size_t i = 0; i < x.size(); i++)
+        x[i] = a * x[i] + b * y[i];
+    
+/*
+ * FIXME : Why is this SOOOO SLOOOOOW ?
+ * 
+
     // calculate number of elements each node should process
     std::size_t N = (x.size() + par_.groupsize() - 1) / par_.groupsize();
     
@@ -375,6 +382,10 @@ void CGPreconditioner::CG_axby_operation (Complex a, cArrayView x, Complex b, co
             end - begin             // number of elements to synchronize
         );
     }
+
+ *
+ *
+ */
 }
 
 void CGPreconditioner::CG_constrain (cArrayView r) const

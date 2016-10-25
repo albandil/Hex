@@ -73,6 +73,10 @@ void ILUCGPreconditioner::reset_lu ()
         // prepare initial (empty) factorization data
         lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
         
+        // feedback to the user
+        if (iblock == 0 and cmd_.factorizer == "any")
+            std::cout << "\tUsing factorizer \"" << lu_[iblock]->name() << "\" (use --lu <factorizer> to change this)" << std::endl;
+        
         // associate existing disk files
         lu_[iblock]->link(format("lu-%d.ooc", iblock));
     }
@@ -213,7 +217,8 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         coo_block = CooMatrix<LU_int_t,Complex>();
         
         // set up factorization data
-        void * data = nullptr;
+        data_[iblock].drop_tolerance = cmd_.droptol;
+        data_[iblock].groupsize = cmd_.groupsize;
 #ifdef WITH_SUPERLU_DIST
         if (cmd_.factorizer == LUFT_SUPERLU_DIST)
             data = const_cast<gridinfo_t*>(&grid_);
@@ -262,12 +267,10 @@ void ILUCGPreconditioner::CG_init (int iblock) const
             }
         }
         
-        // save the diagonal block's CSR representation and its factorization
+        // save the diagonal block's factorization
         lu_[iblock]->link(format("lu-%d.bin", iblock));
         if (cmd_.outofcore)
-        {
             lu_[iblock]->save();
-        }
         
 #ifdef _OPENMP
         // release lock
@@ -305,9 +308,7 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
     
     // release memory
     if (cmd_.outofcore)
-    {
         lu_[iblock]->drop();
-    }
     
 #ifdef _OPENMP
     if (cmd_.factorizer == LUFT_MUMPS)

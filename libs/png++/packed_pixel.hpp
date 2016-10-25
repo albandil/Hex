@@ -65,12 +65,12 @@ namespace png
             return m_value;
         }
 
-        static size_t const get_bit_depth()
+        static size_t get_bit_depth()
         {
             return bits;
         }
 
-        static byte const get_bit_mask()
+        static byte get_bit_mask()
         {
             return (1 << bits) - 1;
         }
