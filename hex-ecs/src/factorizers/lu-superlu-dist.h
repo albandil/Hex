@@ -29,83 +29,87 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#ifdef WITH_SUPERLU_DIST
+
+// --------------------------------------------------------------------------------- //
 
 #include "hex-csrmatrix.h"
+#include "luft.h"
 
-#include "preconditioners.h"
+// --------------------------------------------------------------------------------- //
 
-const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
-    "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
+#include <superlu_zdefs.h>
 
-void CoupledPreconditioner::update (Real E)
+// --------------------------------------------------------------------------------- //
+
+/**
+ * @brief LU factorization object - SuperLU-dist specialization.
+ * 
+ * This class holds information on LU factorization as computed by the free
+ * library SuperLU (distributed version). It is derived from LUft and
+ * shares interface with that class.
+ */
+template <class IdxT, class DataT>
+class LUft_SUPERLU_DIST : public LUft<IdxT,DataT>
 {
-    HexException("The coupled preconditioner is broken in this version of the program!");
-    
-    // concatenate all matrix blocks
-    NumberArray<LU_int_t> I, J;
-    cArray A;
-    // TODO
-    
-    // convert the blocks to CSR
-    CsrMatrix<LU_int_t, Complex> csr;
-    // TODO
-    
-    // set up factorization data
-    LUftData data;
-    data.drop_tolerance = cmd_.droptol;
-#ifdef WITH_SUPERLU_DIST
-    if (cmd_.factorizer == "superlu_dist")
-    {
-        // TODO : setup grid
-    }
-#endif
-#ifdef WITH_MUMPS
-    if (cmd_.factorizer == "mumps")
-    {
-        data.out_of_core = cmd_.mumps_outofcore;
-        data.verbosity = cmd_.mumps_verbose;
-    #ifdef WITH_MPI
-        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
-    #else
-        data.fortran_comm = 0;
-    #endif
-    }
-#endif
-    
-    // factorize
-    lu_->factorize(csr, data);
-}
+    public:
+        
+        /// Default constructor.
+        LUft_SUPERLU_DIST ();
+        
+        /// Destructor.
+        virtual ~LUft_SUPERLU_DIST ();
+        
+        // Disable bitwise copy
+        LUft_SUPERLU_DIST const & operator= (LUft_SUPERLU_DIST const &) = delete;
+        
+        /// New instance of the factorizer.
+        virtual LUft<IdxT,DataT> * New () const { return new LUft_SUPERLU_DIST<IdxT,DataT>(); }
+        
+        /// Get name of the factorizer.
+        virtual std::string name () const { return "superlu_dist"; }
+        
+        /// Factorize.
+        virtual void factorize (CsrMatrix<IdxT,DataT> const & matrix, LUftData data);
+        
+        /// Validity indicator.
+        virtual bool valid () const { return size_ != 0; }
+        
+        /// Return LU byte size.
+        virtual std::size_t size () const { return size_; }
+        
+        /// Solve equations.
+        virtual void solve (const ArrayView<DataT> b, ArrayView<DataT> x, int eqs) const;
+        
+        /// Save factorization data to disk.
+        virtual void save (std::string name) const;
+        
+        /// Load factorization data from disk.
+        virtual void load (std::string name, bool throw_on_io_failure = true);
+        
+        /// Release memory.
+        virtual void drop ();
+        
+    private:
+        
+        /// Matrix that has been factorized.
+        NumberArray<int_t> P_;
+        NumberArray<int_t> I_;
+        NumberArray<std::complex<double>> X_;
+        
+        // scaling and permutation data
+        ScalePermstruct_t ScalePermstruct_;
+        
+        // factorization data
+        LUstruct_t LUstruct_;
+        
+        // process grid
+        gridinfo_t * grid_;
+        
+        /// Memory size.
+        std::size_t size_;
+};
 
-void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
-{
-    // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
-    
-    // convert block array to monolithic array
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        X[ill * Nchunk + i] = r[ill][i];
-    
-    // solve
-    lu_->solve(X, X, 1);
-    
-    // copy solution to result
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        z[ill][i] = X[ill * Nchunk + i];
-}
+// --------------------------------------------------------------------------------- //
 
-void CoupledPreconditioner::finish ()
-{
-    // delete the factorization object
-    lu_.reset();
-    
-    // finish parent class
-    NoPreconditioner::finish();
-}
-
-#endif // WITH_MUMPS
+#endif // WITH_SUPERLU_DIST

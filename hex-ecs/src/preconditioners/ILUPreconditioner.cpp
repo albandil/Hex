@@ -32,9 +32,10 @@
 #include <iostream>
 
 #include "hex-arrays.h"
-#include "hex-luft.h"
+#include "hex-csrmatrix.h"
 #include "hex-misc.h"
 
+#include "luft.h"
 #include "preconditioners.h"
 #include "NoPreconditioner.h"
 
@@ -52,7 +53,7 @@ ILUCGPreconditioner::ILUCGPreconditioner
     Bspline const & bspline_full,
     CommandLine const & cmd
 ) : CGPreconditioner(par, inp, ll, bspline_inner, bspline_full, cmd),
-    lu_(ll.states().size())
+    data_(ll.states().size()), lu_(ll.states().size())
 {
 #ifdef _OPENMP
     omp_init_lock(&lu_lock_);
@@ -64,6 +65,11 @@ ILUCGPreconditioner::~ILUCGPreconditioner ()
 #ifdef _OPENMP
     omp_destroy_lock(&lu_lock_);
 #endif
+    
+#ifdef WITH_SUPERLU_DIST
+    if (cmd_.factorizer == "superlu_dist")
+        superlu_gridexit(&grid_);
+#endif
 }
 
 void ILUCGPreconditioner::reset_lu ()
@@ -71,7 +77,7 @@ void ILUCGPreconditioner::reset_lu ()
     for (unsigned iblock = 0; iblock < ang_.states().size(); iblock++)
     {
         // prepare initial (empty) factorization data
-        lu_[iblock].reset(LUft<LU_int_t,Complex>::New(cmd_.factorizer));
+        lu_[iblock].reset(LUft<LU_int_t,Complex>::Choose(cmd_.factorizer));
         
         // feedback to the user
         if (iblock == 0 and cmd_.factorizer == "any")
@@ -83,24 +89,18 @@ void ILUCGPreconditioner::reset_lu ()
     
 #ifdef WITH_SUPERLU_DIST
     // create process grid for SuperLU-dist
-    if (cmd_.factorizer == LUFT_SUPERLU_DIST)
+    if (cmd_.factorizer == "superlu_dist")
     {
-        // list processes
-        for (int igroup = 0; igroup < par_.Nproc() / cmd_.groupsize; igroup++)
+        int_t nprow = std::sqrt(par_.groupsize());
+        int_t npcol = par_.groupsize() / nprow;
+        
+        while (nprow * npcol != par_.groupsize())
         {
-            // list member processes
-            NumberArray<int_t> usermap;
-            for (int iproc = 0; iproc < cmd_.groupsize; iproc++)
-                usermap.push_back(igroup * cmd_.groupsize + iproc);
-            
-            // create the grid
-            gridinfo_t grid;
-            superlu_gridmap(MPI_COMM_WORLD, cmd_.groupsize, 1, &usermap[0], cmd_.groupsize, &grid);
-            
-            // assign this process to the grid, if it is member of current group
-            if (par_.isMyGroupWork(igroup))
-                grid_ = grid;
+            nprow--;
+            npcol = par_.groupsize() / nprow;
         }
+        
+        superlu_gridinit(par_.groupcomm(), nprow, npcol, &grid_);
     }
 #endif // WITH_SUPERLU_DIST
 }
@@ -220,26 +220,26 @@ void ILUCGPreconditioner::CG_init (int iblock) const
         data_[iblock].drop_tolerance = cmd_.droptol;
         data_[iblock].groupsize = cmd_.groupsize;
 #ifdef WITH_SUPERLU_DIST
-        if (cmd_.factorizer == LUFT_SUPERLU_DIST)
-            data = const_cast<gridinfo_t*>(&grid_);
+        if (cmd_.factorizer == "superlu_dist")
+        {
+            data_[iblock].superlu_dist_grid = const_cast<gridinfo_t*>(&grid_);
+        }
 #endif
 #ifdef WITH_MUMPS
-        MUMPS_INT mumps_data[3];
-        if (cmd_.factorizer == LUFT_MUMPS)
+        if (cmd_.factorizer == "mumps")
         {
-            mumps_data[0] = cmd_.mumps_outofcore;
-            mumps_data[1] = cmd_.mumps_verbose;
+            data_[iblock].out_of_core = cmd_.mumps_outofcore;
+            data_[iblock].verbosity = cmd_.mumps_verbose;
     #ifdef WITH_MPI
-            mumps_data[2] = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
+            data_[iblock].fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
     #else
-            mumps_data[2] = 0;
+            data_[iblock].fortran_comm = 0;
     #endif
-            data = mumps_data;
         }
 #endif
         
         // factorize the block and store it
-        lu_[iblock] = csr.factorize(cmd_.droptol, cmd_.factorizer, data);
+        lu_[iblock]->factorize(csr, data_[iblock]);
         
         // print time and memory info for this block (one thread at a time)
         # pragma omp critical
@@ -283,14 +283,14 @@ void ILUCGPreconditioner::CG_init (int iblock) const
 void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z) const
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
     // precondition by LU
     lu_[iblock]->solve(r, z, 1);
     
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
     {
 #ifdef _OPENMP
         omp_unset_lock(&lu_lock_);
@@ -302,7 +302,7 @@ void ILUCGPreconditioner::CG_prec (int iblock, const cArrayView r, cArrayView z)
 void ILUCGPreconditioner::CG_exit (int iblock) const
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
@@ -311,7 +311,7 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
         lu_[iblock]->drop();
     
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
     
@@ -322,14 +322,14 @@ void ILUCGPreconditioner::CG_exit (int iblock) const
 void ILUCGPreconditioner::finish ()
 {
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_set_lock(&lu_lock_);
 #endif
     
     lu_.resize(0);
     
 #ifdef _OPENMP
-    if (cmd_.factorizer == LUFT_MUMPS)
+    if (cmd_.factorizer == "mumps")
         omp_unset_lock(&lu_lock_);
 #endif
     

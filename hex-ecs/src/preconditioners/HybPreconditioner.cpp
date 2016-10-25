@@ -38,8 +38,15 @@ const std::string HybCGPreconditioner::prec_description = "Combination of ILU an
 
 bool HybCGPreconditioner::ilu_needed (int iblock) const
 {
-    return Nchan_[iblock].first > 0
-        or Nchan_[iblock].second > 0;
+    // angular momenta of the electrons
+    int l1 = ang_.states()[iblock].first;
+    int l2 = ang_.states()[iblock].second;
+    
+    // shift the maximal principal quantum number to be solver by ILU
+    int max_n = max_n_ + cmd_.hyb_additional_levels;
+    
+    // number of channels when r1 -> inf (i.e. second electron is bound)
+    return (inp_.Zp < 0 and max_n > l1) or max_n > l2;
 }
 
 void HybCGPreconditioner::setup ()

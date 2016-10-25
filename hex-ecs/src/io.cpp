@@ -38,6 +38,7 @@
 
 #include "hex-arrays.h"
 #include "hex-cmdline.h"
+#include "hex-csrmatrix.h"
 #include "hex-matrix.h"
 
 #include "io.h"
@@ -186,6 +187,7 @@ void CommandLine::parse (int argc, char* argv[])
 //                     "\t--lightweight-radial-cache (-l)  Do not precalculate two-electron integrals and only apply them on the fly (slower, but saves RAM).                     \n"
                     "\t--lightweight-full         (-L)  Avoid precalculating all large matrices and only apply them on the fly (only available for KPA preconditioner).        \n"
                     "\t--kpa-simple-rad           (-R)  Use simplified radial integral matrix for nested KPA iterations (experimental).                                        \n"
+                    "\t--hyb-additional-levels <number> When using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold.      \n"
 #ifdef WITH_MUMPS
                     "\t--coupling-limit                 Maximal multipole to be considered by the coupled preconditioner.                                                      \n"
                     "\t--mumps-out-of-core              Use out-of-core capability of MUMPS (this is independent on --out-of-core option).                                     \n"
@@ -231,16 +233,7 @@ void CommandLine::parse (int argc, char* argv[])
         "lu", "F", 1, [&](std::vector<std::string> const & optargs) -> bool
             {
                 // choose factorizer
-                if (optargs[0] == "umfpack")
-                    factorizer = LUFT_UMFPACK;
-                else if (optargs[0] == "superlu")
-                    factorizer = LUFT_SUPERLU;
-                else if (optargs[0] == "superlu_dist")
-                    factorizer = LUFT_SUPERLU_DIST;
-                else if (optargs[0] == "mumps")
-                    factorizer = LUFT_MUMPS;
-                else
-                    HexException("Unknown LU-factorizer '%s'.", optargs[0].c_str());
+                factorizer = optargs[0];
                 return true;
             },
         "groupsize", "G", 1, [&](std::vector<std::string> const & optargs) -> bool
@@ -380,6 +373,12 @@ void CommandLine::parse (int argc, char* argv[])
             {
                 // use simplified radial matrix for KPA nested iterations
                 kpa_simple_rad = true;
+                return true;
+            },
+        "hyb-additional-levels", "", 1, [&](std::vector<std::string> const & optargs) -> bool
+            {
+                // when using the HYB preconditioner: precondition more blocks with ILU, useful close below an excitation threshold
+                hyb_additional_levels = std::stoi(optargs[0]);
                 return true;
             },
         "no-lu-update", "", 0, [&](std::vector<std::string> const & optargs) -> bool
@@ -951,7 +950,9 @@ void zip_solution
     
     // factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr = r.S_inner().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu = S_csr.factorize();
+    std::shared_ptr<LUft<LU_int_t,Complex>> S_lu;
+    S_lu.reset(LUft<LU_int_t,Complex>::Choose(cmd.factorizer));
+    S_lu->factorize(S_csr);
     
     // compute all needed bound states
     cArrays Xp1 (Nchan2), Sp1 (Nchan2), Xp2 (Nchan1), Sp2 (Nchan1);

@@ -32,6 +32,7 @@
 #include <iostream>
 
 #include "hex-arrays.h"
+#include "hex-csrmatrix.h"
 #include "hex-misc.h"
 #include "hex-openmp.h"
 
@@ -159,7 +160,9 @@ void NoPreconditioner::update (Real E)
     
     // LU-factorize the overlap matrix
     CsrMatrix<LU_int_t,Complex> csr_S = rad_.S_full().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft<LU_int_t,Complex>> lu_S = csr_S.factorize();
+    std::shared_ptr<LUft<LU_int_t,Complex>> lu_S;
+    lu_S.reset(LUft<LU_int_t,Complex>::Choose("lapack"));
+    lu_S->factorize(csr_S);
     
     // outer one-electron overlap matrix
     SymBandMatrix<Complex> S_outer (Nspline_outer, order + 1);
@@ -468,7 +471,9 @@ void NoPreconditioner::rhs (BlockArray<Complex> & chi, int ie, int instate) cons
     
     // calculate LU-decomposition of the overlap matrix
     CsrMatrix<LU_int_t,Complex> S_csr_full = rad_.S_full().tocoo<LU_int_t>().tocsr();
-    std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_full = S_csr_full.factorize();
+    std::shared_ptr<LUft<LU_int_t,Complex>> lu_S_full;
+    lu_S_full.reset(LUft<LU_int_t,Complex>::Choose("lapack"));
+    lu_S_full->factorize(S_csr_full);
     
     // j-overlaps of shape [Nangmom × Nspline]
     cArray ji_overlaps_full = rad_.overlapj(rad_.bspline_full(), rad_.gaussleg_full(), inp_.maxell, ki, weightEdgeDamp(rad_.bspline_full()), cmd_.fast_bessel);

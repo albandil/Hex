@@ -29,83 +29,48 @@
 //                                                                                   //
 //  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  //
 
-#ifdef WITH_MUMPS
+#include "luft.h"
 
-#include "hex-csrmatrix.h"
+// --------------------------------------------------------------------------------- //
 
-#include "preconditioners.h"
+std::shared_ptr<std::vector<LUft<LU_int_t,Complex>*>> LU;
 
-const std::string CoupledPreconditioner::prec_name = "coupled";
-const std::string CoupledPreconditioner::prec_description = "Coupled preconditioner that uses LU decomposition "
-    "of a matrix composed of all diagonal and selected off-diagonal blocks. This is just a testing feature "
-    "and is likely to severely exceed your RAM. Usage of '--lu mumps' is more or less mandatory, and even that "
-    "may prove insufficient.";
+// --------------------------------------------------------------------------------- //
 
-void CoupledPreconditioner::update (Real E)
+LUftData defaultLUftData =
 {
-    HexException("The coupled preconditioner is broken in this version of the program!");
+    /* drop_tolerance */            1e-8
+    /* out_of_core */               , false
+    /* verbosity */                 , 0
+    /* Fortran MPI communicator */  , 0
+    /* groupsize */                 , 1
+    /* superlu_dist_grid */         , nullptr
+};
+
+// --------------------------------------------------------------------------------- //
+
+template<> LUft<LU_int_t,Complex> * LUft<LU_int_t,Complex>::Choose (std::string factorizer)
+{
+    if (LU.get() == nullptr)
+        HexException("No LU factorization method available.");
     
-    // concatenate all matrix blocks
-    NumberArray<LU_int_t> I, J;
-    cArray A;
-    // TODO
-    
-    // convert the blocks to CSR
-    CsrMatrix<LU_int_t, Complex> csr;
-    // TODO
-    
-    // set up factorization data
-    LUftData data;
-    data.drop_tolerance = cmd_.droptol;
-#ifdef WITH_SUPERLU_DIST
-    if (cmd_.factorizer == "superlu_dist")
+    for (LUft<LU_int_t,Complex> *lu : *LU)
     {
-        // TODO : setup grid
+        if (lu->name() == factorizer or factorizer == "any")
+        {
+            return lu->New();
+        }
     }
-#endif
-#ifdef WITH_MUMPS
-    if (cmd_.factorizer == "mumps")
-    {
-        data.out_of_core = cmd_.mumps_outofcore;
-        data.verbosity = cmd_.mumps_verbose;
-    #ifdef WITH_MPI
-        data.fortran_comm = MPI_Comm_c2f((ompi_communicator_t*) par_.groupcomm());
-    #else
-        data.fortran_comm = 0;
-    #endif
-    }
-#endif
     
-    // factorize
-    lu_->factorize(csr, data);
+    std::cout << "Error!" << std::endl;
+    std::cout << "  The LU factorizer \"" << factorizer << "\" is not available." << std::endl;
+    std::cout << "  The program may not be compiled with support for that factorizer." << std::endl;
+    std::cout << "  The available factorizers are: ";
+    
+    for (LUft<LU_int_t,Complex> *lu : *LU)
+        std::cout << "\"" << lu->name() << "\" ";
+    
+    std::cout << std::endl << std::endl;
+    
+    std::exit(1);
 }
-
-void CoupledPreconditioner::precondition (BlockArray<Complex> const & r, BlockArray<Complex> & z) const
-{
-    // some useful constants
-    std::size_t Nang = r.size(), Nchunk = r[0].size();
-    
-    // convert block array to monolithic array
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        X[ill * Nchunk + i] = r[ill][i];
-    
-    // solve
-    lu_->solve(X, X, 1);
-    
-    // copy solution to result
-    for (unsigned ill = 0; ill < Nang; ill++)
-    for (unsigned i = 0; i < Nchunk; i++)
-        z[ill][i] = X[ill * Nchunk + i];
-}
-
-void CoupledPreconditioner::finish ()
-{
-    // delete the factorization object
-    lu_.reset();
-    
-    // finish parent class
-    NoPreconditioner::finish();
-}
-
-#endif // WITH_MUMPS

@@ -41,7 +41,6 @@
 #include "hex-arrays.h"
 #include "hex-coomatrix.h"
 #include "hex-densematrix.h"
-#include "hex-luft.h"
 
 /**
  * @brief Complex CSR matrix.
@@ -253,100 +252,6 @@ public:
 #else
         HexException("The program was not built with PNG++ library (use -DWITH_PNG).");
 #endif // WITH_PNG
-    }
-    
-    /**
-     * @brief Compute (incomplete) LU factorization.
-     * 
-     * This function computes the LU factorization of the matrix. It uses
-     * the free UMFPACK library.
-     * 
-     * @param droptol Drop tolerance. If an element of the factorization matrices
-     *                should be in absolute value smaller than "droptol" the
-     *                library will omit it completely effectively making the result
-     *                more sparse.
-     * @return Special structure of the LUft type, holding opaque information about
-     *         the factorization.
-     */
-    std::shared_ptr<LUft<IdxT,DataT>> factorize
-    (
-        Real droptol = 0,
-        int use_library = LUFT_ANY,
-        void * data = nullptr
-    ) const
-    {
-        if (use_library == LUFT_ANY or use_library == LUFT_UMFPACK)
-        {
-#ifdef WITH_UMFPACK
-            return factorize_umfpack(droptol, data);
-#else
-            if (use_library != LUFT_ANY)
-                HexException("Program is not compiled with UMFPACK support (use -DWITH_UMFPACK).");
-#endif // WITH_UMFPACK
-        }
-        
-        if (use_library == LUFT_ANY or use_library == LUFT_SUPERLU)
-        {
-#ifdef WITH_SUPERLU
-            return factorize_superlu(droptol, data);
-#else
-            if (use_library != LUFT_ANY)
-                HexException("Program is not compiled with sequential SuperLU support (use -DWITH_SUPERLU).");
-#endif // WITH_SUPERLU
-        }
-        
-        if (use_library == LUFT_ANY or use_library ==  LUFT_SUPERLU_DIST)
-        {
-#ifdef WITH_SUPERLU_DIST
-            return factorize_superlu_dist(droptol, data);
-#else
-            if (use_library != LUFT_ANY)
-                HexException("Program is not compiled with distributed SuperLU support (use -DWITH_SUPERLU_DIST).");
-#endif // WITH_SUPERLU_DIST
-        }
-        
-        if (use_library == LUFT_ANY or use_library ==  LUFT_MUMPS)
-        {
-#ifdef WITH_MUMPS
-            return factorize_mumps(droptol, data);
-#else
-            if (use_library != LUFT_ANY)
-                HexException("Program is not compiled with MUMPS support (use -DWITH_MUMPS).");
-#endif // WITH_MUMPS
-        }
-        
-        HexException("Unsupported LU factorization method %d.", use_library);
-        return nullptr;
-    }
-    
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_umfpack (Real droptol = 0, void * data = nullptr) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu (Real droptol = 0, void * data = nullptr) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_superlu_dist (Real droptol = 0, void * data = nullptr) const;
-    std::shared_ptr<LUft<IdxT,DataT>> factorize_mumps (Real droptol = 0, void * data = nullptr) const;
-    
-    /**
-     * @brief Solve the Ax = b problem, where "b" can be a matrix.
-     * 
-     * Uses UMFPACK through the LUft::solve function.
-     * 
-     * @param b Complex vector containing column-major ordered data; it may be
-     *          a flattened matrix.
-     * @param eqs Number of columns.
-     * @return Array of roots in the same shape as "b".
-     */
-    NumberArray<DataT> solve (const ArrayView<DataT> b, int eqs = 1, int use_library = LUFT_UMFPACK) const
-    {
-        // only square matrices are allowed
-        assert(m_ == n_);
-        
-        // compute the LU factorization
-        std::shared_ptr<LUft<IdxT,DataT>> luft = factorize(use_library);
-        
-        // solve the equations
-        NumberArray<DataT> solution = luft->solve(b, eqs);
-        
-        // return
-        return solution;
     }
     
     /**

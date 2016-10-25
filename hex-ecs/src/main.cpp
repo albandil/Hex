@@ -84,9 +84,18 @@ int main (int argc, char* argv[])
     // Setup parallel environments
     //
     
-        // check some exclusive options
-        if (cmd.factorizer == LUFT_SUPERLU_DIST and not cmd.parallel)
-            HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
+        // some factorizers need MPI environment
+        if (not cmd.parallel)
+        {
+            if
+            (
+                cmd.factorizer == "superlu_dist" or
+                cmd.factorizer == "mumps"
+            )
+            {
+                HexException("You need to run the program using MPI launcher and with --mpi option to use the distributed SuperLU.");
+            }
+        }
         
         // setup MPI
         Parallel par (&argc, &argv, cmd.parallel, cmd.groupsize);

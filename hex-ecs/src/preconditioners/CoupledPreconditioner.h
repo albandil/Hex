@@ -82,6 +82,9 @@ class CoupledPreconditioner : public NoPreconditioner
     protected:
     
         // LU factorization data.
+        LUftData data_;
+        
+        // LU factorization.
         std::shared_ptr<LUft<LU_int_t,Complex>> lu_;
         
         // Workspace used for the solution.
